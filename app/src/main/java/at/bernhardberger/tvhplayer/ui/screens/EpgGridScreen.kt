@@ -138,13 +138,13 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
-import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabListState
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabReader
+import at.bernhardberger.tvhplayer.ui.components.TabContent
+import at.bernhardberger.tvhplayer.ui.components.tabFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
+import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
@@ -342,7 +342,7 @@ fun EpgGridScreen(
     // collector value that can arrive before this composition is replaced.
     val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
     val channelScope = channelScopeState.scope
-    val scopeMotion = rememberBrowseContentMotion(channelScope.activeTagId) {
+    val scopeMotion = rememberTabContentMotion(channelScope.activeTagId) {
         channelViewModel.scope.value.scope.activeTagId
     }
     val observationState = channelViewModel.observation.collectAsStateWithLifecycle()
@@ -1842,7 +1842,7 @@ fun EpgGridScreen(
                 }
             }
             Spacer(Modifier.height(4.dp))
-            BrowseTabContent(
+            TabContent(
                 motion = scopeMotion,
                 selectedKey = channelScope.activeTagId,
                 state = {
@@ -1874,13 +1874,13 @@ fun EpgGridScreen(
             val channelNumbers = frame.numbers
             val renderedWindowStartSec = frame.windowStart
             val windowEndSec = frame.windowEnd
-            val nowSecProvider = rememberBrowseTabReader(frame.nowSec)
+            val nowSecProvider = rememberTabReader(frame.nowSec)
             val tagNotice = frame.tagNotice
             val guideRecovering = frame.recovering
             val hasGuideRecoveryAction = frame.hasRecovery
             val needsGuideSettings = frame.needsSettings
             val permissionDenied = frame.permissionDenied
-            val channelListState = rememberBrowseTabListState(channelListState)
+            val channelListState = rememberTabListState(channelListState)
             val terminalReserve = guideTerminalViewportReserve(
                 frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
             )
@@ -1954,7 +1954,7 @@ fun EpgGridScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .then(if (owner.isCurrent) Modifier.focusRequester(gridFocus) else Modifier)
-                        .browseTabFocus()
+                        .tabFocus()
                         .onPreviewKeyEvent { event ->
                             if (!owner.isCurrent) return@onPreviewKeyEvent true
                             if (!initialFocusEnabled || !programmeFocusOwned) return@onPreviewKeyEvent false
@@ -1988,8 +1988,8 @@ fun EpgGridScreen(
                 ) {
                     itemsIndexed(channels, key = { _, channel -> channel.id.value }) {
                             channelIndex, channel ->
-                        val selected = rememberBrowseTabReader(frame.selected)()
-                        val coveragePending = rememberBrowseTabReader { frame.coveragePending(channel.id) }()
+                        val selected = rememberTabReader(frame.selected)()
+                        val coveragePending = rememberTabReader { frame.coveragePending(channel.id) }()
                         TimelineChannelRow(
                             channel = channel,
                             channelIndex = channelIndex,

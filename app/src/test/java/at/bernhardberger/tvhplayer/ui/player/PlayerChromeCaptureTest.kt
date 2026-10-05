@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -22,6 +23,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
@@ -34,6 +39,8 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
+import at.bernhardberger.tvheadend.sdk.core.EpgRating
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -49,6 +56,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
+import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
@@ -61,6 +69,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
@@ -71,8 +80,11 @@ import java.util.Locale
 import java.util.TimeZone
 import kotlin.time.Instant
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.platform.testTag
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -87,6 +99,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import org.robolectric.shadows.ShadowDialog
 
 /**
  * Player chrome evidence: the production slots (info bar, bar row with its state
@@ -247,20 +260,29 @@ class PlayerChromeCaptureTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = captures("de", 1.3f)
 
+    @Test fun programmeDetailsEnglish() = captures("en", 1f, programmeOnly = true)
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
+    fun programmeDetailsGerman() = captures("de", 1f, programmeOnly = true)
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
+    fun programmeDetailsGermanLargeText() = captures("de", 1.3f, programmeOnly = true)
+
     private enum class Scene {
         CONTROLS_LIVE, CONTROLS_NO_LOGO, CONTROLS_BEHIND, CONTROLS_PAUSED, BANNER_TUNING, BANNER_BEHIND, BANNER_STEP, TRAY_ART, TRAY_TEXT,
-        PROGRAMME_INFO, PROGRAMME_INFO_NO_EPG,
+        PROGRAMME_INFO, PROGRAMME_INFO_NO_EPG, PROGRAMME_INFO_NO_ART, PROGRAMME_INFO_NO_ART_RECORDING, PROGRAMME_SCHEDULE, PROGRAMME_OPENED,
+        PROGRAMME_MORE_INFO, RAIL_SCHEDULE, RAIL_PROGRAMME_OPENED, RAIL_PEEK, PROGRAMME_CONFIRM_RECORD, PROGRAMME_RECORDING_BUSY, PROGRAMME_RECORDING_SCHEDULED,
         // English at font scale 1.0 only (EN_ONLY).
         BANNER_LIVE, CONTROLS_BUFFERING, BANNER_PAUSED, BANNER_NO_EPG_BEHIND, HIDDEN_PAUSED, HIDDEN_BUFFERING, STEP_NEAR_END, STEP_NEAR_END_NO_ICON,
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE, CONTROLS_CARD_FOCUSED,
+        // Trial channel card: focused with the Recent hint, Recent open, the rail opened in place.
+        CHANNEL_CARD, CHANNEL_RECENT, CHANNEL_RAIL,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
     private var revealControls by mutableStateOf(false)
 
-    private fun captures(locale: String, fontScale: Float) {
+    private fun captures(locale: String, fontScale: Float, programmeOnly: Boolean = false) {
         lateinit var view: View
         var scene by mutableStateOf(Scene.CONTROLS_LIVE)
         compose.mainClock.autoAdvance = false
@@ -276,7 +298,10 @@ class PlayerChromeCaptureTest {
             }
         }
         // Recording and state scenes are captured in English at font scale 1.0 only.
-        for (next in Scene.entries.filter { it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f }) {
+        for (next in Scene.entries.filter {
+            if (programmeOnly) it in Scene.PROGRAMME_INFO..Scene.PROGRAMME_RECORDING_SCHEDULED
+            else it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f
+        }) {
             compose.runOnIdle { scene = next; revealControls = false }
             compose.waitForIdle()
             // Advance deterministic Compose time past page and panel motion; never reach a live service.
@@ -293,8 +318,53 @@ class PlayerChromeCaptureTest {
                 compose.waitForIdle()
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
+            if (next == Scene.CHANNEL_CARD) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
             if (next == Scene.CONTROLS_CARD_FOCUSED) {
                 compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
+            }
+            if (next == Scene.PROGRAMME_SCHEDULE) compose.onNodeWithTag("details-schedule-42").assertIsFocused()
+            if (next == Scene.RAIL_SCHEDULE) compose.onNodeWithTag("details-schedule-52").assertIsFocused()
+            if (next == Scene.RAIL_PROGRAMME_OPENED) compose.onNodeWithTag("details-record").assertIsFocused()
+            if (next == Scene.PROGRAMME_OPENED || next == Scene.RAIL_PROGRAMME_OPENED || next == Scene.RAIL_SCHEDULE) {
+                compose.onNodeWithTag("details-tabs").assertDoesNotExist()
+            }
+            if (next == Scene.PROGRAMME_CONFIRM_RECORD) {
+                compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.back)).assertIsFocused()
+            }
+            if (next == Scene.RAIL_PEEK) {
+                val peek = compose.onNodeWithTag("player-rail-schedule-peek").fetchSemanticsNode().boundsInRoot
+                assertEquals("the schedule heading peeks through the bottom edge", 1052f, peek.top, 1f)
+                assertEquals(1080f, peek.bottom, 1f)
+                val label = compose.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val playing = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val recording = compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue("the channel-row markers trail the label", label.right <= playing.left && playing.right < recording.left)
+            }
+            if (next == Scene.PROGRAMME_MORE_INFO) compose.onNodeWithTag("player-info-reading").assertIsFocused()
+            if (next == Scene.PROGRAMME_SCHEDULE || next == Scene.RAIL_SCHEDULE) {
+                val firstFallback = if (next == Scene.RAIL_SCHEDULE) 53 else 43
+                listOf(firstFallback, firstFallback + 2).forEach { id ->
+                    val row = hasAnyAncestor(hasTestTag("details-schedule-$id"))
+                    val mark = compose.onNode(hasTestTag("programme-fallback-mark") and row, useUnmergedTree = true)
+                        .fetchSemanticsNode().boundsInRoot
+                    val time = compose.onNode(hasTestTag("details-schedule-time") and row, useUnmergedTree = true)
+                        .fetchSemanticsNode().boundsInRoot
+                    assertTrue("the bitmap picon or number leaves the time slot free", mark.bottom + 7f <= time.top)
+                    assertTrue("compact marks fit their 80 × 28dp room", mark.width <= 161f && mark.height <= 57f)
+                }
+            }
+            if (next == Scene.PROGRAMME_INFO_NO_ART_RECORDING) {
+                val mark = compose.onNodeWithTag("programme-fallback-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val badge = compose.onNodeWithTag("details-recording-badge", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val progress = compose.onNodeWithTag("details-tile-progress", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue("REC belongs in the facts line, not over the picon", badge.top > progress.bottom)
+                assertTrue("the picon clears the embedded progress", mark.bottom < progress.top)
+            }
+            if (next == Scene.PROGRAMME_MORE_INFO) {
+                val information = compose.onNodeWithTag("details-information").fetchSemanticsNode().boundsInRoot
+                val reader = compose.onNodeWithTag("details-full-description").fetchSemanticsNode().boundsInRoot
+                assertEquals("one gutter separates identity and reading", 40f, reader.left - information.right, 1f)
+                assertTrue("reading uses the remaining six grid columns", reader.width >= 820f)
             }
             if (next == Scene.PROGRAMME_INFO) {
                 compose.onNodeWithTag("live-info-record").assertIsFocused()
@@ -306,11 +376,68 @@ class PlayerChromeCaptureTest {
             compose.onNodeWithTag("player-status-slot", useUnmergedTree = true).assertDoesNotExist()
             compose.onNodeWithTag("player-go-live", useUnmergedTree = true).assertDoesNotExist()
             val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            compose.runOnIdle {
+                val canvas = Canvas(bitmap)
+                view.draw(canvas)
+                if (next == Scene.PROGRAMME_CONFIRM_RECORD) ShadowDialog.getLatestDialog().window!!.decorView.draw(canvas)
+            }
             val directory = File("../artifacts/player-chrome").apply { mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale.png"
             File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
+            if (next == Scene.PROGRAMME_MORE_INFO) {
+                repeat(60) {
+                    compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                    compose.mainClock.advanceTimeBy(32)
+                    compose.waitForIdle()
+                }
+                compose.onNodeWithTag("player-info-reading").assertIsFocused()
+                val metadata = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+                compose.runOnIdle { view.draw(Canvas(metadata)) }
+                File(directory, "programme-more-info-end-$locale-font$fontScale.png").outputStream().use {
+                    metadata.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+                metadata.recycle()
+            }
+            if (next == Scene.PROGRAMME_SCHEDULE) {
+                val mark = compose.onAllNodesWithTag("programme-fallback-mark", useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot
+                val badge = compose.onNodeWithTag("player-rec-badge", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue("the compact picon stays clear of the shared REC badge", mark.right < badge.left)
+                compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+                compose.mainClock.advanceTimeBy(200)
+                compose.waitForIdle()
+                compose.onNodeWithTag("details-tab-1").assertIsFocused()
+                val tabs = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+                compose.runOnIdle { view.draw(Canvas(tabs)) }
+                File(directory, "programme-schedule-tabs-$locale-font$fontScale.png").outputStream().use {
+                    tabs.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+                tabs.recycle()
+                compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                compose.mainClock.advanceTimeBy(200)
+                compose.waitForIdle()
+                val initialViewport = compose.onNodeWithTag("details-schedule").fetchSemanticsNode().boundsInRoot
+                if (fontScale == 1f) {
+                    val fourth = compose.onNodeWithTag("details-schedule-45").fetchSemanticsNode().boundsInRoot
+                    val fifth = compose.onNodeWithTag("details-schedule-46").fetchSemanticsNode().boundsInRoot
+                    assertTrue("four full rows fit at normal text size", fourth.bottom < initialViewport.bottom - 64f)
+                    assertTrue("part of the fifth row previews below", fifth.top < initialViewport.bottom)
+                }
+                repeat(schedule.lastIndex) {
+                    compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                    repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+                }
+                compose.onNodeWithTag("details-schedule-46").assertIsFocused()
+                val viewport = compose.onNodeWithTag("details-schedule").fetchSemanticsNode().boundsInRoot
+                val focused = compose.onNodeWithTag("details-schedule-46").fetchSemanticsNode().boundsInRoot
+                assertTrue("focused scale and outline stay outside the fades", viewport.bottom - focused.bottom >= 72f && focused.top - viewport.top >= 72f)
+                val scrolled = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+                compose.runOnIdle { view.draw(Canvas(scrolled)) }
+                File(directory, "programme-schedule-last-$locale-font$fontScale.png").outputStream().use {
+                    scrolled.compress(Bitmap.CompressFormat.PNG, 100, it)
+                }
+                scrolled.recycle()
+            }
         }
     }
 
@@ -351,6 +478,13 @@ class PlayerChromeCaptureTest {
             Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
             Scene.CONTROLS_CARD_FOCUSED -> Controls(timeshift, behind, paused, content, focus = PlayerIdentityCardTag)
+            Scene.CHANNEL_CARD, Scene.CHANNEL_RECENT -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
+                channelCard = true, recentOpen = scene == Scene.CHANNEL_RECENT)
+            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content, channelCard = true, inPlaceRail = true,
+                recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
+                QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
+                    Modifier.padding(horizontal = PlayerChromeTokens.gridMargin))
+            })
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
             Scene.BANNER_LIVE -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
@@ -384,24 +518,65 @@ class PlayerChromeCaptureTest {
                 QuickZapTrayPreview(channels[0], if (scene == Scene.TRAY_ART) programme else programme.copyWithoutImage(),
                     next, NOW, loader, session, Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(64f)))
             })
-            Scene.PROGRAMME_INFO, Scene.PROGRAMME_INFO_NO_EPG -> LiveProgrammeInfoOverlay(
-                event = programme.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG },
-                channelIdentity = "101 • ORF 1 HD",
-                channelName = "ORF 1 HD",
-                recordingScheduled = false,
-                canRecord = true,
-                recordingState = LiveInfoRecordingState.Idle,
-                confirmationVisible = false,
-                restoreRecordFocus = false,
-                onRecord = {},
-                onRecordingActivate = {},
-                onRecordingDismiss = {},
-                onClose = {},
-                hero = {
-                    ProgrammeHero(programme.image, ChannelId(1), "101", LOGO, loader, session,
-                        Modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight))
-                },
-            )
+            Scene.PROGRAMME_INFO, Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_SCHEDULE,
+            Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_SCHEDULE, Scene.RAIL_PROGRAMME_OPENED,
+            Scene.PROGRAMME_CONFIRM_RECORD, Scene.PROGRAMME_RECORDING_BUSY, Scene.PROGRAMME_RECORDING_SCHEDULED -> {
+                val rail = scene == Scene.RAIL_SCHEDULE || scene == Scene.RAIL_PROGRAMME_OPENED
+                val shown = when {
+                    rail -> trayProgramme
+                    scene == Scene.PROGRAMME_INFO_NO_ART || scene == Scene.PROGRAMME_INFO_NO_ART_RECORDING || scene == Scene.PROGRAMME_SCHEDULE -> programme.copyWithoutImage()
+                    scene == Scene.PROGRAMME_MORE_INFO -> richProgramme
+                    else -> programme
+                }
+                val entries = if (rail) listOf(shown) + schedule.drop(1).mapIndexed { index, event ->
+                    EpgEvent.create(EventId(53L + index), ChannelId(2), event.start, event.stop,
+                        title = event.title, subtitle = event.subtitle, summary = event.summary, genre = event.genre)
+                } else listOf(shown) + schedule.drop(1)
+                val channel = if (rail) channels[1] else channels[0]
+                val identity = "${channel.number} · ${channel.name}"
+                val details = remember(scene) {
+                    ProgramDetailsState().apply {
+                        if (scene == Scene.PROGRAMME_SCHEDULE) tab = 1
+                        if (rail) reset(startOnSchedule = true)
+                        if (scene == Scene.PROGRAMME_OPENED) { tab = 1; open(schedule[2]) }
+                        if (scene == Scene.RAIL_PROGRAMME_OPENED) open(entries[2])
+                        if (scene == Scene.PROGRAMME_MORE_INFO) readMore = true
+                        if (scene == Scene.PROGRAMME_RECORDING_SCHEDULED) open(schedule[1])
+                    }
+                }
+                LiveProgrammeInfoOverlay(
+                    event = shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG },
+                    channelIdentity = identity,
+                    channelName = channel.name.orEmpty(),
+                    recordingScheduled = false,
+                    canRecord = true,
+                    recordingState = LiveInfoRecordingState.Idle,
+                    confirmationVisible = false,
+                    restoreRecordFocus = false,
+                    onRecord = {},
+                    onRecordingActivate = {},
+                    onRecordingDismiss = {},
+                    onClose = {},
+                    details = { recordFocus, firstFocus ->
+                        ProgramDetails(details, shown, entries, NOW, identity,
+                            tile = { event, modifier -> ProgrammeHero(event.image, channel.id, channel.number.toString(), channel.icon, loader, session, modifier,
+                                recordingBadge = scene == Scene.PROGRAMME_SCHEDULE && event.id == shown.id) },
+                            recordingFor = { event ->
+                                val state = when {
+                                    (scene == Scene.PROGRAMME_INFO_NO_ART_RECORDING || scene == Scene.PROGRAMME_SCHEDULE) && event.id == shown.id -> at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
+                                    event.id == entries[3].id || scene == Scene.PROGRAMME_RECORDING_SCHEDULED && event.id == entries[1].id -> at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED
+                                    else -> null
+                                }
+                                state?.let { at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), eventId = event.id, state = it) }
+                            }, canModifyRecordings = true,
+                            recordFocus = recordFocus, firstFocus = firstFocus, onAction = {},
+                            showWatch = rail, busy = scene == Scene.PROGRAMME_RECORDING_BUSY)
+                    },
+                )
+                if (scene == Scene.PROGRAMME_CONFIRM_RECORD) ConfirmProgrammeActionDialog(
+                    action = ProgrammeAction.RECORD, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
+                )
+            }
             // Back while paused hides the Banner: the paused chip stays alone at the state cell's place.
             Scene.HIDDEN_PAUSED -> PlayerHiddenStatusChip(state, liveBarEnd(203_000, null),
                 Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()))
@@ -552,7 +727,15 @@ class PlayerChromeCaptureTest {
         /** The step target's window; by default 3:53 behind live in [window]'s programme. */
         shown: ProgrammeWindow? = null,
         focus: String? = null,
+        /** Trial: the channel card, with three recent channels above it. */
+        channelCard: Boolean = false,
+        recentOpen: Boolean = false,
+        /** Trial: [tray] is the rail opened in place of the channel card. */
+        inPlaceRail: Boolean = false,
+        recordingChannels: Set<ChannelId> = emptySet(),
     ) {
+        var cardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+        Box(Modifier.fillMaxSize()) {
         val shown = shown ?: if (step != null) window.copy(positionFraction = 0.51f, estimatedPosition = Instant.fromEpochSeconds(NOW - 233)) else window
         PlayerChrome(
             mode = PlayerChromeMode.CONTROLS,
@@ -572,6 +755,19 @@ class PlayerChromeCaptureTest {
             imageLoader = loader,
             currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
+            onChannelStep = if (channelCard) { _, _ -> } else null,
+            onChannelZap = if (channelCard) { _, _ -> } else null,
+            onCardClick = if (channelCard) ({}) else null,
+            downHint = "Program info".takeIf { channelCard },
+            recents = if (channelCard) listOf(
+                RecentChannelPeek(null, "102", "ORF 2 HD", ChannelId(2), now = "Universum: Wildes Österreich"),
+                RecentChannelPeek(LOGO, "101", "ORF 1 HD", ChannelId(1), now = "Zeit im Bild"),
+                RecentChannelPeek(null, "103", "ServusTV HD Oesterreich", ChannelId(3), now = "Servus Nachrichten 19:20"),
+            ) else emptyList(),
+            onRecentPick = if (channelCard) ({}) else null,
+            recentRowOpen = recentOpen,
+            channelCardHeld = inPlaceRail,
+            onCardPlaced = { cardBounds = it },
             decorationCoversControls = tray != null,
             controlsDecoration = { emphasisAlpha, controls ->
                 QuickZapPresentation(
@@ -581,16 +777,22 @@ class PlayerChromeCaptureTest {
                     channelContent = {
                         if (tray != null) ChannelDrawer(
                             channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
-                            recordingChannelIds = emptySet(), nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
+                            recordingChannelIds = recordingChannels, nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
                             imageLoader = loader, currentSession = session, active = true, nowSec = NOW,
                             onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                            entryFocusId = ChannelId(1).takeIf { inPlaceRail },
+                            inPlace = inPlaceRail,
                         )
                     },
                     preview = { tray?.invoke() },
                     controls = controls,
+                    inPlaceAnchor = if (inPlaceRail) ({ cardBounds }) else null,
                 )
             },
         )
+        if (inPlaceRail) NowPlayingStrip("101", "ORF 1 HD", LOGO, programme, NOW, loader, session,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp))
+        }
     }
 
     @OptIn(SubscriptionInfrastructureApi::class)
@@ -623,6 +825,23 @@ class PlayerChromeCaptureTest {
             genre = "Drama", image = "imagecache/1")
         val next = EpgEvent.create(EventId(43), ChannelId(1), Instant.fromEpochSeconds(START + 90 * 60), Instant.fromEpochSeconds(START + 120 * 60),
             title = "Nachrichten")
+        val richProgramme = EpgEvent.create(programme.id, programme.channelId, programme.start, programme.stop,
+            title = programme.title, subtitle = programme.subtitle, summary = programme.summary,
+            description = "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive. ".repeat(5),
+            genre = "Drama", categories = listOf("Dokumentation", "Natur"), keywords = listOf("Alpen", "Bergwelt"),
+            episode = EpgEpisode(null, null, 2, null, 3, 6, null, null, "S2 E3"),
+            rating = EpgRating(6, null, null, null, null, 4), copyrightYear = 2025,
+            firstAired = Instant.fromEpochSeconds(START - 86400 * 180), isNew = true, image = programme.image)
+        val schedule = listOf(programme, next,
+            EpgEvent.create(EventId(44), ChannelId(1), Instant.fromEpochSeconds(START + 120 * 60), Instant.fromEpochSeconds(START + 165 * 60),
+                title = "Mountain Rescue", subtitle = "Storm Over the Ridge", image = "imagecache/7",
+                summary = "A storm traps three hikers below the ridge, and the team has one window to reach them before nightfall. " +
+                    "Meanwhile Lena has to decide whether she stays with the team after the season ends.", genre = "Action"),
+            EpgEvent.create(EventId(45), ChannelId(1), Instant.fromEpochSeconds(START + 165 * 60), Instant.fromEpochSeconds(START + 255 * 60),
+                title = "Universum: Wildes Österreich", genre = "Natur"),
+            EpgEvent.create(EventId(46), ChannelId(1), Instant.fromEpochSeconds(START + 255 * 60), Instant.fromEpochSeconds(START + 360 * 60),
+                title = "Northern Lights", genre = "Thriller"),
+        )
         val trayProgramme = EpgEvent.create(EventId(52), ChannelId(2), Instant.fromEpochSeconds(START), Instant.fromEpochSeconds(START + 90 * 60),
             title = "Universum: Wildes Österreich",
             summary = "Die Tierwelt der Alpen im Lauf eines Jahres, vom Frühling bis zum ersten Schnee.",

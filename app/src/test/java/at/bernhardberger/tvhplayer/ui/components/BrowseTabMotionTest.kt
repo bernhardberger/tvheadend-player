@@ -39,7 +39,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Tab
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
@@ -62,7 +61,7 @@ import kotlin.math.abs
 class BrowseTabMotionTest {
     @get:Rule val compose = createComposeRule()
     private val selected = mutableIntStateOf(0)
-    private lateinit var motion: BrowseContentMotion
+    private lateinit var motion: TabContentMotion
     private lateinit var view: View
     private val visits = mutableListOf<Visit>()
     private val labels = mutableMapOf<Int, LayoutCoordinates>()
@@ -195,23 +194,22 @@ class BrowseTabMotionTest {
                     view = LocalView.current
                     pillColor = MaterialTheme.colorScheme.onSurface.toArgb()
                     focusScrollDistance = LocalBringIntoViewSpec.current.calculateScrollDistance(0f, 100f, 600f)
-                    motion = rememberBrowseContentMotion(selected.intValue)
+                    motion = rememberTabContentMotion(selected.intValue)
                     Column(Modifier.size(600.dp, 300.dp).background(Color.Black)) {
                         Text("Header", Modifier.onGloballyPositioned { header = it })
-                        BrowseTabRow(selected.intValue, Modifier.fillMaxWidth()) {
+                        AppTabRow(selected.intValue, AppTabStyle.Page, Modifier.fillMaxWidth()) {
                             names.forEachIndexed { index, name ->
-                                Tab(
+                                AppTab(
                                     selected = selected.intValue == index,
+                                    label = name,
+                                    labelModifier = Modifier.onGloballyPositioned { labels[index] = it },
                                     onFocus = { select(index) },
                                     onClick = { clicks++ },
                                     modifier = Modifier.testTag("tab-$index"),
-                                ) {
-                                    Text(name, Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                                        .onGloballyPositioned { labels[index] = it })
-                                }
+                                )
                             }
                         }
-                        BrowseTabContent(motion, selected.intValue, state = { selected.intValue }, modifier = Modifier.weight(1f)) { _, owner ->
+                        TabContent(motion, selected.intValue, state = { selected.intValue }, modifier = Modifier.weight(1f)) { _, owner ->
                             val visit = remember(owner) {
                                 Visit(owner, listOf(Color.Red, Color.Blue, Color.Green)[visits.size % 3]).also { visits += it }
                             }
@@ -287,7 +285,7 @@ class BrowseTabMotionTest {
         return bitmap
     }
 
-    private class Visit(val owner: BrowseTabOwner, val color: Color) {
+    private class Visit(val owner: TabOwner, val color: Color) {
         var coordinates: LayoutCoordinates? = null
     }
 }

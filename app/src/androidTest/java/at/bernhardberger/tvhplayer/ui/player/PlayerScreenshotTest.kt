@@ -128,7 +128,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                         )
                     } else if (scenario.startsWith("info") || infoOpen) {
                         LiveProgrammeInfoOverlay(
-                            hero = {},
+                            details = { _, _ -> },
                             event = if (scenario == "info-missing") null else programme(long = scenario.startsWith("info-long")), channelIdentity = "1 Documentary HD", channelName = "Documentary HD",
                             recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
                             confirmationVisible = false, restoreRecordFocus = false, onRecord = {},

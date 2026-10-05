@@ -21,7 +21,15 @@ fun programmeActions(
     canModifyRecordings: Boolean = true,
 ): List<ProgrammeAction> {
     val actions = when {
-        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> listOf(ProgrammeAction.WATCH)
+        event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> listOf(
+            ProgrammeAction.WATCH,
+            when (recording?.state) {
+                // Stopping keeps the partial recording; cancelling would abort it on the server.
+                DvrEntryState.RECORDING -> ProgrammeAction.STOP_RECORDING
+                DvrEntryState.SCHEDULED -> ProgrammeAction.CANCEL_RECORDING
+                else -> ProgrammeAction.RECORD
+            },
+        )
         event.start.epochSeconds > nowSec -> when (recording?.state) {
             DvrEntryState.SCHEDULED -> listOf(ProgrammeAction.CANCEL_RECORDING)
             // Stopping keeps the partial recording; cancelling would abort it on the server.

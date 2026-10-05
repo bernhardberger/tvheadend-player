@@ -74,8 +74,8 @@ import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.components.LocalBrowseTabOwner
-import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
+import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
+import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
@@ -217,7 +217,7 @@ internal fun TimelineChannelRow(
 ) {
     val nowSec = nowSecProvider()
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
-    val owner = LocalBrowseTabOwner.current
+    val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
     val formattingZone = remember(nowSec) { java.time.ZoneId.systemDefault() }
     if (BuildConfig.PROFILE_TRACE) ProfileCompositionLifetime("guideRow:$channelIndex")
@@ -458,7 +458,7 @@ internal fun TimelineProgrammeCell(
                 null
             },
             modifier = Modifier
-                .browseTabFocus()
+                .tabFocus()
                 .fillMaxSize()
                 .padding(horizontal = 4.dp)
                 // The panel shape is drawn, not clipped: a clip here would cancel the
@@ -584,7 +584,7 @@ internal fun GuideConnectionRecovery(
             )
             Button(
                 onClick = if (needsSettings) onOpenConnectionSettings else onRetry,
-                modifier = Modifier.browseTabFocus().focusRequester(focusRequester),
+                modifier = Modifier.tabFocus().focusRequester(focusRequester),
             ) {
                 Text(
                     stringResource(
@@ -641,7 +641,7 @@ internal fun GuideEmptyState(
                     } else {
                         onRetry
                     },
-                    modifier = Modifier.browseTabFocus().focusRequester(retryFocusRequester),
+                    modifier = Modifier.tabFocus().focusRequester(retryFocusRequester),
                 ) {
                     Text(
                         stringResource(

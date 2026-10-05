@@ -3,6 +3,12 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -83,6 +89,12 @@ internal fun PlayerChromeControls(
     decoration: @Composable (emphasisAlpha: () -> Float, controls: @Composable () -> Unit) -> Unit,
     markerNavigation: RecordingMarkerNavigation,
     onSeekMarker: (Long) -> Unit,
+    onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    downHint: String? = null,
+    onRecent: (() -> Unit)? = null,
+    /** Trial: the footer scrim reaches up behind the open Recent row. */
+    scrimRise: () -> Float = { 0f },
 ) {
     val live = timeline as? PlayerChromeTimeline.Live
     val recording = timeline as? PlayerChromeTimeline.Recording
@@ -137,8 +149,9 @@ internal fun PlayerChromeControls(
         "player-seekbar" -> if (timelineFocusable) timelineFocus else initialFocus
         else -> null
     }
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable) {
-        if (actions.active) {
+    val pageActive = LocalPlayerPageActive.current
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive) {
+        if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null
                 PlayerIdentityCardTag -> cardFocus
@@ -183,6 +196,7 @@ internal fun PlayerChromeControls(
     decoration({ chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
+        scrimRise = scrimRise,
         modifier = Modifier.onPreviewKeyEvent { event ->
             recording != null && markerNavigation.handle(event, recording.markers, onSeekMarker)
         }.onPreviewKeyEvent { event ->
@@ -249,6 +263,8 @@ internal fun PlayerChromeControls(
         // The card stands above everything else that takes focus: Down leads to the timeline or,
         // when that takes no focus, to the action row's entry; nothing else is reachable from it.
         val cardBelow = if (timelineFocusable) timelineFocus else initialFocus
+        // Trial: the Left/Right press on the card still undecided between a zap (released) and the rail (held).
+        var cardPressKey by remember { mutableStateOf<Key?>(null) }
         val cardModifier = Modifier.focusRequester(cardFocus)
             .onFocusChanged {
                 if (it.isFocused) {
@@ -263,12 +279,44 @@ internal fun PlayerChromeControls(
                 down = cardBelow
             }
             .onPreviewKeyEvent { event ->
-                if (event.key != Key.DirectionDown) false else {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        relocatingKey = event.key
-                        cardBelow.requestFocus()
+                when {
+                    event.key == Key.DirectionDown -> {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            relocatingKey = event.key
+                            cardBelow.requestFocus()
+                        }
+                        true
                     }
-                    true
+                    // Trial: Up opens the recent channels' row above this card.
+                    onRecent != null && event.key == Key.DirectionUp -> {
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            onInteraction()
+                            onRecent()
+                        }
+                        true
+                    }
+                    // Trial: a Left/Right press changes channel when released; held, it opens the rail
+                    // stepping that way, and the held key's repeats run on through the rail.
+                    onChannelZap != null && (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) -> {
+                        val direction = if (event.key == Key.DirectionRight) 1 else -1
+                        val native = event.nativeKeyEvent
+                        when (event.type) {
+                            KeyEventType.KeyDown -> when {
+                                native.repeatCount == 0 -> { onInteraction(); cardPressKey = event.key }
+                                cardPressKey == event.key -> {
+                                    cardPressKey = null
+                                    onChannelStep?.invoke(direction, native.eventTime)
+                                }
+                            }
+                            KeyEventType.KeyUp -> if (cardPressKey == event.key) {
+                                cardPressKey = null
+                                onInteraction()
+                                onChannelZap(direction, native.downTime)
+                            }
+                        }
+                        true
+                    }
+                    else -> false
                 }
             }
         if (recording != null) {
@@ -366,6 +414,7 @@ internal fun PlayerChromeControls(
         }
         }
         Spacer(Modifier.height(TvOverlayTimelineActionGap))
+        Box {
         PlayerActionRow(
             settingsFocus = settingsFocus,
             onSettings = onOptions, onRecord = onRecord.takeIf { actions.record },
@@ -410,6 +459,22 @@ internal fun PlayerChromeControls(
                     }
                 },
         )
+        // Trial: what Down opens, centred between the start and end groups.
+        if (downHint != null) PlayerDownHint(downHint, Modifier.align(Alignment.Center)
+            .pageMotion(0..140, at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy.pageAccelerate,
+                entering = false, inheritedFade = 0..220)
+            .graphicsLayer { alpha = actionsAlpha() * chromeAlpha.value }.testTag("player-down-hint"))
+        }
     }
+    }
+}
+
+@Composable
+internal fun PlayerDownHint(text: String, modifier: Modifier = Modifier, up: Boolean = false) {
+    val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        androidx.tv.material3.Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
+            modifier = Modifier.size(24.dp).rotate(if (up) -90f else 90f))
+        Text(text, style = MaterialTheme.typography.labelLarge, color = tint, maxLines = 1)
     }
 }

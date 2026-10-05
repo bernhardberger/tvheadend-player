@@ -99,15 +99,6 @@ class OverlayInitialFocusDrawTest {
         RecordingConfirmationDialog(PendingRecordingAction.DELETE, "Title", true, {}, {})
     }
 
-    /** Record in programme info: Cancel is the safe initial action. */
-    @Test fun programmeRecordingConfirmation() = assertInitialFocusDrawn("programme-recording-cancel") {
-        ProgrammeRecordingConfirmation(
-            state = LiveInfoRecordingState.Confirming(programme().programmeRecordingTarget(session())),
-            onActivate = {},
-            onDismiss = {},
-        )
-    }
-
     @Test fun recordingMarker() {
         val navigation = RecordingMarkerNavigation()
         val markers = listOf(0L, 60_000L, 120_000L)

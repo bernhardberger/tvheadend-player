@@ -10,12 +10,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
@@ -162,6 +164,190 @@ class QuickZapPresentationTest {
         assertEquals(android.graphics.Color.WHITE, pixel(530))
         compose.runOnIdle { expanded = true }
         assertEquals(android.graphics.Color.RED, pixel(470))
+    }
+
+    @Test fun inPlaceRailStartsAtEntryWithoutComposingTheStartOfTheCatalog() {
+        val catalog = (1L..100L).map { Channel.create(id = ChannelId(it), number = it, name = "Channel $it") }
+        val composedChannels = mutableSetOf<ChannelId>()
+        compose.setContent {
+            val context = LocalContext.current
+            val loader = remember { ImageLoader(context) }
+            TVHeadendPlayerTheme {
+                ChannelDrawer(catalog, ChannelId(50), ChannelId(50), recordingChannelIds = emptySet(),
+                    nowEvent = { composedChannels += it; null }, imageLoader = loader,
+                    onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                    inPlace = true, entryFocusId = ChannelId(50))
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("player-channel-card-50").assertIsFocused()
+        assertFalse("do not measure the start then jump to the entry card", ChannelId(1) in composedChannels)
+        assertTrue("only the viewport and one reserve card per side: $composedChannels", composedChannels.size <= 8)
+        println("RAIL_INITIAL_COMPOSITION count=${composedChannels.size}")
+    }
+
+    @Test fun zeroAlphaPageContentDoesNotDraw() {
+        var progress by mutableStateOf(0f)
+        var draws = 0
+        compose.setContent {
+            view = LocalView.current
+            androidx.compose.runtime.CompositionLocalProvider(LocalPlayerPageProgress provides { progress }) {
+                Box(Modifier.fillMaxSize().pageMotion(150..480)
+                    .then(Modifier.drawBehind { draws++; drawRect(Color.Red) }))
+            }
+        }
+        fun draw() {
+            compose.waitForIdle()
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            bitmap.recycle()
+        }
+        draw()
+        assertEquals(0, draws)
+        compose.runOnIdle { progress = 1f }
+        draw()
+        assertTrue(draws > 0)
+    }
+
+    @Test fun identityAndFocusedRailCardHaveTheSameGeometry() {
+        val inspectorEnabled = androidx.compose.ui.platform.isDebugInspectorInfoEnabled
+        androidx.compose.ui.platform.isDebugInspectorInfoEnabled = true
+        try {
+            val channel = channels.first()
+            compose.setContent {
+                view = LocalView.current
+                val loader = remember { ImageLoader(view.context) }
+                TVHeadendPlayerTheme {
+                    Box(Modifier.fillMaxSize()) {
+                        Box(Modifier.padding(start = 58.dp, top = 30.dp)) {
+                            PlayerIdentityCard(PlayerChromeContent("", PlayerInfoBarData("1", "Channel 1", "", ""),
+                                picon = channel.icon), loader, null, onClick = {}, channelCard = true, held = true)
+                        }
+                        Box(Modifier.padding(top = 230.dp)) {
+                            ChannelDrawer(listOf(channel), channel.id, channel.id, recordingChannelIds = emptySet(),
+                                nowEvent = { null }, imageLoader = loader, onFocusChannel = {}, onPickChannel = {},
+                                onCloseDrawer = {}, inPlace = true, entryFocusId = channel.id)
+                        }
+                    }
+                }
+            }
+            compose.waitForIdle()
+            fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
+            fun rect(tag: String, card: String): androidx.compose.ui.geometry.Rect {
+                val parent = node(card).layoutInfo.coordinates
+                return parent.localBoundingBoxOf(node(tag).layoutInfo.coordinates, clipBounds = false)
+            }
+            fun label(tag: String, card: String): List<Float> {
+                val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+                node(tag).config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
+                val text = results.single()
+                val bounds = rect(tag, card)
+                return listOf(bounds.left, bounds.top, text.firstBaseline + bounds.top,
+                    text.getBoundingBox(text.layoutInput.text.text.indexOf("Channel")).left + bounds.left, bounds.width)
+            }
+            fun corner(card: String): Float = node(card).layoutInfo.getModifierInfo()
+                .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
+                .filter { it.nameFallback == "graphicsLayer" }.mapNotNull { layer ->
+                    @Suppress("UNCHECKED_CAST")
+                    val block = layer.inspectableElements.firstOrNull { it.name == "block" }?.value as? (androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit)
+                    val shape = block?.let { androidx.compose.ui.graphics.GraphicsLayerScope().apply(it).shape }
+                        ?: layer.inspectableElements.firstOrNull { it.name == "shape" }?.value as? androidx.compose.ui.graphics.Shape
+                    (shape?.createOutline(androidx.compose.ui.geometry.Size(196f, 110f),
+                        androidx.compose.ui.unit.LayoutDirection.Ltr, Density(1f)) as? androidx.compose.ui.graphics.Outline.Rounded)
+                        ?.roundRect?.topLeftCornerRadius?.x
+                }.first()
+            val identity = "player-identity-card"
+            val rail = "player-channel-card-1"
+            val identityLabel = label("player-identity-label", identity)
+            val railLabel = label("player-channel-1-identity", rail)
+            println("CARD_GEOMETRY identitySize=${node(identity).layoutInfo.coordinates.size} railSize=${node(rail).layoutInfo.coordinates.size} " +
+                "identityPicon=${rect("player-identity-logo", identity)} railPicon=${rect("player-channel-1-picon", rail)} " +
+                "identityLabel=$identityLabel railLabel=$railLabel identityCorner=${corner(identity)} railCorner=${corner(rail)}")
+            assertEquals(node(identity).layoutInfo.coordinates.size, node(rail).layoutInfo.coordinates.size)
+            assertEquals(rect("player-identity-logo", identity), rect("player-channel-1-picon", rail))
+            identityLabel.zip(railLabel).forEach { (a, b) -> assertEquals(a, b, 0.01f) }
+            assertEquals(corner(identity), corner(rail), 0.01f)
+        } finally {
+            androidx.compose.ui.platform.isDebugInspectorInfoEnabled = inspectorEnabled
+        }
+    }
+
+    @Test fun railPeekWaitsForRevealAndCanReverseDuringItsFade() {
+        var expanded by mutableStateOf(false)
+        var expansion: () -> Float = { 0f }
+        lateinit var peek: androidx.compose.animation.core.MutableTransitionState<Boolean>
+        var headerCompositions = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlayerPage<Unit>(details = null, railHeader = if (expanded) ({
+                    androidx.compose.runtime.SideEffect { headerCompositions++ }
+                    ProgrammeScheduleHeader("1 · Channel 1")
+                }) else null, player = {
+                    peek = LocalPlayerRailPeek.current!!
+                    QuickZapPresentation(expanded, channelsAvailable = false,
+                        inPlaceAnchor = { androidx.compose.ui.geometry.Rect(58f, 300f, 254f, 410f) },
+                        channelContent = { Box(Modifier.fillMaxWidth().height(100.dp)) }, preview = {},
+                        controls = { expansion = LocalInPlaceRailExpansion.current })
+                }, programme = {})
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { expanded = true; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        compose.mainClock.advanceTimeBy(192)
+        compose.waitForIdle()
+        assertTrue(expansion() in 0f..0.999f)
+        assertEquals("no header work competes with the reveal", 0, headerCompositions)
+        compose.mainClock.advanceTimeBy(112)
+        compose.waitForIdle()
+        assertEquals(1f, expansion(), 0f)
+        assertTrue("peek is fading in", peek.targetState && !peek.currentState && !peek.isIdle)
+        compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        compose.mainClock.advanceTimeBy(32)
+        compose.waitForIdle()
+        assertEquals("even an interrupted peek leaves before collapse", 1f, expansion(), 0f)
+        compose.mainClock.advanceTimeBy(400)
+        compose.waitForIdle()
+        assertTrue(peek.isIdle && !peek.currentState)
+        assertEquals(0f, expansion(), 0f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun inPlaceRailRevealsFromCardBoundsWithinPlayerPage() {
+        var expanded by mutableStateOf(false)
+        var expansion: () -> Float = { 0f }
+        val anchor = androidx.compose.ui.geometry.Rect(58f, 300f, 254f, 410f)
+        compose.setContent {
+            view = LocalView.current
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                PlayerPage<Unit>(details = null, player = {
+                    QuickZapPresentation(expanded = expanded, channelsAvailable = false,
+                        inPlaceAnchor = { anchor }, preview = {}, controls = {
+                            expansion = LocalInPlaceRailExpansion.current
+                        }, channelContent = {
+                            Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
+                        })
+                }, programme = {})
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { expanded = true; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(16)
+        compose.waitForIdle()
+        val e = expansion()
+        assertTrue("the reveal is in flight: $e", e > 0f && e < 1f)
+        val right = anchor.right + (960f - anchor.right) * e
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        assertTrue("the card's original area is revealed", android.graphics.Color.red(bitmap.getPixel(150, 320)) > 100)
+        val outside = (right + 100).toInt()
+        assertTrue("the reveal has not yet reached the viewport edge: $right", outside < bitmap.width)
+        assertEquals("pixels beyond the expanding edge remain hidden", 0, android.graphics.Color.red(bitmap.getPixel(outside, 320)))
+        val feather = android.graphics.Color.red(bitmap.getPixel((right + 48).toInt(), 320))
+        assertTrue("the expanding edge stays feathered, not hard-clipped: $feather", feather in 1..200)
+        bitmap.recycle()
     }
 
     @Test fun peekingNewTrayDoesNotDimControlsAboveTheRow() {

@@ -59,6 +59,8 @@ fun PlayerInfoBar(
     recordingNow: Boolean = false,
     contentAlpha: () -> Float = { 1f },
     lastLineEndReserve: Dp = 0.dp,
+    /** Trial: room between the identity and the programme text. */
+    identityGap: Dp = TvOverlayHeaderPiconGap,
     identity: @Composable (Modifier) -> Unit,
 ) {
     val recorded = data.recordedDate != null
@@ -82,7 +84,7 @@ fun PlayerInfoBar(
     // The bar speaks for itself: the identity may be a focusable node of its own. The badges keep
     // their own description.
     Row(modifier.semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalArrangement = Arrangement.spacedBy(TvOverlayHeaderPiconGap), verticalAlignment = Alignment.Bottom) {
+        horizontalArrangement = Arrangement.spacedBy(identityGap), verticalAlignment = Alignment.Bottom) {
         identity(faded)
         // An absent line's place, kept empty.
         val emptyLine: @Composable (TextStyle) -> Unit = { style ->

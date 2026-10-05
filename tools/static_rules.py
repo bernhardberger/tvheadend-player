@@ -127,6 +127,38 @@ def find_static_rule_violations(root: Path) -> list[str]:
                     f"{line_number(code, match.start())} uses {label}"
                 )
 
+        components = "app/src/main/java/at/bernhardberger/tvhplayer/ui/components/"
+        tab_patterns = []
+        if relative_path != components + "AppTabRow.kt":
+            tab_patterns.extend([
+                ("native tab import/reference", r"\bandroidx\s*\.\s*tv\s*\.\s*material3\s*\.\s*(?:TabRow\b|Tab\b)"),
+                ("native tab call", r"\b(?:TabRow|Tab)\s*\("),
+            ])
+        if relative_path != components + "TabContent.kt":
+            tab_patterns.append(("private tab transform", r"\bBrowseMotionPolicy\s*\.\s*tabTransform\b"))
+            animation_names = ["AnimatedContent"] + re.findall(
+                r"\bimport\s+androidx\.compose\.animation\.AnimatedContent\s+as\s+(\w+)", code
+            )
+            for name in animation_names:
+                tab_patterns.append(("private tab animation",
+                    rf"\b{re.escape(name)}\s*\(\s*(?:targetState\s*=\s*)?[^,\n]*\b\w*[Tt]ab\w*\b"))
+        for label, pattern in tab_patterns:
+            for match in re.finditer(pattern, code):
+                violations.append(
+                    f"SharedTabs: {relative_path}:"
+                    f"{line_number(code, match.start())} uses {label}"
+                )
+
+        ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
+        # Recent-row expansion is a local disclosure, not movement between pages.
+        slide_owners = {ui + "BrowseMotionPolicy.kt", ui + "player/PlayerIdentityCard.kt"}
+        if relative_path.startswith(ui) and relative_path not in slide_owners:
+            for match in re.finditer(r"\bslide(?:In|Out)(?:Vertically|Horizontally)\b", code):
+                violations.append(
+                    f"SharedPageMotion: {relative_path}:"
+                    f"{line_number(code, match.start())} uses direct page travel outside the shared motion owner"
+                )
+
     resource_paths = [path for production_root in production_roots
                       for path in sorted((production_root / "res").rglob("*.xml"))]
     for path in resource_paths:

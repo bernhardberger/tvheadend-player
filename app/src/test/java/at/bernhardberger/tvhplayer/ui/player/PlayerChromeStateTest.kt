@@ -17,6 +17,27 @@ import org.junit.Test
 /** The Banner and controls core shared by the players. */
 @OptIn(ExperimentalCoroutinesApi::class)
 class PlayerChromeStateTest {
+    /** The rail stays expanded down to its schedule and back, so the return never replays its reveal. */
+    @Test
+    fun railStaysPresentedThroughItsScheduleAndBack() = runTest {
+        for (rail in listOf(false, true)) {
+            val state = LivePlayerLayerState(this, 5_000L)
+            state.showControls()
+            state.onActionFocused(PlayerIdentityCardTag)
+            if (rail) state.openChannelDrawer()
+            state.openInfo()
+            assertEquals(rail, state.channelRailPresented)
+            state.closeInfo(returnToRail = rail)
+            assertEquals(rail, state.channelDrawerOpen)
+            assertEquals(rail, state.channelRailPresented)
+            if (rail) {
+                state.dismissChannelDrawer()
+                assertEquals(PlayerIdentityCardTag, state.restoreChannelAction)
+            }
+            state.chrome.dispose()
+        }
+    }
+
     @Test
     fun enteringShowsTheBannerInsteadOfControls() = runTest {
         val state = chrome()

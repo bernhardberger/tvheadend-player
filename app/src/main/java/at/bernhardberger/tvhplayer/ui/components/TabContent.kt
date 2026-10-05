@@ -29,7 +29,7 @@ import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 
 /** Presentation history only: selection and readiness remain with the screen. */
 @Stable
-internal class BrowseContentMotion(initialKey: Any?) {
+internal class TabContentMotion(initialKey: Any?) {
     internal class Change(val destination: Any?, val direction: Int)
 
     internal var change by mutableStateOf<Change?>(null)
@@ -61,11 +61,11 @@ internal class BrowseContentMotion(initialKey: Any?) {
 }
 
 @Composable
-internal fun rememberBrowseContentMotion(
+internal fun rememberTabContentMotion(
     selectedKey: Any?,
     currentKey: () -> Any? = { selectedKey },
-): BrowseContentMotion {
-    val motion = remember { BrowseContentMotion(selectedKey) }
+): TabContentMotion {
+    val motion = remember { TabContentMotion(selectedKey) }
     // Consult the owner, not a possibly superseded rendered scope.
     SideEffect { motion.acceptRendered(currentKey()) }
     return motion
@@ -73,25 +73,25 @@ internal fun rememberBrowseContentMotion(
 
 /** A rendered visit, not just a tab ID: old A cannot act after A → B → A. */
 @Stable
-internal class BrowseTabOwner(private val current: () -> Boolean) {
+internal class TabOwner(private val current: () -> Boolean) {
     private var attached = true
     val isCurrent: Boolean get() = attached && current()
     internal fun release() { attached = false }
 }
 
-internal val LocalBrowseTabOwner = staticCompositionLocalOf<BrowseTabOwner?> { null }
+internal val LocalTabOwner = staticCompositionLocalOf<TabOwner?> { null }
 
 /** Keep native styling while making outgoing actionable leaves unfocusable. */
 @Composable
-internal fun Modifier.browseTabFocus(): Modifier {
-    val owner = LocalBrowseTabOwner.current ?: return this
+internal fun Modifier.tabFocus(): Modifier {
+    val owner = LocalTabOwner.current ?: return this
     return focusProperties { canFocus = owner.isCurrent }
 }
 
 /** Never measure two lists against the controller's one authoritative viewport. */
 @Composable
-internal fun rememberBrowseTabListState(current: LazyListState): LazyListState {
-    val owner = LocalBrowseTabOwner.current
+internal fun rememberTabListState(current: LazyListState): LazyListState {
+    val owner = LocalTabOwner.current
     return if (owner?.isCurrent != false) current else remember {
         LazyListState(current.firstVisibleItemIndex, current.firstVisibleItemScrollOffset)
     }
@@ -100,12 +100,12 @@ internal fun rememberBrowseTabListState(current: LazyListState): LazyListState {
 // AnimatedContent's size bookkeeping is keyed by targetState, not contentKey.
 // A fresh target per metadata revision retains obsolete snapshots for the lifetime
 // of the mounted tab. Keep one identity per visit and update only its presentation.
-private class TabBody<T>(val destination: Any?, val owner: BrowseTabOwner, initialState: T) {
+private class TabBody<T>(val destination: Any?, val owner: TabOwner, initialState: T) {
     var state by mutableStateOf(initialState)
 }
 private class DisplayedTabState<T>(var value: T)
 
-private class TabValueReader<T>(private val owner: BrowseTabOwner, private val source: () -> T) {
+private class TabValueReader<T>(private val owner: TabOwner, private val source: () -> T) {
     private var lastRead: DisplayedTabState<T>? = null
 
     fun read(): T {
@@ -121,26 +121,26 @@ private class TabValueReader<T>(private val owner: BrowseTabOwner, private val s
  * The retained value is not observable state, so drawing never invalidates composition.
  */
 @Composable
-internal fun <T> rememberBrowseTabReader(source: () -> T): () -> T {
-    val owner = LocalBrowseTabOwner.current ?: return source
+internal fun <T> rememberTabReader(source: () -> T): () -> T {
+    val owner = LocalTabOwner.current ?: return source
     val latest = rememberUpdatedState(source)
     return remember(owner) { TabValueReader(owner) { latest.value() }::read }
 }
 
 /** Animate immutable presentation values. Only the newest rendered visit may act. */
 @Composable
-internal fun <T> BrowseTabContent(
-    motion: BrowseContentMotion,
+internal fun <T> TabContent(
+    motion: TabContentMotion,
     selectedKey: Any?,
     state: () -> T,
     modifier: Modifier = Modifier,
-    content: @Composable ColumnScope.(T, BrowseTabOwner) -> Unit,
+    content: @Composable ColumnScope.(T, TabOwner) -> Unit,
 ) {
     val generation = motion.externalGeneration
     val visit = remember(selectedKey, generation) { Any() }
     val currentVisit = rememberUpdatedState(visit)
     val owner = remember(visit) {
-        BrowseTabOwner { currentVisit.value === visit && motion.isRequested(selectedKey) }
+        TabOwner { currentVisit.value === visit && motion.isRequested(selectedKey) }
     }
     val displayed = remember(visit) { DisplayedTabState(state()) }
     // Selection callbacks may clear live focus before the new scope is rendered.
@@ -170,12 +170,12 @@ internal fun <T> BrowseTabContent(
                 val transform = BrowseMotionPolicy.tabTransform(sign)
                 transform.using(null)
             },
-            label = "browseTabBody",
+            label = "tabBody",
         ) { body ->
             // A returning tab gets fresh interactive locals, not an old paging job.
             key(body.owner) {
                 DisposableEffect(body.owner) { onDispose(body.owner::release) }
-                CompositionLocalProvider(LocalBrowseTabOwner provides body.owner) {
+                CompositionLocalProvider(LocalTabOwner provides body.owner) {
                     // Visual currentness follows the rendered body, not a request
                     // that has already revoked action ownership while still loading.
                     BrowseContentLayer(departing = body !== target) { layer ->

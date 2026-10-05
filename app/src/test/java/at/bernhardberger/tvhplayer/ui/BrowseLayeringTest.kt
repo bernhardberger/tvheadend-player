@@ -47,9 +47,9 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.ui.components.BrowseContentMotion
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabOwner
+import at.bernhardberger.tvhplayer.ui.components.TabContentMotion
+import at.bernhardberger.tvhplayer.ui.components.TabContent
+import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
@@ -58,7 +58,7 @@ import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigation
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -79,7 +79,7 @@ import kotlin.math.roundToInt
 class BrowseLayeringTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
-    private lateinit var motion: BrowseContentMotion
+    private lateinit var motion: TabContentMotion
     private var selected by mutableStateOf("A")
     private var destination by mutableStateOf<AppNavKey>(ChannelsKey)
     private lateinit var backStack: MutableList<AppNavKey>
@@ -490,11 +490,11 @@ class BrowseLayeringTest {
     }
 
     @Composable private fun Page() {
-        motion = rememberBrowseContentMotion(selected)
+        motion = rememberTabContentMotion(selected)
         Box(Modifier.fillMaxSize()) {
             PaintInk(header)
             PaintInk(tabs)
-            BrowseTabContent(motion, selectedKey = selected, state = { selected }, modifier = Modifier.fillMaxSize()) { _, owner ->
+            TabContent(motion, selectedKey = selected, state = { selected }, modifier = Modifier.fillMaxSize()) { _, owner ->
                 val visit = remember(owner) {
                     Visit(owner, Ink(208f + 56f * visits.size, Color.Cyan)).also { visits += it }
                 }
@@ -562,5 +562,5 @@ class BrowseLayeringTest {
         var coordinates: LayoutCoordinates? = null
         var recordings = 0
     }
-    private class Visit(val owner: BrowseTabOwner, val ink: Ink)
+    private class Visit(val owner: TabOwner, val ink: Ink)
 }

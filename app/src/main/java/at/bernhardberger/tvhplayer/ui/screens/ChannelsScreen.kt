@@ -109,11 +109,11 @@ import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
-import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabListState
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseTabReader
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.TabContent
+import at.bernhardberger.tvhplayer.ui.components.tabFocus
+import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
+import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.ChannelRowEdgeInset
 import at.bernhardberger.tvhplayer.ui.components.ChannelRowGap
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
@@ -272,7 +272,7 @@ internal fun ChannelsScreenContent(
         layoutDirection = layoutDirection,
     )
     val channelScope = channelScopeState.scope
-    val scopeMotion = rememberBrowseContentMotion(channelScope.activeTagId) {
+    val scopeMotion = rememberTabContentMotion(channelScope.activeTagId) {
         scopeStateProvider().scope.activeTagId
     }
     val hasScopeTabs = channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1
@@ -643,7 +643,7 @@ internal fun ChannelsScreenContent(
             )
         }
 
-        BrowseTabContent(
+        TabContent(
             motion = scopeMotion,
             selectedKey = channelScope.activeTagId,
             state = {
@@ -667,8 +667,8 @@ internal fun ChannelsScreenContent(
         val playingChannelId = frame.playingId
         val recordingChannelIds = frame.recordingIds
         val tagNotice = frame.tagNotice
-        val nowSecProvider = rememberBrowseTabReader(frame.nowSec)
-        val listState = rememberBrowseTabListState(listState)
+        val nowSecProvider = rememberTabReader(frame.nowSec)
+        val listState = rememberTabListState(listState)
         if (channels.isEmpty()) {
             if (
                 shouldPresentEmptyTag(
@@ -795,7 +795,7 @@ internal fun ChannelsScreenContent(
                                 ChannelRow(
                                     modifier = Modifier
                                         .then(if (owner.isCurrent) Modifier.focusRequester(rowFocusRequesters.getValue(channelId)) else Modifier)
-                                        .browseTabFocus()
+                                        .tabFocus()
                                         .focusProperties {
                                             if (layoutDirection == LayoutDirection.Ltr) {
                                                 left = navigationFocus ?: FocusRequester.Default
@@ -978,7 +978,7 @@ private fun EmptyChannelsState(
                     Button(
                         onClick = onOpenSettings,
                         modifier = Modifier
-                            .browseTabFocus()
+                            .tabFocus()
                             .padding(top = 24.dp)
                             .focusRequester(actionFocus),
                     ) {
@@ -993,11 +993,11 @@ private fun EmptyChannelsState(
                     ) {
                         Button(
                             onClick = onRetry,
-                            modifier = Modifier.browseTabFocus().focusRequester(actionFocus),
+                            modifier = Modifier.tabFocus().focusRequester(actionFocus),
                         ) {
                             Text(stringResource(R.string.retry))
                         }
-                        OutlinedButton(onClick = onOpenSettings, modifier = Modifier.browseTabFocus()) {
+                        OutlinedButton(onClick = onOpenSettings, modifier = Modifier.tabFocus()) {
                             Text(stringResource(R.string.open_connection_settings))
                         }
                     }
@@ -1051,12 +1051,12 @@ private fun InlineConnectionState(
                 overflow = TextOverflow.Ellipsis,
             )
             if (recoveryAction == ConnectionRecoveryAction.RETRY) {
-                Button(onClick = onRetry, modifier = Modifier.browseTabFocus()) { Text(stringResource(R.string.retry)) }
-                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.browseTabFocus()) {
+                Button(onClick = onRetry, modifier = Modifier.tabFocus()) { Text(stringResource(R.string.retry)) }
+                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.tabFocus()) {
                     Text(stringResource(R.string.connection_settings_short))
                 }
             } else if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
-                Button(onClick = onOpenSettings, modifier = Modifier.browseTabFocus()) {
+                Button(onClick = onOpenSettings, modifier = Modifier.tabFocus()) {
                     Text(stringResource(R.string.connection_settings_short))
                 }
             }
@@ -1128,7 +1128,7 @@ private fun FocusedChannelDetails(
 ) {
     // These reads belong to the details composition, not the screen or list.
     // Keep local native focus ahead of shared selection during restoration.
-    val detailChannelId = rememberBrowseTabReader {
+    val detailChannelId = rememberTabReader {
         focusedChannelId()?.takeIf { id -> channels.any { it.id == id } }
             ?: browsingFocusChannelId(channels, selectedId())
     }()

@@ -35,9 +35,9 @@ class BrowseContentMotionTest {
     @get:Rule val compose = createComposeRule()
     private val selected = mutableIntStateOf(0)
     private val revision = mutableIntStateOf(0)
-    private lateinit var motion: BrowseContentMotion
+    private lateinit var motion: TabContentMotion
     private var bodiesCreated = 0
-    private val owners = mutableListOf<BrowseTabOwner>()
+    private val owners = mutableListOf<TabOwner>()
 
     @Test fun contentMovesInBothDirectionsWhileHeaderStaysPut() = assertDirections(LayoutDirection.Ltr)
 
@@ -145,10 +145,10 @@ class BrowseContentMotionTest {
         var bodyCommits = 0
         compose.setContent {
             TVHeadendPlayerTheme {
-                motion = rememberBrowseContentMotion(selected.intValue)
+                motion = rememberTabContentMotion(selected.intValue)
                 val reader = remember { { revision.intValue } }
                 Column(Modifier.size(300.dp, 200.dp).background(Color.Black).testTag("motion-canvas")) {
-                    BrowseTabContent(motion, selected.intValue, state = { reader }) { source, _ ->
+                    TabContent(motion, selected.intValue, state = { reader }) { source, _ ->
                         SideEffect { bodyCommits++ }
                         ColourLeaf(source)
                     }
@@ -173,7 +173,7 @@ class BrowseContentMotionTest {
 
     @Composable
     private fun ColourLeaf(source: () -> Int) {
-        val value = rememberBrowseTabReader(source)()
+        val value = rememberTabReader(source)()
         val color = when (value) { 0 -> Color.Red; 1 -> Color.Green; else -> Color.Blue }
         Box(Modifier.padding(start = 140.dp).size(20.dp).background(color).testTag("leaf-$value"))
     }
@@ -212,10 +212,10 @@ class BrowseContentMotionTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(LocalLayoutDirection provides direction) {
-                    motion = rememberBrowseContentMotion(selected.intValue)
+                    motion = rememberTabContentMotion(selected.intValue)
                     Column(Modifier.size(300.dp, 200.dp).background(Color.Black).testTag("motion-canvas")) {
                         Text("Tabs", modifier = Modifier.testTag("stationary-header"))
-                        BrowseTabContent(
+                        TabContent(
                             motion, selected.intValue,
                             state = { selected.intValue to revision.intValue },
                             modifier = Modifier.weight(1f).fillMaxWidth(),

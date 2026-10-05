@@ -22,9 +22,9 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.components.BrowseContentMotion
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabContent
-import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion
+import at.bernhardberger.tvhplayer.ui.components.TabContentMotion
+import at.bernhardberger.tvhplayer.ui.components.TabContent
+import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
@@ -53,15 +53,15 @@ class ArchiveDepthOwnershipTest {
         }
         val selected = mutableIntStateOf(0)
         val opened = mutableListOf<DvrEntryId>()
-        lateinit var motion: BrowseContentMotion
+        lateinit var motion: TabContentMotion
         compose.mainClock.autoAdvance = false
         try {
             compose.setContent {
                 val context = LocalContext.current
                 val loader = remember(context) { ImageLoader.Builder(context).build() }
                 TVHeadendPlayerTheme {
-                    motion = rememberBrowseContentMotion(selected.intValue)
-                    BrowseTabContent(motion, selected.intValue, state = { selected.intValue }) { index, owner ->
+                    motion = rememberTabContentMotion(selected.intValue)
+                    TabContent(motion, selected.intValue, state = { selected.intValue }) { index, owner ->
                         val requester = remember { FocusRequester() }
                         ArchiveDepthContent(
                             root = archives[index], navigation = navigation[index],

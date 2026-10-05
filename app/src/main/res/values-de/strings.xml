@@ -508,4 +508,40 @@
         <item quantity="other">Noch %1$d Minuten</item>
     </plurals>
     <string name="player_channel">Sender</string>
+    <string name="player_row_recent">Zuletzt gesehen</string>
+    <string name="player_channel_card_hint">Sender. Links oder rechts wechselt den Sender, gedrückt halten öffnet die Senderliste, oben zeigt zuletzt gesehene Sender, OK öffnet die Senderliste.</string>
+    <string name="player_down_programme_info">Sendungsinfo</string>
+    <string name="player_rail_watching">Läuft</string>
+    <!-- Trial: program details -->
+    <string name="details_tab_details">Details</string>
+    <string name="details_tab_schedule">Programm</string>
+    <string name="details_action_record_series">Serie aufnehmen</string>
+    <string name="details_action_remind">Erinnern</string>
+    <string name="details_action_other_airings">Wiederholungen</string>
+    <string name="details_read_more">Mehr Infos</string>
+    <string name="details_on_now">Jetzt</string>
+    <string name="details_minutes">%1$d Min.</string>
+    <string name="details_watch">Ansehen</string>
+    <string name="details_back_to_tv">Zurück zum TV</string>
+    <string name="details_description">Beschreibung</string>
+    <string name="details_summary">Zusammenfassung</string>
+    <string name="details_genre">Genre</string>
+    <string name="details_categories">Kategorien</string>
+    <string name="details_keywords">Schlagwörter</string>
+    <string name="details_episode">Folge</string>
+    <string name="details_season">Staffel</string>
+    <string name="details_seasons">Staffeln</string>
+    <string name="details_episode_number">Folgennummer</string>
+    <string name="details_episodes">Folgen</string>
+    <string name="details_part">Teil</string>
+    <string name="details_parts">Teile</string>
+    <string name="details_age_rating">Altersfreigabe</string>
+    <string name="details_rating">Freigabe</string>
+    <string name="details_rating_authority">Prüfstelle</string>
+    <string name="details_rating_country">Freigabeland</string>
+    <string name="details_stars">Sternebewertung</string>
+    <string name="details_copyright_year">Copyright-Jahr</string>
+    <string name="details_first_aired">Erstausstrahlung</string>
+    <string name="details_new_yes">Neue Sendung: Ja</string>
+    <string name="details_new_no">Neue Sendung: Nein</string>
 </resources>

@@ -4,7 +4,8 @@ import at.bernhardberger.tvhplayer.ui.notifications.label
 
 import androidx.compose.foundation.background
 
-import at.bernhardberger.tvhplayer.ui.components.BrowseTabRow
+import at.bernhardberger.tvhplayer.ui.components.AppTabRow
+import at.bernhardberger.tvhplayer.ui.components.AppTabStyle
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.roundToInt
 
@@ -61,7 +62,6 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.Tab
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -83,12 +83,11 @@ import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.LocalBrowseTabOwner
-import at.bernhardberger.tvhplayer.ui.components.browseTabFocus
+import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
+import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import coil3.ImageLoader
 import java.time.Instant
@@ -124,44 +123,29 @@ internal fun RecordingModeTabs(
     onClick: (DvrLibraryMode) -> Unit,
     onMoveToContent: () -> Unit,
 ) {
-    BrowseTabRow(
+    AppTabRow(
         selectedTabIndex = selected.ordinal,
-        modifier = modifier
-            .focusRestorer(selectedFocus)
-            .onPreviewKeyEvent { event ->
-                event.type == KeyEventType.KeyDown &&
-                    event.key == Key.DirectionDown &&
-                    onMoveToContent().let { true }
-            },
+        style = AppTabStyle.Page,
+        selectedTabFocus = selectedFocus,
+        modifier = modifier.onPreviewKeyEvent { event ->
+            event.type == KeyEventType.KeyDown &&
+                event.key == Key.DirectionDown &&
+                onMoveToContent().let { true }
+        },
     ) {
         DvrLibraryMode.entries.forEach { mode ->
-            Tab(
+            AppTab(
                 selected = selected == mode,
+                label = stringResource(
+                    when (mode) {
+                        DvrLibraryMode.ARCHIVE -> R.string.recordings_archive
+                        DvrLibraryMode.SCHEDULE -> R.string.recordings_schedule
+                        DvrLibraryMode.PROBLEMS -> R.string.recordings_problems
+                    }
+                ),
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
-                modifier = if (selected == mode) {
-                    Modifier.focusRequester(selectedFocus)
-                } else {
-                    Modifier
-                },
-            ) {
-                Text(
-                    text = stringResource(
-                        when (mode) {
-                            DvrLibraryMode.ARCHIVE -> R.string.recordings_archive
-                            DvrLibraryMode.SCHEDULE -> R.string.recordings_schedule
-                            DvrLibraryMode.PROBLEMS -> R.string.recordings_problems
-                        }
-                    ),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(
-                        horizontal = TvSpacing16,
-                        vertical = TvSpacing8,
-                    ),
-                )
-            }
+            )
         }
     }
 }
@@ -174,7 +158,7 @@ internal fun FolderListRow(
     onClick: () -> Unit,
 ) {
     val summary = remember(folder) { summarizeDvrFolder(folder) }
-    val owner = LocalBrowseTabOwner.current
+    val owner = LocalTabOwner.current
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
@@ -212,7 +196,7 @@ internal fun FolderListRow(
             Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
         },
         modifier = modifier
-            .browseTabFocus()
+            .tabFocus()
             .fillMaxWidth()
             .testTag("recordings-folder-${folder.path.joinToString("/")}"),
     )
@@ -389,7 +373,7 @@ internal fun RecordingSchedule(
         ModeEmptyState(R.string.recordings_schedule_empty)
         return
     }
-    val owner = LocalBrowseTabOwner.current
+    val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
     val entries = groups.flatMap { it.entries }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
@@ -534,7 +518,7 @@ internal fun RecordingProblems(
         ModeEmptyState(R.string.recordings_problems_empty)
         return
     }
-    val owner = LocalBrowseTabOwner.current
+    val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
     val bringIntoViewSpec = LocalBringIntoViewSpec.current
@@ -691,7 +675,7 @@ internal fun RecordingListRow(
     val problem = kind == RecordingRowKind.PROBLEM
     val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrEntryState.RECORDING
     val metadata = recordingListMetadata(entry, problemLabel = entry.subscriptionError?.takeIf { problem }?.label())
-    val owner = LocalBrowseTabOwner.current
+    val owner = LocalTabOwner.current
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
@@ -740,7 +724,7 @@ internal fun RecordingListRow(
             }
         },
         modifier = modifier
-            .browseTabFocus()
+            .tabFocus()
             .fillMaxWidth()
             .testTag("recording-list-entry-${recordingItemKey(entry.id)}")
             .then(if (focusTarget && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier)
@@ -830,7 +814,7 @@ internal fun RecordingsEmptyState(
             Button(
                 onClick = onRetry,
                 modifier = Modifier
-                    .browseTabFocus()
+                    .tabFocus()
                     .focusRequester(retryFocus)
                     .focusProperties { up = upFocus },
             ) { Text(stringResource(R.string.retry)) }

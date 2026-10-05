@@ -90,8 +90,8 @@ class NavigationShellEvidenceTest {
         compose.setContent {
             view = LocalView.current
             Box(Modifier.fillMaxSize().background(Color.Black).padding(start = 80.dp)) {
-                at.bernhardberger.tvhplayer.ui.components.BrowseTabContent(
-                    motion = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContentMotion("scope"),
+                at.bernhardberger.tvhplayer.ui.components.TabContent(
+                    motion = at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion("scope"),
                     selectedKey = "scope",
                     state = { Unit },
                     modifier = Modifier.fillMaxSize(),

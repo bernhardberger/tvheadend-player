@@ -345,11 +345,11 @@ class PlayerChromeEvidenceTest {
         } }
         compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-identity-number", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
         compose.runOnIdle { withLogo = false }
         compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-identity-number", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
@@ -390,7 +390,13 @@ class PlayerChromeEvidenceTest {
         compose.setContent { TVHeadendPlayerTheme {
             view = LocalView.current
             Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)) {
-                PlayerOverlayChrome(headerContent = { PlayerChromeHeader("", it) }) { Spacer(Modifier.height(content)) }
+                PlayerPage<Unit>(details = null, player = {
+                    PlayerControlsLayer(visible = true, modalVisible = false) {
+                        PlayerOverlayChrome(headerContent = { PlayerChromeHeader("", it) }) {
+                            Spacer(Modifier.height(content))
+                        }
+                    }
+                }, programme = {})
             }
         } }
         // Over white a black scrim of alpha a reads 255 * (1 - a); sampled left of the clock, 2px per dp.
@@ -408,11 +414,42 @@ class PlayerChromeEvidenceTest {
             assertEquals("$height: 0.60 where the content starts", 102.0, grey(bitmap, top + 112), 4.0)
             assertEquals("$height: 0.80 52dp into the content", 51.0, grey(bitmap, top + 216), 4.0)
             assertEquals("$height: 0.92 at the bottom edge", 20.0, grey(bitmap, 1079), 4.0)
-            assertEquals("$height: the top fade is 0.64 at the edge", 92.0, grey(bitmap, 0), 4.0)
-            assertEquals("$height: 0.40 at 56dp", 153.0, grey(bitmap, 112), 4.0)
+            assertEquals("$height: the top fade is 0.72 at the edge", 71.0, grey(bitmap, 0), 4.0)
+            assertEquals("$height: 0.48 at 56dp", 133.0, grey(bitmap, 112), 4.0)
             assertEquals("$height: clear from 112dp", 255.0, grey(bitmap, 226), 1.0)
             bitmap.recycle()
         }
+    }
+
+    @Test fun viewportScrimPreservesRailShadingAndClearsWhenNothingIsShown() {
+        lateinit var view: View
+        var opacity by mutableStateOf(1f)
+        val scrim = PlayerPageScrim().apply {
+            alpha = { opacity }
+            previewTop = { 600f }
+            expansion = { 1f }
+        }
+        compose.setContent { TVHeadendPlayerTheme {
+            view = LocalView.current
+            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.White)) {
+                Box(Modifier.fillMaxSize().playerScrim(scrim))
+            }
+        } }
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        // The clock's fade and rail veil are encoded in one gradient, not stacked paint.
+        listOf(0 to 0.72f, 112 to 0.5736f, 224 to 0.36f,
+            488 to 0.36f, 600 to 0.60f, 1079 to 0.92f).forEach { (y, alpha) ->
+            assertEquals("rail alpha at $y", 255.0 * (1f - alpha),
+                android.graphics.Color.red(bitmap.getPixel(200, y)).toDouble(), 2.0)
+        }
+        compose.runOnIdle { opacity = 0f }
+        compose.waitForIdle()
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        listOf(0, 112, 224, 488, 600, 1079).forEach { y ->
+            assertEquals("hidden at $y", android.graphics.Color.WHITE, bitmap.getPixel(200, y))
+        }
+        bitmap.recycle()
     }
 
     @Category(VisualCapture::class)

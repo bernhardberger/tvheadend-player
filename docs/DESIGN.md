@@ -203,8 +203,8 @@ Pressed feedback needs the component to receive the key: parents do not consume
 OK/DPAD_CENTER/ENTER on KeyDown and activate on the component's behalf. Parents
 may own direction keys, Back and key-cycle relocation.
 
-Page-level scopes (Channels, Guide, Recordings) use `TabRow` with the default
-`PillIndicator`. Content slides in the tab's direction, honours RTL order, and
+All tabs use `AppTabRow` + `TabContent`: Page/pill for page navigation, Section/underline within a content area.
+Content slides in the tab's direction, honours RTL order, and
 rapid changes interrupt toward the latest target. Headers stay stationary.
 
 ## 4. Shell, safe area and background
@@ -300,6 +300,33 @@ Anatomy per Material for TV / design kit:
   regions; loading, empty, error and recovery states are explicit.
 - Static captures prove composition only. Motion, focus feel, readability over
   video, overscan and remote-repeat behaviour are physical-TV gates.
+
+### Page motion
+
+The player shares one linear master progress: Down 500 ms, Up/Back 400 ms,
+reversing the same per-element windows continuously. Sections stay at their rest
+positions; there is no full-viewport pull. Controls rise 96dp and fade (0–220 ms;
+Program info fades by 140 ms). Details tabs rise
+120dp over 120–420 ms; the whole details or schedule body rises 160dp over
+150–480 ms, without column or row staggering. Exits use emphasized
+acceleration, entrances emphasized deceleration. The clock stays pinned above
+the dim; details clear it by at least 8dp. Tabs retain their horizontal 300 ms step.
+
+The player keeps its Program info cue. The rail preview rises 120dp (0–200 ms);
+tiles leave above the viewport (60–360 ms), fading by 260 ms. Its real schedule
+headline alone peeks at 55% alpha on the rail keyline, then rises below the top
+band (60–360 ms, emphasized (0.3,0,0,1)), no faster than the tiles departing above
+it. The centered up affordance fades in over 300–500 ms (standard deceleration).
+Scrims are stationary: constant gentle top gradient, details dim in 0–300 ms
+(standard deceleration; linear crossfade from the rail veil), controls bottom
+gradient out 200–350 ms linearly. No gradient edge travels with content.
+
+Only the section at rest accepts focus. Departing focus and semantics drop
+immediately, then details focus its first action (schedule: Now row), or the
+invoking control/rail channel is restored after return. The rail stays expanded
+and does not replay its sideways reveal. The departing details retain their
+channel/event until return settles, then dispose; section 1 stays composed.
+Opening side panels, dialogs, auto-hide and zap reveals retain their own motion.
 
 ## 7. Settings · sliding-depth navigation (Variant C)
 
@@ -522,6 +549,13 @@ colour and indication rules above apply here. Remote keys follow §6.
 
 ### Player chrome (revised 2026-09-30)
 
+- The page top band shares the clock's center line: passive now-playing strip
+  left at the 58dp grid keyline, up affordance centered, clock right. The strip
+  always identifies the watched channel, with a small picon, two-line identity
+  and programme text, and programme progress. It stays pinned between rail and
+  rail schedule; controls-to-details fades it in over 200–400 ms (reversed on Back).
+  Program-details tabs start on the 58dp keyline; only their body keeps the 72dp
+  content inset (x=130dp). Rail-schedule heading and rows remain at x=58dp.
 - Live TV and recordings share one chrome with four modes: hidden; the passive
   **Banner** (clock, info bar, timeline; nothing focusable); the **Banner step**
   (a quick step's preview inside the Banner, without a thumb); and the

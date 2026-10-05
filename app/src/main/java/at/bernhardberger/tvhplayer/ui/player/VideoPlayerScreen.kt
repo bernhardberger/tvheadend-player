@@ -1,9 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
-import at.bernhardberger.tvhplayer.notices.Notice
-import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
@@ -15,8 +12,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -77,8 +72,10 @@ import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingDecision
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
+import at.bernhardberger.tvhplayer.core.ProgrammeAction
+import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
+import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
@@ -94,6 +91,7 @@ import at.bernhardberger.tvhplayer.core.liveInterruptionMessageShown
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
+import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
@@ -106,9 +104,6 @@ import at.bernhardberger.tvhplayer.playback.LivePauseState
 import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.liveInfoRecordingCompletion
-import at.bernhardberger.tvhplayer.core.liveInfoRecordingDecision
-import at.bernhardberger.tvhplayer.core.liveInfoRecordingDismissed
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
@@ -120,10 +115,8 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssueCategory
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
-import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RetainedMetadataAuthority
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -146,6 +139,12 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
+import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
+import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import at.bernhardberger.tvhplayer.ui.screens.currentDvrMutation
+import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineScope
@@ -424,11 +423,26 @@ fun VideoPlayerScreen(
     var restoreOptionsFocus by remember { mutableStateOf(false) }
     var restoreInfoFocus by remember { mutableStateOf(false) }
     var restoreRecordFocus by remember { mutableStateOf(false) }
+    val programDetails = remember { ProgramDetailsState() }
+    var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var infoOpenedFromRecord by remember { mutableStateOf(false) }
     var restoreRecordActionFocus by remember { mutableStateOf(false) }
-    var infoRecordingState by remember {
-        mutableStateOf<LiveInfoRecordingState>(LiveInfoRecordingState.Idle)
-    }
+    // Trial: the channel card's placeholder and the action Down opened Info from.
+    // Trial: the channel the card's first Left/Right stepped to, focused as the rail opens.
+    var railEntryId by remember { mutableStateOf<ChannelId?>(null) }
+    var railEntryStep by remember { mutableStateOf(0) }
+    val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
+    // Trial: closing the rail the card opened hands focus back to the card.
+    var railFromCard by remember { mutableStateOf(false) }
+    // Trial: where the channel card is, for the rail to open from it.
+    var channelCardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var lastChromeAction by remember { mutableStateOf<String?>(null) }
+    var infoReturnAction by remember { mutableStateOf<String?>(null) }
+    var infoPendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
+    var infoMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
+    var infoMutationTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
+    var infoMutationObservation by remember { mutableStateOf<SessionObservation?>(null) }
+    val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
     val rootFocus = remember { FocusRequester() }
 
     var currentChannelId by remember { mutableStateOf(channelId) }
@@ -795,8 +809,13 @@ fun VideoPlayerScreen(
         }
     }
 
-    fun openInfo(fromRecord: Boolean = false) {
+    fun openInfo(fromRecord: Boolean = false, returnTo: String? = null) {
+        programDetails.reset()
+        infoRailChannelId = null
+        infoPendingAction = null
+        infoMutation = null
         infoOpenedFromRecord = fromRecord
+        infoReturnAction = returnTo ?: lastChromeAction.takeIf { layerState.chrome.controlsVisible && !fromRecord }
         restoreInfoFocus = false
         restoreRecordActionFocus = false
         restoreRecordFocus = fromRecord
@@ -804,17 +823,27 @@ fun VideoPlayerScreen(
     }
 
     fun dismissRecordingDialog() {
-        infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
+        infoPendingAction = null
+        infoMutation = null
         layerState.dismissRecordingConfirmation()
-        restoreRecordFocus = true
+        restoreRecordFocus = false
+        programDetails.focusContent()
     }
 
     fun closeInfo() {
-        infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
+        infoPendingAction = null
+        infoMutation = null
         layerState.dismissRecordingConfirmation()
         restoreRecordFocus = false
-        layerState.closeInfo()
-        restoreInfoFocus = !infoOpenedFromRecord
+        layerState.closeInfo(returnToRail = infoRailChannelId != null)
+        infoRailChannelId?.let {
+            railEntryId = it
+            railEntryStep = 0
+            selectedId = it
+            infoRailChannelId = null
+            return
+        }
+        restoreInfoFocus = !infoOpenedFromRecord && infoReturnAction == null
         restoreRecordActionFocus = infoOpenedFromRecord
     }
 
@@ -826,7 +855,7 @@ fun VideoPlayerScreen(
     fun optionsOpenedFromKey(infoWasOpen: Boolean) {
         if (timelineState.seekPending) timelineState.commitPendingSeek()
         channelNumberInput = ""
-        if (infoWasOpen) infoRecordingState = liveInfoRecordingDismissed(infoRecordingState)
+        if (infoWasOpen) { infoPendingAction = null; infoMutation = null }
         restoreOptionsFocus = false
     }
 
@@ -1066,6 +1095,27 @@ fun VideoPlayerScreen(
     // A slot window (no programme at the position) is an axis only: it has no Next line.
     val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
         effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
+    // Trial: the recent channels Up on the card offers, newest first, from every channel rather than
+    // only the current list's.
+    // Only the group the player steps through, so picking one never leaves it; none in it, no row.
+    val recentChannels = remember(recentChannelIds, channels, currentChannelId) {
+        recentChannelIds.filter { it != currentChannelId }
+            .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
+    }
+    var recentRowOpen by remember { mutableStateOf(false) }
+    // The row closes with the controls, so they reopen on the card.
+    LaunchedEffect(layerState.chrome.controlsVisible) { if (!layerState.chrome.controlsVisible) recentRowOpen = false }
+    // Trial: a channel as the card shows it above itself or while switching to it.
+    val recentPeekOf: (Channel) -> RecentChannelPeek = { channel ->
+        RecentChannelPeek(
+            picon = channel.icon,
+            number = channel.visibleChannelNumber?.toString().orEmpty(),
+            name = channel.name.orEmpty(),
+            channelId = channel.id,
+            now = channelsVm.nowEvent(channel.id, nowSec)
+                ?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }?.title,
+        )
+    }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
@@ -1075,29 +1125,26 @@ fun VideoPlayerScreen(
     }
     val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
         committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
-    val actionableInfoEvent = currentProgrammeEvent(observation, infoEvent)
-    val currentRecording = remember(observation, infoEvent?.id) {
-        infoEvent?.let { observation.dvrEntryForEvent(it.id) }
+    val detailsChannelId = infoRailChannelId ?: currentChannelId
+    val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
+    val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
+    val actionableInfoEvent = currentProgrammeEvent(observation, programDetails.opened ?: detailsBaseEvent)
+    val currentRecording = remember(observation, actionableInfoEvent?.id) {
+        actionableInfoEvent?.let { observation.dvrEntryForEvent(it.id) }
     }
     val currentRecordingTarget = currentSession?.let { capability ->
         actionableInfoEvent?.programmeRecordingTarget(capability)
     }
-    val optimisticRecordingTarget = when (val state = infoRecordingState) {
-        is LiveInfoRecordingState.Dispatching -> state.target
-        is LiveInfoRecordingState.Succeeded -> state.target
-        LiveInfoRecordingState.Idle,
-        is LiveInfoRecordingState.Confirming,
-        is LiveInfoRecordingState.Failed -> null
+    val latestRecordingTarget by rememberUpdatedState(currentRecordingTarget)
+    LaunchedEffect(programDetails.selectionVersion, currentRecordingTarget) {
+        infoPendingAction = null
+        infoMutation = null
+        layerState.dismissRecordingConfirmation()
     }
-    val optimisticRecordingMatchesCurrent = optimisticRecordingTarget != null &&
-        optimisticRecordingTarget == currentRecordingTarget
-    val infoRecordingScheduled = currentRecording != null || optimisticRecordingMatchesCurrent
-    val canRecordFromInfo = canModifyRecordings &&
-        actionableInfoEvent?.let { it.stop.epochSeconds > nowSec } == true &&
-        infoRecordingState !is LiveInfoRecordingState.Dispatching &&
-        !(infoRecordingState is LiveInfoRecordingState.Succeeded &&
-            optimisticRecordingMatchesCurrent)
-    val recordActionEligible = !infoRecordingScheduled && canRecordFromInfo
+    val infoActions = actionableInfoEvent?.let {
+        programmeActions(it, nowSec, currentRecording, canModifyRecordings = canModifyRecordings)
+    }.orEmpty()
+    val recordActionEligible = ProgrammeAction.RECORD in infoActions
     val currentSubscriptionFailure = subscriptionFailure.takeIf { playingLiveChannelId == currentChannelId }
         ?: (playbackState as? AppPlaybackState.Failed)?.subscriptionIssue
     val currentLiveInterrupted = liveInterrupted(
@@ -1249,60 +1296,49 @@ fun VideoPlayerScreen(
         ) layerState.onProgrammeChanged()
     }
 
-    LiveInfoRecordingValidityEffect(
-        state = infoRecordingState,
-        currentEvent = actionableInfoEvent,
-        actionEligible = recordActionEligible,
-        confirmationVisible = layerState.recordingConfirmationVisible,
-        onInvalidated = {
-            infoRecordingState = LiveInfoRecordingState.Idle
-            layerState.dismissRecordingConfirmation()
-            restoreRecordFocus = true
-        },
-    )
+    fun activateInfoRecording(action: ProgrammeAction = ProgrammeAction.RECORD) {
+        if (infoMutation != null || action !in infoActions) return
+        val target = currentRecordingTarget ?: return
+        val mutation = when (action) {
+            ProgrammeAction.RECORD -> DvrMutationAction.CreateProgramme(target, configId = null)
+            ProgrammeAction.STOP_RECORDING -> currentRecording?.let { DvrMutationAction.Stop(target.currentSession, it.id) }
+            ProgrammeAction.CANCEL_RECORDING -> currentRecording?.let { DvrMutationAction.Cancel(target.currentSession, it.id) }
+            else -> null
+        } ?: return
+        infoMutation = mutation
+        infoMutationTarget = target
+        infoMutationObservation = observation
+        infoPendingAction = action
+        layerState.showRecordingConfirmation()
+    }
 
-    fun activateInfoRecording() {
-        when (
-            val decision = liveInfoRecordingDecision(
-                state = infoRecordingState,
-                currentEvent = actionableInfoEvent,
-                actionEligible = recordActionEligible,
-            )
-        ) {
-            is LiveInfoRecordingDecision.Dispatch -> {
-                infoRecordingState = LiveInfoRecordingState.Dispatching(decision.target)
-                val noticeContext = notices.context()
-                scope.launch {
-                    val result = session.dvrRepository.scheduleEntry(
-                        decision.target.currentSession,
-                        DvrScheduleRequest(
-                            schedule = DvrSchedule.Programme(decision.target.eventId),
-                            title = decision.target.title,
-                        ),
-                    )
-                    val completion = liveInfoRecordingCompletion(
-                        state = infoRecordingState,
-                        result = result,
-                        infoOpen = layerState.infoOpen,
-                    )
-                    infoRecordingState = completion.state
-                    if (completion.showResult) {
-                        layerState.dismissRecordingConfirmation()
-                        restoreRecordFocus = true
-                    }
-                    val feedback = result.toDvrMutationFeedback()
-                    if (feedback.isFailure) notices.post(
-                        Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, feedback), noticeContext,
-                    )
-                }
+    fun confirmInfoRecording() {
+        if (infoPendingAction == null) return
+        val target = infoMutationTarget ?: return
+        val openingObservation = infoMutationObservation
+        val request = currentDvrMutation(infoMutation, openingObservation, session.observation.value)
+        val noticeContext = notices.context()
+        val selectionVersion = programDetails.selectionVersion
+        infoPendingAction = null
+        layerState.dismissRecordingConfirmation()
+        programDetails.focusContent()
+        if (request == null) { infoMutation = null; return }
+        scope.launch {
+            val currentRequest = currentDvrMutation(request, openingObservation, session.observation.value)
+                ?: return@launch
+            val feedback = dvrMutationActions.execute(currentRequest)
+            notices.postDvrFailure(currentRequest, feedback, noticeContext)
+            if (detailsRecordingResultIsCurrent(request, infoMutation, target, latestRecordingTarget,
+                    layerState.infoOpen, selectionVersion == programDetails.selectionVersion) &&
+                session.observation.value.currentSession === target.currentSession) {
+                infoMutation = null
             }
-            LiveInfoRecordingDecision.Invalidate -> {
-                infoRecordingState = LiveInfoRecordingState.Idle
-                layerState.dismissRecordingConfirmation()
-                restoreRecordFocus = true
-            }
-            LiveInfoRecordingDecision.Ignore -> Unit
         }
+    }
+
+    LaunchedEffect(infoPendingAction, observation) {
+        if (infoPendingAction != null && (infoPendingAction !in infoActions ||
+                currentDvrMutation(infoMutation, infoMutationObservation, observation) == null)) dismissRecordingDialog()
     }
 
     fun dispatchRecoveryRetry() {
@@ -1353,7 +1389,18 @@ fun VideoPlayerScreen(
     if (!contentAllowed) return
     PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
-    val handlePlaybackBack: () -> Unit = {
+    val handlePlaybackBack: () -> Unit = handle@{
+        // Trial: Back first undoes a step inside the program details.
+        if (playerForegroundLayer(currentPlayerForegroundContext()) == PlayerForegroundLayer.INFO &&
+            programDetails.back()
+        ) return@handle
+        // Trial: Back in the recent row returns to the channel card.
+        if (recentRowOpen && layerState.chrome.controlsVisible) {
+            recentRowOpen = false
+            restoreInfoFocus = true
+            layerState.chrome.onUserInteraction()
+            return@handle
+        }
         when (
             playerBackAction(
                 seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
@@ -1415,7 +1462,7 @@ fun VideoPlayerScreen(
         recordingNow = currentChannelId in recordingChannelIds,
         badges = chromeBadges(),
         picon = currentChannel?.icon,
-        artwork = controlsEvent?.image,
+        artwork = null, // Trial: the channel card shows the picon only.
         channelId = currentChannelId,
     )
 
@@ -1424,6 +1471,29 @@ fun VideoPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
+                if (layerState.infoOpen) {
+                    if (event.key == Key.Back) {
+                        // Rebuilding details can detach the KeyUp target. A fresh Back down is
+                        // still a new press, not a repeat of that unfinished revealing cycle.
+                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN && event.nativeKeyEvent.repeatCount == 0) {
+                            layerState.beginOpeningKeyCycle(keyCode)
+                            handlePlaybackBack()
+                        }
+                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
+                        return@onPreviewKeyEvent true
+                    }
+                    if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
+                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
+                        return@onPreviewKeyEvent true
+                    }
+                    // Details owns navigation; no playback or options key
+                    // (including Left-as-Back in the other panels) reaches the player underneath.
+                    return@onPreviewKeyEvent when (event.key) {
+                        Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> false
+                        else -> true
+                    }
+                }
                 if (handlePlayerStopKeyWithoutTarget(
                         event = event,
                         hasActiveTarget = playbackRuntime.activeTarget.value != null,
@@ -1535,10 +1605,10 @@ fun VideoPlayerScreen(
                         }
                     }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
-                        if (timelineState.seekPending) {
-                            timelineState.commitPendingSeek()
-                            restoreInfoFocus = event.key == Key.DirectionUp
-                        }
+                        if (timelineState.seekPending) timelineState.commitPendingSeek()
+                        // Trial: the Banner stands for the timeline row; Up reveals onto the channel
+                        // card above it, Down onto the action row below it.
+                        restoreInfoFocus = event.key == Key.DirectionUp
                         layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
@@ -1596,9 +1666,46 @@ fun VideoPlayerScreen(
                 foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
         }
         val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
+        LaunchedEffect(channelRailOpen, infoRailChannelId) {
+            if (!channelRailOpen && railFromCard && infoRailChannelId == null) {
+                railFromCard = false
+                railEntryStep = 0
+                restoreInfoFocus = true
+            }
+        }
+        // Trial: the rail opens from the channel card on its channel, stepping [direction] once it stands.
+        // A held key's further repeats are not swallowed: they run on through the rail.
+        val openRailFromCard: (Int) -> Unit = { direction ->
+            if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) {
+                openChannelDrawer()
+                railFromCard = true
+                // The rail opens on this channel, where the card was, and then slides the step in.
+                railEntryId = currentChannelId
+                railEntryStep = direction
+                // The preview names where the step lands from the start; at a list end it stays.
+                val index = channels.indexOfFirst { it.id == currentChannelId }
+                (channels.getOrNull(index + direction)?.takeIf { index >= 0 }?.id ?: currentChannelId)
+                    ?.let { selectedId = it }
+            }
+        }
+        PlayerPage(
+            railExpanded = layerState.channelRailPresented,
+            nowPlaying = {
+                NowPlayingStrip(currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
+                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec, imageLoader, currentSession)
+            },
+            details = (detailsChannel to detailsBaseEvent).takeIf {
+                layerState.infoOpen && (foregroundLayer == PlayerForegroundLayer.INFO ||
+                    foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
+            },
+            railHeader = if (layerState.channelRailPresented || programDetails.scheduleEntry && layerState.infoOpen) ({
+                val channel = channels.firstOrNull { it.id == (infoRailChannelId ?: selectedId) }
+                ProgrammeScheduleHeader(listOfNotNull(channel?.visibleChannelNumber?.toString(), channel?.name).joinToString(" · "))
+            }) else null,
+            player = { keepControls ->
         PlayerChrome(
             mode = playerChromeMode(
-                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen,
+                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
                 // A pending or dispatched step holds the Banner up after its own timer ran out.
                 banner = !channelUnavailable && (bannerSeekPreview != null ||
                     (layerState.chrome.bannerVisible && foregroundLayer == PlayerForegroundLayer.NONE)),
@@ -1632,6 +1739,7 @@ fun VideoPlayerScreen(
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
+                    infoReturnAction != null && !layerState.infoOpen -> infoReturnAction
                     restoreInfoFocus -> PlayerIdentityCardTag
                     restoreRecordActionFocus -> "player-record"
                     restoreOptionsFocus -> "player-settings"
@@ -1641,7 +1749,7 @@ fun VideoPlayerScreen(
             imageLoader = imageLoader,
             currentSession = currentSession,
             entry = layerState.chrome.controlsEntry,
-            panelOpen = layerState.optionsPage != null || layerState.infoOpen,
+            panelOpen = layerState.optionsPage != null,
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
                 dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
@@ -1661,24 +1769,39 @@ fun VideoPlayerScreen(
                 layerState.openOptions()
             },
             onInteraction = layerState.chrome::onUserInteraction,
-            onActionFocused = layerState::onActionFocused,
+            onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
             onFocusRestored = {
+                infoReturnAction = null
                 restoreInfoFocus = false
                 restoreRecordActionFocus = false
                 restoreOptionsFocus = false
                 layerState.onChannelActionRestored()
             },
+            // Trial: Down from the action row opens Info.
             onDownFromActions = {
-                if (channels.isNotEmpty()) {
-                    layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
-                    openChannelDrawer()
-                }
+                layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
+                openInfo(returnTo = lastChromeAction ?: "player-pause")
             },
+            downHint = stringResource(R.string.player_down_programme_info),
+            // Trial: a held Left/Right on the card opens the rail stepping that way; OK opens it in place.
+            onChannelStep = { direction, _ -> openRailFromCard(direction) },
+            onCardClick = { openRailFromCard(0) },
+            // Trial: a short Left/Right on the card changes channel like CH+/-: the first at once, a burst settles.
+            onChannelZap = { direction, keyTimeMs -> tuneAdjacentChannel(direction, keyTimeMs) },
+            // Trial: Up on the card focuses the last other channel's card above it; OK there switches.
+            recents = recentChannels.map(recentPeekOf),
+            onRecentPick = { index -> recentChannels.getOrNull(index)?.let { tuneChannel(it) } },
+            recentRowOpen = recentRowOpen,
+            onRecentRowOpenChange = { recentRowOpen = it },
+            onCardPlaced = { channelCardBounds = it },
+            channelCardHeld = channelRailOpen && railFromCard,
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { emphasisAlpha, controls ->
                 QuickZapPresentation(
-                    expanded = channelRailOpen,
-                    channelsAvailable = channels.isNotEmpty(),
+                    // Keep the departing rail expanded throughout its vertical step.
+                    expanded = layerState.channelRailPresented,
+                    // Trial: no peek, Down opens Info; the list keys still open the rail.
+                    channelsAvailable = false,
                     peekAlpha = emphasisAlpha,
                     channelContent = {
                         ChannelDrawer(
@@ -1699,6 +1822,23 @@ fun VideoPlayerScreen(
                                 if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
                                 layerState.dismissChannelDrawer()
                             },
+                            onOpenSchedule = { channel, keyCode ->
+                                layerState.beginOpeningKeyCycle(keyCode)
+                                infoRailChannelId = channel.id
+                                programDetails.reset(startOnSchedule = true)
+                                infoPendingAction = null
+                                infoMutation = null
+                                infoReturnAction = null
+                                infoOpenedFromRecord = false
+                                restoreRecordFocus = false
+                                restoreInfoFocus = false
+                                railEntryId = channel.id
+                                railEntryStep = 0
+                                layerState.openInfo()
+                            },
+                            entryFocusId = railEntryId.takeIf { channelRailOpen },
+                            entryStep = if (channelRailOpen) railEntryStep else 0,
+                            inPlace = true,
                         )
                     },
                     preview = {
@@ -1710,10 +1850,13 @@ fun VideoPlayerScreen(
                             nowSec = nowSec,
                             imageLoader = imageLoader,
                             currentSession = currentSession,
-                            modifier = Modifier.padding(horizontal = 64.dp),
+                            modifier = Modifier.padding(horizontal = PlayerChromeTokens.gridMargin),
+                            settleFirst = railEntryStep != 0,
                         )
                     },
                     controls = controls,
+                    // The rail opens out of the channel card, on its line.
+                    inPlaceAnchor = { channelCardBounds },
                 )
             },
         )
@@ -1729,50 +1872,101 @@ fun VideoPlayerScreen(
             modifier = Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()),
         )
 
-        PlayerPanelVisibility(
-            Unit.takeIf {
-                layerState.infoOpen &&
-                    (foregroundLayer == PlayerForegroundLayer.INFO ||
-                        foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
             },
-        ) {
+        ) { (shownChannel, shownEvent) ->
+            val shownChannelId = shownChannel?.id ?: shownEvent?.channelId ?: currentChannelId
+            val detailsIdentity = listOfNotNull(shownChannel?.visibleChannelNumber?.toString(), shownChannel?.name)
+                .joinToString(" · ")
+            val watch: (() -> Unit)? = shownChannel?.takeIf { it.id != currentChannelId }?.let { channel ->
+                {
+                    infoRailChannelId = null
+                    infoPendingAction = null
+                    infoMutation = null
+                    infoReturnAction = null
+                    layerState.closeInfo()
+                    railFromCard = false
+                    tuneChannel(channel)
+                }
+            }
             LiveProgrammeInfoOverlay(
-                event = infoEvent,
-                channelIdentity = buildString {
-                    currentChannelNumber?.let { number -> append("$number • ") }
-                    append(currentChannelName)
-                },
-                channelName = currentChannelName,
-                recordingScheduled = infoRecordingScheduled,
+                event = shownEvent,
+                channelIdentity = detailsIdentity,
+                channelName = shownChannel?.name.orEmpty(),
+                recordingScheduled = currentRecording != null,
                 canRecord = recordActionEligible,
-                recordingState = infoRecordingState,
-                confirmationVisible = confirmationVisible,
+                recordingState = LiveInfoRecordingState.Idle,
+                confirmationVisible = false,
                 restoreRecordFocus = restoreRecordFocus,
-                onRecord = {
-                    val event = actionableInfoEvent ?: return@LiveProgrammeInfoOverlay
-                    val capability = currentSession ?: return@LiveProgrammeInfoOverlay
-                    infoRecordingState = LiveInfoRecordingState.Confirming(
-                        event.programmeRecordingTarget(capability)
-                    )
-                    layerState.showRecordingConfirmation()
-                    restoreRecordFocus = false
-                },
-                onRecordingActivate = ::activateInfoRecording,
+                onRecord = { activateInfoRecording() },
+                onRecordingActivate = { activateInfoRecording() },
                 onRecordingDismiss = ::dismissRecordingDialog,
                 onClose = ::closeInfo,
+                onWatch = watch,
+                onUp = {
+                    layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_UP)
+                    closeInfo()
+                },
                 onRecordFocusRestored = { restoreRecordFocus = false },
-                hero = {
-                    ProgrammeHero(
-                        image = infoEvent?.image,
-                        channelId = currentChannelId,
-                        channelNumber = currentChannelNumber?.toString().orEmpty(),
-                        picon = currentChannel?.icon,
-                        imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        modifier = Modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight),
+                details = { recordFocus, firstFocus ->
+                    val shown = shownEvent ?: return@LiveProgrammeInfoOverlay
+                    val schedule = remember(observation, shownChannelId, shown.id) {
+                        channelSchedule(shown, { after -> observation.nextEvent(shownChannelId, after) })
+                    }
+                    ProgramDetails(
+                        state = programDetails,
+                        current = shown,
+                        schedule = schedule,
+                        nowSec = nowSec,
+                        channelIdentity = detailsIdentity,
+                        tile = { event, tileModifier ->
+                            ProgrammeHero(
+                                image = event.image,
+                                channelId = shownChannelId,
+                                channelNumber = shownChannel?.visibleChannelNumber?.toString().orEmpty(),
+                                picon = shownChannel?.icon,
+                                imageLoader = imageLoader,
+                                currentSession = currentSession,
+                                modifier = tileModifier,
+                                recordingBadge = observation.dvrEntryForEvent(event.id)?.state == DvrEntryState.RECORDING,
+                            )
+                        },
+                        recordingFor = { event -> observation.dvrEntryForEvent(event.id) },
+                        canModifyRecordings = canModifyRecordings,
+                        recordFocus = recordFocus,
+                        firstFocus = firstFocus,
+                        onAction = { action -> if (action == ProgrammeAction.WATCH) watch?.invoke() else activateInfoRecording(action) },
+                        busy = infoMutation != null && infoPendingAction == null,
+                        showWatch = watch != null,
+                        onClose = {
+                            layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_UP)
+                            closeInfo()
+                        },
                     )
                 },
             )
+            infoPendingAction?.let { action ->
+                ConfirmProgrammeActionDialog(action, actionableInfoEvent?.title.orEmpty(),
+                    onDismiss = ::dismissRecordingDialog, onConfirm = ::confirmInfoRecording,
+                    onPreviewKeyEvent = { event ->
+                        val code = event.nativeKeyEvent.keyCode
+                        when {
+                            playbackSuppressesRevealingKey(layerState.revealingKeyCode, code) -> {
+                                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(code)
+                                true
+                            }
+                            event.key == Key.Back -> {
+                                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN && event.nativeKeyEvent.repeatCount == 0) {
+                                    layerState.beginOpeningKeyCycle(code)
+                                    dismissRecordingDialog()
+                                }
+                                true
+                            }
+                            event.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter) -> false
+                            else -> true
+                        }
+                    })
+            }
         }
 
         PlaybackStatsVisibility(
@@ -1919,3 +2113,6 @@ private fun SessionObservation.dvrEntries(): List<DvrEntry> =
     dvrSnapshotForDisplay?.entries.orEmpty().takeIf {
         dvrSnapshotAuthority == RetainedMetadataAuthority.CURRENT
     }.orEmpty()
+
+/** Trial: how many recent channels the row above the channel card offers. */
+private const val RecentChannelCount = 3

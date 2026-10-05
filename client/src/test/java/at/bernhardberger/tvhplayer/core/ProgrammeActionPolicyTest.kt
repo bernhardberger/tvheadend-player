@@ -19,6 +19,39 @@ class ProgrammeActionPolicyTest {
     private val beforeStart = 1_799_999_900L
 
     @Test
+    fun airingProgrammeOffersWatchThenRecord() {
+        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.RECORD),
+            programmeActions(event, event.start.epochSeconds, null))
+    }
+
+    @Test
+    fun airingRecordingOffersWatchThenStopKeepingThePartialRecording() {
+        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+            programmeActions(event, event.start.epochSeconds, recording(DvrEntryState.RECORDING)))
+    }
+
+    @Test
+    fun airingScheduledRecordingOffersWatchThenCancelAtThePaddingEdge() {
+        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.CANCEL_RECORDING),
+            programmeActions(event, event.start.epochSeconds, recording(DvrEntryState.SCHEDULED)))
+    }
+
+    @Test
+    fun readOnlyAiringProgrammeOffersOnlyWatchForEveryRecordingState() {
+        listOf(null, recording(DvrEntryState.RECORDING), recording(DvrEntryState.SCHEDULED)).forEach {
+            assertEquals(listOf(ProgrammeAction.WATCH),
+                programmeActions(event, event.start.epochSeconds, it, canModifyRecordings = false))
+        }
+    }
+
+    @Test
+    fun endedProgrammeKeepsItsWatchFromStartPolicy() {
+        assertEquals(emptyList<ProgrammeAction>(), programmeActions(event, event.stop.epochSeconds, null))
+        assertEquals(listOf(ProgrammeAction.WATCH_FROM_START),
+            programmeActions(event, event.stop.epochSeconds, recording(DvrEntryState.COMPLETED)))
+    }
+
+    @Test
     fun runningRecordingOfUpcomingProgrammeOffersStopInsteadOfCancel() {
         assertEquals(
             listOf(ProgrammeAction.STOP_RECORDING),

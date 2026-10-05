@@ -72,6 +72,9 @@ class GuideHistoryScreenTest {
     @Test fun pendingStopConsumesInterruptedEnter() = exercise("en", 1f, "stop", activationKeyCode = android.view.KeyEvent.KEYCODE_ENTER)
     @Test fun pendingCancelConsumesInterruptedNumpadEnter() = exercise("en", 1f, "cancel", activationKeyCode = android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
     @Test fun pendingStopConsumesInterruptedNumpadEnter() = exercise("en", 1f, "stop", activationKeyCode = android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
+    @Test fun airingRecordUsesExistingConfirmationAndScheduleExecution() = exercise("en", 1f, "airing-record")
+    @Test fun airingStopUsesExistingConfirmationAndKeepsPartialRecording() = exercise("en", 1f, "airing-stop")
+    @Test fun airingScheduledEntryUsesExistingCancelConfirmation() = exercise("en", 1f, "airing-cancel")
 
     private fun exercise(locale: String, scale: Float, transition: String? = null, replaceSession: Boolean = false,
         activationKeyCode: Int = android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
@@ -85,7 +88,7 @@ class GuideHistoryScreenTest {
         val current = channels.flatMap { channel -> (0..3).map { event(channel.id.value, it) } }
         val history = channels.flatMap { channel -> (-6..-1).map { event(channel.id.value, it) } }
         var archiveFuture = false
-        var recordingState = if (transition == "cancel") DvrEntryState.SCHEDULED else DvrEntryState.RECORDING
+        var recordingState = if (transition == "cancel" || transition == "airing-cancel") DvrEntryState.SCHEDULED else DvrEntryState.RECORDING
         fun observation(withHistory: Boolean) = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels)),
@@ -95,8 +98,8 @@ class GuideHistoryScreenTest {
                         coveredTo = Instant.fromEpochSeconds(hour + 7 * 86400)) })),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = if (transition == "details") listOf(
                 DvrEntry.create(id = DvrEntryId(42), eventId = event(1, -1).id, state = DvrEntryState.COMPLETED))
-                else if (transition == "cancel" || transition == "stop") listOf(
-                    DvrEntry.create(id = DvrEntryId(42), eventId = event(1, 1).id, state = recordingState))
+                else if (transition in listOf("cancel", "stop", "airing-cancel", "airing-stop")) listOf(
+                    DvrEntry.create(id = DvrEntryId(42), eventId = event(1, if (transition?.startsWith("airing-") == true) 0 else 1).id, state = recordingState))
                 else emptyList())),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(if (transition == "config") listOf(
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", "")) else emptyList()),
@@ -144,6 +147,32 @@ class GuideHistoryScreenTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
+        if (transition?.startsWith("airing-") == true) {
+            key(Key.DirectionCenter)
+            compose.onNodeWithText(context.getString(R.string.watch)).assertIsFocused()
+            val label = context.getString(when (transition) {
+                "airing-stop" -> R.string.stop_recording
+                "airing-cancel" -> R.string.cancel_recording
+                else -> R.string.record
+            })
+            when (transition) {
+                "airing-stop" -> session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
+                "airing-cancel" -> session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
+                else -> session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(42)))
+            }
+            val call = when (transition) {
+                "airing-stop" -> FakeSessionCall.DVR_STOP_ENTRY
+                "airing-cancel" -> FakeSessionCall.DVR_CANCEL_ENTRY
+                else -> FakeSessionCall.DVR_SCHEDULE_ENTRY
+            }
+            compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithText(context.getString(R.string.back)).assertIsFocused()
+            assertEquals(0, session.calls.count { it == call })
+            compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.waitUntil(5_000) { session.calls.count { it == call } == 1 }
+            if (transition == "airing-stop") assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+            return
+        }
         if (transition != null) {
             key(if (transition == "details") Key.DirectionLeft else Key.DirectionRight)
             focused(if (transition == "details") "Channel 1 hour -1" else "Channel 1 hour 1")

@@ -79,15 +79,16 @@ class PlayerIdentityCardTest {
         chrome(PlayerChromeMode.CONTROLS)
         val card = bounds("player-identity-card")
         val bar = bounds("player-info-bar")
-        assertEquals("one height, whatever the programme block holds", 90f, card.height, 0.5f)
-        assertEquals("one width, 16:9", 160f, card.width, 0.5f)
+        assertEquals("one height, whatever the programme block holds", 110f, card.height, 0.5f)
+        assertEquals("one width, three grid columns", 196f, card.width, 0.5f)
         assertEquals("it stands on the info bar's bottom edge", bar.bottom, card.bottom, 0.5f)
         val mark = bounds(if (exists("player-identity-logo")) "player-identity-logo" else "player-identity-name")
         assertEquals("the mark is centred across the card", card.center.x, mark.center.x, 0.5f)
-        assertEquals("the mark is centred down the card", card.center.y, mark.center.y, 0.5f)
+        assertEquals("the mark is lifted clear of the number", card.center.y - 6f, mark.center.y, 0.5f)
         assertEquals("on the bar row's start edge", bounds("player-timeline-labels").left, card.left, 0.5f)
-        assertEquals("1", compose.onNodeWithTag("player-identity-number", useUnmergedTree = true).fetchSemanticsNode()
-            .config.getOrNull(SemanticsProperties.Text)?.single()?.text)
+        val label = compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).fetchSemanticsNode()
+            .config.getOrNull(SemanticsProperties.Text)?.single()?.text
+        assertTrue("the number leads the label: $label", label?.startsWith("1") == true)
     }
 
     @Test fun everyLineKeepsItsPlaceBesideTheCardWhateverTheProgrammeHas() {
