@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="456" viewBox="0 0 1080 456">
+  <!-- Original illustrative programme artwork for the local design study.
+       Synthetic scenery, not a TVHeadend-provided asset or production fallback. -->
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#42666e"/><stop offset="1" stop-color="#b3c2bc"/></linearGradient>
+    <linearGradient id="water" x2="0" y2="1"><stop stop-color="#426f77"/><stop offset="1" stop-color="#173a48"/></linearGradient>
+    <linearGradient id="rock" x2=".7" y2="1"><stop stop-color="#405b59"/><stop offset="1" stop-color="#162c32"/></linearGradient>
+    <radialGradient id="light"><stop stop-color="#f6dbaa" stop-opacity=".55"/><stop offset="1" stop-color="#f6dbaa" stop-opacity="0"/></radialGradient>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1080v456H0z"/>
+  <ellipse cx="766" cy="121" rx="230" ry="161" fill="url(#light)"/>
+  <circle cx="766" cy="103" r="28" fill="#e6d6b5" opacity=".85"/>
+  <path fill="#748b88" d="M0 248 115 168 190 221 338 120 464 223 573 145 708 242 867 157 1080 258V456H0z"/>
+  <path fill="#d0d9d2" opacity=".8" d="m268 183 70-63 67 58-52-19-17 10-16-10zm258 5 47-43 51 47-45-20-9 12z"/>
+  <path fill="url(#water)" d="M0 244h1080v212H0z"/>
+  <g fill="none" stroke="#9eb8b6" stroke-width="2" opacity=".23">
+    <path d="M489 264h303m-128 16h190m-316 16h232m-87 20h231m-366 24h242m-56 21h160m-279 28h236m-120 29h183"/>
+  </g>
+  <path fill="url(#rock)" d="m0 131 119 61 44 63 87 19 22 31 128 42 34 44 168 65H0z"/>
+  <path fill="#77968a" opacity=".58" d="m0 131 119 61 44 63 87 19 22 31 128 42-45-12-104-13-24-28-75-13-48-69L0 170z"/>
+  <path fill="#264750" d="m1080 208-102 59-22 34-79 39-37 18 17 12 92-27 67-18 64-14z"/>
+  <path fill="#101e24" opacity=".35" d="M0 395q260-13 390 61H0z"/>
+</svg>

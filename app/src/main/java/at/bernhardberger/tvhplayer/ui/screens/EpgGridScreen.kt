@@ -17,8 +17,11 @@ import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.calculateEndPadding
@@ -27,11 +30,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,8 +65,11 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseVisibleWidthPx
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
@@ -149,6 +157,18 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.JumpToTimeDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.ProgrammeDetailsPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
+import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
+import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusHalfGrowth
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideNowLine
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideViewportFades
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
 import java.time.Instant
@@ -162,7 +182,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
-import kotlin.math.max
 
 private data class GuideTabBody(
     val scope: ChannelScopeState,
@@ -181,6 +200,8 @@ private data class GuideTabBody(
     val needsSettings: Boolean,
     val permissionDenied: Boolean,
     val coveragePending: (ChannelId) -> Boolean,
+    val earlierContent: Boolean,
+    val laterContent: Boolean,
 )
 
 private const val CHANNEL_PAGE_SIZE = 6
@@ -258,13 +279,15 @@ private val emptyGuideIndex = TimelineEpgEventIndex(emptyMap(), emptySet(), empt
 internal fun guideTimelineContentPadding(
     contentPadding: PaddingValues,
     layoutDirection: LayoutDirection,
+    terminalReserve: Dp = 0.dp,
 ): PaddingValues = PaddingValues(
-    start = contentPadding.calculateStartPadding(layoutDirection),
-    top = 2.dp,
-    end = 0.dp,
-    bottom = contentPadding.calculateBottomPadding() + 2.dp,
+    start = contentPadding.calculateStartPadding(layoutDirection) + TvBrowseLeadingInset,
+    top = 8.dp,
+    end = terminalReserve,
+    bottom = maxOf(contentPadding.calculateBottomPadding(), GuideEdgeFade + GuideFocusReserve),
 )
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun EpgGridScreen(
     contentPadding: PaddingValues = PaddingValues(),
@@ -286,14 +309,28 @@ fun EpgGridScreen(
     notices: NoticeCenter = koinInject(),
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
 ) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
     val layoutDirection = LocalLayoutDirection.current
+    val density = LocalDensity.current
     ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
-    val timelineContentPadding = guideTimelineContentPadding(
-        contentPadding = contentPadding,
-        layoutDirection = layoutDirection,
-    )
+    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - GuideChannelWidth - GuideChannelGap)
+        .coerceAtLeast(1.dp)
+    val timelineWidthPx = with(density) { timelineWidth.toPx() }
+    // TV Material's native ListItem focus scale is 1.05; reserve its largest possible
+    // half-growth as well as the normal 8dp breathing room, including long programmes.
+    val horizontalFocusReserve = maxOf(GuideFocusReserve, (timelineWidth - 8.dp) * GuideFocusHalfGrowth)
+    val timeLabelWidth = rememberTextMeasurer().measure(
+        "00:00", style = MaterialTheme.typography.labelMedium,
+    ).size.width
+    // Capacity already budgets the outer safe area. Do not subtract terminal padding again.
+    val visibleWindowSec = guideVisibleWindowSec(timelineWidthPx, timeLabelWidth, density.density)
+    val platformBringIntoView = LocalBringIntoViewSpec.current
+    val verticalFocusInset = with(density) { (GuideEdgeFade + GuideFocusReserve).toPx() }
+    val guideBringIntoView = remember(platformBringIntoView, verticalFocusInset) {
+        InsetBringIntoViewSpec(platformBringIntoView, verticalFocusInset, verticalFocusInset)
+    }
     val coroutineScope = rememberCoroutineScope()
     val dvrMutationActions = remember(session.dvrRepository) {
         DvrMutationActions(session.dvrRepository)
@@ -342,8 +379,12 @@ fun EpgGridScreen(
 
     val guideZoneId = remember { ZoneId.systemDefault() }
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
-    val windowBounds = remember(openedAtSec, guideZoneId) {
+    val coverageWindowBounds = remember(openedAtSec, guideZoneId) {
         guideWindowBounds(openedAtSec, guideZoneId)
+    }
+    val windowBounds = remember(coverageWindowBounds, visibleWindowSec) {
+        // Narrower text-driven capacity must not shorten the domain's seven-day horizon.
+        coverageWindowBounds.copy(latestStartSec = coverageWindowBounds.latestStartSec + GUIDE_VISIBLE_WINDOW_SEC - visibleWindowSec)
     }
     val nowSecProvider = rememberCurrentEpochSeconds()
     // Player Back re-enters on the playing channel at wall-clock now. Outside the current
@@ -377,9 +418,10 @@ fun EpgGridScreen(
                 ?: floorGuideWindowToHour(openedAtSec, guideZoneId)
         )
     }
-    val windowEndSec = windowStartSec + GUIDE_VISIBLE_WINDOW_SEC
+    val windowEndSec = windowStartSec + visibleWindowSec
     var selectedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
     var realizedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
+    var lastFocusedEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
     val gridFocus = remember { FocusRequester() }
     var scopeEntryRequested by remember { mutableStateOf(false) }
     var suppressActivationRelease by remember { mutableStateOf(false) }
@@ -580,6 +622,29 @@ fun EpgGridScreen(
             )
         }
     }
+    val edgeEvents = remember(preparedIndex, orderedChannelIds) {
+        val ids = orderedChannelIds.toSet()
+        preparedIndex?.input?.let { input ->
+            input.events.filter { it.channelId in ids && it.matchesProgrammeCategory(input.category) }
+        }.orEmpty()
+    }
+    val earlierContent = edgeEvents.any {
+        it.start.epochSeconds < windowStartSec && it.stop.epochSeconds > windowBounds.earliestStartSec
+    }
+    val laterContent = edgeEvents.any {
+        it.stop.epochSeconds > windowEndSec && it.start.epochSeconds < windowBounds.latestStartSec + visibleWindowSec
+    }
+    val focusStartInset = horizontalFocusReserve + if (earlierContent) GuideEdgeFade else 0.dp
+    val focusEndInset = horizontalFocusReserve + if (laterContent) GuideEdgeFade else 0.dp
+    val terminalReserve = guideTerminalViewportReserve(
+        earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
+    )
+    val focusTrackWidthPx = timelineWidthPx - with(density) { terminalReserve.roundToPx() }
+    fun focusWindowFor(event: EpgEventEntry): Long = guideFocusWindowStart(
+        event.start.epochSeconds, event.stop.epochSeconds, windowStartSec, visibleWindowSec,
+        focusTrackWidthPx, with(density) { focusStartInset.toPx() }, with(density) { focusEndInset.toPx() },
+        windowBounds.earliestStartSec, windowBounds.latestStartSec,
+    )
     fun channelPageRange(channelIndex: Int): IntRange {
         if (channels.isEmpty()) return 0 until 0
         val boundedIndex = channelIndex.coerceIn(channels.indices)
@@ -597,14 +662,17 @@ fun EpgGridScreen(
         val capability = currentSession ?: return null
         val ids = channelPageIds(channelIndex)
         if (ids.isEmpty()) return null
-        val boundedAnchorSec = windowBounds.constrain(anchorSec)
-        if (boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC <= nowSecProvider()) return null
+        val displayAnchorSec = windowBounds.constrain(anchorSec)
+        if (displayAnchorSec + visibleWindowSec <= nowSecProvider()) return null
+        // Acquisition retains its existing three-hour span and seven-day bound; only
+        // presentation capacity shrinks with text. Track pending work by the shown window.
+        val boundedAnchorSec = coverageWindowBounds.constrain(displayAnchorSec)
         val through = KotlinInstant.fromEpochSeconds(
             boundedAnchorSec + GUIDE_VISIBLE_WINDOW_SEC
         )
         return coverageRequests.request(
             channelIds = ids,
-            windowStartSec = boundedAnchorSec,
+            windowStartSec = displayAnchorSec,
         ) { channelIds ->
             // The SDK takes its metadata monitor before its first suspension. Keep that
             // potentially contended non-UI call off Main; request generations and their
@@ -854,6 +922,17 @@ fun EpgGridScreen(
             return@LaunchedEffect
         }
         val current = selectedTarget
+        // Owned focus in retained history returns to the header if that metadata vanishes.
+        // A focus-safe fractional window can also show live cells, unlike a wholly past
+        // page; those incidental neighbours must not silently take the removed target.
+        if (current != null && lastFocusedEvent?.let {
+                it.id == current.eventId && it.stop.epochSeconds <= nowSecProvider()
+            } == true && focusRows.getOrNull(current.channelIndex)?.events?.none { it.id == current.eventId } != false
+        ) {
+            selectedTarget = null
+            if (mayFocusProgramme) focusGuideHeader()
+            return@LaunchedEffect
+        }
         val preferredIndex = current?.channelIndex
             ?: pendingInitialChannelIndex.takeIf { it >= 0 }
             ?: 0
@@ -1018,6 +1097,10 @@ fun EpgGridScreen(
     LaunchedEffect(
         selectedTarget,
         windowStartSec,
+        visibleWindowSec,
+        focusTrackWidthPx,
+        earlierContent,
+        laterContent,
         channels,
         initialFocusEnabled,
         mayFocusProgramme,
@@ -1044,20 +1127,7 @@ fun EpgGridScreen(
         val event = focusRows.getOrNull(target.channelIndex)?.events
             ?.firstOrNull { it.id == target.eventId }
             ?: return@LaunchedEffect
-        val targetWindow = when {
-            event.start.epochSeconds < windowStartSec ->
-                windowBounds.constrain(
-                    floorGuideWindowToHour(event.start.epochSeconds, guideZoneId)
-                )
-            event.stop.epochSeconds > windowEndSec ->
-                windowBounds.constrain(
-                    floorGuideWindowToHour(
-                        max(event.start.epochSeconds - 30 * 60L, 0L),
-                        guideZoneId,
-                    )
-                )
-            else -> windowStartSec
-        }
+        val targetWindow = focusWindowFor(event)
         if (targetWindow != windowStartSec) {
             if (retainGridFocus()) windowStartSec = targetWindow
             return@LaunchedEffect
@@ -1107,7 +1177,7 @@ fun EpgGridScreen(
         val frontierEvents = withContext(Dispatchers.Default) {
             displayEvents.filter {
                 it.channelId == request.channelId &&
-                    it.stop.epochSeconds > request.throughSec - GUIDE_VISIBLE_WINDOW_SEC &&
+                    it.stop.epochSeconds > request.throughSec - visibleWindowSec &&
                     it.start.epochSeconds < request.throughSec &&
                     it.matchesProgrammeCategory(category)
             }
@@ -1133,7 +1203,7 @@ fun EpgGridScreen(
         if (coverageSettled && target != null) {
             if (mayFocusProgramme && !retainGridFocus()) return@LaunchedEffect
             pendingInitialChannelIndex = target.channelIndex
-            windowStartSec = request.throughSec - GUIDE_VISIBLE_WINDOW_SEC
+            windowStartSec = request.throughSec - visibleWindowSec
             selectedTarget = target
         } else if (
             shouldWaitForGuideCoverage(
@@ -1323,7 +1393,7 @@ fun EpgGridScreen(
             preferredChannelId = preferredChannelId,
             windowStartSec = boundedTargetSec,
             coverageRequest = coverageRequest,
-            throughSec = boundedTargetSec + GUIDE_VISIBLE_WINDOW_SEC,
+            throughSec = boundedTargetSec + visibleWindowSec,
         )
     }
 
@@ -1392,21 +1462,27 @@ fun EpgGridScreen(
                 val currentEvent = focusRows[current.channelIndex].events
                     .firstOrNull { it.id == current.eventId }
                     ?: return true
-                val targetWindowStartSec = windowBounds.constrain(
-                    windowStartSec + GUIDE_VISIBLE_WINDOW_SEC * move.timeFrontierDirection
-                )
-                if (targetWindowStartSec == windowStartSec) return true
                 val boundarySec = if (move.timeFrontierDirection > 0) {
                     currentEvent.stop.epochSeconds
                 } else {
                     currentEvent.start.epochSeconds
                 }
+                // A display-sized step can still land wholly inside a long programme.
+                // Reach its edge so the adjacent programme is eligible in the next window.
+                val targetWindowStartSec = windowBounds.constrain(
+                    if (move.timeFrontierDirection > 0) {
+                        maxOf(windowStartSec + visibleWindowSec, boundarySec)
+                    } else {
+                        minOf(windowStartSec - visibleWindowSec, boundarySec - visibleWindowSec)
+                    }
+                )
+                if (targetWindowStartSec == windowStartSec) return true
                 val originWindowStartSec = windowStartSec
-                if (targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC <= nowSecProvider()) {
+                if (targetWindowStartSec + visibleWindowSec <= nowSecProvider()) {
                     val channelId = channels[current.channelIndex].id
                     val pastEvents = displayEvents.filter { it.channelId == channelId &&
                         it.stop.epochSeconds > targetWindowStartSec &&
-                        it.start.epochSeconds < targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC &&
+                        it.start.epochSeconds < targetWindowStartSec + visibleWindowSec &&
                         it.matchesProgrammeCategory(category) }
                     val target = timelineFrontierFocus(
                         rows = listOf(EpgFocusColumn(channelId, pastEvents)), channelId = channelId,
@@ -1428,7 +1504,7 @@ fun EpgGridScreen(
                     direction = move.timeFrontierDirection,
                     originWindowStartSec = originWindowStartSec,
                     coverageRequest = coverageRequest,
-                    throughSec = targetWindowStartSec + GUIDE_VISIBLE_WINDOW_SEC,
+                    throughSec = targetWindowStartSec + visibleWindowSec,
                 )
                 return true
             }
@@ -1447,7 +1523,7 @@ fun EpgGridScreen(
                 val event = focusRows.getOrNull(next.channelIndex)?.events
                     ?.firstOrNull { it.id == next.eventId }
                 if (mayFocusProgramme && event != null &&
-                    event.start.epochSeconds >= windowStartSec && event.stop.epochSeconds <= windowEndSec &&
+                    focusWindowFor(event) == windowStartSec &&
                     channelListState.layoutInfo.visibleItemsInfo.any { it.index == next.channelIndex }
                 ) {
                     // Attached, visible cells can accept native focus in this key dispatch.
@@ -1591,10 +1667,14 @@ fun EpgGridScreen(
                 },
                 modifier = Modifier
                     .padding(
-                        start = startPadding,
+                        start = startPadding + TvBrowseLeadingInset,
                         top = contentPadding.calculateTopPadding(),
-                        end = endPadding,
-                    ),
+                        end = maxOf(endPadding, TvBrowseTrailingInset),
+                    )
+                    .heightIn(min = with(density) {
+                        maxOf(40.dp, MaterialTheme.typography.headlineMedium.lineHeight.toDp(),
+                            MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
+                    }),
                 actions = {
                     OutlinedButton(
                         onClick = {
@@ -1725,6 +1805,7 @@ fun EpgGridScreen(
             )
             if (hasScopeTabs) {
                 Spacer(Modifier.height(TvSpacing8))
+                Box(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(bottom = 8.dp)) {
                 ChannelTagSelector(
                     tags = channelScope.tags,
                     activeTagId = channelScope.activeTagId,
@@ -1740,7 +1821,7 @@ fun EpgGridScreen(
                     activeFocusRequester = scopeFocus,
                     onMoveToContent = { leaveGuideScope() },
                     modifier = Modifier
-                        .padding(start = startPadding)
+                        .padding(start = startPadding + TvBrowseLeadingInset)
                         .onFocusChanged {
                             if (it.hasFocus) {
                                 profileTrace("P48:focus:guideScope") { }
@@ -1758,8 +1839,9 @@ fun EpgGridScreen(
                             }
                         },
                 )
+                }
             }
-            Spacer(Modifier.height(TvSpacing8))
+            Spacer(Modifier.height(4.dp))
             TabContent(
                 motion = scopeMotion,
                 selectedKey = channelScope.activeTagId,
@@ -1775,6 +1857,7 @@ fun EpgGridScreen(
                                 coverageRequests.isPending(channelId, preparedIndex.input.windowStartSec)
                             }
                         },
+                        earlierContent, laterContent,
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -1789,7 +1872,7 @@ fun EpgGridScreen(
             val eventsByChannel = timelineEventIndex.visibleEventsByChannel
             val orderedChannelIds = frame.ids
             val channelNumbers = frame.numbers
-            val windowStartSec = frame.windowStart
+            val renderedWindowStartSec = frame.windowStart
             val windowEndSec = frame.windowEnd
             val nowSecProvider = rememberTabReader(frame.nowSec)
             val tagNotice = frame.tagNotice
@@ -1798,6 +1881,13 @@ fun EpgGridScreen(
             val needsGuideSettings = frame.needsSettings
             val permissionDenied = frame.permissionDenied
             val channelListState = rememberTabListState(channelListState)
+            val terminalReserve = guideTerminalViewportReserve(
+                frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
+            )
+            val timelineContentPadding = guideTimelineContentPadding(contentPadding, layoutDirection, terminalReserve)
+            // Match layout's rounded padding so the continuous Now line and ruler coincide.
+            val terminalReservePx = with(density) { terminalReserve.roundToPx().toFloat() }
+            val trackWidthPx = timelineWidthPx - terminalReservePx
             UnavailableTagNotice(
                 visible = tagNotice,
                 onDismiss = { if (owner.isCurrent) channelViewModel.dismissUnavailableTagNotice() },
@@ -1836,23 +1926,33 @@ fun EpgGridScreen(
                 )
             } else {
                 TimelineTimeRuler(
-                    windowStartSec = windowStartSec,
-                    windowEndSec = windowStartSec + GUIDE_VISIBLE_WINDOW_SEC,
+                    windowStartSec = renderedWindowStartSec,
+                    windowEndSec = windowEndSec,
                     nowSecProvider = nowSecProvider,
+                    earlierContent = frame.earlierContent,
+                    laterContent = frame.laterContent,
                     modifier = Modifier.padding(
                         start = timelineContentPadding.calculateStartPadding(layoutDirection),
                         end = timelineContentPadding.calculateEndPadding(layoutDirection),
                     ),
                 )
-                Spacer(Modifier.height(4.dp))
+                val trackLeftPx = if (layoutDirection == LayoutDirection.Ltr) {
+                    with(density) { (startPadding + TvBrowseLeadingInset + GuideChannelWidth + GuideChannelGap).toPx() }
+                } else terminalReservePx
+                Box(Modifier.weight(1f).fillMaxWidth()
+                    .guideViewportFades(trackLeftPx, trackWidthPx, frame.earlierContent, frame.laterContent,
+                        above = { channelListState.canScrollBackward }, below = { channelListState.canScrollForward })
+                    .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
+                        MaterialTheme.colorScheme.primary)
+                    .testTag("epg-timeline-content")) {
+                CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
                 LazyColumn(
                     state = channelListState,
                     userScrollEnabled = owner.isCurrent,
                     contentPadding = timelineContentPadding,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth()
+                        .fillMaxSize()
                         .then(if (owner.isCurrent) Modifier.focusRequester(gridFocus) else Modifier)
                         .tabFocus()
                         .onPreviewKeyEvent { event ->
@@ -1898,7 +1998,7 @@ fun EpgGridScreen(
                             ),
                             selectedEventId = selected?.takeIf { it.channelIndex == channelIndex }?.eventId,
                             eventFocusRequesters = eventFocusRequesters,
-                            windowStartSec = windowStartSec,
+                            windowStartSec = renderedWindowStartSec,
                             windowEndSec = windowEndSec,
                             nowSecProvider = nowSecProvider,
                             imageLoader = imageLoader,
@@ -1922,6 +2022,7 @@ fun EpgGridScreen(
                                     if (settled || !programmeFocusOwned || selectedTarget == null) selectedTarget = target
                                     programmeFocusOwned = true
                                     if (target == selectedTarget) {
+                                        lastFocusedEvent = event
                                         selection.setSelected(channel.id)
                                         guidePositionStore.save(GuidePosition(
                                             channelId = channel.id,
@@ -1958,8 +2059,12 @@ fun EpgGridScreen(
                                     timelineContentPadding.calculateStartPadding(layoutDirection).roundToPx()
                                 },
                             ),
+                            focusStartInset = horizontalFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
+                            focusEndInset = horizontalFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
                         )
                     }
+                }
+                }
                 }
             }
             }
@@ -2214,6 +2319,7 @@ fun EpgGridScreen(
             )
         }
 
+    }
     }
 }
 

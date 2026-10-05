@@ -137,36 +137,45 @@ class DepthMotionEvidenceTest {
 
     /**
      * The overlap lets departing columns remain visible beneath the rail.
-     * The protective gradient must dim them, and navigation remains on top.
+     * The protective gradient must dim outgoing columns. A returning active
+     * column stays above that gradient, even while crossing the same overlap.
      */
     @Test
     fun depthMotionPassesBeneathProtectedDrawer() {
         shell()
-        assertEquals(128f, bounds("depth-active").left, .5f)
+        assertEquals(130f, bounds("depth-active").left, .5f)
         val reference = draw()
         var sawOverflow = false
-        fun checkOverlap(frame: Bitmap, label: String) {
+        var sawActiveInkAboveBacking = false
+        fun checkOverlap(frame: Bitmap, label: String, outgoing: Boolean) {
             // Below the header and above the first nav icon: only departing
             // Settings rows can contribute ink here, never a drawer item.
             for (x in 16..70) for (y in 120..170) {
                 val pixel = Color(frame.getPixel(x, y))
-                if (frame.getPixel(x, y) != reference.getPixel(x, y)) sawOverflow = true
-                assertTrue("overflow must be subdued at $label", pixel.red < 0.7f)
+                if (outgoing) {
+                    if (frame.getPixel(x, y) != reference.getPixel(x, y)) sawOverflow = true
+                    assertTrue("outgoing overflow must be subdued at $label", pixel.red < 0.7f)
+                } else if (pixel.red >= .7f) {
+                    // On pop the child exits toward the preview, never this band.
+                    // Returning root ink (including focus overflow) is now active.
+                    sawActiveInkAboveBacking = true
+                }
             }
             write("drawer-overlap-$label", frame)
         }
 
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        depthFrames("push") { frame, label -> checkOverlap(frame, label) }
+        depthFrames("push") { frame, label -> checkOverlap(frame, label, outgoing = true) }
         settle()
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.Back) }
-        depthFrames("pop") { frame, label -> checkOverlap(frame, label) }
+        depthFrames("pop") { frame, label -> checkOverlap(frame, label, outgoing = false) }
         settle()
 
-        assertEquals(128f, bounds("depth-active").left, .5f)
+        assertEquals(130f, bounds("depth-active").left, .5f)
         assertTrue("departing content must remain visible beneath the rail", sawOverflow)
+        assertTrue("returning active content stays above the backing", sawActiveInkAboveBacking)
     }
 
     /**
@@ -696,7 +705,7 @@ class DepthMotionEvidenceTest {
     }
 
     private fun previewLeft(): Int =
-        (compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot.left + 460f).toInt()
+        (compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot.left + 432f).toInt()
 
     private fun bandHasInk(bitmap: Bitmap, left: Int, top: Int, bottom: Int): Boolean {
         val right = minOf(left + 352, bitmap.width)

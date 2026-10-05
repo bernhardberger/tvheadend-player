@@ -10,13 +10,13 @@ import org.junit.Test
 
 class ChannelsViewportPaddingTest {
     @Test
-    fun browseContentRetainsLeadingInsetAndUsesEdgeToEdgeTrailingViewport() {
+    fun browseContentAddsGridInsetAndUsesEdgeToEdgeTrailingViewport() {
         val padding = channelsBrowseViewportPadding(
             contentPadding = PaddingValues(start = 24.dp, end = 48.dp),
             layoutDirection = LayoutDirection.Ltr,
         )
 
-        assertEquals(24.dp, padding.calculateStartPadding(LayoutDirection.Ltr))
+        assertEquals(38.dp, padding.calculateStartPadding(LayoutDirection.Ltr))
         assertEquals(0.dp, padding.calculateEndPadding(LayoutDirection.Ltr))
     }
 
@@ -27,7 +27,7 @@ class ChannelsViewportPaddingTest {
             layoutDirection = LayoutDirection.Rtl,
         )
 
-        assertEquals(48.dp, padding.calculateStartPadding(LayoutDirection.Rtl))
+        assertEquals(62.dp, padding.calculateStartPadding(LayoutDirection.Rtl))
         assertEquals(0.dp, padding.calculateEndPadding(LayoutDirection.Rtl))
     }
 
@@ -40,7 +40,7 @@ class ChannelsViewportPaddingTest {
         )
 
         assertEquals(0.dp, padding.calculateStartPadding(LayoutDirection.Ltr))
-        assertEquals(48.dp, padding.calculateEndPadding(LayoutDirection.Ltr))
+        assertEquals(58.dp, padding.calculateEndPadding(LayoutDirection.Ltr))
         assertEquals(0.dp, padding.calculateTopPadding())
         assertEquals(32.dp, padding.calculateBottomPadding())
         assertEquals(

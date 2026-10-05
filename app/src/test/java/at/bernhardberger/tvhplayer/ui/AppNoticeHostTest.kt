@@ -35,6 +35,7 @@ import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationSt
 import at.bernhardberger.tvhplayer.ui.notifications.*
 import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.player.PlayerOverlayChrome
+import at.bernhardberger.tvhplayer.ui.player.LocalPlayerPageActive
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsGeneralLevels
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
@@ -91,6 +92,7 @@ class AppNoticeHostTest {
 
     @Test fun measuredFooterLiftsShellNoticeAndDisposalRestoresBottomAnchor() {
         var footerVisible by mutableStateOf(true)
+        var pageActive by mutableStateOf(true)
         var footerHeight by mutableStateOf(100.dp)
         val queue = NoticeCenter({ 0L }, { NoticeContext(0, null) })
         compose.setContent {
@@ -98,8 +100,10 @@ class AppNoticeHostTest {
                 MainStartupComposition(MainStartupCompositionState(MainStartupPresentation.Inactive, ChannelsKey, true),
                     onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
                     navigation = { _, _ ->
-                        if (footerVisible) PlayerOverlayChrome(headerContent = {}, footerPadding = PaddingValues(0.dp)) {
-                            Box(Modifier.height(footerHeight))
+                        CompositionLocalProvider(LocalPlayerPageActive provides pageActive) {
+                            if (footerVisible) PlayerOverlayChrome(headerContent = {}, footerPadding = PaddingValues(0.dp)) {
+                                Box(Modifier.height(footerHeight))
+                            }
                         }
                     },
                     notices = { AppNoticeHost(queue, queue.context(), LocalAppNoticeBottomObstruction.current!!.value) })
@@ -117,6 +121,12 @@ class AppNoticeHostTest {
         assertTrue("Inset changes should animate: $movingBottom", movingBottom > 362f && movingBottom < 412f)
         compose.mainClock.autoAdvance = true
         assertBottom(362f)
+        compose.runOnIdle { pageActive = false }
+        assertBottom(512f)
+        compose.runOnIdle { footerHeight = 125.dp }
+        assertBottom(512f)
+        compose.runOnIdle { pageActive = true }
+        assertBottom(387f)
         compose.runOnIdle { footerVisible = false }
         assertBottom(512f)
     }

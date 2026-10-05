@@ -5,7 +5,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -33,6 +35,7 @@ fun PiconBox(
     currentSession: CurrentSessionObservation? = null,
     contentScale: ContentScale = ContentScale.Fit,
     alignment: Alignment = Alignment.Center,
+    placeholderTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) = profileTrace("P1:compose:picon") {
     val piconUrl = remember(currentSession, piconPath) {
         currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
@@ -43,12 +46,13 @@ fun PiconBox(
         contentAlignment = alignment
     ) {
         if (piconUrl == null) {
-            PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f))
+            PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f), tint = placeholderTint)
         } else {
             val icon = painterResource(R.drawable.ic_live_tv_outlined)
-            val tint = MaterialTheme.colorScheme.onSurfaceVariant
-            val loading = remember(icon, tint) { PiconPlaceholderPainter(icon, tint, PICON_LOADING_ALPHA) }
-            val failed = remember(icon, tint) { PiconPlaceholderPainter(icon, tint, 1f) }
+            // Keep Coil's fallback painters stable across focus changes; only their draw tint changes.
+            val tint = rememberUpdatedState(placeholderTint)
+            val loading = remember(icon) { PiconPlaceholderPainter(icon, tint, PICON_LOADING_ALPHA) }
+            val failed = remember(icon) { PiconPlaceholderPainter(icon, tint, 1f) }
             AsyncImage(
                 model = piconUrl,
                 imageLoader = imageLoader,
@@ -66,14 +70,14 @@ fun PiconBox(
 
 private class PiconPlaceholderPainter(
     private val icon: Painter,
-    tint: Color,
+    private val tint: State<Color>,
     private val opacity: Float,
 ) : Painter() {
-    private val colorFilter = ColorFilter.tint(tint)
     // Let the image's allocated bounds size the placeholder, independently of contentScale.
     override val intrinsicSize = Size.Unspecified
 
     override fun DrawScope.onDraw() {
+        val colorFilter = ColorFilter.tint(tint.value)
         val side = size.minDimension
         translate((size.width - side) / 2f, (size.height - side) / 2f) {
             with(icon) { draw(Size(side, side), alpha = opacity, colorFilter = colorFilter) }
@@ -85,6 +89,7 @@ private class PiconPlaceholderPainter(
 fun PiconPlaceholder(
     modifier: Modifier = Modifier,
     initials: String? = null,
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
 ) {
     if (!initials.isNullOrBlank()) {
         androidx.tv.material3.Text(
@@ -96,7 +101,7 @@ fun PiconPlaceholder(
         Icon(
             painter = painterResource(R.drawable.ic_live_tv_outlined),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            tint = tint,
             modifier = modifier,
         )
     }

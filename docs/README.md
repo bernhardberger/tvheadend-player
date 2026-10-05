@@ -39,6 +39,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 
 | Document | Scope and lifecycle |
 |---|---|
+| `browse-cohesion-proposal.md` | Native browse baseline and accepted shared-grid/Archive-depth follow-up; implementation, verification/review status and remaining physical-TV observations. Separately labeled feature proposals remain deferred. |
 | `responsive-ui-foundations-plan.md` | Current browse-performance contracts, delivered foundation and remaining navigation, Guide/cached-startup and physical acceptance gates. Optimized 0.2.53 deployed; assessment pending. |
 | `programme-window-prototype.md` | Programme-window Player prototype behavior, interaction checks and current experiment boundaries. |
 | `defect-ledger.md` | Open and closed defects from the post-SDK-refactor player stabilisation. Read when working on live-player performance or interaction defects; close rows only with the named evidence. |

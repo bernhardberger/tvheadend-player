@@ -127,17 +127,17 @@ class NavigationShellEvidenceTest {
         settingsShell(1f)
 
         assertEquals(80f, drawerWidth(), .5f)
-        assertEquals(128f, bounds("depth-active").left, .5f)
-        assertEquals(352f, bounds("depth-active").width, .5f)
-        assertEquals(588f, derivedPreviewLeft(bounds("depth-active")), .5f)
+        assertEquals(130f, bounds("depth-active").left, .5f)
+        assertEquals(340f, bounds("depth-active").width, .5f)
+        assertEquals(562f, derivedPreviewLeft(bounds("depth-active")), .5f)
 
         openDrawer()
 
         assertEquals(280f, drawerWidth(), .5f)
         // The expanded drawer pushes the unchanged viewport: same width, 200dp over.
-        assertEquals(328f, bounds("depth-active").left, .5f)
-        assertEquals(352f, bounds("depth-active").width, .5f)
-        assertEquals(788f, derivedPreviewLeft(bounds("depth-active")), .5f)
+        assertEquals(330f, bounds("depth-active").left, .5f)
+        assertEquals(340f, bounds("depth-active").width, .5f)
+        assertEquals(762f, derivedPreviewLeft(bounds("depth-active")), .5f)
     }
 
     @Test
@@ -441,7 +441,7 @@ class NavigationShellEvidenceTest {
         compose.waitForIdle()
         capture("$prefix-drawer-open-no-playback", drawerOpen = true)
 
-        assertEquals(128f + 200f, bounds("depth-active").left, .5f)
+        assertEquals(130f + 200f, bounds("depth-active").left, .5f)
     }
 
     /**

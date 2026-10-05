@@ -370,14 +370,12 @@ internal fun ProgrammeDetailsPanel(
     ).filter { liveProgrammeActions || it !in setOf(ProgrammeAction.WATCH, ProgrammeAction.RECORD) }
     val actionFocus = remember { ProgrammeAction.entries.associateWith { FocusRequester() } }
     val closeFocus = remember { FocusRequester() }
-    var focusedAction by remember(event.id) { mutableStateOf(actions.firstOrNull()) }
+    val contentFocus = remember { FocusRequester() }
+    var focusedAction by remember(event.id) { mutableStateOf<ProgrammeAction?>(null) }
     // Capture before apply can automatically move focus from a removed action to Close.
     val removedFocusTarget = if (focusedAction != null && focusedAction !in actions) {
         actions.firstOrNull()?.let(actionFocus::get) ?: closeFocus
     } else null
-    LaunchedEffect(event.id) {
-        (focusedAction?.let(actionFocus::get) ?: closeFocus).requestFocus()
-    }
     LaunchedEffect(actions) {
         // A surviving action (including Close) retains ownership during DVR publication.
         removedFocusTarget?.requestFocus()
@@ -399,9 +397,13 @@ internal fun ProgrammeDetailsPanel(
         contentPadding = contentPadding,
         overlay = notices,
     ) {
+        // Enter at the scrollable description, or the first action when there is no body.
+        // Request from the dialog's composition, after its focus targets are attached.
+        LaunchedEffect(event.id) { contentFocus.requestFocus() }
         ProgrammeContentDetails(
             event = event,
             subtitle = subtitle,
+            modifier = Modifier.focusRequester(contentFocus),
             footer = {
                 recording?.let {
                     Row(

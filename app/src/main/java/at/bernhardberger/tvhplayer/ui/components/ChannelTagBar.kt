@@ -8,15 +8,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -56,28 +64,41 @@ fun ChannelTagSelector(
     if (scopes.isEmpty()) return
 
     val activeIndex = scopes.indexOfFirst { it.first == activeTagId }.coerceAtLeast(0)
+    var hasFocus by remember { mutableStateOf(false) }
+    var focusedTagId by remember { mutableStateOf<ChannelTagId?>(null) }
+    val focusedIndex = if (hasFocus) scopes.indexOfFirst { it.first == focusedTagId } else -1
+    // Focus commits immediately; the parent's scope echo may arrive after native scrolling starts.
+    // Keep the native pill and tab colours on that focus target, not the delayed echo.
+    val selectedIndex = focusedIndex.takeIf { it >= 0 } ?: activeIndex
     val layoutDirection = LocalLayoutDirection.current
     val edgeFadeState = remember(scopes) { TabEdgeFadeState() }
     AppTabRow(
-        selectedTabIndex = activeIndex,
+        selectedTabIndex = selectedIndex,
         style = AppTabStyle.Page,
         selectedTabFocus = activeFocusRequester,
-        onMoveToContent = onMoveToContent,
         modifier = modifier
             .fillMaxWidth()
+            .onFocusChanged { hasFocus = it.hasFocus }
+            .onPreviewKeyEvent { event ->
+                event.type == KeyEventType.KeyDown &&
+                    event.key == Key.DirectionDown &&
+                    onMoveToContent()
+            }
             .onGloballyPositioned(edgeFadeState::updateViewportBounds)
             .navigationEdgeFadeMask(
                 width = TvNavigationRailGradientRunout,
                 maskEnabled = {
                     edgeFadeState.availableFadeWidthPx(
-                        activeIndex = activeIndex,
+                        activeIndex = selectedIndex,
+                        focusedIndex = focusedIndex,
                         layoutDirection = layoutDirection,
                         maximumWidthPx = Float.MAX_VALUE,
                     ) > 0f
                 },
                 availableWidthPx = {
                     edgeFadeState.availableFadeWidthPx(
-                        activeIndex = activeIndex,
+                        activeIndex = selectedIndex,
+                        focusedIndex = focusedIndex,
                         layoutDirection = layoutDirection,
                         maximumWidthPx = TvNavigationRailGradientRunout.toPx(),
                     )
@@ -85,25 +106,28 @@ fun ChannelTagSelector(
             ),
     ) {
         scopes.forEachIndexed { index, (tagId, label) ->
-            val selected = index == activeIndex
-            AppTab(
-                selected = selected,
-                label = label,
-                labelModifier = Modifier.widthIn(max = ChannelScopeItemMaxWidth),
-                onFocus = {
-                    onTagFocus()
-                    edgeFadeState.updateFocusedIndex(index)
-                    onSelectTag(tagId)
-                },
-                onClick = {
-                    onSelectTag(tagId)
-                    onMoveToContent()
-                },
-                modifier = Modifier
-                    .onGloballyPositioned { coordinates ->
-                        edgeFadeState.updateTabBounds(index, coordinates)
+            key(tagId) {
+                val selected = index == selectedIndex
+                AppTab(
+                    selected = selected,
+                    focusTarget = index == activeIndex,
+                    label = label,
+                    labelModifier = Modifier.widthIn(max = ChannelScopeItemMaxWidth),
+                    onFocus = {
+                        focusedTagId = tagId
+                        onTagFocus()
+                        onSelectTag(tagId)
                     },
-            )
+                    onClick = {
+                        onSelectTag(tagId)
+                        onMoveToContent()
+                    },
+                    modifier = Modifier
+                        .onGloballyPositioned { coordinates ->
+                            edgeFadeState.updateTabBounds(index, coordinates)
+                        },
+                )
+            }
         }
     }
 }
@@ -111,7 +135,6 @@ fun ChannelTagSelector(
 private class TabEdgeFadeState {
     private val viewportBounds = mutableStateOf(Rect.Zero)
     private val tabBounds = mutableStateMapOf<Int, Rect>()
-    private val focusedIndex = mutableIntStateOf(-1)
 
     fun updateViewportBounds(coordinates: LayoutCoordinates) {
         viewportBounds.value = coordinates.unclippedBoundsInRoot()
@@ -121,21 +144,17 @@ private class TabEdgeFadeState {
         tabBounds[index] = coordinates.unclippedBoundsInRoot()
     }
 
-    fun updateFocusedIndex(index: Int) {
-        focusedIndex.intValue = index
-    }
-
     fun availableFadeWidthPx(
         activeIndex: Int,
+        focusedIndex: Int,
         layoutDirection: LayoutDirection,
         maximumWidthPx: Float,
     ): Float {
         val viewport = viewportBounds.value
         val active = tabBounds[activeIndex] ?: return 0f
-        val focusedTabIndex = focusedIndex.intValue
-        val focused = tabBounds[focusedTabIndex]
+        val focused = tabBounds[focusedIndex]
         val hasDepartingInactiveTab = tabBounds.any { (index, bounds) ->
-            index != activeIndex && index != focusedTabIndex && when (layoutDirection) {
+            index != activeIndex && index != focusedIndex && when (layoutDirection) {
                 LayoutDirection.Ltr -> bounds.left < viewport.left && bounds.right > viewport.left
                 LayoutDirection.Rtl -> bounds.right > viewport.right && bounds.left < viewport.right
             }

@@ -176,13 +176,18 @@ internal fun <T> TabContent(
             key(body.owner) {
                 DisposableEffect(body.owner) { onDispose(body.owner::release) }
                 CompositionLocalProvider(LocalTabOwner provides body.owner) {
-                    Column(
-                        Modifier.fillMaxSize()
-                            .then(if (body.owner.isCurrent) Modifier else Modifier.clearAndSetSemantics { })
-                            .onPreviewKeyEvent { !body.owner.isCurrent }
-                            .focusProperties { onEnter = { if (!body.owner.isCurrent) cancelFocusChange() } }
-                            .focusGroup(),
-                    ) { content(body.state, body.owner) }
+                    // Visual currentness follows the rendered body, not a request
+                    // that has already revoked action ownership while still loading.
+                    BrowseContentLayer(departing = body !== target) { layer ->
+                        Column(
+                            Modifier.fillMaxSize()
+                                .then(layer)
+                                .then(if (body.owner.isCurrent) Modifier else Modifier.clearAndSetSemantics { })
+                                .onPreviewKeyEvent { !body.owner.isCurrent }
+                                .focusProperties { onEnter = { if (!body.owner.isCurrent) cancelFocusChange() } }
+                                .focusGroup(),
+                        ) { content(body.state, body.owner) }
+                    }
                 }
             }
         }

@@ -83,13 +83,14 @@ internal class AppTabScope internal constructor(
         canFocus: Boolean = true,
         first: Boolean = false,
         last: Boolean = false,
+        focusTarget: Boolean = selected,
     ) {
         with(row) {
             Tab(
                 selected = selected,
                 onFocus = onFocus,
                 onClick = onClick,
-                modifier = modifier.then(if (selected) Modifier.focusRequester(selectedFocus) else Modifier).focusProperties {
+                modifier = modifier.then(if (focusTarget) Modifier.focusRequester(selectedFocus) else Modifier).focusProperties {
                     this.canFocus = canFocus
                     if (first) start = FocusRequester.Cancel
                     if (last) end = FocusRequester.Cancel

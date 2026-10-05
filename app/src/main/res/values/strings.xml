@@ -67,6 +67,7 @@
 
     <!-- Channels dense row and focused details (C3b) -->
     <string name="channel_details_timing">%1$s – %2$s · %3$d min</string>
+    <string name="channels_preview_time_range">%1$s – %2$s</string>
 
     <!-- Settings screen -->
     <string name="settings_server">Connection</string>

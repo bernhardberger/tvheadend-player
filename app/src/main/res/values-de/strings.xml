@@ -63,6 +63,7 @@
     <string name="epg_time_duration">Zeit: %1$s – %2$s • Dauer: %3$d Min.</string>
 
     <string name="channel_details_timing">%1$s – %2$s · %3$d Min.</string>
+    <string name="channels_preview_time_range">%1$s – %2$s</string>
 
     <string name="settings_server">Verbindung</string>
     <string name="settings_general">Allgemein</string>

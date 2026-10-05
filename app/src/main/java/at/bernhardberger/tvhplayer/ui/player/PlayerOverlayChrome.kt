@@ -81,7 +81,8 @@ internal fun PlayerOverlayChrome(
     var footerObstruction by remember { mutableStateOf(0.dp) }
     // Notices rest at the screen's bottom while the page below the controls is in view.
     val pageActive = LocalPlayerPageActive.current
-    SideEffect { noticeObstruction?.value = if (pageActive) footerObstruction else 0.dp }
+    val bottomObstruction = if (pageActive) footerObstruction else 0.dp
+    SideEffect { noticeObstruction?.value = bottomObstruction }
     SideEffect {
         viewport?.footerHeight = { footerHeight + scrimRise() }
     }
