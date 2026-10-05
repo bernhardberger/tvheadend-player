@@ -6,66 +6,43 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInRoot
-import kotlin.math.roundToInt
-import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
+import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 
-/** One motion value coordinates departing chrome and the persistent, peeking channel row. */
+/**
+ * One motion value coordinates the departing footer and the rail rising beneath it, as one
+ * vertical step. The rail rests where the footer was; the page scrim follows the same value.
+ */
 @Composable
 internal fun QuickZapPresentation(
     expanded: Boolean,
-    channelsAvailable: Boolean,
     channelContent: @Composable () -> Unit,
-    peekAlpha: () -> Float = { 1f },
     preview: @Composable () -> Unit,
     controls: @Composable () -> Unit,
-    /**
-     * The channel card's bounds in root coordinates. With it, the rail opens out of the card:
-     * its cards on the card's line, revealed sideways from the card, and nothing travels up.
-     */
-    inPlaceAnchor: (() -> Rect?)? = null,
 ) {
-    val railPeek = LocalPlayerRailPeek.current.takeIf { inPlaceAnchor != null }
-    // Keep the card reveal intact until its peek has faded away. The peek starts only at the
-    // expansion's settled end, not at a guessed delay after the opening key.
-    val holdForPeek = railPeek != null && (railPeek.currentState || !railPeek.isIdle)
     val expansion = animateFloatAsState(
-        if (expanded || holdForPeek) 1f else 0f,
+        if (expanded) 1f else 0f,
         animationSpec = if (expanded) {
             tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
         } else {
@@ -74,100 +51,22 @@ internal fun QuickZapPresentation(
         label = "quick-zap-expansion",
     )
     val revealed by remember(expansion) { derivedStateOf { expansion.value == 1f } }
+    val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
+    // The schedule header peeks only once the rail stands, and leaves before it folds away.
+    val railPeek = LocalPlayerRailPeek.current
     LaunchedEffect(expanded, revealed, railPeek) { railPeek?.targetState = expanded && revealed }
-    var previewHeight by remember { mutableIntStateOf(0) }
-    if (inPlaceAnchor != null) {
-        InPlaceRail(expanded, expansion::value, inPlaceAnchor, channelContent, preview, controls)
-        return
-    }
-    Box(Modifier.fillMaxSize().clipToBounds()) {
-        Box(
-            Modifier.fillMaxSize()
-                .focusProperties { canFocus = !expanded }
-                .then(if (expanded) Modifier.clearAndSetSemantics { } else Modifier)
-                .graphicsLayer {
-                    translationY = -48.dp.toPx() * expansion.value
-                    alpha = 1f - expansion.value
-                }
-                .testTag("player-zap-controls"),
-        ) { controls() }
-        if (channelsAvailable || expanded) {
-            Box(
-                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .graphicsLayer {
-                        alpha = if (expanded) 1f else peekAlpha()
-                        // 12dp focus reserve + 24dp of actual card remains at the bottom.
-                        // The passive preview slot above the cards stays below the peek.
-                        val previewSlot = TvOverlayFooterGradientRunout.toPx() + previewHeight.toFloat()
-                        translationY = (size.height - 36.dp.toPx() - previewSlot) * (1f - expansion.value)
-                    }
-                    // The preview sits above the cards, so the scrim keeps the info bar's
-                    // bottom-anchored stops instead of stretching over the tray. While peeking,
-                    // the tray's top reaches over the transport row, which already sits on the
-                    // controls' own scrim; only the open tray adds one.
-                    .drawBehind {
-                        val span = PlayerChromeTokens.bottomScrimSpan.toPx().coerceAtMost(size.height)
-                        if (expansion.value > 0f) drawRect(
-                            Brush.verticalGradient(
-                                *PlayerChromeTokens.bottomScrimStops,
-                                startY = size.height - span,
-                                endY = size.height,
-                            ),
-                            topLeft = Offset(0f, size.height - span),
-                            size = size.copy(height = span),
-                            alpha = expansion.value,
-                        )
-                    }
-                    .padding(bottom = 32.dp)
-                    .testTag("player-zap-tray"),
-            ) {
-                Column {
-                    // The scrim's clear runout, so the preview text rests on the dark stops.
-                    Spacer(Modifier.height(TvOverlayFooterGradientRunout))
-                    Box(
-                        Modifier.fillMaxWidth()
-                            // Measured with the gap, so the peek offset keeps the cards' top edge.
-                            .onSizeChanged { previewHeight = it.height }
-                            .padding(bottom = PlayerChromeTokens.previewCardGap)
-                            .heightIn(min = PlayerChromeTokens.previewSlotHeight)
-                            .graphicsLayer { alpha = expansion.value }
-                            .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
-                            .testTag("player-zap-preview-slot"),
-                        contentAlignment = Alignment.BottomStart,
-                    ) { preview() }
-                    channelContent()
-                }
-            }
-        }
-    }
-}
-
-/** The cards' top focus reserve inside the rail, above the first card's top edge. */
-private val RailTopInset = 12.dp
-
-@Composable
-private fun InPlaceRail(
-    expanded: Boolean,
-    expansion: () -> Float,
-    anchor: () -> Rect?,
-    channelContent: @Composable () -> Unit,
-    preview: @Composable () -> Unit,
-    controls: @Composable () -> Unit,
-) {
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    var previewTop by remember { mutableIntStateOf(0) }
-    var pageTravel by remember { mutableIntStateOf(0) }
+    var viewportHeight by remember { mutableIntStateOf(0) }
+    var railHeight by remember { mutableIntStateOf(0) }
     val pageProgress = LocalPlayerPageProgress.current
     val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
-    val revealed by remember(expansion) { derivedStateOf { expansion() == 1f } }
     val viewport = LocalPlayerPageScrim.current
     val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
-    androidx.compose.runtime.SideEffect {
-        scrim.previewTop = { previewTop.toFloat() }
-        scrim.expansion = expansion
+    SideEffect {
+        scrim.previewTop = { (viewportHeight - railHeight).toFloat() }
+        scrim.expansion = expansion::value
     }
-    androidx.compose.runtime.DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
-    Box(Modifier.fillMaxSize().clipToBounds().onGloballyPositioned { origin = it.positionInRoot() }) {
+    DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
+    Box(Modifier.fillMaxSize().clipToBounds().onSizeChanged { viewportHeight = it.height }) {
         if (viewport == null) Box(Modifier.matchParentSize().playerScrim(scrim))
         Box(
             Modifier.fillMaxSize()
@@ -175,86 +74,37 @@ private fun InPlaceRail(
                 .then(if (expanded) Modifier.clearAndSetSemantics { } else Modifier)
                 .testTag("player-zap-controls"),
         ) {
-            // The controls' footer gives way to the rail; their header (clock, top scrim) stays.
-            CompositionLocalProvider(LocalInPlaceRailExpansion provides expansion,
+            // The footer gives way to the rail; the header (clock, top scrim) stays.
+            CompositionLocalProvider(LocalRailExpansion provides expansion::value,
                 LocalPlayerPageScrim provides scrim) { controls() }
         }
-        if (!expanded && expansion() == 0f) return@Box
-        // Revealed sideways from the card's own bounds, its growing edges faded. Masked per child,
-        // so the offscreen buffer covers only the preview and the cards, never the whole screen.
-        fun reveal(preview: Boolean = false) = if (revealed) Modifier else Modifier
-            .graphicsLayer {
-                // Preview opacity and mask opacity share the same child-sized buffer.
-                alpha = (expansion() * 2.5f).coerceAtMost(1f) * if (preview) expansion() else 1f
-                compositingStrategy = CompositingStrategy.Offscreen
-            }
-            .drawWithContent {
-                if (expansion() == 0f) return@drawWithContent
-                drawContent()
-                val e = expansion()
-                val card = anchor() ?: return@drawWithContent
-                val left = (card.left - origin.x) * (1f - e)
-                val right = (card.right - origin.x) + (size.width - (card.right - origin.x)) * e
-                val feather = RevealFeather.toPx()
-                val from = left - feather
-                val span = (right + feather) - from
-                drawRect(
-                    Brush.horizontalGradient(
-                        0f to Color.Transparent,
-                        (feather / span) to Color.Black,
-                        ((span - feather) / span) to Color.Black,
-                        1f to Color.Transparent,
-                        startX = from, endX = right + feather,
-                    ),
-                    blendMode = BlendMode.DstIn,
-                )
-            }
-        Layout(
-            content = {
-                Box(
-                    Modifier.padding(bottom = PlayerChromeTokens.previewCardGap)
-                        .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
-                            dy = (-120).dp, entering = false) else Modifier)
-                        .then(reveal(preview = true))
-                        .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
-                        .testTag("player-zap-preview-slot"),
-                    contentAlignment = Alignment.BottomStart,
-                ) { preview() }
-                // Only the moving reveal needs a feather mask; there is no edge at rest.
-                Box(Modifier.then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
-                    entering = false, alphaWindow = 60..260, dyPx = { -pageTravel.toFloat() }) else Modifier)
-                    .then(reveal())
-                    .testTag("player-zap-tray")) {
-                    CompositionLocalProvider(LocalChannelCardLift provides expansion) { channelContent() }
-                }
-            },
-            modifier = Modifier.fillMaxSize(),
-        ) { measurables, constraints ->
-            val loose = constraints.copy(minWidth = constraints.maxWidth, minHeight = 0)
-            val previewPlaceable = measurables[0].measure(loose)
-            val railPlaceable = measurables[1].measure(loose)
-            val card = anchor()
-            // Without a card to open from, the rail keeps the card's usual line above the timeline.
-            val top = if (leavingPage) previewTop + previewPlaceable.height
-                else card?.let { (it.top - origin.y).roundToInt() - RailTopInset.roundToPx() }
-                ?: (constraints.maxHeight - railPlaceable.height - 96.dp.roundToPx())
-            // The card travels with the departing footer; its scrim stays at the rail's rest.
-            if (!leavingPage) previewTop = top - previewPlaceable.height
-            // Same travel and window as the next item's headline: neither can overtake the other.
-            pageTravel = constraints.maxHeight - 96.dp.roundToPx()
-            layout(constraints.maxWidth, constraints.maxHeight) {
-                previewPlaceable.place(0, top - previewPlaceable.height)
-                railPlaceable.place(0, top)
-            }
+        if (!shown && !expanded) return@Box
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .onSizeChanged { railHeight = it.height }
+                .graphicsLayer { translationY = size.height * (1f - expansion.value) }
+                .padding(bottom = TvOverlayBottomPadding),
+        ) {
+            Box(
+                Modifier.fillMaxWidth()
+                    .padding(bottom = PlayerChromeTokens.previewCardGap)
+                    .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
+                        dy = (-120).dp, entering = false) else Modifier)
+                    .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
+                    .testTag("player-zap-preview-slot"),
+                contentAlignment = Alignment.BottomStart,
+            ) { preview() }
+            // Leaves entirely above the viewport, further and so faster than the headline rising beneath it.
+            Box(
+                Modifier.fillMaxWidth()
+                    .then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
+                        entering = false, alphaWindow = 60..260,
+                        dyPx = { viewportHeight.toFloat() * -1f }) else Modifier)
+                    .testTag("player-zap-tray"),
+            ) { channelContent() }
         }
     }
 }
 
-/** How far the in-place rail has opened, for the controls' footer to give way to it. */
-internal val LocalInPlaceRailExpansion = compositionLocalOf<() -> Float> { { 0f } }
-
-/** How far the rail's opening has raised the picon of the card it opens over, from the player card's centre; fully outside the in-place rail. */
-internal val LocalChannelCardLift = compositionLocalOf<() -> Float> { { 1f } }
-
-/** The soft edge of the rail's sideways reveal. */
-private val RevealFeather = 96.dp
+/** How far the rail has opened, for the controls' footer to give way to it. */
+internal val LocalRailExpansion = compositionLocalOf<() -> Float> { { 0f } }

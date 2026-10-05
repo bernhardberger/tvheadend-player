@@ -288,7 +288,7 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
-        recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-seekbar", "player-seekbar", backdrop, expectPeek = false)
+        recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-seekbar", "player-seekbar", backdrop)
     }
 
     @Test
@@ -311,7 +311,7 @@ class PlayerFooterLayoutEvidenceTest {
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
-        recordPair("en-font1.0-960x540-mdpi-d1", "seeking-preview-focus-seekbar", "player-seekbar", backdrop, expectPeek = false)
+        recordPair("en-font1.0-960x540-mdpi-d1", "seeking-preview-focus-seekbar", "player-seekbar", backdrop)
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -334,14 +334,14 @@ class PlayerFooterLayoutEvidenceTest {
         val resting = bounds("player-timeline-track")
         assertEquals(px(4.dp + 8.dp), bounds(actionsTag).top - bounds(timelineTag).bottom, 1f)
         assertEquals(504f, bounds(actionsTag).bottom, 1f)
-        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-resting", "player-pause", backdrop, !recording)
+        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-resting", "player-pause", backdrop)
         key(Key.DirectionUp)
         compose.onNodeWithTag(timelineTag).assertIsFocused()
-        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-focused", timelineTag, backdrop, false)
+        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-focused", timelineTag, backdrop)
         compose.runOnIdle { previewing = true }
         compose.onNodeWithTag("player-pause").assertDoesNotExist()
         compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertExists()
-        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-seeking", timelineTag, backdrop, false)
+        recordPair("de-font1.3-960x540-mdpi-d1", "$kind-seeking", timelineTag, backdrop)
         key(Key.DirectionDown)
         compose.onNodeWithTag("player-pause").assertIsFocused()
         assertTrue(previewing) // Owner deliberately leaves the dispatched seek pending.
@@ -412,7 +412,7 @@ class PlayerFooterLayoutEvidenceTest {
         }
         assertMarker(0.75f)
         recordPair(if (fontScale == 1f) "en-font1.0-960x540-mdpi-d1" else "de-font1.3-960x540-mdpi-d1",
-            "recording-marker-selected-75", "recording-marker-target", backdrop, expectPeek = false)
+            "recording-marker-selected-75", "recording-marker-target", backdrop)
         key(Key.DirectionLeft)
         assertMarker(0.25f)
         key(Key.DirectionLeft)
@@ -623,7 +623,7 @@ class PlayerFooterLayoutEvidenceTest {
         val text = compose.onNodeWithText("0:30:00", useUnmergedTree = true)
         val original = text.fetchSemanticsNode().boundsInRoot
         val track = bounds("player-timeline-track")
-        recordPair("en-font1.0-960x540-mdpi-d1", "recording-playing-endpoints", "player-pause", backdrop, false)
+        recordPair("en-font1.0-960x540-mdpi-d1", "recording-playing-endpoints", "player-pause", backdrop)
         compose.runOnIdle { paused = true }
         assertEquals(original, text.fetchSemanticsNode().boundsInRoot)
         assertEquals(track, bounds("player-timeline-track"))
@@ -632,7 +632,7 @@ class PlayerFooterLayoutEvidenceTest {
             .config[SemanticsProperties.ContentDescription].joinToString()
         assertTrue(description.contains("Paused"))
         compose.onNodeWithText("Paused", substring = true).assertDoesNotExist()
-        recordPair("en-font1.0-960x540-mdpi-d1", "recording-paused-endpoints", "player-pause", backdrop, false)
+        recordPair("en-font1.0-960x540-mdpi-d1", "recording-paused-endpoints", "player-pause", backdrop)
     }
 
     @Test
@@ -918,10 +918,8 @@ class PlayerFooterLayoutEvidenceTest {
                             currentSession = session,
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             onCommitSeek = onCommitSeek,
-                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(
+                            controlsDecoration = { _, controls -> QuickZapPresentation(
                               expanded = false,
-                              channelsAvailable = true,
-                              peekAlpha = emphasisAlpha,
                               preview = {},
                               controls = controls,
                               channelContent = {
@@ -985,12 +983,10 @@ class PlayerFooterLayoutEvidenceTest {
         state: String,
         focusedTag: String,
         backdrop: androidx.compose.runtime.MutableState<Backdrop>,
-        expectPeek: Boolean = true,
     ) {
         for (next in Backdrop.entries) {
             compose.runOnIdle { backdrop.value = next }
             compose.waitForIdle()
-            val peek = measurePeek(focusedTag)
             val name = "$prefix-${next.fileName}-$state"
             capture(name)
             val note = buildString {
@@ -1001,48 +997,12 @@ class PlayerFooterLayoutEvidenceTest {
                 appendLine("fontScale=${if (prefix.contains("font1.3")) "1.3" else "1.0"}")
                 appendLine("backdrop=${next.fileName}")
                 appendLine("focus=$focusedTag")
-                appendLine("focusedBottomPx=${peek.focusedBottom}")
-                appendLine("trayVisualTopPx=${peek.trayVisualTop}")
-                appendLine("cardPeekTopPx=${peek.cardPeekTop}")
-                appendLine("layoutClearancePx=${peek.clearance}")
+                appendLine("focusedBottomPx=${bounds(focusedTag).bottom}")
             }
             for (directory in captureDirectories()) {
                 File(directory, "$name.txt").writeText(note)
             }
-            if (expectPeek) assertTrue("production card peek missing in $name: $note", peek.cardPeekTop != null)
         }
-    }
-
-    private fun measurePeek(focusedTag: String): PeekMeasure {
-        val bitmap = draw()
-        val trayVisualTop = bitmap.height - 36
-        var cardTop: Int? = null
-        for (y in trayVisualTop until bitmap.height) {
-            var cardPixels = 0
-            for (x in 48 until bitmap.width - 48 step 2) {
-                val pixel = bitmap.getPixel(x, y)
-                val red = (pixel shr 16) and 0xFF
-                val green = (pixel shr 8) and 0xFF
-                val blue = pixel and 0xFF
-                val card = kotlin.math.abs(red - 12) <= 2 &&
-                    kotlin.math.abs(green - 15) <= 2 &&
-                    kotlin.math.abs(blue - 16) <= 2
-                val picon = blue > 180 && green > 150 && red in 70..160
-                if (card || picon) cardPixels++
-            }
-            if (cardPixels > 12) {
-                cardTop = y
-                break
-            }
-        }
-        bitmap.recycle()
-        val focusedBottom = bounds(focusedTag).bottom
-        return PeekMeasure(
-            focusedBottom = focusedBottom,
-            trayVisualTop = trayVisualTop,
-            cardPeekTop = cardTop,
-            clearance = cardTop?.minus(focusedBottom),
-        )
     }
 
     private fun capture(name: String, focus: String = "player-pause") {
@@ -1107,13 +1067,6 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     private enum class Backdrop(val fileName: String) { WHITE("white"), TEXTURED("backdrop") }
-
-    private data class PeekMeasure(
-        val focusedBottom: Float,
-        val trayVisualTop: Int,
-        val cardPeekTop: Int?,
-        val clearance: Float?,
-    )
 }
 
 /** A live quick step on the hidden player, as the screen composes it: the passive Banner's preview timeline. */

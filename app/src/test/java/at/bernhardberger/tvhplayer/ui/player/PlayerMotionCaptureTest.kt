@@ -210,7 +210,7 @@ class PlayerMotionCaptureTest {
                 railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
                 player = {
                     live(loader, session, behind = false,
-                        rail = layers.takeIf { rail }, downHint = "Program info".takeUnless { rail })
+                        rail = layers.takeIf { rail }, downHint = "Channels".takeUnless { rail })
                 }) {
                 LiveProgrammeInfoOverlay(
                     event = programme, channelIdentity = "1 · Documentary", channelName = "Documentary",
@@ -243,7 +243,7 @@ class PlayerMotionCaptureTest {
             repeat(2) { compose.mainClock.advanceTimeByFrame() }
             compose.mainClock.advanceTimeBy(16, ignoreFrameDuration = true)
             capture("rail-opening-16ms", directory = "ui-page-scroll",
-                focus = "rail entering from the card", timing = "16 ms after reveal start")
+                focus = "rail rising from below", timing = "16 ms after reveal start")
             compose.mainClock.advanceTimeBy(1_000)
         }
         capture("$pair-rest", directory = "ui-page-scroll")
@@ -363,11 +363,10 @@ class PlayerMotionCaptureTest {
         mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
         entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
         panelOpen: Boolean = false,
-        /** The in-place channel rail over the controls, as the live player shows it. */
+        /** The channel rail below the controls, as the live player shows it. */
         rail: LivePlayerLayerState? = null,
         downHint: String? = null,
     ) {
-        var railAnchor by remember { mutableStateOf<Rect?>(null) }
         val timeshift = AppTimeshiftState(
             available = true,
             bufferStartMs = -600_000,
@@ -400,12 +399,9 @@ class PlayerMotionCaptureTest {
             panelOpen = panelOpen,
             downHint = downHint,
             decorationCoversControls = rail?.channelDrawerOpen == true,
-            onCardPlaced = { railAnchor = it },
             controlsDecoration = { _, controls ->
                 if (rail == null) controls() else QuickZapPresentation(
                     expanded = rail.channelRailPresented,
-                    channelsAvailable = true,
-                    inPlaceAnchor = { railAnchor },
                     preview = { QuickZapTrayPreview(
                         channel = channels.first(), event = programme, next = next,
                         nowSec = 1_800, imageLoader = loader, currentSession = session,

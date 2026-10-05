@@ -257,7 +257,7 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE,
-        // Trial channel card: focused with the Recent hint, Recent open, the rail opened in place.
+        // Trial channel card: focused with the Recent hint, Recent open, the rail open below the controls.
         CHANNEL_CARD, CHANNEL_RECENT, CHANNEL_RAIL,
     }
 
@@ -461,7 +461,7 @@ class PlayerChromeCaptureTest {
                 Controls(timeshift, behind, paused, content)
             Scene.CHANNEL_CARD, Scene.CHANNEL_RECENT -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
                 recentOpen = scene == Scene.CHANNEL_RECENT)
-            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content, inPlaceRail = true,
+            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content,
                 recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
                 QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
                     Modifier.padding(horizontal = PlayerChromeTokens.gridMargin))
@@ -710,11 +710,8 @@ class PlayerChromeCaptureTest {
         focus: String? = null,
         /** Trial: the channel card, with three recent channels above it. */
         recentOpen: Boolean = false,
-        /** Trial: [tray] is the rail opened in place of the channel card. */
-        inPlaceRail: Boolean = false,
         recordingChannels: Set<ChannelId> = emptySet(),
     ) {
-        var cardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
         Box(Modifier.fillMaxSize()) {
         val shown = shown ?: if (step != null) window.copy(positionFraction = 0.51f, estimatedPosition = Instant.fromEpochSeconds(NOW - 233)) else window
         PlayerChrome(
@@ -738,7 +735,7 @@ class PlayerChromeCaptureTest {
             onChannelStep = { _, _ -> },
             onChannelZap = { _, _ -> },
             onCardClick = {},
-            downHint = "Program info",
+            downHint = "Channels",
             recents = listOf(
                 RecentChannelPeek(SPORT_LOGO, "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
                 RecentChannelPeek(LOGO, "101", "Ridge Earth HD", ChannelId(1), now = "Ridge Light"),
@@ -746,31 +743,26 @@ class PlayerChromeCaptureTest {
             ),
             onRecentPick = {},
             recentRowOpen = recentOpen,
-            channelCardHeld = inPlaceRail,
-            onCardPlaced = { cardBounds = it },
             decorationCoversControls = tray != null,
-            controlsDecoration = { emphasisAlpha, controls ->
+            controlsDecoration = { _, controls ->
                 QuickZapPresentation(
                     expanded = tray != null,
-                    channelsAvailable = true,
-                    peekAlpha = emphasisAlpha,
                     channelContent = {
                         if (tray != null) ChannelDrawer(
                             channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
                             imageLoader = loader, currentSession = session, active = true, nowSec = NOW,
                             onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                            entryFocusId = ChannelId(1).takeIf { inPlaceRail },
-                            inPlace = inPlaceRail,
+                            entryFocusId = ChannelId(1),
+                            inPlace = true,
                         )
                     },
                     preview = { tray?.invoke() },
                     controls = controls,
-                    inPlaceAnchor = if (inPlaceRail) ({ cardBounds }) else null,
                 )
             },
         )
-        if (inPlaceRail) NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
+        if (tray != null) NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp))
         }
     }

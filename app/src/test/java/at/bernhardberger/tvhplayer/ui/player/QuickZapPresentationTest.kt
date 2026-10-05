@@ -144,28 +144,6 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("channel-tuning-indicator", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test fun expandedRailIgnoresStaleSeekEmphasis() {
-        var expanded by mutableStateOf(false)
-        compose.setContent {
-            view = LocalView.current
-            Box(Modifier.fillMaxSize().background(Color.White)) {
-                QuickZapPresentation(preview = {}, expanded = expanded, channelsAvailable = true,
-                    peekAlpha = { 0f }, channelContent = {
-                        Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
-                    }, controls = {})
-            }
-        }
-        fun pixel(y: Int): Int {
-            compose.waitForIdle()
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            return bitmap.getPixel(480, y).also { bitmap.recycle() }
-        }
-        assertEquals(android.graphics.Color.WHITE, pixel(530))
-        compose.runOnIdle { expanded = true }
-        assertEquals(android.graphics.Color.RED, pixel(470))
-    }
-
     @Test fun inPlaceRailStartsAtEntryWithoutComposingTheStartOfTheCatalog() {
         val catalog = (1L..100L).map { Channel.create(id = ChannelId(it), number = it, name = "Channel $it") }
         val composedChannels = mutableSetOf<ChannelId>()
@@ -207,37 +185,6 @@ class QuickZapPresentationTest {
         compose.runOnIdle { progress = 1f }
         draw()
         assertTrue(draws > 0)
-    }
-
-    @Test fun onlyTheCardTheRailOpensOverRisesWithTheExpansion() {
-        var lift by mutableStateOf(0f)
-        compose.setContent {
-            view = LocalView.current
-            val loader = remember { ImageLoader(view.context) }
-            TVHeadendPlayerTheme {
-                CompositionLocalProvider(LocalChannelCardLift provides { lift }) {
-                    ChannelDrawer(channels.take(2), channels[0].id, channels[0].id, recordingChannelIds = emptySet(),
-                        nowEvent = { null }, imageLoader = loader, onFocusChannel = {}, onPickChannel = {},
-                        onCloseDrawer = {}, inPlace = true, entryFocusId = channels[0].id)
-                }
-            }
-        }
-        compose.waitForIdle()
-        // How far a card's picon stands above the card's centre.
-        fun rise(id: Int): Float {
-            fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-            val card = node("player-channel-card-$id")
-            return card.size.height / 2f - card.localBoundingBoxOf(node("player-channel-$id-picon"), clipBounds = false).center.y
-        }
-        assertEquals("the opening card starts where the player's centred picon is", 0f, rise(1), 0.01f)
-        assertEquals("every other card stands at full lift", 6f, rise(2), 0.01f)
-        compose.runOnIdle { lift = 0.5f }
-        compose.waitForIdle()
-        assertEquals(3f, rise(1), 0.01f)
-        assertEquals(6f, rise(2), 0.01f)
-        compose.runOnIdle { lift = 1f }
-        compose.waitForIdle()
-        assertEquals(6f, rise(1), 0.01f)
     }
 
     @Test fun identityAndFocusedRailCardHaveTheSameGeometry() {
@@ -318,10 +265,9 @@ class QuickZapPresentationTest {
                     ProgrammeScheduleHeader("1 · Channel 1")
                 }) else null, player = {
                     peek = LocalPlayerRailPeek.current!!
-                    QuickZapPresentation(expanded, channelsAvailable = false,
-                        inPlaceAnchor = { androidx.compose.ui.geometry.Rect(58f, 300f, 254f, 410f) },
+                    QuickZapPresentation(expanded,
                         channelContent = { Box(Modifier.fillMaxWidth().height(100.dp)) }, preview = {},
-                        controls = { expansion = LocalInPlaceRailExpansion.current })
+                        controls = { expansion = LocalRailExpansion.current })
                 }, programme = {})
             }
         }
@@ -337,9 +283,10 @@ class QuickZapPresentationTest {
         assertEquals(1f, expansion(), 0f)
         assertTrue("peek is fading in", peek.targetState && !peek.currentState && !peek.isIdle)
         compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
-        compose.mainClock.advanceTimeBy(32)
+        compose.mainClock.advanceTimeBy(96)
         compose.waitForIdle()
-        assertEquals("even an interrupted peek leaves before collapse", 1f, expansion(), 0f)
+        assertFalse("the peek leaves with the rail", peek.targetState)
+        assertTrue("the rail folds away at once: ${expansion()}", expansion() < 1f)
         compose.mainClock.advanceTimeBy(400)
         compose.waitForIdle()
         assertTrue(peek.isIdle && !peek.currentState)
@@ -347,71 +294,6 @@ class QuickZapPresentationTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun inPlaceRailRevealsFromCardBoundsWithinPlayerPage() {
-        var expanded by mutableStateOf(false)
-        var expansion: () -> Float = { 0f }
-        val anchor = androidx.compose.ui.geometry.Rect(58f, 300f, 254f, 410f)
-        compose.setContent {
-            view = LocalView.current
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                PlayerPage<Unit>(details = null, player = {
-                    QuickZapPresentation(expanded = expanded, channelsAvailable = false,
-                        inPlaceAnchor = { anchor }, preview = {}, controls = {
-                            expansion = LocalInPlaceRailExpansion.current
-                        }, channelContent = {
-                            Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
-                        })
-                }, programme = {})
-            }
-        }
-        compose.waitForIdle()
-        compose.mainClock.autoAdvance = false
-        compose.runOnIdle { expanded = true; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
-        repeat(2) { compose.mainClock.advanceTimeByFrame() }
-        compose.mainClock.advanceTimeBy(16)
-        compose.waitForIdle()
-        val e = expansion()
-        assertTrue("the reveal is in flight: $e", e > 0f && e < 1f)
-        val right = anchor.right + (960f - anchor.right) * e
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        assertTrue("the card's original area is revealed", android.graphics.Color.red(bitmap.getPixel(150, 320)) > 100)
-        val outside = (right + 100).toInt()
-        assertTrue("the reveal has not yet reached the viewport edge: $right", outside < bitmap.width)
-        assertEquals("pixels beyond the expanding edge remain hidden", 0, android.graphics.Color.red(bitmap.getPixel(outside, 320)))
-        val feather = android.graphics.Color.red(bitmap.getPixel((right + 48).toInt(), 320))
-        assertTrue("the expanding edge stays feathered, not hard-clipped: $feather", feather in 1..200)
-        bitmap.recycle()
-    }
-
-    @Test fun peekingNewTrayDoesNotDimControlsAboveTheRow() {
-        var expanded by mutableStateOf(false)
-        compose.setContent {
-            view = LocalView.current
-            Box(Modifier.fillMaxSize().background(Color.White)) {
-                QuickZapPresentation(expanded = expanded, channelsAvailable = true,
-                    peekAlpha = { 1f }, preview = {}, channelContent = {
-                        Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
-                    }, controls = { Box(Modifier.fillMaxSize().background(Color.White)) })
-            }
-        }
-        fun column(): IntArray {
-            compose.waitForIdle()
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            return IntArray(view.height) { bitmap.getPixel(480, it) }.also { bitmap.recycle() }
-        }
-        val peek = column()
-        val cardTop = peek.indexOfFirst { it == android.graphics.Color.RED }
-        assertTrue("the channel row peeks at the bottom edge: $cardTop", cardTop in 480 until 540)
-        assertTrue("controls above the peeking row keep full brightness",
-            (0 until cardTop).all { peek[it] == android.graphics.Color.WHITE })
-        compose.runOnIdle { expanded = true }
-        val open = column()
-        val openCardTop = open.indexOfFirst { it == android.graphics.Color.RED }
-        assertTrue("the open tray keeps its scrim behind the preview",
-            android.graphics.Color.red(open[openCardTop - 8]) < 80)
-    }
     private val channels = (1L..12L).map {
         Channel.create(id = ChannelId(it), number = it, name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
             icon = if (it == 5L) null else ArtworkId(it.toInt()))
@@ -502,6 +384,21 @@ class QuickZapPresentationTest {
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
     }
 
+    // The rail is composed only while it is open, so a reopened rail starts on the playing channel again.
+    @Test fun reopenedRailStartsOnThePlayingChannelAgain() {
+        content()
+        key(Key.DirectionDown)
+        repeat(7) { key(Key.DirectionRight) }
+        card(9).assertIsFocused()
+        for (close in listOf(Key.DirectionUp, Key.Back)) {
+            key(close)
+            compose.onNodeWithTag("player-pause").assertIsFocused()
+            key(Key.DirectionDown)
+            card(2).assertIsFocused()
+        }
+        assertEquals(0, picks)
+    }
+
     @Test fun tunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1f, "en-font1")
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -524,61 +421,6 @@ class QuickZapPresentationTest {
             capture("$prefix-tuned-$id-reopened", id, fontScale)
         }
         assertEquals(2, picks)
-    }
-
-    @Test fun browsedNonplayingCardAndViewportSurviveReentry() {
-        content()
-        key(Key.DirectionDown)
-        repeat(7) { key(Key.DirectionRight) }
-        val before = card(9).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        for (close in listOf(Key.DirectionUp, Key.Back)) {
-            key(close)
-            compose.onNodeWithTag("player-pause").assertIsFocused()
-            key(Key.DirectionDown)
-            card(9).assertIsFocused()
-            assertEquals(before, card(9).fetchSemanticsNode().boundsInRoot)
-        }
-        assertEquals(ChannelId(2), playing)
-        assertEquals(0, picks)
-    }
-
-    @Test fun delayedOwnConfirmationDoesNotReplaceLaterBrowseFocus() {
-        confirmPicks = false
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        compose.runOnIdle { playing = null }
-        key(Key.DirectionRight)
-        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        assertEquals(1, picks)
-    }
-
-    @Test fun lossOfConfirmationWhileClosedPreservesVisibleBrowseUntilConfirmation() {
-        confirmPicks = false
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        key(Key.DirectionRight)
-        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        key(Key.DirectionUp)
-        compose.runOnIdle { playing = null }
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        assertEquals(1, picks)
     }
 
     @Test fun externalConfirmationAfterNullSupersedesPendingLocalPick() {
@@ -644,53 +486,6 @@ class QuickZapPresentationTest {
         key(Key.DirectionDown)
         card(8).assertIsFocused()
         assertEquals(anchored, card(8).fetchSemanticsNode().boundsInRoot)
-        assertEquals(0, picks)
-    }
-
-    @Test fun unconfirmedOrFailedTuneKeepsBrowseAndConfirmedChannelUpReanchors() {
-        content()
-        key(Key.DirectionDown)
-        repeat(2) { key(Key.DirectionRight) }
-        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        key(Key.Back)
-        // A tune that never confirms, then the previous channel re-confirmed.
-        compose.runOnIdle { playing = null }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(2) }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        // The same failure while the rail is open does not re-anchor on close either.
-        compose.runOnIdle { playing = null }
-        compose.runOnIdle { playing = ChannelId(2) }
-        key(Key.Back)
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        // CH+ while closed: awaiting presentation, then the next channel confirmed.
-        key(Key.Back)
-        compose.runOnIdle { playing = null }
-        compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
-        card(3).assertIsFocused()
-        assertEquals(0, picks)
-    }
-
-    @Test fun reorderedAndRemovedBrowseAnchorRecoverWithoutOffscreenFocusWait() {
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.Back)
-        compose.runOnIdle { catalog = channels.filterNot { it.id == ChannelId(3) } + channels[2] }
-        key(Key.DirectionDown)
-        card(3).assertIsFocused()
-        compose.runOnIdle { catalog = channels.filterNot { it.id == ChannelId(3) } }
-        card(2).assertIsFocused()
-        compose.runOnIdle { catalog = emptyList() }
-        compose.onNodeWithTag("player-shelf-close").assertIsFocused()
-        compose.runOnIdle { catalog = channels.takeLast(2) }
-        card(11).assertIsFocused()
         assertEquals(0, picks)
     }
 
@@ -876,9 +671,69 @@ class QuickZapPresentationTest {
         card(2).assertIsFocused()
     }
 
+    @Test fun downFromAnActionOpensTheRailOnThePlayingChannelAndUpReturnsToThatAction() {
+        content(inPlace = true)
+        for (close in listOf(Key.DirectionUp, Key.Back)) {
+            repeat(4) {
+                if (!isFocused("player-settings")) key(Key.DirectionRight)
+            }
+            compose.onNodeWithTag("player-settings").assertIsFocused()
+            key(Key.DirectionDown)
+            card(2).assertIsFocused()
+            // The row it came from gives way: nothing of it takes focus or is announced.
+            compose.onNodeWithTag("player-settings").assertDoesNotExist()
+            // The key that opened the rail does not also move or activate anything in it.
+            assertEquals(0, picks)
+            assertTrue(layers.channelDrawerOpen)
+            key(close)
+            assertFalse(layers.channelDrawerOpen)
+            compose.onNodeWithTag("player-settings").assertIsFocused()
+        }
+        assertEquals(0, picks)
+    }
+
+    @Test fun railRisesFromBelowWhileTheFooterGivesWay() {
+        var expanded by mutableStateOf(false)
+        var expansion: () -> Float = { 0f }
+        compose.setContent {
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                PlayerPage<Unit>(details = null, player = {
+                    QuickZapPresentation(expanded = expanded, preview = {},
+                        controls = { expansion = LocalRailExpansion.current },
+                        channelContent = { Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red)) })
+                }, programme = {})
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("player-zap-tray").assertDoesNotExist()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { expanded = true; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(48)
+        compose.waitForIdle()
+        val e = expansion()
+        assertTrue("the rise is in flight: $e", e > 0f && e < 1f)
+        fun top() = compose.onNodeWithTag("player-zap-tray").fetchSemanticsNode().boundsInRoot.top
+        val rising = top()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        val tray = compose.onNodeWithTag("player-zap-tray").fetchSemanticsNode().boundsInRoot
+        assertTrue("the rail rises from below: $rising then ${tray.top}", rising > tray.top)
+        assertEquals("the rail rests above the bottom safe area", 540f - 36f, tray.bottom, 0.5f)
+        compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(48)
+        compose.waitForIdle()
+        assertTrue("and folds back down: ${top()}", top() > tray.top)
+        compose.mainClock.autoAdvance = true
+    }
+
+    private fun isFocused(tag: String) = runCatching { compose.onNodeWithTag(tag).assertIsFocused() }.isSuccess
+
     private fun content(
         fontScale: Float = 1f,
         bright: Boolean = false,
+        inPlace: Boolean = false,
     ) {
         compose.setContent {
             view = LocalView.current
@@ -950,10 +805,8 @@ class QuickZapPresentationTest {
                             onFocusRestored = layers::onChannelActionRestored,
                             onActionFocused = layers::onActionFocused,
                             decorationCoversControls = layers.channelDrawerOpen,
-                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(
+                            controlsDecoration = { _, controls -> QuickZapPresentation(
                               expanded = layers.channelDrawerOpen,
-                              channelsAvailable = true,
-                              peekAlpha = emphasisAlpha,
                               preview = {},
                               controls = controls,
                               channelContent = {
@@ -973,6 +826,8 @@ class QuickZapPresentationTest {
                                         if (it != null) layers.beginOpeningKeyCycle(it)
                                         layers.dismissChannelDrawer()
                                     },
+                                    entryFocusId = playing.takeIf { inPlace },
+                                    inPlace = inPlace,
                                 )
                               },
                             ) },

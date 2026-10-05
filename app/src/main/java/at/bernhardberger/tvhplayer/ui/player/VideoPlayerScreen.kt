@@ -433,7 +433,6 @@ fun VideoPlayerScreen(
     // Trial: closing the rail the card opened hands focus back to the card.
     var railFromCard by remember { mutableStateOf(false) }
     // Trial: where the channel card is, for the rail to open from it.
-    var channelCardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
     var infoPendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
@@ -1680,6 +1679,17 @@ fun VideoPlayerScreen(
                     ?.let { selectedId = it }
             }
         }
+        // Trial: Down from the action row opens the rail below on the playing channel. Not from the card,
+        // so closing returns to the action it came from.
+        val openRailFromActions: () -> Unit = {
+            layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
+            if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) {
+                openChannelDrawer()
+                railFromCard = false
+                railEntryId = currentChannelId
+                railEntryStep = 0
+            }
+        }
         PlayerPage(
             railExpanded = layerState.channelRailPresented,
             nowPlaying = {
@@ -1766,12 +1776,8 @@ fun VideoPlayerScreen(
                 restoreOptionsFocus = false
                 layerState.onChannelActionRestored()
             },
-            // Trial: Down from the action row opens Info.
-            onDownFromActions = {
-                layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
-                openInfo(returnTo = lastChromeAction ?: "player-pause")
-            },
-            downHint = stringResource(R.string.player_down_programme_info),
+            onDownFromActions = openRailFromActions,
+            downHint = stringResource(R.string.nav_channels),
             channelCardStepping = channelCardStepping,
             onChannelCardFocusChanged = layerState.chrome::onChannelCardFocusChanged,
             // With stepping, a held Left/Right on the card opens the rail stepping that way; OK opens it in place.
@@ -1784,16 +1790,12 @@ fun VideoPlayerScreen(
             onRecentPick = { index -> recentChannels.getOrNull(index)?.let { tuneChannel(it) } },
             recentRowOpen = recentRowOpen,
             onRecentRowOpenChange = { recentRowOpen = it },
-            onCardPlaced = { channelCardBounds = it },
             channelCardHeld = channelRailOpen && railFromCard,
             decorationCoversControls = channelRailOpen,
-            controlsDecoration = { emphasisAlpha, controls ->
+            controlsDecoration = { _, controls ->
                 QuickZapPresentation(
                     // Keep the departing rail expanded throughout its vertical step.
                     expanded = layerState.channelRailPresented,
-                    // Trial: no peek, Down opens Info; the list keys still open the rail.
-                    channelsAvailable = false,
-                    peekAlpha = emphasisAlpha,
                     channelContent = {
                         ChannelDrawer(
                             active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
@@ -1844,8 +1846,6 @@ fun VideoPlayerScreen(
                         )
                     },
                     controls = controls,
-                    // The rail opens out of the channel card, on its line.
-                    inPlaceAnchor = { channelCardBounds },
                 )
             },
         )

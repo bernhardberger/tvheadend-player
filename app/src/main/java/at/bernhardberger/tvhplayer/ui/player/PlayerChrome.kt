@@ -23,8 +23,6 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import coil3.ImageLoader
-import androidx.compose.ui.layout.findRootCoordinates
-import androidx.compose.ui.layout.onGloballyPositioned
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
 
@@ -84,10 +82,8 @@ internal fun PlayerChrome(
     onRecentPick: ((Int) -> Unit)? = null,
     recentRowOpen: Boolean = false,
     onRecentRowOpenChange: (Boolean) -> Unit = {},
-    /** The rail stands in for the channel card, which keeps its focused look meanwhile. */
+    /** The rail was opened from the channel card, which keeps its focused look meanwhile. */
     channelCardHeld: Boolean = false,
-    /** Where the identity card is, in root coordinates, for the rail to open from. */
-    onCardPlaced: ((androidx.compose.ui.geometry.Rect) -> Unit)? = null,
     /** Whether Left/Right on the channel card change channel (tap) or open the rail (hold). */
     channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
     /** Focus arrived on, or left, the channel card or its recent row. */
@@ -137,11 +133,8 @@ internal fun PlayerChrome(
                 lastLineEndReserve = lastLineEndReserve,
                 identityGap = PlayerChromeTokens.identityTextGap,
             ) { faded ->
-                val placed = onCardPlaced?.let { sink -> Modifier.onGloballyPositioned {
-                    sink(it.findRootCoordinates().localBoundingBoxOf(it, clipBounds = false))
-                } } ?: Modifier
                 PlayerIdentityCard(content, imageLoader, currentSession,
-                    faded.then(card).then(placed).onFocusChanged {
+                    faded.then(card).onFocusChanged {
                         if (it.isFocused && !channelCardHeld) cardHeld = false
                     },
                     onClick = { onInteraction(); (onCardClick ?: onInfo)() }.takeIf { shown == PlayerChromeMode.CONTROLS },

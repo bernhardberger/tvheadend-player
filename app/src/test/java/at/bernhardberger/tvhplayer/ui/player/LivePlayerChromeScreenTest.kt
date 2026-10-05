@@ -1265,7 +1265,7 @@ class LivePlayerChromeScreenTest {
         screen()
         key(Key.DirectionDown)
         assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionDown)
+        key(Key.Info)
         assertEquals(listOf("live-info-record"), focused())
         assertFalse(exists("details-schedule"))
         val playing = player.playWhenReady
@@ -1275,8 +1275,33 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("live-info-record"), focused())
         key(Key.Back)
         assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionDown)
+        key(Key.Info)
         assertEquals("a new visit resets Details and its action", listOf("live-info-record"), focused())
+    }
+
+    @Test fun downFromTheActionRowOpensTheRailOnThePlayingChannelAndUpOrBackReturnsToTheAction() {
+        screen()
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-pause"), focused())
+        assertEquals("Channels", texts("player-down-hint"))
+        for (close in listOf(Key.DirectionUp, Key.Back)) {
+            key(Key.DirectionRight)
+            key(Key.DirectionRight)
+            assertEquals(listOf("player-settings"), focused())
+            key(Key.DirectionDown)
+            assertEquals("the rail opens on the playing channel", listOf("player-channel-card-1"), focused())
+            assertFalse("the programme info page does not open", exists("live-info-panel"))
+            assertEquals("the opening key tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            key(Key.DirectionRight)
+            assertEquals("the rail browses without tuning", listOf("player-channel-card-2"), focused())
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            key(close)
+            assertFalse(exists("player-channel-shelf"))
+            assertEquals(listOf("player-settings"), focused())
+            key(Key.DirectionLeft)
+            key(Key.DirectionLeft)
+        }
+        assertEquals(listOf("player-pause"), focused())
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
@@ -1558,7 +1583,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionDown)
         for (tab in 0..1) {
             assertEquals(listOf("player-pause"), focused())
-            key(Key.DirectionDown)
+            key(Key.Info)
             assertTrue("the shared pill is always visible", exists("details-player-hint"))
             key(Key.DirectionUp)
             if (tab == 1) key(Key.DirectionRight)
@@ -1630,11 +1655,10 @@ class LivePlayerChromeScreenTest {
         compose.waitForIdle()
         val closingFooter = compose.onNodeWithTag("player-footer", useUnmergedTree = true).fetchSemanticsNode()
         val closingAlpha = pageAlpha(closingFooter)
-        assertEquals("the peek leaves before the card collapses", 0f, closingAlpha, 0.001f)
+        assertTrue("the rail folds away at once and the footer returns, alpha=$closingAlpha", closingAlpha > 0f)
         compose.mainClock.advanceTimeBy(160)
         compose.waitForIdle()
         assertFalse("the peek is gone during collapse", exists("details-heading"))
-        assertTrue("rail then collapses", pageAlpha(closingFooter) > 0f)
         assertEquals("closing preserves the controls composition", footer.id, closingFooter.id)
         settle()
         assertEquals(1f, pageAlpha(closingFooter), 0.001f)
@@ -1728,7 +1752,7 @@ class LivePlayerChromeScreenTest {
         val clock = compose.onNodeWithTag("player-top-cluster", useUnmergedTree = true).fetchSemanticsNode()
         val clockTop = clock.boundsInRoot.top
         compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.Info) }
         compose.mainClock.advanceTimeBy(250)
         val second = compose.onNodeWithTag("player-page-second").fetchSemanticsNode().layoutInfo.coordinates
         val tabs = compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
@@ -1809,7 +1833,7 @@ class LivePlayerChromeScreenTest {
         val failures = mutableListOf<String>()
         for (down in listOf(true, false)) {
             val frames = mutableListOf(sample())
-            compose.onRoot().performKeyInput { pressKey(if (down) Key.DirectionDown else Key.Back) }
+            compose.onRoot().performKeyInput { pressKey(if (!down) Key.Back else if (rail) Key.DirectionDown else Key.Info) }
             repeat(36) {
                 compose.mainClock.advanceTimeBy(16)
                 frames += sample()

@@ -38,6 +38,9 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
 /** How much lower the Banner's info and timeline rest than the controls', which sit above the action row. */
 internal val PlayerBannerDrop = TvOverlayActionButtonSize + TvOverlayTimelineActionGap
 
+/** How far the footer travels up while the rail takes its place; the page's own exit travels the same. */
+private val RailFooterRise = 96.dp
+
 /** Same bottom anchor as the composed action band, without hidden focusable controls. */
 @Composable
 @ReadOnlyComposable
@@ -66,7 +69,7 @@ internal fun PlayerOverlayChrome(
     // Inside the controls layer, the header comes down and the footer up as they fade in;
     // controls revealed by a zap fade in where they rest.
     val motion = LocalPlayerControlsMotion.current
-    val railExpansion = LocalInPlaceRailExpansion.current
+    val railExpansion = LocalRailExpansion.current
     val viewport = LocalPlayerPageScrim.current.takeIf { motion != null }
     var footerHeight by remember { mutableIntStateOf(0) }
     SideEffect {
@@ -93,6 +96,8 @@ internal fun PlayerOverlayChrome(
                 .pageMotion(0..220, BrowseMotionPolicy.pageAccelerate, dy = (-96).dp, entering = false)
                 .graphicsLayer {
                     enterFrom(PlayerMotion.ChromeOffset); riseFromBanner(); alpha = 1f - railExpansion()
+                    // The footer gives way upward as the rail rises beneath it.
+                    translationY -= RailFooterRise.toPx() * railExpansion()
                     // Paint the departing controls, not a footer-sized offscreen texture.
                     compositingStrategy = CompositingStrategy.ModulateAlpha
                 }
