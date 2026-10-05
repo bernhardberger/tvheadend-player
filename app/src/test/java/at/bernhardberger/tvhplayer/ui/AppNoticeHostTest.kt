@@ -90,7 +90,7 @@ class AppNoticeHostTest {
         assertEquals(512f, bounds.bottom, .5f)
     }
 
-    @Test fun measuredFooterLiftsShellNoticeAndDisposalRestoresBottomAnchor() {
+    @Test fun shellNoticeKeepsBottomAnchorAcrossPlayerChromeChanges() {
         var footerVisible by mutableStateOf(true)
         var pageActive by mutableStateOf(true)
         var footerHeight by mutableStateOf(100.dp)
@@ -106,37 +106,39 @@ class AppNoticeHostTest {
                             }
                         }
                     },
-                    notices = { AppNoticeHost(queue, queue.context(), LocalAppNoticeBottomObstruction.current!!.value) })
+                    notices = { AppNoticeHost(queue, queue.context()) })
             }
         }
         compose.runOnIdle { queue.post(Notice.CacheClear(true), queue.context()) }
         fun assertBottom(expected: Float) {
             assertEquals(expected, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)
         }
-        assertBottom(412f)
+        assertBottom(512f)
         compose.mainClock.autoAdvance = false
         compose.runOnIdle { footerHeight = 150.dp }
-        repeat(6) { compose.mainClock.advanceTimeBy(16); compose.waitForIdle() }
-        val movingBottom = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom
-        assertTrue("Inset changes should animate: $movingBottom", movingBottom > 362f && movingBottom < 412f)
+        repeat(6) {
+            compose.mainClock.advanceTimeBy(16)
+            compose.waitForIdle()
+            assertBottom(512f)
+        }
         compose.mainClock.autoAdvance = true
-        assertBottom(362f)
+        assertBottom(512f)
         compose.runOnIdle { pageActive = false }
         assertBottom(512f)
         compose.runOnIdle { footerHeight = 125.dp }
         assertBottom(512f)
         compose.runOnIdle { pageActive = true }
-        assertBottom(387f)
+        assertBottom(512f)
         compose.runOnIdle { footerVisible = false }
+        assertBottom(512f)
+        compose.runOnIdle { footerVisible = true }
         assertBottom(512f)
     }
 
-    @Test fun independentWindowHostDoesNotInheritShellObstruction() {
+    @Test fun independentWindowHostUsesSameBottomAnchor() {
         val queue = NoticeCenter({ 0L }, { NoticeContext(0, null) })
         compose.setContent {
-            CompositionLocalProvider(LocalAppNoticeBottomObstruction provides remember { mutableStateOf(150.dp) }) {
-                TVHeadendPlayerTheme { AppNoticeHost(queue, queue.context()) }
-            }
+            TVHeadendPlayerTheme { AppNoticeHost(queue, queue.context()) }
         }
         compose.runOnIdle { queue.post(Notice.CacheClear(true), queue.context()) }
         assertEquals(512f, compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom, .5f)

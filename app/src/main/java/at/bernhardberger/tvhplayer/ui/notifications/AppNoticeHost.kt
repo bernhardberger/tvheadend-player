@@ -1,9 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.notifications
 
-import android.animation.ValueAnimator
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -23,8 +19,6 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.lifecycle.Lifecycle
@@ -40,7 +34,6 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
-import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.notices.NoticeSeverity
@@ -48,25 +41,21 @@ import at.bernhardberger.tvhplayer.R
 import kotlinx.coroutines.delay
 import org.koin.compose.koinInject
 
-/** Shell-owned geometry only; dialog windows deliberately do not consume this inset. */
-internal val LocalAppNoticeBottomObstruction = staticCompositionLocalOf<MutableState<Dp>?> { null }
-
 @Composable
 internal fun AppShellNoticeHost(
     queue: NoticeCenter = koinInject(),
     profileOwner: AppProfileOwner = koinInject(),
     session: TvheadendSession = koinInject(),
-    bottomObstruction: Dp = 0.dp,
 ) {
     val generation by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val observation by session.observation.collectAsStateWithLifecycle()
-    AppNoticeHost(queue, NoticeContext(generation, observation.currentSession?.generationIdentity), bottomObstruction)
+    AppNoticeHost(queue, NoticeContext(generation, observation.currentSession?.generationIdentity))
 }
 
 /** One persistent shell consumer. Navigation never controls delivery or restarts a display budget. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun AppNoticeHost(queue: NoticeCenter, context: NoticeContext, bottomObstruction: Dp = 0.dp) {
+internal fun AppNoticeHost(queue: NoticeCenter, context: NoticeContext) {
     val lifecycle by LocalLifecycleOwner.current.lifecycle.currentStateFlow.collectAsStateWithLifecycle()
     val allowed = lifecycle == Lifecycle.State.RESUMED &&
         LocalWindowInfo.current.isWindowFocused && !WindowInsets.isImeVisible
@@ -94,7 +83,7 @@ internal fun AppNoticeHost(queue: NoticeCenter, context: NoticeContext, bottomOb
         it.notice.context == context && queue.remaining(it.expiresAt) > 0
     }?.let {
         val formatted = NoticeFormatter(LocalContext.current).format(it.notice.notice)
-        AppNoticePresentation(formatted.headline, detail = formatted.detail, icon = formatted.icon, bottomObstruction = bottomObstruction)
+        AppNoticePresentation(formatted.headline, detail = formatted.detail, icon = formatted.icon)
     }
 }
 
@@ -105,11 +94,7 @@ internal fun AppNoticePresentation(
     modifier: Modifier = Modifier,
     detail: String? = null,
     icon: AppNoticeIcon? = null,
-    bottomObstruction: Dp = 0.dp,
 ) {
-    val lift = animateDpAsState(bottomObstruction.coerceAtLeast(0.dp),
-        animationSpec = if (ValueAnimator.areAnimatorsEnabled())
-            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard) else snap(), label = "notice clearance")
     val largeText = LocalDensity.current.fontScale > 1f
     val labelStyle = MaterialTheme.typography.labelLarge.copy(
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None))
@@ -118,7 +103,6 @@ internal fun AppNoticePresentation(
         end = TvFullScreenPadding.calculateEndPadding(direction), bottom = 28.dp),
         contentAlignment = Alignment.BottomCenter) {
         Surface(modifier = Modifier
-            .offset { IntOffset(0, -lift.value.roundToPx()) }
             .widthIn(max = 556.dp)
             .heightIn(min = 44.dp)
             .testTag("app-notice")

@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
@@ -30,7 +29,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.ui.notifications.LocalAppNoticeBottomObstruction
 import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
@@ -219,8 +217,6 @@ internal fun MainStartupComposition(
         onDispose(unregister)
     }
 
-    val noticeObstruction = remember { mutableStateOf(0.dp) }
-    CompositionLocalProvider(LocalAppNoticeBottomObstruction provides noticeObstruction) {
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         persistentSurface()
         if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
@@ -248,7 +244,6 @@ internal fun MainStartupComposition(
             )
         }
         notices()
-    }
     }
 
     BackHandler(
@@ -952,8 +947,7 @@ fun AppRoot(
             hasActivePlayback = playbackState !is AppPlaybackState.Idle,
             isPlayerRoute = isPlayer,
         ),
-        notices = { at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost(
-            bottomObstruction = LocalAppNoticeBottomObstruction.current?.value ?: 0.dp) },
+        notices = { at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost() },
         persistentSurface = {
             if (shouldMountPersistentPlayerSurface(
                     hasActivePlayback = playbackState !is AppPlaybackState.Idle,

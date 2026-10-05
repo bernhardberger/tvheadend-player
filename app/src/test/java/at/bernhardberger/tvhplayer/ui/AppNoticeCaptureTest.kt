@@ -16,7 +16,6 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.notices.*
@@ -83,8 +82,7 @@ class AppNoticeCaptureTest {
         compose.setContent {
             view = LocalView.current
             val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
-            val obstruction = remember { mutableStateOf(0.dp) }
-            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale), LocalAppNoticeBottomObstruction provides obstruction) {
+            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize().background(if (overPlayer) Color(0xFFF2EEDC) else Color(0xFF111822))) {
                         if (overPlayer) PlayerChrome(
@@ -96,7 +94,7 @@ class AppNoticeCaptureTest {
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
-                        AppNoticePresentation(variant.headline, detail = variant.detail, icon = variant.icon, bottomObstruction = obstruction.value)
+                        AppNoticePresentation(variant.headline, detail = variant.detail, icon = variant.icon)
                     }
                 }
             }
@@ -117,7 +115,7 @@ class AppNoticeCaptureTest {
         settle()
         val noticeBottom = compose.onNodeWithTag("app-notice").fetchSemanticsNode().boundsInRoot.bottom
         val footerTop = compose.onNodeWithTag("player-footer").fetchSemanticsNode().boundsInRoot.top
-        check(noticeBottom <= footerTop + (TvOverlayFooterGradientRunout.value - 28f) * 2f + 1f)
+        check(kotlin.math.abs(noticeBottom - (540f - 28f) * 2f) <= 1f)
         capture(view, "$locale-font$fontScale-over-player-chrome-visible", locale, fontScale,
             "production player controls over a bright synthetic still; no SurfaceView; noticeBottomPx=$noticeBottom; footerTopPx=$footerTop")
     }

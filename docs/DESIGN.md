@@ -380,9 +380,9 @@ from the bottom, content-sized up to 556dp (eight kit columns), 44dp one-line or
 corners, `labelLarge`, 16dp start/24dp end and 12dp vertical padding; optional 32dp
 icon badge with a 16dp icon and 8dp gap. Details are ellipsized (two detail lines at
 large font scale); the merged polite announcement retains the complete text.
-No focus target, action or key interception. Player notices rise above the measured
-footer content, animating changes; they do not cover its controls. Dialog-window
-hosts do not inherit the shell's footer obstruction.
+No focus target, action or key interception. Notices keep the same fixed bottom
+anchor when player controls appear, resize or disappear; they may temporarily
+overlap the footer. Dialog-window hosts use the same fixed anchor.
 
 FIFO with per-key pending replacement, at most eight pending entries and a 30s
 pending lifetime. INFO displays for 4s, FAILURE for 6s, extended by accessibility
