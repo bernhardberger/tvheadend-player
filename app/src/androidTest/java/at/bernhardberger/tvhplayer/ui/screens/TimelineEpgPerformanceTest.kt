@@ -124,7 +124,7 @@ class TimelineEpgPerformanceTest {
     private fun checkClippedCells(direction: LayoutDirection) {
         val channel = Channel.create(ChannelId(1), name = "Channel", number = 1)
         val events = listOf(event(1, 0, 3600), event(2, 3600, 7200), event(3, 7200, 10800))
-        val visibleWidth = mutableStateOf(494.dp) // 194dp header/gap + 300dp of the 600dp track.
+        val visibleWidth = mutableStateOf(480.dp) // 180dp header/gap + 300dp of the 600dp track.
         val selected = mutableStateOf<EpgFocusTarget?>(null)
         composeRule.setContent {
             val context = LocalContext.current
@@ -132,7 +132,7 @@ class TimelineEpgPerformanceTest {
             val focusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 TVHeadendPlayerTheme {
-                    Box(Modifier.width(794.dp)) {
+                    Box(Modifier.width(780.dp)) {
                         TimelineChannelRow(
                             channel = channel, channelIndex = 0, number = 1,
                             selectedEventId = selected.value?.takeIf { it.channelIndex == 0 }?.eventId,
@@ -148,20 +148,22 @@ class TimelineEpgPerformanceTest {
                 }
             }
         }
-        composeRule.onNodeWithText("Event 1").assertIsDisplayed()
+        val leadingEvent = if (direction == LayoutDirection.Ltr) 1 else 3
+        val trailingEvent = if (direction == LayoutDirection.Ltr) 3 else 1
+        composeRule.onNodeWithText("Event $leadingEvent").assertIsDisplayed()
         composeRule.onNodeWithText("Event 2").assertIsDisplayed()
-        composeRule.onNodeWithText("Event 3").assertDoesNotExist()
+        composeRule.onNodeWithText("Event $trailingEvent").assertDoesNotExist()
         val partialBounds = composeRule.onNodeWithText("Event 2").fetchSemanticsNode().boundsInRoot
-        composeRule.runOnIdle { visibleWidth.value = 794.dp }
-        composeRule.onNodeWithText("Event 3").assertIsDisplayed()
+        composeRule.runOnIdle { visibleWidth.value = 780.dp }
+        composeRule.onNodeWithText("Event $trailingEvent").assertIsDisplayed()
         assertEquals(partialBounds, composeRule.onNodeWithText("Event 2").fetchSemanticsNode().boundsInRoot)
-        composeRule.runOnIdle { visibleWidth.value = 394.dp }
+        composeRule.runOnIdle { visibleWidth.value = 380.dp }
         composeRule.onNodeWithText("Event 2").assertDoesNotExist()
         composeRule.runOnIdle {
-            visibleWidth.value = 494.dp
-            selected.value = EpgFocusTarget(0, EventId(3))
+            visibleWidth.value = 480.dp
+            selected.value = EpgFocusTarget(0, EventId(trailingEvent.toLong()))
         }
-        composeRule.onNodeWithText("Event 3").assertExists()
+        composeRule.onNodeWithText("Event $trailingEvent").assertExists()
         assertEquals(partialBounds, composeRule.onNodeWithText("Event 2").fetchSemanticsNode().boundsInRoot)
     }
 
@@ -215,7 +217,8 @@ class TimelineEpgPerformanceTest {
         }
 
         composeRule.onNodeWithTag("timeline-rows").performScrollToIndex(299)
-        composeRule.onNodeWithText("300  Channel 300").assertIsDisplayed()
+        composeRule.onNodeWithText("300").assertIsDisplayed()
+        composeRule.onNodeWithText("Channel 300").assertIsDisplayed()
     }
 
     @Test

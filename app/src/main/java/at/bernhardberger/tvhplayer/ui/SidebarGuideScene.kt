@@ -1,7 +1,5 @@
 package at.bernhardberger.tvhplayer.ui
 
-import androidx.compose.animation.Crossfade
-import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
@@ -14,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,9 +22,11 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.zIndex
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
+import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
 
 internal const val SIDEBAR_SCENE_DESTINATION = "sidebarSceneDestination"
 
@@ -96,7 +98,6 @@ private val browseDestinations = listOf(
 )
 
 @Composable
-@OptIn(ExperimentalAnimationApi::class)
 private fun SidebarVisitDestination(
     entry: NavEntry<AppNavKey>?,
     index: Int,
@@ -118,41 +119,67 @@ private fun SidebarVisitDestination(
     // transition.currentState alone is not sufficient to retain their content.
     // A destination never visited in this sidebar session is never constructed here.
     if (entry != null && (visible || retained || showing.value)) {
-        Layout(
-            content = {
-                // Settings keeps its existing per-category NavEntry/saveable-state owner.
-                // A category change fades within this root slot rather than replacing it.
-                updateTransition(entry, label = "browseEntry").Crossfade(
-                    contentKey = { it.contentKey },
-                    modifier = Modifier.fillMaxSize(),
-                    animationSpec = tween(APP_DESTINATION_CROSSFADE_DURATION_MILLIS, easing = LinearEasing),
-                ) { destinationEntry ->
-                    val current = destinationEntry.contentKey == entry.contentKey
+        BrowseContentLayer(departing = !visible) { layer ->
+            Layout(
+                content = {
+                    // Settings keeps its existing per-category NavEntry/saveable-state owner.
+                    SidebarEntryContent(entry)
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .zIndex(if (visible) 1f else 0f)
+                    .graphicsLayer {
+                        this.alpha = alpha.value
+                        translationY = position.value * size.height * BrowseMotionPolicy.slideFraction
+                    }
+                    .then(layer)
+                    .then(if (visible) Modifier else Modifier.clearAndSetSemantics { })
+                    .focusProperties { onEnter = { if (!visible) cancelFocusChange() } }
+                    .focusGroup(),
+            ) { measurables, constraints ->
+                // Measuring depends on visibility, not every alpha tick. Translation
+                // and opacity updates stay in the graphics layer above.
+                val child = if (visible || showing.value) {
+                    measurables.firstOrNull()?.measure(constraints)
+                } else null
+                layout(constraints.maxWidth, constraints.maxHeight) { child?.placeRelative(0, 0) }
+            }
+        }
+    }
+}
+
+/** A scene-local crossfade whose actual sibling wrappers can put a returning key on top. */
+@Composable
+private fun SidebarEntryContent(entry: NavEntry<AppNavKey>) {
+    val transition = updateTransition(entry, label = "browseEntry")
+    val entries = remember { mutableStateListOf(transition.currentState) }
+    if (transition.currentState == transition.targetState && !transition.isRunning) {
+        entries.removeAll { it != transition.targetState }
+    }
+    val replacement = entries.indexOfFirst { it.contentKey == entry.contentKey }
+    if (replacement < 0) entries.add(entry) else if (entries[replacement] != entry) entries[replacement] = entry
+
+    Box(Modifier.fillMaxSize()) {
+        entries.forEach { destinationEntry ->
+            key(destinationEntry.contentKey) {
+                val current = destinationEntry.contentKey == entry.contentKey
+                val alpha = transition.animateFloat(
+                    transitionSpec = { tween(APP_DESTINATION_CROSSFADE_DURATION_MILLIS, easing = LinearEasing) },
+                    label = "sidebarEntryAlpha",
+                ) { if (it == destinationEntry) 1f else 0f }
+                BrowseContentLayer(departing = !current) { layer ->
                     Box(
                         Modifier
                             .fillMaxSize()
+                            .zIndex(if (current) 1f else 0f)
+                            .graphicsLayer { this.alpha = alpha.value }
+                            .then(layer)
                             .then(if (current) Modifier else Modifier.clearAndSetSemantics { })
                             .focusProperties { onEnter = { if (!current) cancelFocusChange() } }
                             .focusGroup(),
                     ) { destinationEntry.Content() }
                 }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    this.alpha = alpha.value
-                    translationY = position.value * size.height * BrowseMotionPolicy.slideFraction
-                }
-                .then(if (visible) Modifier else Modifier.clearAndSetSemantics { })
-                .focusProperties { onEnter = { if (!visible) cancelFocusChange() } }
-                .focusGroup(),
-        ) { measurables, constraints ->
-            // Measuring depends on visibility, not every alpha tick. Translation
-            // and opacity updates stay in the graphics layer above.
-            val child = if (visible || showing.value) {
-                measurables.firstOrNull()?.measure(constraints)
-            } else null
-            layout(constraints.maxWidth, constraints.maxHeight) { child?.placeRelative(0, 0) }
+            }
         }
     }
 }

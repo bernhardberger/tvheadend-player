@@ -109,8 +109,8 @@ class SettingsVisualEvidenceTest {
         compose.runOnIdle { navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.GENERAL.name)), visit = navigation.stack.visit + 1)) }
         // Accepted Settings C geometry on the 80dp Material for TV drawer shell.
         val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
-        assertEquals(128f, activeColumn.left, .5f)
-        assertEquals(352f, activeColumn.width, .5f)
+        assertEquals(130f, activeColumn.left, .5f)
+        assertEquals(340f, activeColumn.width, .5f)
         capture("$prefix-root")
         press(Key.DirectionCenter)
         capture("$prefix-general")
@@ -195,5 +195,12 @@ class SettingsVisualEvidenceTest {
         }
         val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        File(directory, "$name.txt").writeText(
+            "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
+                "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
+                "focus/scenario=${name.substringAfter("-font").substringAfter("-")}; " +
+                "production=SideRail+SettingsScreenNavigation; warm playback scrim; " +
+                "static offline composition only\n",
+        )
     }
 }

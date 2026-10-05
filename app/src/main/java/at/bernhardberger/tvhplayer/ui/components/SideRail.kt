@@ -33,12 +33,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -511,34 +506,18 @@ private fun BrowseViewport(
     width: Dp,
     content: @Composable () -> Unit,
 ) {
+    val layering = remember { BrowseContentLayering() }
     SubcomposeLayout(
-        modifier = Modifier.fillMaxSize().zIndex(-1f).drawWithContent {
-            drawContent()
-            run {
-                // Shared overlap: a continuous, light falloff without a
-                // second stop at the drawer edge that reads as a vertical seam.
-                val railWidth = (width.toPx() + ClosedDrawerWidth.toPx() - size.width)
-                    .coerceAtLeast(0f)
-                val runout = 128.dp.toPx()
-                val rtl = layoutDirection == LayoutDirection.Rtl
-                val start = if (rtl) size.width + railWidth else -railWidth
-                val end = if (rtl) size.width - runout else runout
-                drawRect(
-                    brush = Brush.horizontalGradient(
-                        0f to Color.Black.copy(alpha = 0.95f),
-                        1f to Color.Transparent,
-                        startX = start, endX = end,
-                    ),
-                    topLeft = Offset(if (rtl) end else start, 0f),
-                    size = Size(railWidth + runout, size.height),
-                )
-            }
-        },
+        modifier = Modifier
+            .fillMaxSize()
+            .zIndex(-1f)
+            .browseShellLayer(layering, width + ClosedDrawerWidth),
     ) { constraints ->
         val fixedWidth = width.roundToPx()
         val placeable = subcompose(Unit) {
             CompositionLocalProvider(
                 LocalBrowseVisibleWidthPx provides constraints.maxWidth,
+                LocalBrowseContentLayering provides layering,
             ) {
                 Box(Modifier.fillMaxSize()) { content() }
             }

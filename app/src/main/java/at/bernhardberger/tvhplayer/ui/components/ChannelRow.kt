@@ -29,6 +29,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.ImageLoader
@@ -38,7 +39,7 @@ import coil3.ImageLoader
  * own standard padding and two-line minimum, so the row is 64dp when the text fits
  * and grows with the user's text scale instead of clipping.
  */
-internal val ChannelRowWidth = 340.dp
+internal val ChannelRowWidth = TvBrowseColumnWidth
 
 /** Row gap, and the list's horizontal reserve for the library's focus scale. */
 internal val ChannelRowGap = 4.dp
@@ -162,6 +163,7 @@ fun ChannelRow(
                 imageLoader = imageLoader,
                 currentSession = currentSession,
                 piconPath = piconPath,
+                placeholderTint = LocalContentColor.current,
                 modifier = Modifier
                     .testTag("channel-picon")
                     .size(width = ChannelPiconWidth, height = ChannelPiconHeight),
