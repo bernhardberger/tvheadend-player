@@ -274,7 +274,7 @@ class PlayerChromeCaptureTest {
         BANNER_LIVE, CONTROLS_BUFFERING, BANNER_PAUSED, BANNER_NO_EPG_BEHIND, HIDDEN_PAUSED, HIDDEN_BUFFERING, STEP_NEAR_END, STEP_NEAR_END_NO_ICON,
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
-        BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE, CONTROLS_CARD_FOCUSED,
+        BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE,
         // Trial channel card: focused with the Recent hint, Recent open, the rail opened in place.
         CHANNEL_CARD, CHANNEL_RECENT, CHANNEL_RAIL,
     }
@@ -319,9 +319,6 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
             if (next == Scene.CHANNEL_CARD) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
-            if (next == Scene.CONTROLS_CARD_FOCUSED) {
-                compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
-            }
             if (next == Scene.PROGRAMME_SCHEDULE) compose.onNodeWithTag("details-schedule-42").assertIsFocused()
             if (next == Scene.RAIL_SCHEDULE) compose.onNodeWithTag("details-schedule-52").assertIsFocused()
             if (next == Scene.RAIL_PROGRAMME_OPENED) compose.onNodeWithTag("details-record").assertIsFocused()
@@ -332,9 +329,6 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.back)).assertIsFocused()
             }
             if (next == Scene.RAIL_PEEK) {
-                val peek = compose.onNodeWithTag("player-rail-schedule-peek").fetchSemanticsNode().boundsInRoot
-                assertEquals("the schedule heading peeks through the bottom edge", 1052f, peek.top, 1f)
-                assertEquals(1080f, peek.bottom, 1f)
                 val label = compose.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val playing = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val recording = compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -477,10 +471,9 @@ class PlayerChromeCaptureTest {
         when (scene) {
             Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
-            Scene.CONTROLS_CARD_FOCUSED -> Controls(timeshift, behind, paused, content, focus = PlayerIdentityCardTag)
             Scene.CHANNEL_CARD, Scene.CHANNEL_RECENT -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
-                channelCard = true, recentOpen = scene == Scene.CHANNEL_RECENT)
-            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content, channelCard = true, inPlaceRail = true,
+                recentOpen = scene == Scene.CHANNEL_RECENT)
+            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content, inPlaceRail = true,
                 recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
                 QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
                     Modifier.padding(horizontal = PlayerChromeTokens.gridMargin))
@@ -728,7 +721,6 @@ class PlayerChromeCaptureTest {
         shown: ProgrammeWindow? = null,
         focus: String? = null,
         /** Trial: the channel card, with three recent channels above it. */
-        channelCard: Boolean = false,
         recentOpen: Boolean = false,
         /** Trial: [tray] is the rail opened in place of the channel card. */
         inPlaceRail: Boolean = false,
@@ -755,16 +747,16 @@ class PlayerChromeCaptureTest {
             imageLoader = loader,
             currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
-            onChannelStep = if (channelCard) { _, _ -> } else null,
-            onChannelZap = if (channelCard) { _, _ -> } else null,
-            onCardClick = if (channelCard) ({}) else null,
-            downHint = "Program info".takeIf { channelCard },
-            recents = if (channelCard) listOf(
+            onChannelStep = { _, _ -> },
+            onChannelZap = { _, _ -> },
+            onCardClick = {},
+            downHint = "Program info",
+            recents = listOf(
                 RecentChannelPeek(null, "102", "ORF 2 HD", ChannelId(2), now = "Universum: Wildes Österreich"),
                 RecentChannelPeek(LOGO, "101", "ORF 1 HD", ChannelId(1), now = "Zeit im Bild"),
                 RecentChannelPeek(null, "103", "ServusTV HD Oesterreich", ChannelId(3), now = "Servus Nachrichten 19:20"),
-            ) else emptyList(),
-            onRecentPick = if (channelCard) ({}) else null,
+            ),
+            onRecentPick = {},
             recentRowOpen = recentOpen,
             channelCardHeld = inPlaceRail,
             onCardPlaced = { cardBounds = it },

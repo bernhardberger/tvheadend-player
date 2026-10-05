@@ -89,7 +89,7 @@ private val CardHeight = PlayerChromeTokens.channelCardHeight
  * The info bar's identity, in the quick-zap card's kit: a [CompactCard] whose image slot holds the
  * channel's picon (or name), centred over the channel's own colour or the programme's dimmed
  * artwork, and whose title slot holds the number. With [onClick] (the controls) it takes focus,
- * says what it opens and always shows a small info cue; the caller's [modifier] places it in the
+ * says what it opens to accessibility services; the caller's [modifier] places it in the
  * focus graph. Without [onClick] (the Banner) it takes no focus and says nothing.
  */
 @Composable
@@ -129,7 +129,7 @@ internal fun PlayerIdentityCard(
             tagged.focusRequester(mainFocus).semantics { contentDescription = opens }
         },
         image = {
-            IdentityCardImage(content, imageLoader, currentSession, cue = onClick != null && !channelCard, focused = focused)
+            IdentityCardImage(content, imageLoader, currentSession)
             ChannelCardLabel(content.info.channelNumber, content.info.channelName.takeIf { content.picon != null })
             if (channelCard && onClick != null && (focused || held)) {
                 // Inside the card beside the logo, on its line: the card steps through channels. In the
@@ -420,8 +420,6 @@ private fun BoxScope.IdentityCardImage(
     content: PlayerChromeContent,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
-    cue: Boolean,
-    focused: Boolean,
 ) {
     val artwork = remember(currentSession, content.artwork) {
         currentSession?.let { session -> ArtworkId.parse(content.artwork)?.let { AppArtworkSource(session, it) } }
@@ -435,11 +433,6 @@ private fun BoxScope.IdentityCardImage(
                 colorFilter = ColorFilter.tint(Color.Black.copy(alpha = ArtworkScrim), BlendMode.SrcAtop))
             ChannelCardFace(content.picon, null, content.info.channelName, imageLoader, currentSession, backdrop = false)
         }
-    }
-    if (cue) {
-        Icon(painterResource(R.drawable.ic_info), contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 1f else 0.8f),
-            modifier = Modifier.align(Alignment.TopEnd).padding(6.dp).size(16.dp).testTag("player-identity-info-cue"))
     }
 }
 

@@ -51,7 +51,7 @@ class PlayerIdentityCardTest {
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
         assertEquals(listOf("player-identity-card"), focused())
-        assertTrue("the focused card says what it opens", exists("player-identity-info-cue"))
+        assertEquals("the focused card says what it opens", listOf("Info"), cardDescription())
         listOf(Key.DirectionUp, Key.DirectionLeft, Key.DirectionRight).forEach {
             key(it)
             assertEquals("$it leads nowhere from the card", listOf("player-identity-card"), focused())
@@ -61,18 +61,11 @@ class PlayerIdentityCardTest {
         assertEquals("OK opens Info once", 1, infos)
         key(Key.DirectionDown)
         assertEquals(listOf("player-seekbar"), focused())
-        assertTrue("the cue stays without the focus", exists("player-identity-info-cue"))
     }
 
-    @Test fun theBannersCardShowsNoCue() {
+    @Test fun theBannersCardSaysNothing() {
         chrome(PlayerChromeMode.BANNER)
-        assertTrue("the Banner's card opens nothing", !exists("player-identity-info-cue"))
-    }
-
-    @Test fun theControlsCardShowsItsCueBeforeItIsFocused() {
-        chrome(PlayerChromeMode.CONTROLS)
-        assertEquals(listOf("player-pause"), focused())
-        assertTrue("the card says it opens something", exists("player-identity-info-cue"))
+        assertEquals("the Banner's card opens nothing", null, cardDescription())
     }
 
     @Test fun theCardHasOneSizeCentresItsMarkAndStandsOnTheFootersStartEdge() {
@@ -271,6 +264,9 @@ class PlayerIdentityCardTest {
 
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    private fun cardDescription(): List<String>? = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true)
+        .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
 
     private fun focused(): List<String> =
         compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
