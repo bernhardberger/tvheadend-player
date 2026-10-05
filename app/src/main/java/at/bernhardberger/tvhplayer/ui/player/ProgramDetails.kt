@@ -2,6 +2,9 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
@@ -20,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -27,8 +31,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -203,9 +209,11 @@ internal fun ProgramDetails(
     val tabFocus = remember { FocusRequester() }
     val tabMotion = rememberTabContentMotion(state.tab) { state.tab }
     val recording = recordingFor(event)
+    // The viewport belongs to this channel's schedule visit, not its opened programme.
+    val scheduleList = key(current.channelId) { rememberLazyListState() }
     // Only the rail's schedule shares its keyline; programme details retain columns 2–11.
     val railSchedule = LocalPlayerPageRailHeader.current && state.scheduleEntry && state.opened == null
-    Column(modifier.fillMaxSize().padding(horizontal = if (railSchedule) 0.dp else DetailsInset), verticalArrangement = Arrangement.spacedBy(32.dp)) {
+    Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(32.dp)) {
         if (!LocalPlayerPageRailHeader.current) Row(Modifier.fillMaxWidth().height(48.dp)
             .pageMotion(120..420, dy = 120.dp).testTag("details-top-row"), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
@@ -246,10 +254,9 @@ internal fun ProgramDetails(
                 style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(end = 20.dp).testTag("details-heading").semantics { heading() })
         }
-        PlayerDownHint(stringResource(if (state.scheduleEntry) R.string.nav_channels else R.string.details_back_to_tv),
-            Modifier.testTag("details-player-hint"), up = true)
         }
-        Box(Modifier.weight(1f).fillMaxWidth().pageMotion(150..480, dy = 160.dp)) {
+        Box(Modifier.weight(1f).fillMaxWidth()
+            .padding(horizontal = if (railSchedule) 0.dp else DetailsInset).pageMotion(150..480, dy = 160.dp)) {
             val detailsContent: @Composable () -> Unit = {
                 if (state.readMore) FullDescription(event, nowSec, channelIdentity, recording?.state, tile)
                 else DetailsTab(
@@ -273,9 +280,9 @@ internal fun ProgramDetails(
             }
             when {
                 state.opened != null -> detailsContent()
-                state.scheduleEntry -> Schedule(state, schedule, nowSec, tile, recordingFor, FocusRequester.Cancel, onClose)
+                state.scheduleEntry -> Schedule(state, scheduleList, schedule, nowSec, tile, recordingFor, FocusRequester.Cancel, onClose)
                 else -> TabContent(tabMotion, state.tab, state = { state.tab }) { tab, _ ->
-                    if (tab == 1) Schedule(state, schedule, nowSec, tile, recordingFor, tabFocus)
+                    if (tab == 1) Schedule(state, scheduleList, schedule, nowSec, tile, recordingFor, tabFocus)
                     else detailsContent()
                 }
             }
@@ -424,8 +431,10 @@ private fun ProgrammeInformation(
 }
 
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 private fun Schedule(
     state: ProgramDetailsState,
+    list: LazyListState,
     schedule: List<EpgEventEntry>,
     nowSec: Long,
     tile: @Composable (event: EpgEventEntry, modifier: Modifier) -> Unit,
@@ -434,34 +443,35 @@ private fun Schedule(
     onUp: (() -> Unit)? = null,
 ) {
     val owner = LocalTabOwner.current
-    val list = rememberLazyListState(
-        initialFirstVisibleItemIndex = schedule.indexOfFirst { it.id == state.returnRow }.coerceAtLeast(0))
     val rows = remember(schedule.map { it.id }) { schedule.associate { it.id to FocusRequester() } }
-    val scope = rememberCoroutineScope()
+    // Restoring focus must not restart even an interrupted scroll. Native traversal enables it.
+    var navigating by remember { mutableStateOf(false) }
+    val bringIntoView = remember {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+                if (navigating) offset - (containerSize * 0.3f).coerceAtMost(containerSize - size) else 0f
+        }
+    }
     val typography = MaterialTheme.typography
     val rowHeight = maxOf(ScheduleTileHeight, 12.dp + with(LocalDensity.current) {
         typography.titleMedium.lineHeight.toDp() + typography.bodyMedium.lineHeight.toDp() + typography.bodySmall.lineHeight.toDp()
     })
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val anchorRows = ((maxHeight / 2 - ScheduleFocusPadding) / (rowHeight + ScheduleGap)).toInt().coerceAtLeast(1)
-        val bottomRoom = (maxHeight - ScheduleFocusPadding - (rowHeight + ScheduleGap) * anchorRows - rowHeight)
+        val bottomRoom = (maxHeight * 0.7f - rowHeight)
             .coerceAtLeast(ScheduleFocusPadding)
-        suspend fun focusRow(index: Int) {
-            if (owner?.isCurrent == false) return
-            list.scrollToItem((index - anchorRows).coerceAtLeast(0))
-            withFrameNanos { }
-            if (owner?.isCurrent == false) return
-            rows.getValue(schedule[index].id).requestFocus()
-        }
         val pageActive = LocalPlayerPageActive.current
         LaunchedEffect(state.focusRequest, state.tab, pageActive) {
-            if (!pageActive) return@LaunchedEffect
-            if (!state.tabFocused && state.tab == 1) focusRow(schedule.indexOfFirst { it.id == state.returnRow }.coerceAtLeast(0))
+            if (!pageActive || state.tabFocused || state.tab != 1 || owner?.isCurrent == false) return@LaunchedEffect
+            val index = schedule.indexOfFirst { it.id == state.returnRow }.coerceAtLeast(0)
+            // Tab entry selects Now; Back restores the already visible row without re-anchoring.
+            if (list.layoutInfo.visibleItemsInfo.none { it.index == index }) list.scrollToItem(index)
+            withFrameNanos { }
+            if (owner?.isCurrent != false) rows.getValue(schedule[index].id).requestFocus()
         }
+        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyColumn(state = list, verticalArrangement = Arrangement.spacedBy(ScheduleGap),
             contentPadding = PaddingValues(start = ScheduleFocusPadding, end = ScheduleFocusPadding,
                 top = ScheduleFocusPadding, bottom = bottomRoom),
-            userScrollEnabled = false,
             modifier = Modifier
                 .fillMaxHeight().width(ScheduleWidth + ScheduleFocusPadding * 2)
                 .offset(x = -ScheduleFocusPadding)
@@ -491,33 +501,30 @@ private fun Schedule(
                     CompactCard(
                         onClick = { if (owner?.isCurrent != false) state.open(event) },
                         interactionSource = interaction,
-                        border = embeddedProgressCardBorder(),
+                        border = embeddedProgressCardBorder(cardRadius = 12.dp),
                         shape = CardDefaults.shape(PlayerChromeTokens.heroShape),
                         colors = CardDefaults.compactCardColors(containerColor = Color.Transparent),
                         scale = CardDefaults.scale(focusedScale = PlayerChromeTokens.cardFocusedScale),
                         modifier = Modifier.tabFocus().size(ScheduleTileWidth, ScheduleTileHeight)
                             .focusRequester(rows.getValue(event.id)).testTag("details-schedule-${event.id.value}")
                             .onFocusChanged { if (owner?.isCurrent != false && it.isFocused) { state.returnRow = event.id; state.tabFocused = false } }
-                             .focusProperties {
-                                 canFocus = state.tab == 1
-                                up = if (index == 0) tabFocus else FocusRequester.Cancel
-                                down = FocusRequester.Cancel
+                            .focusProperties {
+                                canFocus = state.tab == 1
+                                up = if (index == 0) tabFocus else FocusRequester.Default
+                                down = if (index == schedule.lastIndex) FocusRequester.Cancel else FocusRequester.Default
                                 left = FocusRequester.Cancel
                                 right = FocusRequester.Cancel
                             }
-                             .semantics { contentDescription = listOfNotNull(time, event.title, subtitle, meta.takeIf(String::isNotBlank)).joinToString(", ") }
+                            .semantics { contentDescription = listOfNotNull(time, event.title, subtitle, meta.takeIf(String::isNotBlank)).joinToString(", ") }
                             .onPreviewKeyEvent {
-                                val target = when (it.key) {
-                                    Key.DirectionUp -> if (index == 0) {
-                                        if (onUp == null) return@onPreviewKeyEvent false
-                                        if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onUp()
-                                        return@onPreviewKeyEvent true
-                                    } else index - 1
-                                    Key.DirectionDown -> (index + 1).coerceAtMost(schedule.lastIndex)
-                                    else -> return@onPreviewKeyEvent false
+                                if (it.type == KeyEventType.KeyDown && (it.key == Key.DirectionUp || it.key == Key.DirectionDown)) navigating = true
+                                if (index != 0 || it.key != Key.DirectionUp) false
+                                else {
+                                    if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) {
+                                        if (onUp != null) onUp() else tabFocus.requestFocus()
+                                    }
+                                    true
                                 }
-                                if (it.type == KeyEventType.KeyDown) scope.launch { focusRow(target) }
-                                true
                             },
                         image = {
                             ProgrammeTile(event, nowSec, tile,
@@ -560,6 +567,7 @@ private fun Schedule(
                     }
                 },
             )
+        }
         }
         }
     }

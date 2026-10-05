@@ -156,7 +156,7 @@ private fun InPlaceRail(
 ) {
     var origin by remember { mutableStateOf(Offset.Zero) }
     var previewTop by remember { mutableIntStateOf(0) }
-    var railBottom by remember { mutableIntStateOf(0) }
+    var pageTravel by remember { mutableIntStateOf(0) }
     val pageProgress = LocalPlayerPageProgress.current
     val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
     val revealed by remember(expansion) { derivedStateOf { expansion() == 1f } }
@@ -222,7 +222,7 @@ private fun InPlaceRail(
                 ) { preview() }
                 // Only the moving reveal needs a feather mask; there is no edge at rest.
                 Box(Modifier.then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
-                    entering = false, alphaWindow = 60..260, dyPx = { -railBottom.toFloat() }) else Modifier)
+                    entering = false, alphaWindow = 60..260, dyPx = { -pageTravel.toFloat() }) else Modifier)
                     .then(reveal())
                     .testTag("player-zap-tray")) { channelContent() }
             },
@@ -233,11 +233,13 @@ private fun InPlaceRail(
             val railPlaceable = measurables[1].measure(loose)
             val card = anchor()
             // Without a card to open from, the rail keeps the card's usual line above the timeline.
-            val top = card?.let { (it.top - origin.y).roundToInt() - RailTopInset.roundToPx() }
+            val top = if (leavingPage) previewTop + previewPlaceable.height
+                else card?.let { (it.top - origin.y).roundToInt() - RailTopInset.roundToPx() }
                 ?: (constraints.maxHeight - railPlaceable.height - 96.dp.roundToPx())
             // The card travels with the departing footer; its scrim stays at the rail's rest.
             if (!leavingPage) previewTop = top - previewPlaceable.height
-            railBottom = top + railPlaceable.height
+            // Same travel and window as the next item's headline: neither can overtake the other.
+            pageTravel = constraints.maxHeight - 96.dp.roundToPx()
             layout(constraints.maxWidth, constraints.maxHeight) {
                 previewPlaceable.place(0, top - previewPlaceable.height)
                 railPlaceable.place(0, top)

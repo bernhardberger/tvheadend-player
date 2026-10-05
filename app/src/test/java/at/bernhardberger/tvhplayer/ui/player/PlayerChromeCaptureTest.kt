@@ -790,8 +790,8 @@ class PlayerChromeCaptureTest {
                 )
             },
         )
-        if (inPlaceRail) PlayingChannelChip(visible = true, channelLabel = "101 · ORF 1 HD", title = programme?.title,
-            modifier = Modifier.align(Alignment.TopStart))
+        if (inPlaceRail) NowPlayingStrip("101", "ORF 1 HD", LOGO, programme, NOW, loader, session,
+            modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp))
         }
     }
 

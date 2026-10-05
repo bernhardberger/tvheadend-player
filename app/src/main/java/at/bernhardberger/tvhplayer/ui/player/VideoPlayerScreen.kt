@@ -1686,6 +1686,11 @@ fun VideoPlayerScreen(
             }
         }
         PlayerPage(
+            railExpanded = layerState.channelRailPresented,
+            nowPlaying = {
+                NowPlayingStrip(currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
+                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec, imageLoader, currentSession)
+            },
             details = (detailsChannel to detailsBaseEvent).takeIf {
                 layerState.infoOpen && (foregroundLayer == PlayerForegroundLayer.INFO ||
                     foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
@@ -1850,16 +1855,6 @@ fun VideoPlayerScreen(
                     // The rail opens out of the channel card, on its line.
                     inPlaceAnchor = { channelCardBounds },
                 )
-                // The rail's playing-channel label belongs to the same moving page.
-                PlayingChannelChip(
-                    visible = layerState.channelRailPresented,
-                    channelLabel = listOfNotNull(currentChannelNumber?.toString(), currentChannelName.takeIf { it.isNotBlank() })
-                        .joinToString(" · "),
-                    title = channelsVm.nowEvent(currentChannelId, nowSec)
-                        ?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }?.title,
-                    modifier = Modifier.align(Alignment.TopStart).pageMotion(0..200,
-                        BrowseMotionPolicy.pageAccelerate, dy = (-120).dp, entering = false),
-                )
             },
         )
         // Full recovery and the unavailable message replace even an exiting ring.
@@ -1904,7 +1899,6 @@ fun VideoPlayerScreen(
                 onRecordingDismiss = ::dismissRecordingDialog,
                 onClose = ::closeInfo,
                 onWatch = watch,
-                fromChannelRail = programDetails.scheduleEntry,
                 onUp = {
                     layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_UP)
                     closeInfo()

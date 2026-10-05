@@ -32,6 +32,8 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
@@ -1275,6 +1277,99 @@ class LivePlayerChromeScreenTest {
         assertEquals("a new visit resets Details and its action", listOf("live-info-record"), focused())
     }
 
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun detailsScheduleScrollsSmoothlyAndRestoresViewport() = scheduleScroll(false)
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun railScheduleScrollsSmoothlyAndRestoresViewport() = scheduleScroll(true)
+
+    private fun scheduleScroll(rail: Boolean) {
+        screen()
+        val now = System.currentTimeMillis() / 1_000L
+        session.publish(observation(now, (0..11).map {
+            EpgEvent.create(EventId(11L + it), ChannelId(1), Instant.fromEpochSeconds(now - 600 + it * 1800),
+                Instant.fromEpochSeconds(now + 1200 + it * 1800), title = "Programme $it", summary = "Summary")
+        }))
+        settle()
+        if (rail) { openInfoRail(); key(Key.DirectionDown) }
+        else { key(Key.Info); key(Key.DirectionUp); key(Key.DirectionRight); key(Key.DirectionDown) }
+        var node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
+        val list = node.layoutInfo.getModifierInfo()
+            .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
+            .flatMap { it.inspectableElements.toList() }.map { it.value }
+            .filterIsInstance<androidx.compose.foundation.lazy.LazyListState>().single()
+        assertEquals("list is bounded by the visible viewport", node.boundsInRoot.height, list.layoutInfo.viewportSize.height.toFloat(), 1f)
+        assertTrue("both paths have more rows to scroll", list.canScrollForward)
+        assertPageTopBand()
+        val thumbnail = compose.onNodeWithTag("details-schedule-11", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        val thumbnailLeft = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(thumbnail.size.width / 2f, 0f)).x - thumbnail.size.width / 2f
+        assertEquals("only details-tab content is inset", if (rail) 58f else 130f, thumbnailLeft, 0.5f)
+        println("SCHEDULE rail=$rail viewport=${list.layoutInfo.viewportSize.height}")
+        val failures = mutableListOf<String>()
+        fun scrollPosition(): Int = list.firstVisibleItemIndex *
+            (list.layoutInfo.visibleItemsInfo.first().size + list.layoutInfo.mainAxisItemSpacing) + list.firstVisibleItemScrollOffset
+        fun step(down: Boolean) {
+            val values = mutableListOf(scrollPosition())
+            compose.onRoot().performKeyInput { pressKey(if (down) Key.DirectionDown else Key.DirectionUp) }
+            repeat(40) {
+                compose.mainClock.advanceTimeBy(16)
+                compose.waitForIdle()
+                values += scrollPosition()
+                val focusedRow = compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().single()
+                val coordinates = focusedRow.layoutInfo.coordinates
+                val top = coordinates.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
+                val bottom = coordinates.localToRoot(androidx.compose.ui.geometry.Offset(0f, coordinates.size.height.toFloat())).y
+                if (top < node.boundsInRoot.top - 1 || bottom > node.boundsInRoot.bottom + 1)
+                    failures += "focused row clipped rail=$rail down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
+            }
+            println("SCHEDULE rail=$rail down=$down offsets=$values")
+            if (values.zipWithNext().any { (a, b) -> if (down) b < a else b > a }) failures += "wrong direction: $values"
+            if (values.last() != values.first() && values.distinct().size <= 2) failures += "single-frame jump: $values"
+        }
+        repeat(3) { step(down = true) }
+        assertEquals(listOf("details-schedule-14"), focused())
+        assertTrue(list.canScrollBackward && list.canScrollForward)
+        val position = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
+        val fade = node.layoutInfo.getModifierInfo().first {
+            (it.modifier as? androidx.compose.ui.platform.InspectableValue)?.nameFallback == "drawWithContent"
+        }.modifier
+        // Replay the production edge mask over a solid colour; video/artwork cannot hide a missing fade.
+        compose.runOnIdle {
+            scrimUnderTest.value = Modifier.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
+                .then(fade).drawBehind { drawRect(Color.Red) }
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
+        println("FADE rail=$rail back=${list.canScrollBackward} forward=${list.canScrollForward} pixels=" + listOf(2, 16, 32, view.height / 2, view.height - 3).map { bitmap.getPixel(400, it).toUInt().toString(16) })
+        assertTrue("top edge mask fades", android.graphics.Color.green(bitmap.getPixel(400, 2)) > 200)
+        assertTrue("bottom edge mask fades", android.graphics.Color.green(bitmap.getPixel(400, view.height - 3)) > 200)
+        assertEquals("centre stays opaque", 0, android.graphics.Color.green(bitmap.getPixel(400, view.height / 2)))
+        bitmap.recycle()
+        compose.runOnIdle { scrimUnderTest.value = null }
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        assertEquals(listOf("details-schedule-14"), focused())
+        node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
+        val restored = node.layoutInfo.getModifierInfo().mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
+            .flatMap { it.inspectableElements.toList() }.map { it.value }
+            .filterIsInstance<androidx.compose.foundation.lazy.LazyListState>().single()
+        assertTrue("the same viewport survives opening details", list === restored)
+        assertEquals("Back preserves index and pixel offset", position, restored.firstVisibleItemIndex to restored.firstVisibleItemScrollOffset)
+        repeat(3) { step(down = false) }
+        assertEquals(listOf("details-schedule-11"), focused())
+        repeat(2) { key(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(32)
+        key(Key.DirectionCenter)
+        val interruptedPosition = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
+        key(Key.Back)
+        assertEquals("Back does not restart an interrupted focus scroll", interruptedPosition,
+            list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset)
+        assertTrue(failures.joinToString("\n"), failures.isEmpty())
+    }
+
     @Test fun playerInfoScheduleOpensAProgrammeAndBackRestoresTheRowThenDetails() {
         screen()
         key(Key.Info)
@@ -1572,6 +1667,10 @@ class LivePlayerChromeScreenTest {
         val tabs = compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
         assertTrue(pageAlpha(footerNode) < 1f)
         assertTrue(pageAlpha(compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode()) > 0f)
+        val strip = compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).fetchSemanticsNode()
+        val stripMotion = compose.onNodeWithTag("player-now-playing-motion", useUnmergedTree = true).fetchSemanticsNode()
+        assertTrue("controls-to-details fades the strip in", pageAlpha(stripMotion) > 0f && pageAlpha(stripMotion) < 1f)
+        val stripBounds = strip.boundsInRoot
         val midTabsTop = tabs.positionInRoot().y
         assertTrue("footer rises instead of pulling the viewport", footer.positionInRoot().y < footerTop)
         assertEquals(0f, first.positionInRoot().y, 0f)
@@ -1585,6 +1684,13 @@ class LivePlayerChromeScreenTest {
             tabs.positionInRoot().y - clock.boundsInRoot.bottom >= 8f)
         assertEquals(listOf("live-info-record"), focused())
         assertTrue("the controls stay composed behind the details", controls.isAttached)
+        assertPageTopBand()
+        assertEquals("the strip fades without travelling", stripBounds, strip.boundsInRoot)
+        assertEquals(58f, tabs.positionInRoot().x, 0.5f)
+        assertEquals(130f, compose.onNodeWithTag("details-information", useUnmergedTree = true)
+            .fetchSemanticsNode().layoutInfo.coordinates.positionInRoot().x, 0.5f)
+        assertEquals(1f, pageAlpha(compose.onNodeWithTag("player-now-playing-motion", useUnmergedTree = true)
+            .fetchSemanticsNode()), 0.001f)
         compose.onRoot().performKeyInput { pressKey(Key.Back) }
         compose.mainClock.advanceTimeBy(120)
         assertTrue(second.isAttached)
@@ -1595,6 +1701,7 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-pause"), focused())
         compose.mainClock.autoAdvance = true
         assertTrue("the return reuses the same controls", controls.isAttached)
+        assertFalse("controls rest has no now-playing strip", exists("player-now-playing"))
         assertTrue(exists("player-actions"))
     }
 
@@ -1698,6 +1805,47 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("live-info-panel"))
         assertEquals(listOf("player-channel-card-2"), focused())
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun railScheduleHeadlineNeverOvertakesTheTilesDownOrBack() {
+        screen()
+        publishRailProgrammes()
+        openInfoRail()
+        key(Key.DirectionRight)
+        assertTrue("strip names the watched channel, not the browsed one", texts("player-now-playing").contains("Name 1"))
+        assertFalse(texts("player-now-playing").contains("Name 2"))
+        val header = compose.onNodeWithTag("details-heading", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        val tile = compose.onNodeWithTag("player-channel-card-1", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        val strip = compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).fetchSemanticsNode()
+        val stripMotion = compose.onNodeWithTag("player-now-playing-motion", useUnmergedTree = true).fetchSemanticsNode()
+        val stripBounds = strip.boundsInRoot
+        compose.mainClock.autoAdvance = false
+        for (key in listOf(Key.DirectionDown, Key.Back)) {
+            compose.onRoot().performKeyInput { pressKey(key) }
+            repeat(40) { frame ->
+                compose.mainClock.advanceTimeBy(16)
+                compose.waitForIdle()
+                val headingTop = header.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
+                val tileBottom = tile.localToRoot(androidx.compose.ui.geometry.Offset(0f, tile.size.height.toFloat())).y
+                assertTrue("$key at ${frame * 16}ms: headline $headingTop overtakes tile $tileBottom", headingTop >= tileBottom)
+                assertEquals("strip position stays pinned", stripBounds, strip.boundsInRoot)
+                assertEquals("strip never fades between rail and schedule", 1f, pageAlpha(stripMotion), 0.001f)
+                assertPageTopBand()
+            }
+        }
+    }
+
+    private fun assertPageTopBand() {
+        val strip = compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).fetchSemanticsNode()
+        val hint = compose.onNodeWithTag("details-player-hint", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val clock = compose.onNodeWithTag("player-top-cluster", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(58f, strip.boundsInRoot.left, 0.5f)
+        assertEquals(clock.center.y, strip.boundsInRoot.center.y, 0.5f)
+        assertEquals(clock.center.y, hint.center.y, 0.5f)
+        assertEquals(480f, hint.center.x, 0.5f)
+        assertTrue("strip clears the centered affordance", strip.boundsInRoot.right < hint.left)
+        assertTrue("affordance clears the clock", hint.right < clock.left)
+        assertFalse(strip.config.contains(SemanticsProperties.Focused))
     }
 
     @Test fun playerInfoWatchTunesTheRailChannelAndClosesTheLayers() {

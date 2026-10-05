@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Easing
@@ -14,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
@@ -34,6 +39,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.LocalContentColor
@@ -44,6 +50,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 
 /** Only the section at rest may request focus. Outside the player page nothing changes. */
 internal val LocalPlayerPageActive = compositionLocalOf { true }
@@ -168,6 +175,8 @@ internal fun <T : Any> PlayerPage(
     details: T?,
     modifier: Modifier = Modifier,
     railHeader: (@Composable () -> Unit)? = null,
+    railExpanded: Boolean = false,
+    nowPlaying: (@Composable () -> Unit)? = null,
     player: @Composable (keepControls: Boolean) -> Unit,
     programme: @Composable (T) -> Unit,
 ) {
@@ -214,10 +223,34 @@ internal fun <T : Any> PlayerPage(
                                     }.drawWithContent { if (peekAlpha.value > 0f) drawContent() }) { header?.invoke() }
                             }
                             if (composed) shown?.let {
-                                Box(Modifier.fillMaxSize().padding(top = if (header != null) 96.dp else 0.dp)) { programme(it) }
+                                Box(Modifier.fillMaxSize().padding(top = if (header != null) 156.dp else 0.dp)) { programme(it) }
                             }
                         }
                     }
+                }
+            }
+            // Shared viewport layer: neither strip nor up affordance travels with either page.
+            Box(Modifier.fillMaxWidth().padding(top = TvOverlayTopPadding)) {
+                // Measure the clock's actual line box, including font scale and font metrics.
+                Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
+                    modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+                Box(Modifier.matchParentSize()) {
+                    if (nowPlaying != null) AnimatedVisibility(
+                        visible = railExpanded || composed,
+                        enter = fadeIn(tween(if (header != null) PlayerMotion.MediumMs else 0,
+                            easing = PlayerMotion.StandardDecelerate)),
+                        exit = fadeOut(tween(if (header != null) PlayerMotion.ShortMs else 0,
+                            easing = PlayerMotion.StandardAccelerate)),
+                        modifier = Modifier.align(Alignment.CenterStart)
+                            .padding(start = PlayerChromeTokens.gridMargin).wrapContentHeight(unbounded = true)
+                            .then(if (header == null) Modifier.pageMotion(200..400) else Modifier)
+                            .testTag("player-now-playing-motion"),
+                    ) { nowPlaying() }
+                    if (composed || header != null) PlayerDownHint(
+                        stringResource(if (header != null) R.string.nav_channels else R.string.details_back_to_tv),
+                        Modifier.align(Alignment.Center).pageMotion(300..500,
+                            BrowseMotionPolicy.pageStandardDecelerate).testTag("details-player-hint"), up = true,
+                    )
                 }
             }
         }
@@ -228,19 +261,17 @@ internal fun <T : Any> PlayerPage(
 @Composable
 internal fun ProgrammeScheduleHeader(identity: String) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        val peekTravel = maxHeight - 96.dp
-        Row(Modifier.fillMaxWidth().height(96.dp)
+        val peekTravel = maxHeight - 156.dp
+        Row(Modifier.fillMaxWidth().height(156.dp)
             .padding(horizontal = PlayerChromeTokens.gridMargin)
-            .padding(top = 32.dp, bottom = 16.dp),
+            .padding(top = 92.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Text("$identity · ${stringResource(R.string.details_tab_schedule)}",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f).pageMotion(0..420, BrowseMotionPolicy.pageEmphasized,
+                modifier = Modifier.weight(1f).pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
                     dy = peekTravel, fromAlpha = 0.55f)
                     .padding(end = 20.dp).testTag("details-heading").semantics { heading() })
-            PlayerDownHint(stringResource(R.string.nav_channels), Modifier.pageMotion(300..500,
-                BrowseMotionPolicy.pageStandardDecelerate, dx = 16.dp).testTag("details-player-hint"), up = true)
         }
     }
 }

@@ -23,6 +23,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -183,13 +189,21 @@ class PlayerMotionCaptureTest {
     @Category(VisualCapture::class)
     @Test fun railAndSchedulePageScroll() = pageScroll(rail = true)
 
-    private fun pageScroll(rail: Boolean) {
+    @Category(VisualCapture::class)
+    @Test fun detailsScheduleScrolled() = pageScroll(rail = false, scrollSchedule = true)
+
+    @Category(VisualCapture::class)
+    @Test fun railScheduleScrolled() = pageScroll(rail = true, scrollSchedule = true)
+
+    private fun pageScroll(rail: Boolean, scrollSchedule: Boolean = false) {
         lateinit var layers: LivePlayerLayerState
         show { loader, session ->
             layers = rememberLivePlayerLayerState()
             val details = remember { ProgramDetailsState().apply { reset(startOnSchedule = rail) } }
             LaunchedEffect(Unit) { layers.showControls() }
             PlayerPage(details = Unit.takeIf { layers.infoOpen },
+                railExpanded = layers.channelRailPresented,
+                nowPlaying = { NowPlayingStrip("1", "Documentary", ArtworkId(1), programme, 1_800, loader, session) },
                 railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
                 player = {
                     live(loader, session, behind = false,
@@ -200,10 +214,14 @@ class PlayerMotionCaptureTest {
                     recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
                     confirmationVisible = false, restoreRecordFocus = false,
                     onRecord = {}, onRecordingActivate = {}, onRecordingDismiss = {},
-                    onClose = {}, fromChannelRail = rail,
+                    onClose = {},
                     details = { recordFocus, firstFocus ->
                         ProgramDetails(
-                            state = details, current = programme, schedule = listOf(programme, next),
+                            state = details, current = programme,
+                            schedule = if (scrollSchedule) listOf(programme) + (1..11).map {
+                                EpgEvent.create(EventId(100L + it), ChannelId(1), Instant.fromEpochSeconds(3600L * it),
+                                    Instant.fromEpochSeconds(3600L * (it + 1)), title = "Programme $it", summary = "Schedule programme")
+                            } else listOf(programme, next),
                             nowSec = 1_800, channelIdentity = "1 · Documentary",
                             tile = { event, modifier ->
                                 ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), loader, session, modifier)
@@ -234,6 +252,24 @@ class PlayerMotionCaptureTest {
         capture("$pair-down-250ms", directory = "ui-page-scroll", focus = "inert during page motion", timing = "250 ms after transition start")
         compose.mainClock.advanceTimeBy(1_000)
         capture("$pair-down-settled", directory = "ui-page-scroll", focus = if (rail) "schedule first row" else "details initial action")
+        if (scrollSchedule) {
+            fun key(key: Key) {
+                compose.onRoot().performKeyInput { pressKey(key) }
+                compose.runOnIdle { Snapshot.sendApplyNotifications() }
+                compose.mainClock.advanceTimeBy(1_000)
+                compose.waitForIdle()
+            }
+            if (!rail) {
+                key(Key.DirectionUp); key(Key.DirectionRight); key(Key.DirectionDown)
+                capture("details-schedule-rest", directory = "ui-page-scroll", focus = "schedule Now row")
+            }
+            compose.onNodeWithTag("details-schedule-1").assertIsFocused()
+            repeat(3) { key(Key.DirectionDown) }
+            compose.onNodeWithTag("details-schedule-103").assertIsFocused()
+            capture("${if (rail) "rail" else "details-tab"}-schedule-down-three", directory = "ui-schedule-scroll",
+                focus = "fourth programme focused after three Down keys")
+            return
+        }
         compose.runOnIdle { layers.closeInfo(returnToRail = rail); Snapshot.sendApplyNotifications() }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.mainClock.advanceTimeBy(200, ignoreFrameDuration = true)

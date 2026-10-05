@@ -294,17 +294,17 @@ Anatomy per Material for TV / design kit:
 The player shares one linear master progress: Down 500 ms, Up/Back 400 ms,
 reversing the same per-element windows continuously. Sections stay at their rest
 positions; there is no full-viewport pull. Controls rise 96dp and fade (0–220 ms;
-Program info fades by 140 ms). Details tabs, artwork, text and actions rise
-120/160/200/240dp over 120–420/150–460/180–480/200–500 ms. Exits use emphasized
+Program info fades by 140 ms). Details tabs rise
+120dp over 120–420 ms; the whole details or schedule body rises 160dp over
+150–480 ms, without column or row staggering. Exits use emphasized
 acceleration, entrances emphasized deceleration. The clock stays pinned above
 the dim; details clear it by at least 8dp. Tabs retain their horizontal 300 ms step.
 
 The player keeps its Program info cue. The rail preview rises 120dp (0–200 ms);
 tiles leave above the viewport (60–360 ms), fading by 260 ms. Its real schedule
-headline alone peeks at 55% alpha on the rail keyline, then moves to the rows'
-keyline (0–420 ms); both use emphasized (0.3,0,0,1). Channels fades/slides in
-16dp horizontally (300–500 ms, standard deceleration). Schedule rows rise 160dp
-over 160–500 ms, with 30 ms stagger for the first six rows, all settled by 500 ms.
+headline alone peeks at 55% alpha on the rail keyline, then rises below the top
+band (60–360 ms, emphasized (0.3,0,0,1)), no faster than the tiles departing above
+it. The centered up affordance fades in over 300–500 ms (standard deceleration).
 Scrims are stationary: constant gentle top gradient, details dim in 0–300 ms
 (standard deceleration; linear crossfade from the rail veil), controls bottom
 gradient out 200–350 ms linearly. No gradient edge travels with content.
@@ -452,6 +452,13 @@ colour and indication rules above apply here. Remote keys follow §6.
 
 ### Player chrome (revised 2026-09-30)
 
+- The page top band shares the clock's center line: passive now-playing strip
+  left at the 58dp grid keyline, up affordance centered, clock right. The strip
+  always identifies the watched channel, with a small picon, two-line identity
+  and programme text, and programme progress. It stays pinned between rail and
+  rail schedule; controls-to-details fades it in over 200–400 ms (reversed on Back).
+  Program-details tabs start on the 58dp keyline; only their body keeps the 72dp
+  content inset (x=130dp). Rail-schedule heading and rows remain at x=58dp.
 - Live TV and recordings share one chrome with four modes: hidden; the passive
   **Banner** (clock, info bar, timeline; nothing focusable); the **Banner step**
   (a quick step's preview inside the Banner, without a thumb); and the

@@ -55,7 +55,6 @@ internal fun LiveProgrammeInfoOverlay(
     modifier: Modifier = Modifier,
     onRecordFocusRestored: () -> Unit = {},
     onWatch: (() -> Unit)? = null,
-    fromChannelRail: Boolean = false,
     onUp: () -> Unit = onClose,
 ) {
     val closeFocus = remember { FocusRequester() }
@@ -107,7 +106,6 @@ internal fun LiveProgrammeInfoOverlay(
                         closeFocus = closeFocus,
                         onClose = onClose,
                         onWatch = onWatch,
-                        fromChannelRail = fromChannelRail,
                         onUp = onUp,
                     )
                 } else {
@@ -125,13 +123,10 @@ private fun UnavailableProgrammeInfo(
     closeFocus: FocusRequester,
     onClose: () -> Unit,
     onWatch: (() -> Unit)?,
-    fromChannelRail: Boolean,
     onUp: () -> Unit,
 ) {
     val readingFocus = remember { FocusRequester() }
     Column(Modifier.fillMaxSize().pageMotion(150..480, dy = 160.dp)) {
-        if (!LocalPlayerPageRailHeader.current) PlayerDownHint(stringResource(if (fromChannelRail) R.string.nav_channels else R.string.details_back_to_tv),
-            Modifier.align(Alignment.End).padding(end = 72.dp).testTag("details-player-hint"), up = true)
         Spacer(Modifier.height(24.dp))
         PlayerInfoReadingContent(
             title = stringResource(R.string.player_info_unavailable_title),
