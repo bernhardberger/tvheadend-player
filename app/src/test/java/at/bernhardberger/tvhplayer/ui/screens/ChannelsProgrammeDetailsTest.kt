@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
@@ -317,9 +318,8 @@ class ChannelsProgrammeDetailsTest {
                     if (source.id == ArtworkId(10) && failArtwork) {
                         ErrorResult(null, chain.request, IllegalStateException("Synthetic artwork failure"))
                     } else {
-                        val bitmap = Bitmap.createBitmap(160, 90, Bitmap.Config.ARGB_8888).apply {
-                            eraseColor(if (source.id == ArtworkId(10)) 0xFF486C79.toInt() else 0xFFADC0B6.toInt())
-                        }
+                        val bitmap = if (source.id == ArtworkId(10)) FixtureArt.art("still-ridge-light")
+                            else FixtureArt.picon("ridge-earth")
                         SuccessResult(bitmap.asImage(), chain.request, DataSource.MEMORY)
                     }
                 })
@@ -332,7 +332,7 @@ class ChannelsProgrammeDetailsTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.size(340.dp, height ?: if (scale >= 1.3f) 364.dp else 380.dp)) {
                         ChannelsProgrammeDetails(
-                            channel = Channel.create(ChannelId(1), name = "Documentary HD", icon = picon),
+                            channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", icon = picon),
                             now = programme,
                             next = nextProgramme,
                             nowSec = 900,

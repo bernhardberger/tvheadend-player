@@ -6,6 +6,8 @@ import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -146,7 +148,15 @@ class BrowseCohesionEvidenceTest {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         Locale.setDefault(Locale.US)
         fixtureEpochMillis = System.currentTimeMillis()
-        imageLoader = ImageLoader.Builder(context()).diskCache(null).build()
+        imageLoader = FixtureArt.imageLoader(context(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"),
+            ArtworkId(2) to FixtureArt.picon("harbor-sport"),
+            ArtworkId(4) to FixtureArt.picon("kite-kids"),
+            ArtworkId(5) to FixtureArt.picon("lantern-hour"),
+            ArtworkId(101) to FixtureArt.art("ridge-light"),
+            ArtworkId(102) to FixtureArt.art("harbor-kickoff"),
+            ArtworkId(103) to FixtureArt.art("still-tide-watch"),
+        ))
     }
 
     @After
@@ -166,7 +176,7 @@ class BrowseCohesionEvidenceTest {
         key(Key.DirectionDown)
         capture("channels-current", 1f, "Channels current programme; first row", hasTestTag("channel-row-1"))
         compose.onNodeWithTag("channels-detail-channel", useUnmergedTree = true)
-            .assertTextEquals("Documentary HD")
+            .assertTextEquals("Ridge Earth HD")
         key(Key.DirectionDown)
         key(Key.DirectionDown)
         awaitFocus(hasTestTag("channel-row-3"))
@@ -358,12 +368,13 @@ class BrowseCohesionEvidenceTest {
 
     private fun observation(emptyRecordings: Boolean = false): SessionObservation {
         val names = listOf(
-            "Documentary HD", "Arts and Culture from Around the World HD", "Regional Television",
-            "News HD", "Cinema HD", "Sports HD", "Family HD", "Music HD",
+            "Ridge Earth HD", "Harbor Sport International from Around the World HD", "Northline News",
+            "Kite Kids", "Lantern Hour", "River Court", "Little Orbit", "Harbor Lights",
         )
         val channels = names.mapIndexed { index, name ->
             Channel.create(
                 id = ChannelId(index + 1L), name = name, number = index + 1L,
+                icon = ArtworkId(index + 1).takeIf { index != 2 },
                 tagIds = listOf(ChannelTagId(if (index < 3) 1 else 2)),
             )
         }
@@ -385,6 +396,7 @@ class BrowseCohesionEvidenceTest {
                         else -> "An Evening on ${channel.name}"
                     },
                     summary = DESCRIPTION,
+                    image = if (channel.id == ChannelId(1)) "imagecache/101" else if (channel.id == ChannelId(2)) "imagecache/102" else null,
                     genre = "Documentary",
                     nextEventId = if (offset < 4) EventId(channel.id.value * 100 + offset + 1) else null,
                 )
@@ -413,7 +425,7 @@ class BrowseCohesionEvidenceTest {
     }
 
     private fun recordings(now: Long): List<DvrEntry> = listOf(
-        "Documentaries/northern-lights.ts" to LONG_TITLE,
+        "Documentaries/storm-coast.ts" to "Tide Watch: The Remarkable Journey Along the Storm Coast in Deep Winter",
         "Documentaries/blue-planet.ts" to CURRENT_TITLE,
         "Documentaries/mountain-paths.ts" to "Mountain Paths: The Last Alpine Villages",
         "News/evening-report.ts" to "Evening Report",
@@ -429,8 +441,9 @@ class BrowseCohesionEvidenceTest {
             path = path,
             files = listOf(DvrRecordingFile(fileId = null, path = path, start = null, stop = null, sizeBytes = 2_400_000_000L)),
             playPosition = if (index == 0) 3723.seconds else null,
-            channelName = if (index < 3) "Documentary HD" else "News HD",
-            subtitle = if (index == 0) "A winter expedition beyond the Arctic Circle" else null,
+            channelName = when (index) { 0 -> "Tide Watch"; 1, 2 -> "Ridge Earth HD"; 5 -> "Harbor Sport"; else -> "Northline News" },
+            image = when (index) { 0 -> "imagecache/103"; 1 -> "imagecache/101"; 5 -> "imagecache/102"; else -> null },
+            subtitle = if (index == 0) "Six weeks with the coastguard as the winter storms arrive" else null,
             description = DESCRIPTION,
         )
     }
@@ -527,8 +540,8 @@ class BrowseCohesionEvidenceTest {
     }
 
     private companion object {
-        const val CURRENT_TITLE = "Across the Blue Planet"
-        const val LONG_TITLE = "The Remarkable Journey of the Northern Lights: A Winter Expedition Across the Arctic"
+        const val CURRENT_TITLE = "Ridge Light"
+        const val LONG_TITLE = "Harbor Kickoff: The Remarkable Journey to the Final Across the Northern Coast"
         const val DESCRIPTION = "Follow a small team of naturalists through remote landscapes as they explore " +
             "the changing seasons, meet the people who call these places home and discover the wildlife " +
             "that survives at the edge of the world. This extended programme includes journeys by sea, " +

@@ -1,8 +1,8 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.Image
@@ -56,7 +56,6 @@ import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
-import at.bernhardberger.tvhplayer.ui.player.DebugVideoBackdrop
 import at.bernhardberger.tvhplayer.ui.screens.SETTINGS_ROOT
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
 import at.bernhardberger.tvhplayer.ui.screens.settingsRootLevel
@@ -423,11 +422,7 @@ class NavigationShellEvidenceTest {
 
     /** EN/DE at 1.0 and 1.3, drawer closed and open, over no playback and warm playback. */
     private fun captureShell(locale: String, fontScale: Float) {
-        val warmLabel = if (File(APPROVED_STILL).isFile) {
-            "warm-approved-still"
-        } else {
-            "warm-synthetic-backdrop"
-        }
+        val warmLabel = "warm-fixture-still"
         settingsShell(fontScale)
         val prefix = "$locale-font$fontScale"
 
@@ -458,10 +453,9 @@ class NavigationShellEvidenceTest {
 
     private var warmPlayback by mutableStateOf(false)
 
-    /** Settings root on the global shell, over the approved warm still when present. */
+    /** Settings root on the global shell, over an offline video-like still. */
     private fun settingsShell(fontScale: Float) {
-        val still = File(APPROVED_STILL).takeIf { it.isFile }
-            ?.let { requireNotNull(BitmapFactory.decodeFile(it.path)).asImageBitmap() }
+        val still = FixtureArt.art("still-ridge-light").asImageBitmap()
         lateinit var navigation: DepthNavigationState
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
@@ -470,8 +464,7 @@ class NavigationShellEvidenceTest {
                     navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         if (warmPlayback) {
-                            if (still == null) DebugVideoBackdrop(true, Modifier.fillMaxSize())
-                            else Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             WarmPlaybackScrim()
                         }
                         SideRail(
@@ -541,7 +534,4 @@ class NavigationShellEvidenceTest {
         }
     }
 
-    private companion object {
-        const val APPROVED_STILL = "../artifacts/settings-c-review/approved-comparison-still.png"
-    }
 }

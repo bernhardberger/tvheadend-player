@@ -18,7 +18,7 @@ Load these through `testutil/FixtureArt.kt`.
 - Format edge cases: `glass-harbor-poster-2x3` (480×720, generated as a
   poster, not padded), `harbor-kickoff-4x3` (960×720) and
   `ion-wake-edge-title` (title ink close to the right edge).
-- `art/still-*.jpg`: news stills without readable text.
+- `art/still-*.jpg`: programme stills without readable text, usable as a stand-in video frame behind the player.
 
 ## Provenance
 
@@ -76,3 +76,15 @@ Source path and SHA-256 of each source file, relative to the batch:
 | `art/still-northline-graphics.jpg` | `programmes/news-northline-tonight/stills/05.png` | `232bdc10e57e272d4140ad5be960f8a4dbf76fc22af27d2301c3d2f140110cd4` |
 | `art/still-field-desk-street.jpg` | `programmes/news-field-desk/stills/04.png` | `5cb830aae46330fc25adfbff338694679bd91bdb4b3b221a9acbe4d1800d3101` |
 | `art/still-skyglass-square.jpg` | `programmes/news-skyglass-weather/stills/04.png` | `918647322963ec557b462b0876cf57507d4f83553c2e1ba673922f762e67860d` |
+| `art/still-harbor-kickoff.jpg` | `programmes/sport-harbor-kickoff/stills/01.png` | `db7910283813a10a9a09e318c298d94cda17fd5f0320046c07e842bd0605a63b` |
+| `art/still-river-court.jpg` | `programmes/sport-river-court/stills/01.png` | `00ef0f0d115ecb945fdbfbe9facdf762899173c91f8912d172636472a5f6d1ce` |
+| `art/still-kettle-hour.jpg` | `programmes/ent-kettle-hour/stills/01.png` | `40a8ec8293924ae1613125f830e898e1fa771425d7a2046ade16e538855f5874` |
+| `art/still-glass-harbor.jpg` | `programmes/ent-glass-harbor/stills/01.png` | `4c35d363f9adde869915298db9cfaf448c07ab8ee05a81ce8cf31c56b6615e1c` |
+| `art/still-paper-kite-tales.jpg` | `programmes/kids-paper-kite/stills/01.png` | `a6f14acca850641819f8fd75275dbaf238b09e7b7c9de6e4f803cf386aeae7e8` |
+| `art/still-little-orbit.jpg` | `programmes/kids-little-orbit/stills/01.png` | `2c83c48ba869b4f960237762daa24913d19aa20e3a59198f7ca5dcb0d2a22a5f` |
+| `art/still-lantern-road.jpg` | `programmes/anime-lantern-road/stills/01.png` | `74e4974579fec885f478a2e8dcb6864f890576d4a9e17188931c94f3f2cd5adf` |
+| `art/still-ion-wake.jpg` | `programmes/anime-ion-wake/stills/01.png` | `1fe94653d3b2bfbe157a5484fc5dde7c436c88f9003c55e1d99a61c17db88be8` |
+| `art/still-ridge-light.jpg` | `programmes/nat-ridge-light/stills/01.png` | `2b4a8071e65c2bdad4fa8179312e74d96d6897636cdfbd530a8adc410289db60` |
+| `art/still-harbor-lights-live.jpg` | `programmes/live-harbor-lights/stills/01.png` | `4984f731d6abdf36dcfd94e6912454abce7c6e3cc27c6cddbb74f97452e73f41` |
+| `art/still-tide-watch.jpg` | `programmes/nat-tide-watch/stills/01.png` | `fbecedef93e3acdf52252cf0369bcb56c21132d6300e65a1ba99905d97665a80` |
+| `art/still-coastal-miles.jpg` | `programmes/ent-coastal-miles/stills/01.png` | `04a1fa31e9d3375d0bd0061dc51e6043ed86687eb83533c21b4cf569d488ead3` |

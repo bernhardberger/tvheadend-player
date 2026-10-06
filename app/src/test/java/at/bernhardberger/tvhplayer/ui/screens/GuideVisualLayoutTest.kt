@@ -665,7 +665,8 @@ class GuideVisualLayoutTest {
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null) {
         val channels = (1L..12L).map { id ->
-            Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else "Channel $id HD",
+            Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
+                listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
                 number = id, icon = if (id == 3L) null else ArtworkId(id.toInt()), tagIds = listOf(ChannelTagId(1)))
         }
         fun event(channel: Channel, offset: Int) = EpgEvent.create(

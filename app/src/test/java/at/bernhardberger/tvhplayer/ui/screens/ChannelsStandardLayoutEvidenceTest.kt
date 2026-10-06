@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -922,19 +923,19 @@ class ChannelsStandardLayoutEvidenceTest {
     private fun programmeStop(n: Int): Long = programmeStart(n) + 90 * 60L
 
     private fun name(n: Int): String = when (n) {
-        1 -> "ORF 1 HD"
-        2 -> "ORF 2 HD"
-        3 -> "ZDF HD"
+        1 -> "Ridge Earth HD"
+        2 -> "Harbor Sport HD"
+        3 -> "Northline News"
         LONG_TEXT -> "Ein außergewöhnlich langer Sendername der niemals in eine Zeile passt HD"
         NO_EPG -> "Regional TV"
-        6 -> "Das Erste HD"
-        7 -> "arte HD"
-        8 -> "3sat HD"
-        9 -> "ServusTV HD"
-        10 -> "ProSieben Austria"
-        11 -> "RTL Austria"
-        12 -> "Sky Sport Austria 1"
-        13 -> "ORF Sport +"
+        6 -> "Glass Drama"
+        7 -> "Amber Stage"
+        8 -> "Lantern Hour"
+        9 -> "Harbor Lights"
+        10 -> "Ion Frame"
+        11 -> "Little Orbit"
+        12 -> "River Court"
+        13 -> "Harbor Sport +"
         else -> "Channel $n"
     }
 
@@ -944,10 +945,10 @@ class ChannelsStandardLayoutEvidenceTest {
     private fun programmeTitle(n: Int): String = when (n) {
         LONG_TEXT -> if (isGerman) "Die außergewöhnlich lange Reise der Polarlichter durch die winterliche Arktis" else
             "The Extraordinarily Long Programme Title That Cannot Possibly Fit In One Row"
-        1 -> "Zeit im Bild"
-        2 -> "Universum: Wildes Österreich"
-        3 -> "heute journal"
-        6 -> "Tagesthemen"
+        1 -> "Ridge Light"
+        2 -> "Harbor Kickoff"
+        3 -> "Northline Tonight"
+        6 -> "Glass Harbor"
         else -> "Programme on ${name(n)}"
     }
 
@@ -970,16 +971,7 @@ class ChannelsStandardLayoutEvidenceTest {
         override fun map(data: AppArtworkSource, options: Options): ByteArray {
             val variant = data.id.value
             if (variant == 10) {
-                val bitmap = Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
-                val paint = Paint().apply { color = 0xFF486C79.toInt() }
-                canvas.drawPaint(paint)
-                paint.color = 0xFFADC0B6.toInt()
-                canvas.drawCircle(490f, 90f, 35f, paint)
-                paint.color = 0xFF638F91.toInt()
-                canvas.drawRect(0f, 205f, 640f, 360f, paint)
-                paint.color = 0xFF2B4B54.toInt()
-                canvas.drawOval(RectF(-130f, 150f, 360f, 460f), paint)
+                val bitmap = FixtureArt.art("still-ridge-light")
                 return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
             }
             val (width, height, tint) = when (variant) {

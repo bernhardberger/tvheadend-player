@@ -1,9 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Paint
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -864,11 +864,13 @@ class QuickZapPresentationTest {
                 ImageLoader.Builder(context)
                     .components { add(object : Mapper<AppArtworkSource, ByteArray> {
                         override fun map(data: AppArtworkSource, options: Options): ByteArray {
-                            val bitmap = Bitmap.createBitmap(200, 90, Bitmap.Config.ARGB_8888)
-                            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = 0xFF79D1FF.toInt(); textSize = 64f; isFakeBoldText = true
-                            }
-                            Canvas(bitmap).drawText("TV ${data.id.value}", 12f, 68f, paint)
+                            val bitmap = FixtureArt.picon(when (data.id.value) {
+                                1 -> "ridge-earth"
+                                2 -> "harbor-sport"
+                                3 -> "northline-news"
+                                4 -> "kite-kids"
+                                else -> "lantern-hour"
+                            })
                             return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
                         }
                     }) }

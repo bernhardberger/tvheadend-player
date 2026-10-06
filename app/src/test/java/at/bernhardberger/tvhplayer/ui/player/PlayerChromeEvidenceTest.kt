@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -76,20 +77,8 @@ class PlayerChromeEvidenceTest {
         val app = ApplicationProvider.getApplicationContext<Application>()
         shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
         // Every image request terminates here: deterministic art, no server or network access.
-        val bitmap = Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_8888)
-        Canvas(bitmap).apply {
-            drawColor(android.graphics.Color.rgb(44, 66, 80))
-            val paint = Paint().apply { color = android.graphics.Color.rgb(125, 158, 164) }
-            drawCircle(480f, 95f, 55f, paint)
-            paint.color = android.graphics.Color.rgb(38, 87, 75)
-            drawRect(0f, 225f, 640f, 360f, paint)
-        }
-        // Wide transparent logo fixture, distinct from programme artwork (not a downloaded logo).
-        val logo = Bitmap.createBitmap(512, 144, Bitmap.Config.ARGB_8888)
-        Canvas(logo).apply {
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 100f; isFakeBoldText = true }
-            drawText("ORF 1 HD", 8f, 108f, paint)
-        }
+        val bitmap = FixtureArt.art("ridge-light")
+        val logo = FixtureArt.picon("ridge-earth")
         brightStill = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
         Canvas(brightStill).apply {
             drawColor(android.graphics.Color.rgb(232, 240, 246))
@@ -116,7 +105,7 @@ class PlayerChromeEvidenceTest {
         } }
         val bar = compose.onNodeWithTag("bar").fetchSemanticsNode()
         val spoken = bar.config[SemanticsProperties.ContentDescription].joinToString(" ")
-        assertTrue(spoken.contains("Channel 101, ORF 1 HD"))
+        assertTrue(spoken.contains("Channel 101, Ridge Earth HD"))
         assertTrue(spoken.contains("Now:"))
         assertTrue(spoken.contains("Recording scheduled"))
         assertTrue(spoken.contains("1080 lines"))
@@ -226,12 +215,12 @@ class PlayerChromeEvidenceTest {
             InfoBar(info(true).copy(channelNumber = ""), emptyList(), null, Modifier.fillMaxWidth().testTag("bar"))
         } }
         val spoken = compose.onNodeWithTag("bar").fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString(" ")
-        assertTrue(spoken.startsWith("ORF 1 HD"))
+        assertTrue(spoken.startsWith("Ridge Earth HD"))
         assertTrue(spoken.contains("38 minutes left"))
         assertTrue(spoken.contains("20:15 to 21:45"))
         assertFalse(spoken.contains("Now:"))
         assertFalse(spoken.contains("Next"))
-        assertFalse(spoken.contains(" · ORF"))
+        assertFalse(spoken.contains(" · Ridge"))
         compose.onNodeWithTag("player-scheduled-marker", useUnmergedTree = true).assertDoesNotExist()
     }
 
@@ -544,7 +533,7 @@ class PlayerChromeEvidenceTest {
         }
     }
 
-    @Composable private fun info(recorded: Boolean) = PlayerInfoBarData("101", "ORF 1 HD",
+    @Composable private fun info(recorded: Boolean) = PlayerInfoBarData("101", "Ridge Earth HD",
         "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45", "Drama · S3 E4",
         "Eine neue Perspektive auf Menschen und ihre Geschichten", 38, if (recorded) null else "21:45 Nachrichten", !recorded,
         if (recorded) playerRecordedDate(LocalDate.of(2026, 9, 12)) else null)

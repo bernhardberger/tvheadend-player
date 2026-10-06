@@ -1,9 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Paint
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -441,7 +444,8 @@ class PlayerMotionCaptureTest {
             val loader = remember { piconLoader(context) }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().background(Color(0xFF3A4A5A))) {
-                    DebugVideoBackdrop(visible = true, modifier = Modifier.fillMaxSize())
+                    Image(remember { FixtureArt.art("still-ridge-light").asImageBitmap() }, null,
+                        Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                     content(loader, session)
                 }
             }
@@ -476,13 +480,11 @@ class PlayerMotionCaptureTest {
         .components {
             add(object : Mapper<AppArtworkSource, ByteArray> {
                 override fun map(data: AppArtworkSource, options: Options): ByteArray {
-                    val bitmap = Bitmap.createBitmap(200, 90, Bitmap.Config.ARGB_8888)
-                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = 0xFF79D1FF.toInt()
-                        textSize = 64f
-                        isFakeBoldText = true
-                    }
-                    Canvas(bitmap).drawText("TV ${data.id.value}", 12f, 68f, paint)
+                    val bitmap = FixtureArt.picon(when (data.id.value) {
+                        1 -> "ridge-earth"
+                        2 -> "harbor-sport"
+                        else -> "northline-news"
+                    })
                     return ByteArrayOutputStream().also {
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
                     }.toByteArray()
@@ -498,7 +500,7 @@ class PlayerMotionCaptureTest {
     private val programme = EpgEvent.create(
         id = EventId(1),
         channelId = ChannelId(1),
-        title = "A journey through the mountains and the valleys of the Alps",
+        title = "Ridge Light: A journey through the mountains and the valleys of the Alps",
         start = Instant.fromEpochSeconds(0),
         stop = Instant.fromEpochSeconds(3_600),
     )
@@ -506,7 +508,7 @@ class PlayerMotionCaptureTest {
     private val zappedProgramme = EpgEvent.create(
         id = EventId(3),
         channelId = ChannelId(2),
-        title = "Night sky",
+        title = "Harbor Kickoff",
         start = Instant.fromEpochSeconds(900),
         stop = Instant.fromEpochSeconds(4_500),
     )
@@ -514,12 +516,13 @@ class PlayerMotionCaptureTest {
     private val next = EpgEvent.create(
         id = EventId(2),
         channelId = ChannelId(1),
-        title = "Zeit im Bild",
+        title = "Northline Tonight",
         start = Instant.fromEpochSeconds(3_600),
         stop = Instant.fromEpochSeconds(5_400),
     )
 
     private val channels = (1L..3L).map {
-        Channel.create(id = ChannelId(it), number = it, name = "Channel $it", icon = ArtworkId(it.toInt()))
+        Channel.create(id = ChannelId(it), number = it + 100,
+            name = listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News")[(it - 1).toInt()], icon = ArtworkId(it.toInt()))
     }
 }

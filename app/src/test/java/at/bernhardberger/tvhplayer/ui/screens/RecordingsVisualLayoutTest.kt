@@ -4,6 +4,8 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -74,8 +76,13 @@ class RecordingsVisualLayoutTest {
         oldZone = TimeZone.getDefault()
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-        loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
-            .diskCache(null).build()
+        loader = FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
+            ArtworkId(101) to FixtureArt.art("ridge-light"),
+            ArtworkId(102) to FixtureArt.art("still-tide-watch"),
+            ArtworkId(103) to FixtureArt.art("ridge-light"),
+            ArtworkId(104) to FixtureArt.art("northline-tonight"),
+            ArtworkId(105) to FixtureArt.art("harbor-lights-live"),
+        ))
     }
 
     @After fun release() {
@@ -419,10 +426,10 @@ class RecordingsVisualLayoutTest {
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null) {
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
-            recording(2, "Across the Blue Planet", "Documentaries/Expeditions/blue.ts"),
-            recording(3, "Mountain Paths", "Documentaries/mountains.ts"),
-            recording(4, "Evening Report", "News/report.ts"),
-            recording(5, "The Weekend Concert", "concert.ts"),
+            recording(2, "Tide Watch", "Documentaries/Expeditions/blue.ts"),
+            recording(3, "Ridge Light", "Documentaries/mountains.ts"),
+            recording(4, "Northline Tonight", "News/report.ts"),
+            recording(5, "Harbor Lights Live", "concert.ts"),
             recording(20, "Tomorrow's documentary", null, DvrEntryState.SCHEDULED),
             recording(21, "Unfinished expedition", null, DvrEntryState.COMPLETED_ERROR),
         )
@@ -487,7 +494,8 @@ class RecordingsVisualLayoutTest {
             start = Instant.fromEpochSeconds(1_791_000_000 - id * 86400),
             stop = Instant.fromEpochSeconds(1_791_000_000 - id * 86400 + 90 * 60),
             files = path?.let { listOf(DvrRecordingFile(null, it, null, null, 2_400_000_000L)) }.orEmpty(),
-            channelName = "Documentary HD",
+            channelName = "Ridge Earth HD",
+            image = if (id in 1L..5L) "imagecache/${100 + id}" else null,
             subtitle = if (id == 1L) "A winter expedition beyond the Arctic Circle" else null,
             description = "Follow a small team of naturalists through remote landscapes as they explore " +
                 "the changing seasons, meet local communities and discover wildlife at the edge of the world.",
@@ -596,6 +604,6 @@ class RecordingsVisualLayoutTest {
     }
 
     private companion object {
-        const val LONG_TITLE = "The Remarkable Journey of the Northern Lights: A Winter Expedition Across the Arctic"
+        const val LONG_TITLE = "Ridge Light: The Remarkable Journey of the Northern Lights Across the Arctic"
     }
 }

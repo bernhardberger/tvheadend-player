@@ -24,10 +24,6 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.EpgEvent
-import at.bernhardberger.tvheadend.sdk.core.EventId
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
@@ -36,7 +32,6 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingConfirmationDialog
 import java.io.File
-import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -54,7 +49,8 @@ import org.robolectric.shadows.ShadowDialog
 /**
  * The floating side panel on every player surface that uses it, in English and
  * German at font 1.0 and 1.3: inset 24 dp from the end, top and bottom edges at
- * its width (programme info is wider), with no row text cut. Captures go to
+ * its width, with no row text cut. Live programme info is the full-screen player
+ * page now and is captured by PlayerChromeCaptureTest. Captures go to
  * build/outputs/playback-panel-captures for visual review.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -139,7 +135,6 @@ class PlaybackPanelCaptureTest {
         AUDIO_QUICK_LIST("playback-options-overlay"),
         SUBTITLES_QUICK_LIST("playback-options-overlay"),
         RECORDING_MENU("playback-options-overlay"),
-        PROGRAMME_INFO("live-info-panel", PlaybackInfoPanelWidth),
     }
 
     private fun panels(locale: String, fontScale: Float) {
@@ -166,29 +161,6 @@ class PlaybackPanelCaptureTest {
                             {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                             quickList = PlaybackQuickListSignals(),
                         )
-                        Surface.PROGRAMME_INFO -> LiveProgrammeInfoOverlay(
-                            details = { _, _ -> },
-                            event = EpgEvent.create(
-                                id = EventId(42L),
-                                channelId = ChannelId(1L),
-                                start = Instant.fromEpochSeconds(1_000L),
-                                stop = Instant.fromEpochSeconds(4_600L),
-                                title = PROGRAMME_TITLE,
-                                summary = PROGRAMME_SUMMARY,
-                                description = PROGRAMME_SUMMARY,
-                            ),
-                            channelIdentity = "1 • ORF1 HD",
-                            channelName = "ORF1 HD",
-                            recordingScheduled = false,
-                            canRecord = true,
-                            recordingState = LiveInfoRecordingState.Idle,
-                            confirmationVisible = false,
-                            restoreRecordFocus = false,
-                            onRecord = {},
-                            onRecordingActivate = {},
-                            onRecordingDismiss = {},
-                            onClose = {},
-                        )
                     }
                 }
             }
@@ -201,18 +173,6 @@ class PlaybackPanelCaptureTest {
             println("Focus $name: ${focusedNodes()}")
             capture(view, name).recycle()
             cutTexts(next.panelTag).map { "$next: $it" }
-        }
-        // Programme info opens on its reading region; for review, also capture each
-        // action focused.
-        listOf("live-info-record", "live-info-close").forEach { tag ->
-            println("Bounds $locale-font$fontScale $tag: ${compose.onNodeWithTag(tag).getUnclippedBoundsInRoot()}")
-        }
-        listOf("live-info-record", "live-info-close").forEach { tag ->
-            compose.onNodeWithTag(tag).requestFocus()
-            compose.onNodeWithTag(tag).assertIsFocused()
-            val name = "programme_info-$locale-font$fontScale-${tag.removePrefix("live-info-")}-focused"
-            println("Focus $name: ${focusedNodes()}")
-            capture(view, name).recycle()
         }
         assertEquals("Cut text", emptyList<String>(), cut)
     }
@@ -263,8 +223,5 @@ class PlaybackPanelCaptureTest {
 
     private companion object {
         const val PROGRAMME_TITLE = "Die Rosenheim-Cops: Eine außergewöhnlich lange Sendungsbezeichnung"
-        const val PROGRAMME_SUMMARY = "Ein Bauunternehmer wird tot in seiner Baugrube gefunden. " +
-            "Hofer und Stadler ermitteln zwischen Bauamt, Nachbarschaftsstreit und einer alten Rechnung, " +
-            "die nie bezahlt wurde."
     }
 }
