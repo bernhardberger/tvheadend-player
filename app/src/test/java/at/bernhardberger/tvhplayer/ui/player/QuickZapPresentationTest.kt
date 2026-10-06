@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.key.Key
@@ -199,7 +200,7 @@ class QuickZapPresentationTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize()) {
                         Box(Modifier.padding(start = 58.dp, top = 30.dp)) {
-                            PlayerIdentityCard(PlayerChromeContent("", PlayerInfoBarData("1", "Channel 1", "", ""),
+                            PlayerIdentityCard(PlayerChromeContent("", PlayerInfoBarData("1", lineUp.first().name, "", ""),
                                 picon = channel.icon), loader, null, onClick = {}, channelCard = true, held = true)
                         }
                         Box(Modifier.padding(top = 230.dp)) {
@@ -222,7 +223,7 @@ class QuickZapPresentationTest {
                 val text = results.single()
                 val bounds = rect(tag, card)
                 return listOf(bounds.left, bounds.top, text.firstBaseline + bounds.top,
-                    text.getBoundingBox(text.layoutInput.text.text.indexOf("Channel")).left + bounds.left, bounds.width)
+                    text.getBoundingBox(text.layoutInput.text.text.indexOf("Ridge")).left + bounds.left, bounds.width)
             }
             fun corner(card: String): Float = node(card).layoutInfo.getModifierInfo()
                 .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
@@ -263,7 +264,7 @@ class QuickZapPresentationTest {
             TVHeadendPlayerTheme {
                 PlayerPage<Unit>(details = null, railHeader = if (expanded) ({
                     androidx.compose.runtime.SideEffect { headerCompositions++ }
-                    ProgrammeScheduleHeader("1 · Channel 1")
+                    ProgrammeScheduleHeader("1 · Ridge Earth HD")
                 }) else null, player = {
                     peek = LocalPlayerRailPeek.current!!
                     QuickZapPresentation(expanded,
@@ -295,9 +296,48 @@ class QuickZapPresentationTest {
         compose.mainClock.autoAdvance = true
     }
 
+    /** A fictional programme with its fixture art; see fixture-art/README.md. */
+    private class Programme(val title: String, val art: String, val synopsis: String)
+    private class LineUp(val name: String, val picon: String?, vararg val programmes: Programme)
+
+    private val ridgeLight = Programme("Ridge Light", "ridge-light", "Seasonal light, forests and weather moving over a ridge.")
+    private val tideWatch = Programme("Tide Watch", "still-tide-watch", "Wading birds and seals along a tidal estuary.")
+    private val coastalMiles = Programme("Coastal Miles", "still-coastal-miles", "A walk along a temperate coast, from market to ferry slip.")
+    private val harborKickoff = Programme("Harbor Kickoff", "harbor-kickoff", "Harbor FC meet Amber Town under the floodlights.")
+    private val riverCourt = Programme("River Court", "river-court", "Indoor basketball: River Court against North Quay.")
+    private val extraTime = Programme("Harbor Kickoff: Extra Time", "harbor-kickoff-4x3", "Highlights and interviews after the final whistle.")
+    private val northlineTonight = Programme("Northline Tonight", "northline-tonight", "Evening news from the regional desk.")
+    private val fieldDesk = Programme("Field Desk", "field-desk", "Reporting from a flooded riverside road.")
+    private val weather = Programme("Skyglass Weather", "still-skyglass-square", "The weather for the coast and the hills.")
+    private val paperKite = Programme("Paper Kite Tales", "paper-kite-tales", "A paper kite drifts over painted hills.")
+    private val littleOrbit = Programme("Little Orbit", "little-orbit", "Orbits explained with marbles and a bowl.")
+    private val ionWake = Programme("Ion Wake", "ion-wake", "A courier rides a magnetic rail through Ion Harbor.")
+    private val lanternRoad = Programme("Lantern Road", "lantern-road", "A cartographer maps a valley from a lantern sky-bridge.")
+    private val kettleHour = Programme("The Kettle Hour", "kettle-hour", "Broths, bread and weeknight pans.")
+    private val glassHarbor = Programme("Glass Harbor", "glass-harbor", "Night shifts in a harbour glass workshop.")
+    private val harborLights = Programme("Harbor Lights Live", "harbor-lights-live", "A small-hall concert with a quartet.")
+
+    /** Channel n is entry n - 1: a long German name (4) and a channel without a picon (5). */
+    private val lineUp = listOf(
+        LineUp("Ridge Earth HD", "ridge-earth", ridgeLight, tideWatch, coastalMiles),
+        LineUp("Harbor Sport", "harbor-sport", harborKickoff, riverCourt, extraTime),
+        LineUp("Northline News", "northline-news", northlineTonight, fieldDesk, weather),
+        LineUp("Foundry Docs – Dokumentation und Zeitgeschichte HD", "foundry-docs", tideWatch, ridgeLight, coastalMiles),
+        LineUp("Amber Stage", null, kettleHour, glassHarbor, coastalMiles),
+        LineUp("Kite Kids", "kite-kids", paperKite, littleOrbit),
+        LineUp("Ion Frame", "ion-frame", ionWake, lanternRoad),
+        LineUp("Harbor Lights", "harbor-lights", harborLights, glassHarbor),
+        LineUp("Lantern Hour", "lantern-hour", lanternRoad, ionWake),
+        LineUp("Northline World", "northline-world", fieldDesk, northlineTonight, weather),
+        LineUp("Roundtable Late", "roundtable", harborLights, kettleHour),
+        LineUp("Coastal Miles", "coastal-miles", coastalMiles, tideWatch),
+    )
+    private fun programme(id: Long, index: Int) = lineUp[((id - 1) % lineUp.size).toInt()].programmes.let { it[index % it.size] }
+
     private val channels = (1L..12L).map {
-        Channel.create(id = ChannelId(it), number = it, name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
-            icon = if (it == 5L) null else ArtworkId(it.toInt()))
+        val line = lineUp[(it - 1).toInt()]
+        Channel.create(id = ChannelId(it), number = it, name = line.name,
+            icon = line.picon?.let { _ -> ArtworkId(it.toInt()) })
     }
     private var catalog by mutableStateOf(channels)
 
@@ -353,9 +393,9 @@ class QuickZapPresentationTest {
         assertExists("player-channel-row-2-tile-2-title", true)
         key(Key.DirectionLeft)
         key(Key.DirectionLeft)
-        assertEquals("On now, 00:00, A journey through the mountains, Discover remarkable places.",
+        assertEquals("On now, 00:00, Harbor Kickoff, Harbor FC meet Amber Town under the floodlights.",
             tile(2, 0).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
-        assertEquals("01:00, Afternoon stories, Episode 1",
+        assertEquals("01:00, River Court, Episode 1",
             tile(2, 1).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
         compose.onAllNodes(hasAnyAncestor(hasTestTag("player-channel-row-2"))
             .and(SemanticsMatcher.expectValue(SemanticsProperties.Heading, Unit))).assertCountEquals(1)
@@ -528,14 +568,9 @@ class QuickZapPresentationTest {
 
     private fun rowEvents(id: ChannelId) = (0..8).map { index ->
         EpgEvent.create(id = EventId(id.value * 100 + index), channelId = id,
-            title = when (id.value.toInt() % 4) {
-                0 -> listOf("A century in photographs", "Hidden histories", "The great expedition", "Witnesses of change", "Ancient cities", "The archives")
-                1 -> listOf("World news", "Today's headlines", "Across the country", "The interview", "Business report", "Late bulletin")
-                2 -> listOf("A journey through the mountains", "Afternoon stories", "The living planet", "Evening news", "Music from the city", "Night cinema")
-                else -> listOf("Match of the day", "Inside the stadium", "Road to the finals", "Sporting legends", "Weekend highlights", "Extra time")
-            }[index % 6],
+            title = programme(id.value, index).title,
             subtitle = if (index % 3 == 1) "Episode $index" else null,
-            description = if (index % 3 == 0) "Discover remarkable places.\nStories and perspectives from around the world." else null,
+            description = if (index % 3 == 0) programme(id.value, index).synopsis else null,
             image = if (index % 2 == 1) "imagecache/${1000 + id.value * 10 + index}" else null,
             start = Instant.fromEpochSeconds(index * 3600L), stop = Instant.fromEpochSeconds((index + 1) * 3600L))
     }
@@ -996,18 +1031,10 @@ class QuickZapPresentationTest {
                 ImageLoader.Builder(context)
                     .components { add(object : Mapper<AppArtworkSource, ByteArray> {
                         override fun map(data: AppArtworkSource, options: Options): ByteArray {
-                            val bitmap = if (data.id.value >= 1000) {
-                                FixtureArt.art(listOf("ridge-light", "harbor-kickoff", "northline-tonight",
-                                    "paper-kite-tales", "lantern-road")[data.id.value.toInt() % 5])
-                            } else {
-                                FixtureArt.picon(when (data.id.value) {
-                                    1 -> "ridge-earth"
-                                    2 -> "harbor-sport"
-                                    3 -> "northline-news"
-                                    4 -> "kite-kids"
-                                    else -> "lantern-hour"
-                                })
-                            }
+                            // Programme art is "imagecache/<1000 + channel * 10 + index>"; picons use the channel id.
+                            val id = data.id.value.toLong()
+                            val bitmap = if (id >= 1000) FixtureArt.art(programme((id - 1000) / 10, ((id - 1000) % 10).toInt()).art)
+                                else FixtureArt.picon(checkNotNull(lineUp[(id - 1).toInt()].picon))
                             return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
                         }
                     }) }
@@ -1019,17 +1046,13 @@ class QuickZapPresentationTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     focusColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
+                    val video = remember(playing) {
+                        FixtureArt.art(if (playing == ChannelId(1)) "still-ridge-light" else "still-harbor-kickoff").asImageBitmap()
+                    }
                     Box(Modifier.fillMaxSize().background(if (bright) Color(0xFFDDEAF0) else Color(0xFF24384A))
                         .then(if (rows) Modifier.drawBehind {
-                            // Deterministic video proxy makes the overlay's transparency reviewable.
-                            drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(
-                                listOf(Color(0xFF83C2D9), Color(0xFF4C7182), Color(0xFF193F3C))))
-                            drawCircle(Color(0xFFFFDB9A), 44f, androidx.compose.ui.geometry.Offset(750f, 100f))
-                            drawPath(androidx.compose.ui.graphics.Path().apply {
-                                moveTo(0f, 290f); lineTo(180f, 100f); lineTo(370f, 320f)
-                                lineTo(550f, 150f); lineTo(820f, 380f); lineTo(960f, 240f)
-                                lineTo(960f, 540f); lineTo(0f, 540f); close()
-                            }, Color(0xFF406F6A))
+                            // The playing programme's still stands in for video behind the overlay.
+                            drawImage(video, dstSize = androidx.compose.ui.unit.IntSize(size.width.toInt(), size.height.toInt()))
                         } else Modifier)
                         .onPreviewKeyEvent { event ->
                             val code = event.nativeKeyEvent.keyCode
@@ -1052,7 +1075,7 @@ class QuickZapPresentationTest {
                         PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent("", liveInfoBarData(playing?.value,
-                                playing?.let { "Channel ${it.value}" }.orEmpty(), null, null, false, 900, "")),
+                                playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
                             actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),
                             imageLoader = loader, currentSession = session,
@@ -1127,7 +1150,7 @@ class QuickZapPresentationTest {
     }
 
     private fun event(id: ChannelId) = EpgEvent.create(
-        id = EventId(id.value), channelId = id, title = "A journey through the mountains",
+        id = EventId(id.value), channelId = id, title = programme(id.value, 0).title,
         start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(3600),
     )
     private fun card(id: Int) = compose.onNodeWithTag("player-channel-card-$id")
