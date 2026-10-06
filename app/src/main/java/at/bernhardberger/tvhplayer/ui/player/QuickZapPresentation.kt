@@ -55,8 +55,8 @@ internal fun QuickZapPresentation(
     )
     val rowsReveal = animateFloatAsState(
         if (expanded && channelRows) 1f else 0f,
-        // Closing runs the rise backwards in the footer's return time.
-        animationSpec = tween(if (expanded) ChannelRowsRevealMs else PlayerMotion.MediumMs, easing = LinearEasing),
+        // Closing runs the rise backwards, quicker than it came.
+        animationSpec = tween(if (expanded) ChannelRowsRevealMs else ChannelRowsHideMs, easing = LinearEasing),
         label = "channel-rows-reveal",
     )
     val rowsShown by remember(rowsReveal) { derivedStateOf { rowsReveal.value > 0f } }

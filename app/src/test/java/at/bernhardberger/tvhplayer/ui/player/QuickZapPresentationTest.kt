@@ -301,48 +301,69 @@ class QuickZapPresentationTest {
     }
     private var catalog by mutableStateOf(channels)
 
-    @Test fun channelRowsShowThreeRowsDimTheOthersAndCarryTheNowPlayingStrip() {
+    @Test fun channelRowsShowTheFocusedRowLargeThePreviousRowWholeAboveAndTextOnlyInTheFocusedRow() {
         content(rows = true)
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
         compose.onNodeWithTag("player-now-playing").assertExists()
-        val anchor = (ChannelRowsTop + ChannelRowsAnchor).value
+        val anchor = ChannelRowsAnchor.value
         assertEquals(anchor, rowTop(2), 1f)
-        assertTrue("the previous row shows partly below the strip", rowTop(1) < ChannelRowsTop.value &&
-            rowTop(1) + ChannelRowHeight.value > ChannelRowsTop.value)
-        assertEquals(anchor + ChannelRowHeight.value, rowTop(3), 1f)
-        assertTrue("the row after the next is cut by the bottom edge", rowTop(4) < 540f)
-        // Grid: two columns and their gutter, 16:9, six across the content width.
+        assertEquals(anchor - ChannelRowHeight.value, rowTop(1), 1f)
+        assertEquals(anchor + ChannelRowFocusedHeight.value, rowTop(3), 1f)
+        // The previous row rests whole above the focused header; only the screen top covers it.
+        val header = part(2, "header")
+        val previousTile = tile(1, 0).fetchSemanticsNode().boundsInRoot
+        assertEquals("its tiles end where a quiet row's do", rowTop(1) + 28f + PlayerChromeTokens.channelCardHeight.value,
+            previousTile.bottom, 1f)
+        assertTrue("previous row above the focused header: $previousTile, $header", previousTile.bottom <= header.top)
+        assertTrue("header roughly at the upper third: $header", header.top in 95f..130f)
+        assertTrue("the next row's tiles show", tile(3, 0).fetchSemanticsNode().boundsInRoot.bottom < 540f)
+        assertTrue("the header after it peeks", part(4, "header").top < 540f)
+        // The focused header is large, the others small.
+        assertTrue("header sizes: $header, ${part(3, "header")}", header.height > part(3, "header").height * 1.5f)
+        // Grid: the channel card, four across from the margin, the fifth peeking.
         val second = tile(2, 1).fetchSemanticsNode().boundsInRoot
-        assertEquals(124f, second.width, 1f)
-        assertEquals(70f, second.height, 1f)
-        assertEquals(PlayerChromeTokens.gridMargin.value + 124f + PlayerChromeTokens.gridGutter.value, second.left, 1f)
-        assertEquals(960f - PlayerChromeTokens.gridMargin.value, tile(2, 5).fetchSemanticsNode().boundsInRoot.right, 1f)
-        // The start time sits inside the image, bottom-left; "On now" only on the now tile, top-right.
+        assertEquals(PlayerChromeTokens.channelCardWidth.value, second.width, 1f)
+        assertEquals(PlayerChromeTokens.channelCardHeight.value, second.height, 1f)
+        assertEquals(PlayerChromeTokens.gridMargin.value, tile(2, 0).fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals(PlayerChromeTokens.gridMargin.value + 196f + PlayerChromeTokens.gridGutter.value, second.left, 1f)
+        assertEquals(960f - PlayerChromeTokens.gridMargin.value, tile(2, 3).fetchSemanticsNode().boundsInRoot.right, 1f)
+        assertTrue(tile(2, 4).fetchSemanticsNode().boundsInRoot.left < 960f)
+        // Small chips: the start time inside the image bottom-left; "On now" only on the now tile, top-right.
         val start = part(2, 1, "start")
-        assertTrue("start chip inside the image: $start in $second", start.left - second.left in 0f..8f &&
-            second.bottom - start.bottom in 0f..10f && start.top > second.center.y)
+        assertTrue("start chip inside the image: $start in $second", start.left - second.left in 0f..10f &&
+            second.bottom - start.bottom in 0f..12f && start.height <= 20f)
         val now = tile(2, 0).fetchSemanticsNode().boundsInRoot
         val onNow = part(2, 0, "on-now")
-        assertTrue("on-now tag top-right: $onNow in $now", now.right - onNow.right in 0f..8f &&
-            onNow.top - now.top in 0f..8f)
+        assertTrue("on-now chip top-right: $onNow in $now", now.right - onNow.right in 0f..10f &&
+            onNow.top - now.top in 0f..10f && onNow.height <= 20f && onNow.width < now.width / 2)
         compose.onNodeWithTag("player-channel-row-2-tile-1-on-now", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("player-channel-row-3-tile-0-on-now", useUnmergedTree = true).assertExists()
-        // Title below the image; the subtitle line only where the programme has one.
+        // Text only below the focused row: title and subtitle on the focused tile, a title on the others.
         assertTrue(part(2, 1, "title").top >= second.bottom)
-        compose.onNodeWithTag("player-channel-row-2-tile-1-subtitle", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-channel-row-2-tile-2-subtitle", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-channel-row-2-tile-2-title", useUnmergedTree = true).assertExists()
+        assertExists("player-channel-row-2-tile-0-subtitle", true)
+        assertExists("player-channel-row-2-tile-1-subtitle", false)
+        for (row in listOf(1, 3)) assertExists("player-channel-row-$row-tile-1-title", false)
+        key(Key.DirectionRight)
+        assertExists("player-channel-row-2-tile-1-subtitle", true)
+        assertExists("player-channel-row-2-tile-0-subtitle", false)
+        assertExists("player-channel-row-2-tile-0-title", true)
+        key(Key.DirectionRight)
+        assertExists("player-channel-row-2-tile-2-subtitle", false)
+        assertExists("player-channel-row-2-tile-2-title", true)
+        key(Key.DirectionLeft)
+        key(Key.DirectionLeft)
         assertEquals("On now, 00:00, A journey through the mountains, Discover remarkable places.",
             tile(2, 0).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
         assertEquals("01:00, Afternoon stories, Episode 1",
             tile(2, 1).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
         compose.onAllNodes(hasAnyAncestor(hasTestTag("player-channel-row-2"))
             .and(SemanticsMatcher.expectValue(SemanticsProperties.Heading, Unit))).assertCountEquals(1)
-        // The focused row reads at full emphasis, its neighbours dimmed.
-        val focusedTitle = brightest(part(2, 1, "title"))
-        assertTrue("dimmed: focused $focusedTitle, previous ${brightest(part(1, 1, "title"))}, next ${brightest(part(3, 1, "title"))}",
-            focusedTitle > brightest(part(3, 1, "title")) + 60 && focusedTitle > brightest(part(1, 1, "title")) + 60)
+        // The focused row reads at full emphasis; the next dimmed, the previous fading further.
+        val focused = brightest(part(2, 1, "start"))
+        val next = brightest(part(3, 1, "start"))
+        val previous = brightest(part(1, 1, "start"))
+        assertTrue("dimmed: focused $focused, next $next, previous $previous", focused > next + 60 && previous < next)
         capture("rows-playing")
     }
 
@@ -378,7 +399,8 @@ class QuickZapPresentationTest {
         content(rows = true)
         key(Key.DirectionDown)
         tile(1, 0).assertIsFocused()
-        assertEquals("no row above the first", ChannelRowsTop.value + ChannelRowsAnchor.value, rowTop(1), 1f)
+        assertEquals("no row above the first", ChannelRowsAnchor.value, rowTop(1), 1f)
+        compose.onNodeWithTag("player-channel-row-1-header", useUnmergedTree = true).assertExists()
         capture("rows-first-row")
         key(Key.DirectionUp)
         compose.onNodeWithTag("player-channel-rows").assertDoesNotExist()
@@ -422,18 +444,28 @@ class QuickZapPresentationTest {
             capture("rows-open-motion-%03d".format(percent))
             rowTop(2)
         }
-        val anchor = (ChannelRowsTop + ChannelRowsAnchor).value
-        assertTrue("the focused row rises into place: $tops", tops[1] > anchor + 1f && tops.zipWithNext().all { (a, b) -> b <= a })
+        val anchor = ChannelRowsAnchor.value
+        // Evenly spread: still rising at half time, settled at the end.
+        assertTrue("the focused row rises into place: $tops", tops[1] > anchor + 1f && tops[2] > anchor + 1f &&
+            tops.zipWithNext().all { (a, b) -> b <= a })
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
         assertEquals(anchor, rowTop(2), 1f)
+        val below = rowTop(3)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        // The column follows the focus move over the next frames.
-        repeat(8) { if (rowTop(3) > anchor + ChannelRowHeight.value - 1f) compose.mainClock.advanceTimeByFrame() }
-        compose.mainClock.advanceTimeByFrame()
-        val middle = rowTop(3)
-        assertTrue("mid-scroll: $middle", middle > anchor + 1f && middle < anchor + ChannelRowHeight.value - 1f)
-        capture("rows-row-change-mid")
+        // The column, the headers and the dimming follow the focus move on one clock.
+        repeat(8) { if (rowTop(3) > below - 0.5f) compose.mainClock.advanceTimeByFrame() }
+        var changed = 0L
+        val frames = listOf(25, 50, 75).map { percent ->
+            val at = ChannelRowChangeMs * percent / 100L
+            compose.mainClock.advanceTimeBy(at - changed)
+            changed = at
+            compose.waitForIdle()
+            capture("rows-row-change-%03d".format(percent))
+            rowTop(3) to part(3, "header").height
+        }
+        assertTrue("row change: $frames", frames.all { it.first > anchor + 1f && it.first < below - 1f } &&
+            frames.zipWithNext().all { (a, b) -> b.first < a.first && b.second > a.second })
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
         assertEquals(anchor, rowTop(3), 1f)
@@ -445,6 +477,7 @@ class QuickZapPresentationTest {
         content(rows = true, rowsEmpty = true, rowsLoading = true)
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
+        assertExists("player-channel-row-3-tile-0-status", true)
         capture("rows-loading")
         key(Key.DirectionDown)
         tile(3, 0).assertIsFocused()
@@ -457,6 +490,8 @@ class QuickZapPresentationTest {
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
         compose.onNodeWithTag("player-channel-row-2-tile-0-on-now", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals("No programme information",
+            tile(2, 0).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
         capture("rows-empty")
         key(Key.DirectionCenter)
         assertEquals(1, picks)
@@ -467,6 +502,12 @@ class QuickZapPresentationTest {
     private fun part(channel: Int, programme: Int, name: String) =
         compose.onNodeWithTag("player-channel-row-$channel-tile-$programme-$name", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
+    private fun part(channel: Int, name: String) =
+        compose.onNodeWithTag("player-channel-row-$channel-$name", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    private fun assertExists(tag: String, expected: Boolean) {
+        val node = compose.onNodeWithTag(tag, useUnmergedTree = true)
+        if (expected) node.assertExists(tag) else node.assertDoesNotExist()
+    }
     /** Unclipped, including the rows' motion. */
     private fun rowTop(channel: Int) = compose.onNodeWithTag("player-channel-row-$channel").fetchSemanticsNode().positionInRoot.y
 
