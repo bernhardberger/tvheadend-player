@@ -73,6 +73,15 @@ val SettingsDepthColumnGap = TvBrowseColumnGap
 val SettingsDepthHeadingHeight = 60.dp
 val SettingsDepthRowMinHeight = 56.dp
 
+// ---- Material for TV spec baseline (960×540dp) ----
+// The grid that screens migrate to: twelve 52dp columns with 20dp gutters between 58dp side margins,
+// 28dp top and bottom margins, and Material for TV's medium icon button.
+val TvGridHorizontalMargin = 58.dp
+val TvGridVerticalMargin = 28.dp
+val TvGridColumnWidth = 52.dp
+val TvGridGutter = 20.dp
+val TvIconButtonSize = 40.dp
+
 /** Non-interactive programme progress on browse cards, rows, and detail panes. */
 val TvProgressStripHeight = 4.dp
 
