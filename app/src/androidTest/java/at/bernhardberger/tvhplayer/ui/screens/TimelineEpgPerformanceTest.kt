@@ -43,6 +43,9 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineProgrammeCell
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimelineRowHeight
 import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
@@ -74,7 +77,7 @@ class TimelineEpgPerformanceTest {
                 motion = rememberTabContentMotion(selected.value)
                 TabContent(
                     motion, selected.value, state = { pages[selected.value] },
-                    modifier = Modifier.width(794.dp).height(76.dp),
+                    modifier = Modifier.width(794.dp).height(guideTimelineRowHeight()),
                 ) { events, owner ->
                     TimelineChannelRow(
                         channel = channel, channelIndex = 0, number = 1, selectedEventId = null,
@@ -124,7 +127,8 @@ class TimelineEpgPerformanceTest {
     private fun checkClippedCells(direction: LayoutDirection) {
         val channel = Channel.create(ChannelId(1), name = "Channel", number = 1)
         val events = listOf(event(1, 0, 3600), event(2, 3600, 7200), event(3, 7200, 10800))
-        val visibleWidth = mutableStateOf(480.dp) // 180dp header/gap + 300dp of the 600dp track.
+        val lead = GuideChannelWidth + GuideChannelGap
+        val visibleWidth = mutableStateOf(lead + 300.dp) // Current header/gap + 300dp of the 600dp track.
         val selected = mutableStateOf<EpgFocusTarget?>(null)
         composeRule.setContent {
             val context = LocalContext.current
@@ -132,7 +136,7 @@ class TimelineEpgPerformanceTest {
             val focusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 TVHeadendPlayerTheme {
-                    Box(Modifier.width(780.dp)) {
+                    Box(Modifier.width(lead + 600.dp)) {
                         TimelineChannelRow(
                             channel = channel, channelIndex = 0, number = 1,
                             selectedEventId = selected.value?.takeIf { it.channelIndex == 0 }?.eventId,
@@ -154,13 +158,13 @@ class TimelineEpgPerformanceTest {
         composeRule.onNodeWithText("Event 2").assertIsDisplayed()
         composeRule.onNodeWithText("Event $trailingEvent").assertDoesNotExist()
         val partialBounds = composeRule.onNodeWithText("Event 2").fetchSemanticsNode().boundsInRoot
-        composeRule.runOnIdle { visibleWidth.value = 780.dp }
+        composeRule.runOnIdle { visibleWidth.value = lead + 600.dp }
         composeRule.onNodeWithText("Event $trailingEvent").assertIsDisplayed()
         assertEquals(partialBounds, composeRule.onNodeWithText("Event 2").fetchSemanticsNode().boundsInRoot)
-        composeRule.runOnIdle { visibleWidth.value = 380.dp }
+        composeRule.runOnIdle { visibleWidth.value = lead + 200.dp }
         composeRule.onNodeWithText("Event 2").assertDoesNotExist()
         composeRule.runOnIdle {
-            visibleWidth.value = 480.dp
+            visibleWidth.value = lead + 300.dp
             selected.value = EpgFocusTarget(0, EventId(trailingEvent.toLong()))
         }
         composeRule.onNodeWithText("Event $trailingEvent").assertExists()
@@ -180,7 +184,7 @@ class TimelineEpgPerformanceTest {
                     nowSec = 0, selected = false, focusRequester = requester,
                     formattingZone = formattingZone,
                     onFocused = {}, onOpenDetails = {},
-                    width = 200.dp, modifier = Modifier.width(200.dp).height(76.dp),
+                    width = 200.dp, modifier = Modifier.width(200.dp).height(guideTimelineRowHeight()),
                 )
             }
         }
@@ -204,7 +208,7 @@ class TimelineEpgPerformanceTest {
             TVHeadendPlayerTheme {
                 LazyColumn(Modifier.testTag("timeline-rows")) {
                     items(channels, key = { it.id.value }) { channel ->
-                        Box(Modifier.width(190.dp).height(76.dp)) {
+                        Box(Modifier.width(GuideChannelWidth).height(guideTimelineRowHeight())) {
                             TimelineChannelHeader(
                                 channel = channel,
                                 number = channel.number,
@@ -232,7 +236,7 @@ class TimelineEpgPerformanceTest {
             val selectedFocus = remember { FocusRequester() }
             val formattingZone = remember { java.time.ZoneId.systemDefault() }
             TVHeadendPlayerTheme {
-                Box(Modifier.width(600.dp).height(76.dp)) {
+                Box(Modifier.width(600.dp).height(guideTimelineRowHeight())) {
                     TimelineProgrammeCell(
                         event = first,
                         channel = channel,

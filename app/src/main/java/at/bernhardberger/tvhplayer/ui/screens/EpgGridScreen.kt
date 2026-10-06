@@ -1950,7 +1950,7 @@ fun EpgGridScreen(
                     state = channelListState,
                     userScrollEnabled = owner.isCurrent,
                     contentPadding = timelineContentPadding,
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
                         .fillMaxSize()
                         .then(if (owner.isCurrent) Modifier.focusRequester(gridFocus) else Modifier)

@@ -36,6 +36,7 @@ fun PiconBox(
     contentScale: ContentScale = ContentScale.Fit,
     alignment: Alignment = Alignment.Center,
     placeholderTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    onError: (() -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
     val piconUrl = remember(currentSession, piconPath) {
         currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
@@ -63,6 +64,7 @@ fun PiconBox(
                 // Painter slots preserve loading/error appearance without image subcomposition.
                 placeholder = loading,
                 error = failed,
+                onError = { onError?.invoke() },
             )
         }
     }

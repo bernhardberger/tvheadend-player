@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -82,15 +83,26 @@ import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 import coil3.ImageLoader
 
+private val GuideChannelLogoWidth = 64.dp
+private val GuideChannelLogoHeight = 36.dp
+private val GuideChannelHeaderVerticalPadding = 6.dp
+private val GuideChannelHeaderLineGap = 4.dp
+
 @Composable
 internal fun guideTimelineRowHeight(): Dp = with(LocalDensity.current) {
-    val titleLines = MaterialTheme.typography.titleSmall.lineHeight.toDp() * 2
-    // Preserve both complete name lines below the identity strip, and the native
-    // programme ListItem's time line plus its 12dp top/bottom content padding.
+    val titleLine = MaterialTheme.typography.titleSmall.lineHeight.toDp()
+    val numberLine = MaterialTheme.typography.labelMedium.lineHeight.toDp()
+    val headerContent = maxOf(
+        GuideChannelLogoHeight,
+        numberLine,
+        numberLine + GuideChannelHeaderLineGap + titleLine,
+    ) + GuideChannelHeaderVerticalPadding * 2
+    // One programme title and time line, including native ListItem content padding;
+    // headers either show number/logo or number/name, never all three.
     maxOf(
-        80.dp * fontScale,
-        maxOf(20.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp()) + 4.dp + titleLines + 12.dp,
-        titleLines + MaterialTheme.typography.bodySmall.lineHeight.toDp() + 24.dp,
+        64.dp * fontScale,
+        headerContent,
+        titleLine + MaterialTheme.typography.bodySmall.lineHeight.toDp() + 24.dp,
     )
 }
 
@@ -338,10 +350,14 @@ internal fun TimelineChannelHeader(
     currentSession: CurrentSessionObservation? = null,
     selected: Boolean = false,
 ) {
+    var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
     Surface(
         modifier = Modifier
             .width(GuideChannelWidth)
             .fillMaxHeight()
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(number?.toString(), channel.name?.takeIf { it.isNotBlank() }).joinToString(" ")
+            }
             .testTag("epg-channel-header-${channel.id.value}"),
         colors = SurfaceDefaults.colors(
             containerColor = if (selected) {
@@ -357,13 +373,35 @@ internal fun TimelineChannelHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+                .padding(horizontal = 8.dp, vertical = GuideChannelHeaderVerticalPadding),
+            verticalArrangement = Arrangement.spacedBy(GuideChannelHeaderLineGap, Alignment.CenterVertically),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-            ) {
+            if (channel.icon != null && currentSession != null && !logoFailed) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
+                ) {
+                    if (number != null) {
+                        Text(
+                            text = number.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                        )
+                    }
+                    PiconBox(
+                        imageLoader = imageLoader,
+                        currentSession = currentSession,
+                        piconPath = channel.icon,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .widthIn(max = GuideChannelLogoWidth)
+                            .height(GuideChannelLogoHeight)
+                            .testTag("epg-channel-picon-${channel.id.value}"),
+                        onError = { logoFailed = true },
+                    )
+                }
+            } else {
                 if (number != null) {
                     Text(
                         text = number.toString(),
@@ -372,25 +410,14 @@ internal fun TimelineChannelHeader(
                         maxLines = 1,
                     )
                 }
-                if (channel.icon != null) {
-                    PiconBox(
-                        imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        piconPath = channel.icon,
-                        modifier = Modifier
-                            .width(44.dp)
-                            .height(20.dp)
-                            .testTag("epg-channel-picon-${channel.id.value}"),
-                    )
-                }
+                Text(
+                    text = channel.name.orEmpty(),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth(),
+                )
             }
-            Text(
-                text = channel.name.orEmpty(),
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth(),
-            )
         }
     }
 }
@@ -441,7 +468,7 @@ internal fun TimelineProgrammeCell(
                 Text(
                     // Always render a label so no focusable cell is visually blank.
                     text = event.title.orEmpty(),
-                    maxLines = if (width >= 140.dp) 2 else 1,
+                    maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleSmall,
                 )

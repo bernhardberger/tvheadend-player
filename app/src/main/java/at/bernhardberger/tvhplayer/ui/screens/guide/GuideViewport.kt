@@ -14,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.floor
 
-internal val GuideChannelWidth = 172.dp
+internal val GuideChannelWidth = 124.dp
 internal val GuideChannelGap = 8.dp
 internal val GuideEdgeFade = 48.dp
 internal val GuideFocusReserve = 8.dp
