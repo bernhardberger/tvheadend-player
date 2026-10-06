@@ -300,6 +300,92 @@ class QuickZapPresentationTest {
     }
     private var catalog by mutableStateOf(channels)
 
+    @Test fun channelRowsOpenNavigateAndBackRestoresOpenerFromDistantProgramme() {
+        content(rows = true)
+        key(Key.DirectionDown)
+        tile(2, 0).assertIsFocused()
+        val second = tile(2, 1).fetchSemanticsNode().boundsInRoot
+        val fourth = tile(2, 3).fetchSemanticsNode().boundsInRoot
+        assertEquals(PlayerChromeTokens.channelCardWidth.value, second.width, 1f)
+        assertEquals(PlayerChromeTokens.channelCardHeight.value, second.height, 1f)
+        assertEquals(960f - PlayerChromeTokens.gridMargin.value, fourth.right, 1f)
+        val title = compose.onNodeWithTag("player-channel-row-2-tile-1-title").fetchSemanticsNode().boundsInRoot
+        assertTrue("standard card title is below its image", title.top >= second.bottom)
+        val anchor = tile(2, 0).fetchSemanticsNode().boundsInRoot.top
+        capture("rows-playing")
+        repeat(3) { key(Key.DirectionRight) }
+        tile(2, 3).assertIsFocused()
+        capture("rows-later-programme")
+        key(Key.DirectionDown)
+        tile(3, 0).assertIsFocused()
+        key(Key.DirectionDown)
+        tile(4, 0).assertIsFocused()
+        assertEquals(anchor, tile(4, 0).fetchSemanticsNode().boundsInRoot.top, 1f)
+        capture("rows-two-channels-down")
+        key(Key.DirectionDown)
+        repeat(3) { key(Key.DirectionRight) }
+        tile(5, 3).assertIsFocused()
+        key(Key.Back)
+        compose.onNodeWithTag("player-channel-rows").assertDoesNotExist()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        assertEquals(0, picks)
+    }
+
+    @Test fun channelRowsUpNeverClosesAndNowTunes() {
+        content(rows = true)
+        key(Key.DirectionDown)
+        key(Key.DirectionUp)
+        repeat(3) { key(Key.DirectionUp) }
+        tile(1, 0).assertIsFocused()
+        key(Key.DirectionRight)
+        key(Key.DirectionCenter)
+        assertEquals(0, picks)
+        key(Key.DirectionDown)
+        tile(2, 0).assertIsFocused()
+        key(Key.DirectionDown)
+        tile(3, 0).assertIsFocused()
+        key(Key.DirectionCenter)
+        assertEquals(1, picks)
+        assertEquals(ChannelId(3), playing)
+        compose.onNodeWithTag("player-channel-rows").assertDoesNotExist()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+    }
+
+    @Test fun channelRowsLoadingNeverBlocksNavigationAndEmptyCanTune() {
+        content(rows = true, rowsEmpty = true, rowsLoading = true)
+        key(Key.DirectionDown)
+        tile(2, 0).assertIsFocused()
+        capture("rows-loading")
+        key(Key.DirectionDown)
+        tile(3, 0).assertIsFocused()
+        key(Key.Back)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+    }
+
+    @Test fun channelRowsEmptyCanTune() {
+        content(rows = true, rowsEmpty = true)
+        key(Key.DirectionDown)
+        tile(2, 0).assertIsFocused()
+        capture("rows-empty")
+        key(Key.DirectionCenter)
+        assertEquals(1, picks)
+    }
+
+    private fun tile(channel: Int, programme: Int) = compose.onNodeWithTag("player-channel-row-$channel-tile-$programme")
+
+    private fun rowEvents(id: ChannelId) = (0..5).map { index ->
+        EpgEvent.create(id = EventId(id.value * 100 + index), channelId = id,
+            title = when (id.value.toInt() % 4) {
+                0 -> listOf("A century in photographs", "Hidden histories", "The great expedition", "Witnesses of change", "Ancient cities", "The archives")
+                1 -> listOf("World news", "Today's headlines", "Across the country", "The interview", "Business report", "Late bulletin")
+                2 -> listOf("A journey through the mountains", "Afternoon stories", "The living planet", "Evening news", "Music from the city", "Night cinema")
+                else -> listOf("Match of the day", "Inside the stadium", "Road to the finals", "Sporting legends", "Weekend highlights", "Extra time")
+            }[index],
+            description = "Discover remarkable places and the people who call them home. Stories and perspectives from around the world.",
+            image = if (index % 2 == 1) "imagecache/${1000 + id.value * 10 + index}" else null,
+            start = Instant.fromEpochSeconds(index * 3600L), stop = Instant.fromEpochSeconds((index + 1) * 3600L))
+    }
+
     @Test fun nativeCardCornerGapIsUniformFocusedAndPressed() = cornerGeometry(1f, "en-font1")
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -734,6 +820,9 @@ class QuickZapPresentationTest {
         fontScale: Float = 1f,
         bright: Boolean = false,
         inPlace: Boolean = false,
+        rows: Boolean = false,
+        rowsEmpty: Boolean = false,
+        rowsLoading: Boolean = false,
     ) {
         compose.setContent {
             view = LocalView.current
@@ -753,13 +842,18 @@ class QuickZapPresentationTest {
                 ImageLoader.Builder(context)
                     .components { add(object : Mapper<AppArtworkSource, ByteArray> {
                         override fun map(data: AppArtworkSource, options: Options): ByteArray {
-                            val bitmap = FixtureArt.picon(when (data.id.value) {
-                                1 -> "ridge-earth"
-                                2 -> "harbor-sport"
-                                3 -> "northline-news"
-                                4 -> "kite-kids"
-                                else -> "lantern-hour"
-                            })
+                            val bitmap = if (data.id.value >= 1000) {
+                                FixtureArt.art(listOf("ridge-light", "harbor-kickoff", "northline-tonight",
+                                    "paper-kite-tales", "lantern-road")[data.id.value.toInt() % 5])
+                            } else {
+                                FixtureArt.picon(when (data.id.value) {
+                                    1 -> "ridge-earth"
+                                    2 -> "harbor-sport"
+                                    3 -> "northline-news"
+                                    4 -> "kite-kids"
+                                    else -> "lantern-hour"
+                                })
+                            }
                             return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
                         }
                     }) }
@@ -772,6 +866,17 @@ class QuickZapPresentationTest {
                 TVHeadendPlayerTheme {
                     focusColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
                     Box(Modifier.fillMaxSize().background(if (bright) Color(0xFFDDEAF0) else Color(0xFF24384A))
+                        .then(if (rows) Modifier.drawBehind {
+                            // Deterministic video proxy makes the overlay's transparency reviewable.
+                            drawRect(androidx.compose.ui.graphics.Brush.verticalGradient(
+                                listOf(Color(0xFF83C2D9), Color(0xFF4C7182), Color(0xFF193F3C))))
+                            drawCircle(Color(0xFFFFDB9A), 44f, androidx.compose.ui.geometry.Offset(750f, 100f))
+                            drawPath(androidx.compose.ui.graphics.Path().apply {
+                                moveTo(0f, 290f); lineTo(180f, 100f); lineTo(370f, 320f)
+                                lineTo(550f, 150f); lineTo(820f, 380f); lineTo(960f, 240f)
+                                lineTo(960f, 540f); lineTo(0f, 540f); close()
+                            }, Color(0xFF406F6A))
+                        } else Modifier)
                         .onPreviewKeyEvent { event ->
                             val code = event.nativeKeyEvent.keyCode
                             when {
@@ -806,11 +911,19 @@ class QuickZapPresentationTest {
                             onActionFocused = layers::onActionFocused,
                             decorationCoversControls = layers.channelDrawerOpen,
                             controlsDecoration = { _, controls -> QuickZapPresentation(
-                              expanded = layers.channelDrawerOpen,
+                               expanded = layers.channelDrawerOpen,
+                               channelRows = rows,
                               preview = {},
                               controls = controls,
                               channelContent = {
-                                ChannelDrawer(
+                                if (rows) ChannelRows(
+                                    channels = catalog, playingChannelId = playing, nowSec = 900,
+                                    schedule = { if (rowsEmpty) emptyList() else rowEvents(it) },
+                                    acquireSchedule = { if (rowsLoading) kotlinx.coroutines.awaitCancellation() },
+                                    imageLoader = loader, currentSession = session,
+                                    onPickChannel = { playing = it.id; picks++; layers.dismissChannelDrawer() },
+                                    onClose = layers::dismissChannelDrawer,
+                                ) else ChannelDrawer(
                                     channels = catalog, selectedId = playing, playingChannelId = playing,
                                     playbackIndicator = indicator,
                                     recordingChannelIds = setOf(ChannelId(4)), nowEvent = { if (it == ChannelId(5)) null else event(it) },
@@ -853,8 +966,12 @@ class QuickZapPresentationTest {
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            val directory = File("../artifacts/quick-zap").apply { mkdirs() }
+            val directory = File(if (name.startsWith("rows-")) "../captures/channel-rows" else "../artifacts/quick-zap").apply { mkdirs() }
             File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            if (name.startsWith("rows-")) File(directory, "$name.txt").writeText(
+                "canvas=960x540\ndensity=1.0\nlocale=en\nfontScale=1.0\nplayingChannel=2\n" +
+                    "background=deterministic offline video proxy, not live video\n",
+            )
             if (focusedCard != null) File(directory, "$name.txt").writeText(
                 "canvas=960x540\ndensity=1.0\nlocale=${if (name.startsWith("de")) "de" else "en"}\n" +
                     "fontScale=$fontScale\nfocus=player-channel-card-$focusedCard\nbounds=$focusedBounds\n" +

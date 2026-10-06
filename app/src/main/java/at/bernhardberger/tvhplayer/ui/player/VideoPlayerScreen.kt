@@ -1700,7 +1700,7 @@ fun VideoPlayerScreen(
                 layerState.infoOpen && (foregroundLayer == PlayerForegroundLayer.INFO ||
                     foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
             },
-            railHeader = if (layerState.channelRailPresented || programDetails.scheduleEntry && layerState.infoOpen) ({
+            railHeader = if (railFromCard && layerState.channelRailPresented || programDetails.scheduleEntry && layerState.infoOpen) ({
                 val channel = channels.firstOrNull { it.id == (infoRailChannelId ?: selectedId) }
                 ProgrammeScheduleHeader(listOfNotNull(channel?.visibleChannelNumber?.toString(), channel?.name).joinToString(" · "))
             }) else null,
@@ -1796,8 +1796,29 @@ fun VideoPlayerScreen(
                 QuickZapPresentation(
                     // Keep the departing rail expanded throughout its vertical step.
                     expanded = layerState.channelRailPresented,
+                    channelRows = !railFromCard,
                     channelContent = {
-                        ChannelDrawer(
+                        if (!railFromCard) ChannelRows(
+                            channels = channels,
+                            playingChannelId = currentChannelId,
+                            nowSec = nowSec,
+                            schedule = { id ->
+                                channelSchedule(observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(nowSec))
+                                    ?: observation.nextEvent(id, kotlin.time.Instant.fromEpochSeconds(nowSec)),
+                                    { after -> observation.nextEvent(id, after) })
+                            },
+                            acquireSchedule = { id ->
+                                val capability = currentSession
+                                if (capability != null) kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                                    session.epgRepository.acquireCoverageBatch(capability, listOf(id),
+                                        kotlin.time.Instant.fromEpochSeconds(nowSec + 6 * 3600))
+                                }
+                            },
+                            imageLoader = imageLoader,
+                            currentSession = currentSession,
+                            onPickChannel = { tuneChannel(it); layerState.dismissChannelDrawer() },
+                            onClose = { layerState.dismissChannelDrawer() },
+                        ) else ChannelDrawer(
                             active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                             channels = channels,
                             selectedId = selectedId,

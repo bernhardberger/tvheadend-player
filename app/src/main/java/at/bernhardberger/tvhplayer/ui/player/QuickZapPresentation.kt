@@ -40,6 +40,7 @@ internal fun QuickZapPresentation(
     channelContent: @Composable () -> Unit,
     preview: @Composable () -> Unit,
     controls: @Composable () -> Unit,
+    channelRows: Boolean = false,
 ) {
     val expansion = animateFloatAsState(
         if (expanded) 1f else 0f,
@@ -54,7 +55,7 @@ internal fun QuickZapPresentation(
     val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
     // The schedule header peeks only once the rail stands, and leaves before it folds away.
     val railPeek = LocalPlayerRailPeek.current
-    LaunchedEffect(expanded, revealed, railPeek) { railPeek?.targetState = expanded && revealed }
+    LaunchedEffect(expanded, revealed, railPeek, channelRows) { railPeek?.targetState = expanded && revealed && !channelRows }
     var viewportHeight by remember { mutableIntStateOf(0) }
     var railHeight by remember { mutableIntStateOf(0) }
     val pageProgress = LocalPlayerPageProgress.current
@@ -62,7 +63,7 @@ internal fun QuickZapPresentation(
     val viewport = LocalPlayerPageScrim.current
     val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
     SideEffect {
-        scrim.previewTop = { (viewportHeight - railHeight).toFloat() }
+        scrim.previewTop = { if (channelRows) viewportHeight * .33f else (viewportHeight - railHeight).toFloat() }
         scrim.expansion = expansion::value
     }
     DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
@@ -79,6 +80,12 @@ internal fun QuickZapPresentation(
                 LocalPlayerPageScrim provides scrim) { controls() }
         }
         if (!shown && !expanded) return@Box
+        if (channelRows) {
+            if (expanded) Box(Modifier.fillMaxSize()
+                .graphicsLayer { alpha = expansion.value }
+                .testTag("player-zap-tray")) { channelContent() }
+            return@Box
+        }
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .onSizeChanged { railHeight = it.height }

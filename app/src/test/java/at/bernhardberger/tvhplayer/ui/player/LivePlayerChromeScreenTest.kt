@@ -1279,24 +1279,26 @@ class LivePlayerChromeScreenTest {
         assertEquals("a new visit resets Details and its action", listOf("live-info-record"), focused())
     }
 
-    @Test fun downFromTheActionRowOpensTheRailOnThePlayingChannelAndUpOrBackReturnsToTheAction() {
+    @Test fun downFromTheActionRowOpensRowsAndOnlyBackReturnsToTheAction() {
         screen()
         key(Key.DirectionDown)
         assertEquals(listOf("player-pause"), focused())
         assertEquals("Channels", texts("player-down-hint"))
-        for (close in listOf(Key.DirectionUp, Key.Back)) {
+        repeat(2) {
             key(Key.DirectionRight)
             key(Key.DirectionRight)
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionDown)
-            assertEquals("the rail opens on the playing channel", listOf("player-channel-card-1"), focused())
+            assertEquals("rows open on the playing channel", listOf("player-channel-row-1-tile-0"), focused())
             assertFalse("the programme info page does not open", exists("live-info-panel"))
             assertEquals("the opening key tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-            key(Key.DirectionRight)
-            assertEquals("the rail browses without tuning", listOf("player-channel-card-2"), focused())
+            key(Key.DirectionUp)
+            assertEquals("Up on the first row does not close", listOf("player-channel-row-1-tile-0"), focused())
+            key(Key.DirectionDown)
+            assertEquals("rows browse without tuning", listOf("player-channel-row-2-tile-0"), focused())
             assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-            key(close)
-            assertFalse(exists("player-channel-shelf"))
+            key(Key.Back)
+            assertFalse(exists("player-channel-rows"))
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
