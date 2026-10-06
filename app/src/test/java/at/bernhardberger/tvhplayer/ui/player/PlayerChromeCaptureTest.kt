@@ -61,7 +61,6 @@ import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
@@ -71,10 +70,6 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import coil3.ImageLoader
-import coil3.asImage
-import coil3.decode.DataSource
-import coil3.intercept.Interceptor
-import coil3.request.SuccessResult
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
@@ -93,6 +88,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -117,11 +113,11 @@ class PlayerChromeCaptureTest {
     private lateinit var brightStill: Bitmap
     private var defaultZone: TimeZone? = null
     private val channels = listOf(
-        Channel.create(ChannelId(1), name = "ORF 1 HD", number = 101, icon = LOGO),
-        Channel.create(ChannelId(2), name = "ORF 2 HD", number = 102),
-        Channel.create(ChannelId(3), name = "ServusTV HD", number = 103),
-        Channel.create(ChannelId(4), name = "3sat HD", number = 104),
-        Channel.create(ChannelId(5), name = "arte HD", number = 105),
+        Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = LOGO),
+        Channel.create(ChannelId(2), name = "Harbor Sport HD", number = 102, icon = SPORT_LOGO),
+        Channel.create(ChannelId(3), name = "Northline News", number = 103),
+        Channel.create(ChannelId(4), name = "Kite Kids", number = 104, icon = KIDS_LOGO),
+        Channel.create(ChannelId(5), name = "Lantern Hour", number = 105),
     )
     private val session = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -135,21 +131,6 @@ class PlayerChromeCaptureTest {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         val app = ApplicationProvider.getApplicationContext<Application>()
         shadowOf(app.packageManager).setSystemFeature("android.software.leanback", true)
-        // Every image request terminates here: deterministic art, no server or network access.
-        val art = Bitmap.createBitmap(640, 360, Bitmap.Config.ARGB_8888)
-        Canvas(art).apply {
-            drawColor(android.graphics.Color.rgb(44, 66, 80))
-            val paint = Paint().apply { color = android.graphics.Color.rgb(125, 158, 164) }
-            drawCircle(480f, 95f, 55f, paint)
-            paint.color = android.graphics.Color.rgb(38, 87, 75)
-            drawRect(0f, 225f, 640f, 360f, paint)
-        }
-        // Wide transparent logo fixture, distinct from programme artwork (not a downloaded logo).
-        val logo = Bitmap.createBitmap(512, 144, Bitmap.Config.ARGB_8888)
-        Canvas(logo).apply {
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = android.graphics.Color.WHITE; textSize = 100f; isFakeBoldText = true }
-            drawText("ORF 1 HD", 8f, 108f, paint)
-        }
         brightStill = Bitmap.createBitmap(960, 540, Bitmap.Config.ARGB_8888)
         Canvas(brightStill).apply {
             drawColor(android.graphics.Color.rgb(232, 240, 246))
@@ -158,12 +139,13 @@ class PlayerChromeCaptureTest {
             paint.color = android.graphics.Color.rgb(188, 206, 184)
             drawRect(0f, 350f, 960f, 540f, paint)
         }
-        loader = ImageLoader.Builder(app).components {
-            add(Interceptor { chain ->
-                val image = if ((chain.request.data as? AppArtworkSource)?.id == LOGO) logo else art
-                SuccessResult(image.asImage(), chain.request, DataSource.MEMORY)
-            })
-        }.build()
+        // Every image request terminates here: fictional pack art, no server or network access.
+        loader = FixtureArt.imageLoader(app, mapOf(
+            LOGO to FixtureArt.picon("ridge-earth"), SPORT_LOGO to FixtureArt.picon("harbor-sport"), KIDS_LOGO to FixtureArt.picon("kite-kids"),
+            ArtworkId(1) to FixtureArt.art("ridge-light"),
+            ArtworkId(7) to FixtureArt.art("glass-harbor"),
+            ArtworkId(3) to FixtureArt.art("harbor-kickoff"),
+        ))
     }
 
     @After fun restoreZone() {
@@ -204,9 +186,9 @@ class PlayerChromeCaptureTest {
         var withLogoWidth: Int? = null
         val entries = listOf(
             "0" to ChannelNumberTarget.Pending,
-            "1" to ChannelNumberTarget.Channel("ORF 1 HD", LOGO),
-            "01" to ChannelNumberTarget.Channel("ORF 1 HD", LOGO),
-            "02" to ChannelNumberTarget.Channel("ORF 1 HD", null),
+            "1" to ChannelNumberTarget.Channel("Ridge Earth HD", LOGO),
+            "01" to ChannelNumberTarget.Channel("Ridge Earth HD", LOGO),
+            "02" to ChannelNumberTarget.Channel("Ridge Earth HD", null),
             "12" to ChannelNumberTarget.Channel("Channel without a logo", null),
             "123" to ChannelNumberTarget.Channel("A very long international channel name HD", null),
             "999" to ChannelNumberTarget.None,
@@ -461,7 +443,7 @@ class PlayerChromeCaptureTest {
         }
         val content = PlayerChromeContent(
             clock = formatClock(NOW),
-            info = liveInfoBarData(101, "ORF 1 HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
+            info = liveInfoBarData(101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
                 unavailableTitle = "Programme information unavailable"),
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
@@ -752,9 +734,9 @@ class PlayerChromeCaptureTest {
             onCardClick = {},
             downHint = "Program info",
             recents = listOf(
-                RecentChannelPeek(null, "102", "ORF 2 HD", ChannelId(2), now = "Universum: Wildes Österreich"),
-                RecentChannelPeek(LOGO, "101", "ORF 1 HD", ChannelId(1), now = "Zeit im Bild"),
-                RecentChannelPeek(null, "103", "ServusTV HD Oesterreich", ChannelId(3), now = "Servus Nachrichten 19:20"),
+                RecentChannelPeek(SPORT_LOGO, "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
+                RecentChannelPeek(LOGO, "101", "Ridge Earth HD", ChannelId(1), now = "Ridge Light"),
+                RecentChannelPeek(null, "103", "Northline News International Service", ChannelId(3), now = "Northline Tonight 19:20"),
             ),
             onRecentPick = {},
             recentRowOpen = recentOpen,
@@ -782,7 +764,7 @@ class PlayerChromeCaptureTest {
                 )
             },
         )
-        if (inPlaceRail) NowPlayingStrip("101", "ORF 1 HD", LOGO, programme, NOW, loader, session,
+        if (inPlaceRail) NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp))
         }
     }
@@ -790,7 +772,7 @@ class PlayerChromeCaptureTest {
     @OptIn(SubscriptionInfrastructureApi::class)
     private fun diagnostics(dvb: Boolean): AppPlaybackDiagnostics {
         var live = LiveSubscriptionDiagnostics.update(null, SubscriptionEvent.Started(null, null, SubscriptionCondition.NO_DETAIL, null,
-            LiveSubscriptionSource.create(null, null, null, null, "ORF 1 HD")))
+            LiveSubscriptionSource.create(null, null, null, null, "Ridge Earth HD")))
         if (dvb) live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Signal(53739, 12300, null, null, 0, 0, false))
         live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Queue(0, 0, 0, 0, 0, 0))
         return AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV,
@@ -801,7 +783,9 @@ class PlayerChromeCaptureTest {
     private fun EpgEvent.copyWithoutImage() = EpgEvent.create(id, channelId, start, stop, title = title, summary = summary, genre = genre)
 
     private companion object {
-        val LOGO = ArtworkId.parse("imagecache/2")
+        val LOGO = ArtworkId(2)
+        val SPORT_LOGO = ArtworkId(4)
+        val KIDS_LOGO = ArtworkId(5)
         val hourBehind = AppTimeshiftState(available = true, bufferStartMs = -7_200_000, positionMs = -3_730_000, liveEdgeMs = 0, timingKnown = true)
         val hourBehindStep = at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision(targetMs = -3_700_000, deltaMs = 30_000, clamped = false)
         val nearEnd = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -40_000, liveEdgeMs = 0, timingKnown = true)
@@ -811,12 +795,12 @@ class PlayerChromeCaptureTest {
         const val START = 1_789_244_100L
         const val NOW = START + 52 * 60
         val programme = EpgEvent.create(EventId(42), ChannelId(1), Instant.fromEpochSeconds(START), Instant.fromEpochSeconds(START + 90 * 60),
-            title = "Die außergewöhnliche Reise durch die österreichischen Alpen",
+            title = "Ridge Light: Die außergewöhnliche Reise durch die österreichischen Alpen",
             subtitle = "Eine neue Perspektive auf Menschen und ihre Geschichten",
             summary = "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive.",
             genre = "Drama", image = "imagecache/1")
         val next = EpgEvent.create(EventId(43), ChannelId(1), Instant.fromEpochSeconds(START + 90 * 60), Instant.fromEpochSeconds(START + 120 * 60),
-            title = "Nachrichten")
+            title = "Northline Tonight")
         val richProgramme = EpgEvent.create(programme.id, programme.channelId, programme.start, programme.stop,
             title = programme.title, subtitle = programme.subtitle, summary = programme.summary,
             description = "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive. ".repeat(5),
@@ -826,17 +810,17 @@ class PlayerChromeCaptureTest {
             firstAired = Instant.fromEpochSeconds(START - 86400 * 180), isNew = true, image = programme.image)
         val schedule = listOf(programme, next,
             EpgEvent.create(EventId(44), ChannelId(1), Instant.fromEpochSeconds(START + 120 * 60), Instant.fromEpochSeconds(START + 165 * 60),
-                title = "Mountain Rescue", subtitle = "Storm Over the Ridge", image = "imagecache/7",
+                title = "Glass Harbor", subtitle = "Storm Over the Ridge", image = "imagecache/7",
                 summary = "A storm traps three hikers below the ridge, and the team has one window to reach them before nightfall. " +
-                    "Meanwhile Lena has to decide whether she stays with the team after the season ends.", genre = "Action"),
+                    "Meanwhile Lena has to decide whether she stays with the team after the season ends.", genre = "Drama"),
             EpgEvent.create(EventId(45), ChannelId(1), Instant.fromEpochSeconds(START + 165 * 60), Instant.fromEpochSeconds(START + 255 * 60),
-                title = "Universum: Wildes Österreich", genre = "Natur"),
+                title = "Tide Watch", genre = "Natur"),
             EpgEvent.create(EventId(46), ChannelId(1), Instant.fromEpochSeconds(START + 255 * 60), Instant.fromEpochSeconds(START + 360 * 60),
                 title = "Northern Lights", genre = "Thriller"),
         )
         val trayProgramme = EpgEvent.create(EventId(52), ChannelId(2), Instant.fromEpochSeconds(START), Instant.fromEpochSeconds(START + 90 * 60),
-            title = "Universum: Wildes Österreich",
-            summary = "Die Tierwelt der Alpen im Lauf eines Jahres, vom Frühling bis zum ersten Schnee.",
-            genre = "Natur", image = "imagecache/3")
+            title = "Harbor Kickoff",
+            summary = "Harbor FC empfangen Amber Town unter Flutlicht im städtischen Stadion.",
+            genre = "Sport", image = "imagecache/3")
     }
 }
