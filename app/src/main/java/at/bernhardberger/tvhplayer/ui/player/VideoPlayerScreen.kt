@@ -432,6 +432,8 @@ fun VideoPlayerScreen(
     val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
     // Trial: closing the rail the card opened hands focus back to the card.
     var railFromCard by remember { mutableStateOf(false) }
+    /** Trial: details opened from a channel row's programme; one Back returns to the rows. */
+    var detailsFromRows by remember { mutableStateOf(false) }
     // Trial: where the channel card is, for the rail to open from it.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
@@ -808,6 +810,7 @@ fun VideoPlayerScreen(
 
     fun openInfo(returnTo: String? = null) {
         programDetails.reset()
+        detailsFromRows = false
         infoRailChannelId = null
         infoPendingAction = null
         infoMutation = null
@@ -824,6 +827,7 @@ fun VideoPlayerScreen(
     }
 
     fun closeInfo() {
+        detailsFromRows = false
         infoPendingAction = null
         infoMutation = null
         layerState.dismissRecordingConfirmation()
@@ -1119,6 +1123,8 @@ fun VideoPlayerScreen(
     val detailsChannelId = infoRailChannelId ?: currentChannelId
     val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
     val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
+        // A row's later programme stays reachable on a channel without a current one.
+        ?: programDetails.opened.takeIf { detailsFromRows }
     val actionableInfoEvent = currentProgrammeEvent(observation, programDetails.opened ?: detailsBaseEvent)
     val currentRecording = remember(observation, actionableInfoEvent?.id) {
         actionableInfoEvent?.let { observation.dvrEntryForEvent(it.id) }
@@ -1383,7 +1389,7 @@ fun VideoPlayerScreen(
     val handlePlaybackBack: () -> Unit = handle@{
         // Trial: Back first undoes a step inside the program details.
         if (playerForegroundLayer(currentPlayerForegroundContext()) == PlayerForegroundLayer.INFO &&
-            programDetails.back()
+            (!detailsFromRows || programDetails.readMore) && programDetails.back()
         ) return@handle
         // Trial: Back in the recent row returns to the channel card.
         if (recentRowOpen && layerState.chrome.controlsVisible) {
@@ -1817,7 +1823,25 @@ fun VideoPlayerScreen(
                             imageLoader = imageLoader,
                             currentSession = currentSession,
                             onPickChannel = { tuneChannel(it); layerState.dismissChannelDrawer() },
-                            onClose = { layerState.dismissChannelDrawer() },
+                            onClose = { keyCode ->
+                                if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
+                                layerState.dismissChannelDrawer()
+                            },
+                            // A later programme opens its details over the rows; Back returns to it.
+                            onOpenDetails = { channel, event ->
+                                infoRailChannelId = channel.id
+                                programDetails.reset()
+                                programDetails.open(event)
+                                infoPendingAction = null
+                                infoMutation = null
+                                infoReturnAction = null
+                                restoreInfoFocus = false
+                                railEntryId = channel.id
+                                railEntryStep = 0
+                                layerState.openInfo()
+                                detailsFromRows = true
+                            },
+                            active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                         ) else ChannelDrawer(
                             active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                             channels = channels,

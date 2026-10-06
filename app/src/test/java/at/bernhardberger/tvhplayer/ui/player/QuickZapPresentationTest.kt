@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -300,27 +301,68 @@ class QuickZapPresentationTest {
     }
     private var catalog by mutableStateOf(channels)
 
-    @Test fun channelRowsOpenNavigateAndBackRestoresOpenerFromDistantProgramme() {
+    @Test fun channelRowsShowThreeRowsDimTheOthersAndCarryTheNowPlayingStrip() {
         content(rows = true)
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
+        compose.onNodeWithTag("player-now-playing").assertExists()
+        val anchor = (ChannelRowsTop + ChannelRowsAnchor).value
+        assertEquals(anchor, rowTop(2), 1f)
+        assertTrue("the previous row shows partly below the strip", rowTop(1) < ChannelRowsTop.value &&
+            rowTop(1) + ChannelRowHeight.value > ChannelRowsTop.value)
+        assertEquals(anchor + ChannelRowHeight.value, rowTop(3), 1f)
+        assertTrue("the row after the next is cut by the bottom edge", rowTop(4) < 540f)
+        // Grid: two columns and their gutter, 16:9, six across the content width.
         val second = tile(2, 1).fetchSemanticsNode().boundsInRoot
-        val fourth = tile(2, 3).fetchSemanticsNode().boundsInRoot
-        assertEquals(PlayerChromeTokens.channelCardWidth.value, second.width, 1f)
-        assertEquals(PlayerChromeTokens.channelCardHeight.value, second.height, 1f)
-        assertEquals(960f - PlayerChromeTokens.gridMargin.value, fourth.right, 1f)
-        val title = compose.onNodeWithTag("player-channel-row-2-tile-1-title").fetchSemanticsNode().boundsInRoot
-        assertTrue("standard card title is below its image", title.top >= second.bottom)
-        val anchor = tile(2, 0).fetchSemanticsNode().boundsInRoot.top
+        assertEquals(124f, second.width, 1f)
+        assertEquals(70f, second.height, 1f)
+        assertEquals(PlayerChromeTokens.gridMargin.value + 124f + PlayerChromeTokens.gridGutter.value, second.left, 1f)
+        assertEquals(960f - PlayerChromeTokens.gridMargin.value, tile(2, 5).fetchSemanticsNode().boundsInRoot.right, 1f)
+        // The start time sits inside the image, bottom-left; "On now" only on the now tile, top-right.
+        val start = part(2, 1, "start")
+        assertTrue("start chip inside the image: $start in $second", start.left - second.left in 0f..8f &&
+            second.bottom - start.bottom in 0f..10f && start.top > second.center.y)
+        val now = tile(2, 0).fetchSemanticsNode().boundsInRoot
+        val onNow = part(2, 0, "on-now")
+        assertTrue("on-now tag top-right: $onNow in $now", now.right - onNow.right in 0f..8f &&
+            onNow.top - now.top in 0f..8f)
+        compose.onNodeWithTag("player-channel-row-2-tile-1-on-now", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-channel-row-3-tile-0-on-now", useUnmergedTree = true).assertExists()
+        // Title below the image; the subtitle line only where the programme has one.
+        assertTrue(part(2, 1, "title").top >= second.bottom)
+        compose.onNodeWithTag("player-channel-row-2-tile-1-subtitle", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-channel-row-2-tile-2-subtitle", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-channel-row-2-tile-2-title", useUnmergedTree = true).assertExists()
+        assertEquals("On now, 00:00, A journey through the mountains, Discover remarkable places.",
+            tile(2, 0).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
+        assertEquals("01:00, Afternoon stories, Episode 1",
+            tile(2, 1).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].single())
+        compose.onAllNodes(hasAnyAncestor(hasTestTag("player-channel-row-2"))
+            .and(SemanticsMatcher.expectValue(SemanticsProperties.Heading, Unit))).assertCountEquals(1)
+        // The focused row reads at full emphasis, its neighbours dimmed.
+        val focusedTitle = brightest(part(2, 1, "title"))
+        assertTrue("dimmed: focused $focusedTitle, previous ${brightest(part(1, 1, "title"))}, next ${brightest(part(3, 1, "title"))}",
+            focusedTitle > brightest(part(3, 1, "title")) + 60 && focusedTitle > brightest(part(1, 1, "title")) + 60)
         capture("rows-playing")
-        repeat(3) { key(Key.DirectionRight) }
-        tile(2, 3).assertIsFocused()
+    }
+
+    @Test fun channelRowsBrowseLaterProgrammesAndChannelsOnTheAnchorAndBackRestoresTheOpener() {
+        content(rows = true)
+        key(Key.DirectionDown)
+        val anchor = rowTop(2)
+        repeat(6) { key(Key.DirectionRight) }
+        tile(2, 6).assertIsFocused()
+        assertTrue("the row scrolls with focus: ${tile(2, 6).fetchSemanticsNode().boundsInRoot}",
+            tile(2, 6).fetchSemanticsNode().boundsInRoot.right <=
+            960f - PlayerChromeTokens.gridMargin.value + 1f)
         capture("rows-later-programme")
         key(Key.DirectionDown)
         tile(3, 0).assertIsFocused()
+        assertEquals("the row left behind settles back to its now tile",
+            PlayerChromeTokens.gridMargin.value, tile(2, 0).fetchSemanticsNode().boundsInRoot.left, 1f)
         key(Key.DirectionDown)
         tile(4, 0).assertIsFocused()
-        assertEquals(anchor, tile(4, 0).fetchSemanticsNode().boundsInRoot.top, 1f)
+        assertEquals(anchor, rowTop(4), 1f)
         capture("rows-two-channels-down")
         key(Key.DirectionDown)
         repeat(3) { key(Key.DirectionRight) }
@@ -331,17 +373,27 @@ class QuickZapPresentationTest {
         assertEquals(0, picks)
     }
 
-    @Test fun channelRowsUpNeverClosesAndNowTunes() {
+    @Test fun channelRowsUpOnTheFirstRowClosesToTheOpenerAndOkOpensOrTunes() {
+        playing = ChannelId(1)
         content(rows = true)
         key(Key.DirectionDown)
-        key(Key.DirectionUp)
-        repeat(3) { key(Key.DirectionUp) }
         tile(1, 0).assertIsFocused()
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        assertEquals(0, picks)
+        assertEquals("no row above the first", ChannelRowsTop.value + ChannelRowsAnchor.value, rowTop(1), 1f)
+        capture("rows-first-row")
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("player-channel-rows").assertDoesNotExist()
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        // A later programme opens its details; the now tile tunes.
+        key(Key.DirectionDown)
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
+        key(Key.DirectionRight)
+        key(Key.DirectionCenter)
+        assertEquals(EventId(201), opened?.id)
+        assertEquals(0, picks)
+        key(Key.DirectionUp)
+        tile(1, 0).assertIsFocused()
+        key(Key.DirectionDown)
         key(Key.DirectionDown)
         tile(3, 0).assertIsFocused()
         key(Key.DirectionCenter)
@@ -351,7 +403,45 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
 
-    @Test fun channelRowsLoadingNeverBlocksNavigationAndEmptyCanTune() {
+    @Test fun channelRowsOpenRiseAndRowChangeMotionFrames() {
+        content(rows = true)
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        // The frame the rows first compose and lay out is the reveal's start.
+        repeat(5) {
+            if (compose.onAllNodes(hasTestTag("player-channel-row-2")).fetchSemanticsNodes().isEmpty()) {
+                compose.mainClock.advanceTimeByFrame()
+            }
+        }
+        var elapsed = 0L
+        val tops = listOf(0, 25, 50, 75, 100).map { percent ->
+            val at = ChannelRowsRevealMs * percent / 100L
+            compose.mainClock.advanceTimeBy(at - elapsed)
+            elapsed = at
+            compose.waitForIdle()
+            capture("rows-open-motion-%03d".format(percent))
+            rowTop(2)
+        }
+        val anchor = (ChannelRowsTop + ChannelRowsAnchor).value
+        assertTrue("the focused row rises into place: $tops", tops[1] > anchor + 1f && tops.zipWithNext().all { (a, b) -> b <= a })
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        assertEquals(anchor, rowTop(2), 1f)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        // The column follows the focus move over the next frames.
+        repeat(8) { if (rowTop(3) > anchor + ChannelRowHeight.value - 1f) compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeByFrame()
+        val middle = rowTop(3)
+        assertTrue("mid-scroll: $middle", middle > anchor + 1f && middle < anchor + ChannelRowHeight.value - 1f)
+        capture("rows-row-change-mid")
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        assertEquals(anchor, rowTop(3), 1f)
+        compose.mainClock.autoAdvance = true
+        tile(3, 0).assertIsFocused()
+    }
+
+    @Test fun channelRowsLoadingNeverBlocksNavigation() {
         content(rows = true, rowsEmpty = true, rowsLoading = true)
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
@@ -366,22 +456,45 @@ class QuickZapPresentationTest {
         content(rows = true, rowsEmpty = true)
         key(Key.DirectionDown)
         tile(2, 0).assertIsFocused()
+        compose.onNodeWithTag("player-channel-row-2-tile-0-on-now", useUnmergedTree = true).assertDoesNotExist()
         capture("rows-empty")
         key(Key.DirectionCenter)
         assertEquals(1, picks)
     }
 
+    private var opened: EpgEvent? = null
     private fun tile(channel: Int, programme: Int) = compose.onNodeWithTag("player-channel-row-$channel-tile-$programme")
+    private fun part(channel: Int, programme: Int, name: String) =
+        compose.onNodeWithTag("player-channel-row-$channel-tile-$programme-$name", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot
+    /** Unclipped, including the rows' motion. */
+    private fun rowTop(channel: Int) = compose.onNodeWithTag("player-channel-row-$channel").fetchSemanticsNode().positionInRoot.y
 
-    private fun rowEvents(id: ChannelId) = (0..5).map { index ->
+    private fun brightest(bounds: androidx.compose.ui.geometry.Rect): Int {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        var max = 0
+        for (y in bounds.top.toInt().coerceAtLeast(0) until bounds.bottom.toInt().coerceAtMost(bitmap.height)) {
+            for (x in bounds.left.toInt().coerceAtLeast(0) until bounds.right.toInt().coerceAtMost(bitmap.width)) {
+                val pixel = bitmap.getPixel(x, y)
+                max = maxOf(max, (android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) +
+                    android.graphics.Color.blue(pixel)) / 3)
+            }
+        }
+        bitmap.recycle()
+        return max
+    }
+
+    private fun rowEvents(id: ChannelId) = (0..8).map { index ->
         EpgEvent.create(id = EventId(id.value * 100 + index), channelId = id,
             title = when (id.value.toInt() % 4) {
                 0 -> listOf("A century in photographs", "Hidden histories", "The great expedition", "Witnesses of change", "Ancient cities", "The archives")
                 1 -> listOf("World news", "Today's headlines", "Across the country", "The interview", "Business report", "Late bulletin")
                 2 -> listOf("A journey through the mountains", "Afternoon stories", "The living planet", "Evening news", "Music from the city", "Night cinema")
                 else -> listOf("Match of the day", "Inside the stadium", "Road to the finals", "Sporting legends", "Weekend highlights", "Extra time")
-            }[index],
-            description = "Discover remarkable places and the people who call them home. Stories and perspectives from around the world.",
+            }[index % 6],
+            subtitle = if (index % 3 == 1) "Episode $index" else null,
+            description = if (index % 3 == 0) "Discover remarkable places.\nStories and perspectives from around the world." else null,
             image = if (index % 2 == 1) "imagecache/${1000 + id.value * 10 + index}" else null,
             start = Instant.fromEpochSeconds(index * 3600L), stop = Instant.fromEpochSeconds((index + 1) * 3600L))
     }
@@ -894,6 +1007,7 @@ class QuickZapPresentationTest {
                                 else -> false
                             }
                         }) {
+                        val chrome: @Composable () -> Unit = {
                         PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent("", liveInfoBarData(playing?.value,
@@ -922,7 +1036,11 @@ class QuickZapPresentationTest {
                                     acquireSchedule = { if (rowsLoading) kotlinx.coroutines.awaitCancellation() },
                                     imageLoader = loader, currentSession = session,
                                     onPickChannel = { playing = it.id; picks++; layers.dismissChannelDrawer() },
-                                    onClose = layers::dismissChannelDrawer,
+                                    onClose = { code ->
+                                        if (code != null) layers.beginOpeningKeyCycle(code)
+                                        layers.dismissChannelDrawer()
+                                    },
+                                    onOpenDetails = { _, event -> opened = event },
                                 ) else ChannelDrawer(
                                     channels = catalog, selectedId = playing, playingChannelId = playing,
                                     playbackIndicator = indicator,
@@ -945,6 +1063,19 @@ class QuickZapPresentationTest {
                               },
                             ) },
                         )
+                        }
+                        // Rows run inside the player page, which owns the shared scrim and the now-playing strip.
+                        if (rows) PlayerPage<Unit>(
+                            details = null,
+                            railExpanded = layers.channelDrawerOpen,
+                            nowPlaying = {
+                                val channel = catalog.firstOrNull { it.id == playing }
+                                NowPlayingStrip(channel?.number?.toString(), channel?.name.orEmpty(), channel?.icon,
+                                    playing?.let { rowEvents(it).first() }, 900, loader, session)
+                            },
+                            player = { chrome() },
+                            programme = {},
+                        ) else chrome()
                     }
                 }
             }
@@ -969,7 +1100,7 @@ class QuickZapPresentationTest {
             val directory = File(if (name.startsWith("rows-")) "../captures/channel-rows" else "../artifacts/quick-zap").apply { mkdirs() }
             File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             if (name.startsWith("rows-")) File(directory, "$name.txt").writeText(
-                "canvas=960x540\ndensity=1.0\nlocale=en\nfontScale=1.0\nplayingChannel=2\n" +
+                "canvas=960x540\ndensity=1.0\nlocale=en\nfontScale=1.0\nplayingChannel=${playing?.value}\n" +
                     "background=deterministic offline video proxy, not live video\n",
             )
             if (focusedCard != null) File(directory, "$name.txt").writeText(

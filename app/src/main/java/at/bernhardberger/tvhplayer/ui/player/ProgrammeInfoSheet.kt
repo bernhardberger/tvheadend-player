@@ -198,6 +198,11 @@ internal fun <T : Any> PlayerPage(
     androidx.compose.runtime.SideEffect { if (open || railHeader != null) lastHeader.value = railHeader }
     val header = if (!open && (!settled || peekVisible)) railHeader ?: lastHeader.value else railHeader
     val scrim = remember { PlayerPageScrim() }
+    // The strip fades with a rail visit, including its exit and a details page opened from it; only
+    // details opened from the player bring it in with the page.
+    val stripFromRail = remember { booleanArrayOf(false) }
+    if (railExpanded || header != null) stripFromRail[0] = true else if (composed) stripFromRail[0] = false
+    val railStrip = stripFromRail[0]
     CompositionLocalProvider(LocalPlayerPageProgress provides readProgress, LocalPlayerPageScrim provides scrim,
         LocalPlayerRailPeek provides railPeek) {
         Box(modifier.fillMaxSize().clipToBounds()) {
@@ -237,13 +242,13 @@ internal fun <T : Any> PlayerPage(
                 Box(Modifier.matchParentSize()) {
                     if (nowPlaying != null) AnimatedVisibility(
                         visible = railExpanded || composed,
-                        enter = fadeIn(tween(if (header != null) PlayerMotion.MediumMs else 0,
+                        enter = fadeIn(tween(if (railStrip) PlayerMotion.MediumMs else 0,
                             easing = PlayerMotion.StandardDecelerate)),
-                        exit = fadeOut(tween(if (header != null) PlayerMotion.ShortMs else 0,
+                        exit = fadeOut(tween(if (railStrip) PlayerMotion.ShortMs else 0,
                             easing = PlayerMotion.StandardAccelerate)),
                         modifier = Modifier.align(Alignment.CenterStart)
                             .padding(start = PlayerChromeTokens.gridMargin).wrapContentHeight(unbounded = true)
-                            .then(if (header == null) Modifier.pageMotion(200..400) else Modifier)
+                            .then(if (!railStrip) Modifier.pageMotion(200..400) else Modifier)
                             .testTag("player-now-playing-motion"),
                     ) { nowPlaying() }
                     if (composed || header != null) PlayerDownHint(

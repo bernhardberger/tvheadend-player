@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
@@ -51,6 +53,13 @@ internal fun QuickZapPresentation(
         },
         label = "quick-zap-expansion",
     )
+    val rowsReveal = animateFloatAsState(
+        if (expanded && channelRows) 1f else 0f,
+        // Closing runs the rise backwards in the footer's return time.
+        animationSpec = tween(if (expanded) ChannelRowsRevealMs else PlayerMotion.MediumMs, easing = LinearEasing),
+        label = "channel-rows-reveal",
+    )
+    val rowsShown by remember(rowsReveal) { derivedStateOf { rowsReveal.value > 0f } }
     val revealed by remember(expansion) { derivedStateOf { expansion.value == 1f } }
     val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
     // The schedule header peeks only once the rail stands, and leaves before it folds away.
@@ -62,8 +71,10 @@ internal fun QuickZapPresentation(
     val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
     val viewport = LocalPlayerPageScrim.current
     val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
+    val rowsTop = with(LocalDensity.current) { ChannelRowsTop.toPx() }
     SideEffect {
-        scrim.previewTop = { if (channelRows) viewportHeight * .33f else (viewportHeight - railHeight).toFloat() }
+        // Rows fill the page below the strip: the denser rail scrim starts where they do.
+        scrim.previewTop = { if (channelRows) rowsTop else (viewportHeight - railHeight).toFloat() }
         scrim.expansion = expansion::value
     }
     DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
@@ -79,11 +90,15 @@ internal fun QuickZapPresentation(
             CompositionLocalProvider(LocalRailExpansion provides expansion::value,
                 LocalPlayerPageScrim provides scrim) { controls() }
         }
-        if (!shown && !expanded) return@Box
+        if (!shown && !expanded && !rowsShown) return@Box
         if (channelRows) {
-            if (expanded) Box(Modifier.fillMaxSize()
-                .graphicsLayer { alpha = expansion.value }
-                .testTag("player-zap-tray")) { channelContent() }
+            // Rows keep their own linear clock: each row eases over its staggered window, and
+            // closing runs the same rise backwards.
+            if (expanded || rowsShown) Box(Modifier.fillMaxSize()
+                .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
+                .testTag("player-zap-tray")) {
+                CompositionLocalProvider(LocalChannelRowsReveal provides rowsReveal::value) { channelContent() }
+            }
             return@Box
         }
         Column(

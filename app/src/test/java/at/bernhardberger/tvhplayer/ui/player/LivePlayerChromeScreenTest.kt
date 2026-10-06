@@ -1279,30 +1279,51 @@ class LivePlayerChromeScreenTest {
         assertEquals("a new visit resets Details and its action", listOf("live-info-record"), focused())
     }
 
-    @Test fun downFromTheActionRowOpensRowsAndOnlyBackReturnsToTheAction() {
+    @Test fun downFromTheActionRowOpensRowsAndUpFromTheTopOrBackReturnsToTheAction() {
         screen()
         key(Key.DirectionDown)
         assertEquals(listOf("player-pause"), focused())
         assertEquals("Channels", texts("player-down-hint"))
-        repeat(2) {
+        for (close in listOf(Key.DirectionUp, Key.Back)) {
             key(Key.DirectionRight)
             key(Key.DirectionRight)
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionDown)
             assertEquals("rows open on the playing channel", listOf("player-channel-row-1-tile-0"), focused())
+            assertTrue("the now-playing strip stands above the rows", exists("player-now-playing"))
             assertFalse("the programme info page does not open", exists("live-info-panel"))
             assertEquals("the opening key tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-            key(Key.DirectionUp)
-            assertEquals("Up on the first row does not close", listOf("player-channel-row-1-tile-0"), focused())
-            key(Key.DirectionDown)
-            assertEquals("rows browse without tuning", listOf("player-channel-row-2-tile-0"), focused())
-            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-            key(Key.Back)
+            if (close == Key.Back) {
+                key(Key.DirectionDown)
+                assertEquals("rows browse without tuning", listOf("player-channel-row-2-tile-0"), focused())
+                assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            }
+            // Up on the first row leaves the way Down came in; Back closes from anywhere.
+            key(close)
             assertFalse(exists("player-channel-rows"))
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
         }
+        assertEquals(listOf("player-pause"), focused())
+    }
+
+    @Test fun okOnALaterProgrammeOpensItsDetailsAndOneBackReturnsToItsTile() {
+        screen()
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-channel-row-1-tile-0"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-channel-row-1-tile-1"), focused())
+        key(Key.DirectionCenter)
+        assertTrue("the programme's details open", exists("live-info-panel"))
+        assertTrue(compose.onAllNodesWithText("Later", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertEquals("nothing tunes", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        key(Key.Back)
+        assertFalse(exists("live-info-panel"))
+        assertEquals("one Back returns to the programme", listOf("player-channel-row-1-tile-1"), focused())
+        key(Key.Back)
+        assertFalse(exists("player-channel-rows"))
         assertEquals(listOf("player-pause"), focused())
     }
 
