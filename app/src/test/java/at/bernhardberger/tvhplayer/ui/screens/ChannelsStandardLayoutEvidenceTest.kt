@@ -222,12 +222,12 @@ class ChannelsStandardLayoutEvidenceTest {
 
         val heading = detail("channels-heading").bounds()
         assertEquals("heading x", 130f, heading.left, .5f)
-        assertEquals("heading y", 32f, heading.top, .5f)
+        assertEquals("heading y", 28f, heading.top, .5f)
         detail("channels-heading").assertTextEquals("Channels")
         // Tags follow the real headline height and share the row axis.
         val tabs = tab("All channels").bounds()
         assertEquals("tag row x", 130f, tabs.left, 1f)
-        assertEquals("tag row y", 80f, tabs.top, 1f)
+        assertEquals("tag row y", 76f, tabs.top, 1f)
 
         // The list column spans the focus reserve and runs to the screen bottom.
         val list = compose.onNodeWithTag("channels-list").bounds()
@@ -235,12 +235,12 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
 
-        // Rows: 340dp wide at x130, first at y128, 4dp gaps. Height is the library's
+        // Rows: 340dp wide at x130, first at y124, 4dp gaps. Height is the library's
         // standard two-line minimum and grows with text scale rather than clipping.
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
-        assertEquals("row y", 128f, first.top, .5f)
+        assertEquals("row y", 124f, first.top, .5f)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
@@ -290,9 +290,9 @@ class ChannelsStandardLayoutEvidenceTest {
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
         assertEquals("details width", 340f, details.width, .5f)
-        assertEquals("details top", 128f, details.top, .5f)
+        assertEquals("details top", 124f, details.top, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
-        assertEquals("details bottom inset", 508f, details.bottom, .5f)
+        assertEquals("details bottom inset", 512f, details.bottom, .5f)
     }
 
     @Test
@@ -684,7 +684,7 @@ class ChannelsStandardLayoutEvidenceTest {
         val titleTop = detail("channels-detail-title").bounds().top
         assertEquals("full-width artwork", 340f, image.width, .5f)
         assertEquals("16:9 artwork height", 191.25f, image.height, .5f)
-        assertEquals("Next reaches the real safe bottom", 508f, detail("channels-detail-next").bounds().bottom, .5f)
+        assertEquals("Next reaches the real safe bottom", 512f, detail("channels-detail-next").bounds().bottom, .5f)
         for (channel in 2..NO_EPG) {
             key(Key.DirectionDown)
             row(channel).assertIsFocused()
@@ -695,7 +695,7 @@ class ChannelsStandardLayoutEvidenceTest {
                 detail("channels-detail-subtitle").assertDoesNotExist()
                 detail("channels-detail-description").assertDoesNotExist()
             } else {
-                assertEquals("Next stays pinned to the real safe bottom", 508f, detail("channels-detail-next").bounds().bottom, .5f)
+                assertEquals("Next stays pinned to the real safe bottom", 512f, detail("channels-detail-next").bounds().bottom, .5f)
             }
         }
     }
@@ -726,7 +726,7 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("subtitle 4dp below title", detail("channels-detail-title").bounds().bottom + 4f, detail("channels-detail-subtitle").bounds().top, 1f)
         assertTrue("channel identity inside image", detail("channels-detail-channel").bounds().top >= preview.top)
         assertTrue("progress inside image", detail("channels-detail-progress").bounds().bottom <= preview.bottom)
-        assertEquals("Next is anchored to the real column bottom, not wrap content", 508f, next.bottom, .5f)
+        assertEquals("Next is anchored to the real column bottom, not wrap content", 512f, next.bottom, .5f)
     }
 
     // ---- captures ----

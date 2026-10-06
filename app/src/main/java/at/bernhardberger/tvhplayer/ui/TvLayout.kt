@@ -14,7 +14,7 @@ val TvSpacing48 = 48.dp
 val TvSpacing56 = 56.dp
 val TvSpacing80 = 80.dp
 
-/** Stable title/action slot shared by peer top-level browse destinations. */
+/** Minimum title/action slot height shared by peer top-level browse destinations. */
 val TvBrowseHeaderHeight = 40.dp
 
 /** Nominal browse columns; native focus overflow is reserved inside the leading inset. */
@@ -35,12 +35,21 @@ const val TvScrimModalAlpha = 0.60f
 const val TvTrackAlpha = 0.20f
 const val TvGhostFillAlpha = 0.40f
 
+// ---- Material for TV spec baseline (960×540dp) ----
+// The grid that screens migrate to: twelve 52dp columns with 20dp gutters between 58dp side margins,
+// 28dp top and bottom margins, and Material for TV's medium icon button.
+val TvGridHorizontalMargin = 58.dp
+val TvGridVerticalMargin = 28.dp
+val TvGridColumnWidth = 52.dp
+val TvGridGutter = 20.dp
+val TvIconButtonSize = 40.dp
+
 /** Browse safe-area input owned and passed down by the global navigation shell. */
 val TvScreenPadding = PaddingValues(
     start = 24.dp,
-    top = 32.dp,
-    end = 48.dp,
-    bottom = 32.dp,
+    top = TvGridVerticalMargin,
+    end = TvGridHorizontalMargin,
+    bottom = TvGridVerticalMargin,
 )
 
 /**
@@ -48,10 +57,10 @@ val TvScreenPadding = PaddingValues(
  * onboarding, unlock, and Settings (which keeps only its category rail).
  */
 val TvFullScreenPadding = PaddingValues(
-    start = 48.dp,
-    top = 32.dp,
-    end = 48.dp,
-    bottom = 32.dp,
+    start = TvGridHorizontalMargin,
+    top = TvGridVerticalMargin,
+    end = TvGridHorizontalMargin,
+    bottom = TvGridVerticalMargin,
 )
 
 val TvPlaybackPadding = PaddingValues(
@@ -72,15 +81,6 @@ val SettingsDepthColumnWidth = TvBrowseColumnWidth
 val SettingsDepthColumnGap = TvBrowseColumnGap
 val SettingsDepthHeadingHeight = 60.dp
 val SettingsDepthRowMinHeight = 56.dp
-
-// ---- Material for TV spec baseline (960×540dp) ----
-// The grid that screens migrate to: twelve 52dp columns with 20dp gutters between 58dp side margins,
-// 28dp top and bottom margins, and Material for TV's medium icon button.
-val TvGridHorizontalMargin = 58.dp
-val TvGridVerticalMargin = 28.dp
-val TvGridColumnWidth = 52.dp
-val TvGridGutter = 20.dp
-val TvIconButtonSize = 40.dp
 
 /** Non-interactive programme progress on browse cards, rows, and detail panes. */
 val TvProgressStripHeight = 4.dp

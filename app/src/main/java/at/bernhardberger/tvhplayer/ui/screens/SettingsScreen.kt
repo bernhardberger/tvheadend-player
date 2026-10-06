@@ -68,7 +68,7 @@ internal fun SettingsScreenNavigation(
         columnWidth = SettingsDepthColumnWidth,
         columnGap = SettingsDepthColumnGap,
         contentPadding = PaddingValues(start = inset,
-            top = contentPadding.calculateTopPadding() + TvSpacing24,
+            top = contentPadding.calculateTopPadding(),
             bottom = contentPadding.calculateBottomPadding()),
         modifier = Modifier.fillMaxSize(),
         initialFocusEnabled = initialFocusEnabled,

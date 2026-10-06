@@ -110,6 +110,7 @@ class SettingsVisualEvidenceTest {
         // Accepted Settings C geometry on the 80dp Material for TV drawer shell.
         val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
         assertEquals(130f, activeColumn.left, .5f)
+        assertEquals(28f, activeColumn.top, .5f)
         assertEquals(340f, activeColumn.width, .5f)
         capture("$prefix-root")
         press(Key.DirectionCenter)
@@ -164,7 +165,7 @@ class SettingsVisualEvidenceTest {
         press(Key.DirectionDown)
         val reading = compose.onNodeWithTag("appliance-disclosure")
         reading.assertIsFocused()
-        assertTrue(reading.fetchSemanticsNode().boundsInRoot.bottom <= view.height - 32)
+        assertTrue(reading.fetchSemanticsNode().boundsInRoot.bottom <= view.height - 28)
         capture("$prefix-appliance-reading")
         repeat(8) { press(Key.DirectionDown) }
         reading.assertIsFocused()
@@ -188,6 +189,7 @@ class SettingsVisualEvidenceTest {
     }
 
     private fun capture(name: String) {
+        val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
             bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -200,6 +202,7 @@ class SettingsVisualEvidenceTest {
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
                 "focus/scenario=${name.substringAfter("-font").substringAfter("-")}; " +
                 "production=SideRail+SettingsScreenNavigation; warm playback scrim; " +
+                "activeColumn=$activeColumn; " +
                 "static offline composition only\n",
         )
     }

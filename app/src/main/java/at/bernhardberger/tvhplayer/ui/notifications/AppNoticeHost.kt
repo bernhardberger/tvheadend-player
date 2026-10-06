@@ -33,6 +33,7 @@ import androidx.tv.material3.SurfaceDefaults
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
@@ -100,7 +101,7 @@ internal fun AppNoticePresentation(
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None))
     val direction = LocalLayoutDirection.current
     Box(modifier.fillMaxSize().padding(start = TvFullScreenPadding.calculateStartPadding(direction),
-        end = TvFullScreenPadding.calculateEndPadding(direction), bottom = 28.dp),
+        end = TvFullScreenPadding.calculateEndPadding(direction), bottom = TvGridVerticalMargin),
         contentAlignment = Alignment.BottomCenter) {
         Surface(modifier = Modifier
             .widthIn(max = 556.dp)
