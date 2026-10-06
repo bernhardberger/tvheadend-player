@@ -20,6 +20,65 @@ Load these through `testutil/FixtureArt.kt`.
   `ion-wake-edge-title` (title ink close to the right edge).
 - `art/still-*.jpg`: programme stills without readable text, usable as a stand-in video frame behind the player.
 
+## When to use what
+
+| Test kind | Images |
+| --- | --- |
+| Captures for human review: any test that writes a screen PNG under `captures/`, `artifacts/` or `build/outputs/` | This pack, through `FixtureArt` |
+| Pixel, colour, ink, aspect or contrast assertions (`ChannelAccentsTest`, `PiconBoxTest`, `GuideVisualLayoutTest` ink checks, scrim measurements) | Synthetic bitmaps with known colours and geometry |
+| Geometry, focus, key handling and state tests that draw no art | No images |
+| Deliberate worst cases inside a capture: bright or white frame behind a scrim, missing logo, missing art, loading | Keep them synthetic or absent next to the pack art |
+
+Rules:
+
+- Keep a scene coherent: the picon, channel name, programme title, synopsis,
+  key art and still in one row or card come from the same line in the
+  line-up below. Football art under a documentary title hides real problems
+  as well as a colour block does.
+- Never use real broadcaster names or marks (ORF, ARD, ServusTV and so on),
+  real picons or downloaded EPG images in committed tests. Long-name and
+  German cases extend the fictional names instead.
+- `still-*` images stand in for live video behind the player and for warm
+  backgrounds; key art goes where the app shows programme artwork.
+- Fixtures stay test-only. The APK keeps its generic
+  `startup_background_plate.webp`; do not ship pack art.
+- Serve images through `FixtureArt.imageLoader`, keyed by `ArtworkId`; an id
+  without an image fails like a missing server image. Decoding needs
+  `@GraphicsMode(NATIVE)`.
+- Instrumented `androidTest` screenshots cannot read these JVM test resources
+  and need their own copy.
+- To add an image, export it from the creative batch, scale it to fit 1280×720
+  as JPEG quality 82 (picons stay lossless PNG), and add a provenance row.
+
+## Line-up
+
+The channel each programme belongs to in captures. Channels without a
+programme row are picon-only: use them for rows without art or for the mark
+edge cases.
+
+| Channel (picon) | Programme | Key art | Still | Synopsis |
+| --- | --- | --- | --- | --- |
+| Ridge Earth (`ridge-earth`) | Ridge Light | `ridge-light` | `still-ridge-light` | Seasonal mountain light, forests and weather moving over a ridge. |
+| Ridge Earth | Tide Watch | — | `still-tide-watch` | Coastal wildlife along a tidal estuary, wading birds and seals. |
+| Harbor Sport (`harbor-sport`) | Harbor Kickoff | `harbor-kickoff`, `harbor-kickoff-4x3` | `still-harbor-kickoff` | Match coverage from a floodlit stadium as Harbor FC meet Amber Town. |
+| Harbor Sport | River Court | `river-court` | `still-river-court` | Indoor basketball, River Court against North Quay. |
+| Northline News (`northline-news`) | Northline Tonight | `northline-tonight` | `still-northline-studio`, `still-northline-graphics` | Evening studio news from a regional desk with two anchors. |
+| Northline News | Field Desk | `field-desk` (NEW badge) | `still-field-desk-street` | Field reporting from a flooded riverside road. |
+| Northline News | Skyglass Weather | — | `still-skyglass-square` | Weather presentation. |
+| Kite Kids (`kite-kids`) | Paper Kite Tales | `paper-kite-tales` | `still-paper-kite-tales` | 2D animation about a paper kite over painted hills. |
+| Kite Kids | Little Orbit | `little-orbit` | `still-little-orbit` | A gentle science table about orbits using marbles and a bowl. |
+| Ion Frame (`ion-frame`) | Ion Wake | `ion-wake`, `ion-wake-edge-title` | `still-ion-wake` | Sci-fi anime: a courier rides a magnetic rail through Ion Harbor. |
+| Ion Frame | Lantern Road | `lantern-road` | `still-lantern-road` | Fantasy anime: a cartographer maps a valley from a lantern sky-bridge. |
+| Amber Stage (`amber-stage`) | The Kettle Hour | `kettle-hour` | `still-kettle-hour` | A warm kitchen programme about broths, bread and weeknight pans. |
+| Amber Stage | Glass Harbor | `glass-harbor`, `glass-harbor-poster-2x3` | `still-glass-harbor` | A quiet drama about night-shift workers in a harbour glass workshop. |
+| Amber Stage | Coastal Miles | — | `still-coastal-miles` | A walking travel strand along a temperate coast. |
+| Harbor Lights (`harbor-lights`) | Harbor Lights Live | `harbor-lights-live` | `still-harbor-lights-live` | A small-hall concert with a quartet. |
+
+Picon-only channels: `lantern-hour`, `little-orbit`, `glass-drama`,
+`northline-world`, `river-court`, `landfunk-1`, `reedfen-4`, `coastal-miles`
+(5.5:1 wordmark), `roundtable` (crest), `foundry-docs` and `quiet-hours`
+(dark marks on a light plate).
+
 ## Provenance
 
 Exported from the operator's local creative-assets batch

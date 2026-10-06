@@ -142,6 +142,9 @@ Prefer deterministic offline captures of production composables with fake state
 for static visual review. Record canvas, locale, font scale, and focus state and
 keep generated evidence ignored. This can prove only the captured composition;
 it does not replace integrated or physical-TV gates.
+Draw channel and programme images in captures from the fictional fixture pack;
+`app/src/test/resources/fixture-art/README.md` says which tests use it, which
+stay synthetic, and how to keep a scene coherent.
 
 For interactive UI iteration after local checks, prefer the existing Notebook032
 Android TV emulator and fullscreen viewer: `docs/notebook-tv-preview.md`. Keep
