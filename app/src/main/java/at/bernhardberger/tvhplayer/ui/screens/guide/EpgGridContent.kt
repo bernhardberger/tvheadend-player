@@ -72,7 +72,10 @@ import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing16
+import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
@@ -83,10 +86,9 @@ import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 import coil3.ImageLoader
 
-private val GuideChannelLogoWidth = 64.dp
+private val GuideChannelLogoWidth = 60.dp
 private val GuideChannelLogoHeight = 36.dp
 private val GuideChannelHeaderVerticalPadding = 6.dp
-private val GuideChannelHeaderLineGap = 4.dp
 
 @Composable
 internal fun guideTimelineRowHeight(): Dp = with(LocalDensity.current) {
@@ -95,14 +97,14 @@ internal fun guideTimelineRowHeight(): Dp = with(LocalDensity.current) {
     val headerContent = maxOf(
         GuideChannelLogoHeight,
         numberLine,
-        numberLine + GuideChannelHeaderLineGap + titleLine,
+        titleLine,
     ) + GuideChannelHeaderVerticalPadding * 2
     // One programme title and time line, including native ListItem content padding;
     // headers either show number/logo or number/name, never all three.
     maxOf(
         64.dp * fontScale,
         headerContent,
-        titleLine + MaterialTheme.typography.bodySmall.lineHeight.toDp() + 24.dp,
+        titleLine + MaterialTheme.typography.bodySmall.lineHeight.toDp() + TvSpacing24,
     )
 }
 
@@ -138,7 +140,7 @@ internal fun TimelineTimeRuler(
                 Text(
                     text = stringResource(R.string.epg_channels_heading),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    modifier = Modifier.padding(horizontal = TvSpacing16),
                 )
             }
         }
@@ -314,6 +316,9 @@ internal fun TimelineChannelRow(
                         width = width,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
+                            // The 4dp gap is narrower than the focus scale: the focused
+                            // cell draws above its later neighbour.
+                            .zIndex(if (isFocusTarget) 1f else 0f)
                             .absoluteOffset(x = start)
                             .width(width)
                             .fillMaxHeight()
@@ -369,53 +374,41 @@ internal fun TimelineChannelHeader(
         ),
         shape = MaterialTheme.shapes.small,
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = 8.dp, vertical = GuideChannelHeaderVerticalPadding),
-            verticalArrangement = Arrangement.spacedBy(GuideChannelHeaderLineGap, Alignment.CenterVertically),
+                .padding(horizontal = TvSpacing16, vertical = GuideChannelHeaderVerticalPadding),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
         ) {
+            if (number != null) {
+                Text(
+                    text = number.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                )
+            }
             if (channel.icon != null && currentSession != null && !logoFailed) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-                ) {
-                    if (number != null) {
-                        Text(
-                            text = number.toString(),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                        )
-                    }
-                    PiconBox(
-                        imageLoader = imageLoader,
-                        currentSession = currentSession,
-                        piconPath = channel.icon,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .widthIn(max = GuideChannelLogoWidth)
-                            .height(GuideChannelLogoHeight)
-                            .testTag("epg-channel-picon-${channel.id.value}"),
-                        onError = { logoFailed = true },
-                    )
-                }
+                PiconBox(
+                    imageLoader = imageLoader,
+                    currentSession = currentSession,
+                    piconPath = channel.icon,
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .widthIn(max = GuideChannelLogoWidth)
+                        .height(GuideChannelLogoHeight)
+                        .testTag("epg-channel-picon-${channel.id.value}"),
+                    onError = { logoFailed = true },
+                )
             } else {
-                if (number != null) {
-                    Text(
-                        text = number.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                }
                 Text(
                     text = channel.name.orEmpty(),
                     style = MaterialTheme.typography.titleSmall,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -487,7 +480,7 @@ internal fun TimelineProgrammeCell(
             modifier = Modifier
                 .tabFocus()
                 .fillMaxSize()
-                .padding(horizontal = 4.dp)
+                .padding(horizontal = TvSpacing4 / 2)
                 // The panel shape is drawn, not clipped: a clip here would cancel the
                 // library focus scale the surface applies outside this modifier.
                 .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
@@ -538,9 +531,9 @@ private fun TimelineRowState(
         }
     )
     Row(
-        modifier = modifier.padding(horizontal = 12.dp),
+        modifier = modifier.padding(horizontal = TvSpacing16),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
     ) {
         Text(
             text = text,

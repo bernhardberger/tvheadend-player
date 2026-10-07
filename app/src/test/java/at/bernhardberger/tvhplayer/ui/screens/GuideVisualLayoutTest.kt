@@ -175,6 +175,8 @@ class GuideVisualLayoutTest {
         assertEquals(228f, bounds("epg-channel-row-2").top, .1f)
         assertEquals(130f, bounds("epg-channel-header-1").left, .1f)
         assertEquals(254f, bounds("epg-channel-header-1").right, .1f)
+        assertEquals("Ruler heading shares the 16dp channel text inset", 146f,
+            compose.onNodeWithText(context().getString(R.string.epg_channels_heading)).fetchSemanticsNode().boundsInRoot.left, .1f)
         key(Key.DirectionDown)
         focused(title(1, 0))
         val bitmap = capture("guide-normal", 1f, LayoutDirection.Ltr)
@@ -208,6 +210,12 @@ class GuideVisualLayoutTest {
         assertTrue("Native focus grows above the row instead of clipping", native.top < focus.top)
         assertTrue("Native focus grows below the row instead of clipping", native.bottom > focus.bottom)
         assertEquals("Native focus remains vertically centred", focus.center.y, native.center.y, 1f)
+        val edgeX = native.right.toInt() - 1
+        val edgeY = focus.center.y.toInt()
+        val edgePixel = bitmap.getPixel(edgeX, edgeY)
+        assertTrue("Adjacent programme must not cover the native focused edge at ($edgeX,$edgeY)",
+            android.graphics.Color.red(edgePixel) > 180 && android.graphics.Color.green(edgePixel) > 180 &&
+                android.graphics.Color.blue(edgePixel) > 180)
         compose.onNodeWithText("Northline News", useUnmergedTree = true).assertIsDisplayed()
         bitmap.recycle()
         assertNoPlayback()
@@ -217,18 +225,19 @@ class GuideVisualLayoutTest {
         val logoName = "Kultur und Dokumentationen aus aller Welt HD"
         val noLogoName = "Northline News: International Headlines and Analysis"
         val logoChannel = Channel.create(ChannelId(1), name = logoName, number = 1001, icon = ArtworkId(1))
-        val noLogoChannel = Channel.create(ChannelId(2), name = noLogoName, number = 456)
+        val noLogoChannel = Channel.create(ChannelId(2), name = noLogoName, number = 4567)
         val currentSession = headerSession()
         val scale = mutableStateOf(1f)
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale.value)) {
                 TVHeadendPlayerTheme {
+                    view = LocalView.current
                     Column {
                         Box(Modifier.height(guideTimelineRowHeight())) {
                             TimelineChannelHeader(logoChannel, 1001, loader, currentSession)
                         }
                         Box(Modifier.height(guideTimelineRowHeight())) {
-                            TimelineChannelHeader(noLogoChannel, 456, loader)
+                            TimelineChannelHeader(noLogoChannel, 4567, loader)
                         }
                     }
                 }
@@ -237,7 +246,7 @@ class GuideVisualLayoutTest {
         for (fontScale in listOf(1f, 1.3f, 1.6f)) {
             compose.runOnIdle { scale.value = fontScale }
             val rowHeight = (64f * fontScale).roundToInt().toFloat()
-            for ((id, description) in listOf(1 to "1001 $logoName", 2 to "456 $noLogoName")) {
+            for ((id, description) in listOf(1 to "1001 $logoName", 2 to "4567 $noLogoName")) {
                 val header = compose.onNodeWithTag("epg-channel-header-$id")
                 header.assertContentDescriptionEquals(description)
                 assertFalse("Header is not a D-pad focus target", header.fetchSemanticsNode().config.contains(SemanticsProperties.Focused))
@@ -256,8 +265,9 @@ class GuideVisualLayoutTest {
             assertFalse("Four-digit number must not truncate at $fontScale", numberText.hasVisualOverflow)
             assertFalse(numberText.isLineEllipsized(0))
             val logoNumberBounds = logoNumber.fetchSemanticsNode().boundsInRoot
+            assertEquals(bounds("epg-channel-header-1").left + 16f, logoNumberBounds.left, .1f)
             assertEquals(logoNumberBounds.right + 8f, logo.left, .1f)
-            assertEquals("Logo yields width to the complete channel number", minOf(64f, 108f - logoNumberBounds.width - 8f), logo.width, .1f)
+            assertEquals("Logo yields width to the complete channel number", minOf(60f, 92f - logoNumberBounds.width - 8f), logo.width, .1f)
             assertEquals(36f, logo.height, .1f)
             // Odd pixel row/text heights can centre an even-height logo half a pixel away.
             assertEquals(bounds("epg-channel-header-1").center.y, logo.center.y, .5f)
@@ -268,10 +278,68 @@ class GuideVisualLayoutTest {
             assertEquals(1, text.lineCount)
             assertTrue("Long no-logo names ellipsize on their only line", text.isLineEllipsized(0))
             val nameBounds = name.fetchSemanticsNode().boundsInRoot
-            val number = compose.onNodeWithText("456", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-            assertEquals(number.bottom + 4f, nameBounds.top, .1f)
+            val numberNode = compose.onNodeWithText("4567", useUnmergedTree = true)
+            val number = numberNode.fetchSemanticsNode().boundsInRoot
+            val noLogoNumberLayouts = mutableListOf<TextLayoutResult>()
+            numberNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(noLogoNumberLayouts) }
+            assertFalse("No-logo four-digit number must not truncate at $fontScale", noLogoNumberLayouts.single().hasVisualOverflow)
+            assertFalse(noLogoNumberLayouts.single().isLineEllipsized(0))
+            assertEquals(bounds("epg-channel-header-2").left + 16f, number.left, .1f)
+            assertEquals(number.right + 8f, nameBounds.left, .1f)
+            assertEquals(bounds("epg-channel-header-2").right - 16f, nameBounds.right, .1f)
+            assertEquals(number.center.y, nameBounds.center.y, .5f)
+            assertEquals(bounds("epg-channel-header-2").center.y, nameBounds.center.y, .5f)
             assertTrue("The complete name line fits at $fontScale", text.getLineBottom(0) <= nameBounds.height)
             assertTrue(nameBounds.bottom <= bounds("epg-channel-header-2").bottom - 6f)
+            if (fontScale == 1.3f) {
+                compose.runOnIdle {
+                    val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                    view.draw(Canvas(bitmap))
+                    val file = File("build/outputs/browse-cohesion/guide/guide-four-digit-headers-font1.3.png")
+                    file.parentFile.mkdirs()
+                    file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                    bitmap.recycle()
+                }
+            }
+        }
+    }
+
+    @Test fun adjacentProgrammeSurfacesKeepFourDpGapAndSymmetricTimelineInset() {
+        val channel = Channel.create(ChannelId(1), name = "Northline News", number = 1)
+        val requesters = mutableMapOf<EventId, FocusRequester>()
+        val events = listOf(
+            EpgEvent.create(EventId(1), channelId = channel.id, title = "First programme",
+                start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(3600)),
+            EpgEvent.create(EventId(2), channelId = channel.id, title = "Second programme",
+                start = Instant.fromEpochSeconds(3600), stop = Instant.fromEpochSeconds(7200)),
+        )
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                Box(Modifier.width(732.dp)) {
+                    TimelineChannelRow(channel, 0, 1, null, requesters, 0, 7200,
+                        { 0 }, loader, null, events, true, true, ConnectionUiState.Ready, false,
+                        { null }, {}, {})
+                }
+            }
+        }
+        val first = compose.onNodeWithText("First programme").fetchSemanticsNode().boundsInRoot
+        val second = compose.onNodeWithText("Second programme").fetchSemanticsNode().boundsInRoot
+        assertEquals("Time allocations still start at the timeline edge", 132f, first.left, .1f)
+        assertEquals(300f, first.width, .1f)
+        assertEquals(first.right, second.left, .1f)
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val y = first.center.y.toInt()
+            val gapColor = bitmap.getPixel(432, y)
+            val cellColor = bitmap.getPixel(429, y)
+            assertNotEquals("Surfaces and timeline gap must be visibly distinct", gapColor, cellColor)
+            for (x in 430 until 434) assertEquals("Exactly four gap pixels at x=$x", gapColor, bitmap.getPixel(x, y))
+            assertEquals(cellColor, bitmap.getPixel(434, y))
+            assertEquals("First surface has the same 2dp leading inset", gapColor, bitmap.getPixel(133, y))
+            assertEquals(cellColor, bitmap.getPixel(134, y))
+            bitmap.recycle()
         }
     }
 
@@ -323,6 +391,10 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("1001 ${name.value}")
         assertEquals("Failure preserves the dense row height", 64f, bounds("epg-channel-header-1").height, .1f)
+        val fallbackNumber = compose.onNodeWithText("1001", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val fallbackName = compose.onNodeWithText(name.value, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals("Failed logo uses the same inline gap", fallbackNumber.right + 8f, fallbackName.left, .1f)
+        assertEquals("Failed logo keeps number and name vertically centred", fallbackNumber.center.y, fallbackName.center.y, .5f)
 
         compose.runOnIdle { failArtwork = false; icon.value = ArtworkId(2) }
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
@@ -969,7 +1041,7 @@ class GuideVisualLayoutTest {
         val native = nativeFocusBounds(bitmap)
         // Semantics omit the graphics-layer scale. Check the complete bright surface,
         // including its native 1.05 growth, rather than accepting a clipped rectangle.
-        assertEquals("Complete native focus width", (focus.width - 8f) * 1.05f, native.width, 2f)
+        assertEquals("Complete native focus width", (focus.width - 4f) * 1.05f, native.width, 2f)
         assertEquals("Complete native focus height", focus.height * 1.05f, native.height, 2f)
         assertEquals("Native focus remains centred on its time allocation", focus.center.x, native.center.x, 1f)
         if (direction == LayoutDirection.Ltr) {
@@ -1025,7 +1097,7 @@ class GuideVisualLayoutTest {
                 "focus=${compose.onNode(isFocused()).fetchSemanticsNode().config[SemanticsProperties.Text]}; " +
                 "bounds=${compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot}; position=${position.position.value}\n" +
                 "ruler=${bounds("epg-time-ruler")}; nativeFocusPixels=${nativeFocusBounds(bitmap)}\n" +
-                "headerRefinement=number/logo or number/name; gutter=124dp; nameWidth=108dp; nameType=titleSmall14/20 single line; picon=64x36dp Fit\n" +
+                "headerRefinement=inline number/logo or number/name; gutter=124dp; headerInset=16dp; numberGap=8dp; cellGap=4dp; nameType=titleSmall14/20 single line; picon=max60x36dp Fit\n" +
                 "production=TVHeadendPlayerTheme + SideRail + EpgGridScreen; native D-pad focus; fake SDK; intercepted synthetic picons\n" +
                 "background=opaque theme background, not live video; static Robolectric SDK34 native graphics only\n" +
                 "playbackRequests=$playbackRequests; navigationRequests=$navigationRequests; sdkCalls=${session.calls.size}\n",
@@ -1051,9 +1123,10 @@ class GuideVisualLayoutTest {
             .fetchSemanticsNode().config.contains(SemanticsProperties.Focused))
         val number = compose.onNodeWithText("2", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(124f, header.width, .1f)
-        assertEquals(64f, logo.width, .1f)
+        assertEquals(60f, logo.width, .1f)
         assertEquals(36f, logo.height, .1f)
         assertEquals(number.right + 8f, logo.left, .1f)
+        assertEquals(header.left + 16f, number.left, .1f)
         assertEquals("Logo remains centred to native pixel precision", header.center.y, logo.center.y, .5f)
         assertEquals("Number remains centred to native pixel precision", header.center.y, number.center.y, .5f)
         val noLogoHeader = bounds("epg-channel-header-3")
@@ -1064,9 +1137,11 @@ class GuideVisualLayoutTest {
         val layouts = mutableListOf<TextLayoutResult>()
         name.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val text = layouts.single()
-        assertEquals(108f, nameBounds.width, .1f)
-        assertEquals(noLogoHeader.left + 8f, nameBounds.left, .1f)
-        assertEquals("No-logo number occupies the line above the name", noLogoNumber.bottom + 4f, nameBounds.top, .1f)
+        assertEquals(noLogoHeader.left + 16f, noLogoNumber.left, .1f)
+        assertEquals(noLogoNumber.right + 8f, nameBounds.left, .1f)
+        assertEquals(noLogoHeader.right - 16f, nameBounds.right, .1f)
+        assertEquals("No-logo number and name share the centred row", noLogoNumber.center.y, nameBounds.center.y, .5f)
+        assertEquals(noLogoHeader.center.y, nameBounds.center.y, .5f)
         assertEquals(14.sp, text.layoutInput.style.fontSize)
         assertEquals(20.sp, text.layoutInput.style.lineHeight)
         assertEquals(scale, text.layoutInput.density.fontScale, .001f)
@@ -1093,8 +1168,8 @@ class GuideVisualLayoutTest {
             }
         }
         assertFalse("Production PiconBox must render the intercepted artwork", pixels.isEmpty())
-        assertEquals("Wide picon fills the 64dp allocation without stretching", 64, pixels.maxOf { it.first } - pixels.minOf { it.first } + 1)
-        assertEquals("88:20 artwork stays 4.4:1 inside the 64x36 box", 15, pixels.maxOf { it.second } - pixels.minOf { it.second } + 1)
+        assertEquals("Wide picon fills the 60dp allocation without stretching", 60, pixels.maxOf { it.first } - pixels.minOf { it.first } + 1)
+        assertEquals("88:20 artwork stays 4.4:1 inside the 60x36 box", 14, pixels.maxOf { it.second } - pixels.minOf { it.second } + 1)
         compose.onNodeWithTag("epg-channel-picon-3", useUnmergedTree = true).assertDoesNotExist()
     }
 

@@ -98,6 +98,7 @@ class GuideRealisticSceneTest {
     private val fixture = JSONObject(fixtureBytes.toString(Charsets.UTF_8))
     private val fixtureHash = MessageDigest.getInstance("SHA-256").digest(fixtureBytes).joinToString("") { "%02x".format(it) }
     private var now = Instant.parse(fixture.getString("snapshot_time")).epochSeconds
+    private var fontScale = 1f
     private val channelRecords = records("channels").sortedBy { it.getLong("number") }
     private val channels = channelRecords.mapIndexed { index, record ->
         Channel.create(ChannelId(record.getLong("number")), name = record.getString("name"), number = record.getLong("number"),
@@ -189,6 +190,17 @@ class GuideRealisticSceneTest {
         }
     }
 
+    @Test fun enlargedEnglishLogoAndNoLogoHeadersKeepNumbersComplete() {
+        showAt("2026-09-15T19:40:00", 1.3f)
+        compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
+        val number = compose.onNode(hasText("2") and hasAnyAncestor(hasTestTag("epg-channel-header-2")),
+            useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val name = compose.onNodeWithText("Harbor Sport Plus", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(number.right + 8f, name.left, .1f)
+        assertEquals(number.center.y, name.center.y, .5f)
+        capture("guide-fixture-headers-font1.3")
+    }
+
     @Test fun sevenHourOvernightEventKeepsFocusInTheVisibleFragment() {
         showAt("2026-09-15T01:00:00")
         moveToChannel(12)
@@ -269,7 +281,8 @@ class GuideRealisticSceneTest {
         fail("Channel $number was not reached by D-pad navigation")
     }
 
-    private fun showAt(localClock: String) {
+    private fun showAt(localClock: String, scale: Float = 1f) {
+        fontScale = scale
         now = LocalDateTime.parse(localClock).atZone(ZoneId.of(fixture.getString("timezone"))).toEpochSecond()
         assertTrue(SystemClock.setCurrentTimeMillis(now * 1000))
         show()
@@ -310,7 +323,7 @@ class GuideRealisticSceneTest {
         }
         compose.setContent {
             KoinApplication(application = { modules(noticeModule) }) {
-                CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -338,6 +351,7 @@ class GuideRealisticSceneTest {
 
     private fun capture(name: String) {
         compose.waitForIdle()
+        val headerGeometry = mutableListOf<String>()
         for (channel in channels) {
             val header = compose.onAllNodesWithTag("epg-channel-header-${channel.id.value}").fetchSemanticsNodes().singleOrNull() ?: continue
             assertFalse("Channel headers remain nonfocusable", header.config.contains(SemanticsProperties.Focused))
@@ -347,6 +361,13 @@ class GuideRealisticSceneTest {
             number.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
             assertFalse("Channel number ${channel.number} must not truncate", layouts.single().hasVisualOverflow)
             assertFalse("Channel number ${channel.number} must not ellipsize", layouts.single().isLineEllipsized(0))
+            val logo = compose.onAllNodesWithTag("epg-channel-picon-${channel.id.value}", useUnmergedTree = true)
+                .fetchSemanticsNodes().singleOrNull()
+            val label = compose.onAllNodes(hasText(channel.name.orEmpty()) and
+                hasAnyAncestor(hasTestTag("epg-channel-header-${channel.id.value}")), useUnmergedTree = true)
+                .fetchSemanticsNodes().singleOrNull()
+            headerGeometry += "channel=${channel.number}; header=${header.boundsInRoot}; " +
+                "number=${number.fetchSemanticsNode().boundsInRoot}; logo=${logo?.boundsInRoot}; name=${label?.boundsInRoot}"
         }
         val focus = compose.onNode(isFocused())
         focus.assertIsDisplayed().assertIsFocused()
@@ -369,11 +390,12 @@ class GuideRealisticSceneTest {
         File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         bitmap.recycle()
         File(directory, "$name.txt").writeText(
-            "canvas=960x540dp; density=1; locale=en_US; direction=Ltr; fontScale=1.0; timezone=${fixture.getString("timezone")}\n" +
+            "canvas=960x540dp; density=1; locale=en_US; direction=Ltr; fontScale=$fontScale; timezone=${fixture.getString("timezone")}\n" +
                 "sceneClock=${Instant.fromEpochSeconds(now)}; localClock=${java.time.Instant.ofEpochSecond(now).atZone(ZoneId.of(fixture.getString("timezone")))}; captureClockMillis=${SystemClock.uptimeMillis()}\n" +
                 "focus=${focus.fetchSemanticsNode().config[SemanticsProperties.Text]}; bounds=$bounds; position=${position.position.value}\n" +
                 "windowStart=${position.position.value?.windowStartSec?.let { Instant.fromEpochSeconds(it) }} (null before grid entry)\n" +
                 "fixture=fixture-epg/epg.json; seed=${fixture.getInt("seed")}; sha256=$fixtureHash; noEventOverrides=true\n" +
+                headerGeometry.joinToString(separator = "\n", postfix = "\n") +
                 "production=TVHeadendPlayerTheme + SideRail + EpgGridScreen; native D-pad focus; released fake SDK; FixtureArt.imageLoader\n" +
                 "background=opaque theme, not live video; Robolectric SDK34 native graphics; playbackRequests=$playbackRequests\n",
         )
