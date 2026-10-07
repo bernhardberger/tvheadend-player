@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
+import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 import androidx.activity.compose.BackHandler
@@ -407,7 +408,7 @@ private fun RecordingDetailsSurface(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.64f))
+            .background(Color.Black.copy(alpha = TvScrimModalAlpha))
             .focusGroup()
             .padding(contentPadding)
             .padding(vertical = 24.dp),

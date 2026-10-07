@@ -3,20 +3,25 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.lerp
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
-import at.bernhardberger.tvhplayer.ui.TvSpacing24
-import at.bernhardberger.tvhplayer.ui.SettingsDepthHeadingHeight
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.SettingsDepthRowMinHeight
 import androidx.compose.ui.platform.LocalConfiguration
 import at.bernhardberger.tvhplayer.ui.components.depth.*
+
+/** The preview-slot title reads at the row title size: titleMedium 16sp of headlineMedium 28sp. */
+internal const val SettingsHeadingPreviewScale = 16f / 28f
 
 internal fun settingsLevel(
     id: String,
@@ -25,24 +30,29 @@ internal fun settingsLevel(
     activeContent: (@Composable (androidx.compose.ui.focus.FocusRequester, (android.view.KeyEvent) -> Boolean) -> Unit)? = null,
     initialItemId: String? = null,
     description: String? = null,
-) = DepthLevel(id, rows, heading = { _ ->
+) = DepthLevel(id, rows, heading = { emphasis ->
     // Same heading in the active and preview slots (AOSP TvSettings parity): no
-    // back chevron, so the title never shifts when a column changes role.
-    if (description == null) {
-        Row(Modifier.fillMaxWidth().heightIn(min = SettingsDepthHeadingHeight).padding(bottom = TvSpacing24),
+    // back chevron. It uses the browse header band, so the title sits where the
+    // Channels, Guide and Recordings titles sit. In the preview slot it reads at the
+    // row title size and grows to full size as its column slides into the active slot.
+    val titleBand = @Composable {
+        Row(Modifier.fillMaxWidth().heightIn(min = TvBrowseHeaderHeight),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.semantics { heading() })
+                modifier = Modifier.graphicsLayer {
+                    scaleX = lerp(SettingsHeadingPreviewScale, 1f, emphasis())
+                    scaleY = scaleX
+                    transformOrigin = TransformOrigin(0f, 1f)
+                }.semantics { heading() })
         }
+    }
+    if (description == null) {
+        Box(Modifier.padding(bottom = TvSpacing4)) { titleBand() }
     } else {
         // A level-wide explanation sits under the title, outside every row, so no
         // single option carries it. It aligns with the option text and wraps.
-        Column(Modifier.fillMaxWidth().padding(bottom = TvSpacing24)) {
-            Row(Modifier.fillMaxWidth().heightIn(min = SettingsDepthHeadingHeight - TvSpacing24),
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-                Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.semantics { heading() })
-            }
+        Column(Modifier.fillMaxWidth().padding(bottom = TvSpacing4)) {
+            titleBand()
             Text(description, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(horizontal = TvSpacing16))

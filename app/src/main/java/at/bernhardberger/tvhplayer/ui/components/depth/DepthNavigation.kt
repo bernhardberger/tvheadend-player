@@ -33,12 +33,14 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
+import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.encodeToString
@@ -55,7 +57,9 @@ class DepthRow(
 class DepthLevel(
     val id: String,
     val rows: List<DepthRow>,
-    val heading: @Composable (Boolean) -> Unit,
+    // Emphasis is 1 in the active slot and 0 in the preview slot; it follows the strip
+    // slide, so a heading can grow while its column moves into the active slot.
+    val heading: @Composable (emphasis: () -> Float) -> Unit,
     // A leaf editor is mounted only while active. Its rows are its independent safe preview.
     // Editors forward non-editing Left here before a read-only text field consumes it.
     val activeContent: (@Composable (FocusRequester, (KeyEvent) -> Boolean) -> Unit)? = null,
@@ -94,7 +98,6 @@ fun rememberDepthNavigationState(rootId: String, initialItemId: String? = null):
  * column travels the same single step, so the columns keep their spacing while they
  * move and the one leaving the active slot keeps the arriving column's velocity.
  */
-internal const val DepthPreviewAlpha = 0.6f
 internal const val DepthSlideMillis = 1000
 internal const val DepthAlphaMillis = 200
 private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
@@ -153,7 +156,7 @@ fun DepthNavigation(
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
     onRootBack: (() -> Unit)? = null,
-    previewAlpha: Float = DepthPreviewAlpha,
+    previewAlpha: Float = TvPassiveAlpha,
     isCurrent: Boolean = true,
     onRootLeft: (() -> Unit)? = onRootBack,
     onFirstRowUp: (() -> Unit)? = null,
@@ -330,6 +333,7 @@ fun DepthNavigation(
                 stripColumns.forEach { column ->
                     key(column.path) {
                         val columnVisit = state.stack.visit
+                        val columnOffset = (column.path.size - 1) * stepPixels
                         DepthStripPane(
                             column = column,
                             activePath = state.stack.path,
@@ -342,7 +346,8 @@ fun DepthNavigation(
                             },
                             stackCanPop = stack.canPop,
                             stepPixels = stepPixels,
-                            xOffset = (column.path.size - 1) * stepPixels,
+                            xOffset = columnOffset,
+                            emphasis = { (1f - abs(columnOffset + stripOffset.value) / stepPixels).coerceIn(0f, 1f) },
                             columnWidth = columnWidth,
                             contentPadding = contentPadding,
                             previewAlpha = previewAlpha,
@@ -409,6 +414,7 @@ fun DepthNavigation(
                                                 stackCanPop = stack.canPop,
                                                 stepPixels = stepPixels,
                                                 xOffset = 0,
+                                                emphasis = { 0f },
                                                 columnWidth = columnWidth,
                                                 contentPadding = contentPadding,
                                                 previewAlpha = previewAlpha,
@@ -482,6 +488,7 @@ private fun DepthStripPane(
     stackCanPop: Boolean,
     stepPixels: Int,
     xOffset: Int,
+    emphasis: () -> Float,
     columnWidth: Dp,
     contentPadding: PaddingValues,
     previewAlpha: Float,
@@ -567,7 +574,7 @@ private fun DepthStripPane(
                     },
                 ),
         ) {
-            column.level.heading(column.path.size > 1)
+            column.level.heading(emphasis)
             if (column.level.passiveContent != null) {
                 column.level.passiveContent.invoke()
                 return@Column

@@ -28,6 +28,12 @@ const val TvTextPrimaryAlpha = 1.00f
 const val TvTextSecondaryAlpha = 0.88f
 const val TvTextTertiaryAlpha = 0.72f
 const val TvTextDisabledAlpha = 0.38f
+/**
+ * Passive content that is shown but not active (a preview column, a quiet row header):
+ * AOSP TvSettings' 0.6 preview dim. Pictures in passive rows dim further, so full-colour
+ * artwork does not pull the eye away from the focused row.
+ */
+const val TvPassiveAlpha = 0.60f
 const val TvPanelBrowseAlpha = 0.84f
 const val TvPanelDenseAlpha = 0.92f
 const val WarmPlaybackScrimAlpha = 0.84f
@@ -79,7 +85,6 @@ val TvNavigationRailGradientRunout = TvSpacing32
 /** Settings C logical geometry. Shell inset and drawer translation are separate. */
 val SettingsDepthColumnWidth = TvBrowseColumnWidth
 val SettingsDepthColumnGap = TvBrowseColumnGap
-val SettingsDepthHeadingHeight = 60.dp
 val SettingsDepthRowMinHeight = 56.dp
 
 /** Non-interactive programme progress on browse cards, rows, and detail panes. */
