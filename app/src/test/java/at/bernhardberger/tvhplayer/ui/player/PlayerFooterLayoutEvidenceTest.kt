@@ -126,7 +126,8 @@ class PlayerFooterLayoutEvidenceTest {
         }
         val footer = bounds("player-footer")
         assertEquals(540f, footer.bottom, 1f)
-        assertEquals(px(56.dp + 36.dp + 20.dp).toDouble(), footer.height.toDouble(), 1.0)
+        // The run-out, the content and the player's 28dp bottom margin.
+        assertEquals(px(56.dp + 28.dp + 20.dp).toDouble(), footer.height.toDouble(), 1.0)
     }
 
     @Test
@@ -163,10 +164,10 @@ class PlayerFooterLayoutEvidenceTest {
         val track = bounds("player-timeline-track")
         val actions = bounds("player-actions")
         val seekbar = bounds("player-seekbar")
-        // The focus/semantics node is the track, after the block's 8dp vertical padding.
-        assertEquals(px(56.dp + 8.dp).toDouble(),
+        // The focus/semantics node is the track, after the 4dp live keeps above its row under its text.
+        assertEquals(px(56.dp + 4.dp).toDouble(),
             (seekbar.top - bounds("player-footer").top - bounds("player-info-bar").height).toDouble(), 1.0)
-        assertEquals(px(48.dp), bounds("player-pause").height, 1f)
+        assertEquals("a medium icon button", px(40.dp), bounds("player-pause").height, 1f)
         assertInline(track)
         assertFalse("the controls have no state cell", exists("player-state"))
         val end = bounds("player-end-clock")
@@ -284,8 +285,10 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        compose.onNodeWithTag("player-identity-card").assertIsFocused()
+        compose.onNodeWithTag(PlayerTopIdentityTag).assertIsFocused()
         key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
         recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-seekbar", "player-seekbar", backdrop)
@@ -332,8 +335,9 @@ class PlayerFooterLayoutEvidenceTest {
         val timelineTag = "player-seekbar"
         val actionsTag = "player-actions"
         val resting = bounds("player-timeline-track")
+        // The timeline's 8dp below its row and the 4dp gap above the actions, on the 28dp bottom margin.
         assertEquals(px(4.dp + 8.dp), bounds(actionsTag).top - bounds(timelineTag).bottom, 1f)
-        assertEquals(504f, bounds(actionsTag).bottom, 1f)
+        assertEquals(512f, bounds(actionsTag).bottom, 1f)
         recordPair("de-font1.3-960x540-mdpi-d1", "$kind-resting", "player-pause", backdrop)
         key(Key.DirectionUp)
         compose.onNodeWithTag(timelineTag).assertIsFocused()
@@ -348,9 +352,12 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals(1, commits)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
-        // Without markers above it, Up reaches the card and Down returns to the timeline.
-        compose.onNodeWithTag("player-identity-card").assertIsFocused()
+        // Without markers above it, Up reaches the top identity. Down returns to the action row,
+        // whose Up leads back to the timeline.
+        compose.onNodeWithTag(PlayerTopIdentityTag).assertIsFocused()
         key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         assertTrue(previewing)
         assertEquals(2, commits)
@@ -421,11 +428,14 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         assertMarker(3_599_999f / 3_600_000f)
-        // Up above the markers closes them and reaches the card; Down returns to the timeline.
+        // Up above the markers closes them and reaches the top identity; Down returns to the action
+        // row, whose Up leads back to the timeline.
         key(Key.DirectionUp)
         assertFalse(navigation.open)
-        compose.onNodeWithTag("player-identity-card").assertIsFocused()
+        compose.onNodeWithTag(PlayerTopIdentityTag).assertIsFocused()
         key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
         assertMarker(0.75f)

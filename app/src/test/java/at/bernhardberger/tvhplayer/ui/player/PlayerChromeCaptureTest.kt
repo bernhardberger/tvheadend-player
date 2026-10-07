@@ -1,11 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -67,6 +69,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import coil3.ImageLoader
@@ -257,8 +260,8 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE,
-        // Trial channel card: focused with the Recent hint, Recent open, the rail open below the controls.
-        CHANNEL_CARD, CHANNEL_RECENT, CHANNEL_RAIL,
+        // Trial top identity: focused, its Recent row open, and the channel rows open with the strip in its place.
+        IDENTITY_FOCUSED, RECENT_OPEN, CHANNEL_ROWS_OPEN,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -300,12 +303,22 @@ class PlayerChromeCaptureTest {
                 compose.waitForIdle()
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
-            if (next == Scene.CHANNEL_CARD) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
-            if (next == Scene.CHANNEL_CARD && fontScale == 1f) {
-                // The card and the text block beside it stand on the same bottom edge; their heights differ.
+            if (next == Scene.IDENTITY_FOCUSED) compose.onNodeWithTag(PlayerTopIdentityTag).assertIsFocused()
+            if (next == Scene.RECENT_OPEN) compose.onNodeWithTag("player-identity-recent-0").assertIsFocused()
+            if (next == Scene.CHANNEL_ROWS_OPEN) compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).assertExists()
+            if (next == Scene.IDENTITY_FOCUSED && fontScale == 1f) {
+                // The artwork spans the programme text from the title's top to the Next line's bottom.
+                // At xhdpi each of the three text lines rounds up to a whole pixel, so Next ends up to
+                // 3px (1.5dp) lower; at mdpi they meet exactly (PlayerTopIdentityTest).
                 fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertEquals("the card and the last row share the bottom edge",
-                    bounds(PlayerIdentityCardTag).bottom, bounds("player-info-last-row").bottom, 1f)
+                val tile = bounds("player-info-artwork-tile")
+                assertEquals("the tile stands on the title's top", bounds("player-info-title").top, tile.top, 1f)
+                val next = bounds("player-info-last-row")
+                assertTrue("and ends with the Next line: $tile vs $next", next.bottom - tile.bottom in 0f..3.5f)
+                val row = bounds("player-timeline-labels")
+                assertTrue("the timeline row runs below both from margin to margin: $row",
+                    row.top >= tile.bottom && row.left == tile.left && row.right == 2f * (960f - 58f))
+                compose.onNodeWithTag("player-info-artwork", useUnmergedTree = true).assertExists()
             }
             if (next == Scene.PROGRAMME_SCHEDULE) compose.onNodeWithTag("details-schedule-42").assertIsFocused()
             if (next == Scene.RAIL_SCHEDULE) compose.onNodeWithTag("details-schedule-52").assertIsFocused()
@@ -455,16 +468,21 @@ class PlayerChromeCaptureTest {
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
             badges = playerGlanceBadges(diagnostics(true), TrackGlance(audioDescription = true, subtitles = true, teletext = true)),
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else LOGO,
+            artwork = programme.image.takeUnless { noEpg },
         )
         when (scene) {
             Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
-            Scene.CHANNEL_CARD, Scene.CHANNEL_RECENT -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
-                recentOpen = scene == Scene.CHANNEL_RECENT)
-            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content,
+            Scene.IDENTITY_FOCUSED, Scene.RECENT_OPEN -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
+                recentOpen = scene == Scene.RECENT_OPEN)
+            // The rows as the live player opens them, in its page: the strip stands where the identity was.
+            Scene.CHANNEL_ROWS_OPEN -> PlayerPage<Unit>(details = null, railExpanded = true,
+                nowPlaying = { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session) },
+                player = { Controls(timeshift, false, false, content, rows = true) }, programme = {})
+            Scene.RAIL_PEEK -> Controls(timeshift, false, false, content,
                 recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
                 QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
-                    Modifier.padding(horizontal = PlayerChromeTokens.gridMargin))
+                    Modifier.padding(horizontal = TvGridHorizontalMargin))
             })
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
@@ -615,7 +633,7 @@ class PlayerChromeCaptureTest {
             headerContent = { PlayerChromeHeader(content.clock, it) },
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            PlayerInfoBar(content.info, content.badges, recordingNow = content.recordingNow) { PlayerIdentityCard(content, loader, session, it) }
+            PlayerInfoBar(content.info) { Box(it.size(124.dp, 70.dp).background(TvSurfaceColors.containerLow)) }
             PlayerTimelineBlock(
                 progress = range.displayProgress,
                 tone = PlayerTimelineTone.PREVIEW,
@@ -708,8 +726,10 @@ class PlayerChromeCaptureTest {
         /** The step target's window; by default 3:53 behind live in [window]'s programme. */
         shown: ProgrammeWindow? = null,
         focus: String? = null,
-        /** Trial: the channel card, with three recent channels above it. */
+        /** Trial: the top identity's Recent row, with three recent channels, open. */
         recentOpen: Boolean = false,
+        /** The channel rows open below the controls. */
+        rows: Boolean = false,
         recordingChannels: Set<ChannelId> = emptySet(),
     ) {
         Box(Modifier.fillMaxSize()) {
@@ -732,9 +752,7 @@ class PlayerChromeCaptureTest {
             imageLoader = loader,
             currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
-            onChannelStep = { _, _ -> },
-            onChannelZap = { _, _ -> },
-            onCardClick = {},
+            onChannelZap = { _, _, _ -> },
             downHint = "Channels",
             recents = listOf(
                 RecentChannelPeek(SPORT_LOGO, "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
@@ -743,18 +761,26 @@ class PlayerChromeCaptureTest {
             ),
             onRecentPick = {},
             recentRowOpen = recentOpen,
-            decorationCoversControls = tray != null,
+            decorationCoversControls = tray != null || rows,
             controlsDecoration = { _, controls ->
                 QuickZapPresentation(
-                    expanded = tray != null,
+                    expanded = tray != null || rows,
+                    channelRows = rows,
                     channelContent = {
-                        if (tray != null) ChannelDrawer(
+                        if (rows) ChannelRows(
+                            channels = channels, playingChannelId = ChannelId(1), nowSec = NOW,
+                            schedule = { id -> when (id) {
+                                ChannelId(1) -> listOfNotNull(programme, next)
+                                ChannelId(2) -> listOf(trayProgramme)
+                                else -> emptyList()
+                            } },
+                            acquireSchedule = {}, imageLoader = loader, currentSession = session,
+                            onPickChannel = {}, onClose = {},
+                        ) else if (tray != null) ChannelDrawer(
                             channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
                             imageLoader = loader, currentSession = session, active = true, nowSec = NOW,
                             onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                            entryFocusId = ChannelId(1),
-                            inPlace = true,
                         )
                     },
                     preview = { tray?.invoke() },

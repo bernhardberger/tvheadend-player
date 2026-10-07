@@ -244,6 +244,9 @@ class PlayerMotionCaptureTest {
             compose.mainClock.advanceTimeBy(16, ignoreFrameDuration = true)
             capture("rail-opening-16ms", directory = "ui-page-scroll",
                 focus = "rail rising from below", timing = "16 ms after reveal start")
+            compose.mainClock.advanceTimeBy(104, ignoreFrameDuration = true)
+            capture("rail-opening-120ms", directory = "ui-page-scroll",
+                focus = "top identity shrinking into the now-playing strip", timing = "120 ms after reveal start")
             compose.mainClock.advanceTimeBy(1_000)
         }
         capture("$pair-rest", directory = "ui-page-scroll")
@@ -382,7 +385,7 @@ class PlayerMotionCaptureTest {
         PlayerChrome(
             mode = mode,
             content = PlayerChromeContent("20:15", liveInfoBarData(if (zapped) 2 else 1,
-                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, "")),
+                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ArtworkId(1)),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
                 nowSec = 1_800,
@@ -402,19 +405,15 @@ class PlayerMotionCaptureTest {
             controlsDecoration = { _, controls ->
                 if (rail == null) controls() else QuickZapPresentation(
                     expanded = rail.channelRailPresented,
-                    preview = { QuickZapTrayPreview(
-                        channel = channels.first(), event = programme, next = next,
-                        nowSec = 1_800, imageLoader = loader, currentSession = session,
-                        modifier = Modifier.padding(horizontal = PlayerChromeTokens.gridMargin),
-                    ) },
+                    channelRows = true,
+                    preview = {},
                     controls = controls,
                     channelContent = {
-                        ChannelDrawer(
-                            channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
-                            recordingChannelIds = emptySet(), nowEvent = { programme }, imageLoader = loader,
-                            currentSession = session, active = rail.channelDrawerOpen,
-                            nowSec = 1_800, onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                            onOpenSchedule = { _, _ -> }, entryFocusId = ChannelId(1), inPlace = true,
+                        ChannelRows(
+                            channels = channels, playingChannelId = ChannelId(1), nowSec = 1_800,
+                            schedule = { listOf(programme, next) }, acquireSchedule = {},
+                            imageLoader = loader, currentSession = session,
+                            onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
                         )
                     },
                 )

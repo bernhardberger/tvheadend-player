@@ -456,10 +456,12 @@ class LivePlayerChromeScreenTest {
         assertTrue(exists("player-top-cluster"))
         assertEquals("the controls open on Play/Pause", listOf("player-pause"), focused())
         assertEquals("Down is consumed: the pause was not toggled", playWhenReady, player.playWhenReady)
-        assertEquals("the card is the one focusable thing in the info bar", listOf("player-identity-card"),
+        assertEquals("nothing in the info bar takes focus: the channel stands at the top", emptyList<String?>(),
             (compose.onAllNodes(hasAnyAncestor(hasTestTag("player-info-bar")) and isFocusable()).fetchSemanticsNodes() +
                 compose.onAllNodes(hasTestTag("player-info-bar") and isFocusable()).fetchSemanticsNodes())
                 .map { it.config.getOrNull(SemanticsProperties.TestTag) })
+        assertEquals("the top identity takes focus", 1,
+            compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable()).fetchSemanticsNodes().size)
         assertFalse("the action row has no Info", exists("player-info"))
         assertEquals("the header clock is never focusable", 0,
             compose.onAllNodes(hasAnyAncestor(hasTestTag("player-top-cluster")) and isFocusable()).fetchSemanticsNodes().size)
@@ -558,15 +560,15 @@ class LivePlayerChromeScreenTest {
             compose.onAllNodes(hasAnyAncestor(hasTestTag("player-hidden-slot")) and isFocusable()).fetchSemanticsNodes().size)
     }
 
-    @Test fun atTheLiveEdgeTheBarRowIsPassiveAndUpReachesOnlyTheCard() {
+    @Test fun atTheLiveEdgeTheBarRowIsPassiveAndUpReachesOnlyTheTopIdentity() {
         liveChrome(behindLiveMs = 0)
         assertEquals(listOf("player-pause"), focused())
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the card is all there is above the seekbar", listOf("player-identity-card"), focused())
+        assertEquals("the top identity is all there is above the seekbar", listOf(PlayerTopIdentityTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down returns", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
         assertFalse(exists("player-go-live"))
         assertFalse(exists("player-status-slot"))
         assertFalse("the controls have no state cell; the Pause button speaks for playback", exists("player-state"))
@@ -575,7 +577,7 @@ class LivePlayerChromeScreenTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("player-live-state") and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
-    @Test fun behindLiveUpFromTheSeekbarReachesOnlyTheCard() {
+    @Test fun behindLiveUpFromTheSeekbarReachesOnlyTheTopIdentity() {
         liveChrome(behindLiveMs = 203_000)
         assertEquals(listOf("player-pause"), focused())
         assertEquals("Behind live", description("player-live-state"))
@@ -583,13 +585,11 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the card is all there is above the seekbar", listOf("player-identity-card"), focused())
+        assertEquals("the top identity is all there is above the seekbar", listOf(PlayerTopIdentityTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down returns", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
         assertFalse("no Go live node", exists("player-go-live"))
         assertFalse(exists("player-go-live-label"))
-        key(Key.DirectionDown)
-        assertEquals(listOf("player-pause"), focused())
     }
 
     @Test fun theControlsShowPausedThroughThePlayButtonNotAStateCell() {
@@ -754,7 +754,7 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("live-info-panel"))
     }
 
-    @Test fun playerBadgesComeFromTheSelectedTracksWithoutDiagnostics() {
+    @Test fun theLiveChromeShowsNoStreamBadgesAndStartsNoDiagnostics() {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
         }
@@ -785,16 +785,15 @@ class LivePlayerChromeScreenTest {
             val diagnostics = runtime.diagnostics.value
             assertTrue("Stats is closed: no format or frontend diagnostics",
                 diagnostics.video == null && diagnostics.audio == null && diagnostics.live == null)
-            // Badges describe only the confirmed playing channel.
+            // Trial: the stream badges have no place on the live chrome, with the tracks known.
             playerReady()
             compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
             settle()
             assertTrue(exists("player-banner"))
             val badges = badgeDescription("player-banner")
-            for (expected in listOf("1080 lines", "Video H.264", "Audio DD+ 5.1")) {
-                assertTrue("Banner badges '$badges' contain '$expected'", badges.contains(expected))
+            for (absent in listOf("lines", "Video", "Audio", "Signal-to-noise")) {
+                assertFalse("Banner '$badges' shows no badge ('$absent')", badges.contains(absent))
             }
-            assertFalse("no signal badge", badges.contains("Signal-to-noise"))
 
             // Without live Pause, Center explains over the Banner; Down opens the controls.
             key(Key.DirectionCenter)
@@ -805,9 +804,9 @@ class LivePlayerChromeScreenTest {
             } || compose.onAllNodesWithText("Pause isn't available", substring = true).fetchSemanticsNodes().isNotEmpty())
             key(Key.DirectionDown)
             assertTrue(exists("player-actions"))
-            val controls = badgeDescription("player-info-bar")
-            for (expected in listOf("1080 lines", "Video H.264", "Audio DD+ 5.1")) {
-                assertTrue("controls badges '$controls' contain '$expected'", controls.contains(expected))
+            val controls = identityDescription() + " | " + badgeDescription("player-footer")
+            for (absent in listOf("lines", "Video", "Audio")) {
+                assertFalse("controls '$controls' show no badge ('$absent')", controls.contains(absent))
             }
 
             // Programme Info never starts full diagnostics. Stats for nerds still owns them.
@@ -834,7 +833,7 @@ class LivePlayerChromeScreenTest {
         }
     }
 
-    @Test fun afterAZapNoBadgeShowsThePreviousChannelsFactsUntilTheNewChannelPlays() {
+    @Test fun noStreamBadgeShowsOnTheLiveChromeBeforeOrAfterAZap() {
         val connection = ScriptedSubscriptionConnection().apply {
             scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, null)))
         }
@@ -859,8 +858,8 @@ class LivePlayerChromeScreenTest {
             compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
             settle()
             val badgesA = badgeDescription("player-banner")
-            for (expected in listOf("1080 lines", "Video H.264")) {
-                assertTrue("A's badges '$badgesA' contain '$expected'", badgesA.contains(expected))
+            for (absent in listOf("lines", "Video", "Audio")) {
+                assertFalse("A's Banner '$badgesA' shows no badge ('$absent')", badgesA.contains(absent))
             }
 
             // Zap to B: the player still reports A's tracks and A's diagnostics.
@@ -875,7 +874,7 @@ class LivePlayerChromeScreenTest {
             assertTrue(exists("live-info-panel"))
             key(Key.Back)
             assertFalse(exists("live-info-panel"))
-            val staleControls = badgeDescription("player-info-bar")
+            val staleControls = identityDescription()
             for (stale in listOf("lines", "Video", "Audio")) {
                 assertFalse("B's controls '$staleControls' show no stale '$stale'", staleControls.contains(stale))
             }
@@ -899,9 +898,9 @@ class LivePlayerChromeScreenTest {
             compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Playing }
             settle()
             assertTrue(exists("player-info-bar"))
-            val badgesB = badgeDescription("player-info-bar")
-            for (expected in listOf("720 lines", "Video H.264")) {
-                assertTrue("B's badges '$badgesB' contain '$expected'", badgesB.contains(expected))
+            val badgesB = identityDescription() + " | " + badgeDescription("player-footer")
+            for (absent in listOf("lines", "Video", "Audio")) {
+                assertFalse("B's controls '$badgesB' show no badge ('$absent')", badgesB.contains(absent))
             }
             assertFalse(badgesB.contains("1080"))
             assertFalse(badgesB.contains("82 percent"))
@@ -1328,12 +1327,9 @@ class LivePlayerChromeScreenTest {
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun detailsScheduleScrollsSmoothlyAndRestoresViewport() = scheduleScroll(false)
+    fun detailsScheduleScrollsSmoothlyAndRestoresViewport() = scheduleScroll()
 
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun railScheduleScrollsSmoothlyAndRestoresViewport() = scheduleScroll(true)
-
-    private fun scheduleScroll(rail: Boolean) {
+    private fun scheduleScroll() {
         screen()
         val now = System.currentTimeMillis() / 1_000L
         session.publish(observation(now, (0..11).map {
@@ -1341,8 +1337,7 @@ class LivePlayerChromeScreenTest {
                 Instant.fromEpochSeconds(now + 1200 + it * 1800), title = "Programme $it", summary = "Summary")
         }))
         settle()
-        if (rail) { openInfoRail(); key(Key.DirectionDown) }
-        else { key(Key.Info); key(Key.DirectionUp); key(Key.DirectionRight); key(Key.DirectionDown) }
+        key(Key.Info); key(Key.DirectionUp); key(Key.DirectionRight); key(Key.DirectionDown)
         var node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
         val list = node.layoutInfo.getModifierInfo()
             .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
@@ -1353,16 +1348,16 @@ class LivePlayerChromeScreenTest {
         assertPageTopBand()
         val thumbnail = compose.onNodeWithTag("details-schedule-11", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
         val thumbnailLeft = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(thumbnail.size.width / 2f, 0f)).x - thumbnail.size.width / 2f
-        assertEquals("only details-tab content is inset", if (rail) 58f else 130f, thumbnailLeft, 0.5f)
+        assertEquals("only details-tab content is inset", 130f, thumbnailLeft, 0.5f)
         val thumbnailTop = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(0f, thumbnail.size.height / 2f)).y - thumbnail.size.height / 2f
         assertEquals("Now keeps trial.49's start position", 168f, thumbnailTop, 0.5f)
         assertEquals("peek fractions use the reference canvas", 960, view.width)
         assertEquals("peek fractions use the reference canvas", 540, view.height)
         assertEquals("row gap is fixed", 13, list.layoutInfo.mainAxisItemSpacing)
         assertEquals("viewport bleeds to the screen bottom", 540f, node.boundsInRoot.bottom, 0.5f)
-        val heading = compose.onNodeWithTag(if (rail) "details-heading" else "details-tabs", useUnmergedTree = true).fetchSemanticsNode()
+        val heading = compose.onNodeWithTag("details-tabs", useUnmergedTree = true).fetchSemanticsNode()
         assertTrue("peek stays below the headline/tabs", node.boundsInRoot.top >= heading.boundsInRoot.bottom)
-        println("SCHEDULE rail=$rail viewport=${list.layoutInfo.viewportSize.height}")
+        println("SCHEDULE viewport=${list.layoutInfo.viewportSize.height}")
         val failures = mutableListOf<String>()
         fun assertPeeks() {
             val viewport = node.boundsInRoot
@@ -1379,9 +1374,9 @@ class LivePlayerChromeScreenTest {
                 return (if (top) card.second - edge else edge - card.first) / (card.second - card.first)
             }
             if (list.canScrollBackward && fraction(true) !in 0.3f..0.55f)
-                failures += "top peek rail=$rail fraction=${fraction(true)} viewport=$viewport cards=$cards"
+                failures += "top peek fraction=${fraction(true)} viewport=$viewport cards=$cards"
             if (list.canScrollForward && fraction(false) !in 0.3f..0.55f)
-                failures += "bottom peek rail=$rail fraction=${fraction(false)} viewport=$viewport cards=$cards"
+                failures += "bottom peek fraction=${fraction(false)} viewport=$viewport cards=$cards"
         }
         assertPeeks()
         assertFalse("Now has no previous row", list.canScrollBackward)
@@ -1399,12 +1394,12 @@ class LivePlayerChromeScreenTest {
                 val top = coordinates.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
                 val bottom = coordinates.localToRoot(androidx.compose.ui.geometry.Offset(0f, coordinates.size.height.toFloat())).y
                 if (top < node.boundsInRoot.top - 1 || bottom > node.boundsInRoot.bottom + 1)
-                    failures += "focused row clipped rail=$rail down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
+                    failures += "focused row clipped down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
                 if ((list.canScrollBackward && top < node.boundsInRoot.top + 24f) ||
                     (list.canScrollForward && bottom > node.boundsInRoot.bottom - 32f))
-                    failures += "focused row enters fade rail=$rail down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
+                    failures += "focused row enters fade down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
             }
-            println("SCHEDULE rail=$rail down=$down offsets=$values")
+            println("SCHEDULE down=$down offsets=$values")
             if (values.zipWithNext().any { (a, b) -> if (down) b < a else b > a }) failures += "wrong direction: $values"
             if (values.last() != values.first() && values.distinct().size <= 2) failures += "single-frame jump: $values"
         }
@@ -1428,7 +1423,7 @@ class LivePlayerChromeScreenTest {
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
-        println("FADE rail=$rail back=${list.canScrollBackward} forward=${list.canScrollForward} pixels=" + listOf(2, 16, 32, view.height / 2, view.height - 3).map { bitmap.getPixel(400, it).toUInt().toString(16) })
+        println("FADE back=${list.canScrollBackward} forward=${list.canScrollForward} pixels=" + listOf(2, 16, 32, view.height / 2, view.height - 3).map { bitmap.getPixel(400, it).toUInt().toString(16) })
         assertTrue("top edge mask fades", android.graphics.Color.green(bitmap.getPixel(400, 2)) > 200)
         assertTrue("bottom edge mask fades", android.graphics.Color.green(bitmap.getPixel(400, view.height - 3)) > 200)
         assertEquals("centre stays opaque", 0, android.graphics.Color.green(bitmap.getPixel(400, view.height / 2)))
@@ -1650,117 +1645,43 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-more-info"), focused())
     }
 
-    @Test fun channelCardRailAnimatesOpenAndClosedWithoutReplacingControls() {
+    @Test fun topIdentityLeftAndRightChangeChannelLikeChannelKeysAndHoldingOpensNoRail() {
         screen()
-        key(Key.DirectionUp)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        val footer = compose.onNodeWithTag("player-footer").fetchSemanticsNode()
-        assertEquals(1f, pageAlpha(footer), 0.001f)
-        compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput {
-            keyDown(Key.DirectionRight)
-            advanceEventTime(600)
-            keyUp(Key.DirectionRight)
-        }
-        compose.mainClock.advanceTimeBy(96)
-        compose.waitForIdle()
-        val openingFooter = compose.onNodeWithTag("player-footer", useUnmergedTree = true).fetchSemanticsNode()
-        val openingAlpha = pageAlpha(openingFooter)
-        assertTrue("rail is partway open, footer alpha=$openingAlpha", openingAlpha > 0f && openingAlpha < 1f)
-        assertEquals("opening preserves the controls composition", footer.id, openingFooter.id)
-        assertFalse("the schedule peek is not composed during the card reveal", exists("details-heading"))
-        settle()
-        assertEquals(listOf("player-channel-card-2"), focused())
-        assertEquals(0f, pageAlpha(openingFooter), 0.001f)
-        assertTrue(exists("details-heading"))
-        compose.onRoot().performKeyInput { pressKey(Key.Back) }
-        compose.mainClock.advanceTimeBy(96)
-        compose.waitForIdle()
-        val closingFooter = compose.onNodeWithTag("player-footer", useUnmergedTree = true).fetchSemanticsNode()
-        val closingAlpha = pageAlpha(closingFooter)
-        assertTrue("the rail folds away at once and the footer returns, alpha=$closingAlpha", closingAlpha > 0f)
-        compose.mainClock.advanceTimeBy(160)
-        compose.waitForIdle()
-        assertFalse("the peek is gone during collapse", exists("details-heading"))
-        assertEquals("closing preserves the controls composition", footer.id, closingFooter.id)
-        settle()
-        assertEquals(1f, pageAlpha(closingFooter), 0.001f)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        compose.mainClock.autoAdvance = true
-    }
-
-    @Test fun withSteppingOffHoldingLeftOrRightOnTheChannelCardDoesNotOpenTheRailAndTheRecordActionIsGone() {
-        screen(channelCardStepping = false)
         assertFalse("the live controls have no Record action", exists("player-record"))
         key(Key.DirectionUp)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals("Up reveals the controls onto the top identity", listOf(PlayerTopIdentityTag), focused())
+        key(Key.DirectionRight)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertEquals("focus stays on the identity", listOf(PlayerTopIdentityTag), focused())
         compose.onRoot().performKeyInput {
-            keyDown(Key.DirectionRight)
+            keyDown(Key.DirectionLeft)
             advanceEventTime(600)
-            keyUp(Key.DirectionRight)
+            keyUp(Key.DirectionLeft)
         }
         settle()
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertFalse("no rail opens", exists("player-channel-card-2"))
-        assertEquals("focus stays on the card", listOf(PlayerIdentityCardTag), focused())
+        assertEquals("a held Left steps back like CH-", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse("no rail opens", exists("player-channel-rows") || exists("player-channel-shelf"))
+        assertEquals("focus stays on the identity", listOf(PlayerTopIdentityTag), focused())
+        assertTrue(identityDescription().contains("Name 1"))
     }
 
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun playerInfoRailDownOpensFocusedChannelsScheduleAndBackRestoresTheRail() {
+    @Test fun topIdentityOkOpensTheRecentRowWhichBackClosesOntoTheIdentityAndOkTunes() {
+        // Channel 2 played last, before channel 3.
+        runBlocking { LastPlayedChannelStore(context).run { setChannelId(ChannelId(3)); setChannelId(ChannelId(2)) } }
         screen()
-        publishRailProgrammes()
-        openInfoRail()
-        assertFalse(exists("player-rail-key-hints"))
-        assertTrue(texts("details-heading").contains("Name 1"))
-        key(Key.DirectionRight)
-        assertTrue(texts("details-heading").contains("Name 2"))
-        val header = compose.onNodeWithTag("details-heading", useUnmergedTree = true).fetchSemanticsNode()
-        assertEquals(0.55f, pageAlpha(header), 0.001f)
-        assertEquals(0f, pageAlpha(compose.onNodeWithTag("details-player-hint", useUnmergedTree = true).fetchSemanticsNode()), 0f)
-        val railCard = compose.onNodeWithTag("player-channel-card-1", useUnmergedTree = true).fetchSemanticsNode()
-        assertEquals("peek uses the rail's first-column keyline", railCard.layoutInfo.coordinates.positionInRoot().x,
-            header.layoutInfo.coordinates.positionInRoot().x, 1f)
-        val farCard = compose.onNodeWithTag("player-channel-card-3", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        assertEquals(listOf("player-channel-card-2"), focused())
-        key(Key.DirectionDown)
-        assertEquals("the peek is the schedule header, not a replacement", header.id,
-            compose.onNodeWithTag("details-heading", useUnmergedTree = true).fetchSemanticsNode().id)
-        assertTrue("the rail leaves fully above the viewport",
-            farCard.positionInRoot().y + farCard.size.height <= 0f)
-        assertEquals(listOf("details-schedule-21"), focused())
-        assertEquals("schedule headline stays on the rail keyline", railCard.layoutInfo.coordinates.positionInRoot().x,
-            header.layoutInfo.coordinates.positionInRoot().x, 1f)
-        val thumbnail = compose.onNodeWithTag("details-schedule-21", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        // Focus scales the first thumbnail around its centre; compare the underlying layout keyline.
-        val thumbnailLeft = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(thumbnail.size.width / 2f, 0f)).x - thumbnail.size.width / 2f
-        assertEquals("schedule thumbnails share the headline keyline", header.layoutInfo.coordinates.positionInRoot().x,
-            thumbnailLeft, 1f)
-        assertFalse(exists("details-tab-0"))
-        assertFalse(exists("details-tab-1"))
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        repeat(8) { settle() }
-        assertTrue("the layer cannot time out with the rail", exists("live-info-panel"))
+        key(Key.DirectionUp)
+        assertEquals(listOf(PlayerTopIdentityTag), focused())
         key(Key.DirectionCenter)
-        assertEquals(listOf("details-watch"), focused())
+        assertEquals("OK opens the row onto the newest recent channel", listOf("player-identity-recent-0"), focused())
+        assertEquals("the opening OK tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         key(Key.Back)
-        assertEquals(listOf("details-schedule-21"), focused())
-        compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput { pressKey(Key.Back) }
-        compose.mainClock.advanceTimeBy(300)
-        assertTrue("the same rail cards remain composed", farCard.isAttached)
-        val position = farCard.positionInRoot()
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        var brightest = 0
-        for (x in position.x.toInt().coerceAtLeast(0) until (position.x + farCard.size.width).toInt().coerceAtMost(bitmap.width))
-            for (y in position.y.toInt().coerceAtLeast(0) until (position.y + farCard.size.height).toInt().coerceAtMost(bitmap.height))
-                brightest = maxOf(brightest, android.graphics.Color.red(bitmap.getPixel(x, y)))
-        bitmap.recycle()
-        assertTrue("return paints the far card without replaying the sideways reveal: $brightest", brightest > 180)
-        settle()
-        compose.mainClock.autoAdvance = true
-        assertFalse(exists("live-info-panel"))
-        assertEquals(listOf("player-channel-card-2"), focused())
+        assertFalse("Back closes the row", exists("player-identity-recent-row"))
+        assertEquals("and returns to the identity", listOf(PlayerTopIdentityTag), focused())
+        assertTrue("the controls stay", exists("player-actions"))
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        assertEquals("OK on a recent channel tunes it", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertEquals(listOf(PlayerTopIdentityTag), focused())
     }
 
     @Test fun programInfoMovesElementsNotSectionsThenRestoresFocusAndDisposesDetails() {
@@ -1820,19 +1741,13 @@ class LivePlayerChromeScreenTest {
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun controlsPageScrimFadesMonotonicallyDownAndBack() = pageScrimSeries(rail = false)
-
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun railPageScrimFadesMonotonicallyDownAndBack() = pageScrimSeries(rail = true)
+    fun controlsPageScrimFadesMonotonicallyDownAndBack() = pageScrimSeries()
 
     private val scrimUnderTest = mutableStateOf<Modifier?>(null)
 
-    private fun pageScrimSeries(rail: Boolean) {
+    private fun pageScrimSeries() {
         screen()
-        if (rail) {
-            publishRailProgrammes()
-            openInfoRail()
-        } else key(Key.DirectionDown)
+        key(Key.DirectionDown)
         compose.mainClock.autoAdvance = false
         // Mirror the actual viewport draw modifier over white, without chrome/content occluding
         // the sample points. It reads the production screen's live scrim inputs and page clock.
@@ -1856,19 +1771,19 @@ class LivePlayerChromeScreenTest {
         val failures = mutableListOf<String>()
         for (down in listOf(true, false)) {
             val frames = mutableListOf(sample())
-            compose.onRoot().performKeyInput { pressKey(if (!down) Key.Back else if (rail) Key.DirectionDown else Key.Info) }
+            compose.onRoot().performKeyInput { pressKey(if (!down) Key.Back else Key.Info) }
             repeat(36) {
                 compose.mainClock.advanceTimeBy(16)
                 frames += sample()
             }
-            println("SCRIM rail=$rail down=$down " + frames.filterIndexed { index, _ -> index % 2 == 0 }
+            println("SCRIM down=$down " + frames.filterIndexed { index, _ -> index % 2 == 0 }
                 .mapIndexed { index, values -> "${index * 32}:" + values.joinToString(",") { "%.3f".format(java.util.Locale.ROOT, it) } }.joinToString(";"))
             assertTrue("the sampled scrim actually changes between the two rests",
                 if (down) frames.last()[1] > frames.first()[1] + 0.1f else frames.last()[1] < frames.first()[1] - 0.1f)
             frames.zipWithNext().forEachIndexed { index, (from, to) ->
                 from.indices.forEach { y ->
                     if (if (down) to[y] < from[y] - 1.01f / 255 else to[y] > from[y] + 1.01f / 255)
-                        failures += "rail=$rail down=$down at ${(index + 1) * 16}ms y=${y * 20 + 10}%: ${from[y]} -> ${to[y]}"
+                        failures += "down=$down at ${(index + 1) * 16}ms y=${y * 20 + 10}%: ${from[y]} -> ${to[y]}"
                 }
             }
         }
@@ -1898,55 +1813,23 @@ class LivePlayerChromeScreenTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun playerInfoRailKeepsWatchHiddenForThePlayingChannel() {
+    @Test fun rowsOpenALaterProgrammesDetailsAndTheNowTileTunesAndClosesTheLayers() {
         screen()
-        openInfoRail()
+        publishRailProgrammes()
+        openRows()
         key(Key.DirectionDown)
+        key(Key.DirectionRight)
         key(Key.DirectionCenter)
-        assertFalse(exists("details-watch"))
-        assertEquals(listOf("live-info-record"), focused())
-        key(Key.Back)
-        assertEquals(listOf("details-schedule-11"), focused())
-    }
-
-    @Test fun playerInfoRailScheduleUpRestoresTheFocusedChannel() {
-        screen()
-        publishRailProgrammes()
-        openInfoRail()
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
-        key(Key.DirectionUp)
-        assertFalse(exists("live-info-panel"))
-        assertEquals(listOf("player-channel-card-2"), focused())
+        assertTrue("a later programme opens its details", exists("live-info-panel"))
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-    }
-
-    @Test fun railScheduleHeadlineNeverOvertakesTheTilesDownOrBack() {
-        screen()
-        publishRailProgrammes()
-        openInfoRail()
-        key(Key.DirectionRight)
-        assertTrue("strip names the watched channel, not the browsed one", texts("player-now-playing").contains("Name 1"))
-        assertFalse(texts("player-now-playing").contains("Name 2"))
-        val header = compose.onNodeWithTag("details-heading", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        val tile = compose.onNodeWithTag("player-channel-card-1", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        val strip = compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).fetchSemanticsNode()
-        val stripMotion = compose.onNodeWithTag("player-now-playing-motion", useUnmergedTree = true).fetchSemanticsNode()
-        val stripBounds = strip.boundsInRoot
-        compose.mainClock.autoAdvance = false
-        for (key in listOf(Key.DirectionDown, Key.Back)) {
-            compose.onRoot().performKeyInput { pressKey(key) }
-            repeat(40) { frame ->
-                compose.mainClock.advanceTimeBy(16)
-                compose.waitForIdle()
-                val headingTop = header.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
-                val tileBottom = tile.localToRoot(androidx.compose.ui.geometry.Offset(0f, tile.size.height.toFloat())).y
-                assertTrue("$key at ${frame * 16}ms: headline $headingTop overtakes tile $tileBottom", headingTop >= tileBottom)
-                assertEquals("strip position stays pinned", stripBounds, strip.boundsInRoot)
-                assertEquals("strip never fades between rail and schedule", 1f, pageAlpha(stripMotion), 0.001f)
-                assertPageTopBand()
-            }
-        }
+        key(Key.Back)
+        assertFalse(exists("live-info-panel"))
+        assertEquals("Back returns to the rows", listOf("player-channel-row-2-tile-1"), focused())
+        key(Key.DirectionLeft)
+        key(Key.DirectionCenter)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("player-channel-rows"))
     }
 
     private fun assertPageTopBand() {
@@ -1962,46 +1845,10 @@ class LivePlayerChromeScreenTest {
         assertFalse(strip.config.contains(SemanticsProperties.Focused))
     }
 
-    @Test fun playerInfoWatchTunesTheRailChannelAndClosesTheLayers() {
-        screen()
-        publishRailProgrammes()
-        openInfoRail()
-        key(Key.DirectionRight)
+    private fun openRows() {
         key(Key.DirectionDown)
-        key(Key.DirectionCenter)
-        key(Key.DirectionCenter)
-        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertFalse(exists("live-info-panel"))
-        assertFalse(exists("player-channel-shelf"))
-    }
-
-    @Test fun playerInfoRailWithoutEpgOffersWatchAndReturnsToTheSameChannel() {
-        screen()
-        openInfoRail()
-        key(Key.DirectionRight)
         key(Key.DirectionDown)
-        assertEquals(listOf("details-watch"), focused())
-        assertTrue(texts("live-info-panel").contains("Name 2"))
-        assertEquals("Channels", texts("details-player-hint"))
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-info-reading"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-channel-card-2"), focused())
-        key(Key.DirectionDown)
-        key(Key.Back)
-        assertEquals(listOf("player-channel-card-2"), focused())
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
-        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertFalse(exists("live-info-panel"))
-    }
-
-    private fun openInfoRail() {
-        key(Key.DirectionDown)
-        compose.onNodeWithTag(PlayerIdentityCardTag).performSemanticsAction(SemanticsActions.RequestFocus)
-        settle()
-        key(Key.DirectionCenter)
-        assertEquals(listOf("player-channel-card-1"), focused())
+        assertEquals(listOf("player-channel-row-1-tile-0"), focused())
     }
 
     private fun confirmInfoAction() {
@@ -2029,6 +1876,10 @@ class LivePlayerChromeScreenTest {
     }
 
     private fun idleMainLooper() = shadowOf(Looper.getMainLooper()).idle()
+
+    /** Live's controls name the channel and its badges in the top identity's description. */
+    private fun identityDescription(): String = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
+        .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription).orEmpty().joinToString(" | ")
 
     private fun badgeDescription(tag: String): String =
         compose.onAllNodes(hasAnyAncestor(hasTestTag(tag)), useUnmergedTree = true).fetchSemanticsNodes()
@@ -2075,14 +1926,12 @@ class LivePlayerChromeScreenTest {
         }
     }
 
-    @Test fun channelUpBrowsesTheOpenRailInsteadOfTuning() {
+    @Test fun channelUpDoesNotTuneWhileTheRowsAreOpen() {
         screen()
-        openInfoRail()
-        assertEquals(listOf("player-channel-card-1"), focused())
+        openRows()
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertTrue("the rail stays open", exists("player-channel-shelf"))
-        assertEquals(listOf("player-channel-card-2"), focused())
+        assertTrue("the rows stay open", exists("player-channel-rows"))
     }
 
     @Test fun channelUpTunesWithTheRailClosed() {
@@ -2174,7 +2023,6 @@ class LivePlayerChromeScreenTest {
         )
 
     private fun screen(
-        channelCardStepping: Boolean = true,
         onClose: () -> Unit = {},
         failing: Boolean = false,
         fontScale: Float = 1f,
@@ -2254,7 +2102,7 @@ class LivePlayerChromeScreenTest {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
-                            contentAllowed = contentAllowed(), notices = notices, channelCardStepping = channelCardStepping,
+                            contentAllowed = contentAllowed(), notices = notices,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                         scrimUnderTest.value?.let { Box(Modifier.fillMaxSize().background(Color.White).then(it)) }

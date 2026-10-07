@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
@@ -146,26 +149,6 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("channel-tuning-indicator", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test fun inPlaceRailStartsAtEntryWithoutComposingTheStartOfTheCatalog() {
-        val catalog = (1L..100L).map { Channel.create(id = ChannelId(it), number = it, name = "Channel $it") }
-        val composedChannels = mutableSetOf<ChannelId>()
-        compose.setContent {
-            val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme {
-                ChannelDrawer(catalog, ChannelId(50), ChannelId(50), recordingChannelIds = emptySet(),
-                    nowEvent = { composedChannels += it; null }, imageLoader = loader,
-                    onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                    inPlace = true, entryFocusId = ChannelId(50))
-            }
-        }
-        compose.waitForIdle()
-        compose.onNodeWithTag("player-channel-card-50").assertIsFocused()
-        assertFalse("do not measure the start then jump to the entry card", ChannelId(1) in composedChannels)
-        assertTrue("only the viewport and one reserve card per side: $composedChannels", composedChannels.size <= 8)
-        println("RAIL_INITIAL_COMPOSITION count=${composedChannels.size}")
-    }
-
     @Test fun zeroAlphaPageContentDoesNotDraw() {
         var progress by mutableStateOf(0f)
         var draws = 0
@@ -187,72 +170,6 @@ class QuickZapPresentationTest {
         compose.runOnIdle { progress = 1f }
         draw()
         assertTrue(draws > 0)
-    }
-
-    @Test fun identityAndFocusedRailCardHaveTheSameGeometry() {
-        val inspectorEnabled = androidx.compose.ui.platform.isDebugInspectorInfoEnabled
-        androidx.compose.ui.platform.isDebugInspectorInfoEnabled = true
-        try {
-            val channel = channels.first()
-            compose.setContent {
-                view = LocalView.current
-                val loader = remember { ImageLoader(view.context) }
-                TVHeadendPlayerTheme {
-                    Box(Modifier.fillMaxSize()) {
-                        Box(Modifier.padding(start = 58.dp, top = 30.dp)) {
-                            PlayerIdentityCard(PlayerChromeContent("", PlayerInfoBarData("1", lineUp.first().name, "", ""),
-                                picon = channel.icon), loader, null, onClick = {}, channelCard = true, held = true)
-                        }
-                        Box(Modifier.padding(top = 230.dp)) {
-                            ChannelDrawer(listOf(channel), channel.id, channel.id, recordingChannelIds = emptySet(),
-                                nowEvent = { null }, imageLoader = loader, onFocusChannel = {}, onPickChannel = {},
-                                onCloseDrawer = {}, inPlace = true, entryFocusId = channel.id)
-                        }
-                    }
-                }
-            }
-            compose.waitForIdle()
-            fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
-            fun rect(tag: String, card: String): androidx.compose.ui.geometry.Rect {
-                val parent = node(card).layoutInfo.coordinates
-                return parent.localBoundingBoxOf(node(tag).layoutInfo.coordinates, clipBounds = false)
-            }
-            fun label(tag: String, card: String): List<Float> {
-                val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                node(tag).config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
-                val text = results.single()
-                val bounds = rect(tag, card)
-                return listOf(bounds.left, bounds.top, text.firstBaseline + bounds.top,
-                    text.getBoundingBox(text.layoutInput.text.text.indexOf("Ridge")).left + bounds.left, bounds.width)
-            }
-            fun corner(card: String): Float = node(card).layoutInfo.getModifierInfo()
-                .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
-                .filter { it.nameFallback == "graphicsLayer" }.mapNotNull { layer ->
-                    @Suppress("UNCHECKED_CAST")
-                    val block = layer.inspectableElements.firstOrNull { it.name == "block" }?.value as? (androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit)
-                    val shape = block?.let { androidx.compose.ui.graphics.GraphicsLayerScope().apply(it).shape }
-                        ?: layer.inspectableElements.firstOrNull { it.name == "shape" }?.value as? androidx.compose.ui.graphics.Shape
-                    (shape?.createOutline(androidx.compose.ui.geometry.Size(196f, 110f),
-                        androidx.compose.ui.unit.LayoutDirection.Ltr, Density(1f)) as? androidx.compose.ui.graphics.Outline.Rounded)
-                        ?.roundRect?.topLeftCornerRadius?.x
-                }.first()
-            val identity = "player-identity-card"
-            val rail = "player-channel-card-1"
-            // Only the rail's card carries the label; the player's card leads the info bar's text with it instead.
-            println("CARD_GEOMETRY identitySize=${node(identity).layoutInfo.coordinates.size} railSize=${node(rail).layoutInfo.coordinates.size} " +
-                "identityPicon=${rect("player-identity-logo", identity)} railPicon=${rect("player-channel-1-picon", rail)} " +
-                "railLabel=${label("player-channel-1-identity", rail)} identityCorner=${corner(identity)} railCorner=${corner(rail)}")
-            assertEquals(node(identity).layoutInfo.coordinates.size, node(rail).layoutInfo.coordinates.size)
-            // The rail's picon is lifted clear of its label; the player's card has none and centres it.
-            val identityPicon = rect("player-identity-logo", identity)
-            val railPicon = rect("player-channel-1-picon", rail)
-            assertEquals(identityPicon.size, railPicon.size)
-            assertEquals(identityPicon.left, railPicon.left, 0.01f)
-            assertEquals(identityPicon.top, railPicon.top + 6f, 0.01f)
-            assertEquals(corner(identity), corner(rail), 0.01f)
-        } finally {
-            androidx.compose.ui.platform.isDebugInspectorInfoEnabled = inspectorEnabled
-        }
     }
 
     @Test fun railPeekWaitsForRevealAndCanReverseDuringItsFade() {
@@ -365,9 +282,9 @@ class QuickZapPresentationTest {
         val second = tile(2, 1).fetchSemanticsNode().boundsInRoot
         assertEquals(PlayerChromeTokens.channelCardWidth.value, second.width, 1f)
         assertEquals(PlayerChromeTokens.channelCardHeight.value, second.height, 1f)
-        assertEquals(PlayerChromeTokens.gridMargin.value, tile(2, 0).fetchSemanticsNode().boundsInRoot.left, 1f)
-        assertEquals(PlayerChromeTokens.gridMargin.value + 196f + PlayerChromeTokens.gridGutter.value, second.left, 1f)
-        assertEquals(960f - PlayerChromeTokens.gridMargin.value, tile(2, 3).fetchSemanticsNode().boundsInRoot.right, 1f)
+        assertEquals(TvGridHorizontalMargin.value, tile(2, 0).fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals(TvGridHorizontalMargin.value + 196f + TvGridGutter.value, second.left, 1f)
+        assertEquals(960f - TvGridHorizontalMargin.value, tile(2, 3).fetchSemanticsNode().boundsInRoot.right, 1f)
         assertTrue(tile(2, 4).fetchSemanticsNode().boundsInRoot.left < 960f)
         // Small chips: the start time inside the image bottom-left; "On now" only on the now tile, top-right.
         val start = part(2, 1, "start")
@@ -415,12 +332,12 @@ class QuickZapPresentationTest {
         tile(2, 6).assertIsFocused()
         assertTrue("the row scrolls with focus: ${tile(2, 6).fetchSemanticsNode().boundsInRoot}",
             tile(2, 6).fetchSemanticsNode().boundsInRoot.right <=
-            960f - PlayerChromeTokens.gridMargin.value + 1f)
+            960f - TvGridHorizontalMargin.value + 1f)
         capture("rows-later-programme")
         key(Key.DirectionDown)
         tile(3, 0).assertIsFocused()
         assertEquals("the row left behind settles back to its now tile",
-            PlayerChromeTokens.gridMargin.value, tile(2, 0).fetchSemanticsNode().boundsInRoot.left, 1f)
+            TvGridHorizontalMargin.value, tile(2, 0).fetchSemanticsNode().boundsInRoot.left, 1f)
         key(Key.DirectionDown)
         tile(4, 0).assertIsFocused()
         assertEquals(anchor, rowTop(4), 1f)
@@ -947,7 +864,7 @@ class QuickZapPresentationTest {
     }
 
     @Test fun downFromAnActionOpensTheRailOnThePlayingChannelAndUpReturnsToThatAction() {
-        content(inPlace = true)
+        content()
         for (close in listOf(Key.DirectionUp, Key.Back)) {
             repeat(4) {
                 if (!isFocused("player-settings")) key(Key.DirectionRight)
@@ -994,7 +911,7 @@ class QuickZapPresentationTest {
         compose.waitForIdle()
         val tray = compose.onNodeWithTag("player-zap-tray").fetchSemanticsNode().boundsInRoot
         assertTrue("the rail rises from below: $rising then ${tray.top}", rising > tray.top)
-        assertEquals("the rail rests above the bottom safe area", 540f - 36f, tray.bottom, 0.5f)
+        assertEquals("the rail rests above the bottom safe area", 540f - TvGridVerticalMargin.value, tray.bottom, 0.5f)
         compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
         repeat(2) { compose.mainClock.advanceTimeByFrame() }
         compose.mainClock.advanceTimeBy(48)
@@ -1008,7 +925,6 @@ class QuickZapPresentationTest {
     private fun content(
         fontScale: Float = 1f,
         bright: Boolean = false,
-        inPlace: Boolean = false,
         rows: Boolean = false,
         rowsEmpty: Boolean = false,
         rowsLoading: Boolean = false,
@@ -1121,8 +1037,6 @@ class QuickZapPresentationTest {
                                         if (it != null) layers.beginOpeningKeyCycle(it)
                                         layers.dismissChannelDrawer()
                                     },
-                                    entryFocusId = playing.takeIf { inPlace },
-                                    inPlace = inPlace,
                                 )
                               },
                             ) },

@@ -9,13 +9,13 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 
 internal object PlayerChromeTokens {
     val chipShape = RoundedCornerShape(4.dp)
+    /** Behind a chip's text over a picture or video: the kit's 60% scrim step. */
+    val chipScrim = Color.Black.copy(alpha = 0.60f)
     val heroShape = RoundedCornerShape(12.dp)
     val badgeShape = RoundedCornerShape(2.dp)
     val chipHeight = 24.dp
     val badgeHeight = 18.dp
     val badgeGap = 6.dp
-    /** Eyebrow text to the badges on the same line. */
-    val eyebrowBadgeGap = 12.dp
     val identityWidth = 128.dp
     val identityHeight = 72.dp
     val heroWidth = 360.dp
@@ -25,20 +25,20 @@ internal object PlayerChromeTokens {
     val previewSlotHeight = 96.dp
     val previewCardGap = 16.dp
 
-    /** Trial: Google TV's 960×540dp layout grid: 58dp side margins, 20dp gutters. */
-    val gridMargin = 58.dp
-    val gridGutter = 20.dp
+    /**
+     * The timeline row's distance to the action row, for live and recordings alike; with the row's
+     * 8dp below its labels and the 40dp buttons' 8dp around the glyph it leaves 24dp to the icons.
+     */
+    val timelineActionGap = 4.dp
     /** Trial: the channel card and the rail's cards, three grid columns wide. */
     val channelCardWidth = 196.dp
     val channelCardHeight = 110.dp
-    /** Trial: a wide standard card's text, 16dp beside the card. */
-    val identityTextGap = 16.dp
     /** Trial: the channel cards' focus growth; 1.05 stays clear of the margin and the arrow lanes. */
     const val cardFocusedScale = 1.05f
     /** Trial: a row title's height above a card row. */
     val rowTitleGap = 8.dp
 
-    /** Full-width top fade behind the clock: 0.64 at the edge, 0.40 at 56dp, clear at 112dp. */
+    /** Full-width top fade behind the clock: 0.72 at the edge, 0.48 at 56dp, clear at 112dp. */
     val topScrimHeight = 112.dp
     val topScrimStops = arrayOf(
         0f to Color.Black.copy(alpha = 0.72f),
@@ -62,13 +62,4 @@ internal object PlayerChromeTokens {
             startY = 0f, endY = height,
         )
     }
-
-    /** The quick-zap tray's own scrim, anchored to its bottom edge: a 356dp span. */
-    val bottomScrimSpan = 356.dp
-    val bottomScrimStops = arrayOf(
-        0f to Color.Transparent,
-        64f / 356f to Color.Black.copy(alpha = 0.60f),
-        116f / 356f to Color.Black.copy(alpha = 0.80f),
-        1f to Color.Black.copy(alpha = 0.92f),
-    )
 }

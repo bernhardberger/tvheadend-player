@@ -25,7 +25,13 @@ val TvBrowseTrailingInset = 58.dp
 
 // ---- Product opacity ----
 const val TvTextPrimaryAlpha = 1.00f
-const val TvTextSecondaryAlpha = 0.88f
+/** Descriptions and subtitles: the kit's 80% step. */
+const val TvTextSecondaryAlpha = 0.80f
+/**
+ * Overlines and quiet metadata. The kit's 60% step is drawn on solid surfaces; ours sits
+ * over video and see-through panels, where 60% falls below 4.5:1 over a bright frame
+ * (ThemeColorContractTest). 0.68 is the floor, so this keeps 0.72.
+ */
 const val TvTextTertiaryAlpha = 0.72f
 const val TvTextDisabledAlpha = 0.38f
 /**
@@ -93,10 +99,6 @@ val SettingsDepthRowMinHeight = 56.dp
 val TvProgressStripHeight = 4.dp
 
 // ---- Player overlay geometry ----
-val TvOverlaySidePadding = TvSpacing56
-val TvOverlayTopPadding = TvSpacing32
-val TvOverlayBottomPadding = 36.dp
-
 /** Gradient run-out, not content spacing. Do not unify with the paddings. */
 val TvOverlayHeaderGradientRunout = 72.dp
 val TvOverlayFooterGradientRunout = 56.dp
@@ -128,8 +130,6 @@ val TvOverlayStatusRowHeight
 val TvOverlayTimelineLabelGap = TvSpacing12
 val TvOverlayTimelineBlockGap = TvSpacing24
 
-val TvOverlayActionButtonSize = 48.dp
-val TvOverlayTimelineActionGap = 4.dp
 val TvOverlayActionGap = TvSpacing8
 val TvOverlayActionGroupGap = TvSpacing24
 /** Separation before the terminal Stop action. */

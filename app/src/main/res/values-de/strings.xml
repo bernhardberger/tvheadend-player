@@ -514,8 +514,9 @@
     </plurals>
     <string name="player_channel">Sender</string>
     <string name="player_row_recent">Zuletzt gesehen</string>
-    <string name="player_channel_card_hint">Sender. Links oder rechts wechselt den Sender, gedrückt halten öffnet die Senderliste, oben zeigt zuletzt gesehene Sender, OK öffnet die Senderliste.</string>
-    <string name="player_channel_card_hint_fixed">Sender. Oben zeigt zuletzt gesehene Sender, OK öffnet die Senderliste.</string>
+    <string name="player_channel_card_hint">Links oder rechts wechselt den Sender, OK zeigt zuletzt gesehene Sender.</string>
+    <string name="player_identity_info_hint">OK zeigt die Sendungsinfo.</string>
+    <string name="player_channel_card_hint_no_recents">Links oder rechts wechselt den Sender.</string>
     <string name="player_rail_watching">Läuft</string>
     <!-- Trial: program details -->
     <string name="details_tab_details">Details</string>

@@ -15,6 +15,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import coil3.ImageLoader
@@ -42,20 +44,20 @@ fun QuickZapPreview(
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(metadata, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f))
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha))
             Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface)
             // A sports title says which event; its subtitle says which session.
             subtitle?.let {
                 Text(it, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f))
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha))
             }
             summary?.takeIf { it.isNotBlank() && it != subtitle }?.let {
                 Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f))
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha))
             }
             next?.let { Text(stringResource(R.string.player_next, it), style = MaterialTheme.typography.labelLarge,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)) }
+                maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)) }
         }
     }
 }

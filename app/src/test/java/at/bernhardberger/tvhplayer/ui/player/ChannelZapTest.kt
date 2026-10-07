@@ -29,8 +29,8 @@ class ChannelZapTest {
         private var pending: Job? = null
         val tunes = mutableListOf<Pair<Int, Long>>()
 
-        fun press(channel: Int, atMs: Long) {
-            pending = scope.scheduleChannelZap(pending, pacer.settleDelayMs(atMs)) {
+        fun press(channel: Int, atMs: Long, repeat: Boolean = false) {
+            pending = scope.scheduleChannelZap(pending, pacer.settleDelayMs(atMs, repeat)) {
                 tunes += channel to (scope as TestScope).currentTime
             }
         }
@@ -57,19 +57,91 @@ class ChannelZapTest {
         }
         advanceUntilIdle()
 
-        // Last press at 400 ms, settled CHANNEL_ZAP_SETTLE_MS later.
-        assertEquals(listOf(2 to 0L, 6 to 400L + CHANNEL_ZAP_SETTLE_MS), zapper.tunes)
+        // Last press at 400 ms, the series settled CHANNEL_ZAP_SERIES_MS later.
+        assertEquals(listOf(2 to 0L, 6 to 400L + CHANNEL_ZAP_SERIES_MS), zapper.tunes)
     }
 
     @Test
-    fun pressAfterTheWindowTunesAtOnceAgain() = runTest {
+    fun tapsAtANormalRhythmTuneTheFirstAtOnceAndOnlyTheLastOnceTheSeriesSettles() = runTest {
+        val zapper = Zapper(this)
+
+        for (channel in 2..7) {
+            zapper.press(channel, atMs = currentTime)
+            runCurrent()
+            if (channel == 2) assertEquals("the first tap tunes at once", listOf(2 to 0L), zapper.tunes)
+            else assertEquals("a later tap only moves the selection", listOf(2 to 0L), zapper.tunes)
+            advanceTimeBy(450)
+        }
+        advanceUntilIdle()
+
+        // Six taps 450 ms apart, the last at 2250 ms: one trailing tune, of the last channel.
+        assertEquals(listOf(2 to 0L, 7 to 2_250L + CHANNEL_ZAP_SERIES_MS), zapper.tunes)
+    }
+
+    @Test
+    fun aHeldKeyTunesItsPressAtOnceAndOnlyTheChannelItIsReleasedOn() = runTest {
         val zapper = Zapper(this)
 
         zapper.press(2, atMs = 0)
-        advanceTimeBy(CHANNEL_ZAP_SETTLE_MS)
-        zapper.press(3, atMs = CHANNEL_ZAP_SETTLE_MS)
+        // The first repeat after the key-repeat delay, then the repeat rate.
+        advanceTimeBy(500)
+        var at = 500L
+        for (channel in 3..12) {
+            zapper.press(channel, atMs = at, repeat = true)
+            runCurrent()
+            assertEquals("a repeat never tunes at once", listOf(2 to 0L), zapper.tunes)
+            advanceTimeBy(50)
+            at += 50
+        }
+        advanceUntilIdle()
 
-        assertEquals(listOf(2 to 0L, 3 to CHANNEL_ZAP_SETTLE_MS), zapper.tunes)
+        // The last repeat at 950 ms, settled CHANNEL_ZAP_SETTLE_MS later.
+        assertEquals(listOf(2 to 0L, 12 to 950L + CHANNEL_ZAP_SETTLE_MS), zapper.tunes)
+    }
+
+    @Test
+    fun aRepeatSettlesEvenAfterAQuietPeriod() = runTest {
+        val zapper = Zapper(this)
+
+        zapper.press(2, atMs = 0, repeat = true)
+        runCurrent()
+
+        assertEquals(emptyList<Pair<Int, Long>>(), zapper.tunes)
+        advanceUntilIdle()
+        assertEquals(listOf(2 to CHANNEL_ZAP_SETTLE_MS), zapper.tunes)
+    }
+
+    @Test
+    fun aSeriesGroupsA400To600MsRhythmAndSettlesSoonAfterItsLastTap() {
+        assertEquals(650L, CHANNEL_ZAP_SERIES_MS)
+        assertEquals(350L, CHANNEL_ZAP_SETTLE_MS)
+    }
+
+    @Test
+    fun pressAfterAQuietPeriodTunesAtOnceAgain() = runTest {
+        val zapper = Zapper(this)
+
+        zapper.press(2, atMs = 0)
+        // Just over the 650 ms series window: a slower tap is a single zap of its own.
+        advanceTimeBy(651)
+        zapper.press(3, atMs = 651)
+
+        assertEquals(listOf(2 to 0L, 3 to 651L), zapper.tunes)
+    }
+
+    @Test
+    fun aPressInsideTheSeriesSupersedesTheSettlingTune() = runTest {
+        val zapper = Zapper(this)
+
+        zapper.press(2, atMs = 0)
+        advanceTimeBy(300)
+        zapper.press(3, atMs = 300)
+        // Just before 3 would settle, 4 takes its place; 3 never tunes.
+        advanceTimeBy(CHANNEL_ZAP_SERIES_MS - 1)
+        zapper.press(4, atMs = 300 + CHANNEL_ZAP_SERIES_MS - 1)
+        advanceUntilIdle()
+
+        assertEquals(listOf(2 to 0L, 4 to 300L + 2 * CHANNEL_ZAP_SERIES_MS - 1), zapper.tunes)
     }
 
     @Test

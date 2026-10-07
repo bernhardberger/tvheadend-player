@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.togetherWith
@@ -46,7 +49,6 @@ import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderStatusGap
-import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import coil3.ImageLoader
@@ -143,8 +145,8 @@ internal fun PlayerChromeHeader(clock: String, modifier: Modifier = Modifier) {
         if (LocalPlayerPageScrim.current == null || LocalPlayerControlsMotion.current == null) {
             Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))
         }
-        Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = TvOverlayTopPadding, end = PlayerChromeTokens.gridMargin)
+        Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+            modifier = Modifier.align(Alignment.TopEnd).padding(top = TvGridVerticalMargin, end = TvGridHorizontalMargin)
                 .testTag("player-top-cluster"))
     }
 }
@@ -174,11 +176,11 @@ internal const val QuickZapPreviewSettleMs = 250L
 
 /**
  * [value] once it has stayed unchanged for [settleMs], otherwise null. The initial value is
- * settled immediately, unless [settleFirst]; every later change waits the full delay again.
+ * settled immediately; every later change waits the full delay again.
  */
 @Composable
-internal fun <T : Any> rememberSettled(value: T?, settleMs: Long, settleFirst: Boolean = false): T? {
-    var settled by remember { mutableStateOf(value.takeUnless { settleFirst }) }
+internal fun <T : Any> rememberSettled(value: T?, settleMs: Long): T? {
+    var settled by remember { mutableStateOf(value) }
     LaunchedEffect(value) {
         if (value != settled) {
             settled = null
@@ -205,10 +207,8 @@ internal fun QuickZapTrayPreview(
     modifier: Modifier = Modifier,
     /** Without artwork and summary. */
     compact: Boolean = false,
-    /** Trial: a rail that opens with a step waits for it to settle, as any later step does. */
-    settleFirst: Boolean = false,
 ) {
-    val settledId = rememberSettled(channel?.id, QuickZapPreviewSettleMs, settleFirst)
+    val settledId = rememberSettled(channel?.id, QuickZapPreviewSettleMs)
     val snapshot = channel?.takeIf { it.id == settledId }?.let {
         QuickZapPreviewSnapshot(
             channelId = it.id,

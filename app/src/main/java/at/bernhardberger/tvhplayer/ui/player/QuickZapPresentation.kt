@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -30,7 +31,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
-import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
 
 /**
  * One motion value coordinates the departing footer and the rail rising beneath it, as one
@@ -105,7 +105,7 @@ internal fun QuickZapPresentation(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                 .onSizeChanged { railHeight = it.height }
                 .graphicsLayer { translationY = size.height * (1f - expansion.value) }
-                .padding(bottom = TvOverlayBottomPadding),
+                .padding(bottom = TvGridVerticalMargin),
         ) {
             Box(
                 Modifier.fillMaxWidth()

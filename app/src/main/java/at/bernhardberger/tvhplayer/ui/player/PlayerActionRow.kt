@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -26,11 +28,10 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 
 /** Material disabled content alpha, used for a pause control that stays focusable. */
-internal const val PauseUnavailableIconAlpha = 0.38f
+internal const val PauseUnavailableIconAlpha = TvTextDisabledAlpha
 
 private data class PlayerAction(
     val tag: String,
@@ -69,7 +70,7 @@ internal fun PlayerActionRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(TvOverlayActionButtonSize),
+            .height(TvIconButtonSize),
         horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -92,7 +93,7 @@ internal fun PlayerActionRow(
                             containerColor = Color.Transparent,
                             contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
                         ),
-                        modifier = actionModifier.size(TvOverlayActionButtonSize),
+                        modifier = actionModifier.size(TvIconButtonSize),
                     ) {
                         val glyphModifier = if (tag == "player-pause" && pauseUnavailableReason != null) {
                             Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha }

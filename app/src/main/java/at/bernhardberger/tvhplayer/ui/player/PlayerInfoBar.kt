@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -16,13 +19,12 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.GlanceBadge
-import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderPiconGap
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
 
 /**
@@ -43,11 +45,11 @@ data class PlayerInfoBarData(
 )
 
 /**
- * The [identity] slot (the identity card) and the bottom-anchored programme block: the channel as the
- * eyebrow, the title, the programme's time, metadata and subtitle on one line, and a last row. Every
- * line of the block keeps its place, present or not, so the block is as tall with one line as with four
- * and nothing moves between programmes. Badges share the eyebrow line and are never dropped: the
- * channel text truncates first. The last row (live: Next, recording: the episode) runs the full width.
+ * The [identity] slot (the programme's artwork) on the title's top, one grid gutter before the
+ * programme block: the title, the programme's time, metadata and subtitle on one line, and a last
+ * row. Every line of the block keeps its place, present or not, so the block is as tall with one line
+ * as with three and nothing moves between programmes. The channel stands at the top of the screen;
+ * the description still names it. The last row (live: Next, recording: the episode) runs the full width.
  *
  * @param contentAlpha alpha of the bar's content.
  * @param lastLineEndReserve width the programme block's last line (Next; without it the subtitle;
@@ -58,13 +60,9 @@ data class PlayerInfoBarData(
 @Composable
 fun PlayerInfoBar(
     data: PlayerInfoBarData,
-    badges: List<GlanceBadge>,
     modifier: Modifier = Modifier,
-    recordingNow: Boolean = false,
     contentAlpha: () -> Float = { 1f },
     lastLineEndReserve: Dp = 0.dp,
-    /** Room between the identity and the programme text. */
-    identityGap: Dp = TvOverlayHeaderPiconGap,
     identity: @Composable (Modifier) -> Unit,
 ) {
     val recorded = data.recordedDate != null
@@ -80,7 +78,7 @@ fun PlayerInfoBar(
         else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, playerSpokenTimeRange(data.timeRange)),
         remaining, next, scheduled,
     ).joinToString(". ")
-    val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
     // A recording's episode takes the last row; live keeps its subtitle above Next.
     val lastText = if (recorded) data.subtitle?.takeIf(String::isNotBlank) else next
@@ -92,47 +90,35 @@ fun PlayerInfoBar(
             append(subtitle)
         }
     }
-    val channel = listOf(data.channelNumber, data.channelName).filter(String::isNotBlank).joinToString(" ")
     val reserved = Modifier.reserveEnd(lastLineEndReserve)
-    // The bar speaks for itself: the identity may be a focusable node of its own. The badges keep
-    // their own description.
+    // The bar speaks for itself.
     Row(modifier.semantics(mergeDescendants = true) { contentDescription = description },
-        horizontalArrangement = Arrangement.spacedBy(identityGap), verticalAlignment = Alignment.Bottom) {
+        horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
         // An absent line's place, kept empty.
         val emptyLine: @Composable (TextStyle) -> Unit = { style ->
             Text("", style = style, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
         }
         Column(Modifier.weight(1f)) {
-            // As tall as a badge with or without badges, so arriving badges never move the lines below.
-            Box(faded, contentAlignment = Alignment.CenterStart) {
-            emptyLine(MaterialTheme.typography.labelLarge)
-            Row(Modifier.heightIn(min = PlayerChromeTokens.badgeHeight),
-                horizontalArrangement = Arrangement.spacedBy(PlayerChromeTokens.eyebrowBadgeGap), verticalAlignment = Alignment.CenterVertically) {
-                if (channel.isNotEmpty()) Text(channel, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = secondary, modifier = Modifier.weight(1f, fill = false).testTag("player-info-eyebrow").clearAndSetSemantics {})
-                if (recordingNow) PlayerRecBadge()
-                PlayerGlanceBadges(badges)
-            }
-            }
-            Spacer(Modifier.height(4.dp))
             Text(data.title, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurface, modifier = faded.then(if (programmeLine.isEmpty() && lastText == null) reserved else Modifier)
                     .testTag("player-info-title").clearAndSetSemantics {})
             Spacer(Modifier.height(2.dp))
             if (programmeLine.isNotEmpty()) {
                 Text(programmeLine, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
                     modifier = faded.then(if (lastText == null) reserved else Modifier)
                         .testTag("player-info-programme").clearAndSetSemantics {})
             } else emptyLine(MaterialTheme.typography.bodyMedium)
             Spacer(Modifier.height(8.dp))
-            if (lastText != null) Row(faded.fillMaxWidth().testTag("player-info-last-row"), verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (!recorded && data.nextScheduled && next != null) ScheduledIndicator(Modifier.testTag("player-scheduled-marker"), tint = secondary)
+            if (lastText != null) Row(faded.fillMaxWidth().testTag("player-info-last-row"),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                // Centred on the text line without adding to its height: the row is as tall as its text.
+                if (!recorded && data.nextScheduled && next != null) ScheduledIndicator(
+                    Modifier.noHeight().testTag("player-scheduled-marker"), tint = secondary)
                 Text(lastText, style = MaterialTheme.typography.labelLarge,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = if (recorded) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.88f) else secondary,
+                    color = if (recorded) MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha) else secondary,
                     modifier = reserved.testTag("player-info-last-text").clearAndSetSemantics {})
             } else emptyLine(MaterialTheme.typography.labelLarge)
         }
@@ -144,4 +130,10 @@ private fun Modifier.reserveEnd(reserve: Dp): Modifier = if (reserve <= 0.dp) th
     val max = if (constraints.hasBoundedWidth) (constraints.maxWidth - reserve.roundToPx()).coerceAtLeast(0) else constraints.maxWidth
     val placeable = measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, max), maxWidth = max))
     layout(placeable.width, placeable.height) { placeable.placeRelative(0, 0) }
+}
+
+/** Measures the content at its own height but takes none, centred on where it is placed. */
+private fun Modifier.noHeight(): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+    layout(placeable.width, 0) { placeable.placeRelative(0, -placeable.height / 2) }
 }

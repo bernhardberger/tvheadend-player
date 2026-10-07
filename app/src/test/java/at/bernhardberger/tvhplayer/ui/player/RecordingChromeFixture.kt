@@ -116,3 +116,13 @@ internal fun RecordingChromeFixture(
     PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { buffering && !paused }, Modifier.align(Alignment.Center))
     }
 }
+
+/** What the top identity and its badges say, in the controls (the identity) or the Banner (the badges). */
+internal fun identitySpeech(compose: androidx.compose.ui.test.SemanticsNodeInteractionsProvider): String =
+    compose.onAllNodes(
+        androidx.compose.ui.test.hasTestTag(PlayerTopIdentityTag) or
+            androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag(PlayerTopIdentityTag)),
+        useUnmergedTree = true,
+    ).fetchSemanticsNodes().flatMap {
+        it.config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { emptyList() }
+    }.joinToString(". ")

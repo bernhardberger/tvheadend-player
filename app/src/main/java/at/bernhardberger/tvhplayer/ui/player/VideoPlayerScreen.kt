@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
@@ -171,26 +172,44 @@ private const val COMPLETE_CHANNEL_NUMBER_TIMEOUT_MS = 250L
 private const val NO_CHANNEL_HOLD_MS = 2_000L
 
 /**
- * A CH+/CH- press within this time of the previous one is a repeat: it waits this quiet time
- * so a burst subscribes its last channel only. Every tune opens and releases a server
- * subscription, so a tuner per press would cost more than it shows.
+ * The quiet time after a held channel key's last repeat before its series tunes the channel
+ * reached. Every tune opens and releases a server subscription, so a tuner per press would cost
+ * more than it shows.
  */
 internal const val CHANNEL_ZAP_SETTLE_MS = 350L
+
+/**
+ * A channel key pressed within this time of the series' last press (the first press counts as the
+ * series' at-once tune) belongs to the series: it moves the selection only, and the series tunes
+ * once it has been quiet this long after a tapped press.
+ */
+internal const val CHANNEL_ZAP_SERIES_MS = 650L
 
 /** From the first digit, how long an entry waits for its channel to become playable. */
 internal const val CHANNEL_NUMBER_READY_BOUND_MS = 5_000L
 
 private const val NO_DIRECT_LIVE_TOKEN = -1L
 
-/** Paces CH+/CH- presses: the first tunes at once, a repeat within the window settles. */
-internal class ChannelZapPacer(private val windowMs: Long = CHANNEL_ZAP_SETTLE_MS) {
+/**
+ * Paces channel keys so a series tunes at most its first and its last channel: a press after a
+ * quiet [seriesMs] tunes at once; a later press of the series, and every key repeat, only settles
+ * ([seriesMs] after a tapped press, [settleMs] after a repeat), each superseding the one before.
+ */
+internal class ChannelZapPacer(
+    private val settleMs: Long = CHANNEL_ZAP_SETTLE_MS,
+    private val seriesMs: Long = CHANNEL_ZAP_SERIES_MS,
+) {
     private var lastPressMs: Long? = null
 
-    /** The settle delay for a press at [nowMs]; 0 tunes at once. */
-    fun settleDelayMs(nowMs: Long): Long {
+    /** The settle delay for a press at [nowMs]; 0 tunes at once. A [repeat] never tunes at once. */
+    fun settleDelayMs(nowMs: Long, repeat: Boolean = false): Long {
         val previous = lastPressMs
         lastPressMs = nowMs
-        return if (previous != null && nowMs - previous in 0 until windowMs) windowMs else 0L
+        return when {
+            repeat -> settleMs
+            previous != null && nowMs - previous in 0 until seriesMs -> seriesMs
+            else -> 0L
+        }
     }
 }
 
@@ -341,13 +360,6 @@ internal suspend fun startInitialLivePlayback(
     if (isCurrent()) onResolved(result)
 }
 
-val bottomGradient = Brush.verticalGradient(
-    0f to Color.Transparent,
-    0.35f to Color.Black.copy(alpha = 0.70f),
-    0.70f to Color.Black.copy(alpha = 0.75f),
-    1f to Color.Black.copy(alpha = 0.92f)
-)
-
 @OptIn(UnstableApi::class)
 @Composable
 fun VideoPlayerScreen(
@@ -367,7 +379,6 @@ fun VideoPlayerScreen(
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
-    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -425,16 +436,10 @@ fun VideoPlayerScreen(
     var restoreInfoFocus by remember { mutableStateOf(false) }
     val programDetails = remember { ProgramDetailsState() }
     var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    // Trial: the channel card's placeholder and the action Down opened Info from.
-    // Trial: the channel the card's first Left/Right stepped to, focused as the rail opens.
-    var railEntryId by remember { mutableStateOf<ChannelId?>(null) }
-    var railEntryStep by remember { mutableStateOf(0) }
     val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
-    // Trial: closing the rail the card opened hands focus back to the card.
-    var railFromCard by remember { mutableStateOf(false) }
     /** Trial: details opened from a channel row's programme; one Back returns to the rows. */
     var detailsFromRows by remember { mutableStateOf(false) }
-    // Trial: where the channel card is, for the rail to open from it.
+    // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
     var infoPendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
@@ -833,8 +838,6 @@ fun VideoPlayerScreen(
         layerState.dismissRecordingConfirmation()
         layerState.closeInfo(returnToRail = infoRailChannelId != null)
         infoRailChannelId?.let {
-            railEntryId = it
-            railEntryStep = 0
             selectedId = it
             infoRailChannelId = null
             return
@@ -966,7 +969,7 @@ fun VideoPlayerScreen(
         return true
     }
 
-    fun tuneAdjacentChannel(direction: Int, keyTimeMs: Long): Boolean {
+    fun tuneAdjacentChannel(direction: Int, keyTimeMs: Long, repeat: Boolean): Boolean {
         val adjacentId = ChannelNavigation.adjacentId(
             orderedIds = orderedChannelIds,
             currentId = currentChannelId,
@@ -974,9 +977,9 @@ fun VideoPlayerScreen(
         ) ?: return false
 
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
-        // The first CH+/- tunes at once; a repeat within the window settles first, so a
-        // burst tunes its first and its last channel, not one tuner per key press.
-        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs))
+        // A series' first press tunes at once; its later presses and every repeat settle, so a
+        // series tunes its first and its last channel, not one tuner per key press.
+        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs, repeat))
     }
 
     fun tuneEnteredChannel(): Boolean {
@@ -1090,7 +1093,7 @@ fun VideoPlayerScreen(
     // A slot window (no programme at the position) is an axis only: it has no Next line.
     val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
         effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
-    // Trial: the recent channels Up on the card offers, newest first, from every channel rather than
+    // Trial: the recent channels OK on the top identity offers, newest first, from every channel rather than
     // only the current list's.
     // Only the group the player steps through, so picking one never leaves it; none in it, no row.
     val recentChannels = remember(recentChannelIds, channels, currentChannelId) {
@@ -1098,9 +1101,9 @@ fun VideoPlayerScreen(
             .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
     }
     var recentRowOpen by remember { mutableStateOf(false) }
-    // The row closes with the controls, so they reopen on the card.
+    // The row closes with the controls, so they reopen without it.
     LaunchedEffect(layerState.chrome.controlsVisible) { if (!layerState.chrome.controlsVisible) recentRowOpen = false }
-    // Trial: a channel as the card shows it above itself or while switching to it.
+    // Trial: a channel as the recent row shows it.
     val recentPeekOf: (Channel) -> RecentChannelPeek = { channel ->
         RecentChannelPeek(
             picon = channel.icon,
@@ -1391,7 +1394,7 @@ fun VideoPlayerScreen(
         if (playerForegroundLayer(currentPlayerForegroundContext()) == PlayerForegroundLayer.INFO &&
             (!detailsFromRows || programDetails.readMore) && programDetails.back()
         ) return@handle
-        // Trial: Back in the recent row returns to the channel card.
+        // Trial: Back in the recent row returns to the top identity.
         if (recentRowOpen && layerState.chrome.controlsVisible) {
             recentRowOpen = false
             restoreInfoFocus = true
@@ -1459,7 +1462,8 @@ fun VideoPlayerScreen(
         recordingNow = currentChannelId in recordingChannelIds,
         badges = chromeBadges(),
         picon = currentChannel?.icon,
-        artwork = null, // Trial: the channel card shows the picon only.
+        // The info bar's artwork tile.
+        artwork = controlsEvent?.image,
         channelId = currentChannelId,
     )
 
@@ -1564,7 +1568,8 @@ fun VideoPlayerScreen(
                         railBrowsesChannelKeys = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                     )) {
                         ChannelKeyAction.TUNE ->
-                            return@onPreviewKeyEvent tuneAdjacentChannel(direction, event.nativeKeyEvent.eventTime)
+                            return@onPreviewKeyEvent tuneAdjacentChannel(direction, event.nativeKeyEvent.eventTime,
+                                repeat = event.nativeKeyEvent.repeatCount > 0)
                         ChannelKeyAction.BROWSE_LIST -> Unit
                     }
                 }
@@ -1603,8 +1608,8 @@ fun VideoPlayerScreen(
                     }
                     PlayerKeyAction.REVEAL_CONTROLS -> {
                         if (timelineState.seekPending) timelineState.commitPendingSeek()
-                        // Trial: the Banner stands for the timeline row; Up reveals onto the channel
-                        // card above it, Down onto the action row below it.
+                        // Trial: the Banner stands for the timeline row; Up reveals onto the top
+                        // identity above it, Down onto the action row below it.
                         restoreInfoFocus = event.key == Key.DirectionUp
                         layerState.showControls()
                         return@onPreviewKeyEvent true
@@ -1663,38 +1668,11 @@ fun VideoPlayerScreen(
                 foregroundLayer == PlayerForegroundLayer.DISPATCHED_SEEK_PREVIEW
         }
         val channelRailOpen = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER
-        LaunchedEffect(channelRailOpen, infoRailChannelId) {
-            if (!channelRailOpen && railFromCard && infoRailChannelId == null) {
-                railFromCard = false
-                railEntryStep = 0
-                restoreInfoFocus = true
-            }
-        }
-        // Trial: the rail opens from the channel card on its channel, stepping [direction] once it stands.
-        // A held key's further repeats are not swallowed: they run on through the rail.
-        val openRailFromCard: (Int) -> Unit = { direction ->
-            if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) {
-                openChannelDrawer()
-                railFromCard = true
-                // The rail opens on this channel, where the card was, and then slides the step in.
-                railEntryId = currentChannelId
-                railEntryStep = direction
-                // The preview names where the step lands from the start; at a list end it stays.
-                val index = channels.indexOfFirst { it.id == currentChannelId }
-                (channels.getOrNull(index + direction)?.takeIf { index >= 0 }?.id ?: currentChannelId)
-                    ?.let { selectedId = it }
-            }
-        }
-        // Trial: Down from the action row opens the rail below on the playing channel. Not from the card,
-        // so closing returns to the action it came from.
+        // Trial: Down from the action row opens the channel rows below on the playing channel, so
+        // closing returns to the action it came from.
         val openRailFromActions: () -> Unit = {
             layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
-            if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) {
-                openChannelDrawer()
-                railFromCard = false
-                railEntryId = currentChannelId
-                railEntryStep = 0
-            }
+            if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) openChannelDrawer()
         }
         PlayerPage(
             railExpanded = layerState.channelRailPresented,
@@ -1706,7 +1684,7 @@ fun VideoPlayerScreen(
                 layerState.infoOpen && (foregroundLayer == PlayerForegroundLayer.INFO ||
                     foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
             },
-            railHeader = if (railFromCard && layerState.channelRailPresented || programDetails.scheduleEntry && layerState.infoOpen) ({
+            railHeader = if (programDetails.scheduleEntry && layerState.infoOpen) ({
                 val channel = channels.firstOrNull { it.id == (infoRailChannelId ?: selectedId) }
                 ProgrammeScheduleHeader(listOfNotNull(channel?.visibleChannelNumber?.toString(), channel?.name).joinToString(" · "))
             }) else null,
@@ -1784,27 +1762,22 @@ fun VideoPlayerScreen(
             },
             onDownFromActions = openRailFromActions,
             downHint = stringResource(R.string.nav_channels),
-            channelCardStepping = channelCardStepping,
             onChannelCardFocusChanged = layerState.chrome::onChannelCardFocusChanged,
-            // With stepping, a held Left/Right on the card opens the rail stepping that way; OK opens it in place.
-            onChannelStep = { direction, _ -> openRailFromCard(direction) },
-            onCardClick = { openRailFromCard(0) },
-            // With stepping, a short Left/Right on the card changes channel like CH+/-: the first at once, a burst settles.
-            onChannelZap = { direction, keyTimeMs -> tuneAdjacentChannel(direction, keyTimeMs) },
-            // Up on the card opens the recent channels above it; OK on one switches to it.
+            // Left/Right on the top identity change channel like CH+/-: the first at once, a burst settles.
+            onChannelZap = { direction, keyTimeMs, repeat -> tuneAdjacentChannel(direction, keyTimeMs, repeat) },
+            // OK on the top identity opens the recent channels below it; OK on one switches to it.
             recents = recentChannels.map(recentPeekOf),
             onRecentPick = { index -> recentChannels.getOrNull(index)?.let { tuneChannel(it) } },
             recentRowOpen = recentRowOpen,
             onRecentRowOpenChange = { recentRowOpen = it },
-            channelCardHeld = channelRailOpen && railFromCard,
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { _, controls ->
                 QuickZapPresentation(
                     // Keep the departing rail expanded throughout its vertical step.
                     expanded = layerState.channelRailPresented,
-                    channelRows = !railFromCard,
+                    channelRows = true,
                     channelContent = {
-                        if (!railFromCard) ChannelRows(
+                        ChannelRows(
                             channels = channels,
                             playingChannelId = currentChannelId,
                             nowSec = nowSec,
@@ -1836,60 +1809,14 @@ fun VideoPlayerScreen(
                                 infoMutation = null
                                 infoReturnAction = null
                                 restoreInfoFocus = false
-                                railEntryId = channel.id
-                                railEntryStep = 0
                                 layerState.openInfo()
                                 detailsFromRows = true
                             },
                             active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-                        ) else ChannelDrawer(
-                            active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-                            channels = channels,
-                            selectedId = selectedId,
-                            playingChannelId = confirmedPlayingChannelId,
-                            playbackChannelId = currentChannelId,
-                            playbackIndicator = channelIndicator,
-                            recordingChannelIds = recordingChannelIds,
-                            nowEvent = { channelsVm.nowEvent(it, nowSec) },
-                            nowSec = nowSec,
-                            imageLoader = imageLoader,
-                            currentSession = currentSession,
-                            onFocusChannel = { selectedId = it },
-                            onPickChannel = { tuneChannel(it) },
-                            onCloseDrawer = { keyCode ->
-                                if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
-                                layerState.dismissChannelDrawer()
-                            },
-                            onOpenSchedule = { channel, keyCode ->
-                                layerState.beginOpeningKeyCycle(keyCode)
-                                infoRailChannelId = channel.id
-                                programDetails.reset(startOnSchedule = true)
-                                infoPendingAction = null
-                                infoMutation = null
-                                infoReturnAction = null
-                                restoreInfoFocus = false
-                                railEntryId = channel.id
-                                railEntryStep = 0
-                                layerState.openInfo()
-                            },
-                            entryFocusId = railEntryId.takeIf { channelRailOpen },
-                            entryStep = if (channelRailOpen) railEntryStep else 0,
-                            inPlace = true,
                         )
                     },
-                    preview = {
-                        val focused = channels.firstOrNull { it.id == selectedId }
-                        QuickZapTrayPreview(
-                            channel = focused,
-                            event = focused?.let { channelsVm.nowEvent(it.id, nowSec) },
-                            next = focused?.let { channelsVm.nextEvent(it.id, nowSec) },
-                            nowSec = nowSec,
-                            imageLoader = imageLoader,
-                            currentSession = currentSession,
-                            modifier = Modifier.padding(horizontal = PlayerChromeTokens.gridMargin),
-                            settleFirst = railEntryStep != 0,
-                        )
-                    },
+                    // The rows show no tray preview.
+                    preview = {},
                     controls = controls,
                 )
             },
@@ -1918,7 +1845,6 @@ fun VideoPlayerScreen(
                     infoMutation = null
                     infoReturnAction = null
                     layerState.closeInfo()
-                    railFromCard = false
                     tuneChannel(channel)
                 }
             }
@@ -2088,7 +2014,7 @@ fun VideoPlayerScreen(
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
-                    .background(Color.Black.copy(alpha = 0.78f), MaterialTheme.shapes.large)
+                    .background(Color.Black.copy(alpha = TvOverlayBoxAlpha), MaterialTheme.shapes.large)
                     .padding(24.dp)
                     .testTag("player-channel-unavailable"),
             ) {
@@ -2147,5 +2073,5 @@ private fun SessionObservation.dvrEntries(): List<DvrEntry> =
         dvrSnapshotAuthority == RetainedMetadataAuthority.CURRENT
     }.orEmpty()
 
-/** Trial: how many recent channels the row above the channel card offers. */
+/** Trial: how many recent channels the row below the top identity offers. */
 private const val RecentChannelCount = 3

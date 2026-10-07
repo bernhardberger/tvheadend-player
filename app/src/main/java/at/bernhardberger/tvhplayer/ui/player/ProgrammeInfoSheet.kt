@@ -1,9 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Easing
@@ -50,7 +55,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
-import at.bernhardberger.tvhplayer.ui.TvOverlayTopPadding
 
 /** Only the section at rest may request focus. Outside the player page nothing changes. */
 internal val LocalPlayerPageActive = compositionLocalOf { true }
@@ -235,19 +239,25 @@ internal fun <T : Any> PlayerPage(
                 }
             }
             // Shared viewport layer: neither strip nor up affordance travels with either page.
-            Box(Modifier.fillMaxWidth().padding(top = TvOverlayTopPadding)) {
+            Box(Modifier.fillMaxWidth().padding(top = TvGridVerticalMargin)) {
                 // Measure the clock's actual line box, including font scale and font metrics.
                 Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
                     modifier = Modifier.width(0.dp).clearAndSetSemantics {})
                 Box(Modifier.matchParentSize()) {
+                    // Over the rail the strip grows out of the live top identity's size and shrinks back into
+                    // it, at the chip's start edge, while the identity does the reverse.
                     if (nowPlaying != null) AnimatedVisibility(
                         visible = railExpanded || composed,
                         enter = fadeIn(tween(if (railStrip) PlayerMotion.MediumMs else 0,
-                            easing = PlayerMotion.StandardDecelerate)),
+                            easing = PlayerMotion.StandardDecelerate)) +
+                            scaleIn(tween(if (railStrip) PlayerMotion.PanelMs else 0, easing = PlayerMotion.EmphasizedDecelerate),
+                                initialScale = if (railStrip) NowPlayingFromIdentityScale else 1f, transformOrigin = StripOrigin),
                         exit = fadeOut(tween(if (railStrip) PlayerMotion.ShortMs else 0,
-                            easing = PlayerMotion.StandardAccelerate)),
+                            easing = PlayerMotion.StandardAccelerate)) +
+                            scaleOut(tween(if (railStrip) PlayerMotion.MediumMs else 0, easing = PlayerMotion.EmphasizedAccelerate),
+                                targetScale = if (railStrip) NowPlayingFromIdentityScale else 1f, transformOrigin = StripOrigin),
                         modifier = Modifier.align(Alignment.CenterStart)
-                            .padding(start = PlayerChromeTokens.gridMargin).wrapContentHeight(unbounded = true)
+                            .padding(start = TvGridHorizontalMargin).wrapContentHeight(unbounded = true)
                             .then(if (!railStrip) Modifier.pageMotion(200..400) else Modifier)
                             .testTag("player-now-playing-motion"),
                     ) { nowPlaying() }
@@ -262,13 +272,17 @@ internal fun <T : Any> PlayerPage(
     }
 }
 
+/** The live top identity's chip against the strip's: 64dp to 48dp. */
+private const val NowPlayingFromIdentityScale = 64f / 48f
+private val StripOrigin = TransformOrigin(0f, 0.5f)
+
 /** This is the schedule's actual header, including when only its top section peeks below the rail. */
 @Composable
 internal fun ProgrammeScheduleHeader(identity: String) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val peekTravel = maxHeight - 156.dp
         Row(Modifier.fillMaxWidth().height(156.dp)
-            .padding(horizontal = PlayerChromeTokens.gridMargin)
+            .padding(horizontal = TvGridHorizontalMargin)
             .padding(top = 92.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
             Text("$identity · ${stringResource(R.string.details_tab_schedule)}",
@@ -291,7 +305,7 @@ internal fun ProgrammeInfoSheetFrame(
     content: @Composable () -> Unit,
 ) {
     Box(modifier.fillMaxSize().focusGroup()
-        .padding(horizontal = PlayerChromeTokens.gridMargin)
+        .padding(horizontal = TvGridHorizontalMargin)
         // The pinned 32dp clock inset + 35dp line box leaves a 9dp gap above this row.
         .padding(top = if (LocalPlayerPageRailHeader.current) 0.dp else 76.dp, bottom = bottomPadding)
         .testTag(panelTag).semantics { paneTitle?.let { this.paneTitle = it } }) {

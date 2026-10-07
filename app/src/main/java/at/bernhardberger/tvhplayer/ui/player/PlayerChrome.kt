@@ -1,8 +1,16 @@
 package at.bernhardberger.tvhplayer.ui.player
 
-import androidx.compose.animation.core.animateDpAsState
+import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -12,19 +20,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
+import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import coil3.ImageLoader
+import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 
 /**
  * The player chrome of one screen: header, info bar, timeline and, with the controls, the action
@@ -69,24 +84,16 @@ internal fun PlayerChrome(
     /** A recording's marker navigation, opened from its timeline. */
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     onSeekMarker: (Long) -> Unit = {},
-    /** Holding Left/Right on the focused channel card opens the rail stepping that way (-1, +1). */
-    onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
-    /** A short Left/Right press on the focused channel card changes channel (-1, +1). */
-    onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
-    /** OK on the identity card; without it the card opens Info. */
-    onCardClick: (() -> Unit)? = null,
+    /** Left/Right on live's focused top identity change channel (-1, +1). */
+    onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -> Unit)? = null,
     /** What Down from the action row opens, shown centred in the row. */
     downHint: String? = null,
-    /** The recent channels, newest first: a row above the channel card that Up opens; OK switches. */
+    /** The recent channels, newest first: a row below live's top identity that OK opens; OK switches. */
     recents: List<RecentChannelPeek> = emptyList(),
     onRecentPick: ((Int) -> Unit)? = null,
     recentRowOpen: Boolean = false,
     onRecentRowOpenChange: (Boolean) -> Unit = {},
-    /** The rail was opened from the channel card, which keeps its focused look meanwhile. */
-    channelCardHeld: Boolean = false,
-    /** Whether Left/Right on the channel card change channel (tap) or open the rail (hold). */
-    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
-    /** Focus arrived on, or left, the channel card or its recent row. */
+    /** Focus arrived on, or left, live's top identity or its recent row. */
     onChannelCardFocusChanged: (Boolean) -> Unit = {},
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
@@ -113,53 +120,25 @@ internal fun PlayerChrome(
         }
         val lastLineEndReserve = if (liveEnd) liveDistanceReserve() else 0.dp
         val header: @Composable (Modifier) -> Unit = { PlayerChromeHeader(content.clock, it.testTag("player-header")) }
-        // Held from the rail's opening until focus is back on the card, so it never blinks out in between.
-        var cardHeld by remember { mutableStateOf(false) }
-        LaunchedEffect(channelCardHeld) {
-            if (channelCardHeld) cardHeld = true
-            else if (cardHeld) {
-                delay(PlayerMotion.PanelMs.toLong())
-                cardHeld = false
+        // One chrome for every source: the channel at the top, the info bar leading with the programme's
+        // artwork, and the [timelineRow] the full width below it.
+        val recentList = if (onRecentPick != null) recents else emptyList()
+        val infoBar: @Composable (contentAlpha: () -> Float, timelineRow: @Composable () -> Unit) -> Unit =
+            { contentAlpha, timelineRow ->
+                // Two grid columns of artwork, the text from the third: title 28, 2, programme line 16,
+                // 8, last row 16 is the artwork's 70dp at font scale 1.0; a larger scale grows the
+                // text below the artwork's bottom.
+                PlayerInfoBar(
+                    data = content.info,
+                    modifier = Modifier.testTag("player-info-bar"),
+                    contentAlpha = contentAlpha,
+                    lastLineEndReserve = lastLineEndReserve,
+                ) { faded -> ProgrammeArtworkTile(content.artwork, imageLoader, currentSession, faded) }
+                timelineRow()
             }
-        }
-        // The identity card takes focus in the controls only, which place it in their focus graph.
-        val infoBar: @Composable (contentAlpha: () -> Float, card: Modifier) -> Unit = { contentAlpha, card ->
-            PlayerInfoBar(
-                data = content.info,
-                badges = content.badges,
-                modifier = Modifier.testTag("player-info-bar"),
-                recordingNow = content.recordingNow,
-                contentAlpha = contentAlpha,
-                lastLineEndReserve = lastLineEndReserve,
-                identityGap = PlayerChromeTokens.identityTextGap,
-            ) { faded ->
-                PlayerIdentityCard(content, imageLoader, currentSession,
-                    faded.then(card).onFocusChanged {
-                        if (it.isFocused && !channelCardHeld) cardHeld = false
-                    },
-                    onClick = { onInteraction(); (onCardClick ?: onInfo)() }.takeIf { shown == PlayerChromeMode.CONTROLS },
-                    channelCard = onChannelStep != null,
-                    channelCardStepping = channelCardStepping,
-                    recents = if (onRecentPick != null) recents else emptyList(),
-                    recentOpen = recentRowOpen && shown == PlayerChromeMode.CONTROLS,
-                    onRecentOpenChange = onRecentRowOpenChange,
-                    onRecentClick = { onInteraction(); onRecentPick?.invoke(it) },
-                    onRecentInteraction = onInteraction,
-                    held = cardHeld && shown == PlayerChromeMode.CONTROLS,
-                    onFocusWithinChanged = onChannelCardFocusChanged)
-            }
-        }
         CompositionLocalProvider(LocalStateCellInset provides stateCell) {
-        // The footer's scrim rises behind the open Recent row so it reads over a bright picture.
-        val recentRise by animateDpAsState(
-            if (recentRowOpen && shown == PlayerChromeMode.CONTROLS && recents.isNotEmpty()) RecentRowScrimRise else 0.dp,
-            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
-            label = "recentRise",
-        )
-        val density = LocalDensity.current
         if (shown == PlayerChromeMode.CONTROLS) {
             PlayerChromeControls(
-                scrimRise = { with(density) { recentRise.toPx() } },
                 timeline = timeline,
                 liveBar = liveBar,
                 actions = actions,
@@ -183,20 +162,39 @@ internal fun PlayerChrome(
                 decoration = controlsDecoration,
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,
-                onChannelStep = onChannelStep,
                 onChannelZap = onChannelZap,
-                channelCardStepping = channelCardStepping,
                 downHint = downHint,
-                onRecent = { onRecentRowOpenChange(true) }.takeIf { recents.isNotEmpty() && onRecentPick != null },
+                topIdentity = { placed, focus, onRecentDown ->
+                    PlayerTopIdentity(content, imageLoader, currentSession, placed, focus = focus,
+                        zaps = onChannelZap != null,
+                        // OK opens the recent channels, and has nothing to open without any; without a
+                        // recent pick at all (a recording) it opens the programme's info.
+                        onClick = {
+                            onInteraction()
+                            if (onRecentPick == null) onInfo() else if (recentList.isNotEmpty()) onRecentRowOpenChange(true)
+                        },
+                        recents = recentList,
+                        recentOpen = recentRowOpen,
+                        onRecentOpenChange = onRecentRowOpenChange,
+                        onRecentClick = { onInteraction(); onRecentPick?.invoke(it) },
+                        onRecentInteraction = onInteraction,
+                        onRecentDown = onRecentDown,
+                        onFocusWithinChanged = onChannelCardFocusChanged)
+                },
             )
         } else {
             // Passive: nothing in the Banner takes focus. Without the action row its info and
             // timeline rest on the bottom safe area, one action row lower than the controls'.
             PlayerOverlayChrome(
-                headerContent = header,
+                headerContent = { placed ->
+                    header(placed)
+                    PlayerTopIdentity(content, imageLoader, currentSession, placed)
+                },
+                footerPadding = PaddingValues(start = TvGridHorizontalMargin, end = TvGridHorizontalMargin,
+                    top = TvOverlayFooterGradientRunout, bottom = PlayerBannerBottomPadding),
                 modifier = Modifier.focusProperties { canFocus = false }.testTag("player-banner"),
             ) {
-                infoBar({ 1f }, Modifier)
+                infoBar({ 1f }) {
                 when (timeline) {
                     is PlayerChromeTimeline.Live -> {
                         val step = timeline.step
@@ -216,6 +214,7 @@ internal fun PlayerChrome(
                     }
                     is PlayerChromeTimeline.Recording ->
                         RecordingBannerTimeline(timeline, step = shown == PlayerChromeMode.BANNER_STEP, state = content.state)
+                }
                 }
             }
         }
@@ -299,5 +298,36 @@ internal fun PlayerPresentedLiveTimeline(
     )
 }
 
-/** The open Recent row's height above the channel card, which the footer's scrim covers. */
-private val RecentRowScrimRise = 124.dp
+/**
+ * The info bar's programme artwork: the programme's 16:9 image, or without it [ProgrammeArtworkPlaceholder].
+ * It takes no focus and has no description; the info bar speaks for the programme.
+ */
+@Composable
+private fun ProgrammeArtworkTile(
+    artwork: String?,
+    imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
+    modifier: Modifier,
+) {
+    val id = ArtworkId.parse(artwork)
+    var failed by remember(id, currentSession) { mutableStateOf(false) }
+    Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
+        .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
+        if (id != null && currentSession != null && !failed) {
+            Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLow))
+            AsyncImage(AppArtworkSource(currentSession, id), null, imageLoader,
+                Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
+        } else ProgrammeArtworkPlaceholder()
+    }
+}
+
+/** Trial: what the artwork tile shows without artwork, a plain tile until that is decided. */
+@Composable
+private fun ProgrammeArtworkPlaceholder() {
+    Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLow).testTag("player-info-artwork-placeholder"))
+}
+
+/** The artwork slot: two grid columns at 16:9, from the title's top to the last row's bottom at font scale 1.0. */
+private val ArtworkTileWidth = TvGridColumnWidth * 2 + TvGridGutter
+private val ArtworkTileHeight = 70.dp
+private val ArtworkTileShape = RoundedCornerShape(8.dp)

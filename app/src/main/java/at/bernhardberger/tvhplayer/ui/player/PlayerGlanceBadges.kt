@@ -11,6 +11,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.GlanceBadgeKind
@@ -34,10 +36,10 @@ fun PlayerGlanceBadges(badges: List<GlanceBadge>, modifier: Modifier = Modifier)
     Row(modifier.clearAndSetSemantics { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(PlayerChromeTokens.badgeGap), verticalAlignment = Alignment.CenterVertically) {
         badges.forEach { badge ->
-            Box(Modifier.border(1.dp, color.copy(alpha = 0.64f), PlayerChromeTokens.badgeShape)
+            Box(Modifier.border(1.dp, color.copy(alpha = TvTextTertiaryAlpha), PlayerChromeTokens.badgeShape)
                 .height(PlayerChromeTokens.badgeHeight).padding(horizontal = 5.dp), contentAlignment = Alignment.Center) {
                 Text(badgeLabel(badge, false), style = MaterialTheme.typography.labelMedium, maxLines = 1,
-                    softWrap = false, color = color.copy(alpha = 0.88f))
+                    softWrap = false, color = color.copy(alpha = TvTextSecondaryAlpha))
             }
         }
     }

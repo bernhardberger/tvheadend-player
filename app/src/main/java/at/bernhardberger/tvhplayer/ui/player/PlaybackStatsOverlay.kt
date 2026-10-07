@@ -24,6 +24,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.playback.LiveFrontendState
+import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
@@ -68,7 +69,7 @@ internal fun PlaybackStatsOverlay(
             .width(820.dp)
             .testTag("playback-stats-overlay"),
         colors = SurfaceDefaults.colors(
-            containerColor = Color.Black.copy(alpha = 0.86f),
+            containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha),
             contentColor = MaterialTheme.colorScheme.onSurface,
         ),
         shape = MaterialTheme.shapes.medium,

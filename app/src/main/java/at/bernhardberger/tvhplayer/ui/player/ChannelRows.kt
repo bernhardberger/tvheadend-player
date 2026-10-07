@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -84,7 +87,7 @@ internal val ChannelRowsTop = 60.dp
 /** The focused row's top on screen; the previous row rests fully above it, fading toward [ChannelRowsTop]. */
 internal val ChannelRowsAnchor = 116.dp
 internal const val ChannelRowDimAlpha = 0.4f
-private const val ChannelRowHeaderQuietAlpha = 0.64f
+private const val ChannelRowHeaderQuietAlpha = TvPassiveAlpha
 /** The focused header is headlineSmall (24sp); the others read at titleSmall's size (14sp). */
 internal const val ChannelRowHeaderQuietScale = 14f / 24f
 
@@ -159,7 +162,7 @@ internal fun ChannelRows(
     val reveal = LocalChannelRowsReveal.current
     // Google TV rows: the first tile holds the margin until focus would pass the far margin, and a
     // focused tile never runs into either margin.
-    val marginPx = with(LocalDensity.current) { PlayerChromeTokens.gridMargin.toPx() }
+    val marginPx = with(LocalDensity.current) { TvGridHorizontalMargin.toPx() }
     val horizontalBringIntoView = remember(marginPx) { object : BringIntoViewSpec {
         override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
             val trailing = offset + size - (containerSize - marginPx)
@@ -224,7 +227,7 @@ internal fun ChannelRows(
                 startY = ChannelRowsTop.toPx(), endY = ChannelRowsAnchor.toPx()), blendMode = BlendMode.DstIn)
         }) {
         if (channels.isEmpty()) {
-            Column(Modifier.padding(horizontal = PlayerChromeTokens.gridMargin)
+            Column(Modifier.padding(horizontal = TvGridHorizontalMargin)
                 .padding(top = ChannelRowsAnchor).graphicsLayer { alpha = channelRowRise(reveal(), 1) }) {
                 Text(stringResource(R.string.empty_channel_tag), color = MaterialTheme.colorScheme.onSurface)
                 Button(onClick = { onClose(null) }, modifier = Modifier.focusRequester(emptyFocus)) { Text(stringResource(R.string.close)) }
@@ -317,7 +320,7 @@ private fun ChannelProgrammeRow(
         }
         .testTag("player-channel-row-${channel.id.value}")) {
         // The header grows from titleSmall's size to headlineSmall on its baseline side, above the tiles.
-        Row(Modifier.padding(horizontal = PlayerChromeTokens.gridMargin)
+        Row(Modifier.padding(horizontal = TvGridHorizontalMargin)
             .layout { measurable, constraints ->
                 val header = measurable.measure(constraints)
                 layout(header.width, header.height) {
@@ -346,8 +349,8 @@ private fun ChannelProgrammeRow(
         LazyRow(state = horizontal,
             modifier = Modifier.offset { IntOffset(0, (tilesTop() - 8.dp).roundToPx()) }
                 .onFocusChanged { if (it.hasFocus) onFocused() },
-            contentPadding = PaddingValues(horizontal = PlayerChromeTokens.gridMargin, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(PlayerChromeTokens.gridGutter)) {
+            contentPadding = PaddingValues(horizontal = TvGridHorizontalMargin, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
             itemsIndexed(tiles, key = { index, event -> if (index == 0) "now" else event!!.id.value.toString() }) { index, event ->
                 val title = event?.title
                 val subtitle = channelRowSubtitle(event)
@@ -420,7 +423,7 @@ private fun ChannelProgrammeRow(
 /** Google TV's in-image label: a small dark translucent chip; [live] adds the orange live dot. */
 @Composable
 private fun TileChip(text: String, modifier: Modifier = Modifier, live: Boolean = false) {
-    Row(modifier.background(Color.Black.copy(alpha = 0.6f), PlayerChromeTokens.chipShape)
+    Row(modifier.background(PlayerChromeTokens.chipScrim, PlayerChromeTokens.chipShape)
         .padding(horizontal = 6.dp, vertical = 1.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (live) {

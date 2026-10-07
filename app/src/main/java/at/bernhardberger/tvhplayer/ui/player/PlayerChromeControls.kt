@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.tv.material3.LocalContentColor
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -51,11 +52,11 @@ import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
-import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineActionGap
 
 /**
- * [PlayerChrome]'s controls: the header and info bar, whose identity card takes focus and opens Info,
- * over the focusable timeline and the action row.
+ * [PlayerChrome]'s controls: the header and info bar over the focusable timeline and the action row.
+ * The [topIdentity] in the header takes focus above them all: OK opens live's recent channels, or a
+ * recording's Info.
  * The bar row's state cell and end and the distance behind live are passive. [decoration] hosts them, such as live's
  * quick-zap rail; while it [covered] them they take no focus.
  */
@@ -67,8 +68,11 @@ internal fun PlayerChromeControls(
     /** Resets the timing-unavailable notice when it changes, such as on a zap. */
     identity: Any?,
     header: @Composable (Modifier) -> Unit,
-    /** The info bar with its content alpha and its identity card's place in the focus graph. */
-    infoBar: @Composable (contentAlpha: () -> Float, card: Modifier) -> Unit,
+    /**
+     * The info bar with its content alpha, and the timeline row drawn the full width below it (a
+     * recording's is drawn after the bar instead, with its markers).
+     */
+    infoBar: @Composable (contentAlpha: () -> Float, timelineRow: @Composable () -> Unit) -> Unit,
     /** What playback is doing: the bar row's state cell. */
     state: PlayerStateCell,
     /** Fraction of [PlayerBannerDrop] the footer still rests below its place, taken over from the Banner. */
@@ -89,14 +93,14 @@ internal fun PlayerChromeControls(
     decoration: @Composable (emphasisAlpha: () -> Float, controls: @Composable () -> Unit) -> Unit,
     markerNavigation: RecordingMarkerNavigation,
     onSeekMarker: (Long) -> Unit,
-    onChannelStep: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
-    onChannelZap: ((direction: Int, keyTimeMs: Long) -> Unit)? = null,
+    /** Left/Right on the top identity change channel (-1, +1), on every press and repeat; without it they do nothing. */
+    onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -> Unit)? = null,
     downHint: String? = null,
-    onRecent: (() -> Unit)? = null,
-    /** Whether Left/Right on the channel card change channel (tap) or open the rail (hold). */
-    channelCardStepping: Boolean = PlayerFeatures.channelCardStepping,
-    /** The footer scrim reaches up behind the open Recent row. */
-    scrimRise: () -> Float = { 0f },
+    /**
+     * The top identity, drawn over the header: given the header's placement, its place in the focus
+     * graph, and what Down in its recent row does.
+     */
+    topIdentity: (@Composable (placed: Modifier, focus: Modifier, onRecentDown: () -> Unit) -> Unit)? = null,
 ) {
     val live = timeline as? PlayerChromeTimeline.Live
     val recording = timeline as? PlayerChromeTimeline.Recording
@@ -136,7 +140,7 @@ internal fun PlayerChromeControls(
             timingUnavailable = true
         }
     }
-    // The action row's entry is Play/Pause: where a reveal lands and where Down from the timeline or the card leads.
+    // The action row's entry is Play/Pause: where a reveal lands and where Down from the timeline leads.
     val initialFocus = pauseFocus
     var focusInitialized by remember { mutableStateOf(false) }
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
@@ -177,7 +181,7 @@ internal fun PlayerChromeControls(
         }
     }
     if (recording != null) {
-        // Closing the markers returns focus to the timeline, or with Up moves it on to the card; a
+        // Closing the markers returns focus to the timeline, or with Up moves it on to the identity; a
         // later reveal starts on Pause.
         val restorationBaseline = remember { markerNavigation.restoration }
         LaunchedEffect(markerNavigation.restoration) {
@@ -193,10 +197,57 @@ internal fun PlayerChromeControls(
             if (markerNavigation.selectedMs !in recording.markers || !seekable || !actions.active) markerNavigation.dismiss()
         }
     }
+    // Down from the top identity, or its recent row, returns to the action last focused.
+    var lastAction by remember { mutableStateOf("player-pause") }
+    val actionFocus = when (lastAction) {
+        "player-stop" -> stopFocus
+        "player-settings" -> settingsFocus
+        else -> pauseFocus
+    }
+    // The top identity stands above everything else that takes focus. Left/Right change channel
+    // where there is a channel to change, and never move focus; Up has nowhere to go.
+    val identityModifier = Modifier.focusRequester(cardFocus)
+        .onFocusChanged {
+            if (it.isFocused) {
+                lastFocusedControl = PlayerIdentityCardTag
+                onActionFocused(PlayerIdentityCardTag)
+                onInteraction()
+            }
+        }
+        .focusProperties {
+            canFocus = !covered
+            left = FocusRequester.Cancel; right = FocusRequester.Cancel; up = FocusRequester.Cancel
+            down = actionFocus
+        }
+        .onPreviewKeyEvent { event ->
+            when (event.key) {
+                Key.DirectionDown -> {
+                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                        relocatingKey = event.key
+                        actionFocus.requestFocus()
+                    }
+                    true
+                }
+                Key.DirectionUp -> true
+                // Every press and repeat steps, as CH+/- does: the first at once, a burst settles.
+                Key.DirectionLeft, Key.DirectionRight -> {
+                    if (event.type == KeyEventType.KeyDown) {
+                        onInteraction()
+                        onChannelZap?.invoke(if (event.key == Key.DirectionRight) 1 else -1, event.nativeKeyEvent.eventTime,
+                            event.nativeKeyEvent.repeatCount > 0)
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    val recentDown: () -> Unit = {
+        relocatingKey = Key.DirectionDown
+        actionFocus.requestFocus()
+    }
     decoration({ chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
-        scrimRise = scrimRise,
         modifier = Modifier.onPreviewKeyEvent { event ->
             recording != null && markerNavigation.handle(event, recording.markers, onSeekMarker)
         }.onPreviewKeyEvent { event ->
@@ -204,7 +255,10 @@ internal fun PlayerChromeControls(
             if (event.type == KeyEventType.KeyUp) relocatingKey = null
             true
         }
-    }, headerContent = header) {
+    }, headerContent = { placed ->
+        header(placed)
+        topIdentity?.invoke(placed, identityModifier, recentDown)
+    }) {
         val timelineModifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
                     .focusProperties { canFocus = !covered }
                     .then(if (timelineFocused && !seekable && !previewing) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
@@ -260,74 +314,12 @@ internal fun PlayerChromeControls(
                             else -> false
                         }
                     }
-        // The card stands above everything else that takes focus: Down leads to the timeline or,
-        // when that takes no focus, to the action row's entry; nothing else is reachable from it.
-        val cardBelow = if (timelineFocusable) timelineFocus else initialFocus
-        // The Left/Right press on the card still undecided between a zap (released) and the rail (held).
-        var cardPressKey by remember { mutableStateOf<Key?>(null) }
-        val cardModifier = Modifier.focusRequester(cardFocus)
-            .onFocusChanged {
-                if (it.isFocused) {
-                    lastFocusedControl = PlayerIdentityCardTag
-                    onActionFocused(PlayerIdentityCardTag)
-                    onInteraction()
-                }
-            }
-            .focusProperties {
-                canFocus = !covered
-                left = FocusRequester.Cancel; right = FocusRequester.Cancel; up = FocusRequester.Cancel
-                down = cardBelow
-            }
-            .onPreviewKeyEvent { event ->
-                when {
-                    event.key == Key.DirectionDown -> {
-                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                            relocatingKey = event.key
-                            cardBelow.requestFocus()
-                        }
-                        true
-                    }
-                    // Up opens the recent channels' row above this card.
-                    onRecent != null && event.key == Key.DirectionUp -> {
-                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                            onInteraction()
-                            onRecent()
-                        }
-                        true
-                    }
-                    // A Left/Right press changes channel when released; held, it opens the rail stepping
-                    // that way, and the held key's repeats run on through the rail. Without stepping the
-                    // card takes both keys and does nothing with them.
-                    onChannelZap != null && (event.key == Key.DirectionLeft || event.key == Key.DirectionRight) -> {
-                        if (channelCardStepping) {
-                            val direction = if (event.key == Key.DirectionRight) 1 else -1
-                            val native = event.nativeKeyEvent
-                            when (event.type) {
-                                KeyEventType.KeyDown -> when {
-                                    native.repeatCount == 0 -> { onInteraction(); cardPressKey = event.key }
-                                    cardPressKey == event.key -> {
-                                        cardPressKey = null
-                                        onChannelStep?.invoke(direction, native.eventTime)
-                                    }
-                                }
-                                KeyEventType.KeyUp -> if (cardPressKey == event.key) {
-                                    cardPressKey = null
-                                    onInteraction()
-                                    onChannelZap(direction, native.downTime)
-                                }
-                            }
-                        }
-                        true
-                    }
-                    else -> false
-                }
-            }
         if (recording != null) {
             // The step's target label paints over the info bar, which fades out meanwhile.
             val infoAlpha by animateFloatAsState(if (previewing && !markerNavigation.open) 0f else 1f,
                 tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
             Box(Modifier.graphicsLayer { alpha = infoAlpha }) {
-                infoBar({ 1f }, cardModifier)
+                infoBar({ 1f }) {}
             }
             RecordingControlsTimeline(
                 timeline = recording,
@@ -370,9 +362,10 @@ internal fun PlayerChromeControls(
         val statusTextShown = if (seekable) previewing || seekFeedback != null else scheduleFeedback != null
         val infoAlpha by animateFloatAsState(if (statusTextShown) 0f else 1f,
             tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
-        infoBar({ infoAlpha }, cardModifier)
+        // Live's identity is at the top; the programme block takes no focus but its timeline's.
         val barStatus = if (previewing) live.barStatus(state, window = live.programmeWindow)
             else rememberPlayerBarStatus(state, liveBar?.end).takeIf { live.liveAvailable }
+        infoBar({ infoAlpha }) {
         if (seekable) {
             PlaybackSeekbar(
                 range = timeshiftSeekbarRange(timeshiftState).let { range ->
@@ -416,7 +409,8 @@ internal fun PlayerChromeControls(
             )
         }
         }
-        Spacer(Modifier.height(TvOverlayTimelineActionGap))
+        }
+        Spacer(Modifier.height(PlayerChromeTokens.timelineActionGap))
         Box {
         PlayerActionRow(
             settingsFocus = settingsFocus,
@@ -424,7 +418,7 @@ internal fun PlayerChromeControls(
             onStop = onStop,
             stopFocus = stopFocus,
             onInteraction = onInteraction,
-            onActionFocused = { lastFocusedControl = it; onActionFocused(it) },
+            onActionFocused = { lastFocusedControl = it; lastAction = it; onActionFocused(it) },
             onTogglePause = when {
                 pauseUnavailableReason != null -> { { onPauseUnavailable(pauseUnavailableReason) } }
                 // The selected channel has no installed target yet; a toggle would reach the previous one.
@@ -473,7 +467,7 @@ internal fun PlayerChromeControls(
 
 @Composable
 internal fun PlayerDownHint(text: String, modifier: Modifier = Modifier, up: Boolean = false, shadow: Shadow? = null) {
-    val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.72f)
+    val tint = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         androidx.tv.material3.Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null, tint = tint,
             modifier = Modifier.size(24.dp).rotate(if (up) -90f else 90f))
