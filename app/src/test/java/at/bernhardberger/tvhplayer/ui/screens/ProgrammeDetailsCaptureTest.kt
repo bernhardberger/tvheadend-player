@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
@@ -192,7 +193,7 @@ class ProgrammeDetailsCaptureTest {
                         if (player) ProgrammeInfoSheetFrame {
                             ProgramDetails(ProgramDetailsState(), event, emptyList(), start.epochSeconds + 600, channel.name.orEmpty(),
                                 { shown, modifier -> ProgrammeHero(shown.image, channel.id, "101", channel.icon, loader, session, modifier) },
-                                { null }, true, FocusRequester(), FocusRequester(), {})
+                                { null }, true, remember { FocusRequester() }, remember { FocusRequester() }, {})
                         }
                         else if (guide) ProgrammeDetailsPanel(event, channel,
                             entry.takeIf { scheduled }, { start.epochSeconds + if (scheduled) -60 else 600 }, true, {}, {}, loader, session)
