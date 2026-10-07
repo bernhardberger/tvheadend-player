@@ -23,6 +23,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import kotlinx.coroutines.launch
 
@@ -84,7 +85,10 @@ internal fun ProgrammeDetailsInformation(
     }
 }
 
-/** Stock TV wide-button geometry. Hosts retain their action identities and focus restoration. */
+/**
+ * The TV kit's two-column dialog action: a full-column 48dp button with a 20dp icon and a label
+ * that wraps instead of cutting off. Hosts retain their action identities and focus restoration.
+ */
 @Composable
 internal fun ProgrammeDetailsButton(
     title: String,
@@ -92,11 +96,23 @@ internal fun ProgrammeDetailsButton(
     modifier: Modifier = Modifier,
     icon: @Composable () -> Unit,
 ) {
-    WideButton(onClick = onClick,
-        modifier = modifier.width(240.dp).onPreviewKeyEvent {
+    val shape = RoundedCornerShape(12.dp)
+    Button(onClick = onClick,
+        modifier = modifier.width(DetailsColumnWidth).heightIn(min = 48.dp).onPreviewKeyEvent {
             it.key == Key.DirectionLeft || it.key == Key.DirectionRight
         },
-        icon = icon, title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }, subtitle = null)
+        shape = ButtonDefaults.shape(shape = shape, focusedShape = shape, pressedShape = shape),
+        colors = ButtonDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha),
+            contentColor = MaterialTheme.colorScheme.onSurface,
+            focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
+            focusedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        ),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
+        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) { icon() }
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
 }
 
 @Composable
