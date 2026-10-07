@@ -211,6 +211,8 @@ class RecordingsVisualLayoutTest {
                 startEpochSeconds = 1_791_000_000) }
         show(entries = entries)
         focused("recordings-folder-Documentaries")
+        // Every tab's first heading shares the Archive heading band, so first rows line up.
+        val firstRowTop = bounds("recordings-folder-Documentaries").top
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
         capture("archive-multi-item", 1f)
@@ -225,7 +227,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-40")
-        assertDenseListGeometry()
+        assertDenseListGeometry(firstRowTop)
         capture("schedule-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-41")
@@ -236,7 +238,7 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
-        assertDenseListGeometry()
+        assertDenseListGeometry(firstRowTop)
         capture("problems-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-61")
@@ -618,11 +620,11 @@ class RecordingsVisualLayoutTest {
         tag.startsWith("recording-list-entry-") || tag.startsWith("recordings-folder-")
     }).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.top }
 
-    private fun assertDenseListGeometry() {
-        val rows = visibleListRows()
+    private fun assertDenseListGeometry(firstRowTop: Float) {
+        val rows = visibleListRows().filter { it.height > 63.5f }
         assertEquals(5, rows.size)
         rows.forEachIndexed { index, row ->
-            assertEquals(175f + index * 68f, row.top, .5f)
+            assertEquals(firstRowTop + index * 68f, row.top, .5f)
             assertEquals(64f, row.height, .5f)
         }
         rows.zipWithNext().forEach { (previous, next) -> assertEquals(4f, next.top - previous.bottom, .5f) }

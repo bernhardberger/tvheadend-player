@@ -408,7 +408,7 @@ internal fun RecordingSchedule(
         state = listState,
         userScrollEnabled = active,
         // Full-width native rows grow by more than the narrow archive rows.
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxSize()
@@ -462,11 +462,12 @@ internal fun RecordingSchedule(
                 true
             },
     ) {
-        groups.forEach { section ->
+        groups.forEachIndexed { index, section ->
             item(key = "header-${section.kind}-${section.date}") {
                 RecordingSectionHeader(
                     text = scheduleSectionLabel(section),
                     recordingNow = section.kind == DvrScheduleSectionKind.RECORDING_NOW,
+                    first = index == 0,
                 )
             }
             items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
@@ -552,7 +553,7 @@ internal fun RecordingProblems(
     LazyColumn(
         state = listState,
         userScrollEnabled = active,
-        contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxSize()
@@ -606,6 +607,7 @@ internal fun RecordingProblems(
                 true
             },
     ) {
+        val firstBucket = DvrProblemBucket.entries.firstOrNull { groups[it].orEmpty().isNotEmpty() }
         DvrProblemBucket.entries.forEach { bucket ->
             val bucketEntries = groups[bucket].orEmpty()
             if (bucketEntries.isNotEmpty()) {
@@ -617,7 +619,8 @@ internal fun RecordingProblems(
                             } else {
                                 R.string.recordings_cancelled
                             }
-                        )
+                        ),
+                        first = bucket == firstBucket,
                     )
                 }
                 items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
@@ -736,25 +739,27 @@ internal fun RecordingListRow(
 private fun RecordingSectionHeader(
     text: String,
     recordingNow: Boolean = false,
+    first: Boolean = false,
 ) {
-    Row(
-        modifier = Modifier
-            .padding(top = 8.dp, bottom = 2.dp)
-            .semantics { heading() },
-        horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (recordingNow) {
-            RecordingStatusIndicator(
-                state = DvrEntryState.RECORDING,
-                announceState = false,
+    // Headings use the Archive heading band; later ones keep a gap to the section above.
+    Box(Modifier.padding(top = if (first) 0.dp else 8.dp).height(recordingsHeadingBandHeight())) {
+        Row(
+            modifier = Modifier.semantics { heading() },
+            horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (recordingNow) {
+                RecordingStatusIndicator(
+                    state = DvrEntryState.RECORDING,
+                    announceState = false,
+                )
+            }
+            Text(
+                text = text,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurface,
             )
         }
-        Text(
-            text = text,
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-        )
     }
 }
 

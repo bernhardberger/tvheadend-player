@@ -6,10 +6,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -67,7 +73,12 @@ internal fun ArchiveDepthContent(
             val id = archiveLevelId(folder.path)
             levels[id] = DepthLevel(
                 id = id,
-                heading = { ArchiveLevelHeading(folder.name) },
+                heading = { emphasis ->
+                    ArchiveLevelHeading(
+                        if (folder.path.isEmpty()) stringResource(R.string.recordings_archive_all) else folder.name,
+                        emphasis,
+                    )
+                },
                 emptyContent = {
                     Text(stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface)
@@ -84,7 +95,7 @@ internal fun ArchiveDepthContent(
                             levels[previewId] = DepthLevel(
                                 id = previewId,
                                 rows = emptyList(),
-                                heading = { ArchiveLevelHeading("") },
+                                heading = { ArchiveLevelHeading("", it) },
                                 passiveContent = {
                                     RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry), imageLoader, currentSession)
                                 },
@@ -128,15 +139,32 @@ internal fun ArchiveDepthContent(
     )
 }
 
+/** Every Recordings tab's first heading uses this band, so first rows line up across tabs. */
 @Composable
-private fun ArchiveLevelHeading(name: String) {
-    val style = MaterialTheme.typography.titleMedium
-    val lineHeight = with(LocalDensity.current) { style.lineHeight.toDp() }
-    Box(Modifier.fillMaxWidth().height(maxOf(32.dp, lineHeight + 8.dp))) {
+internal fun recordingsHeadingBandHeight(): Dp {
+    val lineHeight = with(LocalDensity.current) { MaterialTheme.typography.titleLarge.lineHeight.toDp() }
+    return maxOf(32.dp, lineHeight + 4.dp)
+}
+
+/** The preview-slot heading reads at the row title size: titleMedium 16sp of titleLarge 22sp. */
+internal const val ArchiveHeadingPreviewScale = 16f / 22f
+
+/**
+ * Column headings are the second level under the Recordings title: titleLarge like the
+ * Schedule day headings. In the preview slot they read at the row title size and grow
+ * to full size as the column slides into the active slot.
+ */
+@Composable
+private fun ArchiveLevelHeading(name: String, emphasis: () -> Float) {
+    Box(Modifier.fillMaxWidth().height(recordingsHeadingBandHeight())) {
         if (name.isNotEmpty()) Text(
-            name, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            name, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.testTag("archive-level-heading"),
+            modifier = Modifier.graphicsLayer {
+                scaleX = lerp(ArchiveHeadingPreviewScale, 1f, emphasis())
+                scaleY = scaleX
+                transformOrigin = TransformOrigin(0f, 1f)
+            }.semantics { heading() }.testTag("archive-level-heading"),
         )
     }
 }

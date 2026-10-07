@@ -331,6 +331,7 @@
     <string name="recording_already_scheduled">Diese Sendung wird aufgenommen oder ist geplant.</string>
     <string name="recordings_title">Aufnahmen</string>
     <string name="recordings_archive">Archiv</string>
+    <string name="recordings_archive_all">Alle Aufnahmen</string>
     <string name="recordings_schedule">Zeitplan</string>
     <string name="recordings_problems">Probleme</string>
     <string name="recordings_archive_empty">Keine abspielbaren Aufnahmen in diesem Ordner.</string>

@@ -427,6 +427,7 @@
     <string name="recording_already_scheduled">This program is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>
     <string name="recordings_archive">Archive</string>
+    <string name="recordings_archive_all">All recordings</string>
     <string name="recordings_schedule">Schedule</string>
     <string name="recordings_problems">Problems</string>
     <string name="recordings_archive_empty">No playable recordings in this folder.</string>
