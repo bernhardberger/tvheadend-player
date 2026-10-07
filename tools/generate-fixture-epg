@@ -1,0 +1,634 @@
+#!/usr/bin/env python3
+"""Generate the offline, fictional Vienna EPG. Python 3.9+, standard library only."""
+
+import hashlib
+import json
+import random
+import statistics
+from collections import Counter
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from zoneinfo import ZoneInfo
+
+
+ROOT = Path(__file__).resolve().parent.parent
+OUTPUT = ROOT / "app/src/test/resources/fixture-epg/epg.json"
+TZ = ZoneInfo("Europe/Vienna")
+START = datetime(2026, 9, 14, tzinfo=TZ)
+END = START + timedelta(days=3, hours=6)
+NOW = START + timedelta(days=1, hours=19, minutes=40)
+SEED = 20260914
+SOURCE_SHA = "272def30c91dcd0ca77570f49277d4620623067753dc36d79a541d8640511fb5"
+
+# Manifest channel identity, in original logical-channel-number order. The EPG
+# source itself stores only a channel count. No real channels or brands are used.
+LINEUP = [
+    ("harbor-sport", "Harbor Sport", "sports"),
+    ("harbor-sport-plus", "Harbor Sport Plus", "sports"),
+    ("river-court", "River Court TV", "sports"),
+    ("ridge-cycle", "Ridge Cycle", "sports"),
+    ("northline-news", "Northline News", "news"),
+    ("northline-world", "Northline World", "news"),
+    ("skyglass-weather", "Skyglass Weather", "news"),
+    ("city-desk", "City Desk", "news"),
+    ("amber-stage", "Amber Stage", "entertainment"),
+    ("amber-plus", "Amber Plus", "entertainment"),
+    ("glass-drama", "Glass Harbor Drama", "entertainment"),
+    ("coastal-miles", "Coastal Miles", "entertainment"),
+    ("lumen-live", "Lumen Live", "live"),
+    ("harbor-lights", "Harbor Lights", "live"),
+    ("bright-ring", "Bright Ring", "live"),
+    ("roundtable", "Roundtable Late", "live"),
+    ("cedar-world", "Cedar World", "nature"),
+    ("tide-watch", "Tide Watch", "nature"),
+    ("ridge-earth", "Ridge Earth", "nature"),
+    ("foundry-docs", "Foundry Docs", "nature"),
+    ("kite-kids", "Kite Kids", "kids"),
+    ("kite-junior", "Kite Junior", "kids"),
+    ("little-orbit", "Little Orbit", "kids"),
+    ("quiet-hours", "Quiet Hours", "entertainment"),
+    ("ion-frame", "Ion Frame", "anime"),
+    ("lantern-hour", "Lantern Hour", "anime"),
+    ("second-kettle", "Second Kettle", "anime"),
+]
+PICONS = set("harbor-sport river-court northline-news northline-world amber-stage glass-drama coastal-miles harbor-lights roundtable ridge-earth foundry-docs kite-kids little-orbit quiet-hours ion-frame lantern-hour".split())
+
+# id, title, original synopsis, event genre. These 21 IDs have creative-batch
+# art; not all of that art has been exported to Player's smaller fixture pack.
+REUSED = [
+    ("sport-harbor-kickoff", "Harbor Kickoff", "Fictional match coverage from a floodlit municipal stadium as Harbor FC meet Amber Town.", "football"),
+    ("sport-river-court", "River Court", "Indoor basketball from a modest riverside arena, River Court against North Quay.", "basketball"),
+    ("sport-ridge-peloton", "Ridge Peloton", "Road cycling along a ridge highway as a small fictional peloton climbs in crosswind.", "cycling"),
+    ("news-northline-tonight", "Northline Tonight", "Evening studio news from a fictional regional desk with a calm two-anchor format.", "news"),
+    ("news-field-desk", "Field Desk", "Field reporting from a flooded riverside road, engineered as general news pictures without incident branding.", "news magazine"),
+    ("news-skyglass-weather", "Skyglass Weather", "Weather presentation; maps and icons live only as separate overlays, never burned into masters.", "weather"),
+    ("ent-glass-harbor", "Glass Harbor", "A quiet scripted drama about night-shift workers in a fictional glass workshop on a harbor.", "drama series"),
+    ("ent-coastal-miles", "Coastal Miles", "A walking travel strand along a fictional temperate coast, markets and ferry slips without brands.", "travel series"),
+    ("ent-kettle-hour", "The Kettle Hour", "A warm kitchen programme about broths, bread and weeknight pans, shot like daytime television.", "cookery series"),
+    ("live-roundtable-late", "Roundtable Late", "A late talk circle with four seats, warm wood, and no desk branding.", "talk"),
+    ("live-bright-ring", "Bright Ring Quiz", "A studio quiz with a circular floor mark and unlabeled podiums.", "quiz"),
+    ("live-harbor-lights", "Harbor Lights Live", "A small-hall concert with a fictional quartet, captured like a live music insert.", "concert"),
+    ("nat-foundry-hours", "Foundry Hours", "Observational science/industry: a small metal foundry and measuring bench, no safety-poster type.", "documentary series"),
+    ("nat-ridge-light", "Ridge Light", "Seasonal mountain light, forests and weather moving over a fictional ridge.", "nature series"),
+    ("nat-tide-watch", "Tide Watch", "Coastal wildlife along a tidal estuary, wading birds and seals at a respectful distance.", "nature series"),
+    ("kids-little-orbit", "Little Orbit", "A gentle science table about orbits using marbles and a bowl, no textbook pages.", "children's series"),
+    ("kids-paper-kite", "Paper Kite Tales", "Original 2D animation about a paper kite over painted hills. Not a licensed property.", "children's series"),
+    ("kids-maker-table", "Maker Table", "A craft table where children make paper animals with unlabeled supplies.", "children's series"),
+    ("anime-lantern-road", "Lantern Road", "Original fantasy anime: cartographer Ashi Vale walks a lantern sky-bridge to map a valley that will not stay still.", "animation series"),
+    ("anime-ion-wake", "Ion Wake", "Original sci-fi anime: courier Nera Voss rides a magnetic rail through Ion Harbor when the wake field fails.", "animation series"),
+    ("anime-second-kettle", "The Second Kettle", "Original everyday-life anime: two neighbors share a kitchen when a second kettle starts to boil.", "animation series"),
+]
+NEW = [
+    ("news-hour", "Northline: The Hourly Ledger", "The desk rounds up the day's fictional regional stories.", "news"),
+    ("news-headlines", "Northline: Five-Minute Dispatch", "A concise update from the regional desk.", "news"),
+    ("news-bridges", "Between the Estuary Bridges and the City Hall", "Reporters follow a new footbridge from plans to opening day.", "news magazine"),
+    ("news-markets", "The Quayside Economy Notebook", "A small workshop explains how it shares tools with its neighbours.", "news magazine"),
+    ("news-review", "Northline: The Overnight Review", "Recorded interviews revisit the day's regional stories.", "news magazine"),
+    ("de-hour", "Stadtfenster: Nachrichten zur Stunde", "Die Redaktion berichtet aus der fiktiven Stadt am Schilfbogen.", "news"),
+    ("de-headlines", "Stadtfenster: Kurz gemeldet", "Die wichtigsten Meldungen in fünf Minuten.", "news"),
+    ("de-weather", "Wetter über dem Schilfbogen", "Wolken, Wind und die Aussichten für das Umland.", "weather"),
+    ("de-main", "Stadtfenster: Der Abendüberblick", "Der ausführliche Rückblick auf den Tag in der Region.", "news"),
+    ("de-magazine", "Zwischen Schilfbogen und Höhenweg", "Menschen aus der Region erzählen von ihrem Alltag.", "magazine series"),
+    ("de-review", "Stadtfenster: Die Nachtgespräche", "Aufgezeichnete Gespräche aus der Abendredaktion.", "news magazine"),
+    ("morning", "Good Morning from the Copper Quay Kitchen", "Breakfast, small repairs and ideas for the day ahead.", "magazine series"),
+    ("series-locksmith", "The Locksmiths of Bracken Quay", "Two sisters restore an old workshop and discover its neighbours' stories.", "drama series"),
+    ("series-parcel", "Parcel Office at the Thirteenth Footbridge", "A parcel clerk tries to reunite misplaced keepsakes with their owners.", "comedy series"),
+    ("film-clock", "The Clockmaker Who Borrowed the Northern Wind", "A clockmaker builds a wind-powered clock for an isolated village.", "fantasy film"),
+    ("film-ferry", "The Last Ferry to the Orchard Beyond the Fog", "A ferry mechanic helps a travelling gardener find a forgotten orchard.", "drama film"),
+    ("film-rooftop", "A Rooftop Observatory for the Sleeping Village", "Neighbours turn a disused roof into a place to watch the stars.", "comedy film"),
+    ("access", "Copper Quay: Home Before Supper", "Neighbours trade recipes and repair a communal dining table.", "lifestyle series"),
+    ("access-short", "The Copper Quay Noticeboard", "A short look at this evening's fictional community events.", "magazine"),
+    ("sports-preview", "Harbor Touchline: Before the Whistle", "The studio team introduces the players and conditions.", "sports preview"),
+    ("sports-review", "Harbor Touchline: After the Whistle", "The studio revisits the turning points and speaks to the teams.", "sports review"),
+    ("sports-highlights", "Ridge and River: The Highlights Bench", "Edited action from fictional courts, tracks and roads.", "sports highlights"),
+    ("sports-magazine", "Inside the Bracken Quay Training Shed", "Amateur athletes discuss practice and equipment care.", "sports magazine"),
+    ("doc-canals", "The Hidden Canals Beneath the Copper Meadows", "A survey team follows a forgotten waterway under the meadows.", "documentary series"),
+    ("doc-seeds", "The Seedkeepers of Moss Lantern Valley", "Gardeners compare the seeds stored in a hillside archive.", "nature series"),
+    ("doc-feature", "Six Bridges and a River That Changed Its Mind", "A feature-length journey through the changing course of a fictional river.", "documentary feature"),
+    ("de-doc", "Die Werkstätten am grünen Mühlengraben", "Eine Werkstattgemeinschaft zeigt alte Techniken und neue Ideen.", "documentary series"),
+    ("de-feature", "Ein Fluss sucht sich ein neues Bett", "Eine lange Entdeckungsreise entlang eines fiktiven Flusses.", "documentary feature"),
+    ("kids-buttons", "Nimble Nook and the Button Boat", "A tiny boat carries handmade gifts between garden islands.", "children's series"),
+    ("kids-moss", "Mossbell's Pocket-Sized Weather Station", "A curious beetle measures rain with a thimble.", "children's series"),
+    ("kids-pebbles", "Pebble Post at Willow Bend", "Three friends deliver letters along a winding brook.", "children's series"),
+    ("anime-workshop", "Drawing the Copper-Cloud Railway", "Artists demonstrate how an imaginary railway is drawn.", "animation magazine"),
+    ("anime-feature", "The Cartographer of the Unfinished Moonbridge", "A young mapmaker crosses a bridge that redraws itself each night.", "animation film"),
+    ("music-night", "Moss Lantern Sessions: The Overnight Collection", "Long-form instrumental performances from the fictional valley studio.", "music"),
+    ("music-day", "Copper Strings: The Afternoon Collection", "Acoustic sessions and gentle instrumental arrangements.", "music"),
+    ("music-concert", "The Seven Windows Quartet at Bracken Hall", "A fictional quartet plays a complete evening concert.", "concert"),
+    ("weather-loop", "Skyglass: The Valley Forecast Cycle", "An extended rolling forecast for the fictional valley and coast.", "weather"),
+    ("travel-long", "Following the Towpath Until the Lanterns Fade", "An unhurried walking journey follows a fictional canal through the night.", "slow travel"),
+    ("quiz-makers", "The Brass Compass Puzzle Workshop", "Teams build a route through a tabletop puzzle town.", "quiz series"),
+    ("talk-tools", "Four Chairs beside the Copper Workshop Door", "Makers share the stories behind their favourite tools.", "talk series"),
+    ("access-news", "Copper Quay: The Evening Dispatch", "The local desk presents the day's community news.", "news"),
+    ("access-interview", "At the Copper Quay Kitchen Door", "One neighbour explains a project that brought the street together.", "interview"),
+    ("sports-archive", "Harbor Archive: A Court Session Revisited", "A complete fictional arena session from the archive, with studio context.", "sports replay"),
+    ("anime-preview", "Tonight at the Moonbridge Screening Room", "The presenters introduce tonight's animated feature and its visual world.", "animation preview"),
+    ("anime-making", "Building the Moonbridge One Painted Frame at a Time", "A feature-length studio documentary follows the artists from storyboards to the final screening.", "animation documentary"),
+    ("anime-postcard", "Ink-and-Gear Postcards", "A miniature animated journey follows a letter through a clockwork sorting office.", "animation short"),
+    ("doc-canals-pairs", "Copper Meadows: Waterways in Two Chapters", "Each two-part investigation follows a different branch of the buried canal system.", "documentary series"),
+    ("de-doc-pairs", "Mühlengraben: Eine Werkstatt, zwei Geschichten", "Zweiteilige Porträts begleiten Werkstätten vom ersten Entwurf bis zum fertigen Stück.", "documentary series"),
+]
+PROGRAMMES = {p[0]: dict(title=p[1], synopsis=p[2], genre=p[3]) for p in REUSED + NEW}
+ART_IDS = {p[0] for p in REUSED}
+
+# Series-specific story arcs and chapters form ordered episode catalogues.
+# Nothing is drawn from a shared title pool. Long-running animation, children's
+# and factual strands have 96–144 titles, so this window never wraps a list.
+# The same ordinal on a sister channel is a repeat of the SAME episode.
+SERIES_ARCS = {
+    "ent-glass-harbor": (
+        "The Night Furnace|The Apprentice's Bench|The Harbour Window|The Last Glass Delivery",
+        "A Crack in the Order Book|The Unpaid Shift|A Promise Cast in Blue|The Foreman's Empty Chair|The Glassworker Who Would Not Leave Before the Furnace Cooled|A Visitor after Closing|The Rejected Vase|A Shift Shared in Silence|The Workshop Vote|A Name Etched in Glass|The Apprentice Returns|Light through the New Window"),
+    "ent-coastal-miles": (
+        "The Chalk Estuary|The Pebble Peninsula|The Reed Coast|The Lantern Headland",
+        "Along the Ferry Path|A Market beside the Slipway|The Walk to the Tide Steps|Past the Salt Gardens|A Lunch Stop at the Boat Shed|Following the Old Coast Road|The Path above the Dunes|Across the Foot Ferry|The Village beyond the Shingle|Walking until the Last Fishing Boats Return to Shore|A Detour through the Harbour|The View from the Last Milepost"),
+    "ent-kettle-hour": (
+        "The Broth Pot|The Bread Tin|The Weeknight Pan|The Pantry Shelf",
+        "Leeks without the Fuss|Carrots for a Crowd|The Last Spoonful of Lentils|A Gentle Onion Base|Making Room for Root Vegetables|Herbs from a Window Box|A Supper for Late Arrivals|Roasting the Forgotten Parsnip|The Cook Who Saved Every Crust for Tomorrow's Lunch|A Little More Barley|Sharing the Warmest Bowl|Leftovers Worth Looking Forward To"),
+    "series-locksmith": (
+        "The Bracken Workshop|The Lost Key Ledger|The Upper Quay Locks",
+        "A Lock without a Door|The Sister Who Kept the Receipts|A Call from the Empty House|The Spare Key Dispute|A Customer after Midnight|The Workshop's Unfinished Cupboard|The Mechanism Nobody Recognised|A Door Finally Opened"),
+    "series-parcel": (
+        "The Thirteenth Footbridge Round|The Misaddressed Sack|The Orchard Delivery",
+        "A Stamp on the Wrong Corner|The Clerk and the Crooked Label|A Parcel Too Wide for the Bicycle|The Addressee with Two Front Doors|A Delivery Note Written Entirely in Questions|The Queue That Went Round the Sorting Office Twice|An Unclaimed Hatbox|Signed for by the Neighbour's Goat"),
+    "morning": (
+        "Copper Quay Breakfast Club|The Early Kitchen Table|Before the Quay Wakes",
+        "The First Loaf Is Ready|Repairing a Wobbly Stool|Breakfast for the Garden Crew|A Window Box for Beginners|Setting a Table for Ten|A Friendly Start to Market Day|The Kettle before the School Run|A Bench for the Breakfast Corner"),
+    "access": (
+        "Supper on Copper Street|The Shared Dining Table|Copper Quay Comes Home",
+        "A Seat for the New Neighbour|Who Borrowed the Serving Spoon|A Tablecloth Made from Scraps|Moving Dinner into the Courtyard|The Potluck Plan|A Shelf for Everyone's Plates|The Street That Cooked Together|Supper after the Rain"),
+    "nat-foundry-hours": (
+        "The Sand Mould|The Measuring Bench|The Small Furnace|The Pattern Store",
+        "Preparing the First Pour|Reading the Cooling Curve|A Gauge for Tiny Castings|Where the Sprues Go|The Shape inside the Sand|Testing a New Alloy|The Mouldmaker's Notebook|Measuring the Finished Piece|A Pattern Repaired by Hand|The Trial Casting|Listening to the Cooling Metal|From Drawing to Casting"),
+    "nat-ridge-light": (
+        "The Eastern Scree|The High Meadow|The Cedar Saddle|The Cloud Ridge",
+        "Before the First Sunbeam|Shadows across the Larch Trees|Rain on the Upper Slopes|The Haze at Midday|An Evening of Long Shadows|Light beneath the Cloud Bank|The First Frost on the Ridge|A Clearing after the Storm|The Forest in Amber Light|Mists above the Tree Line|The Slope Facing Away from the Sun|The Final Glow on the Summit"),
+    "nat-tide-watch": (
+        "The Outer Sandbank|The Wading Pool|The Seal Inlet|The Reed Estuary",
+        "Tracks on the Falling Tide|Feeding along the Mud Line|The Birds at High Water|A Quiet Hour with the Seals|Shells beneath the Ripple Marks|The Incoming Tide at Dawn|Shelter behind the Dune|A Nest above the Flood Line|The Long Wait for Low Water|The Marsh after Rain|A Channel Cut by the Tide|Watching from the Far Bank"),
+    "doc-seeds": (
+        "The Moss Lantern Seed Vault|The Hillside Bean Garden|The Valley Orchard Archive|The Terraced Herb Beds",
+        "Sorting Last Autumn's Harvest|Testing the Oldest Seeds|A Drawer of Forgotten Varieties|Drying Seeds in the Loft|The Gardeners' Exchange|Labels Written by Three Generations|The First Green Shoots|Keeping a Variety Alive|A Catalogue in Pencil|Seeds for the Upper Terrace|Growing Two Varieties Side by Side|The Next Season's Collection"),
+    "doc-canals": (
+        "The Copper Aqueduct|The Buried Lock|The Meadow Culvert|The Old Canal Basin",
+        "Surveying the Hidden Channel|Reading the Water Marks|A Map beneath the Silt|Following the Brickwork|Measuring the Lost Gradient|The Gate beneath the Reeds|A Culvert Revealed by Drought|Tracing the Tow Rope Scars|The Surveyor's Second Visit|Water beneath the Market Square|A Sounding at the Junction|The Channel Found Again"),
+    "de-doc": (
+        "Die Drechselbank|Die Töpferstube|Die Weberei|Die Buchbinderei|Die Korbflechterei|Die Glaswerkstatt|Die Schmiede|Die Papiermühle|Die Uhrmacherbank|Die Holzwerkstatt|Die Färberei|Die Bürstenbinderei",
+        "Der erste Entwurf|Material mit Geschichte|Ein Werkzeug aus Großmutters Schublade|Warum ein winziger Fehler den ganzen Arbeitsablauf verändert|Die Hände kennen den nächsten Schritt|Ein Lehrling stellt Fragen|Reparieren statt Ersetzen|Das fertige Stück verlässt die Werkstatt"),
+    "de-magazine": (
+        "Am Schilfbogen|Auf dem Höhenweg|Im Bahnhofsgarten|An der Ufertreppe|Im Siedlungshof|Auf dem Mühlenplatz|Hinter dem Gemeindehaus|Unter den Obstbäumen|Am Dorfbrunnen|In der Lesestube|Auf dem Wochenmarkt|Bei der Fähre",
+        "Wer kümmert sich um die Bank|Ein Treffpunkt für alle|Die Nachbarn packen an|Ein kleiner Umweg mit großer Wirkung|Was sich seit dem letzten Sommer verändert hat|Eine Idee wird gemeinsam ausprobiert|Das Gespräch nach Feierabend|Ein ganz gewöhnlicher Tag mit ungewöhnlich vielen Begegnungen"),
+    "kids-paper-kite": (
+        "The Painted Hill|The Paper Orchard|The Crayon Valley|The Ribbon Cloud|The Folded Forest|The Tissue Meadow|The Chalk Pond|The Cardboard Barn|The Pencil Bridge|The Watercolour Garden|The Patchwork Sky|The Paper Moon",
+        "Kite Finds a Tail|A Fold for a Friend|The Wind Takes a Nap|A Ribbon Comes Loose|Kite Shares a Colour|A Cloud Made of Scraps|The Little Tear Is Mended|A Gentle Flight Home"),
+    "kids-little-orbit": (
+        "The Marble Bowl|The Spinning Tray|The String Circle|The Rolling Ramp|The Paper Planet|The Pebble Moon|The Button Sun|The Tilted Plate|The Round Shadow|The Spoon Satellite|The Hoop Model|The Tabletop Sky",
+        "What Makes It Turn|A Push and a Pause|Nearer and Farther|Following the Curved Path|Watching from Above|The Slowest Round Trip|Changing One Thing|Trying the Experiment Again"),
+    "kids-maker-table": (
+        "The Paper Fox|The Cardboard Owl|The Felt Otter|The Cork Badger|The Leaf Hedgehog|The Wool Rabbit|The Button Turtle|The Clay Snail|The Tissue Moth|The Folded Frog|The Scrap Robin|The String Mouse",
+        "Choosing Our Materials|A Shape for the Body|Two Carefully Cut Ears|Sticking without a Mess|Making a Tiny Home|A Colourful Finishing Touch|A Present for a Friend|Our Little Animal Parade"),
+    "kids-buttons": (
+        "Button Boat at Lily Island|Button Boat at Acorn Dock|Button Boat at Daisy Bend|Button Boat at Puddle Point|Button Boat at Moss Pier|Button Boat at Clover Bank|Button Boat at Reed Landing|Button Boat at Fern Bay|Button Boat at Petal Quay|Button Boat at Twig Harbour|Button Boat at Berry Reach|Button Boat at Willow Steps",
+        "Nimble Packs a Gift|A Sail from a Handkerchief|The Missing Blue Button|A Passenger with Wet Paws|A Basket Too Big|Nimble Learns to Wait|A Thank-You on a Leaf|The Smallest Welcome Party"),
+    "kids-moss": (
+        "Mossbell's Rain Gauge|Mossbell's Wind Sock|Mossbell's Dew Jar|Mossbell's Sun Dial|Mossbell's Cloud Chart|Mossbell's Frost Tray|Mossbell's Puddle Ruler|Mossbell's Leaf Sail|Mossbell's Shade Tent|Mossbell's Snow Cup|Mossbell's Breeze Bell|Mossbell's Weather Diary",
+        "One Careful Measurement|A Surprise before Breakfast|The Beetle Checks Twice|A Drop Too Many|Borrowing a Thimble|Making a Little Prediction|The Weather Does Something Different|Writing It All Down"),
+    "kids-pebbles": (
+        "Willow Bend Postbag|Brookside Postbag|Stepping-Stone Postbag|Waterwheel Postbag|Hazel Pool Postbag|Minnow Bridge Postbag|Reed Path Postbag|Old Ford Postbag|Cress Bank Postbag|Mossy Gate Postbag|Alder Reach Postbag|Sedge Corner Postbag",
+        "A Letter Wrapped in String|The Friends Read the Address|A Delivery across the Brook|Waiting for a Reply|A Pebble to Hold the Envelope|The Postbag Gets Heavy|Three Stamps and a Smile|The Last Letter of the Round"),
+    "anime-ion-wake": (
+        "The Silent Rail|The Wake Relay|The Magnetic Causeway|The Copper Switchyard|The Unlit Terminal|The Broken Signal|The Inverted Platform|The Courier Beacon|The Upper Power Loop|The Ion Gate|The Return Circuit|The Last Dispatch",
+        "Nera Misses the Signal|A Package outside the Manifest|The Field Drops to Zero|Rails above the Sleeping Port|A Message in the Wake Noise|The Courier Who Rode beyond the Last Working Relay|A Detour through the Service Tunnel|The Beacon Answers Twice|A Passenger without a Transit Seal|The Switchyard Goes Dark|Nera Restores the Route|The Next Dispatch Arrives"),
+    "anime-lantern-road": (
+        "The First Sky-Bridge|The Valley of Erased Lines|The Folded Horizon|The Lantern Atlas|The Wandering Contour|The Unmapped Stair|The Ink River|The Cartographer's Tower|The Reversed Compass|The Vanishing Plateau|The New Meridian|The Last Map Sheet",
+        "Ashi Draws the Wrong Shore|A Path That Moves at Sunrise|The Lantern Casts Two Shadows|An Empty Space on the Map|The Surveyor with a Borrowed Compass|Ashi Waits for the Valley to Stop Moving Long Enough to Draw|The Bridge beyond the Margin|A Contour Written in Light|The Mapmaker's Unfinished Promise|The Sky-Bridge Loses a Step|A Line Finally Meets Its End|Ashi Opens a Fresh Sheet"),
+    "anime-second-kettle": (
+        "The Shared Kitchen|The Narrow Balcony|The Borrowed Pantry|The Quiet Stairwell|The Courtyard Supper|The Spare Cupboard|The Rainy Landing|The Rooftop Herb Box|The Winter Breakfast|The Open Kitchen Door|The Neighbours' Table|The Second Teapot",
+        "Two Cups and Only One Saucer|The Kettle Boils Too Soon|A Note beside the Sugar Jar|Someone Has Moved the Tea Leaves|An Invitation Written on the Shopping List|The Neighbour Who Always Arrives Just as the Water Boils|A Very Small Disagreement about Toast|The Missing Oven Glove|Sharing the Last Biscuit|A New Place for the Teacups|Waiting for the Other Kettle|Breakfast Together Again"),
+    "quiz-makers": (
+        "The Brass Compass Harbour Board|The Brass Compass Garden Board|The Brass Compass Hill Board|The Brass Compass Canal Board",
+        "The Route with No Straight Lines|A Bridge for Three Tokens|The Team That Chose the Long Way|A Clue inside the Clock Tower|Two Routes to the Same Square|The Last Tile in the Box|A Shortcut Nobody Noticed|The Final Compass Turn"),
+    "talk-tools": (
+        "The Copper Door Joiners|The Copper Door Potters|The Copper Door Weavers|The Copper Door Repairers",
+        "The Tool Passed Down Twice|A Handle Worn Smooth|The First Tool Bought with Wages|Four Opinions about One Workbench|A Repair Remembered for Years|The Guest Who Brought an Entire Box of Unfinished Projects|A Tool That Changed the Workshop|The Chair Reserved for the Apprentice"),
+}
+EPISODE_TITLES = {
+    programme: [f"{arc}: {chapter}" for arc in arcs.split("|") for chapter in chapters.split("|")]
+    for programme, (arcs, chapters) in SERIES_ARCS.items()
+}
+EPISODE_TITLES.update({
+    "doc-canals-pairs": [f"{branch} — Part {part}" for branch in
+                         ("The Meadow Lock Survey", "Following the Buried Aqueduct", "The Basin beneath Copper Hill") for part in (1, 2)],
+    "de-doc-pairs": [f"{workshop} – Teil {part}" for workshop in
+                     ("Die Mühlengraben-Geigenbauer", "Ein neuer Ofen für die Töpferstube", "Die Rückkehr des alten Webstuhls") for part in (1, 2)],
+})
+
+# Editorial slot-length contracts, in minutes, not ranges inferred from output.
+# Advertising and editions account for small variation; omnibus-sized slots
+# must use a different programme, not stretch an ordinary episode or short.
+DURATION_RANGES = {
+    "sport-harbor-kickoff": (150, 210), "sport-river-court": (150, 210), "sport-ridge-peloton": (240, 330),
+    "news-northline-tonight": (20, 20), "news-field-desk": (15, 40), "news-skyglass-weather": (3, 5),
+    "ent-glass-harbor": (45, 50), "ent-coastal-miles": (45, 60), "ent-kettle-hour": (40, 60),
+    "live-roundtable-late": (30, 60), "live-bright-ring": (60, 60), "live-harbor-lights": (180, 180),
+    "nat-foundry-hours": (45, 55), "nat-ridge-light": (45, 55), "nat-tide-watch": (45, 55),
+    "kids-little-orbit": (15, 25), "kids-paper-kite": (7, 13), "kids-maker-table": (15, 25),
+    "anime-lantern-road": (25, 25), "anime-ion-wake": (25, 25), "anime-second-kettle": (25, 25),
+    "news-hour": (12, 15), "news-headlines": (5, 5), "news-bridges": (40, 40), "news-markets": (40, 40),
+    "news-review": (40, 45), "de-hour": (12, 15), "de-headlines": (5, 5), "de-weather": (3, 5),
+    "de-main": (20, 20), "de-magazine": (15, 40), "de-review": (40, 45), "morning": (180, 180),
+    "series-locksmith": (45, 50), "series-parcel": (45, 50), "film-clock": (125, 125),
+    "film-ferry": (100, 110), "film-rooftop": (95, 95), "access": (45, 50), "access-short": (8, 8),
+    "sports-preview": (30, 30), "sports-review": (30, 30), "sports-highlights": (90, 180),
+    "sports-magazine": (60, 60), "doc-canals": (45, 55), "doc-seeds": (45, 55), "doc-feature": (90, 90),
+    "de-doc": (45, 55), "de-feature": (90, 90), "kids-buttons": (7, 13), "kids-moss": (7, 13),
+    "kids-pebbles": (15, 25), "anime-workshop": (10, 10), "anime-feature": (104, 105),
+    "music-night": (180, 360), "music-day": (240, 240), "music-concert": (180, 180),
+    "weather-loop": (30, 360), "travel-long": (420, 420), "quiz-makers": (60, 60), "talk-tools": (60, 60),
+    "access-news": (15, 15), "access-interview": (22, 22), "sports-archive": (180, 180),
+    "anime-preview": (14, 15), "anime-making": (60, 67), "anime-postcard": (5, 5),
+    "doc-canals-pairs": (45, 45), "de-doc-pairs": (45, 45),
+}
+DELIBERATE_LOOPS = {"weather-loop", "news-skyglass-weather", "music-night", "music-day"}
+
+
+def iso(value):
+    return value.astimezone(timezone.utc).isoformat()
+
+
+def instant(value):
+    return datetime.fromisoformat(value)
+
+
+def require(condition, message):
+    if not condition:
+        raise ValueError(message)
+
+
+class Schedule:
+    def __init__(self, channel, events, gaps, rng):
+        self.channel, self.events, self.gaps, self.rng = channel, events, gaps, rng
+        self.cursor = START
+        self.episodes = Counter()
+
+    def add(self, minutes, programme, subtitle=None):
+        if self.cursor >= END:
+            return
+        stop = self.cursor + timedelta(minutes=minutes)
+        require(stop <= END, f"Do not clip {programme} at the coverage boundary")
+        p = PROGRAMMES[programme]
+        event = dict(event_id=f"evt-{self.channel['channel_id']}-{self.cursor:%Y%m%dT%H%M}",
+                     channel_id=self.channel['channel_id'], programme_id=programme,
+                     **p, start=iso(self.cursor), stop=iso(stop),
+                     duration_min=int((stop - self.cursor).total_seconds() // 60),
+                     locale=self.channel['locale'], has_art=programme in ART_IDS)
+        if "series" in p["genre"]:
+            self.episodes[programme] += 1
+            episode = self.episodes[programme]
+            titles = EPISODE_TITLES[programme]
+            require(subtitle is None, "Series subtitles must come from their episode catalogue")
+            require(episode <= len(titles), f"Episode catalogue exhausted: {programme}")
+            event.update(subtitle=titles[episode - 1], season=1, episode=episode)
+        elif subtitle:
+            event["subtitle"] = subtitle
+        self.events.append(event)
+        self.cursor = stop
+
+    def block(self, rows):
+        for minutes, programme in rows:
+            self.add(minutes, programme)
+
+    def gap(self, minutes, reason):
+        stop = min(self.cursor + timedelta(minutes=minutes), END)
+        if self.cursor < stop:
+            self.gaps.append(dict(channel_id=self.channel["channel_id"], start=iso(self.cursor),
+                                  stop=iso(stop), reason=reason))
+            self.cursor = stop
+
+
+def news(s, day):
+    german = s.channel["locale"] == "de"
+    hour = "de-hour" if german else "news-hour"
+    weather = "de-weather" if german else "news-skyglass-weather"
+    headlines = "de-headlines" if german else "news-headlines"
+    magazine = "de-magazine" if german else "news-field-desk"
+    for h in range(24):
+        s.add(15 if h % 2 == 0 else 12, hour)
+        s.add(5 if h % 2 == 0 else 3, weather)
+        if h == 19:
+            s.add(15, magazine)
+            s.add(20, "de-main" if german else "news-northline-tonight")
+            s.add(5, weather)
+            s.add(5, headlines)
+        elif h < 6:
+            s.add(40 if h % 2 == 0 else 45, "de-review" if german else "news-review",
+                  "Wiederholung der Abendgespräche" if german else "Evening interviews: repeat")
+        elif h % 2 == 0:
+            s.add(40, magazine if german else s.rng.choice([magazine, "news-bridges", "news-markets"]))
+        else:
+            s.add(15, magazine)
+            s.add(5, headlines)
+            s.add(25, magazine)
+
+
+def general(s, day):
+    # Sister channels share daytime strands, but not the same prime-time night.
+    prime_day = day + s.channel["number"] - 9
+    s.block([(40, "live-roundtable-late"), (110, "film-ferry"), (45, "ent-glass-harbor"),
+             (45, "series-locksmith"), (60, "ent-kettle-hour"), (60, "ent-coastal-miles"),
+             (180, "morning"), (60, "ent-kettle-hour"), (60, "live-bright-ring"),
+             (60, "ent-coastal-miles"), (60, "ent-kettle-hour"), (60, "live-bright-ring")])
+    s.block([(45, "ent-glass-harbor"), (45, "ent-glass-harbor"), (50, "series-locksmith"),
+             (50, "series-locksmith"), (50, "series-parcel"), (47, "access"),
+             (43, "ent-kettle-hour"), (22, "access-interview"), (8, "access-short"), (15, "access-news")])
+    if prime_day % 3 == 1:
+        s.block([(45, "series-parcel"), (45, "series-parcel"), (35, "live-roundtable-late")])
+    elif prime_day % 3 == 2:
+        s.block([(95, "film-rooftop"), (30, "live-roundtable-late")])
+    else:
+        s.add(125, "film-clock")
+    s.add(100, "film-ferry")
+
+
+def sports(s, day):
+    s.block([(180, "sports-archive"), (180, "sports-highlights"), (60, "sports-magazine"),
+             (120, "sports-highlights"), (60, "sports-magazine"), (90, "sports-highlights"),
+             (30, "sports-preview")])
+    cycling = s.channel["channel_id"] == "ch-ridge-cycle"
+    s.add(300 if cycling else 180, "sport-ridge-peloton" if cycling else "sport-river-court",
+          f"Stage {day + 1}: Copper Ridge to Moss Hollow — live" if cycling else "Afternoon court session — live")
+    s.add(30, "sports-review")
+    if not cycling:
+        s.add(120, "sports-highlights")
+    s.block([(60, "sports-magazine"), (30, "sports-preview")])
+    evening = "sport-river-court" if s.channel["channel_id"] == "ch-river-court" else "sport-harbor-kickoff"
+    s.add(180, evening, f"{PROGRAMMES[evening]['title']}: evening arena session — live")
+    s.block([(30, "sports-review"), (90, "sports-highlights")])
+
+
+def kids(s, day):
+    s.gap(360, "off-air")
+    # Each hour is a curated 60-minute short-form block, never a clipped short.
+    for hour in range(14):
+        durations = [7, 8, 20, 25] if hour % 2 else [12, 13, 15, 20]
+        shorts = ["kids-paper-kite", "kids-buttons", "kids-moss"]
+        longer = ["kids-little-orbit", "kids-maker-table", "kids-pebbles"]
+        s.rng.shuffle(shorts)
+        s.rng.shuffle(longer)
+        s.block(list(zip(durations, shorts[:2] + longer[:2])))
+    s.gap(240, "off-air")
+
+
+def docs(s, day):
+    german = s.channel["locale"] == "de"
+    pool = ["de-doc"] if german else ["nat-ridge-light", "nat-tide-watch", "nat-foundry-hours", "doc-seeds", "doc-canals"]
+    for duration in [50, 55, 45, 55, 55, 50, 50]:
+        s.add(duration, s.rng.choice(pool))
+    for block in range(3):
+        for duration in [50, 55, 45, 45, 45]:
+            s.add(duration, s.rng.choice(pool))
+    doc = "de-doc-pairs" if german else "doc-canals-pairs"
+    s.add(45, doc)
+    s.add(45, doc)
+    s.add(90, "de-feature" if german else "doc-feature")
+    for _ in range(4):
+        s.add(45, s.rng.choice(pool))
+
+
+def music(s, day):
+    s.block([(360, "music-night"), (240, "music-day"), (60, "ent-kettle-hour"), (60, "ent-kettle-hour"),
+             (240, "music-day"), (60, "ent-coastal-miles"), (60, "ent-coastal-miles"),
+             (180, "live-harbor-lights" if day % 2 == 0 else "music-concert"),
+             (180, "music-night")])
+
+
+def weather(s, day):
+    s.add(360, "weather-loop")
+    for hour in range(18):
+        if hour == 12:
+            for _ in range(6):
+                s.add(5, "news-skyglass-weather")
+            s.add(30, "weather-loop")
+        else:
+            s.add(60, "weather-loop")
+
+
+def travel(s, day):
+    # The 23:00–06:00 walk is emitted in one piece by the previous day.
+    if day == 0:
+        s.add(360, "music-night")
+    s.block([(60, "ent-coastal-miles")] * 3 + [(60, "ent-kettle-hour")] * 3 + [(60, "ent-coastal-miles")] * 2)
+    if day == 1:
+        s.gap(120, "missing-guide-data")
+    else:
+        s.block([(60, "ent-coastal-miles")] * 2)
+    s.block([(60, "ent-kettle-hour"), (60, "ent-kettle-hour"), (180, "music-concert"),
+             (60, "ent-coastal-miles"), (60, "ent-coastal-miles"),
+             (420, "travel-long")])
+
+
+def live(s, day):
+    primary = "live-bright-ring" if s.channel["channel_id"] == "ch-bright-ring" else "live-roundtable-late"
+    for block in range(8):
+        s.block([(60, primary), (60, "quiz-makers"), (60, "talk-tools")])
+
+
+def anime(s, day):
+    primary = {"ch-ion-frame": "anime-ion-wake", "ch-lantern-hour": "anime-lantern-road",
+               "ch-second-kettle": "anime-second-kettle"}[s.channel["channel_id"]]
+    for hour in range(20):
+        s.block([(25, primary), (25, primary), (10, "anime-workshop")])
+    if s.channel["channel_id"] == "ch-ion-frame":
+        s.block([(14, "anime-preview"), (104, "anime-feature"), (67, "anime-making"),
+                 (25, primary), (25, primary), (5, "anime-postcard")])
+    else:
+        s.block([(15, "anime-preview"), (105, "anime-feature"), (60, "anime-making"),
+                 (25, primary), (25, primary), (10, "anime-workshop")])
+
+
+def make_fixture():
+    rng = random.Random(SEED)
+    channels, events, gaps = [], [], []
+    profiles = dict(news=news, entertainment=general, sports=sports, kids=kids, nature=docs, live=live, anime=anime)
+    for number, (slug, name, genre) in enumerate(LINEUP, 1):
+        channel = dict(channel_id=f"ch-{slug}", number=number, name=name, genre=genre,
+                       locale="de" if slug in ("city-desk", "foundry-docs") else "en",
+                       picon=f"{slug}.png" if slug in PICONS else None)
+        channels.append(channel)
+        s = Schedule(channel, events, gaps, rng)
+        profile = profiles[genre]
+        if slug == "skyglass-weather":
+            profile = weather
+        elif slug in ("harbor-lights", "quiet-hours"):
+            profile = music
+        elif slug == "coastal-miles":
+            profile = travel
+        for day in range(4):
+            if slug == "harbor-sport-plus" and day == 1:
+                s.gap(54 * 60, "sparse-guide-ended")
+                break
+            if s.cursor >= END:
+                break
+            profile(s, day)
+            expected = min(START + timedelta(days=day + 1, hours=6 if profile == travel else 0), END)
+            require(s.cursor == expected, f"Profile length mismatch: {slug} day {day}: {s.cursor}")
+    # Merge consecutive off-air portions across calendar-day boundaries.
+    merged = []
+    for gap in gaps:
+        if merged and all(merged[-1][key] == gap[key] for key in ("channel_id", "reason")) and merged[-1]["stop"] == gap["start"]:
+            merged[-1]["stop"] = gap["stop"]
+        else:
+            merged.append(gap.copy())
+    events.sort(key=lambda e: (e["start"], e["channel_id"]))
+    fixture = dict(reference_start=iso(START), timezone="Europe/Vienna", seed=SEED,
+                   generator="tools/generate-fixture-epg", source=dict(path="catalogue/epg.json", sha256=SOURCE_SHA),
+                   coverage_stop=iso(END), snapshot_time=iso(NOW), channels=channels,
+                   events=events, gaps=merged, dvr_fixtures=[])
+    def record(channel, local, state, **extra):
+        start = iso(datetime.fromisoformat(local).replace(tzinfo=TZ))
+        e = next(e for e in events if e["channel_id"] == channel and e["start"] == start)
+        fixture["dvr_fixtures"].append(dict(dvr_id=f"dvr-{len(fixture['dvr_fixtures']) + 1:02}",
+                                          event_id=e["event_id"], channel_id=channel,
+                                          title=e["title"], state=state, **extra))
+    record("ch-amber-stage", "2026-09-14T20:15", "completed")
+    record("ch-ridge-cycle", "2026-09-14T12:00", "failed", error="No input signal (fictional)")
+    record("ch-northline-news", "2026-09-15T19:30", "recording")
+    record("ch-amber-stage", "2026-09-15T20:15", "scheduled", series_id="series-parcel")
+    record("ch-amber-stage", "2026-09-15T21:00", "scheduled", series_id="series-parcel")
+    record("ch-amber-stage", "2026-09-16T14:00", "scheduled", series_id="ent-glass-harbor")
+    record("ch-harbor-sport", "2026-09-16T19:00", "scheduled", conflict_group="one-tuner-evening", conflict=True)
+    record("ch-river-court", "2026-09-16T19:00", "scheduled", conflict_group="one-tuner-evening", conflict=True)
+    return fixture
+
+
+def validate(fixture):
+    events, gaps = fixture["events"], fixture["gaps"]
+    require(set(DURATION_RANGES) == set(PROGRAMMES), "Every programme needs a duration contract")
+    require(all(0 < low <= high for low, high in DURATION_RANGES.values()), "Invalid duration contract")
+    require(DELIBERATE_LOOPS <= set(PROGRAMMES) and
+            all(PROGRAMMES[p]["genre"] in ("weather", "music") for p in DELIBERATE_LOOPS), "Invalid deliberate loop")
+    require(set(EPISODE_TITLES) == {p for p, data in PROGRAMMES.items() if "series" in data["genre"]},
+            "Every series needs its own episode catalogue")
+    catalogue_titles = [title for titles in EPISODE_TITLES.values() for title in titles]
+    require(len(set(catalogue_titles)) == len(catalogue_titles), "Episode catalogues reuse a subtitle")
+    channels = {c["channel_id"]: c for c in fixture["channels"]}
+    require(len(channels) == 27, "Expected all 27 original channels")
+    require(len(fixture["channels"]) == 27 and {c["number"] for c in channels.values()} == set(range(1, 28)),
+            "Duplicate channel identities or numbers")
+    require(all(g["channel_id"] in channels and g["reason"] in
+                ("off-air", "missing-guide-data", "sparse-guide-ended") for g in gaps), "Invalid declared gap")
+    require(len({e["event_id"] for e in events}) == len(events), "Duplicate event IDs")
+    require({e["programme_id"] for e in events} >= ART_IDS, "A reused art programme is missing")
+    stats = []
+    for channel_id, channel in channels.items():
+        rows = sorted((e for e in events if e["channel_id"] == channel_id), key=lambda e: e["start"])
+        for previous, following in zip(rows, rows[1:]):
+            programme = previous["programme_id"]
+            require(not (previous["stop"] == following["start"] and programme == following["programme_id"] and
+                         "series" not in PROGRAMMES[programme]["genre"] and programme not in DELIBERATE_LOOPS),
+                    f"Adjacent non-series programme without a declared loop: {programme}")
+        holes = [g for g in gaps if g["channel_id"] == channel_id]
+        intervals = sorted(rows + holes, key=lambda e: e["start"])
+        cursor = START
+        for interval in intervals:
+            start, stop = instant(interval["start"]), instant(interval["stop"])
+            require(start == cursor, f"Undeclared gap or overlap: {channel_id} {start}")
+            require(start < stop <= END, f"Invalid interval: {channel_id} {start}")
+            require(start.second == stop.second == start.microsecond == stop.microsecond == 0,
+                    "Non-whole-minute interval")
+            cursor = stop
+        require(cursor == END, f"Incomplete coverage: {channel_id}")
+        if channel["picon"]:
+            require((ROOT / "app/src/test/resources/fixture-art/picons" / channel["picon"]).is_file(),
+                    f"Missing pack picon: {channel['picon']}")
+        durations = [e["duration_min"] for e in rows]
+        off_grid = sum(instant(e["start"]).astimezone(TZ).minute not in (0, 15, 30, 45) for e in rows)
+        stats.append(f"{channel_id:23} events={len(rows):3} min={min(durations):3} max={max(durations):3} "
+                     f"median={statistics.median(durations):5g} off_grid={off_grid:3} gaps={len(holes)}")
+    subtitle_owners, episode_subtitles = {}, {}
+    channel_episodes = {}
+    for e in sorted(events, key=lambda e: (e["start"], e["channel_id"])):
+        require(e["channel_id"] in channels, "Unknown channel")
+        require(e["duration_min"] * 60 == (instant(e["stop"]) - instant(e["start"])).total_seconds(), "Wrong duration")
+        require(e["has_art"] == (e["programme_id"] in ART_IDS), "Wrong art mapping")
+        require(e["locale"] == channels[e["channel_id"]]["locale"], "Wrong locale")
+        require(all(e[key] == PROGRAMMES[e["programme_id"]][key] for key in ("title", "synopsis", "genre")), "Programme identity changed")
+        low, high = DURATION_RANGES[e["programme_id"]]
+        require(low <= e["duration_min"] <= high,
+                f"Implausible duration for {e['programme_id']}: {e['duration_min']} outside {low}–{high}")
+        if e.get("subtitle"):
+            owner = subtitle_owners.setdefault(e["subtitle"], e["programme_id"])
+            require(owner == e["programme_id"], f"Subtitle belongs to multiple programmes: {e['subtitle']}")
+        if "series" in e["genre"]:
+            require(e.get("subtitle") and e.get("season", 0) > 0 and e.get("episode", 0) > 0, "Missing episode metadata")
+            key = (e["programme_id"], e["season"], e["episode"])
+            subtitle = episode_subtitles.setdefault(key, e["subtitle"])
+            require(subtitle == e["subtitle"], f"Repeat changed its episode subtitle: {key}")
+            titles = EPISODE_TITLES[e["programme_id"]]
+            require(e["season"] == 1 and e["episode"] <= len(titles) and
+                    e["subtitle"] == titles[e["episode"] - 1], "Episode does not match its catalogue")
+            channel_key = (e["channel_id"], e["programme_id"], e["season"])
+            seen = channel_episodes.setdefault(channel_key, set())
+            require(e["episode"] in seen or e["episode"] == max(seen, default=0) + 1,
+                    f"New episodes must increase in order: {channel_key}")
+            seen.add(e["episode"])
+        require("year" not in e, "Film metadata must be fictional and year-free")
+        if channels[e["channel_id"]]["genre"] == "kids":
+            a, b = instant(e["start"]).astimezone(TZ), instant(e["stop"]).astimezone(TZ)
+            require(6 <= a.hour < 20 and b.hour <= 20 and 7 <= e["duration_min"] <= 25, "Kids outside operating hours/short lengths")
+    by_id = {e["event_id"]: e for e in events}
+    for dvr in fixture["dvr_fixtures"]:
+        e = by_id[dvr["event_id"]]
+        require(all(dvr[key] == e[key] for key in ("channel_id", "title")), "DVR reference mismatch")
+        if dvr["state"] == "recording":
+            require(instant(e["start"]) <= NOW < instant(e["stop"]), "Recording not active at snapshot")
+        elif dvr["state"] == "scheduled":
+            require(instant(e["start"]) > NOW, "Scheduled event already started")
+        else:
+            require(instant(e["stop"]) <= NOW, "Finished DVR event is in future")
+        if "series_id" in dvr:
+            require(dvr["series_id"] == e["programme_id"] and "episode" in e, "DVR series mismatch")
+    conflicts = [by_id[d["event_id"]] for d in fixture["dvr_fixtures"] if d.get("conflict")]
+    require(len(conflicts) == 2 and conflicts[0]["channel_id"] != conflicts[1]["channel_id"] and
+            max(e["start"] for e in conflicts) < min(e["stop"] for e in conflicts), "Invalid conflict pair")
+    # Assert the load-bearing layout stresses, not just basic JSON integrity.
+    require(any(e["duration_min"] >= 420 and instant(e["start"]).astimezone(TZ).date() != instant(e["stop"]).astimezone(TZ).date() for e in events), "Missing overnight long event")
+    require(any(e["programme_id"] == "sport-ridge-peloton" and e["duration_min"] >= 240 for e in events), "Missing endurance event")
+    require(sum(40 <= len(p["title"]) <= 60 for p in PROGRAMMES.values()) >= 3, "Missing long titles")
+    require(any(g["reason"] == "missing-guide-data" and instant(g["stop"]) - instant(g["start"]) == timedelta(hours=2) for g in gaps), "Missing two-hour gap")
+    require(any(g["reason"] == "sparse-guide-ended" and instant(g["start"]) == START + timedelta(days=1) for g in gaps), "Missing sparse channel")
+    for day in range(3):
+        for channel in ("ch-northline-news", "ch-northline-world", "ch-city-desk"):
+            for hour in range(24):
+                require(any(e["channel_id"] == channel and 10 <= e["duration_min"] <= 15 and
+                            instant(e["start"]) == START + timedelta(days=day, hours=hour)
+                            for e in events), "Missing hourly bulletin")
+            require(any(e["channel_id"] == channel and e["duration_min"] == 20 and
+                        instant(e["start"]) == START + timedelta(days=day, hours=19, minutes=30)
+                        for e in events), "Missing evening main news")
+        for minute in (14, 58):
+            require(any(e["channel_id"] == "ch-ion-frame" and instant(e["start"]).astimezone(TZ) == START + timedelta(days=day, hours=20 if minute == 14 else 21, minutes=minute) for e in events), "Missing off-grid evening")
+        for minute in range(0, 30, 5):
+            require(any(e["channel_id"] == "ch-skyglass-weather" and e["duration_min"] == 5 and instant(e["start"]).astimezone(TZ) == START + timedelta(days=day, hours=18, minutes=minute) for e in events), "Missing consecutive five-minute slots")
+    return stats
+
+
+def main():
+    fixture = make_fixture()
+    stats = validate(fixture)
+    payload = (json.dumps(fixture, ensure_ascii=False, separators=(",", ":")) + "\n").encode()
+    require(len(payload) < 1_500_000, f"Fixture exceeds size budget: {len(payload)}")
+    # Validate before writing; serialise with fixed order, no wall-clock values.
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.write_bytes(payload)
+    print("\n".join(stats))
+    print(f"programmes={len({e['programme_id'] for e in fixture['events']})} art_programmes={len(ART_IDS)} "
+          f"events={len(fixture['events'])} gaps={len(fixture['gaps'])} dvr={len(fixture['dvr_fixtures'])} bytes={len(payload)}")
+    print(f"sha256={hashlib.sha256(payload).hexdigest()}")
+    print(f"episode_catalogues={len(EPISODE_TITLES)} distinct_subtitles={len({e['subtitle'] for e in fixture['events'] if 'subtitle' in e})} "
+          f"duration_contracts={len(DURATION_RANGES)} deliberate_loop_programmes={len(DELIBERATE_LOOPS)}")
+    print("VALIDATION PASSED: 27 channels; complete declared coverage; no overlaps; DVR and realism checks passed")
+
+
+if __name__ == "__main__":
+    main()
