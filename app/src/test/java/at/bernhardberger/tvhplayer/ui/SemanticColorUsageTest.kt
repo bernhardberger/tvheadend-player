@@ -15,7 +15,7 @@ class SemanticColorUsageTest {
         assertContains("ui/screens/OnboardingScreen.kt", "MaterialTheme.colorScheme.error")
         assertContains("ui/screens/settings/SettingsConnection.kt", "MaterialTheme.colorScheme.error")
         assertContains(
-            "ui/components/ProgrammeContentDetails.kt",
+            "ui/components/ProgrammeDetailsLayout.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
         )
         assertContains(
@@ -33,7 +33,7 @@ class SemanticColorUsageTest {
             "ui/screens/EpgGridScreen.kt",
             "ui/screens/guide/EpgGridContent.kt",
             "ui/screens/guide/EpgGridModals.kt",
-            "ui/components/ProgrammeContentDetails.kt",
+            "ui/components/ProgrammeDetailsLayout.kt",
             "ui/screens/ChannelsScreen.kt",
             "ui/player/LiveProgrammeInfoOverlay.kt",
             "ui/player/PlayerChromeControls.kt",

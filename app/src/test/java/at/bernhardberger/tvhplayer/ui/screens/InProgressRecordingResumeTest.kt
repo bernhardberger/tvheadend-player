@@ -61,7 +61,7 @@ class InProgressRecordingResumeTest {
         val starts = openDetails(playPositionSeconds = 754L)
 
         compose.onNodeWithTag("recording-details-resume").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight) }
+            .performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("recording-details-beginning").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }

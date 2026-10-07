@@ -433,7 +433,7 @@ class RecordingsVisualLayoutTest {
         }
         compose.waitForIdle()
         compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
-        focused("recording-details-close")
+        focused("recording-details-panel")
         compose.onNodeWithTag("recording-details-play").assertDoesNotExist()
         compose.onNodeWithTag("recording-details-delete").assertDoesNotExist()
         key(Key.Back)

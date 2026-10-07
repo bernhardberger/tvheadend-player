@@ -79,7 +79,6 @@ import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.ui.components.RecordingContentDetails
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 import coil3.ImageLoader

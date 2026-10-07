@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
@@ -39,6 +41,7 @@ class RecordingConfirmationStateTest {
     @Test fun actionFailureIsPostedAfterDetailsReopen() = delayedFailure(reopen = true)
 
     private fun delayedFailure(reopen: Boolean) {
+        lateinit var backDispatcher: OnBackPressedDispatcher
         val session = FakeTvheadendSession(observation(DvrEntryState.SCHEDULED))
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
         val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
@@ -53,6 +56,7 @@ class RecordingConfirmationStateTest {
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         compose.setContent {
             TVHeadendPlayerTheme {
+                backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
@@ -64,7 +68,7 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("recording-details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(1, calls) }
-        compose.onNodeWithTag("recording-details-close").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { backDispatcher.onBackPressed() }
         compose.onNodeWithTag("recording-details-cancel").assertDoesNotExist()
         if (reopen) compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }

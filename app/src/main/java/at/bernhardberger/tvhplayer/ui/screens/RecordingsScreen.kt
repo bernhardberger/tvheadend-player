@@ -604,7 +604,9 @@ internal fun RecordingsScreenContent(
     }
     if (opened != null && pendingAction == null) {
         RecordingDetailsPanel(
-            contentPadding = contentPadding,
+            imageLoader = imageLoader,
+            currentSession = selectedCapability,
+            channel = opened.channelId?.let(channelsById::get),
             entry = opened,
             canModifyRecordings = selectedCapability != null,
             playbackEligible = selectedCapability != null,
@@ -671,7 +673,7 @@ internal fun RecordingsScreenContent(
             pendingAction = null
             pendingMutation = null
             // The dismissed dialog must not restore focus to an action whose authority expired.
-            if (selectedCapability == null) detailsInitialAction = RecordingDetailsAction.CLOSE
+            if (selectedCapability == null) detailsInitialAction = null
         }
     }
     if (action != null && target != null && selectedCapability != null && mutationStateCurrent) {

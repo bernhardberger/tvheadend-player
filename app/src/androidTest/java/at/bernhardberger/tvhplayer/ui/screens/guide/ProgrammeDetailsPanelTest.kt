@@ -1,11 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.test.platform.app.InstrumentationRegistry
@@ -31,27 +31,32 @@ class ProgrammeDetailsPanelTest {
         stop = Instant.fromEpochSeconds(3_000),
     )
 
-    private fun showPanel() {
+    private fun showPanel(withDescription: Boolean = false) {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsPanel(
-                    contentPadding = PaddingValues(), event = event, channel = null,
+                    event = if (withDescription) EpgEvent.create(
+                        id = event.id, title = event.title, start = event.start, stop = event.stop,
+                        description = "A programme description",
+                    ) else event, channel = null,
                     recording = recording.value, nowSecProvider = { 1_000 },
                     canModifyRecordings = canModify.value,
                     onAction = {}, onClose = {},
+                    imageLoader = androidx.compose.runtime.remember { coil3.ImageLoader.Builder(context).build() },
+                    currentSession = null,
                 )
             }
         }
     }
 
     @Test
-    fun closeKeepsFocusWhenPublicationReplacesRecordWithCancel() {
-        showPanel()
+    fun moreInfoKeepsFocusWhenPublicationReplacesRecordWithCancel() {
+        showPanel(withDescription = true)
         composeRule.onNodeWithText(context.getString(R.string.record)).assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithText(context.getString(R.string.close)).assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithText(context.getString(R.string.details_read_more)).assertIsFocused()
         publishScheduledRecording()
-        composeRule.onNodeWithText(context.getString(R.string.close)).assertIsFocused()
+        composeRule.onNodeWithText(context.getString(R.string.details_read_more)).assertIsFocused()
     }
 
     @Test
@@ -63,11 +68,11 @@ class ProgrammeDetailsPanelTest {
     }
 
     @Test
-    fun removedMutationCapabilityFallsBackToClose() {
+    fun removedMutationCapabilityFallsBackToPanel() {
         showPanel()
         composeRule.onNodeWithText(context.getString(R.string.record)).assertIsFocused()
         composeRule.runOnIdle { canModify.value = false }
-        composeRule.onNodeWithText(context.getString(R.string.close)).assertIsFocused()
+        composeRule.onNodeWithTag("programme-details-panel").assertIsFocused()
     }
 
     private fun publishScheduledRecording() {

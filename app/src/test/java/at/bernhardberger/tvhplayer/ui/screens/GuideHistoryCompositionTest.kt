@@ -63,8 +63,8 @@ class GuideHistoryCompositionTest {
             val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
-                    if (details) ProgrammeDetailsPanel(PaddingValues(), a, null, null, { 4000 }, false,
-                        {}, { details = false }, liveProgrammeActions = false)
+                    if (details) ProgrammeDetailsPanel(a, null, null, { 4000 }, false,
+                        {}, { details = false }, loader, null, liveProgrammeActions = false)
                     else Column(Modifier.fillMaxSize()) {
                         listOf(1L, 2L).forEach { channel -> TimelineChannelRow(
                             channel = Channel.create(ChannelId(channel), name = "Documentary $channel"),
@@ -90,10 +90,10 @@ class GuideHistoryCompositionTest {
         compose.onNodeWithText("Programme 1").assertIsFocused()
         capture("$locale-font$scale-past-guide", "Programme 1")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithText(label(R.string.close)).assertIsFocused()
+        compose.onNodeWithTag("programme-details-panel").assertIsFocused()
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.onNodeWithText(label(R.string.watch_from_start)).assertDoesNotExist()
-        capture("$locale-font$scale-historical-details", "Close")
+        capture("$locale-font$scale-historical-details", "Details panel")
     }
 
     @Test fun archiveAuthorityFutureRecordAndRealRecordingActions() {
@@ -101,8 +101,8 @@ class GuideHistoryCompositionTest {
         var live by mutableStateOf(false)
         var recording by mutableStateOf<DvrEntry?>(null)
         compose.setContent { TVHeadendPlayerTheme {
-            ProgrammeDetailsPanel(PaddingValues(), selected, null, recording, { 4000 }, true,
-                {}, {}, liveProgrammeActions = live)
+            ProgrammeDetailsPanel(selected, null, recording, { 4000 }, true,
+                {}, {}, remember { ImageLoader.Builder(context).diskCache(null).build() }, null, liveProgrammeActions = live)
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.runOnIdle { live = true }

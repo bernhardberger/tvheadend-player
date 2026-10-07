@@ -2149,8 +2149,9 @@ fun EpgGridScreen(
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
             if (pendingAction == null) ProgrammeDetailsPanel(
+                imageLoader = imageLoader,
+                currentSession = selectedObservation.currentSession,
                 onPreviewKeyEvent = confirmationKeyHandler,
-                contentPadding = contentPadding,
                 event = event,
                 channel = channel,
                 recording = recording,

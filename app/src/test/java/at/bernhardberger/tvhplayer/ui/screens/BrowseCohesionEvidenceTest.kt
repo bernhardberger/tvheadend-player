@@ -203,8 +203,8 @@ class BrowseCohesionEvidenceTest {
         capture("guide-current", 1f, "Guide first channel current programme", hasText(CURRENT_TITLE))
         key(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()
-        capture("guide-details", 1f, "Guide current programme details; description body", hasTestTag("programme-details-body"), dialog = true)
-        compose.onNodeWithText("Close").assertIsDisplayed()
+        capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"), dialog = true)
+        compose.onNodeWithText("Close").assertDoesNotExist()
     }
 
     @Test

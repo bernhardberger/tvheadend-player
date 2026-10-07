@@ -5,6 +5,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -72,7 +73,17 @@ import at.bernhardberger.tvhplayer.core.programmeHasAired
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeContentDetails
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsLayout
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsButton
+import at.bernhardberger.tvhplayer.ui.components.programmeDetailsFrame
+import at.bernhardberger.tvhplayer.ui.player.ProgrammeInformation
+import at.bernhardberger.tvhplayer.ui.player.FullDescription
+import at.bernhardberger.tvhplayer.ui.player.ProgrammeHero
+import at.bernhardberger.tvhplayer.ui.player.programmeReadingFields
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import coil3.ImageLoader
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.runtime.withFrameNanos
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.notifications.label
@@ -347,7 +358,6 @@ private fun epgSearchMessageRes(
 
 @Composable
 internal fun ProgrammeDetailsPanel(
-    contentPadding: PaddingValues,
     event: EpgEventEntry,
     channel: Channel?,
     recording: DvrEntry?,
@@ -355,6 +365,8 @@ internal fun ProgrammeDetailsPanel(
     canModifyRecordings: Boolean,
     onAction: (ProgrammeAction) -> Unit,
     onClose: () -> Unit,
+    imageLoader: ImageLoader,
+    currentSession: CurrentSessionObservation?,
     liveProgrammeActions: Boolean = true,
     notices: @Composable () -> Unit = {},
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
@@ -369,42 +381,41 @@ internal fun ProgrammeDetailsPanel(
         canModifyRecordings = canModifyRecordings,
     ).filter { liveProgrammeActions || it !in setOf(ProgrammeAction.WATCH, ProgrammeAction.RECORD) }
     val actionFocus = remember { ProgrammeAction.entries.associateWith { FocusRequester() } }
-    val closeFocus = remember { FocusRequester() }
-    val contentFocus = remember { FocusRequester() }
+    val panelFocus = remember { FocusRequester() }
+    val moreFocus = remember { FocusRequester() }
+    var readMore by remember(event.id) { mutableStateOf(false) }
+    val hasMore = programmeReadingFields(event, LocalConfiguration.current.locales[0]).isNotEmpty() || event.isNew != null
     var focusedAction by remember(event.id) { mutableStateOf<ProgrammeAction?>(null) }
-    // Capture before apply can automatically move focus from a removed action to Close.
-    val removedFocusTarget = if (focusedAction != null && focusedAction !in actions) {
-        actions.firstOrNull()?.let(actionFocus::get) ?: closeFocus
-    } else null
-    LaunchedEffect(actions) {
-        // A surviving action (including Close) retains ownership during DVR publication.
-        removedFocusTarget?.requestFocus()
-    }
-    val subtitle = buildString {
-        append(channel?.name.orEmpty())
-        if (isNotEmpty()) append(" • ")
-        append(event.start.epochSeconds.formatDateTime())
-        append("–")
-        append(formatHm(event.stop.epochSeconds))
-        append(" • ")
-        append((event.stop.epochSeconds - event.start.epochSeconds).coerceAtLeast(0L) / 60L)
-        append(" min")
-    }
-    DialogScrim(
-        onDismissRequest = onClose,
-        onPreviewKeyEvent = onPreviewKeyEvent,
-        wide = true,
-        contentPadding = contentPadding,
-        overlay = notices,
+    var focusedMore by remember(event.id) { mutableStateOf(false) }
+    var panelFocused by remember(event.id) { mutableStateOf(false) }
+    val noButtons = actions.isEmpty() && !hasMore
+    val primaryFocus = actions.firstOrNull()?.let(actionFocus::get) ?: if (hasMore) moreFocus else panelFocus
+    // Capture before apply can automatically move focus away from a removed action.
+    val removedFocusTarget = if (
+        focusedAction != null && focusedAction !in actions || focusedMore && !hasMore || panelFocused && !noButtons
     ) {
-        // Enter at the scrollable description, or the first action when there is no body.
-        // Request from the dialog's composition, after its focus targets are attached.
-        LaunchedEffect(event.id) { contentFocus.requestFocus() }
-        ProgrammeContentDetails(
-            event = event,
-            subtitle = subtitle,
-            modifier = Modifier.focusRequester(contentFocus),
-            footer = {
+        primaryFocus
+    } else null
+    Dialog(
+        onDismissRequest = { if (readMore) readMore = false else onClose() },
+        properties = DialogProperties(dismissOnBackPress = true, dismissOnClickOutside = false, usePlatformDefaultWidth = false),
+    ) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = TvScrimModalAlpha))
+            .onPreviewKeyEvent(onPreviewKeyEvent)
+            .testTag("programme-details-panel")
+            .then(if (noButtons && !readMore) Modifier
+                .focusRequester(panelFocus)
+                .onFocusChanged { panelFocused = it.isFocused }
+                .focusProperties {
+                    up = FocusRequester.Cancel; down = FocusRequester.Cancel
+                    left = FocusRequester.Cancel; right = FocusRequester.Cancel
+                }
+                .focusable() else Modifier.focusGroup())) {
+            val tile: @Composable (EpgEventEntry, Modifier) -> Unit = { shown, modifier ->
+                ProgrammeHero(shown.image, shown.channelId ?: ChannelId(0), channel?.number?.toString().orEmpty(), channel?.icon,
+                    imageLoader, currentSession, modifier)
+            }
+            val status: @Composable () -> Unit = {
                 recording?.let {
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -426,12 +437,16 @@ internal fun ProgrammeDetailsPanel(
                                 DvrEntryState.FILE_MISSING -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.onSurfaceVariant
                             },
+                            style = MaterialTheme.typography.labelLarge,
                         )
                     }
                     it.subscriptionError?.label()?.let { reason ->
                         Text(
                             text = stringResource(R.string.recording_failure_reason, reason),
                             color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
@@ -445,30 +460,65 @@ internal fun ProgrammeDetailsPanel(
                             }
                         ),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelLarge,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
-            },
-            actions = {
-                actions.forEach { action ->
-                    key(action) {
-                        Button(
-                            onClick = { onAction(action) },
-                            modifier = Modifier.focusRequester(actionFocus.getValue(action))
-                                .onFocusChanged { if (it.isFocused) focusedAction = action },
-                        ) {
-                            Text(programmeActionLabel(action))
+            }
+            Box(Modifier.fillMaxSize().programmeDetailsFrame()) {
+                if (readMore) FullDescription(event, nowSec, channel?.name.orEmpty(), recording?.state, tile, status)
+                else {
+                    LaunchedEffect(event.id) {
+                        withFrameNanos { }
+                        (if (focusedMore && hasMore) moreFocus else focusedAction?.takeIf { it in actions }?.let(actionFocus::get)
+                            ?: primaryFocus).requestFocus()
+                    }
+                    LaunchedEffect(actions, hasMore) {
+                        if (noButtons) panelFocus.requestFocus() else removedFocusTarget?.requestFocus()
+                    }
+                    ProgrammeDetailsLayout(reading = {
+                        ProgrammeInformation(event, nowSec, channel?.name.orEmpty(), recording?.state, tile, true, status)
+                    }) {
+                        actions.forEachIndexed { index, action ->
+                            key(action) {
+                                ProgrammeDetailsButton(
+                                    title = programmeActionLabel(action),
+                                    onClick = { onAction(action) },
+                                    modifier = Modifier.focusRequester(actionFocus.getValue(action))
+                                        .onFocusChanged {
+                                            if (it.isFocused) { focusedAction = action; focusedMore = false; panelFocused = false }
+                                        }
+                                        .focusProperties {
+                                            up = if (index == 0) FocusRequester.Cancel else actionFocus.getValue(actions[index - 1])
+                                            down = if (index == actions.lastIndex) {
+                                                if (hasMore) moreFocus else FocusRequester.Cancel
+                                            } else actionFocus.getValue(actions[index + 1])
+                                        },
+                                    icon = { Icon(painterResource(when (action) {
+                                        ProgrammeAction.RECORD -> R.drawable.ic_fiber_manual_record
+                                        ProgrammeAction.CANCEL_RECORDING, ProgrammeAction.STOP_RECORDING -> R.drawable.ic_stop
+                                        else -> R.drawable.ic_play_arrow
+                                    }), null) },
+                                )
+                            }
                         }
+                        if (hasMore) ProgrammeDetailsButton(
+                            title = stringResource(R.string.details_read_more),
+                            onClick = { readMore = true },
+                            modifier = Modifier.focusRequester(moreFocus)
+                                .onFocusChanged { if (it.isFocused) { focusedAction = null; focusedMore = true; panelFocused = false } }
+                                .focusProperties {
+                                    up = actions.lastOrNull()?.let(actionFocus::get) ?: FocusRequester.Cancel
+                                    down = FocusRequester.Cancel
+                                },
+                            icon = { Icon(painterResource(R.drawable.ic_info), null) },
+                        )
                     }
                 }
-                OutlinedButton(
-                    onClick = onClose,
-                    modifier = Modifier.focusRequester(closeFocus)
-                        .onFocusChanged { if (it.isFocused) focusedAction = null },
-                ) {
-                    Text(stringResource(R.string.close))
-                }
-            },
-        )
+            }
+            notices()
+        }
     }
 }
 

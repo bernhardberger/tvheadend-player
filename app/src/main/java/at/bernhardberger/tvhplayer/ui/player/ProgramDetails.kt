@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -27,9 +26,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -69,19 +65,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.CompactCard
-import androidx.tv.material3.Border
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.LocalContentColor
-import androidx.tv.material3.Surface
-import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import androidx.tv.material3.WideButton
 import androidx.tv.material3.WideCardContainer
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -94,6 +85,13 @@ import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
+import at.bernhardberger.tvhplayer.ui.components.DetailsInset
+import at.bernhardberger.tvhplayer.ui.components.DetailsColumnWidth
+import at.bernhardberger.tvhplayer.ui.components.DetailsTileHeight
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsLayout
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsInformation
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsButton
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsFullDescription
 import at.bernhardberger.tvhplayer.ui.components.AppTabRow
 import at.bernhardberger.tvhplayer.ui.components.AppTabStyle
 import at.bernhardberger.tvhplayer.ui.components.TabContent
@@ -352,15 +350,14 @@ private fun DetailsTab(
         focusTargets[state.lastAction]?.requestFocus() ?: firstFocus.requestFocus()
     }
     // On the 12-column grid: reading in columns 2–5 (text as wide as the tile), actions in columns 8–11.
-    Row(Modifier.fillMaxSize().padding(bottom = 40.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+    ProgrammeDetailsLayout(reading = {
         ProgrammeInformation(event, nowSec, channelIdentity, recording, tile, showDescription = true)
-        Column(Modifier.width(DetailsActionsWidth).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally) {
+    }) {
             shownActions.forEachIndexed { index, action ->
-                WideButton(
+                ProgrammeDetailsButton(
+                    title = action.title,
                     onClick = { if (owner?.isCurrent != false) action.onClick() },
-                    // TV Material 1.1's stock 240dp background and 1.1 focus scale fit this slot.
-                    modifier = Modifier.tabFocus().width(240.dp).testTag(action.tag)
+                    modifier = Modifier.tabFocus().testTag(action.tag)
                         .focusRequester(focusTargets.getValue(action.tag))
                         .then(if (owner?.isCurrent != false && index == 0) Modifier.focusRequester(firstFocus) else Modifier)
                         .then(if (owner?.isCurrent != false && action.record) Modifier.focusRequester(recordFocus) else Modifier)
@@ -383,37 +380,25 @@ private fun DetailsTab(
                         if (action.busy) CircularProgressIndicator(Modifier.size(20.dp), color = LocalContentColor.current, strokeWidth = 2.dp)
                         else Icon(painterResource(action.icon), null)
                     },
-                    title = { Text(action.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    subtitle = null,
                 )
             }
-        }
     }
 }
 
 @Composable
-private fun ProgrammeInformation(
+internal fun ProgrammeInformation(
     event: EpgEventEntry,
     nowSec: Long,
     channelIdentity: String,
     recording: DvrEntryState?,
     tile: @Composable (EpgEventEntry, Modifier) -> Unit,
     showDescription: Boolean,
+    status: (@Composable () -> Unit)? = null,
 ) {
-        Column(Modifier.width(DetailsColumnWidth).fillMaxHeight().testTag("details-information"), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            ProgrammeTile(event, nowSec, tile, Modifier.size(DetailsColumnWidth, DetailsTileHeight))
-            Spacer(Modifier.height(10.dp))
-            event.title?.takeIf(String::isNotBlank)?.let {
-                Text(it, style = MaterialTheme.typography.headlineSmall, maxLines = 2,
-                    overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("details-title"))
-            }
-            detailsSubtitle(event)?.let {
-                Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-             Text(factsLine(event, channelIdentity), style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                 modifier = Modifier.padding(top = 4.dp).testTag("details-facts"))
+    ProgrammeDetailsInformation(event.title, detailsSubtitle(event), factsLine(event, channelIdentity),
+        if (showDescription) programmeDetailsBody(event) else null,
+        tile = { ProgrammeTile(event, nowSec, tile, it) }, status = {
+            if (status != null) status() else
             when (recording) {
                 DvrEntryState.RECORDING -> PlayerRecBadge(Modifier.testTag("details-recording-badge"))
                 DvrEntryState.SCHEDULED -> Row(verticalAlignment = Alignment.CenterVertically,
@@ -423,12 +408,7 @@ private fun ProgrammeInformation(
                 }
                 else -> Unit
             }
-            if (showDescription) programmeDetailsBody(event)?.let { body ->
-                Text(body, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f),
-                    modifier = Modifier.weight(1f, fill = false).padding(top = 6.dp))
-            }
-        }
+        })
 }
 
 @Composable
@@ -584,68 +564,19 @@ private fun Schedule(
 }
 
 @Composable
-private fun FullDescription(
+internal fun FullDescription(
     event: EpgEventEntry,
     nowSec: Long,
     channelIdentity: String,
     recording: DvrEntryState?,
     tile: @Composable (EpgEventEntry, Modifier) -> Unit,
+    status: (@Composable () -> Unit)? = null,
 ) {
-    val reading = remember { FocusRequester() }
-    val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    var focused by remember { mutableStateOf(false) }
-    val scrollStep = with(LocalDensity.current) { 60.dp.roundToPx() }
-    val paneTitle = stringResource(R.string.details_read_more)
     val locale = LocalConfiguration.current.locales[0]
     val fields = programmeReadingFields(event, locale)
-    LaunchedEffect(Unit) { withFrameNanos { }; reading.requestFocus() }
-    Row(Modifier.fillMaxSize().padding(bottom = 40.dp), horizontalArrangement = Arrangement.spacedBy(PlayerChromeTokens.gridGutter)) {
-        ProgrammeInformation(event, nowSec, channelIdentity, recording, tile, showDescription = false)
-        Surface(
-            modifier = Modifier.weight(1f).fillMaxHeight().testTag("details-full-description"),
-            shape = RoundedCornerShape(12.dp),
-            colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 0.06f else 0.03f),
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-            border = Border(BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 0.3f else 0.1f))),
-        ) {
-            Box(Modifier.fillMaxSize().testTag("player-info-reading")
-                .semantics { this.paneTitle = paneTitle }
-                .focusRequester(reading)
-                .onFocusChanged { focused = it.isFocused }
-                .focusProperties {
-                    up = FocusRequester.Cancel
-                    down = FocusRequester.Cancel
-                    left = FocusRequester.Cancel
-                    right = FocusRequester.Cancel
-                }
-                .onPreviewKeyEvent { event ->
-                    val delta = when (event.key) {
-                        Key.DirectionDown -> scrollStep
-                        Key.DirectionUp -> -scrollStep
-                        else -> return@onPreviewKeyEvent false
-                    }
-                    if (event.type == KeyEventType.KeyDown) scope.launch {
-                        scroll.scrollTo((scroll.value + delta).coerceIn(0, scroll.maxValue))
-                    }
-                    true
-                }
-                .focusable()
-                .padding(20.dp)) {
-                Column(Modifier.widthIn(max = 560.dp).fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        val fade = 32.dp.toPx().coerceAtMost(size.height)
-                        if (scroll.canScrollBackward) drawRect(
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black), endY = fade), blendMode = BlendMode.DstIn)
-                        if (scroll.canScrollForward) drawRect(
-                            Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
-                            blendMode = BlendMode.DstIn)
-                    }
-                    .verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+    ProgrammeDetailsFullDescription(reading = {
+        ProgrammeInformation(event, nowSec, channelIdentity, recording, tile, showDescription = false, status = status)
+    }) {
                     fields.forEach { (label, value) ->
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                             Text(stringResource(label), style = MaterialTheme.typography.titleMedium,
@@ -657,9 +588,6 @@ private fun FullDescription(
                         Text(stringResource(if (it) R.string.details_new_yes else R.string.details_new_no),
                             style = MaterialTheme.typography.bodyLarge)
                     }
-                }
-            }
-        }
     }
 }
 
@@ -774,12 +702,6 @@ internal fun channelSchedule(
     }
 }
 
-/** One grid column and its gutter. */
-private val DetailsInset = 72.dp
-/** Four grid columns. */
-private val DetailsColumnWidth = 268.dp
-private val DetailsActionsWidth = 268.dp
-private val DetailsTileHeight = 151.dp
 private val ScheduleWidth = 620.dp
 private val ScheduleTileWidth = 124.dp
 private val ScheduleTileHeight = ScheduleTileWidth * 9 / 16

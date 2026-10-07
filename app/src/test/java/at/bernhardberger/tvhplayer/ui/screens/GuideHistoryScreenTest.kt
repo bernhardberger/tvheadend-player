@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import androidx.activity.ComponentDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.*
@@ -35,6 +36,7 @@ import org.junit.runner.RunWith
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -220,7 +222,7 @@ class GuideHistoryScreenTest {
                 compose.onNodeWithText(context.getString(R.string.watch_from_start)).assertExists()
                 compose.runOnIdle { session.replaceGeneration(observation(false)) }
                 compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.watch_from_start))).fetchSemanticsNodes().isEmpty() }
-                compose.onNodeWithText(context.getString(R.string.close)).assertDoesNotExist()
+                compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
                 compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
                 key(Key.DirectionCenter)
@@ -237,9 +239,15 @@ class GuideHistoryScreenTest {
                 }
                 compose.waitUntil(10_000) { compose.onAllNodes(hasText(dialogTitle)).fetchSemanticsNodes().isEmpty() }
                 compose.onNodeWithText(context.getString(R.string.record)).assertDoesNotExist()
-                if (replaceSession) compose.onNodeWithText(context.getString(R.string.close)).assertDoesNotExist()
-                else compose.onNodeWithText(context.getString(R.string.close)).assertIsFocused()
-                    .performKeyInput { pressKey(Key.DirectionCenter) }
+                if (replaceSession) compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
+                else {
+                    compose.onNodeWithTag("programme-details-panel").assertIsFocused()
+                    compose.runOnIdle {
+                        (ShadowDialog.getShownDialogs().last { it.isShowing } as ComponentDialog)
+                            .onBackPressedDispatcher.onBackPressed()
+                    }
+                    compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
+                }
                 assertEquals(before, session.calls.size)
                 // Session replacement dismisses the dialog before background guide preparation finishes.
                 // The loading anchor can own focus meanwhile, so wait for the actual header action.
