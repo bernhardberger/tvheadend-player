@@ -10,7 +10,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.SettingsDepthHeadingHeight
@@ -110,7 +110,7 @@ internal fun settingsRow(
                 focusedSelectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
                 focusedSelectedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
             ),
-            modifier = modifier.fillMaxWidth().padding(bottom = TvSpacing8)
+            modifier = modifier.fillMaxWidth().padding(bottom = TvSpacing4)
                 .heightIn(min = if (supporting == null) 48.dp else SettingsDepthRowMinHeight).semantics {
                 if (!enabled) disabled()
                 if (checked != null) { role = Role.Switch; toggleableState = ToggleableState(checked) }

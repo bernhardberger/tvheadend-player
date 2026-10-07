@@ -409,7 +409,7 @@ internal fun RecordingSchedule(
         userScrollEnabled = active,
         // Full-width native rows grow by more than the narrow archive rows.
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxSize()
             .onFocusChanged {
@@ -553,7 +553,7 @@ internal fun RecordingProblems(
         state = listState,
         userScrollEnabled = active,
         contentPadding = PaddingValues(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier
             .fillMaxSize()
             .onFocusChanged {

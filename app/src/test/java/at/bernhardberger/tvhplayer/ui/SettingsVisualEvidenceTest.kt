@@ -10,6 +10,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.key.Key
@@ -112,9 +113,17 @@ class SettingsVisualEvidenceTest {
         assertEquals(130f, activeColumn.left, .5f)
         assertEquals(28f, activeColumn.top, .5f)
         assertEquals(340f, activeColumn.width, .5f)
+        if (fontScale == 1f) assertRowTops(92f, 152f, 212f, 272f, 332f)
         capture("$prefix-root")
+        press(Key.DirectionDown)
+        capture("$prefix-root-middle-focus", middleFocus = true)
+        press(Key.DirectionUp)
         press(Key.DirectionCenter)
+        if (fontScale == 1f) assertRowTops(92f, 190f, 272f)
         capture("$prefix-general")
+        press(Key.DirectionDown)
+        capture("$prefix-general-middle-focus", middleFocus = true)
+        press(Key.DirectionUp)
         press(Key.DirectionRight)
         // Match the accepted board: Follow system is both focused and selected.
         capture("$prefix-language")
@@ -188,8 +197,21 @@ class SettingsVisualEvidenceTest {
         compose.waitForIdle()
     }
 
-    private fun capture(name: String) {
+    private fun activeRows(): List<Rect> = compose.onAllNodes(
+            hasAnyAncestor(hasTestTag("depth-active")) and
+                SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused),
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.top }
+
+    private fun assertRowTops(vararg tops: Float) {
+        val rows = activeRows()
+        assertEquals(tops.size, rows.size)
+        tops.zip(rows).forEach { (top, row) -> assertEquals(top, row.top, .5f) }
+    }
+
+    private fun capture(name: String, middleFocus: Boolean = false) {
         val activeColumn = compose.onNodeWithTag("depth-active").fetchSemanticsNode().boundsInRoot
+        val rows = activeRows()
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
             bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -197,12 +219,36 @@ class SettingsVisualEvidenceTest {
         }
         val directory = File("build/outputs/settings-c-captures").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+        val focusEvidence = if (middleFocus) {
+            val focused = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+            val x = (activeColumn.left + 8f).toInt()
+            val ys = (maxOf(0, focused.top.toInt() - 12)..minOf(bitmap.height - 1, focused.bottom.toInt() + 12))
+                .filter { y ->
+                    val pixel = bitmap.getPixel(x, y)
+                    android.graphics.Color.red(pixel) >= 180 && android.graphics.Color.green(pixel) >= 180 &&
+                        android.graphics.Color.blue(pixel) >= 180
+                }
+            assertTrue("Native middle-row focus is visible", ys.isNotEmpty())
+            val native = Rect(focused.left, ys.first().toFloat(), focused.right, (ys.last() + 1).toFloat())
+            // The semantics wrapper includes the 4dp bottom gap, outside the native ListItem.
+            val contentBottom = focused.bottom - 4f
+            assertEquals("Complete native 1.05 focus height", (focused.height - 4f) * 1.05f, native.height, 2f)
+            assertTrue("Native focus grows above the row", native.top < focused.top)
+            assertTrue("Native focus grows below the row", native.bottom > contentBottom)
+            val index = rows.indexOf(focused)
+            assertTrue("Focused row has both neighbours", index > 0 && index < rows.lastIndex)
+            assertTrue("Focus must not overlap previous row content", native.top >= rows[index - 1].bottom - 4f)
+            assertTrue("Focus must not overlap next row", native.bottom <= rows[index + 1].top)
+            "middleFocus=$focused; nativeFocusVertical=$native; rows=$rows\n"
+        } else ""
         File(directory, "$name.txt").writeText(
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
                 "focus/scenario=${name.substringAfter("-font").substringAfter("-")}; " +
                 "production=SideRail+SettingsScreenNavigation; warm playback scrim; " +
                 "activeColumn=$activeColumn; " +
+                "rows=$rows; " +
+                focusEvidence +
                 "static offline composition only\n",
         )
     }

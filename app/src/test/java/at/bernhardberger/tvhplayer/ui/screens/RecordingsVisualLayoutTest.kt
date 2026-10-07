@@ -26,6 +26,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
@@ -198,6 +200,47 @@ class RecordingsVisualLayoutTest {
         assertFullWidthFocusInside("recordings-problems-list", 21)
         compose.onNodeWithContentDescription("Recording problem").assertIsDisplayed()
         capture("problems", 1f, assertFullWidthFocusSafeArea(21))
+        assertNoCommands()
+    }
+
+    @Test fun multiItemListsExposeMiddleRowNativeFocusAndGeometry() {
+        val entries = (1L..8L).map { recording(it, "Expedition episode $it", "Documentaries/episode$it.ts") } +
+            (40L..47L).map { recording(it, "Scheduled expedition ${it - 39}", null, DvrEntryState.SCHEDULED,
+                startEpochSeconds = 1_791_086_400) } +
+            (60L..67L).map { recording(it, "Unfinished expedition ${it - 59}", null, DvrEntryState.COMPLETED_ERROR,
+                startEpochSeconds = 1_791_000_000) }
+        show(entries = entries)
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionCenter)
+        focused("recording-list-entry-1")
+        capture("archive-multi-item", 1f)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-2")
+        // Archive spacing is unchanged: record its existing overlap, but still require complete focus growth.
+        capture("archive-middle-focus", 1f, assertMiddleFocus(2, checkNeighbourClearance = false))
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Schedule").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-40")
+        assertDenseListGeometry()
+        capture("schedule-multi-item", 1f)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-41")
+        capture("schedule-middle-focus", 1f, assertMiddleFocus(41))
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-60")
+        assertDenseListGeometry()
+        capture("problems-multi-item", 1f)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-61")
+        capture("problems-middle-focus", 1f, assertMiddleFocus(61))
         assertNoCommands()
     }
 
@@ -490,11 +533,12 @@ class RecordingsVisualLayoutTest {
         compose.waitForIdle()
     }
 
-    private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED) =
+    private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,
+        startEpochSeconds: Long = 1_791_000_000 - id * 86400) =
         DvrEntry.create(
             id = DvrEntryId(id), title = title, path = path, state = state,
-            start = Instant.fromEpochSeconds(1_791_000_000 - id * 86400),
-            stop = Instant.fromEpochSeconds(1_791_000_000 - id * 86400 + 90 * 60),
+            start = Instant.fromEpochSeconds(startEpochSeconds),
+            stop = Instant.fromEpochSeconds(startEpochSeconds + 90 * 60),
             files = path?.let { listOf(DvrRecordingFile(null, it, null, null, 2_400_000_000L)) }.orEmpty(),
             channelName = "Ridge Earth HD",
             image = if (id in 1L..5L) "imagecache/${100 + id}" else null,
@@ -569,6 +613,54 @@ class RecordingsVisualLayoutTest {
         assertTrue(row.top - verticalGrowth >= list.top && row.bottom + verticalGrowth <= list.bottom)
     }
 
+    private fun visibleListRows(): List<Rect> = compose.onAllNodes(SemanticsMatcher("Recording or folder row") {
+        val tag = it.config.getOrNull(SemanticsProperties.TestTag).orEmpty()
+        tag.startsWith("recording-list-entry-") || tag.startsWith("recordings-folder-")
+    }).fetchSemanticsNodes().map { it.boundsInRoot }.sortedBy { it.top }
+
+    private fun assertDenseListGeometry() {
+        val rows = visibleListRows()
+        assertEquals(5, rows.size)
+        rows.forEachIndexed { index, row ->
+            assertEquals(175f + index * 68f, row.top, .5f)
+            assertEquals(64f, row.height, .5f)
+        }
+        rows.zipWithNext().forEach { (previous, next) -> assertEquals(4f, next.top - previous.bottom, .5f) }
+    }
+
+    private fun assertMiddleFocus(id: Long, checkNeighbourClearance: Boolean = true): String {
+        val row = bounds("recording-list-entry-$id")
+        val rows = visibleListRows()
+        val previous = rows.last { it.top < row.top }
+        val next = rows.first { it.top > row.top }
+        return compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            try {
+                view.draw(Canvas(bitmap))
+                val x = (row.left + 8f).toInt()
+                val ys = (row.top.toInt() - 8..row.bottom.toInt() + 8).filter { y ->
+                    val pixel = bitmap.getPixel(x, y)
+                    android.graphics.Color.red(pixel) >= 180 && android.graphics.Color.green(pixel) >= 180 &&
+                        android.graphics.Color.blue(pixel) >= 180
+                }
+                assertTrue("Native middle-row focus is visible", ys.isNotEmpty())
+                val top = ys.first().toFloat()
+                val bottom = (ys.last() + 1).toFloat()
+                assertEquals("Complete native 1.05 focus height", row.height * 1.05f, bottom - top, 2f)
+                assertTrue("Native focus grows above the row", top < row.top)
+                assertTrue("Native focus grows below the row", bottom > row.bottom)
+                if (checkNeighbourClearance) {
+                    assertTrue("Focus must not overlap previous row", top >= previous.bottom)
+                    assertTrue("Focus must not overlap next row", bottom <= next.top)
+                }
+                "middleFocus=$row; nativeFocusY=$top..$bottom; previous=$previous; next=$next; " +
+                    "clearanceAbove=${top - previous.bottom}; clearanceBelow=${next.top - bottom}"
+            } finally {
+                bitmap.recycle()
+            }
+        }
+    }
+
     private fun textLayout(tag: String): TextLayoutResult {
         val results = mutableListOf<TextLayoutResult>()
         compose.onNodeWithTag(tag, useUnmergedTree = true)
@@ -585,6 +677,7 @@ class RecordingsVisualLayoutTest {
     private fun capture(name: String, scale: Float, focusEvidence: String? = null) {
         if (System.getProperty("tvhplayer.writeMotionCaptures") == "false") return
         assertNoCommands()
+        val rows = visibleListRows()
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
@@ -599,6 +692,7 @@ class RecordingsVisualLayoutTest {
                     "Robolectric SDK34 native View.draw; native D-pad focus; fixed recording dates; absent artwork\n" +
                     "Opaque theme background, no video; SDK/playback/navigation calls=0\n" +
                     "Static composition only, not physical-TV focus feel, overscan, motion or SurfaceView proof.\n" +
+                    "rows=$rows\n" +
                     (focusEvidence?.let { "$it\n" } ?: ""),
             )
             bitmap.recycle()

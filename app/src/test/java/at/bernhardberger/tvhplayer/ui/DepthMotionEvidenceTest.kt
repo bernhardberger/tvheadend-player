@@ -917,12 +917,12 @@ class DepthMotionEvidenceTest {
      * settled states — a static element would make the assertion vacuous — and it
      * must never cross text: glyphs break into several pixel runs, which reads as a
      * duplicate representation and says nothing about the transition. With the
-     * 28dp Settings top margin, 208 crosses the upper edge of the Show Guide menu
+     * 28dp Settings top margin and 4dp row gap, 204 crosses the upper edge of the Show Guide menu
      * switch, above its label's ink, in both settled states. Re-derive with a scan
      * of every scanline holding exactly one run in both settled states if layout
      * shifts again.
      */
-    const val BAND = 208
+    const val BAND = 204
         const val ACTIVE_LEFT = 128
         const val ACTIVE_RIGHT = 128 + 352
         const val PREVIEW_LEFT = 588
