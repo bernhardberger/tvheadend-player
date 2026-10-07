@@ -111,7 +111,9 @@ internal fun ProgrammeDetailsButton(
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
         Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) { icon() }
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
-        Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // The button's surface pins content to its top, so the label holds a full 24dp line to fill the 48dp height.
+        Text(title, Modifier.heightIn(min = 24.dp).wrapContentHeight(), style = MaterialTheme.typography.titleMedium,
+            maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 
