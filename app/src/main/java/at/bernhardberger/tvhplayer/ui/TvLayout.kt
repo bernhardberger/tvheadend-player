@@ -38,6 +38,8 @@ const val TvPanelBrowseAlpha = 0.84f
 const val TvPanelDenseAlpha = 0.92f
 const val WarmPlaybackScrimAlpha = 0.84f
 const val TvScrimModalAlpha = 0.60f
+/** A black box over video (recovery, channel entry, stats): the kit's 80% snackbar background. */
+const val TvOverlayBoxAlpha = 0.80f
 const val TvTrackAlpha = 0.20f
 const val TvGhostFillAlpha = 0.40f
 

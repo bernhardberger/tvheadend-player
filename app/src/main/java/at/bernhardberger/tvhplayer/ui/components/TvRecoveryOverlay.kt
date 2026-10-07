@@ -46,6 +46,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
 import at.bernhardberger.tvhplayer.ui.player.leaving
@@ -96,7 +97,7 @@ fun TvRecoveryOverlay(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = 0.86f))
+                    .background(if (opaque) MaterialTheme.colorScheme.background else Color.Black.copy(alpha = TvOverlayBoxAlpha))
                     .padding(48.dp)
                     // Holds focus without a visible indication until the action takes it;
                     // OK and directions there do nothing, so none reaches what is behind.
