@@ -22,6 +22,11 @@ HPLat/bernhardberger/tvhplayer/ui/player/PlayerTimeline**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/PlaybackSeekbarKt**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/PlayerFocusEffectsKt**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/PlayerMotion**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/PlayerTopIdentityKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/NowPlayingStripKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/PlayerChromePartsKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/PlayerChannelBrowser**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/PlayerChannelCollectionState**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/ChannelDrawerKt**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/QuickZapPresentationKt**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/QuickZapPreviewKt**;->**(**)**
@@ -36,6 +41,9 @@ HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$PlayerIdentityCard
 HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$PlayerInfoBarKt**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$PlayerTimelineRowKt**;->**(**)**
 HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$ChannelDrawerKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$PlayerChannelBrowserKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$PlayerTopIdentityKt**;->**(**)**
+HPLat/bernhardberger/tvhplayer/ui/player/ComposableSingletons$QuickZapPresentationKt**;->**(**)**
 
 # Shared artwork, card, tab, recovery and notice owners executed by that player path.
 HPLat/bernhardberger/tvhplayer/ui/components/Picon**;->**(**)**
