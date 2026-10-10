@@ -26,6 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
+import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -72,7 +74,6 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
-import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
@@ -97,14 +98,17 @@ fun ChannelDrawer(
     onFocusChannel: (ChannelId) -> Unit,
     onPickChannel: (Channel) -> Unit,
     onCloseDrawer: (Int?) -> Unit,
+    onLongClickChannel: ((Channel, EpgEvent) -> Unit)? = null,
+    browserState: PlayerChannelCollectionState? = null,
 ) {
     val ids = remember(channels) { channels.map { it.id } }
     val numbers = remember(channels) { channels.associate { it.id to it.visibleChannelNumber } }
     val requesters = remember(ids) { ids.associateWith { FocusRequester() } }
     // Start on the entry card, rather than measure item 0 then discard it after scrollToItem.
-    val initialId = playingChannelId ?: selectedId
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = ids.indexOf(initialId).coerceAtLeast(0))
-    var focusedId by remember { mutableStateOf(playingChannelId ?: selectedId) }
+    val initialId = browserState?.focusedId ?: playingChannelId ?: selectedId
+    val localListState = rememberLazyListState(initialFirstVisibleItemIndex = ids.indexOf(initialId).coerceAtLeast(0))
+    val listState = rememberTabListState(browserState?.listState ?: localListState)
+    var focusedId by remember { mutableStateOf(initialId) }
     var entered by remember { mutableStateOf(false) }
     var focusedCatalog by remember { mutableStateOf(emptyList<ChannelId>()) }
     var observedPlayingId by remember { mutableStateOf(playingChannelId) }
@@ -130,12 +134,18 @@ fun ChannelDrawer(
         }
     }
     val pageActive = LocalPlayerPageActive.current
+    val tabOwner = LocalTabOwner.current
+    // Capture before disposal can automatically focus a neighbouring lazy item.
+    val entryId = focusedId?.takeIf { it in ids }
+        ?: playingChannelId?.takeIf { it in ids }
+        ?: selectedId?.takeIf { it in ids } ?: ids.firstOrNull()
+    fun ownsInput() = active && pageActive && tabOwner?.isCurrent != false
     LaunchedEffect(ids, active, playingChannelId, pageActive) {
-        if (!pageActive) {
+        if (!ownsInput()) {
             entered = false
             return@LaunchedEffect
         }
-        if (playingChannelId != observedPlayingId) {
+        if (browserState == null && playingChannelId != observedPlayingId) {
             // Null means awaiting presentation, not a different channel selection.
             // Preserve the local pick until a non-null confirmation resolves it.
             if (playingChannelId != null) {
@@ -160,6 +170,7 @@ fun ChannelDrawer(
             reanchorId = null
         }
         if (ids.isEmpty()) {
+            browserState?.focusedId = null
             entered = false
             if (active) {
                 withFrameNanos { }
@@ -168,31 +179,31 @@ fun ChannelDrawer(
             return@LaunchedEffect
         }
         if (entered && focusedId in ids && focusedCatalog == ids) return@LaunchedEffect
-        val target = focusedId?.takeIf { it in ids }
-            ?: playingChannelId?.takeIf { it in ids }
-            ?: selectedId?.takeIf { it in ids } ?: ids.first()
+        val target = entryId ?: ids.first()
         focusedId = target
+        browserState?.focusedId = target
         // Once the rail is laid out, the anchor moves to the start keyline.
         withFrameNanos { }
         snapshotFlow { listState.layoutInfo }
             .first { it.totalItemsCount == ids.size && it.visibleItemsInfo.isNotEmpty() }
         val index = ids.indexOf(target)
-        if (listState.firstVisibleItemIndex != index || listState.firstVisibleItemScrollOffset != 0) {
+        if (browserState == null || listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) {
             listState.scrollToItem(index)
         }
-        if (!active) return@LaunchedEffect
+        if (!ownsInput()) return@LaunchedEffect
         snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == target.value } }.first { it }
         withFrameNanos { }
-        requesters.getValue(target).requestFocus()
         focusedCatalog = ids
+        if (ownsInput()) requesters.getValue(target).requestFocus()
         entered = true
     }
     Column(
         Modifier.fillMaxWidth()
-            .focusProperties { canFocus = active }
+            .focusProperties { canFocus = ownsInput() }
             .then(if (!active) Modifier.clearAndSetSemantics { } else Modifier)
             .testTag("player-channel-shelf")
             .onPreviewKeyEvent { event ->
+                if (!ownsInput()) return@onPreviewKeyEvent true
                 val channelStep = ChannelNavigation.directionForKeyCode(event.nativeKeyEvent.keyCode)
                     .takeIf { active }
                 when {
@@ -213,10 +224,10 @@ fun ChannelDrawer(
             },
     ) {
         if (channels.isEmpty()) {
-            Text(stringResource(R.string.empty_channel_tag), Modifier.padding(horizontal = 48.dp), color = MaterialTheme.colorScheme.onSurface)
+            Text(stringResource(R.string.empty_channel_tag), Modifier.padding(horizontal = 58.dp), color = MaterialTheme.colorScheme.onSurface)
             androidx.tv.material3.Button(
-                onClick = { onCloseDrawer(null) },
-                modifier = Modifier.padding(horizontal = 48.dp).focusRequester(emptyFocus).testTag("player-shelf-close"),
+                onClick = { if (ownsInput()) onCloseDrawer(null) },
+                modifier = Modifier.padding(start = 58.dp, end = 58.dp, top = 16.dp).focusRequester(emptyFocus).testTag("player-shelf-close"),
             ) { Text(stringResource(R.string.close)) }
         }
         // Insets belong to list content, not its viewport: adjacent cards travel to the screen edge.
@@ -233,10 +244,14 @@ fun ChannelDrawer(
                 layout((placeable.width - 2 * offscreenPx).coerceAtLeast(0), placeable.height) { placeable.place(-offscreenPx, 0) }
             },
             state = listState,
-            contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = 12.dp),
+            // Room above and below the cards for the focus scale and border.
+            contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = ChannelCardRoom),
             horizontalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             items(channels, key = { it.id.value }) { channel ->
+                // Details consume the opening release. Retire the native Card's held-click state
+                // when input ownership leaves, without replacing the remembered row or viewport.
+                androidx.compose.runtime.key(ownsInput()) {
                 CompactZapCard(
                     channel = channel,
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
@@ -247,25 +262,32 @@ fun ChannelDrawer(
                     imageLoader = imageLoader,
                     currentSession = currentSession,
                     onClick = {
-                        if (active) {
+                        if (ownsInput()) {
                             if (channel.id != playingChannelId) pendingPickId = channel.id
                             reanchorId = null
                             onPickChannel(channel)
                         }
                     },
+                    onLongClick = onLongClickChannel?.let { open -> {
+                        if (ownsInput()) nowEvent(channel.id)?.takeIf {
+                            it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds
+                        }?.let { open(channel, it) }
+                    } },
                     modifier = Modifier
-                        .focusProperties { canFocus = active }
+                        .focusProperties { canFocus = ownsInput() }
                         .testTag("player-channel-card-${channel.id.value}")
                         .focusRequester(requesters.getValue(channel.id))
                         .onFocusChanged {
-                            if (it.isFocused && active) {
+                            if (it.isFocused && ownsInput() && (focusedCatalog.isEmpty() || focusedCatalog == ids)) {
                                 profileTrace("P44:focus:rail") {
                                     focusedId = channel.id
+                                    browserState?.focusedId = channel.id
                                     onFocusChannel(channel.id)
                                 }
                             }
                         },
                 )
+                }
             }
         }
         }
@@ -285,15 +307,22 @@ private fun CompactZapCard(
     currentSession: CurrentSessionObservation?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
+    // The programme leads; without one, the channel does.
+    val programme = currentEvent?.title?.takeIf { it.isNotBlank() }
+    val identity = listOfNotNull(number?.toString(), channel.name).joinToString(" ")
     // Preserve the kit's 54dp picon region; let the two text baselines grow with font scale.
     val cardHeight = with(LocalDensity.current) {
         70.dp + MaterialTheme.typography.titleMedium.lineHeight.toDp() + MaterialTheme.typography.bodySmall.lineHeight.toDp()
     }
     CompactCard(
         onClick = onClick,
+        onLongClick = onLongClick,
         border = embeddedProgressCardBorder(),
+        // The kit scrim keeps text legible over artwork; this card's text sits on a flat surface.
+        scrimBrush = SolidColor(Color.Transparent),
         modifier = modifier.width(196.dp),
         image = {
             Box(Modifier.fillMaxWidth().height(cardHeight).background(TvSurfaceColors.containerLowest)) {
@@ -307,9 +336,9 @@ private fun CompactZapCard(
         title = {
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = listOfNotNull(number?.toString(), channel.name).joinToString(" "),
+                    text = programme ?: identity,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-identity"),
+                    modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-${if (programme != null) "now" else "identity"}"),
                 )
                 // The new marker fades in; the old one leaves at once so two glyphs never
                 // overlap in the slot and its tag and announcement go with it.
@@ -327,17 +356,22 @@ private fun CompactZapCard(
             }
         },
         subtitle = {
-            val title = currentEvent?.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.no_epg)
-            val subtitle = if (currentEvent == null) title else {
-                "${formatClock(currentEvent.start.epochSeconds)} · $title" +
-                    stringResource(R.string.quick_zap_minutes_left, ((currentEvent.stop.epochSeconds - nowSec + 59) / 60).toInt())
+            // The picon already names the channel, so only its text may shorten; time left stays whole.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 6.dp)) {
+                Text(
+                    text = if (programme != null) identity else stringResource(R.string.no_epg),
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false)
+                        .testTag("player-channel-${channel.id.value}-${if (programme != null) "identity" else "now"}"),
+                )
+                if (programme != null && currentEvent != null) {
+                    Text(
+                        stringResource(R.string.quick_zap_minutes_left, ((currentEvent.stop.epochSeconds - nowSec + 59) / 60).toInt()),
+                        maxLines = 1, softWrap = false,
+                        modifier = Modifier.testTag("player-channel-${channel.id.value}-left"),
+                    )
+                }
             }
-            Text(
-                subtitle,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 6.dp)
-                    .testTag("player-channel-${channel.id.value}-now"),
-            )
         },
         description = {
             if (currentEvent != null) {

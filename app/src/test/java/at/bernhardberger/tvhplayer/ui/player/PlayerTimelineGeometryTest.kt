@@ -220,8 +220,8 @@ class PlayerTimelineGeometryTest {
             // Painted above its parent's bounds, it is still displayed: no ancestor clips it.
             compose.onNodeWithTag("player-live-state", useUnmergedTree = true).assertIsDisplayed()
             assertEquals("'$name': the box ends with the row", row.right, bounds.right, 0.5f)
-            // Live's programme block keeps 4dp above its bar row.
-            assertEquals("'$name': at one offset above the bar row", row.top - px(4.dp), bounds.bottom, 0.5f)
+            // Live's programme block keeps 12dp above its bar row (16dp above its labels' text).
+            assertEquals("'$name': at one offset above the bar row", row.top - px(12.dp), bounds.bottom, 0.5f)
             // Start, bar, end: the start label's box, the bar and the end clock's box fill the row.
             val stateCell = if (banner) px(cell + 8.dp) else 0f
             assertEquals("'$name': the bar starts after the start box", row.left + stateCell + px(widths!!.leading + 8.dp), track.left, 1f)
@@ -235,7 +235,7 @@ class PlayerTimelineGeometryTest {
                 val end = if (exists("player-end-clock")) bounds("player-end-clock").right else row.right
                 assertEquals("'$name': the distance's right edge is the end clock's", end, drawn.right, 0.5f)
                 assertTrue("'$name': above the bar row", drawn.bottom <= row.top)
-                assertEquals("'$name': at one offset above the bar row", row.top - px(4.dp), drawn.bottom, 0.5f)
+                assertEquals("'$name': at one offset above the bar row", row.top - px(12.dp), drawn.bottom, 0.5f)
                 val style = compose.onNodeWithTag("player-distance", useUnmergedTree = true).fetchSemanticsNode().let { node ->
                     mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                         .also { node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!(it) }.single().layoutInput.style
@@ -258,7 +258,7 @@ class PlayerTimelineGeometryTest {
         // The last line and its text: Next; without Next the subtitle; without guide data the title.
         val infos = listOf(
             Triple("a long Next line", "player-info-last-text", PlayerInfoBarData("1", "One", "Programme", "00:00–01:00", subtitle = "Subtitle", next = long)),
-            Triple("a long subtitle without Next", "player-info-programme", PlayerInfoBarData("1", "One", "Programme", "00:00–01:00", subtitle = long)),
+            Triple("a long subtitle without Next", "player-info-subtitle", PlayerInfoBarData("1", "One", "Programme", "00:00–01:00", subtitle = long)),
             Triple("a long title without guide data", "player-info-title", PlayerInfoBarData("1", "One", long, "")),
         )
         val mode = if (banner) PlayerChromeMode.BANNER else PlayerChromeMode.CONTROLS

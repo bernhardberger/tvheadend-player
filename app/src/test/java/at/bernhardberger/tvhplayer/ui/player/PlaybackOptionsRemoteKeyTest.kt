@@ -624,7 +624,7 @@ class PlaybackOptionsRemoteKeyTest {
         showRecording(controlsVisible = true)
         for ((origin, close) in listOf(
             "player-stop" to Key.Back,
-            PlayerTopIdentityTag to Key.DirectionCenter,
+            PlayerIdentityCardTag to Key.DirectionCenter,
             "player-settings" to null,
             "player-seekbar" to Key.Back,
         )) {

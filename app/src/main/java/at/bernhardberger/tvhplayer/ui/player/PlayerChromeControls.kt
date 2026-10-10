@@ -55,8 +55,7 @@ import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 
 /**
  * [PlayerChrome]'s controls: the header and info bar over the focusable timeline and the action row.
- * The [topIdentity] in the header takes focus above them all: OK opens live's recent channels, or a
- * recording's Info.
+ * The [topIdentity] is passive; the programme artwork above the timeline opens Info.
  * The bar row's state cell and end and the distance behind live are passive. [decoration] hosts them, such as live's
  * quick-zap rail; while it [covered] them they take no focus.
  */
@@ -72,7 +71,7 @@ internal fun PlayerChromeControls(
      * The info bar with its content alpha, and the timeline row drawn the full width below it (a
      * recording's is drawn after the bar instead, with its markers).
      */
-    infoBar: @Composable (contentAlpha: () -> Float, timelineRow: @Composable () -> Unit) -> Unit,
+    infoBar: @Composable (contentAlpha: () -> Float, programmeFocus: Modifier, timelineRow: @Composable () -> Unit) -> Unit,
     /** What playback is doing: the bar row's state cell. */
     state: PlayerStateCell,
     /** Fraction of [PlayerBannerDrop] the footer still rests below its place, taken over from the Banner. */
@@ -93,12 +92,11 @@ internal fun PlayerChromeControls(
     decoration: @Composable (emphasisAlpha: () -> Float, controls: @Composable () -> Unit) -> Unit,
     markerNavigation: RecordingMarkerNavigation,
     onSeekMarker: (Long) -> Unit,
-    /** Left/Right on the top identity change channel (-1, +1), on every press and repeat; without it they do nothing. */
+    /** Retained trial caller input; the passive top identity does not handle keys. */
     onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -> Unit)? = null,
     downHint: String? = null,
     /**
-     * The top identity, drawn over the header: given the header's placement, its place in the focus
-     * graph, and what Down in its recent row does.
+     * The passive top identity, drawn over the header. Legacy focus slots receive no focus target.
      */
     topIdentity: (@Composable (placed: Modifier, focus: Modifier, onRecentDown: () -> Unit) -> Unit)? = null,
 ) {
@@ -146,6 +144,7 @@ internal fun PlayerChromeControls(
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
+    var programmeFocused by remember { mutableStateOf(false) }
     val chromeAlpha = rememberPlayerChromeAlpha(timelineFocused, previewing)
     val chromeHidden = timelineFocused && previewing
     // Capture ownership before the timeline's focus node goes. Compose may automatically focus a
@@ -181,7 +180,7 @@ internal fun PlayerChromeControls(
         }
     }
     if (recording != null) {
-        // Closing the markers returns focus to the timeline, or with Up moves it on to the identity; a
+        // Closing the markers returns focus to the timeline, or with Up moves it on to programme Info; a
         // later reveal starts on Pause.
         val restorationBaseline = remember { markerNavigation.restoration }
         LaunchedEffect(markerNavigation.restoration) {
@@ -197,17 +196,19 @@ internal fun PlayerChromeControls(
             if (markerNavigation.selectedMs !in recording.markers || !seekable || !actions.active) markerNavigation.dismiss()
         }
     }
-    // Down from the top identity, or its recent row, returns to the action last focused.
+    // Down from programme Info retraces Up: the timeline where it takes focus,
+    // else the action last focused.
     var lastAction by remember { mutableStateOf("player-pause") }
     val actionFocus = when (lastAction) {
         "player-stop" -> stopFocus
         "player-settings" -> settingsFocus
         else -> pauseFocus
     }
-    // The top identity stands above everything else that takes focus. Left/Right change channel
-    // where there is a channel to change, and never move focus; Up has nowhere to go.
+    val belowIdentity = if (timelineFocusable) timelineFocus else actionFocus
+    // Programme Info is the top of the focus graph. Left/Right never zap or move focus.
     val identityModifier = Modifier.focusRequester(cardFocus)
         .onFocusChanged {
+            programmeFocused = it.isFocused
             if (it.isFocused) {
                 lastFocusedControl = PlayerIdentityCardTag
                 onActionFocused(PlayerIdentityCardTag)
@@ -217,33 +218,25 @@ internal fun PlayerChromeControls(
         .focusProperties {
             canFocus = !covered
             left = FocusRequester.Cancel; right = FocusRequester.Cancel; up = FocusRequester.Cancel
-            down = actionFocus
+            down = belowIdentity
         }
         .onPreviewKeyEvent { event ->
             when (event.key) {
                 Key.DirectionDown -> {
                     if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                         relocatingKey = event.key
-                        actionFocus.requestFocus()
+                        belowIdentity.requestFocus()
                     }
                     true
                 }
                 Key.DirectionUp -> true
-                // Every press and repeat steps, as CH+/- does: the first at once, a burst settles.
-                Key.DirectionLeft, Key.DirectionRight -> {
-                    if (event.type == KeyEventType.KeyDown) {
-                        onInteraction()
-                        onChannelZap?.invoke(if (event.key == Key.DirectionRight) 1 else -1, event.nativeKeyEvent.eventTime,
-                            event.nativeKeyEvent.repeatCount > 0)
-                    }
-                    true
-                }
+                Key.DirectionLeft, Key.DirectionRight -> true
                 else -> false
             }
         }
     val recentDown: () -> Unit = {
         relocatingKey = Key.DirectionDown
-        actionFocus.requestFocus()
+        belowIdentity.requestFocus()
     }
     decoration({ chromeAlpha.value }) {
     PlayerOverlayChrome(
@@ -257,7 +250,7 @@ internal fun PlayerChromeControls(
         }
     }, headerContent = { placed ->
         header(placed)
-        topIdentity?.invoke(placed, identityModifier, recentDown)
+        topIdentity?.invoke(placed, Modifier, recentDown)
     }) {
         val timelineModifier = Modifier.testTag("player-seekbar").focusRequester(timelineFocus)
                     .focusProperties { canFocus = !covered }
@@ -270,7 +263,7 @@ internal fun PlayerChromeControls(
                             if (recording != null) onActionFocused("player-seekbar")
                         }
                     }
-                    .focusProperties { down = initialFocus; up = cardFocus }
+                    .focusProperties { down = actionFocus; up = cardFocus }
                     .onPreviewKeyEvent { event ->
                         when (event.key) {
                             Key.DirectionLeft, Key.DirectionRight -> {
@@ -305,7 +298,7 @@ internal fun PlayerChromeControls(
                                             event.key, recording?.markerRevision ?: 0L)
                                     } else {
                                         relocatingKey = event.key
-                                        if (event.key == Key.DirectionDown) initialFocus.requestFocus()
+                                        if (event.key == Key.DirectionDown) actionFocus.requestFocus()
                                         else cardFocus.requestFocus()
                                     }
                                 }
@@ -316,15 +309,16 @@ internal fun PlayerChromeControls(
                     }
         if (recording != null) {
             // The step's target label paints over the info bar, which fades out meanwhile.
-            val infoAlpha by animateFloatAsState(if (previewing && !markerNavigation.open) 0f else 1f,
+            val showPreview = previewing && !markerNavigation.open && !programmeFocused
+            val infoAlpha by animateFloatAsState(if (showPreview) 0f else 1f,
                 tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
             Box(Modifier.graphicsLayer { alpha = infoAlpha }) {
-                infoBar({ 1f }) {}
+                infoBar({ 1f }, identityModifier) {}
             }
             RecordingControlsTimeline(
                 timeline = recording,
                 range = recordingRange.takeIf { seekable },
-                previewing = previewing && !markerNavigation.open,
+                previewing = showPreview,
                 paused = paused,
                 state = state,
                 markerNavigation = markerNavigation,
@@ -359,13 +353,13 @@ internal fun PlayerChromeControls(
         } else previewFeedback
         // The info bar rests right above the timeline. A seek label or feedback paints over the
         // bar, so the bar fades out meanwhile instead of anything moving.
-        val statusTextShown = if (seekable) previewing || seekFeedback != null else scheduleFeedback != null
+        val statusTextShown = !programmeFocused && (if (seekable) previewing || seekFeedback != null else scheduleFeedback != null)
         val infoAlpha by animateFloatAsState(if (statusTextShown) 0f else 1f,
             tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
-        // Live's identity is at the top; the programme block takes no focus but its timeline's.
+        // Programme Info remains visible while focused; feedback resumes after leaving it.
         val barStatus = if (previewing) live.barStatus(state, window = live.programmeWindow)
             else rememberPlayerBarStatus(state, liveBar?.end).takeIf { live.liveAvailable }
-        infoBar({ infoAlpha }) {
+        infoBar({ infoAlpha }, identityModifier) {
         if (seekable) {
             PlaybackSeekbar(
                 range = timeshiftSeekbarRange(timeshiftState).let { range ->
@@ -374,11 +368,11 @@ internal fun PlayerChromeControls(
                 timeshiftPosition = requireNotNull(timelinePosition),
                 stepDeltaMs = live.stepDeltaMs,
                 programmeWindow = programmeWindow,
-                previewing = previewing,
+                previewing = previewing && !programmeFocused,
                 collapsed = false,
                 barStatus = barStatus,
                 timeshiftStartLabel = timeshiftStartClock(live.timeshift, live.nowSec),
-                feedback = seekFeedback,
+                feedback = seekFeedback.takeUnless { programmeFocused },
                 feedbackIsError = timeshiftFeedbackIsError || previewing && programmeWindow?.targetAvailable == false,
                 paused = paused,
                 onSeekTo = { onInteraction(); onSeek(it - timeshiftState.positionMs) },
@@ -399,7 +393,7 @@ internal fun PlayerChromeControls(
             PlayerPresentedLiveTimeline(
                 presentation = requireNotNull(liveBar),
                 state = state,
-                feedback = scheduleFeedback,
+                feedback = scheduleFeedback.takeUnless { programmeFocused },
                 feedbackIsError = timeshiftFeedbackIsError,
                 modifier = (if (pausable) timelineModifier else if (event != null) Modifier.testTag("player-schedule-progress") else Modifier)
                     .then(if (pausable || event != null) Modifier.semantics(mergeDescendants = true) {

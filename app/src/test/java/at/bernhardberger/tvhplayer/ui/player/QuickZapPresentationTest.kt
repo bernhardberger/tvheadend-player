@@ -172,7 +172,7 @@ class QuickZapPresentationTest {
         assertTrue(draws > 0)
     }
 
-    @Test fun railPeekWaitsForRevealAndCanReverseDuringItsFade() {
+    @Test fun railRevealNeverAddsTheHistoricalPeek() {
         var expanded by mutableStateOf(false)
         var expansion: () -> Float = { 0f }
         lateinit var peek: androidx.compose.animation.core.MutableTransitionState<Boolean>
@@ -200,7 +200,7 @@ class QuickZapPresentationTest {
         compose.mainClock.advanceTimeBy(112)
         compose.waitForIdle()
         assertEquals(1f, expansion(), 0f)
-        assertTrue("peek is fading in", peek.targetState && !peek.currentState && !peek.isIdle)
+        assertTrue("the browser has no bottom-edge peek", !peek.targetState && !peek.currentState && peek.isIdle)
         compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
         compose.mainClock.advanceTimeBy(96)
         compose.waitForIdle()

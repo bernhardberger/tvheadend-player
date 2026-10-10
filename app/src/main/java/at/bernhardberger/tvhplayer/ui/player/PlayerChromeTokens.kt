@@ -20,10 +20,8 @@ internal object PlayerChromeTokens {
     val identityHeight = 72.dp
     val heroWidth = 360.dp
     val heroHeight = 202.dp
-    val previewWidth = 160.dp
-    val previewHeight = 90.dp
-    val previewSlotHeight = 96.dp
-    val previewCardGap = 16.dp
+    /** From the preview to the title of the rail's focused row. */
+    val previewCardGap = 20.dp
 
     /**
      * The timeline row's distance to the action row, for live and recordings alike; with the row's

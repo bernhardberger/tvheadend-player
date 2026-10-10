@@ -22,7 +22,7 @@ class LivePlayerLayerStateTest {
     fun quickZapKeepsTheTrayUntilExplicitDismissalAndDoesNotAutoHide() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.showControls()
-        state.onActionFocused("player-identity-card")
+        state.onActionFocused("player-settings")
         state.openChannelDrawer()
         state.chrome.updateAutoHideEligibility(false)
         repeat(3) { state.onChannelTuneRequested() }
@@ -33,7 +33,7 @@ class LivePlayerLayerStateTest {
         state.dismissChannelDrawer()
         assertFalse(state.channelDrawerOpen)
         assertTrue(state.chrome.controlsVisible)
-        assertEquals("player-identity-card", state.restoreChannelAction)
+        assertEquals("player-settings", state.restoreChannelAction)
         // A zap on the hidden player shows the Banner, not the controls.
         state.chrome.hideControls()
         state.onChannelTuneRequested()
@@ -75,14 +75,14 @@ class LivePlayerLayerStateTest {
     @Test
     fun shelfDismissalRestoresInvokerWithoutChangingTuneCloseBehavior() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
-        for (action in listOf("player-pause", "player-identity-card", "player-settings", "player-stop")) {
+        for (action in listOf("player-pause", "player-settings", "player-stop")) {
             state.showControls()
             state.onActionFocused(action)
             state.openChannelDrawer()
             state.beginOpeningKeyCycle(19)
             state.dismissChannelDrawer()
             assertEquals(PlayerForegroundLayer.CONTROLS, playerForegroundLayer(state.foregroundContext()))
-            assertEquals(if (action == "player-stop") "player-pause" else action, state.restoreChannelAction)
+            assertEquals(action, state.restoreChannelAction)
             assertEquals(19, state.revealingKeyCode)
             state.onChannelActionRestored()
             assertNull(state.restoreChannelAction)

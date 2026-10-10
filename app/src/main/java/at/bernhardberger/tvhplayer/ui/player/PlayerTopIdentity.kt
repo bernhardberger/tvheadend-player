@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
@@ -133,9 +134,11 @@ internal fun PlayerTopIdentity(
         }
         Layout(
             content = {
-                // The clock's line box, which the identity is centred on, as the strip is.
-                Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
-                    modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+                // The room's header band (or the clock's line, if taller), which the identity is centred on, as the strip is.
+                Box(Modifier.width(0.dp).heightIn(min = TvBrowseHeaderHeight)) {
+                    Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
+                        modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+                }
                 val identityLayer = Modifier.graphicsLayer {
                     val m = morph()
                     alpha = 1f - m
@@ -145,8 +148,10 @@ internal fun PlayerTopIdentity(
                     transformOrigin = TransformOrigin(IdentityInset.toPx() / size.width.coerceAtLeast(1f), 0.5f)
                 }
                 if (focus == null) {
-                    // The info bar names the channel.
-                    Box(identityLayer.testTag(PlayerTopIdentityTag)) {
+                    val spoken = identitySpoken(content)
+                    Box(identityLayer.testTag(PlayerTopIdentityTag).semantics(mergeDescendants = true) {
+                        contentDescription = spoken
+                    }) {
                         IdentityContent(content, imageLoader, currentSession, focused = false)
                     }
                 } else {
@@ -256,7 +261,8 @@ private fun IdentityContent(
             }
         }
         Text(listOf(info.channelNumber, info.channelName).filter(String::isNotBlank).joinToString("  "),
-            style = MaterialTheme.typography.titleMedium, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            // The room's headline: the channel is the player's room, one step below the programme's title.
+            style = MaterialTheme.typography.titleLarge, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
             // The focusable identity's description, or the Banner's info bar, names the channel.
             modifier = Modifier.weight(1f, fill = false).widthIn(max = IdentityTextMaxWidth)
                 .testTag("player-top-identity-name").clearAndSetSemantics {})

@@ -456,11 +456,11 @@ class LivePlayerChromeScreenTest {
         assertTrue(exists("player-top-cluster"))
         assertEquals("the controls open on Play/Pause", listOf("player-pause"), focused())
         assertEquals("Down is consumed: the pause was not toggled", playWhenReady, player.playWhenReady)
-        assertEquals("nothing in the info bar takes focus: the channel stands at the top", emptyList<String?>(),
+        assertEquals("the programme artwork opens details", listOf<String?>(PlayerIdentityCardTag),
             (compose.onAllNodes(hasAnyAncestor(hasTestTag("player-info-bar")) and isFocusable()).fetchSemanticsNodes() +
                 compose.onAllNodes(hasTestTag("player-info-bar") and isFocusable()).fetchSemanticsNodes())
                 .map { it.config.getOrNull(SemanticsProperties.TestTag) })
-        assertEquals("the top identity takes focus", 1,
+        assertEquals("the top identity is passive", 0,
             compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable()).fetchSemanticsNodes().size)
         assertFalse("the action row has no Info", exists("player-info"))
         assertEquals("the header clock is never focusable", 0,
@@ -566,9 +566,9 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the top identity is all there is above the seekbar", listOf(PlayerTopIdentityTag), focused())
+        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
+        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
         assertFalse(exists("player-go-live"))
         assertFalse(exists("player-status-slot"))
         assertFalse("the controls have no state cell; the Pause button speaks for playback", exists("player-state"))
@@ -585,9 +585,9 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the top identity is all there is above the seekbar", listOf(PlayerTopIdentityTag), focused())
+        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
+        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
         assertFalse("no Go live node", exists("player-go-live"))
         assertFalse(exists("player-go-live-label"))
     }
@@ -1288,18 +1288,20 @@ class LivePlayerChromeScreenTest {
             key(Key.DirectionRight)
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionDown)
-            assertEquals("rows open on the playing channel", listOf("player-channel-row-1-tile-0"), focused())
+            assertEquals("browser opens on the playing channel", listOf("player-channel-card-1"), focused())
             assertTrue("the now-playing strip stands above the rows", exists("player-now-playing"))
+            // This screen's channel never leaves tuning.
+            compose.onNode(hasTestTag("channel-tuning-indicator") and hasAnyAncestor(hasTestTag("player-now-playing")),
+                useUnmergedTree = true).assertExists("the strip carries the playback marker")
             assertFalse("the programme info page does not open", exists("live-info-panel"))
             assertEquals("the opening key tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
             if (close == Key.Back) {
-                key(Key.DirectionDown)
-                assertEquals("rows browse without tuning", listOf("player-channel-row-2-tile-0"), focused())
+                key(Key.DirectionRight)
+                assertEquals("cards browse without tuning", listOf("player-channel-card-2"), focused())
                 assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
             }
-            // Up on the first row leaves the way Down came in; Back closes from anywhere.
             key(close)
-            assertFalse(exists("player-channel-rows"))
+            assertFalse(exists("player-channel-browser"))
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
@@ -1307,22 +1309,81 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-pause"), focused())
     }
 
-    @Test fun okOnALaterProgrammeOpensItsDetailsAndOneBackReturnsToItsTile() {
+    @Test fun holdOnACardOpensCurrentDetailsAndOneBackReturnsToItsCard() {
         screen()
+        publishRailProgrammes()
         key(Key.DirectionDown)
         key(Key.DirectionDown)
-        assertEquals(listOf("player-channel-row-1-tile-0"), focused())
+        assertEquals(listOf("player-channel-card-1"), focused())
         key(Key.DirectionRight)
-        assertEquals(listOf("player-channel-row-1-tile-1"), focused())
-        key(Key.DirectionCenter)
+        assertEquals(listOf("player-channel-card-2"), focused())
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter); advanceEventTime(1_200); keyUp(Key.DirectionCenter) }
+        settle()
         assertTrue("the programme's details open", exists("live-info-panel"))
-        assertTrue(compose.onAllNodesWithText("Later", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        assertTrue("as a dialog", exists("player-programme-dialog"))
+        assertFalse("without section tabs or heading", exists("details-top-row"))
+        assertFalse("without the page hint", exists("details-player-hint"))
         assertEquals("nothing tunes", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        val action = focused()
+        key(Key.DirectionUp)
+        assertTrue("Up does not close the dialog", exists("live-info-panel"))
+        assertEquals(action, focused())
         key(Key.Back)
         assertFalse(exists("live-info-panel"))
-        assertEquals("one Back returns to the programme", listOf("player-channel-row-1-tile-1"), focused())
+        assertEquals("one Back returns to the card", listOf("player-channel-card-2"), focused())
+        key(Key.DirectionCenter)
+        assertEquals("the first short OK after a native hold tunes", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         key(Key.Back)
-        assertFalse(exists("player-channel-rows"))
+        assertFalse(exists("player-channel-browser"))
+        assertEquals(listOf("player-pause"), focused())
+    }
+
+    @Test fun accessibilityLongClickAfterCompletedOkDoesNotSwallowFirstDetailsOk() {
+        screen()
+        publishRailProgrammes()
+        key(Key.DirectionDown); key(Key.DirectionDown)
+        key(Key.DirectionRight); key(Key.DirectionRight)
+        key(Key.DirectionCenter)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(3)), runtime.activeTarget.value)
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("player-channel-card-2").performSemanticsAction(SemanticsActions.OnLongClick)
+        settle()
+        assertTrue(exists("live-info-panel"))
+        key(Key.DirectionCenter)
+        assertEquals("a fresh OK activates Watch", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+    }
+
+    @Test fun reopenedRailPreviewsItsRememberedCardFromTheFirstFrame() {
+        screen()
+        publishRailProgrammes()
+        openRows()
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-channel-card-2"), focused())
+        key(Key.Back)
+        assertFalse(exists("player-channel-browser"))
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        repeat(6) {
+            compose.mainClock.advanceTimeByFrame()
+            val previewText = compose.onAllNodes(hasAnyAncestor(hasTestTag("player-zap-preview")), useUnmergedTree = true)
+                .fetchSemanticsNodes().flatMap { node -> node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+            assertTrue("frame $it previews the remembered card, not the playing one: $previewText",
+                previewText.isEmpty() || "Second channel now" in previewText)
+        }
+        compose.mainClock.autoAdvance = true
+        settle()
+        assertEquals(listOf("player-channel-card-2"), focused())
+    }
+
+    @Test fun withoutRecentChannelsTheRailHasOneRowAndDownStaysOnIt() {
+        screen()
+        key(Key.DirectionDown); key(Key.DirectionDown)
+        assertEquals(listOf("player-channel-card-1"), focused())
+        assertFalse(exists("player-channel-row-RECENT"))
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-channel-card-1"), focused())
+        key(Key.Back)
+        assertFalse(exists("player-channel-browser"))
         assertEquals(listOf("player-pause"), focused())
     }
 
@@ -1645,43 +1706,45 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("details-more-info"), focused())
     }
 
-    @Test fun topIdentityLeftAndRightChangeChannelLikeChannelKeysAndHoldingOpensNoRail() {
+    @Test fun upRevealLandsOnPauseAndTheProgrammeNeverZaps() {
         screen()
         assertFalse("the live controls have no Record action", exists("player-record"))
         key(Key.DirectionUp)
-        assertEquals("Up reveals the controls onto the top identity", listOf(PlayerTopIdentityTag), focused())
+        assertEquals("Up reveals controls onto Pause", listOf("player-pause"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionRight)
-        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertEquals("focus stays on the identity", listOf(PlayerTopIdentityTag), focused())
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals("focus stays on the programme", listOf(PlayerIdentityCardTag), focused())
         compose.onRoot().performKeyInput {
             keyDown(Key.DirectionLeft)
             advanceEventTime(600)
             keyUp(Key.DirectionLeft)
         }
         settle()
-        assertEquals("a held Left steps back like CH-", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertFalse("no rail opens", exists("player-channel-rows") || exists("player-channel-shelf"))
-        assertEquals("focus stays on the identity", listOf(PlayerTopIdentityTag), focused())
+        assertEquals("a held Left never zaps", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse("no browser opens", exists("player-channel-browser"))
+        assertEquals("focus stays on the programme", listOf(PlayerIdentityCardTag), focused())
         assertTrue(identityDescription().contains("Name 1"))
     }
 
-    @Test fun topIdentityOkOpensTheRecentRowWhichBackClosesOntoTheIdentityAndOkTunes() {
+    @Test fun recentRowRemembersItsSelectionAndReopensDirectlyOnCards() {
         // Channel 2 played last, before channel 3.
         runBlocking { LastPlayedChannelStore(context).run { setChannelId(ChannelId(3)); setChannelId(ChannelId(2)) } }
         screen()
-        key(Key.DirectionUp)
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
-        key(Key.DirectionCenter)
-        assertEquals("OK opens the row onto the newest recent channel", listOf("player-identity-recent-0"), focused())
-        assertEquals("the opening OK tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        openRows()
+        key(Key.DirectionDown)
+        assertEquals("newest recent channel", listOf("player-channel-card-2"), focused())
+        assertEquals("browsing tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         key(Key.Back)
-        assertFalse("Back closes the row", exists("player-identity-recent-row"))
-        assertEquals("and returns to the identity", listOf(PlayerTopIdentityTag), focused())
+        assertFalse("Back closes the browser", exists("player-channel-browser"))
+        assertEquals("and returns to Pause", listOf("player-pause"), focused())
         assertTrue("the controls stay", exists("player-actions"))
-        key(Key.DirectionCenter)
+        key(Key.DirectionDown)
+        assertEquals("remembered tab opens on cards", listOf("player-channel-card-2"), focused())
         key(Key.DirectionCenter)
         assertEquals("OK on a recent channel tunes it", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
+        assertTrue("another channel keeps the browser", exists("player-channel-browser"))
     }
 
     @Test fun programInfoMovesElementsNotSectionsThenRestoresFocusAndDisposesDetails() {
@@ -1813,23 +1876,16 @@ class LivePlayerChromeScreenTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun rowsOpenALaterProgrammesDetailsAndTheNowTileTunesAndClosesTheLayers() {
+    @Test fun shortOkTunesDirectlyAndKeepsBrowsingContext() {
         screen()
         publishRailProgrammes()
         openRows()
-        key(Key.DirectionDown)
         key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        assertTrue("a later programme opens its details", exists("live-info-panel"))
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        key(Key.Back)
-        assertFalse(exists("live-info-panel"))
-        assertEquals("Back returns to the rows", listOf("player-channel-row-2-tile-1"), focused())
-        key(Key.DirectionLeft)
         key(Key.DirectionCenter)
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(exists("live-info-panel"))
-        assertFalse(exists("player-channel-rows"))
+        assertTrue(exists("player-channel-browser"))
+        assertEquals(listOf("player-channel-card-2"), focused())
     }
 
     private fun assertPageTopBand() {
@@ -1848,7 +1904,7 @@ class LivePlayerChromeScreenTest {
     private fun openRows() {
         key(Key.DirectionDown)
         key(Key.DirectionDown)
-        assertEquals(listOf("player-channel-row-1-tile-0"), focused())
+        assertEquals(listOf("player-channel-card-1"), focused())
     }
 
     private fun confirmInfoAction() {
@@ -1931,7 +1987,7 @@ class LivePlayerChromeScreenTest {
         openRows()
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertTrue("the rows stay open", exists("player-channel-rows"))
+        assertTrue("the browser stays open", exists("player-channel-browser"))
     }
 
     @Test fun channelUpTunesWithTheRailClosed() {

@@ -138,7 +138,7 @@ class PlayerMotionTest {
         var infoPresses = 0
         checkPanelCloseHandsFocusBack(
             panelTag = "recording-info-panel",
-            actionTag = PlayerTopIdentityTag,
+            actionTag = PlayerIdentityCardTag,
             activations = { infoPresses },
             controls = { _, open, restore, restored ->
                 RecordingChromeFixture(

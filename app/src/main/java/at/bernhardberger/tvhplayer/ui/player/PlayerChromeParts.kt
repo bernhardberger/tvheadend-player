@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -145,9 +147,12 @@ internal fun PlayerChromeHeader(clock: String, modifier: Modifier = Modifier) {
         if (LocalPlayerPageScrim.current == null || LocalPlayerControlsMotion.current == null) {
             Box(Modifier.fillMaxWidth().height(PlayerChromeTokens.topScrimHeight).background(PlayerChromeTokens.topScrim))
         }
-        Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
-            modifier = Modifier.align(Alignment.TopEnd).padding(top = TvGridVerticalMargin, end = TvGridHorizontalMargin)
-                .testTag("player-top-cluster"))
+        // The room's header band, as a browse room's header actions stand in it.
+        Box(Modifier.align(Alignment.TopEnd).padding(top = TvGridVerticalMargin, end = TvGridHorizontalMargin)
+            .heightIn(min = TvBrowseHeaderHeight), contentAlignment = Alignment.CenterEnd) {
+            Text(clock, style = MaterialTheme.typography.titleLarge, maxLines = 1, color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+                modifier = Modifier.testTag("player-top-cluster"))
+        }
     }
 }
 
@@ -171,30 +176,31 @@ internal data class QuickZapPreviewSnapshot(
     val subtitle: String? = null,
 )
 
-/** How long focus must rest on a quick-zap card before its preview fades in. */
+/** How long focus must rest on a quick-zap card after a held key before its preview fades in. */
 internal const val QuickZapPreviewSettleMs = 250L
 
 /**
- * [value] once it has stayed unchanged for [settleMs], otherwise null. The initial value is
- * settled immediately; every later change waits the full delay again.
+ * [value], or null while [held] and for [settleMs] after it is released. Each single press
+ * shows its value at once, so the previews crossfade; a held key shows and loads nothing per
+ * card until focus rests where it stopped.
  */
 @Composable
-internal fun <T : Any> rememberSettled(value: T?, settleMs: Long): T? {
-    var settled by remember { mutableStateOf(value) }
-    LaunchedEffect(value) {
-        if (value != settled) {
-            settled = null
+internal fun <T : Any> rememberUnlessHeld(value: T?, held: Boolean, settleMs: Long): T? {
+    var rested by remember { mutableStateOf(true) }
+    LaunchedEffect(held) {
+        if (held) rested = false
+        else if (!rested) {
             delay(settleMs)
-            settled = value
+            rested = true
         }
     }
-    return value?.takeIf { it == settled }
+    return value.takeIf { !held && rested }
 }
 
 /**
- * Passive preview of the focused quick-zap card. It fades out as soon as focus
- * moves and fades in once focus rests, bottom-anchored in a fixed slot so neither the tray
- * nor the cards move with the preview's length.
+ * Passive preview of the focused quick-zap card, bottom-anchored in a fixed slot so neither the
+ * tray nor the cards move with the preview's length. A press crossfades to the new card's
+ * preview; while [scrolling] it hides until focus rests.
  */
 @Composable
 internal fun QuickZapTrayPreview(
@@ -207,8 +213,9 @@ internal fun QuickZapTrayPreview(
     modifier: Modifier = Modifier,
     /** Without artwork and summary. */
     compact: Boolean = false,
+    scrolling: Boolean = false,
 ) {
-    val settledId = rememberSettled(channel?.id, QuickZapPreviewSettleMs)
+    val settledId = rememberUnlessHeld(channel?.id, scrolling, QuickZapPreviewSettleMs)
     val snapshot = channel?.takeIf { it.id == settledId }?.let {
         QuickZapPreviewSnapshot(
             channelId = it.id,
@@ -255,6 +262,9 @@ internal fun QuickZapTrayPreviewFrame(
                 fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
         },
         contentKey = { it?.channelId },
+        // Both sides sit on the cards while they overlap, as the slot itself does; a shorter
+        // preview would otherwise start at the taller one's top and drop when that one leaves.
+        contentAlignment = Alignment.BottomStart,
         modifier = modifier.focusProperties { canFocus = false }.testTag("player-zap-preview"),
         label = "quick-zap-preview",
     ) { shown ->

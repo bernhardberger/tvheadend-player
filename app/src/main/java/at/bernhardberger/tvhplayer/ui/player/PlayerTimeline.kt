@@ -111,8 +111,11 @@ internal val ReadoutThumbGap = 8.dp
 /** The timeline block's room below its bar row. */
 internal val TimelineRowInset = 8.dp
 
-/** The room above the bar row: with the labels 4dp inside their row, the info bar's last text stands 8dp above them. */
-private val TimelineRowTopInset = 4.dp
+/**
+ * The room above the bar row: with the labels 4dp inside their row, the programme block (card and last text line)
+ * stands 16dp above them, the same as the timeline's distance to the action row, so the timeline reads as its own band.
+ */
+private val TimelineRowTopInset = 12.dp
 
 /**
  * Where the step readout's chip and the distance's drawn text lie in the root, written when they are

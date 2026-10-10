@@ -32,7 +32,7 @@ class PlayerChromeStateTest {
             assertEquals(rail, state.channelRailPresented)
             if (rail) {
                 state.dismissChannelDrawer()
-                assertEquals(PlayerIdentityCardTag, state.restoreChannelAction)
+                assertEquals("player-pause", state.restoreChannelAction)
             }
             state.chrome.dispose()
         }

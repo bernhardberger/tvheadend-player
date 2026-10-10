@@ -74,7 +74,7 @@ internal class LivePlayerLayerState(
     )
 
     private var lastFocusedAction: String? = null
-    /** The focused control a quick list returns to; unlike the drawer's, it may be Stop. */
+    /** The focused control a quick list returns to; both lists and the drawer restore Stop too. */
     private var lastFocusedControl: String? = null
     private var channelDrawerReturnAction: String? = null
     private var quickListReturnAction: String? = null
@@ -82,8 +82,8 @@ internal class LivePlayerLayerState(
         private set
 
     fun onActionFocused(action: String) = profileTrace("P44:focus:control") {
-        lastFocusedAction = action.takeIf { it in setOf("player-pause", PlayerIdentityCardTag, "player-settings") }
-        lastFocusedControl = lastFocusedAction ?: action.takeIf { it == "player-stop" }
+        lastFocusedAction = action.takeIf { it in setOf("player-pause", "player-stop", "player-settings") } ?: lastFocusedAction
+        lastFocusedControl = action.takeUnless { it == "player-seekbar" }
     }
 
     fun onChannelActionRestored() {

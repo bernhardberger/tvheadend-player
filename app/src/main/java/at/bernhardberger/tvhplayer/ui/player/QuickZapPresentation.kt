@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,6 +9,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -43,6 +46,10 @@ internal fun QuickZapPresentation(
     preview: @Composable () -> Unit,
     controls: @Composable () -> Unit,
     channelRows: Boolean = false,
+    /** The tray continues off the screen's bottom edge, in as much room as the page header leaves it. */
+    trayBleeds: Boolean = false,
+    /** Centred in the page's top band while the rail is open. */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val expansion = animateFloatAsState(
         if (expanded) 1f else 0f,
@@ -64,7 +71,7 @@ internal fun QuickZapPresentation(
     val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
     // The schedule header peeks only once the rail stands, and leaves before it folds away.
     val railPeek = LocalPlayerRailPeek.current
-    LaunchedEffect(expanded, revealed, railPeek, channelRows) { railPeek?.targetState = expanded && revealed && !channelRows }
+    LaunchedEffect(railPeek) { railPeek?.targetState = false }
     var viewportHeight by remember { mutableIntStateOf(0) }
     var railHeight by remember { mutableIntStateOf(0) }
     val pageProgress = LocalPlayerPageProgress.current
@@ -103,9 +110,10 @@ internal fun QuickZapPresentation(
         }
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .then(if (trayBleeds) Modifier.padding(top = TvGridVerticalMargin + TvBrowseHeaderHeight) else Modifier)
                 .onSizeChanged { railHeight = it.height }
                 .graphicsLayer { translationY = size.height * (1f - expansion.value) }
-                .padding(bottom = TvGridVerticalMargin),
+                .padding(bottom = if (trayBleeds) 0.dp else TvGridVerticalMargin),
         ) {
             Box(
                 Modifier.fillMaxWidth()
@@ -119,12 +127,23 @@ internal fun QuickZapPresentation(
             // Leaves entirely above the viewport, further and so faster than the headline rising beneath it.
             Box(
                 Modifier.fillMaxWidth()
+                    .then(if (trayBleeds) Modifier.weight(1f, fill = false) else Modifier)
                     .then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
                         entering = false, alphaWindow = 60..260,
                         dyPx = { viewportHeight.toFloat() * -1f }) else Modifier)
                     .testTag("player-zap-tray"),
             ) { channelContent() }
         }
+        if (header != null) Box(
+            Modifier.align(Alignment.TopCenter)
+                .padding(top = TvGridVerticalMargin).heightIn(min = TvBrowseHeaderHeight)
+                .graphicsLayer { alpha = expansion.value }
+                .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
+                    entering = false) else Modifier)
+                .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
+                .testTag("player-zap-header"),
+            contentAlignment = Alignment.Center,
+        ) { header() }
     }
 }
 

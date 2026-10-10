@@ -703,12 +703,28 @@ colour and indication rules above apply here. Remote keys follow §6.
   playback. Pending recording confirmation/configuration is revalidated against
   current live metadata, and old-session details close when ownership changes.
 
-### Quick-zap cards (accepted 2026-09-21)
+### Quick-zap cards (accepted 2026-09-21, rail revised 2026-10-10)
 
-- Use the Penpot compact channel-card anatomy: 196×110dp at default font scale,
-  centered picon above channel identity, one current-programme line with start
-  time and minutes remaining, and a 2dp cyan progress strip. Use TV Material
-  `CompactCard` indication; card height grows with localized text scale.
+- Use the compact channel-card anatomy: 196×110dp at default font scale, a
+  centered picon on a flat surface without the kit's text scrim, the current
+  programme title (with the playing and recording markers) as the main line,
+  `<number> <name> · Nm left` below it, and a 2dp cyan progress strip. Use TV
+  Material `CompactCard` indication; card height grows with localized text scale.
+- The rail follows the kit's immersive list: focus stays on the first slot and a
+  preview of the focused card stands above the rows, its text on the start
+  keyline and the programme artwork trailing on the text's last line. Single
+  Left/Right steps crossfade the preview; while Left/Right is held it is hidden and
+  returns 250 ms after release. Reopening previews the remembered card from the
+  first frame.
+- Two rows: the first is titled with the active channel group (or All channels),
+  the second is Recent channels and is absent while empty. The quiet row's title
+  shrinks to title-small at the passive alpha and its cards dim to 40%; Down and
+  Up change rows over 300 ms and each row keeps its card and viewport. Up from the
+  first row returns to the controls. The top band's centred up hint names what
+  Up leads to: Back to TV on the first row, the first row's title on Recent.
+- Short OK tunes; holding OK opens the programme details as a full-screen
+  two-column dialog that fades in and out, without tabs or the up hint, and only
+  Back closes it.
 - While player controls are visible, the upper 24dp of the cards peeks above the
   bottom screen edge. The peek is passive; Down opens the tray. First entry
   focuses the playing channel (or a deterministic available fallback).
@@ -728,7 +744,7 @@ colour and indication rules above apply here. Remote keys follow §6.
   at either screen edge, while focused cards stay inside the safe area with room
   for native focus scale.
 - Selecting another channel keeps the tray, focused card and scroll position.
-  Back, Up, or selecting the confirmed playing channel returns to player controls
+  Back, Up from the first row, or selecting the confirmed playing channel returns to player controls
   and restores the invoking action. The tray does not auto-hide during zapping.
 - A confirmed external change while the tray is open (a completed numeric tune)
   never moves browse focus; it reanchors the tray when it closes. Digits,

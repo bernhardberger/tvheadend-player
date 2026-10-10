@@ -151,35 +151,62 @@ class PlayerChromeEvidenceTest {
         assertEquals(setOf(2L), active.toSet())
     }
 
-    @Test fun quickZapPreviewWaitsForFocusToRestAndRepeatedStepsRestartTheWait() {
+    @Test fun quickZapPreviewFollowsEachPressAndWaitsForAHeldKeyToRest() {
         var focused by mutableStateOf<ChannelId?>(ChannelId(1))
-        var settled: ChannelId? = null
-        fun focus(id: ChannelId) = compose.runOnIdle {
-            focused = id
+        var held by mutableStateOf(false)
+        var shown: ChannelId? = null
+        fun set(block: () -> Unit) = compose.runOnIdle {
+            block()
             androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
         }
-        compose.setContent { settled = rememberSettled(focused, QuickZapPreviewSettleMs) }
+        compose.setContent { shown = rememberUnlessHeld(focused, held, QuickZapPreviewSettleMs) }
         compose.waitForIdle()
-        assertEquals("the opening card previews at once", ChannelId(1), settled)
+        assertEquals("the opening card previews at once", ChannelId(1), shown)
         compose.mainClock.autoAdvance = false
-        focus(ChannelId(2))
+        for (id in listOf(2L, 3L, 2L)) {
+            set { focused = ChannelId(id) }
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("each press swaps at once, however quick", ChannelId(id), shown)
+        }
+        set { held = true; focused = ChannelId(3) }
         compose.mainClock.advanceTimeByFrame()
-        assertNull("moving hides the preview immediately", settled)
+        assertNull("a held key hides the preview from its first repeat", shown)
+        set { focused = ChannelId(4) }
+        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs * 2)
+        assertNull("and keeps it hidden while held", shown)
+        set { held = false }
         compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
-        focus(ChannelId(3))
-        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
-        assertNull("a repeat step restarts the wait", settled)
+        assertNull("focus rests before the preview returns", shown)
         compose.mainClock.advanceTimeBy(100)
-        assertEquals(ChannelId(3), settled)
-        focus(ChannelId(4))
+        assertEquals(ChannelId(4), shown)
+        set { focused = ChannelId(5) }
         compose.mainClock.advanceTimeByFrame()
-        focus(ChannelId(3))
+        assertEquals("the next press swaps at once again", ChannelId(5), shown)
+    }
+
+    @Test fun crossfadingToAShorterPreviewKeepsItOnTheCardsFromTheFirstFrame() {
+        fun snapshot(id: Long) = QuickZapPreviewSnapshot(ChannelId(id), "p$id", "", null, null, null)
+        var shown by mutableStateOf(snapshot(1))
+        compose.setContent { TVHeadendPlayerTheme { Box(Modifier.size(400.dp), contentAlignment = Alignment.BottomStart) {
+            QuickZapTrayPreviewFrame(shown) {
+                Box(Modifier.fillMaxWidth().height(if (it.channelId == ChannelId(1)) 200.dp else 100.dp).testTag(it.title))
+            }
+        } } }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle {
+            shown = snapshot(2)
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
         compose.mainClock.advanceTimeByFrame()
-        assertNull("returning to the previous card waits again", settled)
-        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
-        assertNull("the full wait restarts", settled)
-        compose.mainClock.advanceTimeBy(100)
-        assertEquals(ChannelId(3), settled)
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("p1", useUnmergedTree = true).assertExists()
+        val bottom = 400.dp
+        compose.onNodeWithTag("p2").assertTopPositionInRootIsEqualTo(bottom - 100.dp)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("p1", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("p2").assertTopPositionInRootIsEqualTo(bottom - 100.dp)
     }
 
     @Test fun tickingSecondsDoNotChangeLiveRegionAnnouncementButStateDoes() {
@@ -228,16 +255,13 @@ class PlayerChromeEvidenceTest {
     /** The info bar with an empty artwork slot, passive as in the Banner. */
     @Composable
     private fun InfoBar(data: PlayerInfoBarData, modifier: Modifier = Modifier) {
-        PlayerInfoBar(data, modifier) { Box(it.size(124.dp, 70.dp).background(TvSurfaceColors.containerLow)) }
+        PlayerInfoBar(data, modifier) { Box(it.size(196.dp, 110.dp).background(TvSurfaceColors.containerLow)) }
     }
 
-    private fun lastRowLayout(recorded: Boolean) {
-        var gapPx = 0f
+    @Test fun liveNextRowRunsFullWidthOnTheArtworksBottomEdge() {
         compose.setContent { TVHeadendPlayerTheme {
-            gapPx = with(LocalDensity.current) { 8.dp.toPx() }
             Box(Modifier.fillMaxSize()) {
-                // Live: Next is the last row; recording: the episode; both under the programme line.
-                InfoBar(info(recorded), Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
+                InfoBar(info(false), Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
             }
         } }
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -245,27 +269,28 @@ class PlayerChromeEvidenceTest {
         val text = bounds("player-info-last-text")
         val row = bounds("player-info-last-row")
         val bar = bounds("bar")
-        val above = bounds("player-info-programme")
-        assertEquals("the last row stands a fixed gap under the programme line", gapPx, text.top - above.bottom, 1f)
+        assertEquals("Next stands on the artwork's bottom edge", bar.bottom, row.bottom, 1f)
         assertEquals("the row is as tall as its text", text.height, row.height, 1f)
         assertEquals("the row runs to the bar's end: nothing takes room at its end", bar.right, row.right, 1f)
         assertEquals("the row starts where the title starts", title.left, row.left, 1f)
     }
 
-    @Test fun liveNextRowRunsFullWidthAndIsAsTallAsItsText() = lastRowLayout(recorded = false)
-
-    @Test fun recordingEpisodeRowRunsFullWidthAndIsAsTallAsItsText() = lastRowLayout(recorded = true)
-
-    @Test fun recordingWithoutEpisodeHasNoLastRow() {
+    @Test fun aRecordingHasNoLastRowItsEpisodeIsTheSubtitle() {
         var episode by mutableStateOf<String?>("Episode 4")
         compose.setContent { TVHeadendPlayerTheme {
             Box(Modifier.fillMaxSize()) {
                 InfoBar(info(true).copy(subtitle = episode), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
             }
         } }
-        compose.onNodeWithTag("player-info-last-row", useUnmergedTree = true).assertExists()
-        compose.runOnIdle { episode = null }
         compose.onNodeWithTag("player-info-last-row", useUnmergedTree = true).assertDoesNotExist()
+        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val subtitle = compose.onNodeWithTag("player-info-subtitle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("the episode stands under the title", title.bottom <= subtitle.top + 0.5f)
+        compose.runOnIdle { episode = null }
+        compose.onNodeWithTag("player-info-subtitle", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-info-last-row", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals("the title keeps its place", title,
+            compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
     }
 
     @Test fun scheduledMarkerIsANeutralClockNotTheRedRecGlyph() {
@@ -311,7 +336,7 @@ class PlayerChromeEvidenceTest {
         assertTrue("one row", bounds.maxOf { it.center.y } - bounds.minOf { it.center.y } < 1f)
     }
 
-    @Test fun theTitleLeadsTheInfoBarWithTheArtworkOnItsTop() {
+    @Test fun theEyebrowLeadsTheInfoBarBesideTheArtwork() {
         compose.setContent { TVHeadendPlayerTheme {
             Box(Modifier.fillMaxSize()) {
                 InfoBar(info(false), Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
@@ -319,9 +344,11 @@ class PlayerChromeEvidenceTest {
         } }
         val bar = compose.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
         val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val eyebrow = compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         compose.onNodeWithTag("player-info-eyebrow", useUnmergedTree = true).assertDoesNotExist()
-        assertEquals("no channel line above the title", bar.top, title.top, 0.5f)
-        assertEquals("the text starts a grid gutter after the slot", bar.left + with(compose.density) { (124 + 20).dp.toPx() }, title.left, 0.5f)
+        assertEquals("the time and metadata lead on the bar's top, no channel line", bar.top, eyebrow.top, 0.5f)
+        assertTrue("the title follows them", eyebrow.bottom <= title.top + 0.5f)
+        assertEquals("the text starts a grid gutter after the slot", bar.left + with(compose.density) { (196 + 20).dp.toPx() }, title.left, 0.5f)
     }
 
     @Test fun topIdentityShowsTheLogoOrTheNumberInItsChipNeverBoth() {

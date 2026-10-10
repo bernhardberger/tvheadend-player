@@ -25,6 +25,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.withKeyDown
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
@@ -291,15 +292,27 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the identity is all there is above the seekbar", listOf(PlayerTopIdentityTag), focused())
+        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down returns to the action last focused", listOf("player-pause"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
         assertFalse(exists("player-go-live"))
         assertFalse(exists("player-status-slot"))
         assertFalse("the controls have no state cell", exists("player-state"))
         compose.onNodeWithTag("player-pause").assertContentDescriptionEquals("Pause")
+    }
+
+    @Test fun eitherRevealDirectionAfterABannerStepLandsOnPauseNotProgramme() {
+        screen()
+        playing()
+        for (direction in listOf(Key.DirectionUp, Key.DirectionDown)) {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+            compose.onRoot().performKeyInput { withKeyDown(direction) { advanceEventTime(1_200) } }
+            settle()
+            assertEquals(listOf("player-pause"), focused())
+            key(Key.Back)
+        }
     }
 
     @Test fun theElapsedLabelKeepsThePlaybackPositionWhileAStepIsPending() {
@@ -321,7 +334,7 @@ class RecordingPlayerChromeScreenTest {
         screen()
         playing()
         key(Key.DirectionDown)
-        for (action in listOf(PlayerTopIdentityTag, "player-settings")) {
+        for (action in listOf(PlayerIdentityCardTag, "player-settings")) {
             compose.onNodeWithTag(action).performSemanticsAction(SemanticsActions.RequestFocus)
             settle()
             key(Key.DirectionCenter)

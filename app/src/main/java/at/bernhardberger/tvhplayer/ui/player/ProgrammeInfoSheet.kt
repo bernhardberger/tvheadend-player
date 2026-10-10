@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.foundation.layout.heightIn
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.core.animateFloat
@@ -13,6 +15,7 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Easing
 import androidx.compose.animation.core.updateTransition
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -59,6 +62,8 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 /** Only the section at rest may request focus. Outside the player page nothing changes. */
 internal val LocalPlayerPageActive = compositionLocalOf { true }
 internal val LocalPlayerPageRailHeader = compositionLocalOf { false }
+/** Programme details shown as a dialog: no section tabs or heading, and only Back closes it. */
+internal val LocalProgrammeDialog = compositionLocalOf { false }
 internal val LocalPlayerPageScrim = compositionLocalOf<PlayerPageScrim?> { null }
 internal val LocalPlayerPageProgress = compositionLocalOf<(() -> Float)?> { null }
 internal val LocalPlayerRailPeek = compositionLocalOf<MutableTransitionState<Boolean>?> { null }
@@ -178,6 +183,8 @@ internal fun Modifier.playerScrim(
 internal fun <T : Any> PlayerPage(
     details: T?,
     modifier: Modifier = Modifier,
+    /** Opens [details] as a dialog over the resting player page: it fades in and out, nothing travels. */
+    dialog: Boolean = false,
     railHeader: (@Composable () -> Unit)? = null,
     railExpanded: Boolean = false,
     nowPlaying: (@Composable () -> Unit)? = null,
@@ -185,9 +192,20 @@ internal fun <T : Any> PlayerPage(
     programme: @Composable (T) -> Unit,
 ) {
     val open = details != null
+    // A dialog stays one until it has faded out.
+    val dialogMode = remember { booleanArrayOf(false) }
+    if (open) dialogMode[0] = dialog
+    val asDialog = dialogMode[0]
     val transition = updateTransition(open, label = "player-page")
-    val progress = transition.animateFloat({ BrowseMotionPolicy.pageProgress(targetState) }, label = "page-progress") { if (it) 1f else 0f }
-    val readProgress = remember { { progress.value } }
+    val progress = transition.animateFloat({
+        if (!asDialog) BrowseMotionPolicy.pageProgress(targetState)
+        else if (targetState) tween(PlayerMotion.MediumMs, easing = PlayerMotion.StandardDecelerate)
+        else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)
+    }, label = "page-progress") { if (it) 1f else 0f }
+    val pageProgress = remember { { progress.value } }
+    val atRest = remember { { 0f } }
+    // Under a dialog the player page stays where it is.
+    val readProgress = if (asDialog) atRest else pageProgress
     val settled = transition.currentState == open && transition.targetState == open && !transition.isRunning
     val composed = open || !settled
     val shown = rememberLastShown(details)
@@ -231,7 +249,7 @@ internal fun <T : Any> PlayerPage(
                                         compositingStrategy = CompositingStrategy.ModulateAlpha
                                     }.drawWithContent { if (peekAlpha.value > 0f) drawContent() }) { header?.invoke() }
                             }
-                            if (composed) shown?.let {
+                            if (composed && !asDialog) shown?.let {
                                 Box(Modifier.fillMaxSize().padding(top = if (header != null) 156.dp else 0.dp)) { programme(it) }
                             }
                         }
@@ -240,9 +258,11 @@ internal fun <T : Any> PlayerPage(
             }
             // Shared viewport layer: neither strip nor up affordance travels with either page.
             Box(Modifier.fillMaxWidth().padding(top = TvGridVerticalMargin)) {
-                // Measure the clock's actual line box, including font scale and font metrics.
-                Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
-                    modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+                // The room's header band, or the clock's actual line box if taller (font scale, font metrics).
+                Box(Modifier.width(0.dp).heightIn(min = TvBrowseHeaderHeight)) {
+                    Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
+                        modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+                }
                 Box(Modifier.matchParentSize()) {
                     // Over the rail the strip grows out of the live top identity's size and shrinks back into
                     // it, at the chip's start edge, while the identity does the reverse.
@@ -261,11 +281,26 @@ internal fun <T : Any> PlayerPage(
                             .then(if (!railStrip) Modifier.pageMotion(200..400) else Modifier)
                             .testTag("player-now-playing-motion"),
                     ) { nowPlaying() }
-                    if (composed || header != null) PlayerDownHint(
-                        stringResource(if (header != null) R.string.nav_channels else R.string.details_back_to_tv),
+                    if (!asDialog && (composed || header != null)) PlayerDownHint(
+                        stringResource(if (header != null || railExpanded) R.string.nav_channels else R.string.details_back_to_tv),
                         Modifier.align(Alignment.Center).pageMotion(300..500,
                             BrowseMotionPolicy.pageStandardDecelerate).testTag("details-player-hint"), up = true,
                     )
+                }
+            }
+            // The dialog covers everything, the shared band included, on the room's own surface.
+            if (composed && asDialog) shown?.let {
+                PlayerMotionFrame(leaving = !open || !settled, modifier = Modifier.fillMaxSize()
+                    .graphicsLayer { alpha = progress.value }
+                    .background(MaterialTheme.colorScheme.background)
+                    .testTag("player-programme-dialog")) {
+                    CompositionLocalProvider(
+                        LocalPlayerPageActive provides (open && settled),
+                        LocalPlayerPageProgress provides null,
+                        LocalProgrammeDialog provides true,
+                    ) {
+                        Box(Modifier.fillMaxSize()) { programme(it) }
+                    }
                 }
             }
         }

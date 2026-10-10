@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -20,12 +21,15 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import coil3.ImageLoader
@@ -41,6 +45,7 @@ internal fun NowPlayingStrip(
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
+    playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
 ) {
     val current = programme?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
@@ -57,9 +62,16 @@ internal fun NowPlayingStrip(
             )
         }
         Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max)) {
-            Text(listOfNotNull(channelNumber, channelName.takeIf { it.isNotBlank() }).joinToString(" "),
-                style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // The playing card's marker: this strip is what plays, not what the rail or details show.
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(listOfNotNull(channelNumber, channelName.takeIf { it.isNotBlank() }).joinToString(" "),
+                    Modifier.weight(1f, fill = false),
+                    style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                    ChannelPlaybackMarker(playbackIndicator, size = 16.dp)
+                }
+            }
             Text(current?.title.orEmpty(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

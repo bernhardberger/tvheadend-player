@@ -12,10 +12,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
@@ -45,11 +42,11 @@ data class PlayerInfoBarData(
 )
 
 /**
- * The [identity] slot (the programme's artwork) on the title's top, one grid gutter before the
- * programme block: the title, the programme's time, metadata and subtitle on one line, and a last
- * row. Every line of the block keeps its place, present or not, so the block is as tall with one line
- * as with three and nothing moves between programmes. The channel stands at the top of the screen;
- * the description still names it. The last row (live: Next, recording: the episode) runs the full width.
+ * The [identity] slot (the programme's artwork) one grid gutter before the programme block, both
+ * sharing the bar's top: an eyebrow with the programme's time and metadata, the title, the subtitle
+ * (a recording: its episode) and, live, Next on the slot's bottom edge. Every line of the block keeps
+ * its place, present or not, so nothing moves between programmes. The channel stands at the top of the
+ * screen; the description still names it. The Next row runs the full width.
  *
  * @param contentAlpha alpha of the bar's content.
  * @param lastLineEndReserve width the programme block's last line (Next; without it the subtitle;
@@ -80,37 +77,40 @@ fun PlayerInfoBar(
     ).joinToString(". ")
     val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)
     val faded = Modifier.graphicsLayer { alpha = contentAlpha() }
-    // A recording's episode takes the last row; live keeps its subtitle above Next.
-    val lastText = if (recorded) data.subtitle?.takeIf(String::isNotBlank) else next
-    val subtitle = data.subtitle?.takeIf(String::isNotBlank).takeIf { !recorded }
-    val programmeLine = buildAnnotatedString {
-        withStyle(SpanStyle(color = secondary)) { append(facts) }
-        if (subtitle != null) {
-            if (facts.isNotEmpty()) withStyle(SpanStyle(color = secondary)) { append(" · ") }
-            append(subtitle)
-        }
-    }
+    // Live ends on Next; a recording has none, its episode stands on the subtitle's line.
+    val lastText = next.takeIf { !recorded }
+    val subtitle = data.subtitle?.takeIf(String::isNotBlank)
     val reserved = Modifier.reserveEnd(lastLineEndReserve)
+    // Without a last row, the lowest present line leaves the distance its room.
+    val reserveOn = when {
+        lastText != null -> "last"
+        subtitle != null -> "subtitle"
+        facts.isNotEmpty() -> "facts"
+        else -> "title"
+    }
+    val factsLine: @Composable (TextStyle) -> Unit = { style ->
+        if (facts.isNotEmpty()) Text(facts, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis, color = secondary,
+            modifier = faded.then(if (reserveOn == "facts") reserved else Modifier)
+                .testTag("player-info-programme").clearAndSetSemantics {})
+        else Text("", style = style, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
+    }
     // The bar speaks for itself.
-    Row(modifier.semantics(mergeDescendants = true) { contentDescription = description },
+    Row(modifier.height(IntrinsicSize.Min).semantics(mergeDescendants = true) { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(TvGridGutter), verticalAlignment = Alignment.Top) {
         identity(faded)
-        // An absent line's place, kept empty.
-        val emptyLine: @Composable (TextStyle) -> Unit = { style ->
-            Text("", style = style, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
-        }
-        Column(Modifier.weight(1f)) {
-            Text(data.title, style = MaterialTheme.typography.headlineSmall, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurface, modifier = faded.then(if (programmeLine.isEmpty() && lastText == null) reserved else Modifier)
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            factsLine(MaterialTheme.typography.labelLarge)
+            Spacer(Modifier.height(4.dp))
+            Text(data.title, style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface, modifier = faded.then(if (reserveOn == "title") reserved else Modifier)
                     .testTag("player-info-title").clearAndSetSemantics {})
             Spacer(Modifier.height(2.dp))
-            if (programmeLine.isNotEmpty()) {
-                Text(programmeLine, style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
-                    modifier = faded.then(if (lastText == null) reserved else Modifier)
-                        .testTag("player-info-programme").clearAndSetSemantics {})
-            } else emptyLine(MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(8.dp))
+            Text(subtitle.orEmpty(), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha),
+                modifier = faded.then(if (reserveOn == "subtitle") reserved else Modifier)
+                    .then(if (subtitle != null) Modifier.testTag("player-info-subtitle") else Modifier).clearAndSetSemantics {})
+            // Now above, Next on the artwork's bottom edge.
+            Spacer(Modifier.weight(1f).heightIn(min = 8.dp))
             if (lastText != null) Row(faded.fillMaxWidth().testTag("player-info-last-row"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 // Centred on the text line without adding to its height: the row is as tall as its text.
@@ -118,9 +118,9 @@ fun PlayerInfoBar(
                     Modifier.noHeight().testTag("player-scheduled-marker"), tint = secondary)
                 Text(lastText, style = MaterialTheme.typography.labelLarge,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    color = if (recorded) MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha) else secondary,
+                    color = secondary,
                     modifier = reserved.testTag("player-info-last-text").clearAndSetSemantics {})
-            } else emptyLine(MaterialTheme.typography.labelLarge)
+            } else Text("", style = MaterialTheme.typography.labelLarge, maxLines = 1, modifier = Modifier.clearAndSetSemantics {})
         }
     }
 }

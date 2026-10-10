@@ -307,8 +307,8 @@ fun RecordingPlayerScreen(
         PlayerKeyAction.REVEAL_CONTROLS -> {
             if (timelineState.seekPending) {
                 timelineState.commitPendingSeek()
-                restoreInfoActionFocus = true
             }
+            restoreInfoActionFocus = false
             chrome.showControls()
             true
         }

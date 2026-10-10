@@ -19,6 +19,7 @@ import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -47,25 +48,84 @@ class PlayerIdentityCardTest {
     @get:Rule val compose = createComposeRule()
     private var infos = 0
 
+    @Test fun missingEpgStillNamesTheChannelAndInfoAction() {
+        recording(info = PlayerInfoBarData("101", "Ridge Earth", "", ""))
+        key(Key.DirectionUp); key(Key.DirectionUp)
+        assertTrue(description().orEmpty().joinToString().contains("Ridge Earth"))
+        val semantics = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true).fetchSemanticsNode().config
+        assertEquals("OK shows the programme info.", semantics[SemanticsProperties.StateDescription])
+        key(Key.DirectionCenter)
+        assertEquals(1, infos)
+    }
+
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun persistentLiveFeedbackDoesNotHideFocusedProgrammeInfo() = focusedInfoDuringFeedback(recording = false)
+
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun retainedRecordingSeekPreviewDoesNotHideFocusedProgrammeInfo() = focusedInfoDuringFeedback(recording = true)
+
+    private fun focusedInfoDuringFeedback(recording: Boolean) {
+        lateinit var view: android.view.View
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = androidx.compose.ui.platform.LocalView.current
+                if (recording) RecordingChromeFixture(targetMs = 1_900_000L,
+                    onInfo = { infos++ })
+                else PlayerChrome(mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("20:15", PlayerInfoBarData("101", "Ridge Earth", "Programme", "20:00–21:00")),
+                    timeline = PlayerChromeTimeline.Live(AppTimeshiftState(available = true, timingKnown = true,
+                        bufferStartMs = -600_000, positionMs = -60_000, liveEdgeMs = 0), nowSec = 1_800,
+                        feedback = "Persistent seek feedback"),
+                    actions = PlayerChromeActions(active = true, paused = false),
+                    imageLoader = ImageLoader(ApplicationProvider.getApplicationContext<Application>()), currentSession = null,
+                    onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = { infos++ }, onOptions = {}, onInteraction = {},
+                    onPauseUnavailable = {}, onActionFocused = {}, onFocusRestored = {}, onDownFromActions = {})
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-seekbar"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertFalse("focused Info is not overpainted by recording seek status", exists("recording-seek-preview"))
+        compose.onNodeWithText("Persistent seek feedback", useUnmergedTree = true).assertDoesNotExist()
+        fun pixels(): IntArray {
+            val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
+            val rect = bounds(PlayerIdentityCardTag)
+            val width = rect.width.toInt(); val height = rect.height.toInt()
+            return IntArray(width * height).also {
+                bitmap.getPixels(it, 0, width, rect.left.toInt(), rect.top.toInt(), width, height)
+                bitmap.recycle()
+            }
+        }
+        val withFeedback = pixels()
+        assertTrue("persistent feedback leaves the rendered focused artwork visibly painted", withFeedback.count {
+            android.graphics.Color.red(it) > 180 && android.graphics.Color.green(it) > 180
+        } > 20)
+        key(Key.DirectionCenter)
+        assertEquals("OK reaches programme details", 1, infos)
+    }
+
     @Test fun upFromTheSeekbarFocusesTheIdentityWhichOpensInfoAndDownReturnsToTheActions() {
         recording()
         assertEquals(listOf("player-pause"), focused())
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
-        assertEquals("the identity names the recording's channel", listOf("Channel 1, Documentary"), description())
-        assertEquals("and says what OK opens", "OK shows the programme info.", stateDescription())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertTrue("the target names the programme", !description().isNullOrEmpty())
         assertFalse("no channel to change: no arrows", exists("player-top-identity-previous"))
         listOf(Key.DirectionUp, Key.DirectionLeft, Key.DirectionRight).forEach {
             key(it)
-            assertEquals("$it leads nowhere from the identity", listOf(PlayerTopIdentityTag), focused())
+            assertEquals("$it leads nowhere from the programme", listOf(PlayerIdentityCardTag), focused())
         }
         assertEquals(0, infos)
         key(Key.DirectionCenter)
         assertEquals("OK opens Info once", 1, infos)
         key(Key.DirectionDown)
-        assertEquals("Down returns to the action last focused", listOf("player-pause"), focused())
+        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
     }
 
     @Test fun theBannersIdentityIsAPictureWithoutFocus() {
@@ -107,7 +167,7 @@ class PlayerIdentityCardTest {
         return buildMap {
             put("identity", identity)
             put("artwork", tile)
-            put("placeholder", bounds("player-info-artwork-placeholder"))
+            put("placeholder", bounds("player-info-artwork-fallback"))
             put("title", bounds("player-info-title"))
             put("timeline", labels.left to labels.right)
             put("timeline top", labels.top)
@@ -162,7 +222,7 @@ class PlayerIdentityCardTest {
             compose.waitForIdle()
             assertEquals("$name: the bar keeps its height", full.getValue("player-info-bar").height, bounds("player-info-bar").height, 0.5f)
             assertEquals("$name: the title keeps its place", full.getValue("player-info-title").top, bounds("player-info-title").top, 0.5f)
-            assertEquals("$name: the slot stands on the title's top", bounds("player-info-title").top, bounds("slot").top, 0.5f)
+            assertEquals("$name: the slot stands on the bar's top", bounds("player-info-bar").top, bounds("slot").top, 0.5f)
             if (exists("player-info-programme")) assertEquals("$name: the programme line keeps its place",
                 full.getValue("player-info-programme").top, bounds("player-info-programme").top, 0.5f)
             if (exists("player-info-last-row")) assertEquals("$name: the last row keeps its place",
@@ -170,14 +230,16 @@ class PlayerIdentityCardTest {
         }
     }
 
-    @Test fun theTitleLeadsAndTheProgrammeLineStandsUnderIt() {
+    @Test fun theTimeLeadsAsAnEyebrowAboveTheTitleAndTheSubtitleStandsUnderIt() {
         recording(info = PlayerInfoBarData("1", "One", "Title", "20:15–21:45", subtitle = "Episode", next = "21:45 News"))
         assertFalse("the channel stands at the top, not in the info bar", exists("player-info-eyebrow"))
         val title = bounds("player-info-title")
         val programme = bounds("player-info-programme")
+        val subtitle = bounds("player-info-subtitle")
         val last = bounds("player-info-last-row")
-        assertTrue("the time, metadata and subtitle stand under the title", title.bottom <= programme.top + 0.5f)
-        assertTrue("the last row stands under them", programme.bottom <= last.top + 0.5f)
+        assertTrue("the time and metadata stand above the title", programme.bottom <= title.top + 0.5f)
+        assertTrue("the subtitle stands under the title", title.bottom <= subtitle.top + 0.5f)
+        assertTrue("the last row stands under them", subtitle.bottom <= last.top + 0.5f)
         assertEquals("the artwork and the text share the bar's top", bounds("player-info-bar").top, bounds("player-info-artwork-tile").top, 1f)
     }
 
@@ -187,7 +249,7 @@ class PlayerIdentityCardTest {
         key(Key.DirectionRight)
         assertEquals(listOf("player-stop"), focused())
         key(Key.DirectionUp)
-        assertEquals("Up from any action reaches the identity", listOf(PlayerTopIdentityTag), focused())
+        assertEquals("Up from any action reaches the programme", listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
         assertEquals("Down leads back to that action", listOf("player-stop"), focused())
         assertEquals(0, infos)
@@ -199,11 +261,11 @@ class PlayerIdentityCardTest {
         // Held Up reaches the identity once; its repeats and release change nothing there.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionUp) { advanceEventTime(1_200) } }
         settle()
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
-        // Held Down returns to the action row and goes no further.
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        // Held Down returns to the seekbar and goes no further.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionDown) { advanceEventTime(1_200) } }
         settle()
-        assertEquals(listOf("player-pause"), focused())
+        assertEquals(listOf("player-seekbar"), focused())
         assertEquals(0, infos)
     }
 
@@ -216,7 +278,7 @@ class PlayerIdentityCardTest {
         assertEquals("the covered controls hold no focus", emptyList<String>(), focused())
         compose.runOnIdle { panelOpen = false; restoreFocus = PlayerIdentityCardTag }
         settle()
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         assertEquals("the restore is acknowledged once", 1, restores)
         // And opened from the identity itself.
         key(Key.DirectionCenter)
@@ -225,7 +287,7 @@ class PlayerIdentityCardTest {
         settle()
         compose.runOnIdle { panelOpen = false; restoreFocus = PlayerIdentityCardTag }
         settle()
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         assertEquals(2, restores)
     }
 
@@ -252,10 +314,10 @@ class PlayerIdentityCardTest {
         assertTrue("Up from the seekbar opens the markers", navigation.open)
         key(Key.DirectionUp)
         assertFalse("Up above the markers closes them", navigation.open)
-        assertEquals(listOf(PlayerTopIdentityTag), focused())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionUp)
+        assertEquals("Down returns to the seekbar, not into the markers", listOf("player-seekbar"), focused())
+        assertFalse(navigation.open)
         key(Key.DirectionUp)
         key(Key.DirectionDown)
         assertFalse(navigation.open)
@@ -294,7 +356,7 @@ class PlayerIdentityCardTest {
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
-    private fun description(): List<String>? = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
+    private fun description(): List<String>? = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true)
         .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
 
     private fun stateDescription(): String? = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
