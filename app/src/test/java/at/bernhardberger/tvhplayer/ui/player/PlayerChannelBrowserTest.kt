@@ -33,6 +33,7 @@ class PlayerChannelBrowserTest {
     @get:Rule val compose = createComposeRule()
     private var state by mutableStateOf(PlayerChannelBrowserState())
     private var shown by mutableStateOf(true)
+    private var active by mutableStateOf(true)
     private var channels by mutableStateOf((1L..16L).map { Channel.create(ChannelId(it), name = "Channel $it", number = it) })
     private var recent by mutableStateOf(channels.drop(1).reversed())
     private val picks = mutableListOf<ChannelId>()
@@ -48,7 +49,7 @@ class PlayerChannelBrowserTest {
                         PlayerChannelBrowser(state, channels, recent, ChannelId(1), emptySet(),
                             { id -> if (events) EpgEvent.create(EventId(id.value), id, Instant.fromEpochSeconds(1),
                                 Instant.fromEpochSeconds(100), title = "Programme ${id.value}") else null },
-                            50, loader, null, true, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
+                            50, loader, null, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
                             { closes += it }, channelsTitle = "Sport")
                         PlayerChannelBrowserHint(state, recent.isNotEmpty(), "Sport", Modifier.testTag("hint"))
                     }
@@ -160,6 +161,57 @@ class PlayerChannelBrowserTest {
         focused(1)
         assertEquals(PlayerChannelRow.ON_NOW, state.row)
         assertNull(state.recent.focusedId)
+    }
+
+    @Test fun aRowChangeReleasedWhileTheRailWasAwayDoesNotSwallowTheNextPress() {
+        screen()
+        key(Key.DirectionDown)
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionUp) }; settle()
+        assertEquals(PlayerChannelRow.ON_NOW, state.row)
+        compose.runOnIdle { shown = false }; settle()
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionUp) }
+        compose.runOnIdle { shown = true }; settle()
+        key(Key.DirectionUp)
+        assertEquals(listOf(android.view.KeyEvent.KEYCODE_DPAD_UP), closes)
+    }
+
+    @Test fun aRowThatEmptiesDoesNotComeBackFocused() {
+        screen()
+        key(Key.DirectionDown)
+        assertEquals(PlayerChannelRow.RECENT, state.row)
+        val history = recent
+        compose.runOnIdle { recent = emptyList() }; settle()
+        assertEquals(PlayerChannelRow.ON_NOW, state.row)
+        compose.runOnIdle { recent = history }; settle()
+        assertEquals(PlayerChannelRow.ON_NOW, state.row)
+        focused(1)
+    }
+
+    @Test fun newSessionOnTheSameRowStartsOverOnThePlayingChannel() {
+        screen()
+        repeat(3) { key(Key.DirectionRight) }
+        focused(4)
+        compose.runOnIdle { state = PlayerChannelBrowserState() }; settle()
+        focused(1)
+        assertEquals(PlayerChannelRow.ON_NOW, state.row)
+        assertEquals(ChannelId(1), state.onNow.focusedId)
+    }
+
+    @Test fun retainedAccessibilityActionsCannotActOnceTheRailStopsOwningInput() {
+        screen()
+        fun actions() = compose.onNodeWithTag("player-channel-card-1").fetchSemanticsNode().config.let {
+            it[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!! to
+                it[androidx.compose.ui.semantics.SemanticsActions.OnLongClick].action!!
+        }
+        val (click, longClick) = actions()
+        compose.runOnIdle { active = false }; settle()
+        compose.runOnIdle { click(); longClick() }
+        compose.runOnIdle { active = true }; settle()
+        val (keptClick, keptLongClick) = actions()
+        compose.runOnIdle { shown = false }; settle()
+        compose.runOnIdle { keptClick(); keptLongClick() }
+        assertTrue(picks.isEmpty())
+        assertTrue(details.isEmpty())
     }
 
     @Test fun heldUpMovesOnlyOneRowAndASecondPressReturnsToControls() {

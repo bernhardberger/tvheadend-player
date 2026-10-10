@@ -23,6 +23,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.tv.material3.MaterialTheme
@@ -102,8 +105,13 @@ internal fun PlayerChannelBrowser(
     LaunchedEffect(state, active, pageActive) {
         // A hold that ended while the rail was away left no release behind.
         state.scrolling = false
+        state.relocatingKey = null
     }
     val rows = if (recentChannels.isEmpty()) listOf(PlayerChannelRow.ON_NOW) else PlayerChannelRow.entries
+    LaunchedEffect(state, rows) {
+        // A row that went away does not come back focused when it returns.
+        if (state.row !in rows) state.row = PlayerChannelRow.ON_NOW
+    }
     val current = state.row.takeIf { it in rows } ?: PlayerChannelRow.ON_NOW
     val currentRows by rememberUpdatedState(rows)
     // Read when called: a retired card's retained click must not act for the row that left.
@@ -171,6 +179,9 @@ internal fun PlayerChannelBrowser(
                     .testTag("player-channel-row-${row.name}")) {
                     Text(if (row == PlayerChannelRow.ON_NOW) channelsTitle else stringResource(R.string.player_row_recent),
                         Modifier.padding(horizontal = TvGridHorizontalMargin)
+                            // The row above the focused one is invisible, so its title leaves the accessibility tree too.
+                            .then(if (index < rows.indexOf(current)) Modifier.clearAndSetSemantics { }
+                                else Modifier.semantics { heading() })
                             .graphicsLayer {
                                 val e = emphasis()
                                 scaleX = lerp(quietScale, 1f, e)

@@ -30,10 +30,12 @@ import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
@@ -108,9 +110,10 @@ fun ChannelDrawer(
     val initialId = browserState?.focusedId ?: playingChannelId ?: selectedId
     val localListState = rememberLazyListState(initialFirstVisibleItemIndex = ids.indexOf(initialId).coerceAtLeast(0))
     val listState = rememberTabListState(browserState?.listState ?: localListState)
-    var focusedId by remember { mutableStateOf(initialId) }
-    var entered by remember { mutableStateOf(false) }
-    var focusedCatalog by remember { mutableStateOf(emptyList<ChannelId>()) }
+    // A replaced collection (a new session) starts over rather than keep the old one's focus.
+    var focusedId by remember(browserState) { mutableStateOf(initialId) }
+    var entered by remember(browserState) { mutableStateOf(false) }
+    var focusedCatalog by remember(browserState) { mutableStateOf(emptyList<ChannelId>()) }
     var observedPlayingId by remember { mutableStateOf(playingChannelId) }
     var pendingPickId by remember { mutableStateOf<ChannelId?>(null) }
     var confirmedId by remember { mutableStateOf(playingChannelId) }
@@ -139,8 +142,13 @@ fun ChannelDrawer(
     val entryId = focusedId?.takeIf { it in ids }
         ?: playingChannelId?.takeIf { it in ids }
         ?: selectedId?.takeIf { it in ids } ?: ids.firstOrNull()
-    fun ownsInput() = active && pageActive && tabOwner?.isCurrent != false
-    LaunchedEffect(ids, active, playingChannelId, pageActive) {
+    // Read when called: a card's retained accessibility action outlives the composition that made it.
+    val currentActive by rememberUpdatedState(active)
+    val currentPageActive by rememberUpdatedState(pageActive)
+    val attached = remember { booleanArrayOf(true) }
+    DisposableEffect(Unit) { onDispose { attached[0] = false } }
+    fun ownsInput() = attached[0] && currentActive && currentPageActive && tabOwner?.isCurrent != false
+    LaunchedEffect(ids, active, playingChannelId, pageActive, browserState) {
         if (!ownsInput()) {
             entered = false
             return@LaunchedEffect

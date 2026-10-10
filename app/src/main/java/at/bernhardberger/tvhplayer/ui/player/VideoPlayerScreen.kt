@@ -861,10 +861,20 @@ fun VideoPlayerScreen(
         restoreOptionsFocus = false
     }
 
+    // Confirmed watch history, newest first, restricted to the current channel scope.
+    val recentChannels = remember(recentChannelIds, channels, currentChannelId) {
+        recentChannelIds.filter { it != currentChannelId }
+            .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
+    }
+
     fun openChannelDrawer() {
-        // The rail reopens on its remembered card; preview that card from the first frame.
-        selectedId = channelBrowser.collection(channelBrowser.row).focusedId
-            ?.takeIf { id -> channels.any { it.id == id } } ?: browsingFocusChannelId(
+        // The rail reopens on its remembered card; preview that card from the first frame. A card
+        // gone from its row reopens the row on its first card, as the rail itself does.
+        val row = channelBrowser.row.takeIf { it == PlayerChannelRow.ON_NOW || recentChannels.isNotEmpty() }
+            ?: PlayerChannelRow.ON_NOW
+        val rowChannels = if (row == PlayerChannelRow.RECENT) recentChannels else channels
+        selectedId = channelBrowser.collection(row).focusedId?.takeIf { id -> rowChannels.any { it.id == id } }
+            ?: recentChannels.firstOrNull()?.id?.takeIf { row == PlayerChannelRow.RECENT } ?: browsingFocusChannelId(
             visibleChannels = channels,
             currentFocusId = currentChannelId,
         )
@@ -1099,11 +1109,6 @@ fun VideoPlayerScreen(
     // A slot window (no programme at the position) is an axis only: it has no Next line.
     val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
         effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
-    // Confirmed watch history, newest first, restricted to the current channel scope.
-    val recentChannels = remember(recentChannelIds, channels, currentChannelId) {
-        recentChannelIds.filter { it != currentChannelId }
-            .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
-    }
     val currentChannelNumber = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,

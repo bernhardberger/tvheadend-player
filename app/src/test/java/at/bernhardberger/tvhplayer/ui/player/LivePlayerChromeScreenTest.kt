@@ -1375,6 +1375,32 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-channel-card-2"), focused())
     }
 
+    @Test fun recentCardTunedElsewhereReopensTheRowOnItsFirstCardFromTheFirstFrame() {
+        runBlocking { LastPlayedChannelStore(context).run { setChannelId(ChannelId(3)); setChannelId(ChannelId(2)) } }
+        screen()
+        publishRailProgrammes()
+        openRows()
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-channel-card-2"), focused())
+        key(Key.Back)
+        key(Key.ChannelUp)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertEquals(listOf("player-pause"), focused())
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        repeat(6) {
+            compose.mainClock.advanceTimeByFrame()
+            val previewText = compose.onAllNodes(hasAnyAncestor(hasTestTag("player-zap-preview")), useUnmergedTree = true)
+                .fetchSemanticsNodes().flatMap { node -> node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+            assertFalse("frame $it previews the tuned channel that left the row: $previewText", "Second channel now" in previewText)
+        }
+        compose.mainClock.autoAdvance = true
+        settle()
+        val recentRow = hasAnyAncestor(hasTestTag("player-channel-row-RECENT"))
+        compose.onNode(hasTestTag("player-channel-card-2") and recentRow).assertDoesNotExist()
+        compose.onNode(isFocused() and recentRow).assertExists()
+    }
+
     @Test fun withoutRecentChannelsTheRailHasOneRowAndDownStaysOnIt() {
         screen()
         key(Key.DirectionDown); key(Key.DirectionDown)

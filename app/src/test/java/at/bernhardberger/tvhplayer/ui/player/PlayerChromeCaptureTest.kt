@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import androidx.compose.ui.semantics.getOrNull
 
@@ -836,7 +837,7 @@ class PlayerChromeCaptureTest {
                     },
                     preview = { tray?.invoke() },
                     trayBleeds = browser != null && !emptyRecent,
-                    header = browser?.let { { PlayerChannelBrowserHint(it, !emptyRecent, "All channels") } },
+                    header = browser?.let { { PlayerChannelBrowserHint(it, !emptyRecent, stringResource(R.string.all_channels)) } },
                     controls = controls,
                 )
             },
