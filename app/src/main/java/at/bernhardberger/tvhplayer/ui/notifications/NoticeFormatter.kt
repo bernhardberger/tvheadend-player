@@ -72,6 +72,7 @@ internal class NoticeFormatter(private val context: Context) {
         val name = entry.title?.trim()?.takeIf(String::isNotEmpty) ?: channel ?: context.getString(R.string.recording_notice_fallback)
         val detail = buildList {
             add(name)
+            if (notice.count == 1) entry.subtitle?.trim()?.takeIf { it.isNotEmpty() && it != name }?.let(::add)
             when (notice.kind) {
                 DvrChangeKind.SCHEDULED -> if (notice.count > 1) {
                     add(context.resources.getQuantityString(R.plurals.recording_notice_count, notice.count, notice.count))

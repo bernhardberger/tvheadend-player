@@ -377,7 +377,9 @@ One passive host in the app shell, above ordinary destinations including playbac
 independent dialog windows use the same center and deadline. **Bottom centre**, 28dp
 from the bottom, content-sized up to 556dp (eight kit columns), 44dp one-line or
 64dp two-line minimum. Kit appearance: `inverseSurface`/`inverseOnSurface`, 12dp
-corners, `labelLarge`, 16dp start/24dp end and 12dp vertical padding; optional 32dp
+corners, no border, and the kit's dark/4 shadow (black: 15% opacity, 10dp blur,
+4dp spread, 6dp down; then 30% opacity, 3dp blur, 2dp down). `labelLarge`,
+16dp start/24dp end and 12dp vertical padding; optional 32dp
 icon badge with a 16dp icon and 8dp gap. Details are ellipsized (two detail lines at
 large font scale); the merged polite announcement retains the complete text.
 No focus target, action or key interception. Notices keep the same fixed bottom
@@ -392,7 +394,9 @@ Expiry never alters domain state or removes durable recovery content.
 
 DVR successes come only from SDK server changes, including this client's actions;
 command failures post a separate failure notice. Same-rule series scheduling groups
-distinct entries within 2s. External removal of an archive recording is silent;
+distinct entries within 2s. Individual DVR notices include the supplied subtitle
+after the title when nonblank and distinct; grouped notices omit episode subtitles.
+External removal of an archive recording is silent;
 removing a scheduled entry announces cancellation. Connection loss is debounced 3s
 after a Ready baseline, restoration only follows a posted loss, and login rejection
 only follows Ready in the same profile generation. Startup and profile changes are

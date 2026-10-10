@@ -55,7 +55,8 @@ class AppNoticeCaptureTest {
     private fun captureVariants(locale: String, fontScale: Float) {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val title = if (locale == "de") "Die Bergwelt im Herbst" else "Mountains in Autumn"
-        val entry = DvrEntry.create(DvrEntryId(1), title = title, channelName = "Documentary HD",
+        val entry = DvrEntry.create(DvrEntryId(1), title = title,
+            subtitle = if (locale == "de") "Unterwegs in den Alpen" else "Exploring the Alps", channelName = "Documentary HD",
             start = now + 1_800.seconds, subscriptionError = DvrSubscriptionError.NO_DISK_SPACE)
         val formatter = NoticeFormatter(context)
         val variants = DvrChangeKind.entries.map { kind ->

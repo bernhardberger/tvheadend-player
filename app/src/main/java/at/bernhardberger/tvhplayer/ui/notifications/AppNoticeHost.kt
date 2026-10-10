@@ -7,6 +7,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -19,6 +22,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.lifecycle.Lifecycle
@@ -96,6 +100,7 @@ internal fun AppNoticePresentation(
     detail: String? = null,
     icon: AppNoticeIcon? = null,
 ) {
+    val shape = RoundedCornerShape(12.dp)
     val largeText = LocalDensity.current.fontScale > 1f
     val labelStyle = MaterialTheme.typography.labelLarge.copy(
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None))
@@ -106,12 +111,17 @@ internal fun AppNoticePresentation(
         Surface(modifier = Modifier
             .widthIn(max = 556.dp)
             .heightIn(min = 44.dp)
+            // TV kit dark/4: broad ambient shadow plus a tighter contact shadow.
+            .dropShadow(shape, Shadow(radius = 10.dp, spread = 4.dp,
+                color = Color.Black.copy(alpha = .15f), offset = DpOffset(0.dp, 6.dp)))
+            .dropShadow(shape, Shadow(radius = 3.dp,
+                color = Color.Black.copy(alpha = .30f), offset = DpOffset(0.dp, 2.dp)))
             .testTag("app-notice")
             .semantics(mergeDescendants = true) {
                 liveRegion = LiveRegionMode.Polite
                 contentDescription = listOfNotNull(message, detail).joinToString(". ")
             },
-            shape = RoundedCornerShape(12.dp),
+            shape = shape,
             colors = SurfaceDefaults.colors(containerColor = MaterialTheme.colorScheme.inverseSurface,
                 contentColor = MaterialTheme.colorScheme.inverseOnSurface)) {
             Row(Modifier.padding(start = 16.dp, top = 12.dp, end = 24.dp, bottom = 12.dp),
