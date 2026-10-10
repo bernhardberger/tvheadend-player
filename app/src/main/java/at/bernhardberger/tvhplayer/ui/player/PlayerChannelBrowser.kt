@@ -35,6 +35,14 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import coil3.ImageLoader
+import kotlin.math.abs
+
+internal const val ChannelRowDimAlpha = 0.4f
+/** Row change: the column, the headers and the dimming all follow one position on this clock. */
+internal const val ChannelRowChangeMs = 300
+
+/** A row's emphasis at [distance] rows from the column position: 1 focused, 0 one row or more away. */
+internal fun channelRowEmphasis(distance: Float): Float = (1f - abs(distance)).coerceIn(0f, 1f)
 
 /** How much of the next row shows below the focused one: its quiet title and the top of its cards. */
 internal val PlayerChannelRowPeek = 52.dp

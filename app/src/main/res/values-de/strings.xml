@@ -57,10 +57,6 @@
 
     <string name="options">Optionen</string>
     <string name="no_epg">Keine Programmdaten</string>
-    <string name="channel_rows_no_programme">Keine Programminformationen</string>
-    <string name="channel_rows_loading">Programme werden geladen…</string>
-    <string name="channel_rows_error">Programminformationen nicht verfügbar</string>
-    <string name="channel_rows_on_now">Läuft jetzt</string>
     <string name="epg_next">Danach um %1$s</string>
     <string name="select_channel_hint">Wählen Sie links einen Sender aus, um Details anzuzeigen.</string>
 

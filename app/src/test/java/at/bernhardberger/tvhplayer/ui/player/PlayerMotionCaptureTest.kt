@@ -56,6 +56,9 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.R
+import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import coil3.ImageLoader
 import coil3.map.Mapper
@@ -403,20 +406,29 @@ class PlayerMotionCaptureTest {
             downHint = downHint,
             decorationCoversControls = rail?.channelDrawerOpen == true,
             controlsDecoration = { _, controls ->
-                if (rail == null) controls() else QuickZapPresentation(
-                    expanded = rail.channelRailPresented,
-                    channelRows = true,
-                    preview = {},
-                    controls = controls,
-                    channelContent = {
-                        ChannelRows(
-                            channels = channels, playingChannelId = ChannelId(1), nowSec = 1_800,
-                            schedule = { listOf(programme, next) }, acquireSchedule = {},
-                            imageLoader = loader, currentSession = session,
-                            onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
-                        )
-                    },
-                )
+                if (rail == null) controls() else {
+                    val browser = remember { PlayerChannelBrowserState() }
+                    QuickZapPresentation(
+                        expanded = rail.channelRailPresented,
+                        preview = {
+                            QuickZapTrayPreview(channels.first(), programme, null, 1_800, loader, session,
+                                Modifier.padding(horizontal = TvGridHorizontalMargin))
+                        },
+                        trayBleeds = true,
+                        header = { PlayerChannelBrowserHint(browser, true, stringResource(R.string.all_channels)) },
+                        controls = controls,
+                        channelContent = {
+                            PlayerChannelBrowser(
+                                state = browser, channels = channels, recentChannels = channels.drop(1),
+                                playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
+                                nowEvent = { programme }, nowSec = 1_800,
+                                imageLoader = loader, currentSession = session,
+                                onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
+                                onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
+                            )
+                        },
+                    )
+                }
             },
         )
     }

@@ -59,10 +59,6 @@
 
     <string name="options">Options</string>
     <string name="no_epg">No EPG</string>
-    <string name="channel_rows_no_programme">No programme information</string>
-    <string name="channel_rows_loading">Loading programmes…</string>
-    <string name="channel_rows_error">Programme information unavailable</string>
-    <string name="channel_rows_on_now">On now</string>
     <string name="epg_next">Next %1$s</string>
     <string name="select_channel_hint">Select a channel on the left to see details.</string>
 

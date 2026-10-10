@@ -441,8 +441,6 @@ fun VideoPlayerScreen(
     val programDetails = remember { ProgramDetailsState() }
     var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
     val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
-    /** Trial: details opened from a channel row's programme; one Back returns to the rows. */
-    var detailsFromRows by remember { mutableStateOf(false) }
     // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
@@ -819,7 +817,6 @@ fun VideoPlayerScreen(
 
     fun openInfo(returnTo: String? = null) {
         programDetails.reset()
-        detailsFromRows = false
         infoRailChannelId = null
         infoPendingAction = null
         infoMutation = null
@@ -836,7 +833,6 @@ fun VideoPlayerScreen(
     }
 
     fun closeInfo() {
-        detailsFromRows = false
         infoPendingAction = null
         infoMutation = null
         layerState.dismissRecordingConfirmation()
@@ -1121,8 +1117,6 @@ fun VideoPlayerScreen(
     val detailsChannelId = infoRailChannelId ?: currentChannelId
     val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
     val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
-        // A row's later programme stays reachable on a channel without a current one.
-        ?: programDetails.opened.takeIf { detailsFromRows }
     val actionableInfoEvent = currentProgrammeEvent(observation, programDetails.opened ?: detailsBaseEvent)
     val currentRecording = remember(observation, actionableInfoEvent?.id) {
         actionableInfoEvent?.let { observation.dvrEntryForEvent(it.id) }
@@ -1387,7 +1381,7 @@ fun VideoPlayerScreen(
     val handlePlaybackBack: () -> Unit = handle@{
         // Trial: Back first undoes a step inside the program details.
         if (playerForegroundLayer(currentPlayerForegroundContext()) == PlayerForegroundLayer.INFO &&
-            (!detailsFromRows || programDetails.readMore) && programDetails.back()
+            programDetails.back()
         ) return@handle
         when (
             playerBackAction(
@@ -1784,7 +1778,6 @@ fun VideoPlayerScreen(
                                 infoReturnAction = null
                                 restoreInfoFocus = false
                                 layerState.openInfo()
-                                detailsFromRows = false
                             },
                             active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                             channelsTitle = channelsTitle,

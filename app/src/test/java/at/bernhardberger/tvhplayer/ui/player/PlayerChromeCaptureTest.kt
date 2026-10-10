@@ -272,8 +272,8 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE,
-        // Trial top identity: focused, its Recent row open, and the channel rows open with the strip in its place.
-        IDENTITY_FOCUSED, RECENT_OPEN, CHANNEL_ROWS_OPEN, BROWSER_NOW, BROWSER_EMPTY,
+        // Trial top identity: focused and its Recent row open.
+        IDENTITY_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -325,7 +325,6 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
                 compose.onNodeWithTag("player-channel-row-RECENT").assertDoesNotExist()
             }
-            if (next == Scene.CHANNEL_ROWS_OPEN) compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).assertExists()
             if (next == Scene.IDENTITY_FOCUSED && fontScale == 1f) {
                 // The artwork card stands on the programme text's top and Next sits on its bottom edge.
                 // At xhdpi the text lines round up to whole pixels, so Next may end up to 3px lower.
@@ -515,10 +514,6 @@ class PlayerChromeCaptureTest {
                             })
                     }, programme = {})
             }
-            // The rows as the live player opens them, in its page: the strip stands where the identity was.
-            Scene.CHANNEL_ROWS_OPEN -> PlayerPage<Unit>(details = null, railExpanded = true,
-                nowPlaying = { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session) },
-                player = { Controls(timeshift, false, false, content, rows = true) }, programme = {})
             Scene.RAIL_PEEK -> Controls(timeshift, false, false, content,
                 recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
                 QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
@@ -775,8 +770,6 @@ class PlayerChromeCaptureTest {
         focus: String? = null,
         /** Trial: the top identity's Recent row, with three recent channels, open. */
         recentOpen: Boolean = false,
-        /** The channel rows open below the controls. */
-        rows: Boolean = false,
         recordingChannels: Set<ChannelId> = emptySet(),
         browser: PlayerChannelBrowserState? = null,
         emptyRecent: Boolean = false,
@@ -810,25 +803,15 @@ class PlayerChromeCaptureTest {
             ),
             onRecentPick = {},
             recentRowOpen = recentOpen,
-            decorationCoversControls = tray != null || rows,
+            decorationCoversControls = tray != null,
             controlsDecoration = { _, controls ->
                 QuickZapPresentation(
-                    expanded = tray != null || rows,
-                    channelRows = rows,
+                    expanded = tray != null,
                     channelContent = {
                         if (browser != null) PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
                             channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },
                             NOW, loader, session, true, {}, {}, { _, _, _ -> }, {})
-                        else if (rows) ChannelRows(
-                            channels = channels, playingChannelId = ChannelId(1), nowSec = NOW,
-                            schedule = { id -> when (id) {
-                                ChannelId(1) -> listOfNotNull(programme, next)
-                                ChannelId(2) -> listOf(trayProgramme)
-                                else -> emptyList()
-                            } },
-                            acquireSchedule = {}, imageLoader = loader, currentSession = session,
-                            onPickChannel = {}, onClose = {},
-                        ) else if (tray != null) ChannelDrawer(
+                        else if (tray != null) ChannelDrawer(
                             channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
                             imageLoader = loader, currentSession = session, active = true, nowSec = NOW,
