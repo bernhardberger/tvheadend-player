@@ -204,7 +204,8 @@ internal fun ProgramDetails(
 ) {
     val event = state.opened ?: current
     val isCurrent = event.id == current.id
-    val tabs = schedule.size > 1 && !state.scheduleEntry && state.opened == null
+    val dialog = LocalProgrammeDialog.current
+    val tabs = !dialog && schedule.size > 1 && !state.scheduleEntry && state.opened == null
     val tabFocus = remember { FocusRequester() }
     val tabMotion = rememberTabContentMotion(state.tab) { state.tab }
     val recording = recordingFor(event)
@@ -213,7 +214,9 @@ internal fun ProgramDetails(
     // Only the rail's schedule shares its keyline; programme details retain columns 2–11.
     val railSchedule = LocalPlayerPageRailHeader.current && state.scheduleEntry && state.opened == null
     Column(modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(32.dp)) {
-        if (!LocalPlayerPageRailHeader.current) Row(Modifier.fillMaxWidth().height(48.dp)
+        // The dialog keeps the heading's room so its content sits where the page's does.
+        if (dialog) Spacer(Modifier.height(48.dp))
+        else if (!LocalPlayerPageRailHeader.current) Row(Modifier.fillMaxWidth().height(48.dp)
             .pageMotion(120..420, dy = 120.dp).testTag("details-top-row"), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween) {
         if (tabs) {
@@ -274,7 +277,7 @@ internal fun ProgramDetails(
                     state = state,
                     tabFocus = if (tabs) tabFocus else FocusRequester.Cancel,
                     onReadMore = { state.readMore = true },
-                    onUp = if (tabs) null else onClose,
+                    onUp = if (tabs || dialog) null else onClose,
                 )
             }
             when {

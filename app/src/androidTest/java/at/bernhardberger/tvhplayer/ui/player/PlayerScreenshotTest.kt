@@ -176,7 +176,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
 
                             onInfo = {},
                             decorationCoversControls = true,
-                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(expanded = true, channelsAvailable = true, peekAlpha = emphasisAlpha, preview = {}, controls = controls, channelContent = {
+                            controlsDecoration = { _, controls -> QuickZapPresentation(expanded = true, preview = {}, controls = controls, channelContent = {
                             ChannelDrawer(
                                 channels = if (scenario == "shelf-empty") emptyList() else List(15) {
                                     Channel.create(id = ChannelId(it + 1L), icon = ArtworkId(it + 1), name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")

@@ -42,7 +42,6 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
 import androidx.media3.common.C
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import coil3.ImageLoader
 import java.util.Locale
 import org.junit.Assert.assertEquals

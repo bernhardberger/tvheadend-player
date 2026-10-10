@@ -29,7 +29,6 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import coil3.ImageLoader
 import org.junit.Assert.assertEquals
@@ -578,9 +577,8 @@ class PlayerOverlayCompositionTest {
         composeRule.onNodeWithTag("player-info").assertDoesNotExist()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-stop").assertIsFocused()
+        composeRule.onNodeWithTag("player-record").assertDoesNotExist()
         composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
-        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithTag("player-record").assertIsFocused()
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("player-settings").assertIsFocused()
         composeRule.onNodeWithContentDescription("Settings").assertExists()
@@ -594,7 +592,7 @@ class PlayerOverlayCompositionTest {
         assertTrue(timeline.bottom <= actionsAfter.top)
 
         composeRule.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
-        composeRule.onNodeWithTag("player-record").assertIsFocused()
+        composeRule.onNodeWithTag("player-stop").assertIsFocused()
     }
 
     private fun event(id: Int, start: Long, stop: Long, title: String) = EpgEvent.create(

@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import kotlinx.coroutines.launch
 
@@ -130,7 +131,7 @@ internal fun ProgrammeDetailsFullDescription(
     val scrollStep = with(LocalDensity.current) { 60.dp.roundToPx() }
     val paneTitle = stringResource(R.string.details_read_more)
     LaunchedEffect(Unit) { withFrameNanos { }; readingFocus.requestFocus() }
-    Row(modifier.fillMaxSize().padding(bottom = 40.dp), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+    Row(modifier.fillMaxSize().padding(bottom = 40.dp), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
         reading()
         Surface(modifier = Modifier.weight(1f).fillMaxHeight().testTag("details-full-description"),
             shape = RoundedCornerShape(12.dp),

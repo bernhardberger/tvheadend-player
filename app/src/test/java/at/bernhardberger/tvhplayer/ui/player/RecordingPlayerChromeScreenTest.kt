@@ -25,6 +25,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.pressKey
+import androidx.compose.ui.test.withKeyDown
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
@@ -134,7 +135,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("Down is consumed: the pause was not toggled", playWhenReady, player.playWhenReady)
         assertFalse("recordings have no Record", exists("player-record"))
         assertFalse("recordings have no Go live", exists("player-go-live"))
-        assertTrue(exists("player-stop") && exists("player-settings") && exists("player-identity-card"))
+        assertTrue(exists("player-stop") && exists("player-settings") && exists(PlayerTopIdentityTag))
         assertFalse("the action row has no Info", exists("player-info"))
     }
 
@@ -283,7 +284,7 @@ class RecordingPlayerChromeScreenTest {
             description("recording-seek-preview"))
     }
 
-    @Test fun upFromTheSeekbarReachesOnlyTheCardAndTheBarRowHasNoStatusSlot() {
+    @Test fun upFromTheSeekbarReachesOnlyTheIdentityAndTheBarRowHasNoStatusSlot() {
         compose.setContent { TVHeadendPlayerTheme { RecordingChromeFixture() } }
         compose.mainClock.autoAdvance = false
         settle()
@@ -291,13 +292,27 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the card is all there is above the seekbar", listOf("player-identity-card"), focused())
+        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down returns", listOf("player-seekbar"), focused())
+        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
         assertFalse(exists("player-go-live"))
         assertFalse(exists("player-status-slot"))
         assertFalse("the controls have no state cell", exists("player-state"))
         compose.onNodeWithTag("player-pause").assertContentDescriptionEquals("Pause")
+    }
+
+    @Test fun eitherRevealDirectionAfterABannerStepLandsOnPauseNotProgramme() {
+        screen()
+        playing()
+        for (direction in listOf(Key.DirectionUp, Key.DirectionDown)) {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+            compose.onRoot().performKeyInput { withKeyDown(direction) { advanceEventTime(1_200) } }
+            settle()
+            assertEquals(listOf("player-pause"), focused())
+            key(Key.Back)
+        }
     }
 
     @Test fun theElapsedLabelKeepsThePlaybackPositionWhileAStepIsPending() {
@@ -315,11 +330,11 @@ class RecordingPlayerChromeScreenTest {
         assertFalse("a recording draws no remaining time", exists("player-distance"))
     }
 
-    @Test fun infoAndOptionsReturnFocusToTheCardAndTheSettingsAction() {
+    @Test fun infoAndOptionsReturnFocusToTheIdentityAndTheSettingsAction() {
         screen()
         playing()
         key(Key.DirectionDown)
-        for (action in listOf("player-identity-card", "player-settings")) {
+        for (action in listOf(PlayerIdentityCardTag, "player-settings")) {
             compose.onNodeWithTag(action).performSemanticsAction(SemanticsActions.RequestFocus)
             settle()
             key(Key.DirectionCenter)
@@ -338,8 +353,7 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("Behind live", description("player-live-state"))
         assertEquals("the length carries no recording dot", "1:00:00", endClock())
         assertEquals("the badge says it", "Recording now", description("player-rec-badge"))
-        assertTrue("and the info bar speaks it", compose.onNodeWithTag("player-info-bar").fetchSemanticsNode()
-            .config[SemanticsProperties.ContentDescription].contains("Recording now"))
+        assertTrue("and the top identity, which carries it, speaks it", identitySpeech(compose).contains("Recording now"))
     }
 
     @Test fun markerKeysStillWorkInTheControls() {

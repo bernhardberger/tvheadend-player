@@ -134,16 +134,16 @@ class PlayerMotionTest {
         )
     }
 
-    @Test fun closingRecordingInfoHandsFocusAndKeysToTheCardWhileThePanelFades() {
+    @Test fun closingRecordingInfoHandsFocusAndKeysToTheIdentityWhileThePanelFades() {
         var infoPresses = 0
         checkPanelCloseHandsFocusBack(
             panelTag = "recording-info-panel",
-            actionTag = "player-identity-card",
+            actionTag = PlayerIdentityCardTag,
             activations = { infoPresses },
             controls = { _, open, restore, restored ->
                 RecordingChromeFixture(
                     positionMs = 600_000, panelOpen = open, onInfo = { infoPresses++ },
-                    restoreFocus = "player-identity-card".takeIf { restore },
+                    restoreFocus = PlayerIdentityCardTag.takeIf { restore },
                     onFocusRestored = { if (restore) restored() },
                 )
             },

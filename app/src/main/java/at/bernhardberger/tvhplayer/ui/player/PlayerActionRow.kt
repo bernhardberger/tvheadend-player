@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
+import at.bernhardberger.tvhplayer.ui.TvIconButtonSize
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -26,11 +28,10 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.TvOverlayActionButtonSize
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 
 /** Material disabled content alpha, used for a pause control that stays focusable. */
-internal const val PauseUnavailableIconAlpha = 0.38f
+internal const val PauseUnavailableIconAlpha = TvTextDisabledAlpha
 
 private data class PlayerAction(
     val tag: String,
@@ -50,8 +51,6 @@ internal fun PlayerActionRow(
     onStop: () -> Unit,
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier,
-    onRecord: (() -> Unit)? = null,
-    recordFocus: FocusRequester? = null,
     paused: Boolean = false,
     stopFocus: FocusRequester? = null,
     onActionFocused: (String) -> Unit = {},
@@ -60,27 +59,24 @@ internal fun PlayerActionRow(
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
-    val record = stringResource(R.string.record)
     val stop = stringResource(R.string.stop_playback)
     val actions = listOf(
         PlayerAction("player-pause", playPause,
             if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
         PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
-        PlayerAction("player-record", record, R.drawable.ic_fiber_manual_record, onRecord, recordFocus),
         PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
-    // Play/Pause and Stop stand at the start; the rest, from its first action there is, at the end.
-    val endGroupStart = if (onRecord != null) "player-record" else "player-settings"
+    // Play/Pause and Stop stand at the start; Settings at the end.
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(TvOverlayActionButtonSize),
+            .height(TvIconButtonSize),
         horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         actions.forEach { (tag, label, icon, action, focus) ->
             key(tag) {
-                if (tag == endGroupStart) Spacer(Modifier.weight(1f))
+                if (tag == "player-settings") Spacer(Modifier.weight(1f))
                 if (action != null) {
                     val actionModifier = Modifier
                         .testTag(tag)
@@ -97,7 +93,7 @@ internal fun PlayerActionRow(
                             containerColor = Color.Transparent,
                             contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (tag == "player-pause") 1f else 0.88f),
                         ),
-                        modifier = actionModifier.size(TvOverlayActionButtonSize),
+                        modifier = actionModifier.size(TvIconButtonSize),
                     ) {
                         val glyphModifier = if (tag == "player-pause" && pauseUnavailableReason != null) {
                             Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha }

@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.res.painterResource
 import androidx.tv.material3.Icon
+import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineTickAlpha
+import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.StepDirection
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -35,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +76,7 @@ import kotlin.math.roundToInt
 /** Plain status text sits in the light end of the footer gradient, so it needs its own backing. */
 @Composable
 internal fun Modifier.playerStatusScrim(): Modifier = background(
-    Color.Black.copy(alpha = 0.78f),
+    Color.Black.copy(alpha = TvOverlayBoxAlpha),
     MaterialTheme.shapes.small,
 ).padding(horizontal = 8.dp)
 
@@ -104,6 +107,15 @@ private fun Modifier.timelineSpan(
  * touching the focused bar's thumb (AOSP Live TV keeps its time label about 5dp clear of a 12dp one).
  */
 internal val ReadoutThumbGap = 8.dp
+
+/** The timeline block's room below its bar row. */
+internal val TimelineRowInset = 8.dp
+
+/**
+ * The room above the bar row: with the labels 4dp inside their row, the programme block (card and last text line)
+ * stands 16dp above them, the same as the timeline's distance to the action row, so the timeline reads as its own band.
+ */
+private val TimelineRowTopInset = 12.dp
 
 /**
  * Where the step readout's chip and the distance's drawn text lie in the root, written when they are
@@ -290,7 +302,7 @@ fun PlayerTimelineBar(
             }
             markerFractions.filter { it > 0f && it < 1f }.forEach { fraction ->
                 Box(Modifier.offset(x = maxWidth * fraction - 0.5.dp).width(1.dp).height(barHeight)
-                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)).testTag("recording-marker-tick"))
+                    .background(MaterialTheme.colorScheme.onSurface.copy(alpha = TvOverlayTimelineTickAlpha)).testTag("recording-marker-tick"))
             }
             rewindableStartFraction?.takeIf { !programmeWindow && it > 0f && it < 1f }?.let { fraction ->
                 val start = fraction.coerceIn(0f, 1f)
@@ -496,7 +508,7 @@ fun PlayerTimelineBlock(
                     .graphicsLayer { alpha = if (readoutCover.coversDistance) 0f else 1f }
             },
         )
-        Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+        Column(Modifier.fillMaxWidth().padding(top = TimelineRowTopInset, bottom = TimelineRowInset)) {
             if (inlineLabels) {
                 TimelineEndpointRow(
                     widths = widths,

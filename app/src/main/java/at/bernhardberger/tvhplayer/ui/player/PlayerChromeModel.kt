@@ -119,8 +119,6 @@ internal data class PlayerChromeActions(
      * (recordings, presentation fixtures) leaves Pause as it is.
      */
     val livePause: LivePauseAvailability? = null,
-    /** Record stands before Settings at the row's end. */
-    val record: Boolean = true,
     /** Test tag of the control that takes focus back, such as after a panel closes. */
     val restoreFocus: String? = null,
 )

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,13 +19,13 @@ import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.withKeyDown
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
-import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import org.junit.Assert.assertEquals
@@ -36,7 +37,10 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The info bar's identity card: its size, its place in the controls' focus graph and the lines beside it. */
+/**
+ * A recording's identity card in the info bar: its size, its place in the controls' focus graph and
+ * the lines beside it. Live names its channel at the top instead ([PlayerTopIdentityTest]).
+ */
 @OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -44,59 +48,168 @@ class PlayerIdentityCardTest {
     @get:Rule val compose = createComposeRule()
     private var infos = 0
 
-    @Test fun upFromTheSeekbarFocusesTheCardWhichOpensInfoAndDownReturns() {
-        chrome(PlayerChromeMode.CONTROLS)
+    @Test fun missingEpgStillNamesTheChannelAndInfoAction() {
+        recording(info = PlayerInfoBarData("101", "Ridge Earth", "", ""))
+        key(Key.DirectionUp); key(Key.DirectionUp)
+        assertTrue(description().orEmpty().joinToString().contains("Ridge Earth"))
+        val semantics = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true).fetchSemanticsNode().config
+        assertEquals("OK shows the programme info.", semantics[SemanticsProperties.StateDescription])
+        key(Key.DirectionCenter)
+        assertEquals(1, infos)
+    }
+
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun persistentLiveFeedbackDoesNotHideFocusedProgrammeInfo() = focusedInfoDuringFeedback(recording = false)
+
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun retainedRecordingSeekPreviewDoesNotHideFocusedProgrammeInfo() = focusedInfoDuringFeedback(recording = true)
+
+    private fun focusedInfoDuringFeedback(recording: Boolean) {
+        lateinit var view: android.view.View
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = androidx.compose.ui.platform.LocalView.current
+                if (recording) RecordingChromeFixture(targetMs = 1_900_000L,
+                    onInfo = { infos++ })
+                else PlayerChrome(mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("20:15", PlayerInfoBarData("101", "Ridge Earth", "Programme", "20:00–21:00")),
+                    timeline = PlayerChromeTimeline.Live(AppTimeshiftState(available = true, timingKnown = true,
+                        bufferStartMs = -600_000, positionMs = -60_000, liveEdgeMs = 0), nowSec = 1_800,
+                        feedback = "Persistent seek feedback"),
+                    actions = PlayerChromeActions(active = true, paused = false),
+                    imageLoader = ImageLoader(ApplicationProvider.getApplicationContext<Application>()), currentSession = null,
+                    onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = { infos++ }, onOptions = {}, onInteraction = {},
+                    onPauseUnavailable = {}, onActionFocused = {}, onFocusRestored = {}, onDownFromActions = {})
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-seekbar"), focused())
+        key(Key.DirectionUp)
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertFalse("focused Info is not overpainted by recording seek status", exists("recording-seek-preview"))
+        compose.onNodeWithText("Persistent seek feedback", useUnmergedTree = true).assertDoesNotExist()
+        fun pixels(): IntArray {
+            val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
+            val rect = bounds(PlayerIdentityCardTag)
+            val width = rect.width.toInt(); val height = rect.height.toInt()
+            return IntArray(width * height).also {
+                bitmap.getPixels(it, 0, width, rect.left.toInt(), rect.top.toInt(), width, height)
+                bitmap.recycle()
+            }
+        }
+        val withFeedback = pixels()
+        assertTrue("persistent feedback leaves the rendered focused artwork visibly painted", withFeedback.count {
+            android.graphics.Color.red(it) > 180 && android.graphics.Color.green(it) > 180
+        } > 20)
+        key(Key.DirectionCenter)
+        assertEquals("OK reaches programme details", 1, infos)
+    }
+
+    @Test fun upFromTheSeekbarFocusesTheIdentityWhichOpensInfoAndDownReturnsToTheActions() {
+        recording()
         assertEquals(listOf("player-pause"), focused())
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals(listOf("player-identity-card"), focused())
-        assertEquals("the focused card says what it opens", listOf("Info"), cardDescription())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertTrue("the target names the programme", !description().isNullOrEmpty())
+        assertFalse("no channel to change: no arrows", exists("player-top-identity-previous"))
         listOf(Key.DirectionUp, Key.DirectionLeft, Key.DirectionRight).forEach {
             key(it)
-            assertEquals("$it leads nowhere from the card", listOf("player-identity-card"), focused())
+            assertEquals("$it leads nowhere from the programme", listOf(PlayerIdentityCardTag), focused())
         }
         assertEquals(0, infos)
         key(Key.DirectionCenter)
         assertEquals("OK opens Info once", 1, infos)
         key(Key.DirectionDown)
-        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
     }
 
-    @Test fun theBannersCardSaysNothing() {
-        chrome(PlayerChromeMode.BANNER)
-        assertEquals("the Banner's card opens nothing", null, cardDescription())
+    @Test fun theBannersIdentityIsAPictureWithoutFocus() {
+        recording(PlayerChromeMode.BANNER)
+        assertTrue(exists(PlayerTopIdentityTag))
+        assertEquals(0, compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals(emptyList<String>(), focused())
+        assertFalse("the card is gone", exists(PlayerIdentityCardTag))
     }
 
-    @Test fun theCardHasOneSizeCentresItsMarkAndStandsOnTheFootersStartEdge() {
-        chrome(PlayerChromeMode.CONTROLS)
-        val card = bounds("player-identity-card")
-        val bar = bounds("player-info-bar")
-        assertEquals("one height, whatever the programme block holds", 110f, card.height, 0.5f)
-        assertEquals("one width, three grid columns", 196f, card.width, 0.5f)
-        assertEquals("it stands on the info bar's bottom edge", bar.bottom, card.bottom, 0.5f)
-        val mark = bounds(if (exists("player-identity-logo")) "player-identity-logo" else "player-identity-name")
-        assertEquals("the mark is centred across the card", card.center.x, mark.center.x, 0.5f)
-        assertEquals("the mark is lifted clear of the number", card.center.y - 6f, mark.center.y, 0.5f)
-        assertEquals("on the bar row's start edge", bounds("player-timeline-labels").left, card.left, 0.5f)
-        val label = compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).fetchSemanticsNode()
-            .config.getOrNull(SemanticsProperties.Text)?.single()?.text
-        assertTrue("the number leads the label: $label", label?.startsWith("1") == true)
+    /** One chrome: a recording's layout is live's, at the same canvas and font scale. */
+    @Test fun aRecordingHasLivesChromeGeometry() {
+        for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER)) {
+            val recording = geometry(mode, live = false)
+            val live = geometry(mode, live = true)
+            assertEquals("$mode: the same geometry\nrecording $recording\nlive $live", live, recording)
+        }
     }
 
-    @Test fun everyLineKeepsItsPlaceBesideTheCardWhateverTheProgrammeHas() {
+    private fun geometry(mode: PlayerChromeMode, live: Boolean): Map<String, Any> {
+        shownLive = live
+        shownMode = mode
+        if (!composed) {
+            composed = true
+            compose.setContent {
+                TVHeadendPlayerTheme {
+                    val info = PlayerInfoBarData("1", "One", "Title", "20:15–21:45", subtitle = "Episode",
+                        next = "21:45 News".takeIf { shownLive })
+                    if (shownLive) LiveChromeFixture(shownMode, info)
+                    else RecordingChromeFixture(mode = shownMode, info = info, active = shownMode == PlayerChromeMode.CONTROLS)
+                }
+            }
+            compose.mainClock.autoAdvance = false
+        }
+        settle()
+        val identity = bounds(PlayerTopIdentityTag)
+        val tile = bounds("player-info-artwork-tile")
+        val labels = bounds("player-timeline-labels")
+        return buildMap {
+            put("identity", identity)
+            put("artwork", tile)
+            put("placeholder", bounds("player-info-artwork-fallback"))
+            put("title", bounds("player-info-title"))
+            put("timeline", labels.left to labels.right)
+            put("timeline top", labels.top)
+            put("info top", bounds("player-info-bar").top)
+            if (mode == PlayerChromeMode.CONTROLS) {
+                put("actions", listOf("player-pause", "player-stop", "player-settings").map(::bounds))
+                put("timeline to actions", bounds("player-pause").top - labels.bottom)
+            }
+        }
+    }
+
+    @androidx.compose.runtime.Composable
+    private fun LiveChromeFixture(mode: PlayerChromeMode, info: PlayerInfoBarData) {
+        PlayerChrome(
+            mode = mode,
+            content = PlayerChromeContent("20:15", info),
+            timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800),
+            actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS, paused = false),
+            imageLoader = ImageLoader(ApplicationProvider.getApplicationContext<Application>()), currentSession = null,
+            onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
+            onPauseUnavailable = {}, onActionFocused = {}, onFocusRestored = {}, onDownFromActions = {},
+            onChannelZap = { _, _, _ -> }, onRecentPick = {},
+        )
+    }
+
+    private var composed = false
+    private var shownLive by mutableStateOf(false)
+    private var shownMode by mutableStateOf(PlayerChromeMode.CONTROLS)
+
+    @Test fun everyLineKeepsItsPlaceBesideTheArtworkWhateverTheProgrammeHas() {
         var info by mutableStateOf(PlayerInfoBarData("1", "One", "Title", "20:15–21:45", subtitle = "Episode", next = "21:45 News"))
-        val loader = ImageLoader(ApplicationProvider.getApplicationContext<Application>())
         compose.setContent {
             TVHeadendPlayerTheme {
                 Box(Modifier.width(800.dp)) {
-                    PlayerInfoBar(info, emptyList(), Modifier.testTag("player-info-bar")) {
-                        PlayerIdentityCard(PlayerChromeContent("", info), loader, null, it)
+                    PlayerInfoBar(info, Modifier.testTag("player-info-bar")) {
+                        Box(it.size(124.dp, 70.dp).testTag("slot"))
                     }
                 }
             }
         }
-        val full = listOf("player-info-bar", "player-info-title", "player-info-subtitle", "player-info-last-row").associateWith(::bounds)
+        val full = listOf("player-info-bar", "player-info-title", "player-info-programme", "player-info-last-row")
+            .associateWith(::bounds)
         val cases = mapOf(
             "no subtitle" to info.copy(subtitle = null),
             "no Next" to info.copy(next = null),
@@ -109,94 +222,83 @@ class PlayerIdentityCardTest {
             compose.waitForIdle()
             assertEquals("$name: the bar keeps its height", full.getValue("player-info-bar").height, bounds("player-info-bar").height, 0.5f)
             assertEquals("$name: the title keeps its place", full.getValue("player-info-title").top, bounds("player-info-title").top, 0.5f)
-            if (exists("player-info-subtitle")) assertEquals("$name: the subtitle keeps its place",
-                full.getValue("player-info-subtitle").top, bounds("player-info-subtitle").top, 0.5f)
-            if (exists("player-info-last-row")) {
-                if (case.recordedDate == null) assertEquals("$name: Next keeps its place",
-                    full.getValue("player-info-last-row").top, bounds("player-info-last-row").top, 0.5f)
-                else assertEquals("$name: the episode groups closely with the title",
-                    bounds("player-info-title").bottom + 2f, bounds("player-info-last-row").top, 0.5f)
-            }
+            assertEquals("$name: the slot stands on the bar's top", bounds("player-info-bar").top, bounds("slot").top, 0.5f)
+            if (exists("player-info-programme")) assertEquals("$name: the programme line keeps its place",
+                full.getValue("player-info-programme").top, bounds("player-info-programme").top, 0.5f)
+            if (exists("player-info-last-row")) assertEquals("$name: the last row keeps its place",
+                full.getValue("player-info-last-row").top, bounds("player-info-last-row").top, 0.5f)
         }
     }
 
-    @Test fun inTheBannerTheCardIsAPictureWithoutFocus() {
-        chrome(PlayerChromeMode.BANNER)
-        assertTrue(exists("player-identity-card"))
-        assertEquals(0, compose.onAllNodes(hasTestTag("player-identity-card") and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
-        assertEquals(emptyList<String>(), focused())
+    @Test fun theTimeLeadsAsAnEyebrowAboveTheTitleAndTheSubtitleStandsUnderIt() {
+        recording(info = PlayerInfoBarData("1", "One", "Title", "20:15–21:45", subtitle = "Episode", next = "21:45 News"))
+        assertFalse("the channel stands at the top, not in the info bar", exists("player-info-eyebrow"))
+        val title = bounds("player-info-title")
+        val programme = bounds("player-info-programme")
+        val subtitle = bounds("player-info-subtitle")
+        val last = bounds("player-info-last-row")
+        assertTrue("the time and metadata stand above the title", programme.bottom <= title.top + 0.5f)
+        assertTrue("the subtitle stands under the title", title.bottom <= subtitle.top + 0.5f)
+        assertTrue("the last row stands under them", subtitle.bottom <= last.top + 0.5f)
+        assertEquals("the artwork and the text share the bar's top", bounds("player-info-bar").top, bounds("player-info-artwork-tile").top, 1f)
     }
 
-    @Test fun withoutAFocusableTimelineUpFromTheActionRowFocusesTheCardAndDownReturnsToPause() {
-        // No timeshift: the timeline takes no focus.
-        chrome(PlayerChromeMode.CONTROLS, timeshift = AppTimeshiftState(), livePause = LivePauseAvailability.UNAVAILABLE)
+    @Test fun withoutASeekableTimelineUpFromTheActionRowFocusesTheIdentityAndDownReturnsToThatAction() {
+        recording(canSeek = false)
         assertEquals(listOf("player-pause"), focused())
-        assertFalse("the passive timeline takes no focus", exists("player-seekbar"))
         key(Key.DirectionRight)
         assertEquals(listOf("player-stop"), focused())
         key(Key.DirectionUp)
-        assertEquals("Up from any action reaches the card", listOf("player-identity-card"), focused())
+        assertEquals("Up from any action reaches the programme", listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals("Down leads to the action row's entry", listOf("player-pause"), focused())
-        assertEquals(0, toggles)
+        assertEquals("Down leads back to that action", listOf("player-stop"), focused())
         assertEquals(0, infos)
     }
 
-    @Test fun pauseKeepsItsFocusWhenTheTimeshiftBufferLeaves() {
-        chrome(PlayerChromeMode.CONTROLS)
-        assertEquals(listOf("player-pause"), focused())
-        compose.runOnIdle { timeshift = AppTimeshiftState() }
-        settle()
-        assertFalse("the timeline takes no focus without timeshift", exists("player-seekbar"))
-        assertEquals("Play/Pause stays in the row and keeps the focus", listOf("player-pause"), focused())
-        assertFalse("the action row has no Info", exists("player-info"))
-    }
-
-    @Test fun theKeyThatMovesFocusToOrFromTheCardDoesNotActOnItsNewTarget() {
-        chrome(PlayerChromeMode.CONTROLS)
+    @Test fun theKeyThatMovesFocusToOrFromTheIdentityDoesNotActOnItsNewTarget() {
+        recording()
         key(Key.DirectionUp)
-        // Held Up reaches the card once; its repeats and release change nothing there.
+        // Held Up reaches the identity once; its repeats and release change nothing there.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionUp) { advanceEventTime(1_200) } }
         settle()
-        assertEquals(listOf("player-identity-card"), focused())
-        // Held Down returns to the seekbar and goes no further, to the action row.
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        // Held Down returns to the seekbar and goes no further.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionDown) { advanceEventTime(1_200) } }
         settle()
         assertEquals(listOf("player-seekbar"), focused())
         assertEquals(0, infos)
-        assertEquals(0, toggles)
     }
 
-    @Test fun closingInfoReturnsFocusToTheCardHoweverInfoWasOpened() {
-        // Info opened by the remote's INFO key: focus was on Pause, not on the card.
-        chrome(PlayerChromeMode.CONTROLS)
+    @Test fun closingInfoReturnsFocusToTheIdentityHoweverInfoWasOpened() {
+        // Info opened by the remote's INFO key: focus was on Pause, not on the identity.
+        recording()
         assertEquals(listOf("player-pause"), focused())
         compose.runOnIdle { panelOpen = true }
         settle()
         assertEquals("the covered controls hold no focus", emptyList<String>(), focused())
-        compose.runOnIdle { panelOpen = false; restoreFocus = "player-identity-card" }
+        compose.runOnIdle { panelOpen = false; restoreFocus = PlayerIdentityCardTag }
         settle()
-        assertEquals(listOf("player-identity-card"), focused())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         assertEquals("the restore is acknowledged once", 1, restores)
-        // And opened from the card itself.
+        // And opened from the identity itself.
         key(Key.DirectionCenter)
         assertEquals(1, infos)
         compose.runOnIdle { panelOpen = true }
         settle()
-        compose.runOnIdle { panelOpen = false; restoreFocus = "player-identity-card" }
+        compose.runOnIdle { panelOpen = false; restoreFocus = PlayerIdentityCardTag }
         settle()
-        assertEquals(listOf("player-identity-card"), focused())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         assertEquals(2, restores)
     }
 
-    @Test fun theCardReportsItsFocusAsAControlSoAPanelCanReturnToIt() {
-        chrome(PlayerChromeMode.CONTROLS)
+    @Test fun theIdentityReportsItsFocusAsAControlSoAPanelCanReturnToIt() {
+        recording()
         key(Key.DirectionUp)
         key(Key.DirectionUp)
-        assertEquals("player-identity-card", reported.last())
+        assertEquals(PlayerIdentityCardTag, reported.last())
     }
 
-    @Test fun aboveARecordingsMarkersUpReachesTheCardAndDownReturnsToTheSeekbar() {
+    @Test fun aboveARecordingsMarkersUpReachesTheIdentityAndDownReturnsToTheActions() {
         val navigation = RecordingMarkerNavigation()
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -212,9 +314,10 @@ class PlayerIdentityCardTest {
         assertTrue("Up from the seekbar opens the markers", navigation.open)
         key(Key.DirectionUp)
         assertFalse("Up above the markers closes them", navigation.open)
-        assertEquals(listOf("player-identity-card"), focused())
+        assertEquals(listOf(PlayerIdentityCardTag), focused())
         key(Key.DirectionDown)
-        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the seekbar, not into the markers", listOf("player-seekbar"), focused())
+        assertFalse(navigation.open)
         key(Key.DirectionUp)
         key(Key.DirectionDown)
         assertFalse(navigation.open)
@@ -222,35 +325,23 @@ class PlayerIdentityCardTest {
         assertEquals(0, infos)
     }
 
-    private var timeshift by mutableStateOf(
-        AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -203_000, liveEdgeMs = 0, timingKnown = true))
     private var panelOpen by mutableStateOf(false)
     private var restoreFocus by mutableStateOf<String?>(null)
     private var restores = 0
-    private var toggles = 0
-    private var options = 0
     private val reported = mutableListOf<String>()
 
-    private fun chrome(
-        mode: PlayerChromeMode,
-        info: PlayerInfoBarData = liveInfoBarData(1, "One", null, null, false, 1_800, "Programme"),
-        timeshift: AppTimeshiftState = this.timeshift,
-        livePause: LivePauseAvailability? = null,
+    private fun recording(
+        mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
+        info: PlayerInfoBarData? = null,
+        canSeek: Boolean = true,
     ) {
-        this.timeshift = timeshift
-        val loader = ImageLoader(ApplicationProvider.getApplicationContext<Application>())
         compose.setContent {
             TVHeadendPlayerTheme {
-                PlayerChrome(
-                    mode = mode,
-                    content = PlayerChromeContent("20:15", info),
-                    timeline = PlayerChromeTimeline.Live(this.timeshift, nowSec = 1_800),
-                    actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS && !panelOpen, paused = false,
-                        livePause = livePause, record = false, restoreFocus = restoreFocus),
-                    imageLoader = loader, currentSession = null,
-                    onTogglePause = { toggles++ }, onSeek = {}, onStop = {}, onInfo = { infos++ }, onOptions = { options++ },
-                    onInteraction = {}, panelOpen = panelOpen,
-                    onPauseUnavailable = { toggles++ },
+                RecordingChromeFixture(
+                    mode = mode, info = info, canSeek = canSeek,
+                    active = mode == PlayerChromeMode.CONTROLS && !panelOpen, panelOpen = panelOpen,
+                    restoreFocus = restoreFocus,
+                    onInfo = { infos++ },
                     onActionFocused = { reported += it },
                     onFocusRestored = { restores++; restoreFocus = null },
                 )
@@ -265,8 +356,11 @@ class PlayerIdentityCardTest {
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
-    private fun cardDescription(): List<String>? = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true)
+    private fun description(): List<String>? = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true)
         .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
+
+    private fun stateDescription(): String? = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
+        .fetchSemanticsNode().config.getOrNull(SemanticsProperties.StateDescription)
 
     private fun focused(): List<String> =
         compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()

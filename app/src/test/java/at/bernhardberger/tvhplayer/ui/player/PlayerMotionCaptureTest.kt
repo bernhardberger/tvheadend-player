@@ -56,6 +56,9 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.R
+import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import coil3.ImageLoader
 import coil3.map.Mapper
@@ -210,7 +213,7 @@ class PlayerMotionCaptureTest {
                 railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
                 player = {
                     live(loader, session, behind = false,
-                        rail = layers.takeIf { rail }, downHint = "Program info".takeUnless { rail })
+                        rail = layers.takeIf { rail }, downHint = "Channels".takeUnless { rail })
                 }) {
                 LiveProgrammeInfoOverlay(
                     event = programme, channelIdentity = "1 · Documentary", channelName = "Documentary",
@@ -243,7 +246,10 @@ class PlayerMotionCaptureTest {
             repeat(2) { compose.mainClock.advanceTimeByFrame() }
             compose.mainClock.advanceTimeBy(16, ignoreFrameDuration = true)
             capture("rail-opening-16ms", directory = "ui-page-scroll",
-                focus = "rail entering from the card", timing = "16 ms after reveal start")
+                focus = "rail rising from below", timing = "16 ms after reveal start")
+            compose.mainClock.advanceTimeBy(104, ignoreFrameDuration = true)
+            capture("rail-opening-120ms", directory = "ui-page-scroll",
+                focus = "top identity shrinking into the now-playing strip", timing = "120 ms after reveal start")
             compose.mainClock.advanceTimeBy(1_000)
         }
         capture("$pair-rest", directory = "ui-page-scroll")
@@ -363,11 +369,10 @@ class PlayerMotionCaptureTest {
         mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
         entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
         panelOpen: Boolean = false,
-        /** The in-place channel rail over the controls, as the live player shows it. */
+        /** The channel rail below the controls, as the live player shows it. */
         rail: LivePlayerLayerState? = null,
         downHint: String? = null,
     ) {
-        var railAnchor by remember { mutableStateOf<Rect?>(null) }
         val timeshift = AppTimeshiftState(
             available = true,
             bufferStartMs = -600_000,
@@ -383,7 +388,7 @@ class PlayerMotionCaptureTest {
         PlayerChrome(
             mode = mode,
             content = PlayerChromeContent("20:15", liveInfoBarData(if (zapped) 2 else 1,
-                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, "")),
+                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ArtworkId(1)),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
                 nowSec = 1_800,
@@ -400,28 +405,30 @@ class PlayerMotionCaptureTest {
             panelOpen = panelOpen,
             downHint = downHint,
             decorationCoversControls = rail?.channelDrawerOpen == true,
-            onCardPlaced = { railAnchor = it },
             controlsDecoration = { _, controls ->
-                if (rail == null) controls() else QuickZapPresentation(
-                    expanded = rail.channelRailPresented,
-                    channelsAvailable = true,
-                    inPlaceAnchor = { railAnchor },
-                    preview = { QuickZapTrayPreview(
-                        channel = channels.first(), event = programme, next = next,
-                        nowSec = 1_800, imageLoader = loader, currentSession = session,
-                        modifier = Modifier.padding(horizontal = PlayerChromeTokens.gridMargin),
-                    ) },
-                    controls = controls,
-                    channelContent = {
-                        ChannelDrawer(
-                            channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
-                            recordingChannelIds = emptySet(), nowEvent = { programme }, imageLoader = loader,
-                            currentSession = session, active = rail.channelDrawerOpen,
-                            nowSec = 1_800, onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                            onOpenSchedule = { _, _ -> }, entryFocusId = ChannelId(1), inPlace = true,
-                        )
-                    },
-                )
+                if (rail == null) controls() else {
+                    val browser = remember { PlayerChannelBrowserState() }
+                    QuickZapPresentation(
+                        expanded = rail.channelRailPresented,
+                        preview = {
+                            QuickZapTrayPreview(channels.first(), programme, null, 1_800, loader, session,
+                                Modifier.padding(horizontal = TvGridHorizontalMargin))
+                        },
+                        trayBleeds = true,
+                        header = { PlayerChannelBrowserHint(browser, true, stringResource(R.string.all_channels)) },
+                        controls = controls,
+                        channelContent = {
+                            PlayerChannelBrowser(
+                                state = browser, channels = channels, recentChannels = channels.drop(1),
+                                playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
+                                nowEvent = { programme }, nowSec = 1_800,
+                                imageLoader = loader, currentSession = session,
+                                onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
+                                onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
+                            )
+                        },
+                    )
+                }
             },
         )
     }

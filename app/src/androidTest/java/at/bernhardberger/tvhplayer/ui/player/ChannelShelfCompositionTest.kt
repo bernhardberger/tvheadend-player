@@ -101,7 +101,7 @@ class ChannelShelfCompositionTest {
                         onActionFocused = layers::onActionFocused,
                         onFocusRestored = layers::onChannelActionRestored,
                         decorationCoversControls = layers.channelDrawerOpen,
-                        controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(expanded = layers.channelDrawerOpen, channelsAvailable = true, peekAlpha = emphasisAlpha, preview = {}, controls = controls, channelContent = {
+                        controlsDecoration = { _, controls -> QuickZapPresentation(expanded = layers.channelDrawerOpen, preview = {}, controls = controls, channelContent = {
                             ChannelDrawer(
                                 active = layers.channelDrawerOpen,
                                 channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),

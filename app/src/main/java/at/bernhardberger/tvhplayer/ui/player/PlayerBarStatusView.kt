@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -45,8 +46,6 @@ import at.bernhardberger.tvhplayer.core.PlayerEndAnnouncement
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.hiddenStatusText
-import at.bernhardberger.tvhplayer.ui.TvOverlayBottomPadding
-import at.bernhardberger.tvhplayer.ui.TvOverlaySidePadding
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineRowHeight
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 
@@ -177,8 +176,8 @@ internal fun playerHiddenChipPadding(): PaddingValues {
     val lineHeight = with(LocalDensity.current) { MaterialTheme.typography.labelLarge.lineHeight.toDp() }
     val row = maxOf(TvOverlayTimelineRowHeight, lineHeight)
     return PaddingValues(
-        start = TvOverlaySidePadding - HiddenChipPadding,
-        bottom = TvOverlayBottomPadding + 8.dp + (row - PlayerChromeTokens.chipHeight).coerceAtLeast(0.dp) / 2,
+        start = TvGridHorizontalMargin - HiddenChipPadding,
+        bottom = PlayerBannerBottomPadding + TimelineRowInset + (row - PlayerChromeTokens.chipHeight).coerceAtLeast(0.dp) / 2,
     )
 }
 
@@ -206,7 +205,7 @@ internal fun PlayerHiddenStatusChip(state: PlayerStateCell, end: PlayerBarEnd?, 
                 Modifier.testTag("player-hidden-slot").clearAndSetSemantics {
                     contentDescription = description
                     liveRegion = LiveRegionMode.Polite
-                }.background(Color.Black.copy(alpha = 0.56f), PlayerChromeTokens.chipShape)
+                }.background(PlayerChromeTokens.chipScrim, PlayerChromeTokens.chipShape)
                     .heightIn(min = PlayerChromeTokens.chipHeight).padding(horizontal = HiddenChipPadding),
                 horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically,
             ) {

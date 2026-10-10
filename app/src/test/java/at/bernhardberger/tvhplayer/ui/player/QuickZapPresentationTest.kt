@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
@@ -10,7 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -144,48 +145,6 @@ class QuickZapPresentationTest {
         compose.onNodeWithTag("channel-tuning-indicator", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    @Test fun expandedRailIgnoresStaleSeekEmphasis() {
-        var expanded by mutableStateOf(false)
-        compose.setContent {
-            view = LocalView.current
-            Box(Modifier.fillMaxSize().background(Color.White)) {
-                QuickZapPresentation(preview = {}, expanded = expanded, channelsAvailable = true,
-                    peekAlpha = { 0f }, channelContent = {
-                        Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
-                    }, controls = {})
-            }
-        }
-        fun pixel(y: Int): Int {
-            compose.waitForIdle()
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            return bitmap.getPixel(480, y).also { bitmap.recycle() }
-        }
-        assertEquals(android.graphics.Color.WHITE, pixel(530))
-        compose.runOnIdle { expanded = true }
-        assertEquals(android.graphics.Color.RED, pixel(470))
-    }
-
-    @Test fun inPlaceRailStartsAtEntryWithoutComposingTheStartOfTheCatalog() {
-        val catalog = (1L..100L).map { Channel.create(id = ChannelId(it), number = it, name = "Channel $it") }
-        val composedChannels = mutableSetOf<ChannelId>()
-        compose.setContent {
-            val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme {
-                ChannelDrawer(catalog, ChannelId(50), ChannelId(50), recordingChannelIds = emptySet(),
-                    nowEvent = { composedChannels += it; null }, imageLoader = loader,
-                    onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                    inPlace = true, entryFocusId = ChannelId(50))
-            }
-        }
-        compose.waitForIdle()
-        compose.onNodeWithTag("player-channel-card-50").assertIsFocused()
-        assertFalse("do not measure the start then jump to the entry card", ChannelId(1) in composedChannels)
-        assertTrue("only the viewport and one reserve card per side: $composedChannels", composedChannels.size <= 8)
-        println("RAIL_INITIAL_COMPOSITION count=${composedChannels.size}")
-    }
-
     @Test fun zeroAlphaPageContentDoesNotDraw() {
         var progress by mutableStateOf(0f)
         var draws = 0
@@ -209,70 +168,7 @@ class QuickZapPresentationTest {
         assertTrue(draws > 0)
     }
 
-    @Test fun identityAndFocusedRailCardHaveTheSameGeometry() {
-        val inspectorEnabled = androidx.compose.ui.platform.isDebugInspectorInfoEnabled
-        androidx.compose.ui.platform.isDebugInspectorInfoEnabled = true
-        try {
-            val channel = channels.first()
-            compose.setContent {
-                view = LocalView.current
-                val loader = remember { ImageLoader(view.context) }
-                TVHeadendPlayerTheme {
-                    Box(Modifier.fillMaxSize()) {
-                        Box(Modifier.padding(start = 58.dp, top = 30.dp)) {
-                            PlayerIdentityCard(PlayerChromeContent("", PlayerInfoBarData("1", "Channel 1", "", ""),
-                                picon = channel.icon), loader, null, onClick = {}, channelCard = true, held = true)
-                        }
-                        Box(Modifier.padding(top = 230.dp)) {
-                            ChannelDrawer(listOf(channel), channel.id, channel.id, recordingChannelIds = emptySet(),
-                                nowEvent = { null }, imageLoader = loader, onFocusChannel = {}, onPickChannel = {},
-                                onCloseDrawer = {}, inPlace = true, entryFocusId = channel.id)
-                        }
-                    }
-                }
-            }
-            compose.waitForIdle()
-            fun node(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
-            fun rect(tag: String, card: String): androidx.compose.ui.geometry.Rect {
-                val parent = node(card).layoutInfo.coordinates
-                return parent.localBoundingBoxOf(node(tag).layoutInfo.coordinates, clipBounds = false)
-            }
-            fun label(tag: String, card: String): List<Float> {
-                val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
-                node(tag).config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!.invoke(results)
-                val text = results.single()
-                val bounds = rect(tag, card)
-                return listOf(bounds.left, bounds.top, text.firstBaseline + bounds.top,
-                    text.getBoundingBox(text.layoutInput.text.text.indexOf("Channel")).left + bounds.left, bounds.width)
-            }
-            fun corner(card: String): Float = node(card).layoutInfo.getModifierInfo()
-                .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
-                .filter { it.nameFallback == "graphicsLayer" }.mapNotNull { layer ->
-                    @Suppress("UNCHECKED_CAST")
-                    val block = layer.inspectableElements.firstOrNull { it.name == "block" }?.value as? (androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit)
-                    val shape = block?.let { androidx.compose.ui.graphics.GraphicsLayerScope().apply(it).shape }
-                        ?: layer.inspectableElements.firstOrNull { it.name == "shape" }?.value as? androidx.compose.ui.graphics.Shape
-                    (shape?.createOutline(androidx.compose.ui.geometry.Size(196f, 110f),
-                        androidx.compose.ui.unit.LayoutDirection.Ltr, Density(1f)) as? androidx.compose.ui.graphics.Outline.Rounded)
-                        ?.roundRect?.topLeftCornerRadius?.x
-                }.first()
-            val identity = "player-identity-card"
-            val rail = "player-channel-card-1"
-            val identityLabel = label("player-identity-label", identity)
-            val railLabel = label("player-channel-1-identity", rail)
-            println("CARD_GEOMETRY identitySize=${node(identity).layoutInfo.coordinates.size} railSize=${node(rail).layoutInfo.coordinates.size} " +
-                "identityPicon=${rect("player-identity-logo", identity)} railPicon=${rect("player-channel-1-picon", rail)} " +
-                "identityLabel=$identityLabel railLabel=$railLabel identityCorner=${corner(identity)} railCorner=${corner(rail)}")
-            assertEquals(node(identity).layoutInfo.coordinates.size, node(rail).layoutInfo.coordinates.size)
-            assertEquals(rect("player-identity-logo", identity), rect("player-channel-1-picon", rail))
-            identityLabel.zip(railLabel).forEach { (a, b) -> assertEquals(a, b, 0.01f) }
-            assertEquals(corner(identity), corner(rail), 0.01f)
-        } finally {
-            androidx.compose.ui.platform.isDebugInspectorInfoEnabled = inspectorEnabled
-        }
-    }
-
-    @Test fun railPeekWaitsForRevealAndCanReverseDuringItsFade() {
+    @Test fun railRevealNeverAddsTheHistoricalPeek() {
         var expanded by mutableStateOf(false)
         var expansion: () -> Float = { 0f }
         lateinit var peek: androidx.compose.animation.core.MutableTransitionState<Boolean>
@@ -281,13 +177,12 @@ class QuickZapPresentationTest {
             TVHeadendPlayerTheme {
                 PlayerPage<Unit>(details = null, railHeader = if (expanded) ({
                     androidx.compose.runtime.SideEffect { headerCompositions++ }
-                    ProgrammeScheduleHeader("1 · Channel 1")
+                    ProgrammeScheduleHeader("1 · Ridge Earth HD")
                 }) else null, player = {
                     peek = LocalPlayerRailPeek.current!!
-                    QuickZapPresentation(expanded, channelsAvailable = false,
-                        inPlaceAnchor = { androidx.compose.ui.geometry.Rect(58f, 300f, 254f, 410f) },
+                    QuickZapPresentation(expanded,
                         channelContent = { Box(Modifier.fillMaxWidth().height(100.dp)) }, preview = {},
-                        controls = { expansion = LocalInPlaceRailExpansion.current })
+                        controls = { expansion = LocalRailExpansion.current })
                 }, programme = {})
             }
         }
@@ -301,11 +196,12 @@ class QuickZapPresentationTest {
         compose.mainClock.advanceTimeBy(112)
         compose.waitForIdle()
         assertEquals(1f, expansion(), 0f)
-        assertTrue("peek is fading in", peek.targetState && !peek.currentState && !peek.isIdle)
+        assertTrue("the browser has no bottom-edge peek", !peek.targetState && !peek.currentState && peek.isIdle)
         compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
-        compose.mainClock.advanceTimeBy(32)
+        compose.mainClock.advanceTimeBy(96)
         compose.waitForIdle()
-        assertEquals("even an interrupted peek leaves before collapse", 1f, expansion(), 0f)
+        assertFalse("the peek leaves with the rail", peek.targetState)
+        assertTrue("the rail folds away at once: ${expansion()}", expansion() < 1f)
         compose.mainClock.advanceTimeBy(400)
         compose.waitForIdle()
         assertTrue(peek.isIdle && !peek.currentState)
@@ -313,74 +209,48 @@ class QuickZapPresentationTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun inPlaceRailRevealsFromCardBoundsWithinPlayerPage() {
-        var expanded by mutableStateOf(false)
-        var expansion: () -> Float = { 0f }
-        val anchor = androidx.compose.ui.geometry.Rect(58f, 300f, 254f, 410f)
-        compose.setContent {
-            view = LocalView.current
-            Box(Modifier.fillMaxSize().background(Color.Black)) {
-                PlayerPage<Unit>(details = null, player = {
-                    QuickZapPresentation(expanded = expanded, channelsAvailable = false,
-                        inPlaceAnchor = { anchor }, preview = {}, controls = {
-                            expansion = LocalInPlaceRailExpansion.current
-                        }, channelContent = {
-                            Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
-                        })
-                }, programme = {})
-            }
-        }
-        compose.waitForIdle()
-        compose.mainClock.autoAdvance = false
-        compose.runOnIdle { expanded = true; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
-        repeat(2) { compose.mainClock.advanceTimeByFrame() }
-        compose.mainClock.advanceTimeBy(16)
-        compose.waitForIdle()
-        val e = expansion()
-        assertTrue("the reveal is in flight: $e", e > 0f && e < 1f)
-        val right = anchor.right + (960f - anchor.right) * e
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        assertTrue("the card's original area is revealed", android.graphics.Color.red(bitmap.getPixel(150, 320)) > 100)
-        val outside = (right + 100).toInt()
-        assertTrue("the reveal has not yet reached the viewport edge: $right", outside < bitmap.width)
-        assertEquals("pixels beyond the expanding edge remain hidden", 0, android.graphics.Color.red(bitmap.getPixel(outside, 320)))
-        val feather = android.graphics.Color.red(bitmap.getPixel((right + 48).toInt(), 320))
-        assertTrue("the expanding edge stays feathered, not hard-clipped: $feather", feather in 1..200)
-        bitmap.recycle()
-    }
+    /** A fictional programme with its fixture art; see fixture-art/README.md. */
+    private class Programme(val title: String, val art: String, val synopsis: String)
+    private class LineUp(val name: String, val picon: String?, vararg val programmes: Programme)
 
-    @Test fun peekingNewTrayDoesNotDimControlsAboveTheRow() {
-        var expanded by mutableStateOf(false)
-        compose.setContent {
-            view = LocalView.current
-            Box(Modifier.fillMaxSize().background(Color.White)) {
-                QuickZapPresentation(expanded = expanded, channelsAvailable = true,
-                    peekAlpha = { 1f }, preview = {}, channelContent = {
-                        Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red))
-                    }, controls = { Box(Modifier.fillMaxSize().background(Color.White)) })
-            }
-        }
-        fun column(): IntArray {
-            compose.waitForIdle()
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-            return IntArray(view.height) { bitmap.getPixel(480, it) }.also { bitmap.recycle() }
-        }
-        val peek = column()
-        val cardTop = peek.indexOfFirst { it == android.graphics.Color.RED }
-        assertTrue("the channel row peeks at the bottom edge: $cardTop", cardTop in 480 until 540)
-        assertTrue("controls above the peeking row keep full brightness",
-            (0 until cardTop).all { peek[it] == android.graphics.Color.WHITE })
-        compose.runOnIdle { expanded = true }
-        val open = column()
-        val openCardTop = open.indexOfFirst { it == android.graphics.Color.RED }
-        assertTrue("the open tray keeps its scrim behind the preview",
-            android.graphics.Color.red(open[openCardTop - 8]) < 80)
-    }
+    private val ridgeLight = Programme("Ridge Light", "ridge-light", "Seasonal light, forests and weather moving over a ridge.")
+    private val tideWatch = Programme("Tide Watch", "still-tide-watch", "Wading birds and seals along a tidal estuary.")
+    private val coastalMiles = Programme("Coastal Miles", "still-coastal-miles", "A walk along a temperate coast, from market to ferry slip.")
+    private val harborKickoff = Programme("Harbor Kickoff", "harbor-kickoff", "Harbor FC meet Amber Town under the floodlights.")
+    private val riverCourt = Programme("River Court", "river-court", "Indoor basketball: River Court against North Quay.")
+    private val extraTime = Programme("Harbor Kickoff: Extra Time", "harbor-kickoff-4x3", "Highlights and interviews after the final whistle.")
+    private val northlineTonight = Programme("Northline Tonight", "northline-tonight", "Evening news from the regional desk.")
+    private val fieldDesk = Programme("Field Desk", "field-desk", "Reporting from a flooded riverside road.")
+    private val weather = Programme("Skyglass Weather", "still-skyglass-square", "The weather for the coast and the hills.")
+    private val paperKite = Programme("Paper Kite Tales", "paper-kite-tales", "A paper kite drifts over painted hills.")
+    private val littleOrbit = Programme("Little Orbit", "little-orbit", "Orbits explained with marbles and a bowl.")
+    private val ionWake = Programme("Ion Wake", "ion-wake", "A courier rides a magnetic rail through Ion Harbor.")
+    private val lanternRoad = Programme("Lantern Road", "lantern-road", "A cartographer maps a valley from a lantern sky-bridge.")
+    private val kettleHour = Programme("The Kettle Hour", "kettle-hour", "Broths, bread and weeknight pans.")
+    private val glassHarbor = Programme("Glass Harbor", "glass-harbor", "Night shifts in a harbour glass workshop.")
+    private val harborLights = Programme("Harbor Lights Live", "harbor-lights-live", "A small-hall concert with a quartet.")
+
+    /** Channel n is entry n - 1: a long German name (4) and a channel without a picon (5). */
+    private val lineUp = listOf(
+        LineUp("Ridge Earth HD", "ridge-earth", ridgeLight, tideWatch, coastalMiles),
+        LineUp("Harbor Sport", "harbor-sport", harborKickoff, riverCourt, extraTime),
+        LineUp("Northline News", "northline-news", northlineTonight, fieldDesk, weather),
+        LineUp("Foundry Docs – Dokumentation und Zeitgeschichte HD", "foundry-docs", tideWatch, ridgeLight, coastalMiles),
+        LineUp("Amber Stage", null, kettleHour, glassHarbor, coastalMiles),
+        LineUp("Kite Kids", "kite-kids", paperKite, littleOrbit),
+        LineUp("Ion Frame", "ion-frame", ionWake, lanternRoad),
+        LineUp("Harbor Lights", "harbor-lights", harborLights, glassHarbor),
+        LineUp("Lantern Hour", "lantern-hour", lanternRoad, ionWake),
+        LineUp("Northline World", "northline-world", fieldDesk, northlineTonight, weather),
+        LineUp("Roundtable Late", "roundtable", harborLights, kettleHour),
+        LineUp("Coastal Miles", "coastal-miles", coastalMiles, tideWatch),
+    )
+    private fun programme(id: Long, index: Int) = lineUp[((id - 1) % lineUp.size).toInt()].programmes.let { it[index % it.size] }
+
     private val channels = (1L..12L).map {
-        Channel.create(id = ChannelId(it), number = it, name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
-            icon = if (it == 5L) null else ArtworkId(it.toInt()))
+        val line = lineUp[(it - 1).toInt()]
+        Channel.create(id = ChannelId(it), number = it, name = line.name,
+            icon = line.picon?.let { _ -> ArtworkId(it.toInt()) })
     }
     private var catalog by mutableStateOf(channels)
 
@@ -468,6 +338,21 @@ class QuickZapPresentationTest {
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
     }
 
+    // The rail is composed only while it is open, so a reopened rail starts on the playing channel again.
+    @Test fun reopenedRailStartsOnThePlayingChannelAgain() {
+        content()
+        key(Key.DirectionDown)
+        repeat(7) { key(Key.DirectionRight) }
+        card(9).assertIsFocused()
+        for (close in listOf(Key.DirectionUp, Key.Back)) {
+            key(close)
+            compose.onNodeWithTag("player-pause").assertIsFocused()
+            key(Key.DirectionDown)
+            card(2).assertIsFocused()
+        }
+        assertEquals(0, picks)
+    }
+
     @Test fun tunedCardsKeepBoundsAcrossUpAndBack() = stableReentry(1f, "en-font1")
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -490,61 +375,6 @@ class QuickZapPresentationTest {
             capture("$prefix-tuned-$id-reopened", id, fontScale)
         }
         assertEquals(2, picks)
-    }
-
-    @Test fun browsedNonplayingCardAndViewportSurviveReentry() {
-        content()
-        key(Key.DirectionDown)
-        repeat(7) { key(Key.DirectionRight) }
-        val before = card(9).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        for (close in listOf(Key.DirectionUp, Key.Back)) {
-            key(close)
-            compose.onNodeWithTag("player-pause").assertIsFocused()
-            key(Key.DirectionDown)
-            card(9).assertIsFocused()
-            assertEquals(before, card(9).fetchSemanticsNode().boundsInRoot)
-        }
-        assertEquals(ChannelId(2), playing)
-        assertEquals(0, picks)
-    }
-
-    @Test fun delayedOwnConfirmationDoesNotReplaceLaterBrowseFocus() {
-        confirmPicks = false
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        compose.runOnIdle { playing = null }
-        key(Key.DirectionRight)
-        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        assertEquals(1, picks)
-    }
-
-    @Test fun lossOfConfirmationWhileClosedPreservesVisibleBrowseUntilConfirmation() {
-        confirmPicks = false
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
-        key(Key.DirectionRight)
-        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        key(Key.DirectionUp)
-        compose.runOnIdle { playing = null }
-        compose.onNodeWithTag("player-pause").assertIsFocused()
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        assertEquals(1, picks)
     }
 
     @Test fun externalConfirmationAfterNullSupersedesPendingLocalPick() {
@@ -610,53 +440,6 @@ class QuickZapPresentationTest {
         key(Key.DirectionDown)
         card(8).assertIsFocused()
         assertEquals(anchored, card(8).fetchSemanticsNode().boundsInRoot)
-        assertEquals(0, picks)
-    }
-
-    @Test fun unconfirmedOrFailedTuneKeepsBrowseAndConfirmedChannelUpReanchors() {
-        content()
-        key(Key.DirectionDown)
-        repeat(2) { key(Key.DirectionRight) }
-        val before = card(4).assertIsFocused().fetchSemanticsNode().boundsInRoot
-        key(Key.Back)
-        // A tune that never confirms, then the previous channel re-confirmed.
-        compose.runOnIdle { playing = null }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        key(Key.Back)
-        compose.runOnIdle { playing = ChannelId(2) }
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        assertEquals(before, card(4).fetchSemanticsNode().boundsInRoot)
-        // The same failure while the rail is open does not re-anchor on close either.
-        compose.runOnIdle { playing = null }
-        compose.runOnIdle { playing = ChannelId(2) }
-        key(Key.Back)
-        key(Key.DirectionDown)
-        card(4).assertIsFocused()
-        // CH+ while closed: awaiting presentation, then the next channel confirmed.
-        key(Key.Back)
-        compose.runOnIdle { playing = null }
-        compose.runOnIdle { playing = ChannelId(3) }
-        key(Key.DirectionDown)
-        card(3).assertIsFocused()
-        assertEquals(0, picks)
-    }
-
-    @Test fun reorderedAndRemovedBrowseAnchorRecoverWithoutOffscreenFocusWait() {
-        content()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.Back)
-        compose.runOnIdle { catalog = channels.filterNot { it.id == ChannelId(3) } + channels[2] }
-        key(Key.DirectionDown)
-        card(3).assertIsFocused()
-        compose.runOnIdle { catalog = channels.filterNot { it.id == ChannelId(3) } }
-        card(2).assertIsFocused()
-        compose.runOnIdle { catalog = emptyList() }
-        compose.onNodeWithTag("player-shelf-close").assertIsFocused()
-        compose.runOnIdle { catalog = channels.takeLast(2) }
-        card(11).assertIsFocused()
         assertEquals(0, picks)
     }
 
@@ -842,6 +625,65 @@ class QuickZapPresentationTest {
         card(2).assertIsFocused()
     }
 
+    @Test fun downFromAnActionOpensTheRailOnThePlayingChannelAndUpReturnsToThatAction() {
+        content()
+        for (close in listOf(Key.DirectionUp, Key.Back)) {
+            repeat(4) {
+                if (!isFocused("player-settings")) key(Key.DirectionRight)
+            }
+            compose.onNodeWithTag("player-settings").assertIsFocused()
+            key(Key.DirectionDown)
+            card(2).assertIsFocused()
+            // The row it came from gives way: nothing of it takes focus or is announced.
+            compose.onNodeWithTag("player-settings").assertDoesNotExist()
+            // The key that opened the rail does not also move or activate anything in it.
+            assertEquals(0, picks)
+            assertTrue(layers.channelDrawerOpen)
+            key(close)
+            assertFalse(layers.channelDrawerOpen)
+            compose.onNodeWithTag("player-settings").assertIsFocused()
+        }
+        assertEquals(0, picks)
+    }
+
+    @Test fun railRisesFromBelowWhileTheFooterGivesWay() {
+        var expanded by mutableStateOf(false)
+        var expansion: () -> Float = { 0f }
+        compose.setContent {
+            Box(Modifier.fillMaxSize().background(Color.Black)) {
+                PlayerPage<Unit>(details = null, player = {
+                    QuickZapPresentation(expanded = expanded, preview = {},
+                        controls = { expansion = LocalRailExpansion.current },
+                        channelContent = { Box(Modifier.fillMaxWidth().height(100.dp).background(Color.Red)) })
+                }, programme = {})
+            }
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("player-zap-tray").assertDoesNotExist()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { expanded = true; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(48)
+        compose.waitForIdle()
+        val e = expansion()
+        assertTrue("the rise is in flight: $e", e > 0f && e < 1f)
+        fun top() = compose.onNodeWithTag("player-zap-tray").fetchSemanticsNode().boundsInRoot.top
+        val rising = top()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        val tray = compose.onNodeWithTag("player-zap-tray").fetchSemanticsNode().boundsInRoot
+        assertTrue("the rail rises from below: $rising then ${tray.top}", rising > tray.top)
+        assertEquals("the rail rests above the bottom safe area", 540f - TvGridVerticalMargin.value, tray.bottom, 0.5f)
+        compose.runOnIdle { expanded = false; androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications() }
+        repeat(2) { compose.mainClock.advanceTimeByFrame() }
+        compose.mainClock.advanceTimeBy(48)
+        compose.waitForIdle()
+        assertTrue("and folds back down: ${top()}", top() > tray.top)
+        compose.mainClock.autoAdvance = true
+    }
+
+    private fun isFocused(tag: String) = runCatching { compose.onNodeWithTag(tag).assertIsFocused() }.isSuccess
+
     private fun content(
         fontScale: Float = 1f,
         bright: Boolean = false,
@@ -864,13 +706,10 @@ class QuickZapPresentationTest {
                 ImageLoader.Builder(context)
                     .components { add(object : Mapper<AppArtworkSource, ByteArray> {
                         override fun map(data: AppArtworkSource, options: Options): ByteArray {
-                            val bitmap = FixtureArt.picon(when (data.id.value) {
-                                1 -> "ridge-earth"
-                                2 -> "harbor-sport"
-                                3 -> "northline-news"
-                                4 -> "kite-kids"
-                                else -> "lantern-hour"
-                            })
+                            // Programme art is "imagecache/<1000 + channel * 10 + index>"; picons use the channel id.
+                            val id = data.id.value.toLong()
+                            val bitmap = if (id >= 1000) FixtureArt.art(programme((id - 1000) / 10, ((id - 1000) % 10).toInt()).art)
+                                else FixtureArt.picon(checkNotNull(lineUp[(id - 1).toInt()].picon))
                             return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
                         }
                     }) }
@@ -900,10 +739,11 @@ class QuickZapPresentationTest {
                                 else -> false
                             }
                         }) {
+                        val chrome: @Composable () -> Unit = {
                         PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent("", liveInfoBarData(playing?.value,
-                                playing?.let { "Channel ${it.value}" }.orEmpty(), null, null, false, 900, "")),
+                                playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
                             actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),
                             imageLoader = loader, currentSession = session,
@@ -916,10 +756,8 @@ class QuickZapPresentationTest {
                             onFocusRestored = layers::onChannelActionRestored,
                             onActionFocused = layers::onActionFocused,
                             decorationCoversControls = layers.channelDrawerOpen,
-                            controlsDecoration = { emphasisAlpha, controls -> QuickZapPresentation(
-                              expanded = layers.channelDrawerOpen,
-                              channelsAvailable = true,
-                              peekAlpha = emphasisAlpha,
+                            controlsDecoration = { _, controls -> QuickZapPresentation(
+                               expanded = layers.channelDrawerOpen,
                               preview = {},
                               controls = controls,
                               channelContent = {
@@ -943,6 +781,8 @@ class QuickZapPresentationTest {
                               },
                             ) },
                         )
+                        }
+                        chrome()
                     }
                 }
             }
@@ -953,7 +793,7 @@ class QuickZapPresentationTest {
     }
 
     private fun event(id: ChannelId) = EpgEvent.create(
-        id = EventId(id.value), channelId = id, title = "A journey through the mountains",
+        id = EventId(id.value), channelId = id, title = programme(id.value, 0).title,
         start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(3600),
     )
     private fun card(id: Int) = compose.onNodeWithTag("player-channel-card-$id")

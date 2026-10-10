@@ -606,9 +606,10 @@
         <item quantity="other">%1$d minutes left</item>
     </plurals>
     <string name="player_channel">Channel</string>
-    <string name="player_row_recent">Recent</string>
-    <string name="player_channel_card_hint">Channel. Left or right changes channel, holding them opens the channel list, up shows recent channels, OK opens the channel list.</string>
-    <string name="player_down_programme_info">Program info</string>
+    <string name="player_row_recent">Recent channels</string>
+    <string name="player_channel_card_hint">Left or right changes channel, OK shows recent channels.</string>
+    <string name="player_identity_info_hint">OK shows the programme info.</string>
+    <string name="player_channel_card_hint_no_recents">Left or right changes channel.</string>
     <string name="player_rail_watching">Watching</string>
     <!-- Trial: program details -->
     <string name="details_tab_details">Details</string>

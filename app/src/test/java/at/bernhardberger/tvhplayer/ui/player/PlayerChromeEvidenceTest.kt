@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
@@ -98,7 +99,7 @@ class PlayerChromeEvidenceTest {
     @Test fun passiveBarBadgesAndSlotHaveMergedSemanticsAndNoFocusActions() {
         compose.setContent { TVHeadendPlayerTheme {
             Column {
-                InfoBar(info(false), badges(), null, Modifier.fillMaxWidth().testTag("bar"))
+                InfoBar(info(false), Modifier.fillMaxWidth().testTag("bar"))
                 PlayerStateCellView(PlayerStateCell.PLAYING, Modifier.testTag("chip"))
                 PlayerGlanceBadges(glanceBadges(audioDescription = true, subtitles = true, teletext = true), Modifier.width(400.dp).testTag("badges"))
             }
@@ -108,7 +109,7 @@ class PlayerChromeEvidenceTest {
         assertTrue(spoken.contains("Channel 101, Ridge Earth HD"))
         assertTrue(spoken.contains("Now:"))
         assertTrue(spoken.contains("Recording scheduled"))
-        assertTrue(spoken.contains("1080 lines"))
+        assertFalse("the info bar carries no stream badges", spoken.contains("1080 lines"))
         assertTrue(bar.children.isEmpty())
         compose.onNodeWithContentDescription("Audio description, Subtitles, Teletext available").assertExists()
         compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus), useUnmergedTree = true).assertCountEquals(0)
@@ -150,35 +151,62 @@ class PlayerChromeEvidenceTest {
         assertEquals(setOf(2L), active.toSet())
     }
 
-    @Test fun quickZapPreviewWaitsForFocusToRestAndRepeatedStepsRestartTheWait() {
+    @Test fun quickZapPreviewFollowsEachPressAndWaitsForAHeldKeyToRest() {
         var focused by mutableStateOf<ChannelId?>(ChannelId(1))
-        var settled: ChannelId? = null
-        fun focus(id: ChannelId) = compose.runOnIdle {
-            focused = id
+        var held by mutableStateOf(false)
+        var shown: ChannelId? = null
+        fun set(block: () -> Unit) = compose.runOnIdle {
+            block()
             androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
         }
-        compose.setContent { settled = rememberSettled(focused, QuickZapPreviewSettleMs) }
+        compose.setContent { shown = rememberUnlessHeld(focused, held, QuickZapPreviewSettleMs) }
         compose.waitForIdle()
-        assertEquals("the opening card previews at once", ChannelId(1), settled)
+        assertEquals("the opening card previews at once", ChannelId(1), shown)
         compose.mainClock.autoAdvance = false
-        focus(ChannelId(2))
+        for (id in listOf(2L, 3L, 2L)) {
+            set { focused = ChannelId(id) }
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("each press swaps at once, however quick", ChannelId(id), shown)
+        }
+        set { held = true; focused = ChannelId(3) }
         compose.mainClock.advanceTimeByFrame()
-        assertNull("moving hides the preview immediately", settled)
+        assertNull("a held key hides the preview from its first repeat", shown)
+        set { focused = ChannelId(4) }
+        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs * 2)
+        assertNull("and keeps it hidden while held", shown)
+        set { held = false }
         compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
-        focus(ChannelId(3))
-        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
-        assertNull("a repeat step restarts the wait", settled)
+        assertNull("focus rests before the preview returns", shown)
         compose.mainClock.advanceTimeBy(100)
-        assertEquals(ChannelId(3), settled)
-        focus(ChannelId(4))
+        assertEquals(ChannelId(4), shown)
+        set { focused = ChannelId(5) }
         compose.mainClock.advanceTimeByFrame()
-        focus(ChannelId(3))
+        assertEquals("the next press swaps at once again", ChannelId(5), shown)
+    }
+
+    @Test fun crossfadingToAShorterPreviewKeepsItOnTheCardsFromTheFirstFrame() {
+        fun snapshot(id: Long) = QuickZapPreviewSnapshot(ChannelId(id), "p$id", "", null, null, null)
+        var shown by mutableStateOf(snapshot(1))
+        compose.setContent { TVHeadendPlayerTheme { Box(Modifier.size(400.dp), contentAlignment = Alignment.BottomStart) {
+            QuickZapTrayPreviewFrame(shown) {
+                Box(Modifier.fillMaxWidth().height(if (it.channelId == ChannelId(1)) 200.dp else 100.dp).testTag(it.title))
+            }
+        } } }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle {
+            shown = snapshot(2)
+            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+        }
         compose.mainClock.advanceTimeByFrame()
-        assertNull("returning to the previous card waits again", settled)
-        compose.mainClock.advanceTimeBy(QuickZapPreviewSettleMs - 50)
-        assertNull("the full wait restarts", settled)
-        compose.mainClock.advanceTimeBy(100)
-        assertEquals(ChannelId(3), settled)
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("p1", useUnmergedTree = true).assertExists()
+        val bottom = 400.dp
+        compose.onNodeWithTag("p2").assertTopPositionInRootIsEqualTo(bottom - 100.dp)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("p1", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("p2").assertTopPositionInRootIsEqualTo(bottom - 100.dp)
     }
 
     @Test fun tickingSecondsDoNotChangeLiveRegionAnnouncementButStateDoes() {
@@ -212,7 +240,7 @@ class PlayerChromeEvidenceTest {
 
     @Test fun recordedAndUnnumberedIdentityHaveNoNextOrNowAndUseSpokenWords() {
         compose.setContent { TVHeadendPlayerTheme {
-            InfoBar(info(true).copy(channelNumber = ""), emptyList(), null, Modifier.fillMaxWidth().testTag("bar"))
+            InfoBar(info(true).copy(channelNumber = ""), Modifier.fillMaxWidth().testTag("bar"))
         } }
         val spoken = compose.onNodeWithTag("bar").fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString(" ")
         assertTrue(spoken.startsWith("Ridge Earth HD"))
@@ -224,19 +252,16 @@ class PlayerChromeEvidenceTest {
         compose.onNodeWithTag("player-scheduled-marker", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    /** The info bar with its identity card, passive as in the Banner. */
+    /** The info bar with an empty artwork slot, passive as in the Banner. */
     @Composable
-    private fun InfoBar(data: PlayerInfoBarData, badges: List<GlanceBadge>, picon: ArtworkId?, modifier: Modifier = Modifier) {
-        PlayerInfoBar(data, badges, modifier) { PlayerIdentityCard(PlayerChromeContent("", data, picon = picon), loader, session, it) }
+    private fun InfoBar(data: PlayerInfoBarData, modifier: Modifier = Modifier) {
+        PlayerInfoBar(data, modifier) { Box(it.size(196.dp, 110.dp).background(TvSurfaceColors.containerLow)) }
     }
 
-    private fun lastRowLayout(recorded: Boolean) {
-        var gapPx = 0f
+    @Test fun liveNextRowRunsFullWidthOnTheArtworksBottomEdge() {
         compose.setContent { TVHeadendPlayerTheme {
-            gapPx = with(LocalDensity.current) { (if (recorded) 2.dp else 8.dp).toPx() }
             Box(Modifier.fillMaxSize()) {
-                // Live: Next is the last row, under the subtitle; recording: the episode, under the title.
-                InfoBar(info(recorded), emptyList(), null, Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
+                InfoBar(info(false), Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
             }
         } }
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -244,34 +269,35 @@ class PlayerChromeEvidenceTest {
         val text = bounds("player-info-last-text")
         val row = bounds("player-info-last-row")
         val bar = bounds("bar")
-        val above = if (recorded) title else bounds("player-info-subtitle")
-        assertEquals("the episode groups with the title; Next has its own separation", gapPx, text.top - above.bottom, 1f)
+        assertEquals("Next stands on the artwork's bottom edge", bar.bottom, row.bottom, 1f)
         assertEquals("the row is as tall as its text", text.height, row.height, 1f)
         assertEquals("the row runs to the bar's end: nothing takes room at its end", bar.right, row.right, 1f)
         assertEquals("the row starts where the title starts", title.left, row.left, 1f)
     }
 
-    @Test fun liveNextRowRunsFullWidthAndIsAsTallAsItsText() = lastRowLayout(recorded = false)
-
-    @Test fun recordingEpisodeRowRunsFullWidthAndIsAsTallAsItsText() = lastRowLayout(recorded = true)
-
-    @Test fun recordingWithoutEpisodeHasNoLastRow() {
+    @Test fun aRecordingHasNoLastRowItsEpisodeIsTheSubtitle() {
         var episode by mutableStateOf<String?>("Episode 4")
         compose.setContent { TVHeadendPlayerTheme {
             Box(Modifier.fillMaxSize()) {
-                InfoBar(info(true).copy(subtitle = episode), emptyList(), null, Modifier.fillMaxWidth().align(Alignment.BottomCenter))
+                InfoBar(info(true).copy(subtitle = episode), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
             }
         } }
-        compose.onNodeWithTag("player-info-last-row", useUnmergedTree = true).assertExists()
-        compose.runOnIdle { episode = null }
         compose.onNodeWithTag("player-info-last-row", useUnmergedTree = true).assertDoesNotExist()
+        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val subtitle = compose.onNodeWithTag("player-info-subtitle", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("the episode stands under the title", title.bottom <= subtitle.top + 0.5f)
+        compose.runOnIdle { episode = null }
+        compose.onNodeWithTag("player-info-subtitle", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-info-last-row", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals("the title keeps its place", title,
+            compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
     }
 
     @Test fun scheduledMarkerIsANeutralClockNotTheRedRecGlyph() {
         lateinit var view: View
         compose.setContent { TVHeadendPlayerTheme {
             view = LocalView.current
-            InfoBar(info(false), emptyList(), null, Modifier.fillMaxWidth())
+            InfoBar(info(false), Modifier.fillMaxWidth())
         } }
         val marker = compose.onNodeWithTag("player-scheduled-marker", useUnmergedTree = true)
             .assertWidthIsEqualTo(16.dp).assertHeightIsEqualTo(16.dp)
@@ -291,54 +317,53 @@ class PlayerChromeEvidenceTest {
         bitmap.recycle()
     }
 
-    @Test fun infoAtLargeFontRetainsAllAccessibilityBadges() {
+    @Test fun badgesAtLargeFontRetainAllAccessibilityBadges() {
         compose.setContent { CompositionLocalProvider(LocalDensity provides Density(2f, 1.3f)) { TVHeadendPlayerTheme {
-            InfoBar(info(false), badges(), null, Modifier.width(864.dp).testTag("bar"))
+            PlayerGlanceBadges(badges(), Modifier.width(864.dp).testTag("bar"))
         } } }
         val spoken = compose.onNodeWithTag("bar").fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString(" ")
         listOf("DD+ 5.1", "Audio description", "Subtitles", "Teletext available").forEach { assertTrue(it, spoken.contains(it)) }
     }
 
-    @Test fun badgesShareTheEyebrowLineAndTheEyebrowTruncatesBeforeAnyBadgeIsDropped() {
+    @Test fun badgesShareOneRowAndNoneIsDropped() {
         compose.setContent { TVHeadendPlayerTheme {
-            InfoBar(info(false), badges(), null, Modifier.width(560.dp).testTag("bar"))
+            PlayerGlanceBadges(badges(), Modifier.width(560.dp).testTag("bar"))
         } }
         val labels = listOf("1080", "H.264", "AD", "SUB", "TXT")
         val bounds = labels.map { compose.onNodeWithText(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot }
         val bar = compose.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
         bounds.forEach { assertTrue("badge inside the bar: $it", it.right <= bar.right + 0.5f) }
         assertTrue("one row", bounds.maxOf { it.center.y } - bounds.minOf { it.center.y } < 1f)
-        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertTrue("badges sit above the title", bounds.all { it.bottom <= title.top + 0.5f })
     }
 
-    @Test fun eyebrowAndTitleStayPutWhenTheBadgesArrive() {
-        var withBadges by mutableStateOf(false)
+    @Test fun theEyebrowLeadsTheInfoBarBesideTheArtwork() {
         compose.setContent { TVHeadendPlayerTheme {
             Box(Modifier.fillMaxSize()) {
-                InfoBar(info(false), if (withBadges) badges() else emptyList(), null, Modifier.fillMaxWidth().align(Alignment.BottomCenter))
+                InfoBar(info(false), Modifier.fillMaxWidth().align(Alignment.BottomCenter).testTag("bar"))
             }
         } }
-        fun tops() = listOf("player-info-eyebrow", "player-info-title").map {
-            compose.onNodeWithTag(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.let { b -> b.top to b.left }
-        }
-        val before = tops()
-        compose.runOnIdle { withBadges = true }
-        assertEquals("the badges moved the eyebrow or title", before, tops())
+        val bar = compose.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
+        val title = compose.onNodeWithTag("player-info-title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val eyebrow = compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("player-info-eyebrow", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals("the time and metadata lead on the bar's top, no channel line", bar.top, eyebrow.top, 0.5f)
+        assertTrue("the title follows them", eyebrow.bottom <= title.top + 0.5f)
+        assertEquals("the text starts a grid gutter after the slot", bar.left + with(compose.density) { (196 + 20).dp.toPx() }, title.left, 0.5f)
     }
 
-    @Test fun identityShowsTheLogoAndNumberOrTheNameInsteadOfTheLogoNeverBoth() {
+    @Test fun topIdentityShowsTheLogoOrTheNumberInItsChipNeverBoth() {
         var withLogo by mutableStateOf(true)
         compose.setContent { TVHeadendPlayerTheme {
-            InfoBar(info(false), emptyList(), if (withLogo) ArtworkId.parse("imagecache/2") else null, Modifier.fillMaxWidth())
+            PlayerTopIdentity(PlayerChromeContent("", info(false), picon = if (withLogo) ArtworkId.parse("imagecache/2") else null),
+                loader, session, Modifier.fillMaxSize())
         } }
-        compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-top-identity-logo", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-top-identity-number", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-top-identity-name", useUnmergedTree = true).assertExists()
         compose.runOnIdle { withLogo = false }
-        compose.onNodeWithTag("player-identity-logo", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-identity-name", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-identity-label", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-top-identity-logo", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("player-top-identity-number", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-top-identity-name", useUnmergedTree = true).assertExists()
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
@@ -395,7 +420,7 @@ class PlayerChromeEvidenceTest {
             compose.waitForIdle()
             val footer = compose.onNodeWithTag("player-footer").fetchSemanticsNode().boundsInRoot
             assertEquals("$height: the footer is its 56dp run-out, its content and the bottom padding",
-                1080f - (56 + height.value + 36) * 2, footer.top, 0.5f)
+                1080f - (56 + height.value + TvGridVerticalMargin.value) * 2, footer.top, 0.5f)
             val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
             compose.runOnIdle { view.draw(Canvas(bitmap)) }
             val top = footer.top.toInt()
@@ -487,7 +512,7 @@ class PlayerChromeEvidenceTest {
                                 PlayerGlanceBadges(badges())
                                 PlayerGlanceBadges(glanceBadges(1080, "video/avc", "audio/aac", 2))
                             }
-                            Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), badges(), if (scene == Scene.INFO_NO_LOGO) null else ArtworkId.parse("imagecache/2"), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
+                            Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
                             Scene.HERO_ART, Scene.HERO_FALLBACK, Scene.HERO_NEUTRAL -> ProgrammeHero(
                                 if (scene == Scene.HERO_ART) "imagecache/1" else null, ChannelId(101), "101",
                                 if (scene == Scene.HERO_NEUTRAL) null else ArtworkId.parse("imagecache/2"), loader, session,

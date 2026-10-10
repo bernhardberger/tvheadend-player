@@ -307,8 +307,8 @@ fun RecordingPlayerScreen(
         PlayerKeyAction.REVEAL_CONTROLS -> {
             if (timelineState.seekPending) {
                 timelineState.commitPendingSeek()
-                restoreInfoActionFocus = true
             }
+            restoreInfoActionFocus = false
             chrome.showControls()
             true
         }
@@ -651,7 +651,6 @@ fun RecordingPlayerScreen(
                 actions = PlayerChromeActions(
                     active = chrome.controlsVisible && optionsPage == null,
                     paused = !playWhenReady,
-                    record = false,
                     restoreFocus = when {
                         restoreQuickListControl != null -> restoreQuickListControl
                         restoreInfoActionFocus -> PlayerIdentityCardTag

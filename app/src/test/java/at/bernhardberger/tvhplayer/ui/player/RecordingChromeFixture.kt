@@ -60,6 +60,8 @@ internal fun RecordingChromeFixture(
     buffering: Boolean = false,
     info: PlayerInfoBarData? = null,
     picon: ArtworkId? = null,
+    artwork: String? = null,
+    currentSession: at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation? = null,
     markers: List<Long> = emptyList(),
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },
     markerRevision: Long = 0L,
@@ -84,6 +86,7 @@ internal fun RecordingChromeFixture(
             state = playerStateCell(paused),
             recordingNow = growing,
             picon = picon,
+            artwork = artwork,
         ),
         timeline = PlayerChromeTimeline.Recording(
             positionMs = positionMs,
@@ -95,9 +98,9 @@ internal fun RecordingChromeFixture(
             markers = markers,
             markerRevision = markerRevision,
         ),
-        actions = PlayerChromeActions(active = active, paused = paused, record = false, restoreFocus = restoreFocus),
+        actions = PlayerChromeActions(active = active, paused = paused, restoreFocus = restoreFocus),
         imageLoader = imageLoader,
-        currentSession = null,
+        currentSession = currentSession,
         onTogglePause = onTogglePause,
         onSeek = onSeek,
         onStop = onStop,
@@ -116,3 +119,13 @@ internal fun RecordingChromeFixture(
     PlayerBusyIndicator(PlayerBusyStatus.BUFFERING.takeIf { buffering && !paused }, Modifier.align(Alignment.Center))
     }
 }
+
+/** What the top identity and its badges say, in the controls (the identity) or the Banner (the badges). */
+internal fun identitySpeech(compose: androidx.compose.ui.test.SemanticsNodeInteractionsProvider): String =
+    compose.onAllNodes(
+        androidx.compose.ui.test.hasTestTag(PlayerTopIdentityTag) or
+            androidx.compose.ui.test.hasAnyAncestor(androidx.compose.ui.test.hasTestTag(PlayerTopIdentityTag)),
+        useUnmergedTree = true,
+    ).fetchSemanticsNodes().flatMap {
+        it.config.getOrElse(androidx.compose.ui.semantics.SemanticsProperties.ContentDescription) { emptyList() }
+    }.joinToString(". ")

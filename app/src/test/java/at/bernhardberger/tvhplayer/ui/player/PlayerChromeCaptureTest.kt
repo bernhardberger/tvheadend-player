@@ -1,12 +1,21 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.ui.res.stringResource
+import at.bernhardberger.tvhplayer.R
+import androidx.compose.ui.semantics.getOrNull
+
+
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.view.View
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -67,6 +76,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import coil3.ImageLoader
@@ -91,6 +101,7 @@ import org.junit.experimental.categories.Category
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -242,6 +253,10 @@ class PlayerChromeCaptureTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = captures("de", 1.3f)
 
+    @Test fun navigationTrialEnglish() = captures("en", 1f, trialOnly = true)
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
+    fun navigationTrialGermanLargeText() = captures("de", 1.3f, trialOnly = true)
+
     @Test fun programmeDetailsEnglish() = captures("en", 1f, programmeOnly = true)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun programmeDetailsGerman() = captures("de", 1f, programmeOnly = true)
@@ -257,14 +272,15 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE,
-        // Trial channel card: focused with the Recent hint, Recent open, the rail opened in place.
-        CHANNEL_CARD, CHANNEL_RECENT, CHANNEL_RAIL,
+        // Trial top identity: focused and its Recent row open.
+        IDENTITY_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
     private var revealControls by mutableStateOf(false)
 
-    private fun captures(locale: String, fontScale: Float, programmeOnly: Boolean = false) {
+    private fun captures(locale: String, fontScale: Float, programmeOnly: Boolean = false, trialOnly: Boolean = false) {
+        if (trialOnly) brightStill = FixtureArt.art("still-ridge-light")
         lateinit var view: View
         var scene by mutableStateOf(Scene.CONTROLS_LIVE)
         compose.mainClock.autoAdvance = false
@@ -281,7 +297,9 @@ class PlayerChromeCaptureTest {
         }
         // Recording and state scenes are captured in English at font scale 1.0 only.
         for (next in Scene.entries.filter {
-            if (programmeOnly) it in Scene.PROGRAMME_INFO..Scene.PROGRAMME_RECORDING_SCHEDULED
+            if (trialOnly) it in setOf(Scene.CONTROLS_LIVE, Scene.IDENTITY_FOCUSED, Scene.BROWSER_NOW,
+                Scene.RECENT_OPEN, Scene.BROWSER_EMPTY, Scene.RAIL_PROGRAMME_OPENED, Scene.RECORDING_CONTROLS)
+            else if (programmeOnly) it in Scene.PROGRAMME_INFO..Scene.PROGRAMME_RECORDING_SCHEDULED
             else it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f
         }) {
             compose.runOnIdle { scene = next; revealControls = false }
@@ -300,10 +318,31 @@ class PlayerChromeCaptureTest {
                 compose.waitForIdle()
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
-            if (next == Scene.CHANNEL_CARD) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
+            if (next == Scene.IDENTITY_FOCUSED) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
+            if (next == Scene.RECENT_OPEN) compose.onNodeWithTag("player-channel-card-2").assertIsFocused()
+            if (next == Scene.BROWSER_NOW) compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
+            if (next == Scene.BROWSER_EMPTY) {
+                compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
+                compose.onNodeWithTag("player-channel-row-RECENT").assertDoesNotExist()
+            }
+            if (next == Scene.IDENTITY_FOCUSED && fontScale == 1f) {
+                // The artwork card stands on the programme text's top and Next sits on its bottom edge.
+                // At xhdpi the text lines round up to whole pixels, so Next may end up to 3px lower.
+                fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val tile = bounds("player-info-artwork-tile")
+                // Native TV focus grows the artwork around its unchanged 196 × 110dp layout box.
+                val focusOverhang = (tile.height - 220f) / 2f
+                assertEquals("the layout tile stands on the text's top", bounds("player-info-bar").top, tile.top + focusOverhang, 1f)
+                val next = bounds("player-info-last-row")
+                assertTrue("and ends with the Next line: $tile vs $next", next.bottom - (tile.bottom - focusOverhang) in 0f..3.5f)
+                val row = bounds("player-timeline-labels")
+                assertTrue("the timeline row runs below both from margin to margin: $row",
+                    row.top >= tile.bottom && row.left == bounds("player-info-bar").left && row.right == 2f * (960f - 58f))
+                compose.onNodeWithTag("player-info-artwork", useUnmergedTree = true).assertExists()
+            }
             if (next == Scene.PROGRAMME_SCHEDULE) compose.onNodeWithTag("details-schedule-42").assertIsFocused()
             if (next == Scene.RAIL_SCHEDULE) compose.onNodeWithTag("details-schedule-52").assertIsFocused()
-            if (next == Scene.RAIL_PROGRAMME_OPENED) compose.onNodeWithTag("details-record").assertIsFocused()
+            if (next == Scene.RAIL_PROGRAMME_OPENED) compose.onNodeWithTag("details-watch").assertIsFocused()
             if (next == Scene.PROGRAMME_OPENED || next == Scene.RAIL_PROGRAMME_OPENED || next == Scene.RAIL_SCHEDULE) {
                 compose.onNodeWithTag("details-tabs").assertDoesNotExist()
             }
@@ -311,10 +350,11 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.back)).assertIsFocused()
             }
             if (next == Scene.RAIL_PEEK) {
-                val label = compose.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val playing = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val recording = compose.onNodeWithTag("channel-recording-indicator", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertTrue("the channel-row markers trail the label", label.right <= playing.left && playing.right < recording.left)
+                val card = hasAnyAncestor(hasTestTag("player-channel-card-1"))
+                val label = compose.onNodeWithTag("player-channel-1-now", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val playing = compose.onNode(hasTestTag("channel-playing-indicator") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val recording = compose.onNode(hasTestTag("channel-recording-indicator") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue("the card's markers trail its programme", label.right <= playing.left && playing.right < recording.left)
             }
             if (next == Scene.PROGRAMME_MORE_INFO) compose.onNodeWithTag("player-info-reading").assertIsFocused()
             if (next == Scene.PROGRAMME_SCHEDULE || next == Scene.RAIL_SCHEDULE) {
@@ -357,7 +397,7 @@ class PlayerChromeCaptureTest {
                 view.draw(canvas)
                 if (next == Scene.PROGRAMME_CONFIRM_RECORD) ShadowDialog.getLatestDialog().window!!.decorView.draw(canvas)
             }
-            val directory = File("../artifacts/player-chrome").apply { mkdirs() }
+            val directory = File(if (trialOnly) "/tmp/opencode/rail-round2/captures" else "../artifacts/player-chrome").apply { mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale.png"
             File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
@@ -449,16 +489,35 @@ class PlayerChromeCaptureTest {
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
             badges = playerGlanceBadges(diagnostics(true), TrackGlance(audioDescription = true, subtitles = true, teletext = true)),
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else LOGO,
+            artwork = programme.image.takeUnless { noEpg },
         )
         when (scene) {
             Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
-            Scene.CHANNEL_CARD, Scene.CHANNEL_RECENT -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag,
-                recentOpen = scene == Scene.CHANNEL_RECENT)
-            Scene.CHANNEL_RAIL, Scene.RAIL_PEEK -> Controls(timeshift, false, false, content, inPlaceRail = true,
+            Scene.IDENTITY_FOCUSED -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag)
+            Scene.BROWSER_NOW, Scene.RECENT_OPEN, Scene.BROWSER_EMPTY -> {
+                val state = remember(scene) { PlayerChannelBrowserState().apply {
+                    if (scene == Scene.RECENT_OPEN) row = PlayerChannelRow.RECENT
+                    onNow.focusedId = channels.first().id
+                    recent.focusedId = channels[1].id
+                } }
+                PlayerPage<Unit>(details = null, railExpanded = true,
+                    nowPlaying = { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
+                        playbackIndicator = ChannelPlaybackIndicator.PLAYING) },
+                    player = {
+                        Controls(timeshift, false, false, content, browser = state, emptyRecent = scene == Scene.BROWSER_EMPTY,
+                            tray = {
+                                QuickZapTrayPreview((if (scene == Scene.RECENT_OPEN) channels[1] else channels[0])
+                                    .takeUnless { scene == Scene.BROWSER_EMPTY },
+                                    if (scene == Scene.RECENT_OPEN) trayProgramme else programme, null, NOW, loader, session,
+                                    Modifier.padding(horizontal = TvGridHorizontalMargin))
+                            })
+                    }, programme = {})
+            }
+            Scene.RAIL_PEEK -> Controls(timeshift, false, false, content,
                 recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
                 QuickZapTrayPreview(channels[1], trayProgramme, null, NOW, loader, session,
-                    Modifier.padding(horizontal = PlayerChromeTokens.gridMargin))
+                    Modifier.padding(horizontal = TvGridHorizontalMargin))
             })
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
@@ -512,14 +571,14 @@ class PlayerChromeCaptureTest {
                 val details = remember(scene) {
                     ProgramDetailsState().apply {
                         if (scene == Scene.PROGRAMME_SCHEDULE) tab = 1
-                        if (rail) reset(startOnSchedule = true)
+                        // A held OK on a rail card opens the programme's details as a dialog.
+                        if (scene == Scene.RAIL_SCHEDULE) reset(startOnSchedule = true)
                         if (scene == Scene.PROGRAMME_OPENED) { tab = 1; open(schedule[2]) }
-                        if (scene == Scene.RAIL_PROGRAMME_OPENED) open(entries[2])
                         if (scene == Scene.PROGRAMME_MORE_INFO) readMore = true
                         if (scene == Scene.PROGRAMME_RECORDING_SCHEDULED) open(schedule[1])
                     }
                 }
-                LiveProgrammeInfoOverlay(
+                val panel: @Composable () -> Unit = { LiveProgrammeInfoOverlay(
                     event = shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG },
                     channelIdentity = identity,
                     channelName = channel.name.orEmpty(),
@@ -547,7 +606,11 @@ class PlayerChromeCaptureTest {
                             recordFocus = recordFocus, firstFocus = firstFocus, onAction = {},
                             showWatch = rail, busy = scene == Scene.PROGRAMME_RECORDING_BUSY)
                     },
-                )
+                ) }
+                if (rail) PlayerPage(details = Unit, railExpanded = true, dialog = scene == Scene.RAIL_PROGRAMME_OPENED,
+                    nowPlaying = { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
+                        playbackIndicator = ChannelPlaybackIndicator.PLAYING) },
+                    player = {}, programme = { panel() }) else panel()
                 if (scene == Scene.PROGRAMME_CONFIRM_RECORD) ConfirmProgrammeActionDialog(
                     action = ProgrammeAction.RECORD, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
                 )
@@ -583,8 +646,11 @@ class PlayerChromeCaptureTest {
                     restoreFocus = "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP },
                     growing = growing,
                     info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
-                        positionMs = 1_045_000, durationMs = 4_350_000, nowSec = NOW),
+                         positionMs = 1_045_000, durationMs = 4_350_000, nowSec = NOW)
+                         .copy(channelName = "Ridge Earth HD", channelNumber = "101"),
                     picon = LOGO,
+                    artwork = programme.image,
+                    currentSession = session,
                     markers = listOf(0L, 900_000L, 2_700_000L).takeIf { scene == Scene.RECORDING_CONTROLS }.orEmpty(),
                     imageLoader = loader,
                     modifier = Modifier.align(Alignment.BottomCenter),
@@ -609,7 +675,7 @@ class PlayerChromeCaptureTest {
             headerContent = { PlayerChromeHeader(content.clock, it) },
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            PlayerInfoBar(content.info, content.badges, recordingNow = content.recordingNow) { PlayerIdentityCard(content, loader, session, it) }
+            PlayerInfoBar(content.info) { Box(it.size(124.dp, 70.dp).background(TvSurfaceColors.containerLow)) }
             PlayerTimelineBlock(
                 progress = range.displayProgress,
                 tone = PlayerTimelineTone.PREVIEW,
@@ -702,13 +768,12 @@ class PlayerChromeCaptureTest {
         /** The step target's window; by default 3:53 behind live in [window]'s programme. */
         shown: ProgrammeWindow? = null,
         focus: String? = null,
-        /** Trial: the channel card, with three recent channels above it. */
+        /** Trial: the top identity's Recent row, with three recent channels, open. */
         recentOpen: Boolean = false,
-        /** Trial: [tray] is the rail opened in place of the channel card. */
-        inPlaceRail: Boolean = false,
         recordingChannels: Set<ChannelId> = emptySet(),
+        browser: PlayerChannelBrowserState? = null,
+        emptyRecent: Boolean = false,
     ) {
-        var cardBounds by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
         Box(Modifier.fillMaxSize()) {
         val shown = shown ?: if (step != null) window.copy(positionFraction = 0.51f, estimatedPosition = Instant.fromEpochSeconds(NOW - 233)) else window
         PlayerChrome(
@@ -729,10 +794,8 @@ class PlayerChromeCaptureTest {
             imageLoader = loader,
             currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
-            onChannelStep = { _, _ -> },
-            onChannelZap = { _, _ -> },
-            onCardClick = {},
-            downHint = "Program info",
+            onChannelZap = { _, _, _ -> },
+            downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
             recents = listOf(
                 RecentChannelPeek(SPORT_LOGO, "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
                 RecentChannelPeek(LOGO, "101", "Ridge Earth HD", ChannelId(1), now = "Ridge Light"),
@@ -740,31 +803,29 @@ class PlayerChromeCaptureTest {
             ),
             onRecentPick = {},
             recentRowOpen = recentOpen,
-            channelCardHeld = inPlaceRail,
-            onCardPlaced = { cardBounds = it },
             decorationCoversControls = tray != null,
-            controlsDecoration = { emphasisAlpha, controls ->
+            controlsDecoration = { _, controls ->
                 QuickZapPresentation(
                     expanded = tray != null,
-                    channelsAvailable = true,
-                    peekAlpha = emphasisAlpha,
                     channelContent = {
-                        if (tray != null) ChannelDrawer(
+                        if (browser != null) PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
+                            channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },
+                            NOW, loader, session, true, {}, {}, { _, _, _ -> }, {})
+                        else if (tray != null) ChannelDrawer(
                             channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
                             recordingChannelIds = recordingChannels, nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
                             imageLoader = loader, currentSession = session, active = true, nowSec = NOW,
                             onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
-                            entryFocusId = ChannelId(1).takeIf { inPlaceRail },
-                            inPlace = inPlaceRail,
                         )
                     },
                     preview = { tray?.invoke() },
+                    trayBleeds = browser != null && !emptyRecent,
+                    header = browser?.let { { PlayerChannelBrowserHint(it, !emptyRecent, stringResource(R.string.all_channels)) } },
                     controls = controls,
-                    inPlaceAnchor = if (inPlaceRail) ({ cardBounds }) else null,
                 )
             },
         )
-        if (inPlaceRail) NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
+        if (tray != null && browser == null) NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp))
         }
     }

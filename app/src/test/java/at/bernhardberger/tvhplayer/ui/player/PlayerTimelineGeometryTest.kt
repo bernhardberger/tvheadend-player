@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -219,7 +220,8 @@ class PlayerTimelineGeometryTest {
             // Painted above its parent's bounds, it is still displayed: no ancestor clips it.
             compose.onNodeWithTag("player-live-state", useUnmergedTree = true).assertIsDisplayed()
             assertEquals("'$name': the box ends with the row", row.right, bounds.right, 0.5f)
-            assertEquals("'$name': at one offset above the bar row", row.top - px(8.dp), bounds.bottom, 0.5f)
+            // Live's programme block keeps 12dp above its bar row (16dp above its labels' text).
+            assertEquals("'$name': at one offset above the bar row", row.top - px(12.dp), bounds.bottom, 0.5f)
             // Start, bar, end: the start label's box, the bar and the end clock's box fill the row.
             val stateCell = if (banner) px(cell + 8.dp) else 0f
             assertEquals("'$name': the bar starts after the start box", row.left + stateCell + px(widths!!.leading + 8.dp), track.left, 1f)
@@ -233,7 +235,7 @@ class PlayerTimelineGeometryTest {
                 val end = if (exists("player-end-clock")) bounds("player-end-clock").right else row.right
                 assertEquals("'$name': the distance's right edge is the end clock's", end, drawn.right, 0.5f)
                 assertTrue("'$name': above the bar row", drawn.bottom <= row.top)
-                assertEquals("'$name': at one offset above the bar row", row.top - px(8.dp), drawn.bottom, 0.5f)
+                assertEquals("'$name': at one offset above the bar row", row.top - px(12.dp), drawn.bottom, 0.5f)
                 val style = compose.onNodeWithTag("player-distance", useUnmergedTree = true).fetchSemanticsNode().let { node ->
                     mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
                         .also { node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!(it) }.single().layoutInput.style
@@ -306,8 +308,8 @@ class PlayerTimelineGeometryTest {
             TVHeadendPlayerTheme {
                 val info = liveInfoBarData(1, "One", airing, airing, false, now, "Programme")
                 val loader = remember { ImageLoader(context) }
-                PlayerInfoBar(info, emptyList(), Modifier.testTag("player-info-bar"), lastLineEndReserve = reserve) {
-                    PlayerIdentityCard(PlayerChromeContent("", info), loader, null, it)
+                PlayerInfoBar(info, Modifier.testTag("player-info-bar"), lastLineEndReserve = reserve) {
+                    Box(it.size(124.dp, 70.dp))
                 }
             }
         }
@@ -354,9 +356,10 @@ class PlayerTimelineGeometryTest {
                 val texts = compose.onAllNodes(androidx.compose.ui.test.hasAnyAncestor(hasTestTag("player-timeline-labels")), useUnmergedTree = true)
                     .fetchSemanticsNodes().flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }.joinToString(" ") { it.text }
                 assertFalse("$case: no recording dot in the row: $texts", texts.contains("●"))
-                // The badge in the eyebrow, not the bar row, says the recording still runs.
+                // The badge beside the top identity's name, not the bar row, says the recording still runs.
                 assertEquals("$case: the badge", stillRecording, exists("player-rec-badge"))
-                assertEquals("$case: the info bar speaks it: ${infoDescription()}", stillRecording, infoDescription().contains("Recording now"))
+                assertEquals("$case: the identity speaks it: ${identitySpeech(compose)}", stillRecording,
+                    identitySpeech(compose).contains("Recording now"))
             }
             assertEquals("${if (stillRecording) "growing" else "finished"} recording, $layer: a paused row was shown", 1, pausedFrames)
         }
@@ -842,7 +845,7 @@ class PlayerTimelineGeometryTest {
         var cell by mutableStateOf(PlayerStateCell.PLAYING)
         compose.setContent { LiveChrome(Frame("", PlayerChromeMode.CONTROLS, live(window = airingWindow), cell, busy = busy)) }
         settle()
-        val tags = listOf("player-timeline-track", "player-info-title", "player-info-last-row", "player-pause", "player-stop", "player-settings", "player-identity-card")
+        val tags = listOf("player-timeline-track", "player-info-title", "player-info-last-row", "player-pause", "player-stop", "player-settings", PlayerTopIdentityTag, "player-info-artwork-tile")
         val before = tags.associateWith(::bounds)
         val focusedBefore = compose.onNode(isFocused()).fetchSemanticsNode().id
         for (next in listOf(PlayerBusyStatus.TUNING, PlayerBusyStatus.BUFFERING, null)) {
@@ -937,7 +940,7 @@ class PlayerTimelineGeometryTest {
         }
     }
 
-    private val infoTextTags = listOf("player-info-title", "player-info-eyebrow", "player-info-last-text")
+    private val infoTextTags = listOf("player-info-title", "player-info-programme", "player-info-last-text")
 
     /**
      * The Banner draws no thumb, so its step readout keeps the place it had at 5e096f0: the chip's bottom

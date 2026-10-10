@@ -29,6 +29,7 @@ import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import coil3.ImageLoader
@@ -76,7 +77,7 @@ internal fun ChannelNumberOverlay(
         if (displayed.number.isNotEmpty()) {
             Surface(
                 colors = SurfaceDefaults.colors(
-                    containerColor = Color.Black.copy(alpha = 0.78f),
+                    containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
                 shape = MaterialTheme.shapes.small,

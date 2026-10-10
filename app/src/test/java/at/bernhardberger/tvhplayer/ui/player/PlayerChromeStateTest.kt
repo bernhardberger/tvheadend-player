@@ -32,7 +32,7 @@ class PlayerChromeStateTest {
             assertEquals(rail, state.channelRailPresented)
             if (rail) {
                 state.dismissChannelDrawer()
-                assertEquals(PlayerIdentityCardTag, state.restoreChannelAction)
+                assertEquals("player-pause", state.restoreChannelAction)
             }
             state.chrome.dispose()
         }
@@ -143,6 +143,49 @@ class PlayerChromeStateTest {
         advanceTimeBy(5_000L)
         runCurrent()
         assertTrue(state.controlsVisible)
+    }
+
+    @Test
+    fun theControlsWaitThirtySecondsWhileFocusIsOnTheChannelCardAndFiveOnceItLeaves() = runTest {
+        val state = chrome()
+
+        state.showControls()
+        state.updateAutoHideEligibility(eligible = true)
+        advanceTimeBy(4_000L)
+        state.onChannelCardFocusChanged(true)
+        advanceTimeBy(29_999L)
+        runCurrent()
+        assertTrue("the move restarted a 30 s timeout", state.controlsVisible)
+        advanceTimeBy(1L)
+        runCurrent()
+        assertFalse(state.controlsVisible)
+
+        state.showControls()
+        state.updateAutoHideEligibility(eligible = true)
+        state.onChannelCardFocusChanged(true)
+        advanceTimeBy(20_000L)
+        state.onChannelCardFocusChanged(false)
+        advanceTimeBy(4_999L)
+        runCurrent()
+        assertTrue("leaving the card restarts the ordinary timeout", state.controlsVisible)
+        advanceTimeBy(1L)
+        runCurrent()
+        assertFalse(state.controlsVisible)
+    }
+
+    @Test
+    fun aHiddenOrCoveredChromeForgetsTheChannelCardFocus() = runTest {
+        val state = chrome()
+
+        state.showControls()
+        state.updateAutoHideEligibility(eligible = true)
+        state.onChannelCardFocusChanged(true)
+        state.hideControls()
+        state.showControls()
+        state.updateAutoHideEligibility(eligible = true)
+        advanceTimeBy(5_000L)
+        runCurrent()
+        assertFalse("a stale card focus does not stretch the next reveal", state.controlsVisible)
     }
 
     @Test

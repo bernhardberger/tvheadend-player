@@ -15,6 +15,13 @@ fun playerPlaybackProgressing(
     playerReady: Boolean,
 ): Boolean = isPlaying && playerReady
 
+/** How long the live controls stay up while focus rests on the channel card or its recent row. */
+const val PLAYER_CHANNEL_CARD_AUTO_HIDE_MS = 30_000L
+
+/** The controls' auto-hide delay: [baseMillis], or longer while [channelCardFocused] (the card or its recent row). */
+fun playerControlsAutoHideTimeoutMillis(baseMillis: Long, channelCardFocused: Boolean): Long =
+    if (channelCardFocused) maxOf(baseMillis, PLAYER_CHANNEL_CARD_AUTO_HIDE_MS) else baseMillis
+
 fun playerControlsAutoHideEligible(context: PlayerAutoHideContext): Boolean =
     context.controlsVisible &&
         context.playbackProgressing &&
