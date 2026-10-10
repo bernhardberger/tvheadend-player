@@ -664,7 +664,7 @@ colour and indication rules above apply here. Remote keys follow §6.
   waits for animation. An unknown number shows `No channel` for two seconds before
   dismissal; it has no shake, flash or success-style confirmation.
 - Tuning and buffering show as one thin ring centred over the video, without a
-  panel, scrim or text: 44dp, 3dp stroke with a fine dark outline, 180 ms fade. It
+  panel, scrim or text: 44dp, plain white 3dp stroke with no outline, 180 ms fade. It
   appears after 500 ms of an owned tune that has not presented and after 1 s of
   continuous buffering, identically in every chrome layer, and layer changes do
   not restart the delays. It is not focusable, moves nothing, is not composed while
