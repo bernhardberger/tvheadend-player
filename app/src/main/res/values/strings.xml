@@ -423,6 +423,7 @@
     <string name="recording_action_rejected">Your Tvheadend server rejected the recording request.</string>
     <string name="recording_action_not_supported">Your Tvheadend server does not support this recording action.</string>
     <string name="recording_action_timeout">Your Tvheadend server did not answer in time. The change may still apply; check the recording before trying again.</string>
+    <string name="recording_action_unknown_outcome">The server reply could not be read. The change may have applied; check the recording before trying again.</string>
     <string name="recording_action_connection">The recording request could not reach your Tvheadend server.</string>
     <string name="recording_already_scheduled">This program is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>

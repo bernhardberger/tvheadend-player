@@ -16,6 +16,8 @@ class ConnectionUiStateTest {
             SessionFailure.AuthenticationRejected to ConnectionFailureKind.AUTHENTICATION,
             SessionFailure.PermissionDenied to ConnectionFailureKind.PERMISSION_DENIED,
             SessionFailure.IncompatibleServer to ConnectionFailureKind.INCOMPATIBLE_SERVER,
+            SessionFailure.ServerUpgradeRequired to ConnectionFailureKind.INCOMPATIBLE_SERVER,
+            SessionFailure.MetadataOverflow to ConnectionFailureKind.OTHER,
             SessionFailure.NoChannels to ConnectionFailureKind.ZERO_CHANNELS,
             SessionFailure.ServerUnreachable to ConnectionFailureKind.UNREACHABLE,
             SessionFailure.NetworkUnavailable to ConnectionFailureKind.UNREACHABLE,
@@ -34,6 +36,8 @@ class ConnectionUiStateTest {
             SessionFailure.SynchronizationFailed(SessionOperationFailure.NOT_SUPPORTED) to
                 ConnectionFailureKind.INCOMPATIBLE_SERVER,
             SessionFailure.UnexpectedFailure to ConnectionFailureKind.OTHER,
+            SessionFailure.SynchronizationFailed(SessionOperationFailure.MALFORMED_RESPONSE) to
+                ConnectionFailureKind.OTHER,
         )
 
         cases.forEach { (failure, kind) ->
@@ -50,6 +54,13 @@ class ConnectionUiStateTest {
 
     @Test
     fun recoveryActionUsesSdkDispositionAndKeepsSubscriptionRetry() {
+        assertEquals(ConnectionRecoveryAction.RETRY,
+            SessionState.Unavailable(SessionFailure.ServerUpgradeRequired).toConnectionUiState().primaryRecoveryAction())
+        assertEquals(ConnectionRecoveryAction.NONE,
+            SessionState.Unavailable(SessionFailure.MetadataOverflow).toConnectionUiState().primaryRecoveryAction())
+        assertEquals(ConnectionRecoveryAction.RETRY,
+            SessionState.Unavailable(SessionFailure.SynchronizationFailed(SessionOperationFailure.MALFORMED_RESPONSE))
+                .toConnectionUiState().primaryRecoveryAction())
         assertEquals(
             ConnectionRecoveryAction.RETRY,
             ConnectionUiState.Error(

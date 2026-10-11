@@ -47,8 +47,8 @@ android {
         applicationId = "at.bernhardberger.tvhplayer"
         minSdk = 28
         targetSdk = 36
-        versionCode = 160
-        versionName = "0.2.92"
+        versionCode = 161
+        versionName = "0.2.93"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
@@ -101,11 +101,6 @@ val releasedSdkSources = configurations.create("releasedSdkSources") {
     isCanBeResolved = true
     isTransitive = false
 }
-val releasedSdkFfmpegSources = configurations.create("releasedSdkFfmpegSources") {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    isTransitive = false
-}
 
 dependencies {
     implementation(libs.tvheadend.sdk.media3) {
@@ -125,16 +120,8 @@ dependencies {
             }
         }
     }
-    add(releasedSdkFfmpegSources.name, "at.bernhardberger.tvheadend:sdk-media3") {
-        version { strictly(libs.versions.tvheadend.sdk.get()) }
-        artifact {
-            classifier = "ffmpeg-sources"
-            type = "tar.xz"
-            extension = "tar.xz"
-        }
-    }
-
     implementation(project(":client"))
+    implementation(project(":decoder-ffmpeg"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.core.splashscreen)
@@ -156,7 +143,7 @@ dependencies {
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
 
-    // Presentation API only; the released SDK owns concrete playback and codecs.
+    // The SDK owns playback; :decoder-ffmpeg supplies the platform-first audio fallback.
     implementation(libs.androidx.media3.ui)
     implementation(libs.androidx.media3.session)
     implementation(libs.kotlinx.coroutines.core)
@@ -200,7 +187,6 @@ val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
     }.files
     from(media3Aar)
     from(releasedSdkSources)
-    from(releasedSdkFfmpegSources)
     into(layout.buildDirectory.dir("released-sdk-evidence"))
 }
 tasks.register("verifyExternalSdkConsumption") {
@@ -214,9 +200,10 @@ tasks.register("verifyExternalSdkConsumption") {
         .map(String::toBooleanStrict)
         .getOrElse(false)
     evaluationDependsOn(":client")
+    evaluationDependsOn(":decoder-ffmpeg")
     val productionVariants = listOf(":app", ":client").flatMap { owner ->
         listOf("debug", "release", "profile", "profileServer").map { "$owner:$it" }
-    }
+    } + listOf(":decoder-ffmpeg:debug", ":decoder-ffmpeg:release")
     val productionClasspaths = productionVariants.flatMap { variant ->
         val owner = project(variant.substringBeforeLast(":"))
         listOf("CompileClasspath", "RuntimeClasspath").map { suffix ->
@@ -235,14 +222,18 @@ tasks.register("verifyExternalSdkConsumption") {
             }
         }
     }.toSet()
-    // The in-repo :client library is the only allowed project dependency; SDK projects stay forbidden.
+    // Only app-owned modules are allowed; SDK projects and file fallbacks stay forbidden.
     val clientProjectPath = ":client"
+    val decoderProjectPath = ":decoder-ffmpeg"
     val forbiddenLocalDependencies = productionClasspaths.flatMap { (classpathName, classpath) ->
         classpath.hierarchy.flatMap { configuration ->
             configuration.dependencies.mapNotNull { dependency ->
                 when (dependency) {
                     is ProjectDependency -> "$classpathName:${configuration.name}:project:${dependency.path}"
-                        .takeIf { dependency.path != clientProjectPath }
+                        .takeIf {
+                            !(classpathName.startsWith(":app:") && dependency.path == clientProjectPath) &&
+                                !(classpathName.startsWith(":app:") && dependency.path == decoderProjectPath)
+                        }
                     is FileCollectionDependency -> dependency.files.files
                         .filterNot { it.name in setOf("android.jar", "core-for-system-modules.jar") }
                         .takeIf { it.isNotEmpty() }
@@ -275,7 +266,9 @@ tasks.register("verifyExternalSdkConsumption") {
                     when (val id = component.id) {
                         is ProjectComponentIdentifier -> listOfNotNull(
                             "project=${id.displayName}".takeIf {
-                                id.projectPath != appProjectPath && id.projectPath != clientProjectPath
+                                id.projectPath != appProjectPath && id.projectPath != clientProjectPath &&
+                                    id.projectPath != variant.substringBeforeLast(":") &&
+                                    !(variant.startsWith(":app:") && id.projectPath == decoderProjectPath)
                             },
                         )
                         is ModuleComponentIdentifier -> buildList {
@@ -318,7 +311,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
                 "prove public SDK consumption. Publish the SDK release and re-run without the flag."
         }
-        check(sdkVersion == "0.23.0") { "Expected public SDK 0.23.0 but found $sdkVersion" }
+        check(sdkVersion == "0.24.0") { "Expected public SDK 0.24.0 but found $sdkVersion" }
         val expectedDirectSdkDependencies = setOf(
             ":app:implementation:sdk-android:$sdkVersion",
             ":app:implementation:sdk-media3:$sdkVersion",
@@ -333,7 +326,7 @@ tasks.register("verifyExternalSdkConsumption") {
             "App/client dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
         check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
-        check(projectPaths == setOf(":", ":app", clientProjectPath)) {
+        check(projectPaths == setOf(":", ":app", clientProjectPath, decoderProjectPath)) {
             "Unexpected Gradle projects: $projectPaths"
         }
 
@@ -349,7 +342,7 @@ tasks.register("verifyExternalSdkConsumption") {
         }
 
         val expectedTvheadendModules = mapOf(
-            "htsp" to "0.10.0",
+            "htsp" to "1.0.0-beta.1",
             "sdk-android" to sdkVersion,
             "sdk-core" to sdkVersion,
             "sdk-media3" to sdkVersion,
@@ -370,7 +363,9 @@ tasks.register("verifyExternalSdkConsumption") {
                     val (module, version) = entry.removePrefix("tvheadend=").split(":", limit = 2)
                     module to version
                 }
-            val expectedModules = if (variant == ":app:profile") {
+            val expectedModules = if (variant.startsWith(":decoder-ffmpeg:")) {
+                emptyMap()
+            } else if (variant == ":app:profile") {
                 expectedTvheadendModules + ("sdk-testing" to sdkVersion)
             } else expectedTvheadendModules
             check(resolvedTvheadendModules == expectedModules) {
@@ -388,13 +383,14 @@ tasks.register("verifyExternalSdkConsumption") {
             val media3Versions = runtimeGraph.filter { it.startsWith("media3=") }
                 .map { it.removePrefix("media3=") }
                 .toSet()
-            check(media3Versions == setOf("1.11.0")) {
+            check(media3Versions == setOf("1.11.1")) {
                 "$variant runtime Media3 versions are $media3Versions"
             }
+            if (variant.startsWith(":decoder-ffmpeg:")) return@forEach
             val coilVersions = runtimeGraph.filter { it.startsWith("coil=") }
                 .map { it.removePrefix("coil=") }
                 .toSet()
-            check(coilVersions == setOf("3.5.0")) {
+            check(coilVersions == setOf("3.6.3")) {
                 "$variant runtime Coil versions are $coilVersions"
             }
             val dataStoreVersions = runtimeGraph.filter { it.startsWith("datastore=") }
@@ -406,7 +402,7 @@ tasks.register("verifyExternalSdkConsumption") {
             val coroutinesVersions = runtimeGraph.filter { it.startsWith("coroutines=") }
                 .map { it.removePrefix("coroutines=") }
                 .toSet()
-            check(coroutinesVersions == setOf("1.10.2")) {
+            check(coroutinesVersions == setOf("1.11.0")) {
                 "$variant runtime Coroutines versions are $coroutinesVersions"
             }
         }

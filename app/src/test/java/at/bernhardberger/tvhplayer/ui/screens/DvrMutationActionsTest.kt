@@ -156,6 +156,7 @@ class DvrMutationActionsTest {
             DvrMutationResult.ServerRejected to DvrMutationFeedback.REJECTED,
             DvrMutationResult.NotSupported to DvrMutationFeedback.NOT_SUPPORTED,
             DvrMutationResult.Timeout to DvrMutationFeedback.TIMEOUT,
+            DvrMutationResult.MalformedResponse to DvrMutationFeedback.UNKNOWN_OUTCOME,
             DvrMutationResult.NotReady to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
             DvrMutationResult.ObservationExpired to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
             DvrMutationResult.TransportUnavailable to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
@@ -171,6 +172,29 @@ class DvrMutationActionsTest {
             assertEquals(expected, feedback)
             assertTrue(feedback.isFailure)
         }
+    }
+
+    @Test
+    fun malformedMutationIsUncertainAndNeverRepeated() = runTest {
+        val calls = mutableListOf<String>()
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.MalformedResponse },
+            stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.MalformedResponse },
+            cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.MalformedResponse },
+            deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.MalformedResponse },
+        )
+        val current = currentSession()
+        val target = ProgrammeRecordingTarget(EventId(7), null, 100, 200, "News", current)
+        val actionsToRun = listOf(
+            DvrMutationAction.CreateProgramme(target, null),
+            DvrMutationAction.Stop(current, DvrEntryId(4)),
+            DvrMutationAction.Cancel(current, DvrEntryId(4)),
+            DvrMutationAction.Delete(current, DvrEntryId(4)),
+        )
+        actionsToRun.forEach { action ->
+            assertEquals(DvrMutationFeedback.UNKNOWN_OUTCOME, actions.execute(action))
+        }
+        assertEquals(listOf("schedule", "stop", "cancel", "delete"), calls)
     }
 
     private fun currentSession(): CurrentSessionObservation = FakeSessionObservation(

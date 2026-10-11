@@ -6,7 +6,7 @@ cd "$ROOT_DIR"
 
 # --staged-sdk builds against the SDK checkout staged in ../tvheadend-sdk/build/local-maven so an
 # SDK fix can be tested before it is published. Such a run cannot prove public SDK consumption, so
-# it drops the provenance gate and reports a weaker conclusion. It never gates a release.
+# it drops only SDK provenance and reports a weaker conclusion. It never gates a release.
 staged_sdk=false
 capture_tests=exclude
 for argument in "$@"; do
@@ -40,8 +40,7 @@ if [[ "$staged_sdk" == true ]]; then
     printf '==> WARNING: building against the staged SDK\n'
     printf '    This is a development build. It is not release-verified, must not be signed or\n'
     printf '    published, and must not be installed on a production device.\n'
-    printf '    SDK provenance and native decoder corresponding-source gates are skipped: both\n'
-    printf '    pin the digests of a published release, which a staged build does not have.\n'
+    printf '    Public SDK provenance is skipped; app-owned native/source proof remains required.\n'
 fi
 
 export ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
@@ -87,7 +86,7 @@ printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "
 
 printf '==> External native dependency and packaged APK integrity\n'
 if [[ "$staged_sdk" == true ]]; then
-    printf 'skipped: the native gate pins released artifact digests\n'
+    ./tools/check-native-libs --staged-sdk
 else
     ./tools/check-native-libs
 fi

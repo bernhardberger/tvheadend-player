@@ -327,6 +327,7 @@
     <string name="recording_action_rejected">Ihr Tvheadend-Server hat die Aufnahmeanfrage abgelehnt.</string>
     <string name="recording_action_not_supported">Ihr Tvheadend-Server unterstützt diese Aufnahmeaktion nicht.</string>
     <string name="recording_action_timeout">Ihr Tvheadend-Server hat nicht rechtzeitig geantwortet. Die Änderung kann trotzdem wirksam werden; prüfen Sie die Aufnahme, bevor Sie es erneut versuchen.</string>
+    <string name="recording_action_unknown_outcome">Die Serverantwort konnte nicht gelesen werden. Die Änderung kann bereits wirksam sein; prüfen Sie die Aufnahme, bevor Sie es erneut versuchen.</string>
     <string name="recording_action_connection">Ihr Tvheadend-Server konnte für die Aufnahmeanfrage nicht erreicht werden.</string>
     <string name="recording_already_scheduled">Diese Sendung wird aufgenommen oder ist geplant.</string>
     <string name="recordings_title">Aufnahmen</string>

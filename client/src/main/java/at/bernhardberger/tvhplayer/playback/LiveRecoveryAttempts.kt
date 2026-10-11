@@ -13,6 +13,7 @@ internal data class LiveRecoveryFence(
     val reason: PlaybackRecoveryReason,
     val selection: LivePlaybackSelection,
     val targetEpoch: Long,
+    val viewingIntent: Long? = null,
 ) {
     fun matches(
         activeTarget: AppPlaybackTarget?,
@@ -55,7 +56,7 @@ internal fun shouldRepublishPlayerStateAfterRecovery(
     observation: SessionObservation,
     healthyActiveTarget: AppPlaybackTarget?,
 ): Boolean =
-    result?.isStarted != true &&
+    result?.isStarted != true && result != PlaybackTargetResult.DEPARTED &&
         healthyActiveTarget != null &&
         healthyActiveTarget == activeTarget &&
         fence.matches(activeTarget, activeTargetEpoch, observation)

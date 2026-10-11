@@ -231,12 +231,29 @@ class AppPlaybackRuntime(
     private var targetContinuity: Long? = null
     @Volatile
     private var targetInstallationInProgress = false
-    /** Playlist replacements on the player: the SDK installs every target's source as one. */
+    /** Nonempty current-item replacement witnesses; removing the predecessor is not a new source. */
     @Volatile
     private var playerSources = 0L
     /** The live install in progress, for the escalations its new source already reports. */
     @Volatile
     private var liveInstall: LiveInstallAttribution? = null
+
+    /** Exact installed item, never a media-id match against an application replacement. */
+    @Volatile
+    private var ownedMediaItem: MediaItem? = null
+    private var departedEpoch: Long? = null
+    private var bufferRecovery: LiveRecoveryFence? = null
+    @Volatile
+    private var exhaustedRecoveryEpoch: Long? = null
+    @Volatile
+    private var exhaustedRecoveryInstall: LiveInstallAttribution? = null
+    /** Presentation fence for a coordinator stop retry, never Player cleanup identity. */
+    private data class LiveRetirementRetry(
+        val epoch: Long?,
+        val install: LiveInstallAttribution?,
+    )
+    @Volatile
+    private var liveRetirement: LiveRetirementRetry? = null
 
     /**
      * [sourceGeneration]: [playerSources] when the install began; [selection]: the session-bound
@@ -298,6 +315,10 @@ class AppPlaybackRuntime(
                 observation.keptLiveLossNotice()?.let { observedLiveLoss = ObservedLiveLoss(observedEpoch, it) }
             }
             targetCommands.serialize(onClosed = {}) {
+                if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
+                    withdrawDepartedTargetLocked()
+                    return@serialize
+                }
                 // The recorded stop releases the keep even if the server restarted the stream since.
                 if (observedEpoch == activeTargetEpoch && foregroundPlaybackLifecycle.isKeeping(observedEpoch)) {
                     keptLiveLoss(observedEpoch)?.let { notice ->
@@ -330,20 +351,28 @@ class AppPlaybackRuntime(
     }
 
     private val listener = object : Player.Listener {
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            resumeRecoveryOnPlayerChange()
+        }
+
+        override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
+            resumeRecoveryOnPlayerChange()
+        }
+
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            audioTracks.onMediaItemTransition()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onMediaItemTransition()
         }
 
         override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
-            audioTracks.onTrackSelectionParametersChanged(parameters)
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTrackSelectionParametersChanged(parameters)
         }
 
         override fun onTracksChanged(tracks: Tracks) {
-            audioTracks.onTracksChanged()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTracksChanged()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
-            if (!targetInstallationInProgress && targetCommands.isOpen()) {
+            if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 if (policy.trace.enabled && playbackState == Player.STATE_READY) {
                     policy.trace.ready(activeTargetEpoch)
                 }
@@ -354,7 +383,10 @@ class AppPlaybackRuntime(
         }
 
         override fun onTimelineChanged(timeline: Timeline, reason: Int) {
-            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) playerSources++
+            if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) {
+                val currentItem = player.currentMediaItem
+                if (currentItem != null && currentItem !== ownedMediaItem) playerSources++
+            }
             applyPendingRecordingRecovery()
         }
 
@@ -370,7 +402,9 @@ class AppPlaybackRuntime(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            if (!targetInstallationInProgress && targetCommands.isOpen()) presentation.publishPlayerState()
+            if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
+                presentation.publishPlayerState()
+            }
         }
 
         override fun onPlayerError(error: PlaybackException) {
@@ -460,6 +494,15 @@ class AppPlaybackRuntime(
             // target stayed: a Pause the viewer gave meanwhile is still the latest transport
             // intent, so it applies to that retained target.
             if (endLiveSelection(generation)) pauseRetainedLiveTargetLocked()
+            if (result?.isStarted != true && result != PlaybackTargetResult.DEPARTED &&
+                generation == playbackRequests.get() && !isPlaybackIntentStopped(generation) &&
+                healthyActiveTarget() is AppPlaybackTarget.Live &&
+                livePlaybackObservation.value is LivePlaybackObservation.Active
+            ) {
+                // The completed selection fell back to the retained target. Old queued reports
+                // keep their old intent; fresh reports now belong to this completed selection.
+                servedIntent.set(generation)
+            }
             result
         }
 
@@ -488,8 +531,10 @@ class AppPlaybackRuntime(
         servedGeneration: Long? = null,
         // The viewer's Retry (see retryLive): a fresh start, not recovery, for presentation and audio.
         viewerRetry: Boolean = false,
+        recoveryFence: LiveRecoveryFence? = null,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        val recoveryIntent = playbackRequests.get()
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
             if (!recovering && _activeTarget.value == null || viewerRetry && healthyActiveTarget() == null) {
                 presentation.publishStarting()
@@ -497,7 +542,10 @@ class AppPlaybackRuntime(
         }
         val playerSettings = settings.playerSettings.first()
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
-        audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        // An explicit first request configures persisted output even when its target is
+        // unavailable. Recovery defers all Player configuration until its reads are rechecked.
+        if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
         val profileSelection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (profileSelection == null) {
             return completeUnavailableTarget(
@@ -517,7 +565,11 @@ class AppPlaybackRuntime(
             )
         }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
-        audioTracks.loadStoredAudioLocked(channelId)?.let { return it }
+        val audioResult = audioTracks.loadStoredAudioLocked(channelId) {
+            recoveryFence == null || canContinueRecoveryLocked(recoveryFence)
+        }
+        if (recoveryFence != null && !canContinueRecoveryLocked(recoveryFence)) return null
+        audioResult?.let { return it }
         val selection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (selection == null) {
             return completeUnavailableTarget(
@@ -538,6 +590,7 @@ class AppPlaybackRuntime(
             )
         }
         val retainInterruptionMute = recovering && !viewerRetry && audioInterruptions.interruptionMuted
+        if (recoveryFence != null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
         val timeshiftPeriod = policy.liveTimeshiftPeriod(playerSettings)
         var committed = false
         // The viewer paused this channel before it started: that Pause replaces the startup Play.
@@ -549,9 +602,15 @@ class AppPlaybackRuntime(
         liveInstall = install
         val result = try { installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
+            canInstall = { recoveryFence == null || canContinueRecoveryLocked(recoveryFence) },
             installTarget = {
                 if (!targetCommands.isOpen()) {
                     PlaybackTargetResult.SHUT_DOWN
+                } else if (recoverySelection != null &&
+                    (recoveryIntent != playbackRequests.get() || isPlaybackIntentStopped(recoveryIntent) ||
+                        livePlaybackObservation.value == LivePlaybackObservation.Departed)
+                ) {
+                    PlaybackTargetResult.NOT_READY
                 } else {
                     when (
                         val target = coordinator.setLiveTarget(
@@ -1096,6 +1155,7 @@ class AppPlaybackRuntime(
                         latestIntent = playbackRequests.get(),
                     ),
                 )
+                resumeBufferRecoveryLocked()
             }
         }
     }
@@ -1119,9 +1179,14 @@ class AppPlaybackRuntime(
         val timer = keepTimer
         keepTimer = null
         if (timer !== currentCoroutineContext().job) timer?.cancel()
-        player.pause()
+        bufferRecovery = null
+        if (ownedMediaItem != null && player.currentMediaItem === ownedMediaItem &&
+            livePlaybackObservation.value != LivePlaybackObservation.Departed
+        ) player.pause()
         livePauseController.dropPendingLivePauseLocked()
-        audioInterruptions.clearAudioInterruptionLocked()
+        if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
+            audioInterruptions.withdrawAudioInterruptionLocked()
+        } else audioInterruptions.clearAudioInterruptionLocked()
         recordingMarkers.clearRecordingMarkers()
         val epoch = presentationEpoch.begin()
         presentation.endTargetPresentationLocked(epoch)
@@ -1351,7 +1416,9 @@ class AppPlaybackRuntime(
                 if (epoch != activeTargetEpoch && !continued && !servesArrival) return@serialize
                 val timeshift = audioInterruptions.currentInterruptionContent() == AudioInterruptionContent.LIVE_TIMESHIFT
                 val live = _activeTarget.value is AppPlaybackTarget.Live
-                if (live && !timeshift && !livePauseController.currentLivePauseAvailability().acceptsPause()) return@serialize
+                if (live && !timeshift && !livePauseController.currentLivePauseAvailability().acceptsPause() &&
+                    !(playWhenReady && hasExhaustedRecovery())
+                ) return@serialize
                 if (playWhenReady) {
                     val result = audioInterruptions.playWithAudioFocusLocked(resumeTimeshift = timeshift)
                     // A denied focus request retains its interruption hold/mute. Only a
@@ -1435,12 +1502,56 @@ class AppPlaybackRuntime(
     fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
         // The escalation belongs to the target playing when the SDK reports it, not to a
         // replacement that commits before it is admitted.
-        val origin = currentLiveRecoveryFence(
-            reason = reason,
-            observation = session.observation.value,
-            activeTarget = _activeTarget.value,
-            activeTargetEpoch = activeTargetEpoch,
-        )
+        val origin = activeTargetEpoch?.let { epoch ->
+            activeLiveSelection?.let { LiveRecoveryFence(reason, it, epoch, servedIntent.get()) }
+        }
+        val reportedInstall = liveInstall?.takeIf { it.sourceGeneration != playerSources }
+        if (reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED ||
+            reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED ||
+            reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED
+        ) {
+            // The source being installed owns its callback even while the predecessor's epoch
+            // is still active. Deduplicate that receipt, not the predecessor's exhaustion.
+            val duplicate = if (reportedInstall != null) {
+                exhaustedRecoveryInstall === reportedInstall
+            } else {
+                activeTargetEpoch != null && (exhaustedRecoveryEpoch == activeTargetEpoch ||
+                    exhaustedRecoveryInstall?.committedEpoch == activeTargetEpoch)
+            }
+            if (duplicate) {
+                resumeRecoveryOnPlayerChange()
+                return
+            }
+            if (reportedInstall != null) exhaustedRecoveryInstall = reportedInstall
+            else exhaustedRecoveryEpoch = activeTargetEpoch
+            // Record installation work at the callback boundary, before a newer viewing intent
+            // can enter the command lock. Its cleanup is not a permission to retune that intent.
+            val retirement = LiveRetirementRetry(
+                activeTargetEpoch,
+                reportedInstall,
+            ).takeIf { reason != PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED }
+            if (retirement != null) liveRetirement = retirement
+            scope.launch {
+                targetCommands.serialize(onClosed = {}) {
+                    val installed = reportedInstall?.committedEpoch?.let {
+                        LiveRecoveryFence(reason, reportedInstall.selection, it, servedIntent.get())
+                    }
+                    val fence = (installed ?: origin)?.takeIf(::liveRecoveryFenceMatches)
+                    if (retirement != null && liveRetirement === retirement && !retryLiveRetirementLocked()) {
+                        // Keep this report owed. A later callback or Player event retries cleanup,
+                        // not a second installation, and does not spend a recovery attempt.
+                        bufferRecovery = fence
+                        return@serialize
+                    }
+                    if (fence == null) return@serialize
+                    if (bufferRecovery != null) return@serialize
+                    exhaustedRecoveryEpoch = fence.targetEpoch
+                    bufferRecovery = fence
+                    resumeBufferRecoveryLocked()
+                }
+            }
+            return
+        }
         // The SDK reports a target's escalations only while that target owns the player's
         // source, and may report the new source's before the install that set it commits here.
         // Once the install replaced the source, the report is the install's if it commits;
@@ -1469,7 +1580,7 @@ class AppPlaybackRuntime(
             admitLocked = admit@{ _ ->
                 // Admission waits for the install, so its outcome is known here: a commit owns
                 // the report (with the selection it installed, never the current session's).
-                val installed = install?.committedEpoch?.let { LiveRecoveryFence(reason, install.selection, it) }
+                val installed = install?.committedEpoch?.let { LiveRecoveryFence(reason, install.selection, it, servedIntent.get()) }
                 val requestedEpoch = installed?.targetEpoch ?: reportedEpoch
                 if (foregroundPlaybackLifecycle.isKeeping(activeTargetEpoch)) {
                     if (requestedEpoch != activeTargetEpoch) return@admit null
@@ -1479,7 +1590,7 @@ class AppPlaybackRuntime(
                 if (!foreground) return@admit null
                 // Checked before the budget: a replacement that committed meanwhile owns its own.
                 val fence = (installed ?: origin)?.takeIf(::liveRecoveryFenceMatches) ?: return@admit null
-                if (audioInterruptions.interruptionPaused || viewerPausedLocked(fence.targetEpoch)) {
+                if (recoveryPlaybackBlocked(fence.targetEpoch)) {
                     // The SDK does not escalate this target again: keep the request, without
                     // claiming an attempt, until playback may continue (the interruption ends,
                     // or the viewer plays again after a Pause).
@@ -1506,20 +1617,13 @@ class AppPlaybackRuntime(
     }
 
     private suspend fun retryLiveRecoveryLocked(fence: LiveRecoveryFence): PlaybackTargetResult? {
-        if (audioInterruptions.interruptionPaused || !foreground) return null
-        if (!fence.matches(
-                activeTarget = _activeTarget.value,
-                activeTargetEpoch = activeTargetEpoch,
-                observation = session.observation.value,
-            )
-        ) {
-            return null
-        }
+        if (recoveryPlaybackBlocked(fence.targetEpoch) || !liveRecoveryFenceMatches(fence)) return null
         return playLive(
             channelId = fence.selection.channelId,
             recovering = true,
             expectedPresentationEpoch = fence.targetEpoch,
             recoverySelection = fence.selection,
+            recoveryFence = fence,
         )
     }
 
@@ -1529,13 +1633,7 @@ class AppPlaybackRuntime(
      * override it. The attempt, already budgeted, then stays owed until the viewer plays again.
      */
     private suspend fun retryResumedLiveRecoveryLocked(fence: LiveRecoveryFence): PlaybackTargetResult? {
-        if (foreground && !audioInterruptions.interruptionPaused && viewerPausedLocked(fence.targetEpoch) &&
-            fence.matches(
-                activeTarget = _activeTarget.value,
-                activeTargetEpoch = activeTargetEpoch,
-                observation = session.observation.value,
-            )
-        ) {
+        if (foreground && recoveryPlaybackBlocked(fence.targetEpoch) && liveRecoveryFenceMatches(fence)) {
             liveRecovery.oweAgainLocked(fence)
             return null
         }
@@ -1546,6 +1644,114 @@ class AppPlaybackRuntime(
     private fun viewerPausedLocked(epoch: Long): Boolean =
         !player.playWhenReady || livePauseController.pendingLivePauseEpoch == epoch
 
+    private fun recoveryPlaybackBlocked(epoch: Long): Boolean =
+        !foreground || audioInterruptions.interruptionPaused || viewerPausedLocked(epoch) ||
+            player.playbackSuppressionReason != Player.PLAYBACK_SUPPRESSION_REASON_NONE
+
+    private fun hasExhaustedRecovery(): Boolean =
+        listOfNotNull(bufferRecovery, liveRecovery.deferredRecovery, liveRecovery.interruptedRecovery).any {
+            it.reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED ||
+                it.reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED ||
+                it.reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED
+        }
+
+    private fun canContinueRecoveryLocked(fence: LiveRecoveryFence): Boolean {
+        if (!liveRecoveryFenceMatches(fence)) return false
+        if (player.currentMediaItem?.let { it !== ownedMediaItem } == true) {
+            withdrawDepartedTargetLocked()
+            return false
+        }
+        if (recoveryPlaybackBlocked(fence.targetEpoch)) {
+            liveRecovery.oweAgainLocked(fence)
+            return false
+        }
+        return true
+    }
+
+    private fun resumeRecoveryOnPlayerChange() {
+        scope.launch {
+            targetCommands.serialize(onClosed = {}) {
+                resumeBufferRecoveryLocked()
+                resumeInterruptedLiveRecoveryLocked()
+            }
+        }
+    }
+
+    private suspend fun resumeBufferRecoveryLocked() {
+        if (!retryLiveRetirementLocked()) return
+        val fence = bufferRecovery ?: return
+        if (!liveRecoveryFenceMatches(fence)) {
+            bufferRecovery = null
+            return
+        }
+        if (player.currentMediaItem?.let { it !== ownedMediaItem } == true) {
+            withdrawDepartedTargetLocked()
+            return
+        }
+        if (!foreground) return
+        // Admission, blocked transport, backoff and the attempt budget have one owner.
+        bufferRecovery = null
+        dispatchLiveRecovery(fence.reason, fence)
+    }
+
+    private suspend fun retryLiveRetirementLocked(): Boolean {
+        val obligation = liveRetirement ?: return true
+        val epoch = obligation.install?.committedEpoch ?: obligation.epoch
+        // A later explicit installation already replaced/retired this SDK target. Never
+        // stop that newer installation merely because the older callback arrived late.
+        if (activeTargetEpoch == epoch ||
+            activeTargetEpoch == null && departedEpoch == epoch
+        ) {
+            val result = try {
+                coordinator.stop()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: RuntimeException) {
+                presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
+                return false
+            }
+            when (result) {
+                is PlaybackStopResult.Stopped, is PlaybackStopResult.RetiredAfterDeparture,
+                PlaybackStopResult.AlreadyStopped -> Unit
+                is PlaybackStopResult.PlayerUnavailable -> {
+                    if (epoch != null && activeTargetEpoch == epoch &&
+                        player.currentMediaItem === ownedMediaItem
+                    ) presentationEpoch.publishIfCurrent(epoch) {
+                        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
+                    }
+                    return false
+                }
+                PlaybackStopResult.NotRunning, PlaybackStopResult.ShutDown -> {
+                    presentation.publishFailed(recoveryExhaustedState(result,
+                        PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED))
+                    return false
+                }
+            }
+        }
+        if (liveRetirement === obligation) liveRetirement = null
+        return true
+    }
+
+    /** Withdraw attribution without pausing, preparing or changing replacement playback. */
+    private fun withdrawDepartedTargetLocked() {
+        departedEpoch = activeTargetEpoch
+        bufferRecovery = null
+        liveRecovery.dropDeferredLocked()
+        liveRecovery.dropInterruptedLocked()
+        val epoch = presentationEpoch.begin()
+        presentation.endTargetPresentationLocked(epoch)
+        activeTargetEpoch = null
+        activeLiveSelection = null
+        _activeTarget.value = null
+        _recordingSelection.value = null
+        _recordingAdmission.value = null
+        livePauseController.dropPendingLivePauseLocked()
+        audioInterruptions.withdrawAudioInterruptionLocked()
+        recordingMarkers.clearRecordingMarkers()
+        presentation.publishIdle()
+        presentation.publishDiagnostics()
+    }
+
     /**
      * Playback may continue after an audio interruption (focus returned, a play acquired it, or a
      * rejected hold went on muted) or the viewer's Pause: the admitted recovery the interruption
@@ -1554,13 +1760,16 @@ class AppPlaybackRuntime(
      * owed while the interruption or the viewer's own Pause holds playback.
      */
     private fun resumeInterruptedLiveRecoveryLocked() {
+        if (bufferRecovery != null) scope.launch {
+            targetCommands.serialize(onClosed = {}) { resumeBufferRecoveryLocked() }
+        }
         val interrupted = liveRecovery.interruptedRecovery
         if (interrupted != null && !liveRecoveryFenceMatches(interrupted)) liveRecovery.dropInterruptedLocked()
         val deferred = liveRecovery.deferredRecovery
         if (deferred != null && !liveRecoveryFenceMatches(deferred)) liveRecovery.dropDeferredLocked()
         val epoch = activeTargetEpoch ?: return
         if (liveRecovery.interruptedRecovery == null && liveRecovery.deferredRecovery == null) return
-        if (!foreground || audioInterruptions.interruptionPaused || viewerPausedLocked(epoch)) return
+        if (recoveryPlaybackBlocked(epoch)) return
         if (liveRecovery.interruptedRecovery != null) {
             liveRecovery.resumeInterruptedLocked(::retryResumedLiveRecoveryLocked) { fence ->
                 presentationEpoch.publishIfCurrent(fence.targetEpoch) {
@@ -1575,7 +1784,10 @@ class AppPlaybackRuntime(
         liveRecovery.takeDeferredLocked()?.let { dispatchLiveRecovery(it.reason, origin = it) }
     }
 
-    private fun liveRecoveryFenceMatches(fence: LiveRecoveryFence): Boolean = fence.matches(
+    private fun liveRecoveryFenceMatches(fence: LiveRecoveryFence): Boolean =
+        livePlaybackObservation.value != LivePlaybackObservation.Departed && departedEpoch != fence.targetEpoch &&
+        (fence.viewingIntent == null || fence.viewingIntent == playbackRequests.get()) &&
+        !isPlaybackIntentStopped(fence.viewingIntent ?: servedIntent.get()) && fence.matches(
         activeTarget = _activeTarget.value,
         activeTargetEpoch = activeTargetEpoch,
         observation = session.observation.value,
@@ -1623,17 +1835,21 @@ class AppPlaybackRuntime(
 
     private suspend fun installTargetForPresentation(
         expectedPresentationEpoch: Long,
+        canInstall: () -> Boolean = { true },
         installTarget: suspend () -> PlaybackTargetResult,
         onStarted: () -> Unit,
         onFailed: (PlaybackTargetResult) -> Unit,
     ): PlaybackTargetResult {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
+        if (!canInstall()) return PlaybackTargetResult.NOT_READY
         val previousPlayWhenReady = player.playWhenReady
         val previousTarget = healthyActiveTarget()
         val previousTargetEpoch = activeTargetEpoch
         val previousMediaItem = player.currentMediaItem
         presentation.coverVideoForTargetInstallLocked()
-        player.pause()
+        // A pending SDK source has no app ownership receipt; let the coordinator retry its
+        // exact retained sources without pausing an unrelated current replacement.
+        if (!coordinator.playerCleanupPending.value) player.pause()
         targetInstallationInProgress = true
         return try {
             val result = completePlaybackTargetInstallation(
@@ -1643,8 +1859,17 @@ class AppPlaybackRuntime(
                         presentationEpoch.isCurrent(expectedPresentationEpoch)
                 },
                 activeTarget = ::healthyActiveTarget,
-                onStarted = onStarted,
-                onFailed = onFailed,
+                onStarted = {
+                    ownedMediaItem = player.currentMediaItem
+                    audioInterruptions.restoreWithdrawnMuteOnCommitLocked()
+                    departedEpoch = null
+                    bufferRecovery = null
+                    onStarted()
+                },
+                onFailed = { result ->
+                    if (result == PlaybackTargetResult.DEPARTED) withdrawDepartedTargetLocked()
+                    else onFailed(result)
+                },
             )
             if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
             result
@@ -1664,7 +1889,9 @@ class AppPlaybackRuntime(
                 player.playWhenReady = previousPlayWhenReady
                 presentation.publishPlayerState()
             }
-            audioTracks.activateAudioAfterInstallLocked()
+            if (_activeTarget.value != null && livePlaybackObservation.value != LivePlaybackObservation.Departed) {
+                audioTracks.activateAudioAfterInstallLocked()
+            }
         }
     }
 
@@ -1722,6 +1949,15 @@ class AppPlaybackRuntime(
     ) {
         if (!targetCommands.isOpen()) return
         if (healthyActiveTarget() != null) return
+        if (coordinator.playerCleanupPending.value && activeTargetEpoch != null) {
+            // A failed stop can leave Media3 non-IDLE, but that source is no longer playable.
+            // Keep the target epoch so the serialized retirement retry still owns its fence.
+            presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
+                presentation.publishFailed(AppPlaybackState.Failed(reason, targetResult))
+                presentation.publishDiagnostics()
+            }
+            return
+        }
         val epoch = presentationEpoch.beginIfCurrent(expectedPresentationEpoch) ?: return
         presentationEpoch.publishIfCurrent(epoch) {
             presentation.endTargetPresentationLocked(epoch)
@@ -1739,6 +1975,8 @@ class AppPlaybackRuntime(
 
     private fun healthyActiveTarget(): AppPlaybackTarget? = targetCommands.readIfOpen {
         _activeTarget.value.takeIf {
+            !coordinator.playerCleanupPending.value &&
+            livePlaybackObservation.value != LivePlaybackObservation.Departed && departedEpoch != activeTargetEpoch &&
             activePlayerTargetIsHealthy(
                 playerErrorPresent = player.playerError != null,
                 playbackState = player.playbackState,
@@ -1900,6 +2138,7 @@ class AppPlaybackRuntime(
         fence: LiveRecoveryFence,
         result: PlaybackTargetResult?,
     ) {
+        if (coordinator.playerCleanupPending.value) return
         if (shouldRepublishPlayerStateAfterRecovery(
                 result = result,
                 fence = fence,

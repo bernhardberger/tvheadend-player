@@ -278,7 +278,7 @@ class BackgroundPlaybackRuntimeTest {
         connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
         await { liveObservation()?.serverStopped == true }
         settle() // The loss check is queued behind the held command.
-        connection.loseGeneration()
+        connection.completeStreams()
         // Ending the subscription clears the flag without a restart.
         await { liveObservation()?.let { !it.serverStopped && it.timeshiftState !is LiveTimeshiftState.Available } == true }
         release.complete(Unit)

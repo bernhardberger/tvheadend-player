@@ -173,6 +173,7 @@ private fun UnavailableProgrammeInfo(
 internal fun dvrFailureLabel(result: DvrMutationResult<*>): String = stringResource(
     when (result) {
         DvrMutationResult.AccessDenied -> R.string.recording_action_permission
+        DvrMutationResult.MalformedResponse -> R.string.recording_action_unknown_outcome
         DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
         DvrMutationResult.ServerRejected,
         DvrMutationResult.NotSupported -> R.string.recording_action_rejected

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import runpy
+import shutil
 import struct
+import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -16,30 +20,86 @@ CHECKER = runpy.run_path(str(CHECKER_PATH), run_name="native_checker_test")
 
 
 class NativePublicationEvidenceTest(unittest.TestCase):
-    def test_public_release_bytes_and_corresponding_sources_are_pinned(self) -> None:
-        self.assertEqual(CHECKER["SDK_COORDINATE"], "at.bernhardberger.tvheadend:sdk-media3:0.23.0")
-        self.assertEqual(
-            CHECKER["EXPECTED_AAR_SHA256"],
-            "dc062bd1fec8a7ccc240539ed1af24051cf37292a115b62ccc1a1ccd87fc4f62",
+    def test_app_owned_bytes_and_compiled_sources_match_provenance(self) -> None:
+        errors = []
+        module = ROOT / "decoder-ffmpeg"
+        CHECKER["validate_corresponding_source"](
+            module / CHECKER["FFMPEG_SOURCES_NAME"], errors, module / "upstream",
         )
-        self.assertEqual(
-            CHECKER["EXPECTED_FFMPEG_SOURCES_SHA256"],
-            "9eeca8490f794574185986c0df7800d65ccca2980f57dc26b630a398581d7929",
-        )
-        self.assertEqual(len(CHECKER["EXPECTED_STANDARD_SOURCE_SHA256"]), 4)
-        self.assertEqual(
-            CHECKER["EXPECTED_STANDARD_SOURCE_SHA256"],
-            {
-                "sdk-android-0.23.0-sources.jar":
-                    "5361e2924b04e6779dbb752a1cbeb2c72d4c6d8075319265682ba9af09872991",
-                "sdk-core-0.23.0-sources.jar":
-                    "d8d27e46ffa2d6d11b8ae92701fb7f79e16fc03eb7d75c4f7a14a2cd39f1f46e",
-                "sdk-media3-0.23.0-sources.jar":
-                    "58d10c07e81c341d70966ac2e61502139283fc5b97b76af64f4872be9909bf4e",
-                "sdk-playback-0.23.0-sources.jar":
-                    "abf814b33ab0cc379bf3e504a0ad5629d49f88d63f57cea9a328f5ea45b9a155",
-            },
-        )
+        libraries = CHECKER["validate_native_module"](module, errors)
+        self.assertEqual(errors, [])
+        self.assertEqual(set(libraries), set(CHECKER["EXPECTED_ABIS"]))
+
+    def test_native_gate_rejects_tampered_missing_and_extra_libraries(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            module = Path(directory)
+            native = module / "src/main/jniLibs"
+            shutil.copytree(ROOT / "decoder-ffmpeg/src/main/jniLibs", native)
+            library = native / "arm64-v8a/libffmpegJNI.so"
+            library.write_bytes(library.read_bytes() + b"tampered")
+            (native / "x86/libffmpegJNI.so").unlink()
+            (native / "x86/extra.so").write_bytes(b"unexpected")
+            errors = []
+            CHECKER["validate_native_module"](module, errors)
+            self.assertTrue(any("SHA-256" in e for e in errors))
+            self.assertTrue(any("missing" in e for e in errors))
+            self.assertTrue(any("inventory" in e for e in errors))
+
+    def test_native_gate_rejects_wrong_abi_even_when_hash_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            module = Path(directory)
+            native = module / "src/main/jniLibs"
+            shutil.copytree(ROOT / "decoder-ffmpeg/src/main/jniLibs", native)
+            library = native / "arm64-v8a/libffmpegJNI.so"
+            data = bytearray(library.read_bytes())
+            struct.pack_into("<H", data, 18, 62)  # x86-64 in the arm64 slot
+            library.write_bytes(data)
+            hashes = CHECKER["PROVENANCE"]["libraries"]
+            old = hashes["arm64-v8a"]
+            try:
+                hashes["arm64-v8a"] = hashlib.sha256(data).hexdigest()
+                errors = []
+                CHECKER["validate_native_module"](module, errors)
+                self.assertTrue(any("wrong ELF ABI" in e for e in errors))
+            finally:
+                hashes["arm64-v8a"] = old
+
+    def test_java_source_substitution_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            upstream = Path(directory) / "upstream"
+            shutil.copytree(ROOT / "decoder-ffmpeg/upstream", upstream)
+            java = upstream / "libraries/decoder_ffmpeg/src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioRenderer.java"
+            java.write_bytes(java.read_bytes() + b"// changed")
+            errors = []
+            CHECKER["validate_corresponding_source"](
+                ROOT / "decoder-ffmpeg" / CHECKER["FFMPEG_SOURCES_NAME"], errors, upstream,
+            )
+            self.assertTrue(any("source differs" in e for e in errors))
+
+    def test_staged_sdk_keeps_native_gate_and_cannot_pass_release(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            apk = Path(directory) / "app.apk"
+            libraries = ROOT / "decoder-ffmpeg/src/main/jniLibs"
+            with zipfile.ZipFile(apk, "w") as archive:
+                for abi in CHECKER["EXPECTED_ABIS"]:
+                    archive.write(libraries / abi / CHECKER["EXPECTED_LIBRARY"],
+                                  f"lib/{abi}/{CHECKER['EXPECTED_LIBRARY']}")
+            command = [sys.executable, str(CHECKER_PATH), "--staged-sdk", "--apk", str(apk),
+                       "--evidence-directory", str(Path(directory) / "absent-sdk-evidence")]
+            staged = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertEqual(staged.returncode, 0, staged.stderr)
+            self.assertIn("public SDK provenance NOT verified", staged.stdout)
+            release = subprocess.run(command + ["--release"], capture_output=True,
+                                     text=True, timeout=30)
+            self.assertNotEqual(release.returncode, 0)
+            self.assertIn("a staged SDK cannot pass the release gate", release.stderr)
+            with zipfile.ZipFile(apk, "w") as archive:
+                for abi in CHECKER["EXPECTED_ABIS"]:
+                    data = (libraries / abi / CHECKER["EXPECTED_LIBRARY"]).read_bytes()
+                    archive.writestr(f"lib/{abi}/{CHECKER['EXPECTED_LIBRARY']}", data + b"tampered")
+            tampered = subprocess.run(command, capture_output=True, text=True, timeout=30)
+            self.assertNotEqual(tampered.returncode, 0)
+            self.assertIn("differs from the app-owned decoder", tampered.stderr)
 
     def test_source_gate_rejects_every_missing_required_legal_or_build_entry(self) -> None:
         required = CHECKER["REQUIRED_SOURCE_ENTRIES"]
@@ -94,7 +154,7 @@ class NativePublicationEvidenceTest(unittest.TestCase):
         self.assertEqual(CHECKER["ALIGNMENT_ABIS"], ("arm64-v8a", "x86_64"))
         self.assertEqual(CHECKER["EXPECTED_MINIMUM_ALIGNMENT"], 16384)
 
-    def test_apk_decoder_bytes_must_match_released_aar_bytes(self) -> None:
+    def test_apk_decoder_bytes_must_match_app_owned_bytes(self) -> None:
         elf = bytearray(120)
         elf[:6] = b"\x7fELF\x02\x01"
         struct.pack_into("<Q", elf, 32, 64)

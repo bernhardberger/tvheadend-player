@@ -48,12 +48,15 @@ revision `bac232fd02b0855df9275281a2a7a47643768719`, under Apache License 2.0.
 The source pin and hash are recorded in `skills-lock.json`; a copy of the
 upstream license is retained in that skill's `LICENSE.txt`.
 
-The released `at.bernhardberger.tvheadend:sdk-media3:0.3.0` AAR contains
-AndroidX Media3 1.11.0's Apache-2.0 FFmpeg extension. FFmpeg remains under
-LGPL-2.1-or-later. The app uses the extension as the AC-3/E-AC-3/MP3 fallback
-behind platform decoding. Exact release hashes and complete Media3/FFmpeg source
-are provided by the public SDK publication and its `ffmpeg-sources` classifier.
+The app-owned `decoder-ffmpeg` module contains AndroidX Media3 1.11.1's
+Apache-2.0 FFmpeg audio extension. FFmpeg 6.0.2 remains under LGPL-2.1-or-later.
+The app uses the extension as the AC-3/E-AC-3/MP3 fallback behind platform
+decoding. Upstream copyright and license files are retained in
+`decoder-ffmpeg/upstream/` and the complete corresponding-source archive.
+Exact source revisions, build inputs and native hashes are recorded in
+`decoder-ffmpeg/provenance.json`; rebuild instructions are in
+`decoder-ffmpeg/README.md`.
 
 Unused inherited AV1, IAMF, and MPEG-H decoder AARs were removed. Every binary
-release must ship that byte-pinned native corresponding-source classifier beside
+release must ship that byte-pinned native corresponding-source archive beside
 the APK and normal application and released SDK source classifiers.

@@ -47,6 +47,7 @@ internal class AudioInterruptionController(
         private set
     var interruptionMuted = false
         private set
+    private var ownsAudioDisable = false
 
     /**
      * A live recovery keeps an interruption mute: recovery is not viewer consent to resume audio.
@@ -72,6 +73,30 @@ internal class AudioInterruptionController(
     }
 
     fun clearAudioInterruptionLocked() {
+        resetAudioInterruptionLocked()
+        setInterruptionMuted(false)
+    }
+
+    /** Departure relinquishes callbacks, not the replacement item's audio configuration. */
+    fun withdrawAudioInterruptionLocked() {
+        resetAudioInterruptionLocked()
+        restoreAppAudioDisable = restoreAppAudioDisable || ownsAudioDisable
+        ownsAudioDisable = false
+        interruptionMuted = false
+    }
+
+    // Attribution can end while the Player still carries our mute. Only the next app-owned
+    // commit may undo it; departure itself must not change the replacement's parameters.
+    private var restoreAppAudioDisable = false
+
+    fun restoreWithdrawnMuteOnCommitLocked() {
+        if (!restoreAppAudioDisable) return
+        restoreAppAudioDisable = false
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, false).build()
+    }
+
+    private fun resetAudioInterruptionLocked() {
         focusGeneration++
         audioFocus.abandon()
         interruption = null
@@ -79,19 +104,23 @@ internal class AudioInterruptionController(
         interruptionContent = AudioInterruptionContent.NONE
         resumeAfterInterruption = false
         interruptionPaused = false
-        setInterruptionMuted(false)
     }
 
     private fun setInterruptionMuted(muted: Boolean) {
         if (interruptionMuted == muted) return
         interruptionMuted = muted
-        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-            .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, muted).build()
+        if (muted) ownsAudioDisable = C.TRACK_TYPE_AUDIO !in player.trackSelectionParameters.disabledTrackTypes
+        if (ownsAudioDisable) {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, muted).build()
+        }
+        if (!muted) ownsAudioDisable = false
         if (!muted) audioTracks.restoreAudioAfterInterruptionLocked()
     }
 
     fun preserveInterruptionMute() {
         if (interruptionMuted && C.TRACK_TYPE_AUDIO !in player.trackSelectionParameters.disabledTrackTypes) {
+            ownsAudioDisable = true
             player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true).build()
         }

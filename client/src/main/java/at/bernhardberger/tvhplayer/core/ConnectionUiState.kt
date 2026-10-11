@@ -86,7 +86,8 @@ fun SessionState.toConnectionState(): ConnectionState = when (this) {
 private fun SessionFailure.toConnectionFailureKind(): ConnectionFailureKind = when (this) {
     SessionFailure.AuthenticationRejected -> ConnectionFailureKind.AUTHENTICATION
     SessionFailure.PermissionDenied -> ConnectionFailureKind.PERMISSION_DENIED
-    SessionFailure.IncompatibleServer -> ConnectionFailureKind.INCOMPATIBLE_SERVER
+    SessionFailure.IncompatibleServer,
+    SessionFailure.ServerUpgradeRequired -> ConnectionFailureKind.INCOMPATIBLE_SERVER
     SessionFailure.NoChannels -> ConnectionFailureKind.ZERO_CHANNELS
     SessionFailure.ServerUnreachable,
     SessionFailure.NetworkUnavailable,
@@ -101,5 +102,6 @@ private fun SessionFailure.toConnectionFailureKind(): ConnectionFailureKind = wh
             ConnectionFailureKind.INCOMPATIBLE_SERVER
         else -> ConnectionFailureKind.OTHER
     }
-    else -> ConnectionFailureKind.OTHER
+    SessionFailure.MetadataOverflow,
+    SessionFailure.UnexpectedFailure -> ConnectionFailureKind.OTHER
 }

@@ -4,17 +4,16 @@ set -euo pipefail
 ROOT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 ANDROID_HOME="${ANDROID_HOME:-/opt/android-sdk}"
 APPLICATION_ID="at.bernhardberger.tvhplayer"
-SDK_VERSION="0.23.0"
-SDK_SOURCE_COMMIT="12e90164166d083d36b53f92374349d2a8c5cc0c"
+SDK_VERSION="0.24.0"
+SDK_SOURCE_COMMIT="1983ff49cbaf950a67d07ed976ab1874c4fd86cc"
 EVIDENCE_DIR="$ROOT_DIR/app/build/released-sdk-evidence"
-NATIVE_SOURCE_NAME="sdk-media3-${SDK_VERSION}-ffmpeg-sources.tar.xz"
+NATIVE_SOURCE_NAME="ffmpeg-media3-1.11.1-sources.tar.xz"
 SDK_SOURCE_NAME="tvheadend-sdk-${SDK_VERSION}-corresponding-source.tar.gz"
 SDK_SOURCE_FILES=(
     "sdk-android-${SDK_VERSION}-sources.jar"
     "sdk-core-${SDK_VERSION}-sources.jar"
     "sdk-media3-${SDK_VERSION}-sources.jar"
     "sdk-playback-${SDK_VERSION}-sources.jar"
-    "$NATIVE_SOURCE_NAME"
 )
 
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=normal)" ]]; then
@@ -68,7 +67,7 @@ tar \
     -C "$EVIDENCE_DIR" \
     -cf - \
     "${SDK_SOURCE_FILES[@]}" | gzip -n > "$temporary_dir/$SDK_SOURCE_NAME"
-cp "$EVIDENCE_DIR/$NATIVE_SOURCE_NAME" "$temporary_dir/$NATIVE_SOURCE_NAME"
+cp "$ROOT_DIR/decoder-ffmpeg/$NATIVE_SOURCE_NAME" "$temporary_dir/$NATIVE_SOURCE_NAME"
 
 # apksigner verify must fail before and after alignment, proving this host did not sign the APK.
 if "$apksigner" verify "$built_apk" >/dev/null 2>&1; then

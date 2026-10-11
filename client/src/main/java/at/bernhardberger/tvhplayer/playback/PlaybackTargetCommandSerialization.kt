@@ -69,7 +69,7 @@ internal suspend fun completePlaybackTargetInstallation(
     if (!presentationStillCurrent()) return result
     if (result.isStarted) {
         onStarted()
-    } else if (activeTarget() == null) {
+    } else if (result == PlaybackTargetResult.DEPARTED || activeTarget() == null) {
         onFailed(result)
     }
     return result

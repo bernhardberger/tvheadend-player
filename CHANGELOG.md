@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Adopt TVHeadend SDK 0.24.0 and HTSP 1.0.0-beta.1, including SDK-owned retry
+  of failed Player cleanup while preserving unrelated playback items.
+- Recover exhausted live buffers only when playback can advance, preserving
+  pause, audio interruption and newer channel-selection intent. Viewer pause
+  remains available only with server timeshift.
+- Retain platform-first AC-3/E-AC-3/MP3 software audio fallback through an
+  app-owned Media3 1.11.1 FFmpeg extension with pinned sources and native binaries.
+- Report unreadable recording-action responses as uncertain outcomes rather
+  than confirmed failures, and identify servers requiring an HTSP upgrade.
+
 ## 0.2.13
 
 - Adopt published TVHeadend SDK 0.13.0 for anchored timeshift selections,

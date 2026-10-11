@@ -7,6 +7,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrChangeOrigin
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import org.junit.Assert.assertEquals
@@ -20,6 +22,12 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
     private val formatter get() = NoticeFormatter(ApplicationProvider.getApplicationContext<Application>())
+
+    @Test fun malformedMutationDoesNotClaimRejectionOrSuccess() {
+        val result = formatter.format(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.UNKNOWN_OUTCOME))
+        assertEquals("Recording action not confirmed", result.headline)
+        assertEquals("The server reply could not be read. The change may have applied; check the recording before trying again.", result.detail)
+    }
 
     @Test fun recordingStartedIncludesTheSuppliedEpisodeBeforeTheChannel() {
         val entry = DvrEntry.create(DvrEntryId(1), title = " MotoGP ",

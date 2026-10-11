@@ -58,7 +58,7 @@ sealed interface Notice {
 /** Coarse user-facing action outcome; success is never posted as an action notice. */
 enum class DvrMutationFeedback(val isFailure: Boolean) {
     CONFIRMED(false), ACCEPTED_UNCONFIRMED(false), PERMISSION_DENIED(true), CONNECTION_LIMIT(true),
-    REJECTED(true), NOT_SUPPORTED(true), TIMEOUT(true), CONNECTION_UNAVAILABLE(true),
+    REJECTED(true), NOT_SUPPORTED(true), TIMEOUT(true), UNKNOWN_OUTCOME(true), CONNECTION_UNAVAILABLE(true),
 }
 
 fun DvrMutationResult<*>.toDvrMutationFeedback(): DvrMutationFeedback = when (this) {
@@ -69,6 +69,7 @@ fun DvrMutationResult<*>.toDvrMutationFeedback(): DvrMutationFeedback = when (th
     DvrMutationResult.ServerRejected -> DvrMutationFeedback.REJECTED
     DvrMutationResult.NotSupported -> DvrMutationFeedback.NOT_SUPPORTED
     DvrMutationResult.Timeout -> DvrMutationFeedback.TIMEOUT
+    DvrMutationResult.MalformedResponse -> DvrMutationFeedback.UNKNOWN_OUTCOME
     DvrMutationResult.NotReady, DvrMutationResult.ObservationExpired,
     DvrMutationResult.TransportUnavailable -> DvrMutationFeedback.CONNECTION_UNAVAILABLE
 }

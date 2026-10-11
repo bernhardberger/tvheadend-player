@@ -83,7 +83,7 @@ internal class PlaybackAudioTracks(
      * Loads the stored audio choice for [channelId] before a live target is installed. Returns
      * the result that ends the start, or null to go on.
      */
-    suspend fun loadStoredAudioLocked(channelId: ChannelId): PlaybackTargetResult? {
+    suspend fun loadStoredAudioLocked(channelId: ChannelId, canApply: () -> Boolean = { true }): PlaybackTargetResult? {
         val audioProfile = profileOwner.serverProfile.value
         val audioProfileId = profileOwner.audioProfileId
         audioWriteJob?.join()
@@ -96,6 +96,7 @@ internal class PlaybackAudioTracks(
         if (profileOwner.serverProfile.value !== audioProfile || profileOwner.audioProfileId != audioProfileId) {
             return PlaybackTargetResult.NOT_READY
         }
+        if (!canApply()) return PlaybackTargetResult.NOT_READY
         audioSelection.useProfile(audioProfile, player)
         audioSelection.load(channelId, storedAudio)
         return null

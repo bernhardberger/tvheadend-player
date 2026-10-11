@@ -1,37 +1,40 @@
 #!/usr/bin/env python3
-"""Verify the byte-pinned released SDK native artifact, source, and packaged APK."""
+"""Verify app-owned audio decoder provenance, APK bytes, and released SDK sources."""
 
 from __future__ import annotations
 
 import argparse
 import hashlib
+import json
 import struct
 import sys
 import tarfile
+import tomllib
 import zipfile
 from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.23.0"
-SDK_VERSION = "0.23.0"
+SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.24.0"
+SDK_VERSION = "0.24.0"
 EVIDENCE_DIRECTORY = ROOT / "app/build/released-sdk-evidence"
 SDK_AAR_NAME = f"sdk-media3-{SDK_VERSION}.aar"
-FFMPEG_SOURCES_NAME = f"sdk-media3-{SDK_VERSION}-ffmpeg-sources.tar.xz"
-EXPECTED_AAR_SHA256 = "dc062bd1fec8a7ccc240539ed1af24051cf37292a115b62ccc1a1ccd87fc4f62"
-EXPECTED_FFMPEG_SOURCES_SHA256 = "9eeca8490f794574185986c0df7800d65ccca2980f57dc26b630a398581d7929"
+NATIVE_DIRECTORY = ROOT / "decoder-ffmpeg"
+PROVENANCE = json.loads((NATIVE_DIRECTORY / "provenance.json").read_text())
+FFMPEG_SOURCES_NAME = PROVENANCE["sourceArchive"]
+EXPECTED_AAR_SHA256 = "f8607785ba4a6a994d87b301b243593afc2dc19895775716b605533d141f6454"
+EXPECTED_FFMPEG_SOURCES_SHA256 = PROVENANCE["sourceArchiveSha256"]
 EXPECTED_STANDARD_SOURCE_SHA256 = {
-    f"sdk-android-{SDK_VERSION}-sources.jar": "5361e2924b04e6779dbb752a1cbeb2c72d4c6d8075319265682ba9af09872991",
-    f"sdk-core-{SDK_VERSION}-sources.jar": "d8d27e46ffa2d6d11b8ae92701fb7f79e16fc03eb7d75c4f7a14a2cd39f1f46e",
-    f"sdk-media3-{SDK_VERSION}-sources.jar": "58d10c07e81c341d70966ac2e61502139283fc5b97b76af64f4872be9909bf4e",
-    f"sdk-playback-{SDK_VERSION}-sources.jar": "abf814b33ab0cc379bf3e504a0ad5629d49f88d63f57cea9a328f5ea45b9a155",
+    f"sdk-android-{SDK_VERSION}-sources.jar": "0051ec113a73a3eb16c9f1a1cc787b7641766229f0201ae2808956a988685e9d",
+    f"sdk-core-{SDK_VERSION}-sources.jar": "4219d7ff3fef71477561da5db623d5eedcb1e4da9b75a42fc0205eb140589e94",
+    f"sdk-media3-{SDK_VERSION}-sources.jar": "c179c6f832f94efefa59d42597f936a405d443db0e56bd3fe2fdaf29d25290d2",
+    f"sdk-playback-{SDK_VERSION}-sources.jar": "7004cf2e5f13b4332d5f8b82056968e5861ced6675f5898583e60cafdfe1a43d",
 }
 EXPECTED_ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 # Android's 16 KiB page-size contract applies to the shipped 64-bit targets.
 ALIGNMENT_ABIS = ("arm64-v8a", "x86_64")
 EXPECTED_LIBRARY = "libffmpegJNI.so"
 EXPECTED_MINIMUM_ALIGNMENT = 16384
-EXPECTED_EMBEDDED_DECODER = "libs/media3-decoder-ffmpeg-1.11.0.jar"
 REQUIRED_SOURCE_ENTRIES = {
     "ffmpeg/COPYING.LGPLv2.1",
     "ffmpeg/LICENSE.md",
@@ -39,11 +42,14 @@ REQUIRED_SOURCE_ENTRIES = {
     "ffmpeg/libavcodec/ac3dec.c",
     "ffmpeg/libavcodec/eac3dec.c",
     "ffmpeg/libavcodec/mpegaudiodec_fixed.c",
-    "media3-1.11.0/LICENSE",
-    "media3-1.11.0/libraries/decoder_ffmpeg/README.md",
-    "media3-1.11.0/libraries/decoder_ffmpeg/src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioRenderer.java",
-    "media3-1.11.0/libraries/decoder_ffmpeg/src/main/jni/build_ffmpeg.sh",
-    "media3-1.11.0/libraries/decoder_ffmpeg/src/main/jni/ffmpeg_jni.cc",
+    "media3-1.11.1/LICENSE",
+    "media3-1.11.1/libraries/decoder_ffmpeg/README.md",
+    "media3-1.11.1/libraries/decoder_ffmpeg/proguard-rules.txt",
+    "media3-1.11.1/libraries/decoder_ffmpeg/src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioRenderer.java",
+    "media3-1.11.1/libraries/decoder_ffmpeg/src/main/java/androidx/media3/decoder/ffmpeg/FfmpegAudioDecoder.java",
+    "media3-1.11.1/libraries/decoder_ffmpeg/src/main/java/androidx/media3/decoder/ffmpeg/FfmpegLibrary.java",
+    "media3-1.11.1/libraries/decoder_ffmpeg/src/main/jni/build_ffmpeg.sh",
+    "media3-1.11.1/libraries/decoder_ffmpeg/src/main/jni/ffmpeg_jni.cc",
 }
 PT_LOAD = 1
 
@@ -154,29 +160,17 @@ def validate_decoder_entries(
     return libraries
 
 
-def validate_aar(path: Path, errors: list[str]) -> dict[str, bytes]:
+def validate_aar(path: Path, errors: list[str]) -> None:
     if not regular_file(path, "released SDK Media3 AAR", errors):
-        return {}
+        return
     require_hash(path, EXPECTED_AAR_SHA256, "released SDK Media3 AAR", errors)
     try:
         with zipfile.ZipFile(path) as archive:
             names = archive.namelist()
-            if names.count(EXPECTED_EMBEDDED_DECODER) != 1:
-                errors.append(
-                    "released SDK Media3 AAR must contain exactly "
-                    f"{EXPECTED_EMBEDDED_DECODER}"
-                )
-            native_entries = [name for name in names if name.startswith("jni/") and name.endswith(".so")]
-            expected_native = {f"jni/{abi}/{EXPECTED_LIBRARY}" for abi in EXPECTED_ABIS}
-            if set(native_entries) != expected_native or len(native_entries) != len(expected_native):
-                errors.append(
-                    f"released SDK Media3 AAR native entries {native_entries} do not match "
-                    f"{sorted(expected_native)}"
-                )
-            return validate_decoder_entries(archive, "jni", "released SDK Media3 AAR", errors)
+            if any(name.startswith("jni/") or "decoder-ffmpeg" in name for name in names):
+                errors.append("released SDK Media3 AAR must not supply app-owned native/FFmpeg payloads")
     except (OSError, zipfile.BadZipFile) as error:
         errors.append(f"released SDK Media3 AAR is unreadable: {error}")
-        return {}
 
 
 def safe_archive_path(name: str) -> bool:
@@ -191,7 +185,7 @@ def validate_source_members(members: list[tarfile.TarInfo], errors: list[str]) -
     unsafe = sorted(name for name in names if not safe_archive_path(name))
     if unsafe:
         errors.append(f"released FFmpeg corresponding source contains unsafe paths: {unsafe}")
-    unexpected_roots = sorted({PurePosixPath(name).parts[0] for name in names if name} - {"ffmpeg", "media3-1.11.0"})
+    unexpected_roots = sorted({PurePosixPath(name).parts[0] for name in names if name} - {"ffmpeg", "media3-1.11.1"})
     if unexpected_roots:
         errors.append(f"released FFmpeg corresponding source has unexpected roots: {unexpected_roots}")
     regular_names = {member.name for member in members if member.isfile()}
@@ -232,7 +226,7 @@ def validate_source_members(members: list[tarfile.TarInfo], errors: list[str]) -
         errors.append(f"released FFmpeg corresponding source has special entries: {special}")
 
 
-def validate_corresponding_source(path: Path, errors: list[str]) -> None:
+def validate_corresponding_source(path: Path, errors: list[str], upstream: Path | None = None) -> None:
     if not regular_file(path, "released FFmpeg corresponding source", errors):
         return
     require_hash(
@@ -244,6 +238,20 @@ def validate_corresponding_source(path: Path, errors: list[str]) -> None:
     try:
         with tarfile.open(path, mode="r:xz") as archive:
             validate_source_members(archive.getmembers(), errors)
+            if upstream is not None:
+                expected_files = set()
+                for member in archive.getmembers():
+                    if not member.isfile() or not member.name.startswith("media3-1.11.1/"):
+                        continue
+                    relative = member.name.removeprefix("media3-1.11.1/")
+                    expected_files.add(relative)
+                    target = upstream / relative
+                    if regular_file(target, "upstream Media3 source", errors):
+                        if target.read_bytes() != archive.extractfile(member).read():
+                            errors.append(f"upstream Media3 source differs from pinned archive: {relative}")
+                actual_files = {str(p.relative_to(upstream)) for p in upstream.rglob("*") if p.is_file()}
+                if actual_files != expected_files:
+                    errors.append("upstream Media3 file inventory differs from pinned archive")
     except (OSError, tarfile.TarError) as error:
         errors.append(f"released FFmpeg corresponding source is unreadable: {error}")
 
@@ -260,8 +268,39 @@ def validate_apk(path: Path, aar_libraries: dict[str, bytes], errors: list[str])
     for abi in EXPECTED_ABIS:
         if abi in aar_libraries and abi in apk_libraries and aar_libraries[abi] != apk_libraries[abi]:
             errors.append(
-                f"packaged APK {abi}/{EXPECTED_LIBRARY} differs from the released SDK AAR"
+                f"packaged APK {abi}/{EXPECTED_LIBRARY} differs from the app-owned decoder"
             )
+
+
+def validate_native_module(directory: Path, errors: list[str]) -> dict[str, bytes]:
+    if set(PROVENANCE["libraries"]) != set(EXPECTED_ABIS):
+        errors.append("native provenance ABI inventory is incomplete")
+    libraries = {}
+    native_root = directory / "src/main/jniLibs"
+    expected_files = {f"{abi}/{EXPECTED_LIBRARY}" for abi in EXPECTED_ABIS}
+    actual_files = {str(p.relative_to(native_root)) for p in native_root.rglob("*") if p.is_file()}
+    if actual_files != expected_files:
+        errors.append("app-owned native library inventory differs from four approved audio libraries")
+    for abi in EXPECTED_ABIS:
+        path = native_root / abi / EXPECTED_LIBRARY
+        require_hash(path, PROVENANCE["libraries"].get(abi, ""), f"app-owned decoder {abi}", errors)
+        if not path.is_file():
+            continue
+        data = path.read_bytes()
+        libraries[abi] = data
+        try:
+            alignments = load_alignments(data, str(path))
+            if abi in ALIGNMENT_ABIS and any(a < EXPECTED_MINIMUM_ALIGNMENT for a in alignments):
+                errors.append(f"app-owned decoder {abi}: load alignment below {EXPECTED_MINIMUM_ALIGNMENT}")
+            expected_class, expected_machine = {
+                "armeabi-v7a": (1, 40), "arm64-v8a": (2, 183), "x86": (1, 3), "x86_64": (2, 62),
+            }[abi]
+            if (data[4], data[5], struct.unpack_from("<H", data, 16)[0],
+                    struct.unpack_from("<H", data, 18)[0]) != (expected_class, 1, 3, expected_machine):
+                errors.append(f"app-owned decoder {abi}: wrong ELF ABI or file type")
+        except (ValueError, struct.error) as error:
+            errors.append(str(error))
+    return libraries
 
 
 def main() -> int:
@@ -272,6 +311,8 @@ def main() -> int:
         help="default to the unsigned release APK instead of the debug APK",
     )
     parser.add_argument("--apk", type=Path, help="APK to inspect instead of the default")
+    parser.add_argument("--staged-sdk", action="store_true",
+                        help="skip only released SDK evidence; app-owned native proof remains mandatory")
     parser.add_argument(
         "--evidence-directory",
         type=Path,
@@ -293,10 +334,13 @@ def main() -> int:
 
     errors: list[str] = []
     aar = evidence_directory / SDK_AAR_NAME
-    sources = evidence_directory / FFMPEG_SOURCES_NAME
+    catalog = tomllib.loads((ROOT / "gradle/libs.versions.toml").read_text())["versions"]
+    if catalog["media3"] != PROVENANCE["media3Version"]:
+        errors.append("Media3 catalog version does not match app-owned decoder provenance")
+    if args.release and args.staged_sdk:
+        errors.append("a staged SDK cannot pass the release gate")
     expected_evidence_names = {
         SDK_AAR_NAME,
-        FFMPEG_SOURCES_NAME,
         *EXPECTED_STANDARD_SOURCE_SHA256,
     }
     actual_evidence_names = (
@@ -304,16 +348,21 @@ def main() -> int:
         if evidence_directory.is_dir()
         else set()
     )
-    if actual_evidence_names != expected_evidence_names:
+    if not args.staged_sdk and actual_evidence_names != expected_evidence_names:
         errors.append(
             f"released SDK evidence files {sorted(actual_evidence_names)} do not match "
             f"{sorted(expected_evidence_names)}"
         )
-    for name, expected_hash in EXPECTED_STANDARD_SOURCE_SHA256.items():
-        require_hash(evidence_directory / name, expected_hash, f"released SDK source {name}", errors)
-    validate_corresponding_source(sources, errors)
-    aar_libraries = validate_aar(aar, errors)
-    validate_apk(apk, aar_libraries, errors)
+    if not args.staged_sdk:
+        if catalog["tvheadend-sdk"] != SDK_VERSION:
+            errors.append("SDK catalog does not match pinned public release; publication evidence must be updated")
+        for name, expected_hash in EXPECTED_STANDARD_SOURCE_SHA256.items():
+            require_hash(evidence_directory / name, expected_hash, f"released SDK source {name}", errors)
+        validate_aar(aar, errors)
+    validate_corresponding_source(NATIVE_DIRECTORY / FFMPEG_SOURCES_NAME, errors,
+                                 NATIVE_DIRECTORY / "upstream")
+    libraries = validate_native_module(NATIVE_DIRECTORY, errors)
+    validate_apk(apk, libraries, errors)
 
     for error in errors:
         print(f"error: {error}", file=sys.stderr)
@@ -321,11 +370,13 @@ def main() -> int:
         return 1
     mode = "release" if args.release else "debug"
     print(
-        f"Released SDK native gate passed: {SDK_COORDINATE}, SHA-256 "
-        f"{EXPECTED_AAR_SHA256}, {len(EXPECTED_ABIS)} shipped ABIs, 16 KiB ELF "
+        f"App-owned native gate passed: Media3 {PROVENANCE['media3Version']}, "
+        f"{len(EXPECTED_ABIS)} shipped ABIs, 16 KiB ELF "
         f"alignment on {', '.join(ALIGNMENT_ABIS)}, complete corresponding source, "
         f"and matching {mode} APK"
     )
+    if args.staged_sdk:
+        print("Staged SDK: public SDK provenance NOT verified; not release evidence")
     return 0
 
 

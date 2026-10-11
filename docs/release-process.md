@@ -93,7 +93,7 @@ commands are:
 ./tools/release verify-signed build/release/signed/0.2.1
 ```
 
-`prepare` resolves the byte-pinned SDK 0.23.0 artifacts and source classifiers
+`prepare` resolves the byte-pinned SDK 0.24.0 artifacts and source classifiers
 from the public repositories, verifies them, and creates the unsigned bundle.
 `sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
@@ -119,8 +119,8 @@ creates `build/release/unsigned/<version>/` containing:
 
 - the unsigned APK;
 - `.tar.gz` and `.zip` application corresponding-source archives;
-- exact released SDK source classifiers and the SDK-published Media3/FFmpeg
-  corresponding-source classifier;
+- exact released SDK source classifiers and the app-owned Media3/FFmpeg
+  corresponding-source archive (see `decoder-ffmpeg/README.md`);
 - `release-manifest.json` with identity, version, source commit, and hashes;
 - `SHA256SUMS` covering the complete unsigned bundle.
 
@@ -148,8 +148,8 @@ The signed output contains:
 
 - the signed APK;
 - both application corresponding-source formats;
-- exact released SDK source classifiers and the SDK-published Media3/FFmpeg
-  corresponding-source classifier;
+- exact released SDK source classifiers and the app-owned Media3/FFmpeg
+  corresponding-source archive;
 - the original unsigned manifest;
 - a signed `release-manifest.json` with source commit and certificate identity;
 - `SHA256SUMS` and the complete `apksigner` verification report.

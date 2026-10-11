@@ -1,0 +1,22 @@
+{
+  "media3Version": "1.11.1",
+  "media3Revision": "8c6678b657ede1e7883fc164ef73ed483c7796c3",
+  "media3UpstreamArchiveSha256": "bbe2157458f2eb365f9eebf4a8d4f903d8da7ab1e275aa0ad680cd253811b724",
+  "ffmpegReleaseFile": "6.0.2",
+  "ffmpegReportedRevision": "3f92512f",
+  "ffmpegInputArchiveSha256": "9eeca8490f794574185986c0df7800d65ccca2980f57dc26b630a398581d7929",
+  "sourceArchive": "ffmpeg-media3-1.11.1-sources.tar.xz",
+  "sourceArchiveSha256": "7f84a79a525f80fa89ca4bf541325b5a068a20fc59ad5835fa6d148e68177a54",
+  "ndk": "26.1.10909125",
+  "compiler": "Android clang 17.0.2 (r487747d), d9f89f4d16663d5012e5c09495f3b30ece3d2362",
+  "androidApi": 28,
+  "host": "linux-x86_64",
+  "makeJobs": 2,
+  "decoders": ["ac3", "eac3", "mp3"],
+  "libraries": {
+    "arm64-v8a": "1b48e424a00ec822bbfcaa6c414736bb45b742e9099d440183e61a67cd1ad7a2",
+    "armeabi-v7a": "1693bb829787d5d3145571581409aa695158c1e2682ccb58811e1d2f656bb773",
+    "x86": "d164069f06982f584cf25a2cd786e9dfafb9616a2e07b4e85e3165b95a79fd9e",
+    "x86_64": "ca9f0032a93a7c18787e065ddec3bc43875cdfe9d74563c4bce88c9c3dfd49ba"
+  }
+}

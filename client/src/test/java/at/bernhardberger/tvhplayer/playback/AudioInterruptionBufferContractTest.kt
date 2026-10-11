@@ -31,7 +31,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.lang.reflect.Proxy
-import java.io.IOException
 
 /** Drives the released SDK source with real readers/queues, without depending on a device decoder. */
 @RunWith(RobolectricTestRunner::class)
@@ -39,8 +38,8 @@ import java.io.IOException
 class AudioInterruptionBufferContractTest {
     @Test fun disabledAudioIsDiscardedWhileVideoAdvancesBeyondTheSampleLimit() = exercise(discard = true)
 
-    @Test(expected = IOException::class)
-    fun withoutDiscardDisabledAudioHitsTheReleasedSdkBufferLimit() = exercise(discard = false)
+    @Test
+    fun withoutDiscardDisabledAudioReportsExhaustionAfterRetirement() = exercise(discard = false)
 
     private fun exercise(discard: Boolean) = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
@@ -49,7 +48,13 @@ class AudioInterruptionBufferContractTest {
         // Capture the actual source installed by the public coordinator; drive its period below.
         val capturingPlayer = Proxy.newProxyInstance(ExoPlayer::class.java.classLoader,
             arrayOf(ExoPlayer::class.java)) { _, method, args ->
-            if (method.name == "setMediaSource") { source = args!![0] as MediaSource; null }
+            if (method.name == "setMediaSource") {
+                source = args!![0] as MediaSource
+                // Install the real source so SDK ownership checks see its actual timeline uid.
+                // Suppress prepare below: this test drives its period, not ExoPlayer's renderer.
+                method.invoke(player, *args)
+            }
+            else if (method.name == "prepare") null
             else method.invoke(player, *(args ?: emptyArray()))
         } as ExoPlayer
         val connection = ScriptedSubscriptionConnection().apply {
@@ -62,7 +67,11 @@ class AudioInterruptionBufferContractTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).apply { scriptLivePlaybackSuccess(manager) }
-        val coordinator = createTvheadendPlaybackCoordinator(capturingPlayer).also { it.launchIn(scope) }
+        val recoveries = mutableListOf<PlaybackRecoveryReason>()
+        val coordinator = createTvheadendPlaybackCoordinator(capturingPlayer, onRecoveryRequired = {
+            assertEquals(0, player.mediaItemCount)
+            recoveries += it
+        }).also { it.launchIn(scope) }
         var period: MediaPeriod? = null
         var timeline: Timeline? = null
         val caller = MediaSource.MediaSourceCaller { _, value -> timeline = value }
@@ -103,7 +112,7 @@ class AudioInterruptionBufferContractTest {
             var consumed = 0
             var lastPosition = 0L
             // 5,120 packets per track exceed the SDK's 4,096-sample cap if disabled audio is retained.
-            repeat(80) { batch ->
+            for (batch in 0 until 80) {
                 repeat(64) { emitPair(connection, 8 + batch * 64 + it) }
                 val expectedEnd = (8L + batch * 64 + 62) * 40_000
                 await {
@@ -117,11 +126,17 @@ class AudioInterruptionBufferContractTest {
                         }
                     }
                     if (discard) livePeriod.discardBuffer(lastPosition, false)
-                    lastPosition >= expectedEnd
+                    lastPosition >= expectedEnd || recoveries.isNotEmpty()
+                }
+                if (recoveries.isNotEmpty()) {
+                    assertFalse(discard)
+                    assertEquals(listOf(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED), recoveries)
+                    return@runBlocking
                 }
                 if (discard) assertTrue("Queues must remain bounded while audio is disabled", allocator.totalBytesAllocated < 2 * 1024 * 1024)
             }
             assertTrue(consumed > 4_096)
+            assertTrue("Retained disabled audio must exhaust its bounded queue", discard)
             livePeriod.maybeThrowPrepareError()
             videoStream.maybeThrowError()
         } finally {

@@ -167,15 +167,19 @@ deliberately separated: reproducible unsigned bundles are prepared on the
 engineering host, while the stable private signing key remains on an isolated
 owner-controlled host.
 
-The app consumes the released
-`at.bernhardberger.tvheadend:sdk-media3:0.3.0` artifact, which keeps Media3
-1.11.0 and its bundled FFmpeg extension on one release boundary. Playback is
-platform-first with the native extension retained as the AC-3/E-AC-3/MP3
-fallback. The release gate pins the public AAR and source-classifier hashes,
-checks the shipped ABI matrix and applicable 16 KiB ELF alignment, and proves
-that the APK contains the same native bytes. Every binary release must include
-application source, all released SDK source classifiers, the published
-Media3/FFmpeg corresponding-source classifier, and their checksums.
+The app consumes the TVHeadend SDK and supplies its own Media3 1.11.1 FFmpeg
+audio extension in [`decoder-ffmpeg/`](decoder-ffmpeg/README.md). Playback is
+platform-first, with AC-3/E-AC-3/MP3 software fallback. Native provenance pins
+the upstream sources, build inputs and binary hashes; verification checks all
+four ABIs, applicable 16 KiB ELF alignment, and byte identity in the APK.
+Every binary release must include application source, released SDK source
+classifiers, the app-owned Media3/FFmpeg corresponding-source archive, and
+their checksums.
+
+The app consumes public SDK `0.24.0` from Maven Central. `./tools/verify` checks
+the resolved dependency graph and byte-pinned SDK evidence. Opt-in local SDK
+substitution remains available for development; `./tools/verify --staged-sdk`
+cannot establish public SDK provenance or authorize a release.
 
 See [`docs/release-process.md`](docs/release-process.md) for the complete release,
 signature, source, and rollback gates.

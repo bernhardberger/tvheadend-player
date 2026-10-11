@@ -27,7 +27,8 @@ internal class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
         is Notice.Dvr -> formatDvr(notice, now)
         is Notice.DvrActionFailed -> FormattedNotice(context.getString(
-            if (notice.failure == DvrMutationFeedback.TIMEOUT) R.string.recording_action_not_confirmed
+            if (notice.failure == DvrMutationFeedback.TIMEOUT ||
+                notice.failure == DvrMutationFeedback.UNKNOWN_OUTCOME) R.string.recording_action_not_confirmed
             else R.string.recording_action_failed),
             context.getString(when (notice.failure) {
                 DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
@@ -35,6 +36,7 @@ internal class NoticeFormatter(private val context: Context) {
                 DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
                 DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
                 DvrMutationFeedback.TIMEOUT -> R.string.recording_action_timeout
+                DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_unknown_outcome
                 DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
                 DvrMutationFeedback.CONFIRMED, DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> error("Not an action failure")
             }), AppNoticeIcon.WARNING)

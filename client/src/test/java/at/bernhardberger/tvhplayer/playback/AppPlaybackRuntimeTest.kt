@@ -738,6 +738,24 @@ class AppPlaybackRuntimeTest {
     }
 
     @Test
+    fun exhaustedRecoveryReportsTheRetiredTargetIssueAfterDeparture() {
+        val state = recoveryExhaustedState(
+            PlaybackStopResult.RetiredAfterDeparture(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
+            PlaybackRecoveryReason.LIVE_ENDED,
+        )
+
+        assertEquals(AppPlaybackFailureReason.OTHER, state.reason)
+        assertSame(SubscriptionIssue.NO_FREE_ADAPTER, state.subscriptionIssue)
+        assertEquals(PlaybackRecoveryReason.LIVE_ENDED, state.recoveryReason)
+        assertNull(
+            recoveryExhaustedState(
+                PlaybackStopResult.RetiredAfterDeparture(finalSubscriptionIssue = null),
+                PlaybackRecoveryReason.LIVE_ENDED,
+            ).subscriptionIssue,
+        )
+    }
+
+    @Test
     fun orderedServerPauseReconcilesOnlyAnActiveLiveTarget() {
         val liveTarget = AppPlaybackTarget.Live(ChannelId(23))
 

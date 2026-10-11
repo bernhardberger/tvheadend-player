@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<lint>
+    <!-- Retained verbatim for source provenance; excluded from JavaCompile and the APK. -->
+    <issue id="UnsafeOptInUsageError">
+        <ignore path="upstream/libraries/decoder_ffmpeg/src/main/java/androidx/media3/decoder/ffmpeg/ExperimentalFfmpegVideoRenderer.java" />
+    </issue>
+</lint>

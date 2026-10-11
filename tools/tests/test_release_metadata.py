@@ -187,13 +187,14 @@ class ReleaseMetadataTest(unittest.TestCase):
         metadata = (ROOT / "tools/release_metadata.py").read_text(encoding="utf-8")
 
         self.assertNotIn('git -C "$SDK_ROOT" archive', prepare)
-        self.assertIn('SDK_VERSION="0.23.0"', prepare)
+        self.assertIn('SDK_VERSION="0.24.0"', prepare)
         self.assertIn(
-            'SDK_SOURCE_COMMIT="12e90164166d083d36b53f92374349d2a8c5cc0c"',
+            'SDK_SOURCE_COMMIT="1983ff49cbaf950a67d07ed976ab1874c4fd86cc"',
             prepare,
         )
         self.assertIn(":app:syncReleasedSdkEvidence", prepare)
-        self.assertIn("sdk-media3-${SDK_VERSION}-ffmpeg-sources.tar.xz", prepare)
+        self.assertNotIn("sdk-media3-${SDK_VERSION}-ffmpeg-sources", prepare)
+        self.assertIn('cp "$ROOT_DIR/decoder-ffmpeg/$NATIVE_SOURCE_NAME"', prepare)
         self.assertIn("--sdk-source-commit", prepare)
         self.assertIn("--sdk-source-tar-gz", prepare)
         self.assertIn('["artifacts"]["sdkSourceTarGz"]', sign)
