@@ -15,6 +15,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.text.TextLayoutResult
@@ -186,6 +187,20 @@ class GuideRealisticSceneTest {
         AppClock.format = ClockFormat.TWELVE_HOUR
         showAt("2026-09-15T19:40:00")
         capture("guide-fixture-evening-12h")
+        val clock = Regex("""\d{1,2}:\d\d [AP]M""")
+        val shownTimes = compose.onAllNodes(androidx.compose.ui.test.hasText(":", substring = true), useUnmergedTree = true)
+            .fetchSemanticsNodes().filter { node ->
+                node.layoutInfo.isPlaced && node.config.getOrNull(SemanticsProperties.Text).orEmpty()
+                    .any { clock.containsMatchIn(it.text) }
+            }
+        assertTrue("12-hour programme times are shown", shownTimes.any { node ->
+            node.config.getOrNull(SemanticsProperties.Text).orEmpty().any { it.text.contains('–') } })
+        shownTimes.forEach { node ->
+            val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+            node.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action?.invoke(layouts)
+            assertFalse("${node.config.getOrNull(SemanticsProperties.Text)} is clipped",
+                layouts.single().hasVisualOverflow)
+        }
     } finally {
         AppClock.format = ClockFormat.SYSTEM
     }

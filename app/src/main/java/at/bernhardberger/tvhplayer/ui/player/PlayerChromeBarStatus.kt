@@ -141,13 +141,22 @@ internal data class LiveBarPresentation(
     val liveEdge: Float? = null,
     val motionKey: Any? = null,
     val showTrack: Boolean = true,
+    /** The clock times behind [startLabel] and [end], so a held row follows a clock-format change. */
+    val startClockSec: Long? = null,
+    val endClockSec: Long? = null,
+)
+
+/** The held row in the current clock format: its coordinates stay, its clock texts follow the setting. */
+private fun LiveBarPresentation.inCurrentClockFormat(): LiveBarPresentation = copy(
+    startLabel = startClockSec?.let(::formatClock) ?: startLabel,
+    end = end?.let { end -> endClockSec?.let { end.copy(end = formatClock(it)) } ?: end },
 )
 
 /** A timing gap holds the whole row and its distance across Banner/controls changes. */
 internal fun PlayerChromeTimeline.Live.barPresentation(previous: LiveBarPresentation?): LiveBarPresentation {
     val expectsTiming = timeshiftExpected || committedTimeshift.available
     val unknown = liveAvailable && expectsTiming && !committedTimeshift.timingKnown && !tuning && !liveStart
-    if (unknown && previous != null) return previous
+    if (unknown && previous != null) return previous.inCurrentClockFormat()
     val schedule = scheduleProgress()
     val range = committedTimeshift.takeIf { liveAvailable && it.available && it.timingKnown && schedule == null }
         ?.let(::timeshiftSeekbarRange)
@@ -167,6 +176,10 @@ internal fun PlayerChromeTimeline.Live.barPresentation(previous: LiveBarPresenta
         liveEdge = range?.let { 1f },
         motionKey = motionKey to schedule?.axisKey,
         showTrack = schedule != null || range != null || expectsTiming || !liveAvailable,
+        startClockSec = schedule?.startSec ?: window?.start?.epochSeconds
+            ?: range?.let { bufferStartClockSec(nowSec, committedTimeshift.liveEdgeMs, it.displayStartMs) },
+        endClockSec = (window?.stop?.epochSeconds ?: schedule?.stopSec ?: committedWindow?.stop?.epochSeconds)
+            .takeIf { end?.end != null },
     )
 }
 

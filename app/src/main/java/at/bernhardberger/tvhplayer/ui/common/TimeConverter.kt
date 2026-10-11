@@ -10,6 +10,7 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAccessor
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * The app-wide 12/24-hour choice. Snapshot state, so composition that formats a
@@ -32,13 +33,19 @@ fun formatDateAndClock(
     datePattern: String,
     locale: Locale = Locale.getDefault(),
     uses24Hour: Boolean = AppClock.uses24Hour,
-): String = DateTimeFormatter.ofPattern("$datePattern ${clockPattern(uses24Hour)}", locale).format(time)
+): String = formatter("$datePattern ${clockPattern(uses24Hour)}", locale).format(time)
 
 fun formatClock(
     time: TemporalAccessor,
     locale: Locale = Locale.getDefault(),
     uses24Hour: Boolean = AppClock.uses24Hour,
-): String = DateTimeFormatter.ofPattern(clockPattern(uses24Hour), locale).format(time)
+): String = formatter(clockPattern(uses24Hour), locale).format(time)
+
+/** Formatters are immutable and the guide formats several times per cell, so each pattern is built once. */
+private val formatters = ConcurrentHashMap<Pair<String, Locale>, DateTimeFormatter>()
+
+private fun formatter(pattern: String, locale: Locale): DateTimeFormatter =
+    formatters.getOrPut(pattern to locale) { DateTimeFormatter.ofPattern(pattern, locale) }
 
 /**
  * Widest-case clock texts for sizing a fixed label box: every digit is [digit], and 12-hour

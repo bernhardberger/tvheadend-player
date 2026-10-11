@@ -13,8 +13,8 @@ import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
-import java.time.ZoneId
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import java.time.ZoneId
 import java.time.format.TextStyle
 import kotlin.time.Clock
 import kotlin.time.Instant

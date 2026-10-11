@@ -43,9 +43,12 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -469,13 +472,7 @@ internal fun TimelineProgrammeCell(
                 )
             },
             supportingContent = if (width >= 90.dp) {
-                {
-                    Text(
-                        text = "$startTime–$stopTime",
-                        maxLines = 1,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
+                { ProgrammeTimeText(range = "$startTime–$stopTime", start = startTime) }
             } else {
                 null
             },
@@ -510,6 +507,22 @@ internal fun TimelineProgrammeCell(
                     .padding(6.dp),
             ) }
         }
+    }
+}
+
+/** The programme's [range] when it fits the cell on one line, else its [start] alone: a 12-hour range runs wider. */
+@Composable
+private fun ProgrammeTimeText(range: String, start: String) {
+    val style = MaterialTheme.typography.bodySmall
+    Layout(content = {
+        Text(text = range, maxLines = 1, softWrap = false, style = style)
+        // The cell's description already reads the full range.
+        Text(text = start, maxLines = 1, overflow = TextOverflow.Ellipsis, style = style,
+            modifier = Modifier.clearAndSetSemantics {})
+    }) { measurables, constraints ->
+        val full = measurables[0].measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+        val shown = full.takeIf { it.width <= constraints.maxWidth } ?: measurables[1].measure(constraints.copy(minWidth = 0))
+        layout(shown.width, shown.height) { shown.placeRelative(0, 0) }
     }
 }
 

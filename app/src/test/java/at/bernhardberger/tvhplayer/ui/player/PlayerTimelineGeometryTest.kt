@@ -44,6 +44,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import coil3.ImageLoader
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.settings.ClockFormat
 import kotlin.time.Duration.Companion.minutes
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import org.junit.Assert.assertEquals
@@ -692,6 +693,35 @@ class PlayerTimelineGeometryTest {
             assertEquals("0:30 behind live", text("player-distance"))
             if (exists("player-seekbar")) assertFalse("held rendering must not grant seeking",
                 compose.onNodeWithTag("player-seekbar").fetchSemanticsNode().config.contains(androidx.compose.ui.semantics.SemanticsActions.CustomActions))
+        }
+    }
+
+    @Test fun aHeldRowFollowsAClockFormatChange() {
+        val behind = buffered.copy(positionMs = -30_000, paused = true)
+        var gap by mutableStateOf(false)
+        compose.setContent { LiveChrome(Frame("", PlayerChromeMode.CONTROLS,
+            if (gap) live(behind.copy(timingKnown = false, playbackTarget = null)) else live(behind, window = airingWindow),
+            PlayerStateCell.PAUSED)) }
+        settle()
+        val fill = fillFraction()!!
+        val start = leadingText()
+        val end = text("player-end-clock")
+        compose.runOnIdle { gap = true }
+        settle()
+        try {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.common.AppClock.format = ClockFormat.TWELVE_HOUR }
+            settle()
+            assertEquals("the held row keeps its fill", fill, fillFraction()!!, 0.002f)
+            assertTrue("held start in 12-hour: ${leadingText()}", leadingText().matches(Regex("""\d{1,2}:\d\d [AP]M""")))
+            assertTrue("held end in 12-hour: ${text("player-end-clock")}",
+                text("player-end-clock").matches(Regex("""\d{1,2}:\d\d [AP]M""")))
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.common.AppClock.format = ClockFormat.SYSTEM }
+            settle()
+            assertEquals(start, leadingText())
+            assertEquals(end, text("player-end-clock"))
+            assertEquals("0:30 behind live", text("player-distance"))
+        } finally {
+            at.bernhardberger.tvhplayer.ui.common.AppClock.format = ClockFormat.SYSTEM
         }
     }
 
