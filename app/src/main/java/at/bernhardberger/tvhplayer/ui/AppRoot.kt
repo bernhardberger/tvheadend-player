@@ -71,6 +71,7 @@ import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
@@ -474,6 +475,7 @@ fun AppRoot(
     )
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    LaunchedEffect(uiSettings.clockFormat) { AppClock.format = uiSettings.clockFormat }
     val profileOwner: AppProfileOwner = koinInject()
     val profileGeneration by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val currentChannelReadiness = connectionPresentation.currentChannelReadiness

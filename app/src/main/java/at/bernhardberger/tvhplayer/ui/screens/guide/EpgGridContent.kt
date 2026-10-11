@@ -77,6 +77,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
@@ -440,9 +441,10 @@ internal fun TimelineProgrammeCell(
     val locale = androidx.compose.ui.platform.LocalLocale.current.platformLocale
     val startSec = event.start.epochSeconds
     val stopSec = event.stop.epochSeconds
-    val startDate = remember(startSec, locale, formattingZone) { startSec.formatDateTime() }
-    val startTime = remember(startSec, locale, formattingZone) { formatHm(startSec) }
-    val stopTime = remember(stopSec, locale, formattingZone) { formatHm(stopSec) }
+    val uses24Hour = AppClock.uses24Hour
+    val startDate = remember(startSec, locale, formattingZone, uses24Hour) { startSec.formatDateTime() }
+    val startTime = remember(startSec, locale, formattingZone, uses24Hour) { formatHm(startSec) }
+    val stopTime = remember(stopSec, locale, formattingZone, uses24Hour) { formatHm(stopSec) }
     var focused by remember { mutableStateOf(false) }
     val description = stringResource(
         R.string.epg_cell_description,

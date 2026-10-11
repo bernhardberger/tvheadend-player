@@ -14,7 +14,7 @@ import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import java.time.format.TextStyle
 import kotlin.time.Clock
 import kotlin.time.Instant
@@ -90,7 +90,7 @@ internal class NoticeFormatter(private val context: Context) {
                             today.plusDays(1) -> context.getString(R.string.tomorrow)
                             else -> date.dayOfWeek.getDisplayName(TextStyle.SHORT, locale)
                         }
-                        add("$day ${date.format(DateTimeFormatter.ofPattern("HH:mm", locale))}")
+                        add("$day ${formatClock(date, locale)}")
                     }
                 }
                 DvrChangeKind.RECORDING_STARTED -> if (channel != null && channel != name) add(channel)

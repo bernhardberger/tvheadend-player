@@ -85,6 +85,7 @@ import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.formatDateAndClock
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
@@ -868,9 +869,7 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
 )
 
 internal fun Long?.recordingDateTime(): String = this?.let {
-    Instant.ofEpochSecond(it)
-        .atZone(ZoneId.systemDefault())
-        .format(DateTimeFormatter.ofPattern("EEE d MMM HH:mm"))
+    formatDateAndClock(Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault()), "EEE d MMM")
 }.orEmpty()
 
 private fun recordingDurationMinutes(entry: DvrEntry): Long? {

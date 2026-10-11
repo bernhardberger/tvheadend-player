@@ -173,7 +173,7 @@ class AppNoticeHostTest {
                     })
             }
         }
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionDown); pressKey(Key.DirectionCenter) }
+        compose.onRoot().performKeyInput { repeat(3) { pressKey(Key.DirectionDown) }; pressKey(Key.DirectionCenter) }
         compose.runOnIdle { playback = true }
         compose.onNodeWithText("Playback action").assertIsFocused()
         compose.runOnIdle { release.complete(Unit) }

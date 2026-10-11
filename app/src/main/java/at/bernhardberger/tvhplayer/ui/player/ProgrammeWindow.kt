@@ -9,7 +9,7 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.core.TIMESHIFT_LIVE_EDGE_TOLERANCE_MS
 import at.bernhardberger.tvhplayer.core.programmeTimingDescribesPlayback
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import kotlin.time.Instant
 
 /**
@@ -143,6 +143,5 @@ internal fun programmeWindowClockLabels(event: EpgEvent, zone: ZoneId = ZoneId.s
 private fun programmeWindowClockLabels(startAt: Instant, stopAt: Instant, zone: ZoneId): Pair<String, String> {
     val start = java.time.Instant.ofEpochSecond(startAt.epochSeconds).atZone(zone)
     val end = java.time.Instant.ofEpochSecond(stopAt.epochSeconds).atZone(zone)
-    val formatter = DateTimeFormatter.ofPattern("HH:mm")
-    return start.format(formatter) to end.format(formatter)
+    return formatClock(start) to formatClock(end)
 }

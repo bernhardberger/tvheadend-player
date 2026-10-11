@@ -29,6 +29,8 @@ import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvhplayer.settings.ClockFormat
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
@@ -178,6 +180,14 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-kids-off-air-ion-off-grid")
         moveToChannel(27)
         capture("guide-fixture-lower-channels")
+    }
+
+    @Test fun twelveHourClockKeepsRulerAndProgrammeTimesReadable() = try {
+        AppClock.format = ClockFormat.TWELVE_HOUR
+        showAt("2026-09-15T19:40:00")
+        capture("guide-fixture-evening-12h")
+    } finally {
+        AppClock.format = ClockFormat.SYSTEM
     }
 
     @Test fun consecutiveFiveMinuteWeatherSlotsKeepDpadFocusAccessible() {

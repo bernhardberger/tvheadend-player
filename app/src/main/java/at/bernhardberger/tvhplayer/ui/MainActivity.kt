@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityServ
 import at.bernhardberger.tvhplayer.core.ApplianceEntryPolicy
 import at.bernhardberger.tvhplayer.core.MainStartupState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.player.stopPlaybackAndClose
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
@@ -299,6 +300,8 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        // The device clock format can change while the app is in the background.
+        AppClock.systemUses24Hour = android.text.format.DateFormat.is24HourFormat(this)
         startupBrandIntro.resumed(true)
     }
 

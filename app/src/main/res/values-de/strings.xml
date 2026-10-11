@@ -105,6 +105,9 @@
     <string name="language_follow_system">System folgen</string>
     <string name="language_german">Deutsch</string>
     <string name="language_english">Englisch</string>
+    <string name="settings_clock_format">Uhrzeitformat</string>
+    <string name="clock_format_12_hour">12 Stunden (8:15\u00A0PM)</string>
+    <string name="clock_format_24_hour">24 Stunden (20:15)</string>
     <string name="profile">Streamprofil</string>
     <string name="profile_server_default">Serverstandard</string>
     <string name="profile_direct_streaming">Direktes Streaming</string>

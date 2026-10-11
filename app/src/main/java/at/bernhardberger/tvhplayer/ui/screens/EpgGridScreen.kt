@@ -137,6 +137,9 @@ import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
+import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
+import at.bernhardberger.tvhplayer.ui.common.formatDateAndClock
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
@@ -173,7 +176,6 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -321,9 +323,10 @@ fun EpgGridScreen(
     // TV Material's native ListItem focus scale is 1.05; reserve its largest possible
     // half-growth as well as the normal 8dp breathing room, including long programmes.
     val horizontalFocusReserve = maxOf(GuideFocusReserve, (timelineWidth - 8.dp) * GuideFocusHalfGrowth)
-    val timeLabelWidth = rememberTextMeasurer().measure(
-        "00:00", style = MaterialTheme.typography.labelMedium,
-    ).size.width
+    val timeLabelMeasurer = rememberTextMeasurer()
+    val timeLabelWidth = clockWidthSamples(uses24Hour = AppClock.uses24Hour, digit = '0').maxOf {
+        timeLabelMeasurer.measure(it, style = MaterialTheme.typography.labelMedium).size.width
+    }
     // Capacity already budgets the outer safe area. Do not subtract terminal padding again.
     val visibleWindowSec = guideVisibleWindowSec(timelineWidthPx, timeLabelWidth, density.density)
     val platformBringIntoView = LocalBringIntoViewSpec.current
@@ -2403,6 +2406,5 @@ private fun rememberCurrentEpochSeconds(): () -> Long {
     return remember(nowSec) { { nowSec.longValue } }
 }
 
-internal fun Long.formatDateTime(): String = Instant.ofEpochSecond(this)
-    .atZone(ZoneId.systemDefault())
-    .format(DateTimeFormatter.ofPattern("EEE d MMM HH:mm"))
+internal fun Long.formatDateTime(): String =
+    formatDateAndClock(Instant.ofEpochSecond(this).atZone(ZoneId.systemDefault()), "EEE d MMM")

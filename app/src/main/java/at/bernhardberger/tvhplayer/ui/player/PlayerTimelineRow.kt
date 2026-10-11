@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
 import kotlin.math.roundToInt
 
 /** Gap between an endpoint label box and the track. */
@@ -52,9 +54,10 @@ internal val DistanceTextGap = 16.dp
 
 /**
  * The label boxes of [kind], measured once from the widest text they can show in the actual label
- * style and font scale: live `88:88` before and after the bar, a recording `8:88:88`; the localized
- * `8:88:88 behind live`. Nothing the row shows, tuning included, changes them, so the bar never
- * moves. A longer text ellipsizes in its box.
+ * style and font scale: live the widest clock of the current 12/24-hour format (`88:88` or
+ * `88:88 PM`) before and after the bar, a recording `8:88:88`; the localized `8:88:88 behind live`.
+ * Nothing the row shows, tuning included, changes them, so the bar never moves. A longer text
+ * ellipsizes in its box.
  */
 @Composable
 internal fun rememberTimelineEndpointWidths(kind: TimelineKind): TimelineEndpointWidths {
@@ -62,11 +65,12 @@ internal fun rememberTimelineEndpointWidths(kind: TimelineKind): TimelineEndpoin
     val style = timelineLabelStyle()
     val density = LocalDensity.current
     val distance = stringResource(R.string.timeshift_behind_live, "8:88:88")
-    return remember(kind, measurer, style, density, distance) {
+    val clockSamples = clockWidthSamples(uses24Hour = AppClock.uses24Hour)
+    return remember(kind, measurer, style, density, distance, clockSamples) {
         fun width(text: String): Dp = with(density) {
             measurer.measure(text, style, softWrap = false, maxLines = 1, density = density).size.width.toDp()
         }
-        val clock = width(if (kind == TimelineKind.LIVE) "88:88" else "8:88:88")
+        val clock = if (kind == TimelineKind.LIVE) clockSamples.maxOf(::width) else width("8:88:88")
         TimelineEndpointWidths(leading = clock, trailing = clock, distance = width(distance))
     }
 }

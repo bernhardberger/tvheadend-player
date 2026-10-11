@@ -26,6 +26,7 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvhplayer.settings.AppLanguage
+import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
@@ -279,6 +280,7 @@ class SettingsDepthNavigationTest {
     @Test fun rootGeneralLanguageChoiceAndSwitchAreExplicitAndRestoreParent() {
         var language by mutableStateOf(AppLanguage.SYSTEM)
         var showGuide by mutableStateOf(true)
+        var clockFormat by mutableStateOf(ClockFormat.SYSTEM)
         var languageCalls = 0
         var clearCalls = 0
         lateinit var navigation: DepthNavigationState
@@ -294,8 +296,10 @@ class SettingsDepthNavigationTest {
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsScreenNavigation(navigation,
                         listOf(settingsRootLevel()) + settingsGeneralLevels(
-                            UiSettings(showEpgMenu = showGuide), language, CacheStatistics.EMPTY, CacheClearState.IDLE,
-                            { languageCalls++; navigation.pop(); language = it }, { showGuide = !showGuide }, { clearCalls++ }),
+                            UiSettings(showEpgMenu = showGuide, clockFormat = clockFormat), language, CacheStatistics.EMPTY,
+                            CacheClearState.IDLE,
+                            { languageCalls++; navigation.pop(); language = it }, { showGuide = !showGuide }, { clearCalls++ },
+                            onSelectClockFormat = { navigation.pop(); clockFormat = it }),
                         initialFocusEnabled = !drawerActive, contentPadding = padding)
                     }
                 }
@@ -320,6 +324,15 @@ class SettingsDepthNavigationTest {
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("App language").assertIsFocused()
         assertEquals(SettingsSection.GENERAL.name, navigation.stack.active.levelId)
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Clock format").assertIsFocused()
+        press(Key.DirectionRight)
+        compose.onNodeWithText("Follow system").assertIsFocused()
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Clock format").assertIsFocused()
+        compose.onNodeWithText("12-hour (8:15 PM)").assertExists()
+        assertEquals(ClockFormat.TWELVE_HOUR, clockFormat)
         press(Key.DirectionDown)
         press(Key.DirectionRight)
         assertTrue(showGuide)

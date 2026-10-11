@@ -77,6 +77,8 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.settings.ClockFormat
+import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import coil3.ImageLoader
@@ -279,7 +281,20 @@ class PlayerChromeCaptureTest {
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
     private var revealControls by mutableStateOf(false)
 
-    private fun captures(locale: String, fontScale: Float, programmeOnly: Boolean = false, trialOnly: Boolean = false) {
+    @Test fun englishTwelveHourClock() = try {
+        AppClock.format = ClockFormat.TWELVE_HOUR
+        captures("en", 1f, clockSuffix = "-12h")
+    } finally {
+        AppClock.format = ClockFormat.SYSTEM
+    }
+
+    private fun captures(
+        locale: String,
+        fontScale: Float,
+        programmeOnly: Boolean = false,
+        trialOnly: Boolean = false,
+        clockSuffix: String = "",
+    ) {
         if (trialOnly) brightStill = FixtureArt.art("still-ridge-light")
         lateinit var view: View
         var scene by mutableStateOf(Scene.CONTROLS_LIVE)
@@ -398,7 +413,7 @@ class PlayerChromeCaptureTest {
                 if (next == Scene.PROGRAMME_CONFIRM_RECORD) ShadowDialog.getLatestDialog().window!!.decorView.draw(canvas)
             }
             val directory = File(if (trialOnly) "/tmp/opencode/rail-round2/captures" else "../artifacts/player-chrome").apply { mkdirs() }
-            val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale.png"
+            val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale$clockSuffix.png"
             File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
             if (next == Scene.PROGRAMME_MORE_INFO) {

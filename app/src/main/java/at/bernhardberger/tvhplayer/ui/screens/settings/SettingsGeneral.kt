@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.cacheSizeMegabytes
 import at.bernhardberger.tvhplayer.settings.AppLanguage
+import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.SettingsSection
@@ -22,6 +23,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 internal const val LANGUAGE_LEVEL = "app-language"
+internal const val CLOCK_FORMAT_LEVEL = "clock-format"
 
 @Composable
 internal fun settingsGeneralLevels(
@@ -45,6 +47,10 @@ internal fun settingsGeneralLevels(
         },
         onToggleEpg = { scope.launch { settingsStore.setShowEpgMenu(!settings.showEpgMenu) } },
         onClearCache = storageViewModel::clearCache,
+        onSelectClockFormat = { format ->
+            navigation.pop()
+            scope.launch { settingsStore.setClockFormat(format) }
+        },
     )
 }
 
@@ -58,7 +64,14 @@ internal fun settingsGeneralLevels(
     onSelectLanguage: (AppLanguage) -> Unit,
     onToggleEpg: () -> Unit,
     onClearCache: () -> Unit,
+    onSelectClockFormat: (ClockFormat) -> Unit = {},
 ): List<DepthLevel> {
+    val clockFormats = listOf(
+        ClockFormat.SYSTEM to stringResource(R.string.language_follow_system),
+        ClockFormat.TWELVE_HOUR to stringResource(R.string.clock_format_12_hour),
+        ClockFormat.TWENTY_FOUR_HOUR to stringResource(R.string.clock_format_24_hour),
+    )
+    val clockFormatTitle = stringResource(R.string.settings_clock_format)
     val languages = listOf(
         AppLanguage.SYSTEM to stringResource(R.string.language_follow_system),
         AppLanguage.GERMAN to stringResource(R.string.language_german),
@@ -74,6 +87,8 @@ internal fun settingsGeneralLevels(
     return listOf(
         settingsLevel(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), listOf(
             settingsRow(LANGUAGE_LEVEL, languageTitle, languages.first { it.first == selectedLanguage }.second, child = LANGUAGE_LEVEL),
+            settingsRow(CLOCK_FORMAT_LEVEL, clockFormatTitle,
+                clockFormats.first { it.first == settings.clockFormat }.second, child = CLOCK_FORMAT_LEVEL),
             settingsRow("guide-menu", stringResource(R.string.show_epg_menu),
                 section = stringResource(R.string.settings_navigation), checked = settings.showEpgMenu, onClick = onToggleEpg),
             settingsRow("clear-cache", stringResource(R.string.clear_cache),
@@ -86,5 +101,8 @@ internal fun settingsGeneralLevels(
         settingsLevel(LANGUAGE_LEVEL, languageTitle, languages.map { (language, label) ->
             settingsRow(language.name, label, selected = language == selectedLanguage, onClick = { onSelectLanguage(language) })
         }, initialItemId = selectedLanguage.name),
+        settingsLevel(CLOCK_FORMAT_LEVEL, clockFormatTitle, clockFormats.map { (format, label) ->
+            settingsRow(format.name, label, selected = format == settings.clockFormat, onClick = { onSelectClockFormat(format) })
+        }, initialItemId = settings.clockFormat.name),
     )
 }
