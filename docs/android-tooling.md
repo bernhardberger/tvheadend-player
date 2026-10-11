@@ -37,6 +37,18 @@ not permission to change dependencies. `tools/verify` includes the published SDK
 and native provenance gates. It compiles Android tests but does not run them.
 Use the `gradle-run` skill for bounded logs, cancellation and live-test isolation.
 
+On copilot, an installed `/usr/local/bin/tvhplayer-verify` launcher makes
+`tools/verify` run in its own transient systemd unit, outside the agent backend.
+The host owns an 8 GiB aggregate build ceiling. Cancellation stops the whole
+unit, including orphaned workers; its name is printed at startup. Isolated runs
+use single-use Gradle and in-process Kotlin to prevent reuse of daemons outside
+the unit, and cap Gradle at one worker to keep lint and Robolectric within the
+memory ceiling. Disk caches, build slots and scratch paths stay unchanged.
+Other hosts without the launcher keep the local verification path;
+an installed launcher's failure never silently falls back. Direct `./gradlew`
+calls and older worktrees without this hook are not covered. Host controls and
+rollback live in homelab's `docs/operator/opencode-build-resources.md`.
+
 ### Fast local iteration
 
 For a small local change, run the owning test method or class and finish once the
@@ -92,6 +104,7 @@ uncached until their external inputs and outputs are fully declared.
 
 Routine app tests (`exclude`, including `tools/verify`) use two separate JVM workers,
 running different classes concurrently while keeping methods within a class serial.
+The isolated verification lane's one-worker Gradle cap limits this to one test worker.
 Use `-Ptvhplayer.testForks=1` with Gradle for serial diagnosis or lower memory use;
 supported values are `1` and `2`. Visual modes (`all` and `only`) remain single-worker.
 The 970-case routine suite measured 59s with one worker versus 45s with two; total

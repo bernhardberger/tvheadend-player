@@ -151,7 +151,7 @@ def find_static_rule_violations(root: Path) -> list[str]:
 
         ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
         # Recent-row expansion is a local disclosure, not movement between pages.
-        slide_owners = {ui + "BrowseMotionPolicy.kt", ui + "player/PlayerIdentityCard.kt"}
+        slide_owners = {ui + "BrowseMotionPolicy.kt", ui + "player/PlayerTopIdentity.kt"}
         if relative_path.startswith(ui) and relative_path not in slide_owners:
             for match in re.finditer(r"\bslide(?:In|Out)(?:Vertically|Horizontally)\b", code):
                 violations.append(

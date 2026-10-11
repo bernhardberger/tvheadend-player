@@ -21,7 +21,18 @@ for argument in "$@"; do
     esac
 done
 
+# The shared integration host installs this launcher. Other developer hosts keep
+# the ordinary local path. Never silently fall back when the installed runner fails.
+if [[ -x /usr/local/bin/tvhplayer-verify && "${TVHPLAYER_VERIFY_ISOLATED:-}" != 1 ]]; then
+    exec /usr/local/bin/tvhplayer-verify "$ROOT_DIR" "$@"
+fi
+
 gradle_arguments=()
+if [[ "${TVHPLAYER_VERIFY_ISOLATED:-}" == 1 ]]; then
+    # Reusing a daemon outside the unit would bypass its budget and cancellation.
+    # Keep lint and Robolectric forks inside the shared 8 GiB build ceiling.
+    gradle_arguments+=(--no-daemon --max-workers=1 -Pkotlin.compiler.execution.strategy=in-process)
+fi
 provenance_tasks=(:app:verifyExternalSdkConsumption)
 if [[ "$staged_sdk" == true ]]; then
     gradle_arguments+=(-Ptvheadend.sdk.local=true)

@@ -188,7 +188,7 @@ class StaticRulesTest(unittest.TestCase):
     def test_page_motion_allows_shared_owner_local_disclosure_and_non_code(self):
         ui = "app/src/main/java/at/bernhardberger/tvhplayer/ui/"
         self.write(ui + "BrowseMotionPolicy.kt", "slideInVertically(spec) { it }")
-        self.write(ui + "player/PlayerIdentityCard.kt", "slideInVertically(spec) { it / 4 }")
+        self.write(ui + "player/PlayerTopIdentity.kt", "slideInVertically(spec) { it / 4 }")
         self.write(ui + "player/Screen.kt", '// slideInVertically(spec)\nval text = "slideOutHorizontally"\nBrowseMotionPolicy.pageScroll<Float>()')
         self.assertEqual([], find_static_rule_violations(self.root))
 
