@@ -160,6 +160,31 @@ These recur on several screens and are better decided once than per screen.
 3. Should "Back on Channels reopens the player once" survive, given TV-DB?
 4. Does "Show Guide menu" survive 1.0?
 
+**U3 brief, owner answers (2026-10-12)**
+
+The first U3/U15 brief proposed Home direction A "Rows" (recent channels, on
+now, recordings, upcoming recordings; initial focus on the last channel), with B
+"Hero" and C "Channel rows" as alternatives.
+
+- Home is the Back root: Back from the player (including autostart) and from
+  Guide, Recordings and Settings lands on Home; Back on Home goes to its top,
+  then leaves the app. "Back on Channels reopens the player once" is retired.
+- Returning to the player from deep in the app: Back to Home, then OK on the
+  first Recent card, which is the channel that was playing. The TV key (U14) is
+  a shortcut on top of that path.
+- Continue watching appears on Home and in Recordings. In Recordings the owner
+  prefers a row above the folder list over a virtual folder (no invented folders
+  mixed into the real structure); to be felt out in U6 together with the other
+  Recordings rework.
+- The "On now" row's channel source waits for the channel-tag decision in U4.
+- OK on a recording card plays it, with no details step. An unwatched
+  recording starts from the beginning. A partly watched one asks first: "Resume
+  from h:mm" or "Start from the beginning" (owner: no spoilers after falling
+  asleep), without showing a picture from the resume point. Details stay one
+  press away (hold OK) and visible beside the Recordings list.
+- Channel-rows becomes a view mode in Channels or the Guide (U4/U5), not Home.
+- The "Show Guide menu" setting is removed.
+
 ## Splash, startup and app-wide feedback
 
 **Today**
