@@ -43,14 +43,20 @@ trap 'rm -rf "$temporary_dir"' EXIT
 cd "$ROOT_DIR"
 ./tools/verify
 # Release bytes are always built from scratch: a fresh JVM and no outputs restored from the build cache.
-./gradlew clean :app:syncReleasedSdkEvidence assemblePlayRelease --no-daemon --no-build-cache
+./gradlew clean :app:syncReleasedSdkEvidence :app:assemblePlayRelease :app:assembleApplianceRelease :app:bundlePlayRelease --no-daemon --no-build-cache
 
 built_apk="app/build/outputs/apk/play/release/app-play-release-unsigned.apk"
-if [[ ! -f "$built_apk" ]]; then
-    printf 'error: expected unsigned release APK was not produced: %s\n' "$built_apk" >&2
-    exit 1
-fi
-./tools/check-native-libs --release --apk "$built_apk"
+built_appliance_apk="app/build/outputs/apk/appliance/release/app-appliance-release-unsigned.apk"
+built_aab="app/build/outputs/bundle/playRelease/app-play-release.aab"
+for artifact in "$built_apk" "$built_appliance_apk" "$built_aab"; do
+    if [[ ! -f "$artifact" ]]; then
+        printf 'error: expected release artifact was not produced: %s\n' "$artifact" >&2
+        exit 1
+    fi
+done
+for apk in "$built_apk" "$built_appliance_apk"; do
+    ./tools/check-native-libs --release --apk "$apk"
+done
 
 for source_file in "${SDK_SOURCE_FILES[@]}"; do
     if [[ ! -f "$EVIDENCE_DIR/$source_file" || -L "$EVIDENCE_DIR/$source_file" ]]; then
@@ -69,19 +75,22 @@ tar \
     "${SDK_SOURCE_FILES[@]}" | gzip -n > "$temporary_dir/$SDK_SOURCE_NAME"
 cp "$ROOT_DIR/decoder-ffmpeg/$NATIVE_SOURCE_NAME" "$temporary_dir/$NATIVE_SOURCE_NAME"
 
-# apksigner verify must fail before and after alignment, proving this host did not sign the APK.
-if "$apksigner" verify "$built_apk" >/dev/null 2>&1; then
-    printf 'error: Gradle unexpectedly produced a signed release APK\n' >&2
-    exit 1
-fi
-
-aligned_apk="$temporary_dir/tvheadend-player-unsigned.apk"
-"$zipalign" -f -P 16 4 "$built_apk" "$aligned_apk"
-"$zipalign" -c -P 16 4 "$aligned_apk"
-if "$apksigner" verify "$aligned_apk" >/dev/null 2>&1; then
-    printf 'error: aligned release APK is unexpectedly signed\n' >&2
-    exit 1
-fi
+# apksigner verify must fail before and after alignment for both APKs.
+for flavor in play appliance; do
+    apk="app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
+    aligned="$temporary_dir/$flavor-unsigned.apk"
+    if "$apksigner" verify "$apk" >/dev/null 2>&1; then
+        printf 'error: Gradle unexpectedly produced a signed release APK\n' >&2
+        exit 1
+    fi
+    "$zipalign" -f -P 16 4 "$apk" "$aligned"
+    "$zipalign" -c -P 16 4 "$aligned"
+    if "$apksigner" verify "$aligned" >/dev/null 2>&1; then
+        printf 'error: aligned release APK is unexpectedly signed\n' >&2
+        exit 1
+    fi
+done
+aligned_apk="$temporary_dir/play-unsigned.apk"
 
 badging="$($aapt dump badging "$aligned_apk")"
 if [[ ! "$badging" =~ package:\ name=\'([^\']+)\' ]]; then
@@ -103,6 +112,15 @@ if [[ ! "$badging" =~ versionName=\'([^\']+)\' ]]; then
     exit 1
 fi
 version_name="${BASH_REMATCH[1]}"
+appliance_badging="$($aapt dump badging "$temporary_dir/appliance-unsigned.apk")"
+if [[ "$appliance_badging" != *"package: name='${APPLICATION_ID}.appliance' versionCode='$version_code' versionName='$version_name'"* ]]; then
+    printf 'error: Appliance APK identity or version does not match the release\n' >&2
+    exit 1
+fi
+python3 tools/release_metadata.py validate-aab \
+    --aab "$built_aab" --play-apk "$aligned_apk" \
+    --version-code "$version_code" --version-name "$version_name" --unsigned
+printf 'AAB: native payload matches Play APK; 64-bit ELF LOAD alignment >=16 KB; bundletool confirms uncompressed PAGE_ALIGNMENT_16K generated APKs and Play identity.\n'
 
 release_dir="${1:-$ROOT_DIR/build/release/unsigned/$version_name}"
 if [[ -e "$release_dir" ]]; then
@@ -111,10 +129,14 @@ if [[ -e "$release_dir" ]]; then
 fi
 mkdir -p "$release_dir"
 
-apk_name="tvheadend-player-${version_name}-unsigned.apk"
+apk_name="tvheadend-player-${version_name}-play-unsigned.apk"
+appliance_apk_name="tvheadend-player-${version_name}-appliance-unsigned.apk"
+aab_name="tvheadend-player-${version_name}-play-unsigned.aab"
 source_tar_name="tvheadend-player-${version_name}-source.tar.gz"
 source_zip_name="tvheadend-player-${version_name}-source.zip"
 cp "$aligned_apk" "$release_dir/$apk_name"
+cp "$temporary_dir/appliance-unsigned.apk" "$release_dir/$appliance_apk_name"
+cp "$built_aab" "$release_dir/$aab_name"
 cp "$temporary_dir/$NATIVE_SOURCE_NAME" "$release_dir/$NATIVE_SOURCE_NAME"
 cp "$temporary_dir/$SDK_SOURCE_NAME" "$release_dir/$SDK_SOURCE_NAME"
 git archive --format=tar.gz --prefix="tvheadend-player-${version_name}/" \
@@ -128,7 +150,9 @@ python3 tools/release_metadata.py create-unsigned \
     --version-name "$version_name" \
     --source-commit "$(git rev-parse HEAD)" \
     --sdk-source-commit "$SDK_SOURCE_COMMIT" \
-    --unsigned-apk "$release_dir/$apk_name" \
+    --unsigned-play-apk "$release_dir/$apk_name" \
+    --unsigned-appliance-apk "$release_dir/$appliance_apk_name" \
+    --unsigned-play-aab "$release_dir/$aab_name" \
     --source-tar-gz "$release_dir/$source_tar_name" \
     --source-zip "$release_dir/$source_zip_name" \
     --native-source-tar-gz "$release_dir/$NATIVE_SOURCE_NAME" \
@@ -138,6 +162,8 @@ python3 tools/release_metadata.py create-unsigned \
     cd "$release_dir"
     sha256sum \
         "$apk_name" \
+        "$appliance_apk_name" \
+        "$aab_name" \
         "$source_tar_name" \
         "$source_zip_name" \
         "$NATIVE_SOURCE_NAME" \

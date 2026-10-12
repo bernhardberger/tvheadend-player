@@ -1242,7 +1242,9 @@ def require_play_replacement_safe(adb: str, serial: str) -> None:
                 )
 
 
-def resolve_verified_release_apk(bundle: Path) -> Path:
+def resolve_verified_release_apk(bundle: Path, package_name: str = DEFAULT_PACKAGE) -> Path:
+    if package_name not in (DEFAULT_PACKAGE, APPLIANCE_PACKAGE):
+        fail("release installation is available only for the Play or Appliance package")
     bundle = bundle.expanduser().resolve()
     subprocess.run(
         [str(RELEASE_TOOL), "verify-signed", str(bundle)],
@@ -1250,10 +1252,12 @@ def resolve_verified_release_apk(bundle: Path) -> Path:
     )
     try:
         manifest = json.loads((bundle / "release-manifest.json").read_text(encoding="utf-8"))
-        if manifest.get("applicationId") != DEFAULT_PACKAGE:
-            fail(f"release bundle is not for {DEFAULT_PACKAGE}")
-        apk_name = manifest["artifacts"]["signedApk"]["file"]
-        if not isinstance(apk_name, str) or Path(apk_name).name != apk_name:
+        artifact_key = "signedApplianceApk" if package_name == APPLIANCE_PACKAGE else "signedPlayApk"
+        artifact = manifest["artifacts"][artifact_key]
+        if artifact.get("applicationId") != package_name:
+            fail(f"release APK is not for {package_name}")
+        apk_name = artifact["file"]
+        if not isinstance(apk_name, str) or Path(apk_name).name != apk_name or not apk_name.endswith(".apk"):
             fail("release bundle has an invalid signed APK path")
         apk = bundle / apk_name
         if apk.is_symlink() or not apk.is_file():
@@ -1680,10 +1684,9 @@ def main() -> int:
         return 0
 
     if args.action == "install-release":
-        if package_name != DEFAULT_PACKAGE:
-            fail(f"release installation is available only for package {DEFAULT_PACKAGE}")
-        apk = resolve_verified_release_apk(args.bundle)
-        require_play_replacement_safe(adb, serial)
+        apk = resolve_verified_release_apk(args.bundle, package_name)
+        if package_name == DEFAULT_PACKAGE:
+            require_play_replacement_safe(adb, serial)
         run(adb_command(adb, serial, "install", "-r", str(apk)))
         show_package_info(adb, serial, package_name)
         return 0

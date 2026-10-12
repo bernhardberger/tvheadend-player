@@ -64,7 +64,9 @@ python3 "$ROOT_DIR/tools/release_metadata.py" validate-unsigned \
     --application-id "$manifest_application_id" \
     --version-code "$manifest_version_code" \
     --version-name "$manifest_version_name"
-unsigned_apk_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["unsignedApk"]["file"])' "$manifest")"
+unsigned_apk_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["unsignedPlayApk"]["file"])' "$manifest")"
+unsigned_appliance_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["unsignedApplianceApk"]["file"])' "$manifest")"
+unsigned_aab_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["unsignedPlayAab"]["file"])' "$manifest")"
 source_tar_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["sourceTarGz"]["file"])' "$manifest")"
 source_zip_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["sourceZip"]["file"])' "$manifest")"
 native_source_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["nativeSourceTarGz"]["file"])' "$manifest")"
@@ -98,11 +100,23 @@ python3 "$ROOT_DIR/tools/release_metadata.py" validate-unsigned \
     --application-id "$application_id" \
     --version-code "$version_code" \
     --version-name "$version_name"
-"$zipalign" -c -P 16 4 "$unsigned_apk"
-if "$apksigner" verify "$unsigned_apk" >/dev/null 2>&1; then
-    printf 'error: incoming APK is already signed\n' >&2
+appliance_badging="$($aapt dump badging "$INCOMING_DIR/$unsigned_appliance_name")"
+if [[ "$appliance_badging" != *"package: name='${APPLICATION_ID}.appliance' versionCode='$version_code' versionName='$version_name'"* ]]; then
+    printf 'error: Appliance APK identity or version does not match the release\n' >&2
     exit 1
 fi
+for apk in "$unsigned_apk" "$INCOMING_DIR/$unsigned_appliance_name"; do
+    "$zipalign" -c -P 16 4 "$apk"
+    if "$apksigner" verify "$apk" >/dev/null 2>&1; then
+        printf 'error: incoming APK is already signed\n' >&2
+        exit 1
+    fi
+done
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-aab \
+    --aab "$INCOMING_DIR/$unsigned_aab_name" --play-apk "$unsigned_apk" \
+    --version-code "$version_code" --version-name "$version_name" --unsigned
+command -v jarsigner >/dev/null
+command -v keytool >/dev/null
 
 if [[ -z "$OUTPUT_DIR" ]]; then
     OUTPUT_DIR="$(dirname "$INCOMING_DIR")/signed/$version_name"
@@ -150,43 +164,62 @@ else
     temporary_password_files=true
 fi
 
-signed_apk_name="tvheadend-player-${version_name}.apk"
-signed_apk="$temporary_dir/$signed_apk_name"
-"$apksigner" sign \
-    --ks "$KEYSTORE" \
-    --ks-key-alias "$KEY_ALIAS" \
-    --ks-pass "file:$store_password_file" \
-    --key-pass "file:$key_password_file" \
-    --out "$signed_apk" \
-    "$unsigned_apk"
+signed_apk_name="tvheadend-player-${version_name}-play.apk"
+signed_appliance_name="tvheadend-player-${version_name}-appliance.apk"
+signed_aab_name="tvheadend-player-${version_name}-play.aab"
+for flavor in play appliance; do
+    input="$unsigned_apk"
+    output="$temporary_dir/$signed_apk_name"
+    if [[ "$flavor" == appliance ]]; then
+        input="$INCOMING_DIR/$unsigned_appliance_name"
+        output="$temporary_dir/$signed_appliance_name"
+    fi
+    "$apksigner" sign \
+        --ks "$KEYSTORE" \
+        --ks-key-alias "$KEY_ALIAS" \
+        --ks-pass "file:$store_password_file" \
+        --key-pass "file:$key_password_file" \
+        --out "$output" \
+        "$input"
+    "$zipalign" -c -P 16 4 "$output"
+    "$apksigner" verify --verbose --print-certs "$output" > "$temporary_dir/$flavor-verify.txt"
+    certificate_sha256="$(python3 "$ROOT_DIR/tools/release_metadata.py" verify-apk-certificate "$temporary_dir/$flavor-verify.txt")"
+done
+jarsigner -keystore "$KEYSTORE" \
+    -storepass:file "$store_password_file" \
+    -keypass:file "$key_password_file" \
+    -signedjar "$temporary_dir/$signed_aab_name" \
+    "$INCOMING_DIR/$unsigned_aab_name" "$KEY_ALIAS"
 if [[ "$temporary_password_files" == true ]]; then
     rm -f "$store_password_file" "$key_password_file"
 fi
 
-"$zipalign" -c -P 16 4 "$signed_apk"
-signature_report="$($apksigner verify --verbose --print-certs "$signed_apk")"
-if [[ ! "$signature_report" =~ Signer\ \#1\ certificate\ SHA-256\ digest:\ ([0-9a-fA-F]+) ]]; then
-    printf 'error: unable to read signing certificate SHA-256 digest\n' >&2
-    exit 1
-fi
-certificate_sha256="${BASH_REMATCH[1]}"
+python3 "$ROOT_DIR/tools/release_metadata.py" verify-aab-signature "$temporary_dir/$signed_aab_name" > "$temporary_dir/aab-verify.txt"
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-aab \
+    --aab "$temporary_dir/$signed_aab_name" --play-apk "$temporary_dir/$signed_apk_name" \
+    --version-code "$version_code" --version-name "$version_name"
 
 staged_output="$temporary_dir/signed-bundle"
 mkdir "$staged_output"
-cp "$signed_apk" "$staged_output/$signed_apk_name"
+cp "$temporary_dir/$signed_apk_name" "$staged_output/$signed_apk_name"
+cp "$temporary_dir/$signed_appliance_name" "$staged_output/$signed_appliance_name"
+cp "$temporary_dir/$signed_aab_name" "$staged_output/$signed_aab_name"
 cp "$INCOMING_DIR/$source_tar_name" "$staged_output/$source_tar_name"
 cp "$INCOMING_DIR/$source_zip_name" "$staged_output/$source_zip_name"
 cp "$INCOMING_DIR/$native_source_name" "$staged_output/$native_source_name"
 cp "$INCOMING_DIR/$sdk_source_name" "$staged_output/$sdk_source_name"
 cp "$manifest" "$staged_output/unsigned-release-manifest.json"
-printf '%s\n' "$signature_report" > "$staged_output/APKSIGNER-VERIFY.txt"
+cat "$temporary_dir/play-verify.txt" "$temporary_dir/appliance-verify.txt" > "$staged_output/APKSIGNER-VERIFY.txt"
+cp "$temporary_dir/aab-verify.txt" "$staged_output/JARSIGNER-VERIFY.txt"
 
 python3 "$ROOT_DIR/tools/release_metadata.py" create-signed \
     --unsigned-manifest "$manifest" \
     --application-id "$application_id" \
     --version-code "$version_code" \
     --version-name "$version_name" \
-    --signed-apk "$staged_output/$signed_apk_name" \
+    --signed-play-apk "$staged_output/$signed_apk_name" \
+    --signed-appliance-apk "$staged_output/$signed_appliance_name" \
+    --signed-play-aab "$staged_output/$signed_aab_name" \
     --source-tar-gz "$staged_output/$source_tar_name" \
     --source-zip "$staged_output/$source_zip_name" \
     --native-source-tar-gz "$staged_output/$native_source_name" \
@@ -197,12 +230,15 @@ python3 "$ROOT_DIR/tools/release_metadata.py" create-signed \
     cd "$staged_output"
     sha256sum \
         "$signed_apk_name" \
+        "$signed_appliance_name" \
+        "$signed_aab_name" \
         "$source_tar_name" \
         "$source_zip_name" \
         "$native_source_name" \
         "$sdk_source_name" \
         unsigned-release-manifest.json \
         APKSIGNER-VERIFY.txt \
+        JARSIGNER-VERIFY.txt \
         release-manifest.json > SHA256SUMS
 )
 mkdir -p "$(dirname "$OUTPUT_DIR")"

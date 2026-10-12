@@ -130,10 +130,7 @@ def _run(command: list[str], *, capture: bool = False) -> subprocess.CompletedPr
 
 
 def _load_manifest(path: Path) -> dict[str, Any]:
-    loaded = json.loads(path.read_text(encoding="utf-8"))
-    if not isinstance(loaded, dict):
-        raise ValueError(f"manifest must contain a JSON object: {path}")
-    return loaded
+    return release_metadata._load_manifest(path)
 
 
 def _unsigned_bundle(path: Path | None, source_commit: str) -> tuple[Path, dict[str, Any]]:
@@ -165,6 +162,7 @@ def _unsigned_bundle(path: Path | None, source_commit: str) -> tuple[Path, dict[
     expected = {artifact["file"] for artifact in manifest["artifacts"].values()}
     expected.add("release-manifest.json")
     release_metadata.validate_checksum_file(checksums_path, path, expected)
+    release_metadata._verify_artifact_files(manifest, path)
     if manifest["sourceCommit"] != source_commit:
         raise ValueError("unsigned bundle source commit does not match HEAD")
     return path, manifest
@@ -220,15 +218,17 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
     unsigned_manifest_path = path / "unsigned-release-manifest.json"
     checksums_path = path / "SHA256SUMS"
     report_path = path / "APKSIGNER-VERIFY.txt"
-    for required in (manifest_path, unsigned_manifest_path, checksums_path, report_path):
+    aab_report_path = path / "JARSIGNER-VERIFY.txt"
+    for required in (manifest_path, unsigned_manifest_path, checksums_path, report_path, aab_report_path):
         if required.is_symlink() or not required.is_file():
             raise ValueError(f"signed release bundle is incomplete: {required.name}")
 
     manifest = _load_manifest(manifest_path)
     release_metadata.validate_signed_manifest(manifest)
     expected = {artifact["file"] for artifact in manifest["artifacts"].values()}
-    expected.update({"release-manifest.json", "unsigned-release-manifest.json", "APKSIGNER-VERIFY.txt"})
+    expected.update({"release-manifest.json", "unsigned-release-manifest.json", "APKSIGNER-VERIFY.txt", "JARSIGNER-VERIFY.txt"})
     release_metadata.validate_checksum_file(checksums_path, path, expected)
+    release_metadata._verify_artifact_files(manifest, path)
 
     unsigned = _load_manifest(unsigned_manifest_path)
     release_metadata.validate_unsigned_manifest(
@@ -239,29 +239,33 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
     )
     release_metadata.validate_source_lineage(unsigned, manifest)
 
-    apk = path / manifest["artifacts"]["signedApk"]["file"]
     aapt, apksigner, zipalign = _find_android_tools()
-    _run([str(zipalign), "-c", "-P", "16", "4", str(apk)])
-    signature = _run(
-        [str(apksigner), "verify", "--verbose", "--print-certs", str(apk)],
-        capture=True,
-    ).stdout
-    fingerprint_match = re.search(r"certificate SHA-256 digest: ([0-9a-fA-F]+)", signature)
-    if fingerprint_match is None:
-        raise ValueError("unable to read APK signing certificate")
-    if release_metadata.normalize_fingerprint(fingerprint_match.group(1)) != release_metadata.CANONICAL_CERTIFICATE_SHA256:
-        raise ValueError("APK signing certificate is not canonical")
-    badging = _run([str(aapt), "dump", "badging", str(apk)], capture=True).stdout
-    identity = re.search(r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", badging)
-    if identity is None:
-        raise ValueError("unable to read signed APK identity")
-    application_id, version_code, version_name = identity.groups()
-    if (
-        application_id != manifest["applicationId"]
-        or int(version_code) != manifest["versionCode"]
-        or version_name != manifest["versionName"]
-    ):
-        raise ValueError("signed APK identity does not match release manifest")
+    for name in ("signedPlayApk", "signedApplianceApk"):
+        artifact = manifest["artifacts"][name]
+        apk = path / artifact["file"]
+        _run([str(zipalign), "-c", "-P", "16", "4", str(apk)])
+        signature = _run(
+            [str(apksigner), "verify", "--verbose", "--print-certs", str(apk)],
+            capture=True,
+        ).stdout
+        release_metadata.verify_apk_certificate(signature)
+        badging = _run([str(aapt), "dump", "badging", str(apk)], capture=True).stdout
+        identity = re.search(r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", badging)
+        if identity is None:
+            raise ValueError("unable to read signed APK identity")
+        application_id, version_code, version_name = identity.groups()
+        if (
+            application_id != artifact["applicationId"]
+            or int(version_code) != manifest["versionCode"]
+            or version_name != manifest["versionName"]
+        ):
+            raise ValueError("signed APK identity does not match release manifest")
+    aab = path / manifest["artifacts"]["signedPlayAab"]["file"]
+    release_metadata.verify_aab_signature(aab)
+    release_metadata.validate_aab(
+        aab, path / manifest["artifacts"]["signedPlayApk"]["file"],
+        manifest["versionCode"], manifest["versionName"],
+    )
     return manifest
 
 

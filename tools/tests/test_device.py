@@ -6,6 +6,7 @@ import stat
 import subprocess
 import tempfile
 import unittest
+import json
 from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
@@ -2170,7 +2171,8 @@ class DevicePolicyTest(unittest.TestCase):
             apk.write_bytes(b"signed apk")
             (bundle / "release-manifest.json").write_text(
                 '{"applicationId":"at.bernhardberger.tvhplayer",'
-                '"artifacts":{"signedApk":{"file":"product.apk"}}}',
+                '"artifacts":{"signedPlayApk":{"file":"product.apk",'
+                '"applicationId":"at.bernhardberger.tvhplayer"}}}',
                 encoding="utf-8",
             )
 
@@ -2186,6 +2188,36 @@ class DevicePolicyTest(unittest.TestCase):
                 ],
                 check=True,
             )
+
+    def test_release_apk_selection_matches_package_and_never_selects_aab(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            artifacts = {
+                "signedPlayApk": {"file": "play.apk", "applicationId": DEVICE["DEFAULT_PACKAGE"]},
+                "signedApplianceApk": {"file": "appliance.apk", "applicationId": DEVICE["APPLIANCE_PACKAGE"]},
+                "signedPlayAab": {"file": "play.aab", "applicationId": DEVICE["DEFAULT_PACKAGE"]},
+            }
+            for artifact in artifacts.values():
+                (bundle / artifact["file"]).write_bytes(b"fixture")
+            manifest = bundle / "release-manifest.json"
+            manifest.write_text(json.dumps({"artifacts": artifacts}))
+            with patch.object(DEVICE["subprocess"], "run") as verify:
+                for package, name in ((DEVICE["DEFAULT_PACKAGE"], "play.apk"), (DEVICE["APPLIANCE_PACKAGE"], "appliance.apk")):
+                    self.assertEqual(resolve_verified_release_apk(bundle, package), bundle / name)
+                self.assertEqual(verify.call_count, 2)
+                with self.assertRaises(SystemExit):
+                    resolve_verified_release_apk(bundle, "unsupported.package")
+                self.assertEqual(verify.call_count, 2)
+                artifacts["signedApplianceApk"]["file"] = "play.aab"
+                manifest.write_text(json.dumps({"artifacts": artifacts}))
+                with self.assertRaises(SystemExit):
+                    resolve_verified_release_apk(bundle, DEVICE["APPLIANCE_PACKAGE"])
+
+    def test_release_apk_selection_stops_when_bundle_verification_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(DEVICE["subprocess"], "run", side_effect=subprocess.CalledProcessError(1, "verify-signed")):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    resolve_verified_release_apk(Path(directory), DEVICE["APPLIANCE_PACKAGE"])
 
     def test_test_mutation_requires_matching_expected_identity(self) -> None:
         self.assertEqual(

@@ -20,10 +20,10 @@ every GitHub release. Play App Signing must use this project's own release key
 ("use your own key" at enrollment), so a GitHub APK and a Play install update
 each other.
 
-Until `tools/prepare-release` stages the Appliance APK, it produces the Play APK
-only. Do not install a release on a household Appliance TV (the production G08)
-until the Appliance APK is in the signed bundle: the Play build under the old
-application ID would update that install and drop HOME and GUIDE.
+The bundle also includes a Play AAB for Google Play. Household Appliance TVs
+must be switched once to the Appliance build because Play owns the old
+application ID; installing Play over the old household build would drop HOME
+and GUIDE.
 
 ## Version policy
 
@@ -66,12 +66,13 @@ immediate rollback clients.
 
 ## Host boundary
 
-- LXC 106 builds and verifies an unsigned, zip-aligned APK from a clean commit.
+- LXC 106 builds and verifies unsigned, zip-aligned Play and Appliance APKs and
+  a Play AAB from one clean commit.
   It also packages application source, released SDK source classifiers, native
   corresponding source, checksums, and a JSON manifest. It has no release key
   and Gradle has no signing setup.
 - LXC 117 holds the stable product key. It verifies every incoming byte before
-  prompting for passwords, signs the already aligned APK, and rejects any
+  prompting for passwords, signs both already aligned APKs and the AAB, and rejects any
   certificate other than the pinned product certificate.
 
 The canonical key alias is `tvhplayer-release`. Its public certificate SHA-256
@@ -114,8 +115,8 @@ from the public repositories, verifies them, and creates the unsigned bundle.
 SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
 commit, and signs non-interactively using owner-only password files configured
 in the LXC 117 SSH environment. It retrieves the signed
-bundle and independently verifies checksums, source continuity, APK identity,
-alignment, and the pinned certificate. It never installs to a TV or publishes a
+bundle and independently verifies checksums, source continuity, all three artifact
+identities, native alignment, and the pinned certificate. It never installs to a TV or publishes a
 release. It never reads or builds a sibling SDK checkout.
 
 The lower-level commands below remain available for diagnosis and manual use.
@@ -129,18 +130,26 @@ Central. Then run:
 ```
 
 The command runs the strict native gate and full verifier, performs a clean
-unsigned release build, proves the APK has no signature, zip-aligns it, and
+unsigned release build, proves both APKs have no signature, zip-aligns them, and
 creates `build/release/unsigned/<version>/` containing:
 
-- the unsigned APK;
+- `tvheadend-player-<version>-play-unsigned.apk`;
+- `tvheadend-player-<version>-appliance-unsigned.apk`;
+- `tvheadend-player-<version>-play-unsigned.aab`;
 - `.tar.gz` and `.zip` application corresponding-source archives;
 - exact released SDK source classifiers and the app-owned Media3/FFmpeg
   corresponding-source archive (see `decoder-ffmpeg/README.md`);
-- `release-manifest.json` with identity, version, source commit, and hashes;
+- `release-manifest.json` with per-artifact application ID/flavor, version, source commit, and hashes;
 - `SHA256SUMS` covering the complete unsigned bundle.
 
 Transfer that directory to LXC 117 over an authenticated channel. Verify the
 transferred directory and expected source commit before signing.
+
+Local bundletool (SDK standalone JAR or the Gradle cache) must confirm the AAB's
+Play identity and uncompressed, 16 KB aligned native-library configuration for
+generated APKs. The native bytes must match the Play APK, with both ARM ABIs and
+16 KB ELF LOAD alignment on 64-bit libraries. The AAB itself is a compressed
+upload container, not an APK to zip-align. Missing bundletool fails closed.
 
 ## Isolated signing on LXC 117
 
@@ -155,19 +164,23 @@ The tool uses `umask 077` and verifies incoming checksums, manifest identity,
 version, unsigned state, and 16 KB alignment. On the isolated signing host,
 `TVHPLAYER_SIGNING_STORE_PASS_FILE` and `TVHPLAYER_SIGNING_KEY_PASS_FILE` may
 name non-empty owner-only files owned by the signing user; otherwise the tool
-falls back to interactive prompts. Passwords are passed to `apksigner` only by
-`file:` reference and never as command arguments. The tool then verifies the
-signature and requires the pinned certificate fingerprint.
+falls back to interactive prompts. Both APKs use `apksigner`; the AAB uses
+`jarsigner` with the same keystore and alias. Passwords use only file references
+(`file:` for apksigner, `-storepass:file` / `-keypass:file` for jarsigner), never
+password values in arguments. All three signatures must match the pinned
+certificate. AAB verification uses strict jarsigner verification and keytool's
+certificate fingerprint; the pinned self-signed chain is allowed, unsigned
+entries are not.
 
 The signed output contains:
 
-- the signed APK;
+- the signed `-play.apk`, `-appliance.apk`, and `-play.aab` artifacts;
 - both application corresponding-source formats;
 - exact released SDK source classifiers and the app-owned Media3/FFmpeg
   corresponding-source archive;
 - the original unsigned manifest;
 - a signed `release-manifest.json` with source commit and certificate identity;
-- `SHA256SUMS` and the complete `apksigner` verification report.
+- `SHA256SUMS`, `APKSIGNER-VERIFY.txt` (both APKs), and `JARSIGNER-VERIFY.txt`.
 
 Publish that set together. Review it for private data before upload. The signing
 fingerprint is public verification material; the private key and passwords are
@@ -206,12 +219,15 @@ then run `doctor` with that same target. Install only the complete signed bundle
 through the bounded wrapper:
 
 ```bash
-./tools/device --target g08 install-release \
+./tools/device --target g08 --package at.bernhardberger.tvhplayer.appliance install-release \
   --bundle build/release/signed/0.2.1 \
   --confirm-release-install
 ```
 
-The wrapper independently verifies bundle checksums, source continuity, APK
+The wrapper verifies all three artifacts, then selects the APK for `--package`
+(Play by default, Appliance when explicitly selected); it never installs the AAB.
+Play installation refuses to replace an installed package with Appliance HOME
+or GUIDE entry points. It verifies bundle checksums, source continuity, artifact
 identity, alignment, and the pinned signing certificate before rechecking all
 four live identity properties and invoking the Android package installer. It
 does not launch the app, inject input, provision credentials, or remove rollback
