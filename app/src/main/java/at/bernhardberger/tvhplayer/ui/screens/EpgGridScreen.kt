@@ -208,6 +208,8 @@ private data class GuideTabBody(
 
 private const val CHANNEL_PAGE_SIZE = 6
 private const val GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS = 10_000L
+// Hidden for 1.0, owner decision 2026-10-12.
+private const val GuideSearchEntryVisible = false
 
 private enum class GuideHeaderFocus {
     DATE,
@@ -522,7 +524,11 @@ fun EpgGridScreen(
         when (lastHeaderFocus) {
             GuideHeaderFocus.DATE -> guideDateFocus.requestFocus()
             GuideHeaderFocus.NOW -> guideNowFocus.requestFocus()
-            GuideHeaderFocus.SEARCH -> guideSearchFocus.requestFocus()
+            GuideHeaderFocus.SEARCH -> if (GuideSearchEntryVisible) {
+                guideSearchFocus.requestFocus()
+            } else {
+                guideNowFocus.requestFocus()
+            }
             GuideHeaderFocus.CLEAR_FILTER -> guideClearFilterFocus.requestFocus()
         }
     }.getOrDefault(false)
@@ -605,7 +611,10 @@ fun EpgGridScreen(
     LaunchedEffect(showSearchDialog, restoreSearchHeaderFocus, indexCurrent) {
         if (indexCurrent && !showSearchDialog && restoreSearchHeaderFocus) {
             withFrameNanos { }
-            runCatching { guideSearchFocus.requestFocus() }
+            runCatching {
+                if (GuideSearchEntryVisible) guideSearchFocus.requestFocus()
+                else guideNowFocus.requestFocus()
+            }
             restoreSearchHeaderFocus = false
         }
     }
@@ -1739,41 +1748,43 @@ fun EpgGridScreen(
                     ) {
                         Text(stringResource(R.string.now))
                     }
-                    OutlinedButton(
-                        onClick = {
-                            releaseProgrammeFocus()
-                            searchQuery = ""
-                            searchResult = null
-                            searchObservation = null
-                            searchRequest = null
-                            restoreSearchResultFocus = null
-                            showSearchDialog = true
-                        },
-                        modifier = Modifier
-                            .focusRequester(guideSearchFocus)
-                            .onFocusChanged {
-                                if (it.isFocused) {
-                                    releaseProgrammeFocus()
-                                    lastHeaderFocus = GuideHeaderFocus.SEARCH
-                                }
-                            }
-                            .onPreviewKeyEvent { event ->
-                                if (
-                                    event.type == KeyEventType.KeyDown &&
-                                    event.key == Key.DirectionDown
-                                ) {
-                                    if (hasScopeTabs) {
-                                        scopeFocus.requestFocus()
-                                    } else {
-                                        focusGuideContent()
+                    if (GuideSearchEntryVisible) {
+                        OutlinedButton(
+                            onClick = {
+                                releaseProgrammeFocus()
+                                searchQuery = ""
+                                searchResult = null
+                                searchObservation = null
+                                searchRequest = null
+                                restoreSearchResultFocus = null
+                                showSearchDialog = true
+                            },
+                            modifier = Modifier
+                                .focusRequester(guideSearchFocus)
+                                .onFocusChanged {
+                                    if (it.isFocused) {
+                                        releaseProgrammeFocus()
+                                        lastHeaderFocus = GuideHeaderFocus.SEARCH
                                     }
-                                } else {
-                                    false
                                 }
-                            }
-                            .testTag("epg-search-open"),
-                    ) {
-                        Text(stringResource(R.string.epg_search))
+                                .onPreviewKeyEvent { event ->
+                                    if (
+                                        event.type == KeyEventType.KeyDown &&
+                                        event.key == Key.DirectionDown
+                                    ) {
+                                        if (hasScopeTabs) {
+                                            scopeFocus.requestFocus()
+                                        } else {
+                                            focusGuideContent()
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                }
+                                .testTag("epg-search-open"),
+                        ) {
+                            Text(stringResource(R.string.epg_search))
+                        }
                     }
                     if (category != ProgrammeCategory.ALL) {
                         OutlinedButton(

@@ -503,14 +503,38 @@ class GuideVisualLayoutTest {
         key(Key.DirectionRight)
         focused(context().getString(R.string.now))
         key(Key.DirectionRight)
-        focused(context().getString(R.string.epg_search))
-        val search = bounds("epg-search-open")
-        assertEquals(902f, search.right, .1f)
+        focused(context().getString(R.string.now))
+        compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
+        val now = compose.onNodeWithText(context().getString(R.string.now)).fetchSemanticsNode().boundsInRoot
+        assertEquals(902f, now.right, .1f)
         val heading = compose.onNodeWithText(context().getString(R.string.epg_title)).fetchSemanticsNode().boundsInRoot
-        assertEquals("Actions stay centred on the heading row", heading.center.y, search.center.y, .1f)
+        assertEquals("Actions stay centred on the heading row", heading.center.y, now.center.y, .1f)
         val bitmap = capture("guide-header-focus-large-de", 1.3f, LayoutDirection.Ltr)
         assertTrue("Native focused button clears the 48dp physical safe area", nativeFocusBounds(bitmap).right <= 912f)
         bitmap.recycle()
+    }
+
+    @Test fun hiddenSearchEntryKeepsHeaderNavigationAndRestorationOnVisibleActions() {
+        show()
+        compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
+        compose.onNodeWithText(context().getString(R.string.epg_search)).assertDoesNotExist()
+        key(Key.DirectionUp)
+        val date = compose.onNode(isFocused()).fetchSemanticsNode().id
+        key(Key.DirectionRight)
+        focused(context().getString(R.string.now))
+        key(Key.DirectionRight)
+        focused(context().getString(R.string.now))
+        key(Key.DirectionLeft)
+        assertEquals(date, compose.onNode(isFocused()).fetchSemanticsNode().id)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        focused(context().getString(R.string.all_channels))
+        key(Key.DirectionUp)
+        focused(context().getString(R.string.now))
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        assertNoPlayback()
     }
 
     @Test fun horizontalAndVerticalEdgeFocusSettlesOutsideLocalFades() {
