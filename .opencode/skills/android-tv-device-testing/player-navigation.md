@@ -8,8 +8,9 @@ subtitles.
 ## Start
 
 - Launch with `./tools/device launch`, not a hand-written implicit intent.
-- With a configured server and autoplay on (the default), startup opens the live
-  player on the last-played channel. Otherwise it opens Channels. A preparing or
+- With a configured server and autoplay on (off by default), startup opens the
+  live player on the last-played channel. Otherwise it opens Channels, with focus
+  on the group tabs: press Down before Center to reach a channel. A preparing or
   connection screen may show first.
 
 ## Browse screens

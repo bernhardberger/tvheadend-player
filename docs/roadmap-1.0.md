@@ -85,8 +85,8 @@ Source: `defect-ledger.md`, `media3-upgrade-assessment-2026-07-28.md`.
 |---|---|---|
 | P1 | D14: Media3 rendered/dropped/skipped frame counters and A/V offset in diagnostics and the stats overlay | Counters visible; unit coverage of the model **Done 2026-10-12** |
 | P2 | D24: retain a privacy-safe exception classification (cause class, top frame) with `Failed` | Detail line shows it; unit coverage **Done 2026-10-12** |
-| P3 | G10 reliability session: zap stress (D12/D17), ORF1 matrix (D24), timeshift (D15), header fallback (D20), stutter (D14) **[TV]** | Each row attributed, fixed or closed with evidence |
-| P4 | Fixes arising from P3 | Focused regression test per fix |
+| P3 | **Deferred (owner 2026-10-12): the G10 has run fine all day; reopen only when a defect shows up in use.** G10 reliability session: zap stress (D12/D17), ORF1 matrix (D24), timeshift (D15), header fallback (D20), stutter (D14) **[TV]** | Each row attributed, fixed or closed with evidence |
+| P4 | Deferred with P3. Fixes arising from P3 | Focused regression test per fix |
 | P5 | Media3 1.11.1 device matrix and interlaced-motion comparison (assessment steps 5–6, doc still names 1.10.1) **[TV]** | Assessment updated to the current stack and gate passed |
 | P6 | G08 intermittent bad render mode (`appliance-mode-plan.md`): decide observe-only or investigate | Owner decision recorded |
 
@@ -305,7 +305,7 @@ Gaps:
 
 | Version | Content | Exit |
 |---|---|---|
-| 0.3 | P1–P4, H1, U2 inventory, S5 checklist read as input to the UX work | Reliability session done; inventory accepted; home-screen integration scope fixed |
+| 0.3 | P1–P2, H1, U2 inventory, S5 checklist read as input to the UX work (P3–P4 deferred) | Inventory accepted; home-screen integration scope fixed |
 | 0.4 | U3 home screen and U15 shared patterns; UI-independent foundations: E3 (minimal journeys), E4, R2, S1/S3 split, S6 AAB, D4 data, U14 | Home screen on the G10; minified release; Play build has no Appliance entry points |
 | 0.5–0.7 | U4–U10 screen by screen in the U2 order (D9 inside U6), U1 trials decided in place; E5/E6 alongside | Each screen accepted as it lands |
 | 0.8 | U16 entry focus and Back; E2 full journeys, E7, E8 on the settled screens; S5 audit and fixes; U12 goldens | Numbers recorded; TV checklist passes or deviations documented |
