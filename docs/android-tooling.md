@@ -46,8 +46,12 @@ the unit, and cap Gradle at one worker to keep lint and Robolectric within the
 memory ceiling. Disk caches, build slots and scratch paths stay unchanged.
 Other hosts without the launcher keep the local verification path;
 an installed launcher's failure never silently falls back. Direct `./gradlew`
-calls and older worktrees without this hook are not covered. Host controls and
-rollback live in homelab's `docs/operator/opencode-build-resources.md`.
+now enters the same slice through a small host-only hook, applied to the main
+checkout and existing development worktrees on 2026-10-12. It preserves the
+caller directory and arguments; disk-backed Gradle caches and JVM scratch are
+used for this path. Reapply the marked hook after regenerating the wrapper.
+Host controls and rollback live in homelab's
+`docs/operator/opencode-build-resources.md`.
 
 ### Fast local iteration
 
@@ -130,6 +134,11 @@ command after `--`, with explicit `--device` on CLI operations and `-s` on ADB:
 ```bash
 /root/homelab/tools/android-emulator with-adb-tunnel offline-player -- /opt/android-sdk/platform-tools/adb -s emulator-5556 get-state
 ```
+
+The helper starts the AVD, but not its host container. If SSH to `.119` reports
+`No route to host`, check CT 119's live Proxmox status before declaring the lane
+unavailable: its autostart is disabled. Follow the existing recovery procedure in
+`/root/homelab/services/lxc/119-android-emulator.md`, retaining the emulator lease.
 
 Inside that tunnel, use these standard operations as needed. Skip installation
 when the required verified APKs are already installed. Do not run them

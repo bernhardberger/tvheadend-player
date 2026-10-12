@@ -88,6 +88,17 @@ APP_BASE_NAME=${0##*/}
 # Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
 APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exit
 
+# BEGIN homelab build isolation
+# Host-local launcher; other machines keep the generated wrapper behavior.
+if [ -x /usr/local/bin/tvhplayer-verify ]; then
+    case $(cat /proc/self/cgroup 2>/dev/null) in
+        *:/tvhbuild.slice/tvhplayer-verify-*.service) ;; # already contained
+        *) exec /usr/local/bin/tvhplayer-verify --gradle "$APP_HOME" "$@" ;;
+    esac
+fi
+# END homelab build isolation
+
+
 # Use the maximum available, or set MAX_FD != -1 to use that value.
 MAX_FD=maximum
 

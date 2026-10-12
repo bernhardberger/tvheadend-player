@@ -83,6 +83,15 @@ reads do not authorize repository edits or scope changes. Independent review
 modes retain their evidence and non-mutation contracts. Do not run competing
 writers on the same document or substitute a provider route.
 
+`tv-ux-brief` may also create local design artifacts under
+`/tmp/opencode/tv-ux-brief/<assignment>/` and render SVG mockups with its narrowly
+allowed CairoSVG command. It inspects the resulting images before returning
+them. This scratch-only design capability does not authorize repository edits,
+builds, device operations or publication. Penpot connectivity is not a
+prerequisite for a rendered proposal. Dispatch local rendering in the foreground
+and verify the tool call in a fresh child after a permission change; the
+background dispatcher limitation below also applies to this capability.
+
 With `opencode-task-model` 1.3.1, dispatch `app-device-operator` with
 `background: false`. Its background dispatcher adds a
 fixed read/search/webfetch sandbox at session level, overriding the selected

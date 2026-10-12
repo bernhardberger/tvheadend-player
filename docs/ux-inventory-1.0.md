@@ -184,6 +184,9 @@ now, recordings, upcoming recordings; initial focus on the last channel), with B
   press away (hold OK) and visible beside the Recordings list.
 - Channel-rows becomes a view mode in Channels or the Guide (U4/U5), not Home.
 - The "Show Guide menu" setting is removed.
+- Hold OK (Menu as a shortcut) opens a context menu, not the details page
+  (owner: "long press imho is context menu"). Details is an entry in that menu.
+- "Upcoming recordings" stays a Home row.
 
 ## Splash, startup and app-wide feedback
 
