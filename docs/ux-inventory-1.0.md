@@ -191,6 +191,100 @@ now, recordings, upcoming recordings; initial focus on the last channel), with B
   watched, or new and unwatched; one leaves the row when watched to about 95%
   (the app's existing completion point) or deleted. Most recent activity first.
 
+**U15 shared patterns: guideline check and owner answers (2026-10-12)**
+
+Round 2 drafts (context menu, details, errors, resume prompt) were checked
+against the official Material for TV and Google TV guidance, the TV Design Kit
+and the JetStream/JetFit samples.
+
+- Press-and-hold Select "can be used to show more options" (Navigation on TV);
+  TV-DM only forbids depending on the Menu key. No rule requires a second,
+  non-long-press route to the context actions. The earlier claim that Google TV
+  requires one is withdrawn: the resume prompt gets no Details button, and the
+  Channels preview stays passive.
+- Details become one reading column: identity, metadata, synopsis, then the
+  actions directly below, related rows below that. Today's two-column layout
+  (text left, initial focus on buttons right) breaks the Layouts guide: "Ensure
+  the focus path is aligned with hierarchy" and "Don't direct user attention
+  back-and-forth between panels" (owner, confirmed against the guide).
+  Artwork, when present, sits behind or beside the column and never carries
+  the reading path, so missing EIT artwork leaves no hole.
+- Review fixes: the context panel's focused row must keep about 58dp from the
+  right edge (this also applies to today's player side panel); resume positions
+  read "1 h 2 min", not "1:02".
+- "Mark as watched" is in 1.0. Recordings show three watch states: unwatched,
+  partly watched, watched.
+- The notice is the snackbar-like one-off event and keeps "Connection lost"; the
+  offline strip shows the ongoing state ("Reconnecting…").
+- A channel page would not be a programme-details variant. The owner pictures an
+  immersive list or hero plus rows, which belongs with the Channels view modes
+  in U4.
+
+Round 3 owner review (2026-10-12), checked against Figma metadata of the kit and
+samples:
+
+- Follow the kit components exactly. Context menu = kit Modal drawer
+  Direction=Right (280dp, 24dp inset, list header plus 64dp list items, not
+  buttons); this supersedes the 58dp clearance note above. Confirmations = kit
+  Dialog Standard (centered, title, supporting text, filled + outlined action
+  row). Multi-choice prompts such as resume = kit Dialog Two Column (text left,
+  wide-button column right).
+- Details artwork follows JetStream: large top-right hero (about 85% of width
+  and height) faded into the surface by gradients, not a small boxed image.
+- Every details page starts on Watch. A scheduled future programme shows
+  "Recording scheduled" as status and "Cancel recording…" as a secondary
+  button, never a pre-focused cancel. Cancel confirmation names what is lost
+  and offers "Keep recording" (focused) and "Cancel recording", not Yes/No.
+- Resume prompt: Resume and Start from the beginning only; Back closes it.
+- Watch state in lists sits in the list item's trailing slot: nothing for
+  unwatched (Tvheadend has no "new" flag), partial icon plus "… min left" in
+  the metadata line for partly watched, check for watched. No progress bars in
+  list rows. The Recordings side pane rework (including moving details to the
+  left on OK) belongs to U6.
+- English copy is US English.
+
+**U15 agreed pattern, round 6 (owner, 2026-10-13: "good to build this now and
+see for ourselves")**
+
+This supersedes the round-3 points above where they conflict. Reference frames:
+`build/brief/u15/` (ignored; designer notes in `brief.md`).
+
+- **Context menu** (hold OK; Menu as a shortcut) follows JetFit's More options
+  pattern as a right-hand panel (316dp): header with the channel logo (40dp
+  tile) beside a one-line title and two meta lines, then a column of wide
+  buttons (268×48dp, leading icon). Channels: Watch · Program details · Record ·
+  Show in Guide. The kit navigation drawer with list items was rejected: it
+  reads as app navigation.
+- **Details page** follows JetFit's info block over JetStream's hero (full
+  width, 432dp, three two-stop gradients; over warm playback the hero fades
+  into the scrimmed video):
+  - eyebrow: logo · number · channel | genre, plus one status chip for the
+    broadcast state ("On now", red-dot "Recording scheduled");
+  - title (dominant), one quiet episode line, two-line synopsis;
+  - facts row, value over label (Starts · Length · Left; recordings Recorded ·
+    Length · Left), labels left-aligned;
+  - the viewer's own progress is only the bar under the facts row;
+  - pill buttons, 40dp, 12dp gap, filled primary with play icon, outlined
+    secondaries with one icon each, sentence case, no ellipsis, no times in
+    labels: on now Watch · Record · Show in Guide; later Watch channel · Cancel
+    recording (or Record) · Show in Guide; recording Resume · Start over;
+  - below: the next programs on the channel as tv-material standard cards
+    (kit focus border; channel logo on the placeholder without art); scrolling
+    down keeps a compact identity line and shows the full description and
+    secondary facts (genre, episode, audio, subtitles, picture).
+- **Center dialogs** use the kit Two Column dialog for both decisions: resume
+  (Resume · Start over; Back closes) and cancel recording (Keep recording
+  focused · Cancel recording).
+- **Offline** has three parts: a one-off notice "Connection lost · Showing
+  saved channels"; a warning badge on the rail's Settings item while
+  disconnected; errors at the point of use (blocking error frame). Settings →
+  Connection shows the status and a focused "Try again". The offline strip and
+  a lasting snackbar were rejected.
+- **Watch states** in lists as in frame 13 (trailing marker, "28 min left"),
+  built with the Recordings rework (U6).
+- Physical-TV checks: hero over live video and bright art, badge legibility
+  from the couch, focus feel of the button row and cards.
+
 ## Splash, startup and app-wide feedback
 
 **Today**
