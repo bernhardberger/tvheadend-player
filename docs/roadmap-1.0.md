@@ -13,7 +13,8 @@ In 1.0:
 
 - **Store readiness:** a Google Play TV listing that passes the TV app quality
   review and Play policy (workstream S).
-- Home-screen integration (scoped by the H1 spike below).
+- ~~Home-screen integration~~: not in 1.0. The H1 spike showed Google TV renders
+  nothing from an uncertified app (owner 2026-10-12: H2–H5 out).
 - Disk space in Recordings (owner's personal requirement).
 - UX rework of every screen, including a new home screen (workstream U).
 - Remaining open work: defects, appliance, release, documentation.
@@ -38,7 +39,8 @@ Owner, 2026-10-11:
   replaces the earlier "series recording" scope item and drops D1–D3, D5 and
   D6 (later the same day; supersedes "D5 and D6 are in"). Rule-made
   recordings already appear in Recordings.
-- Manual one-off recordings (D9) are undecided.
+- Manual one-off recordings (D9) are in, after D4 free disk space, and may be
+  dropped if time runs short (owner 2026-10-12).
 - No numeric performance targets at all (startup, zap or UI response): the
   benchmarks record numbers, and the owner's judgment on the G10 decides what
   is slow. No budget file or automatic gate.
@@ -100,7 +102,7 @@ Source: SDK `DvrRepository`; `recording-progress-sync-plan.md`;
 | D5, D6 | **Dropped 2026-10-11** (owner): no entry editing, no timer rules | — |
 | D7 | **Already shipped** (corrected 2026-10-11; the plan's status line is stale): growing recordings play with a moving timeline (0e4e0fbf) and resume where the viewer stopped (0c4d14c5). Remaining: update the `recording-progress-sync-plan.md` status, then archive it under X2 | Plan status corrected |
 | D8 | Real-server DVR mutation pass on the test server **[TV]** | Schedule, cancel and delete (and D9 if in) observed end to end |
-| D9 | **Undecided.** Manual one-off recording: channel, day, start and end, sent as the SDK's `DvrSchedule.ExplicitTime`. No rule and no EPG dependency; the server records the window. The cost is a D-pad time-entry surface that follows U13 | Owner decision; then TV floor, tests, notices via `NoticeCenter` |
+| D9 | **In (owner 2026-10-12), after D4; droppable if time runs short.** Manual one-off recording: channel, day, start and end, sent as the SDK's `DvrSchedule.ExplicitTime`. No rule and no EPG dependency; the server records the window. The cost is a D-pad time-entry surface that follows U13 | Owner decision; then TV floor, tests, notices via `NoticeCenter` |
 
 ### H — Home-screen integration
 
@@ -122,15 +124,26 @@ Research, 2026-10-11, developer.android.com:
 
 | ID | Item | Exit |
 |---|---|---|
-| H1 | Spike on the G10 and TCL: debug build that publishes a Watch Next recording, a preview channel and a search provider; record what each launcher renders **[TV]** | Matrix of what is visible per device; owner picks 1.0 scope |
-| H2 | Watch Next: in-progress recordings ("Continue watching"), deep link into recording playback with resume; removal on completion/delete | Only if H1 shows it renders or certification is pursued |
-| H3 | Preview channel ("Recently recorded" / "On now") with deep links | Only if H1 shows it renders on targets that matter |
-| H4 | Global/voice search into Guide/Recordings | Stretch after 1.0 (U10) |
-| H5 | Deep-link contract: one documented intent shape for channel, programme and recording, guarded by the Appliance profile | Tests for each link kind and profile |
+| H1 | **Done 2026-10-12 (result below).** Spike on the G10 and TCL: debug build that publishes a Watch Next recording, a preview channel and a search provider; record what each launcher renders **[TV]** | Matrix of what is visible per device; owner picks 1.0 scope |
+| H2 | **Out of 1.0 (owner 2026-10-12).** Watch Next: in-progress recordings ("Continue watching"), deep link into recording playback with resume; removal on completion/delete | Only if H1 shows it renders or certification is pursued |
+| H3 | **Out of 1.0 (owner 2026-10-12).** Preview channel ("Recently recorded" / "On now") with deep links | Only if H1 shows it renders on targets that matter |
+| H4 | Global/voice search into Guide/Recordings. Google TV global search does not query app search providers (H1) | Stretch after 1.0 (U10) |
+| H5 | **Out of 1.0 (owner 2026-10-12): no caller without H2–H3; the Appliance build enters the player through its own path.** Deep-link contract: one documented intent shape for channel, programme and recording, guarded by the Appliance profile | Tests for each link kind and profile |
 
-H5 is useful regardless and underlies H2–H4. If H1 shows nothing renders on
-Google TV without certification, 1.0 home-screen scope reduces to H5 plus
-whatever the classic launcher shows. Decide then.
+Before the spike: H5 underlay H2–H4, and if nothing rendered on Google TV
+without certification, scope would shrink to H5 plus the classic launcher.
+
+H1 result on the G10 (Google TV launcher, 2026-10-12; spike branch
+`spike/h1-home-screen`, commit `acdb82af`): the spike published 2 Watch Next
+entries and a 3-entry preview channel, and the request to show the channel
+went to the launcher without a consent dialog. Nothing appears on the Home tab:
+there is no Continue watching row and no app channel row; every row below "Your
+apps" is Google's own feed. A global search for a published title returns only
+YouTube videos. The spike's search provider is not queried. On Google TV, H2 and
+H3 render nothing without partner certification, and H4 has no path.
+Decision (owner 2026-10-12): H1 is done and H2–H5 are out of 1.0. The Basic TV
+mode of the production G08 (no Google account) uses the same Google TV launcher
+with apps only, so no older launcher needs a test.
 
 ### U — UX rework (the main body of 1.0)
 
@@ -212,7 +225,7 @@ Source: `appliance-mode-spec.md`, `appliance-mode-plan.md`.
 |---|---|---|
 | A1 | HOME role on the TCL is ignored by firmware: record the accepted GUIDE accessibility workaround as the 1.0 behavior, or pursue further | Owner decision recorded in the spec |
 | A2 | Residual gates: GUIDE/wake retest, process death, held repeat, TalkBack **[TV]** | Observed on the current build |
-| A3 | Deep links from the home screen (H5) respect Appliance containment | Covered by H5 tests |
+| A3 | ~~Deep links from the home screen (H5) respect Appliance containment~~ Dropped with H5 (2026-10-12) | — |
 
 ### R — Release hardening
 
@@ -292,9 +305,9 @@ Gaps:
 
 | Version | Content | Exit |
 |---|---|---|
-| 0.3 | P1–P4, H1, U2 inventory, S5 checklist read as input to the UX work, decision D9 | Reliability session done; inventory accepted; home-screen integration scope fixed |
-| 0.4 | U3 home screen and U15 shared patterns; UI-independent foundations: E3 (minimal journeys), E4, R2, S1/S3 split, S6 AAB, D4 data, H5, U14 | Home screen on the G10; minified release; Play build has no Appliance entry points |
-| 0.5–0.7 | U4–U10 screen by screen in the U2 order (D9 inside U6), U1 trials decided in place, H2–H4 as scoped; E5/E6 alongside | Each screen accepted as it lands |
+| 0.3 | P1–P4, H1, U2 inventory, S5 checklist read as input to the UX work | Reliability session done; inventory accepted; home-screen integration scope fixed |
+| 0.4 | U3 home screen and U15 shared patterns; UI-independent foundations: E3 (minimal journeys), E4, R2, S1/S3 split, S6 AAB, D4 data, U14 | Home screen on the G10; minified release; Play build has no Appliance entry points |
+| 0.5–0.7 | U4–U10 screen by screen in the U2 order (D9 inside U6), U1 trials decided in place; E5/E6 alongside | Each screen accepted as it lands |
 | 0.8 | U16 entry focus and Back; E2 full journeys, E7, E8 on the settled screens; S5 audit and fixes; U12 goldens | Numbers recorded; TV checklist passes or deviations documented |
 | 0.9 RC | U11, P5, A1–A2, R1, R3–R5, E9, S7–S10, X1–X4; S4 reviewer instructions and demo video, recorded on the RC before the closed-test submission; S11 closed test | All [TV] gates observed; closed test running |
 | 1.0 | R6, Play production release after S11 | Signed release on GitHub and Play |
@@ -321,11 +334,10 @@ Order rationale:
 
 ## Owner decisions needed
 
-1. Remaining U2 questions and the screen order (0.3). First pass done
-   2026-10-12; open per screen: Channels view modes and group tabs (U4), Recordings views and tabs (U6),
-   continue watching on Home or in Recordings (U3/U6).
-2. D9 manual one-off recordings (0.3).
-3. U1 trials, each inside its screen's rework.
-4. H2–H4 after the H1 matrix.
-5. S9 GPLv3-on-Play conclusion.
-6. A1 and P6.
+1. Remaining U2 questions, each settled inside its screen's rework with
+   prototypes and trials rather than up front (owner 2026-10-12): Channels view
+   modes and group tabs (U4), Recordings views and tabs (U6), continue watching
+   on Home or in Recordings (U3/U6).
+2. U1 trials, each inside its screen's rework.
+3. S9 GPLv3-on-Play conclusion.
+4. A1 and P6.
