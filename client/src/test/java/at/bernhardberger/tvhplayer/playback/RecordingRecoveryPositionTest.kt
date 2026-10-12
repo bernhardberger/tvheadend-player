@@ -10,7 +10,6 @@ package at.bernhardberger.tvhplayer.playback
 import android.app.Application
 import android.net.Uri
 import android.os.Looper
-import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -152,6 +151,14 @@ class RecordingRecoveryPositionTest {
         assertEventuallyNear(TWENTY_MINUTES)
     }
 
+    @Test fun repeatedRetryKeepsTheOriginalDurationWhenTheReplacementIsShorter() = exercise {
+        retryWithChangedPendingDuration(unknown = false)
+    }
+
+    @Test fun repeatedRetryKeepsTheOriginalDurationWhenTheReplacementDurationIsUnknown() = exercise {
+        retryWithChangedPendingDuration(unknown = true)
+    }
+
     @Test fun aNewPlayWhileTheRecoverySeekWaitsStartsPerTheViewersChoice() = exercise {
         play(FIRST)
         failAtTwentyMinutes()
@@ -251,7 +258,7 @@ class RecordingRecoveryPositionTest {
         assertGrowingTarget()
         awaitUnseekablePlayback()
 
-        skippedMs += 20_000 // the recovered play has waited the SDK's growing settle bound
+        awaitRecoveryTimeout()
         media.openSeeking()
 
         awaitMain { player.isCurrentMediaItemSeekable }
@@ -321,7 +328,7 @@ class RecordingRecoveryPositionTest {
             awaitUnseekablePlayback()
 
             session.publish(completedObservation(spanMinutes = 30)) // the recording ends while recovery waits
-            skippedMs += 20_000 // the recovered play has waited the SDK's growing settle bound
+            awaitRecoveryTimeout()
             media.openSeeking()
 
             awaitMain { player.isCurrentMediaItemSeekable }
@@ -380,12 +387,9 @@ class RecordingRecoveryPositionTest {
             }
         }).also { it.launchIn(scope) }
 
-        /** Elapsed time the recovered play is taken to have waited beyond the player's clock. */
-        @Volatile var skippedMs = 0L
-
         val runtime = AppPlaybackRuntime(player, if (growing) GrowingRecordingSession(session) else session,
             coordinator, settings, profiles, scope, TvheadendAudioOutputProvider(context), focus,
-            PlaybackRuntimePolicy.fromPlayerSettings(), elapsedRealtime = { SystemClock.elapsedRealtime() + skippedMs })
+            PlaybackRuntimePolicy.fromPlayerSettings())
 
         fun observation(entries: List<DvrEntryId> = listOf(FIRST, SECOND)) = recordings(
             entries, bookmark, if (growing) DvrEntryState.RECORDING else DvrEntryState.COMPLETED, growing,
@@ -440,6 +444,26 @@ class RecordingRecoveryPositionTest {
             awaitMain { player.isPlaying && player.currentPosition >= TWENTY_MINUTES }
         }
 
+        suspend fun retryWithChangedPendingDuration(unknown: Boolean) {
+            play(FIRST)
+            failAtTwentyMinutes()
+            media.seekable = false
+            media.lengthMs = 21 * ONE_MINUTE
+            media.unknownDuration = unknown
+            assertTrue(runtime.retryRecording()?.isStarted == true)
+            awaitUnseekablePlayback()
+            assertEquals(if (unknown) C.TIME_UNSET else 21 * ONE_MINUTE, player.duration)
+            assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
+            media.unknownDuration = false
+            assertTrue(runtime.retryRecording()?.isStarted == true)
+            awaitUnseekablePlayback()
+            // 20/21 exceeds the completion cutoff; only the original 30-minute duration
+            // keeps this owed position eligible, even when the new timeline becomes seekable.
+            assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
+            media.openSeeking()
+            assertEventuallyNear(TWENTY_MINUTES)
+        }
+
         /** The viewer skips to 20 minutes and the recording's read fails 2 s later. */
         suspend fun failAtTwentyMinutes() = failAt(TWENTY_MINUTES)
 
@@ -490,6 +514,12 @@ class RecordingRecoveryPositionTest {
         }
 
         suspend fun settleMain() { repeat(20) { tick() } }
+
+        suspend fun awaitRecoveryTimeout() {
+            assertNotNull(coordinator.pendingRecordingRecoveryPosition.value)
+            // Pump both the SDK's Handler timeout and Media3's real playback threads.
+            awaitMain { coordinator.pendingRecordingRecoveryPosition.value == null }
+        }
     }
 
     /**
@@ -537,6 +567,7 @@ class RecordingRecoveryPositionTest {
         /** The byte offset the most recent read reached, for diagnostics. */
         @Volatile var readPosition = 0L
         @Volatile var seekable = true
+        @Volatile var unknownDuration = false
         /** The length a new open of the recording serves, as a growing file's probe reports it. */
         @Volatile var lengthMs = RECORDING_MS.toLong()
         private val held = mutableListOf<Pair<ExtractorOutput, SeekMap>>()
@@ -579,7 +610,7 @@ class RecordingRecoveryPositionTest {
                     val gated = synchronized(held) {
                         (!seekable).also { if (it) held += output to seekMap }
                     }
-                    output.seekMap(if (gated) SeekMap.Unseekable(seekMap.durationUs) else seekMap)
+                    output.seekMap(if (gated) SeekMap.Unseekable(if (unknownDuration) C.TIME_UNSET else seekMap.durationUs) else seekMap)
                 }
             })
             override fun read(input: ExtractorInput, seekPosition: PositionHolder): Int = wav.read(input, seekPosition)

@@ -2,11 +2,11 @@
 @file:OptIn(
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
     kotlinx.coroutines.ExperimentalCoroutinesApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
-import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopOutcome
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
@@ -24,11 +24,14 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopOutcome
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import java.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -39,7 +42,6 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.time.Duration
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -1056,7 +1058,7 @@ class AudioInterruptionRuntimeTest {
             admitLocked = {
                 recovery.admitLocked(stopped)
                 admitted = true
-                stopped to LiveRecoveryAttempt(attempt = 2, delayMillis = 60_000L)
+                stopped to LiveRetuneDecision.Admitted(attempt = 2, delay = 60.seconds)
             },
             retryLocked = { events += "stopped attempt retuned"; null },
         )
@@ -1226,18 +1228,24 @@ class AudioInterruptionRuntimeTest {
             }
         }
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
-        // The retune and then the channel change both install (subscribe order: 2 and 3).
-        await { connection.subscribeCount == 3 && zap?.isCompleted == true && pause?.isCompleted == true }
-        // Their collectors run on Dispatchers.Default and need not register in subscribe order.
-        // Give both the same startup status; the retired retune cannot publish it for channel 2.
-        val replacements = List(2) { connection.awaitCollectionRegistered() }
-        for (registration in replacements) {
-            startSubscription(registration)
-            connection.emit(registration, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
-        }
+        await { zap?.isCompleted == true && pause?.isCompleted == true }
         assertTrue(zap?.await()?.isStarted == true)
-        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
-            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        // The retired retune may never subscribe. Feed whichever collectors actually open,
+        // without assuming their count or registration order on Dispatchers.Default.
+        val startup = scope.launch {
+            while (isActive) {
+                val registration = connection.awaitCollectionRegistered()
+                startSubscription(registration)
+                connection.emit(registration, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+            }
+        }
+        try {
+            await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+                ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null &&
+                connection.subscribeCount - connection.unsubscribeCount == 1 }
+        } finally {
+            startup.cancelAndJoin()
+        }
         markReady()
         delay(300)
         settle()
@@ -1318,6 +1326,7 @@ class AudioInterruptionRuntimeTest {
         await { zap.isCompleted }
         assertTrue(escalated)
         assertTrue(zap.await()?.isStarted == true)
+        await { connection.subscribeCount == 2 }
         delay(300)
         settle()
         // Channel 1's escalation is stale once channel 2 committed: dropped silently.
@@ -1359,6 +1368,7 @@ class AudioInterruptionRuntimeTest {
         settle()
         // Playing again, the deferred recovery goes on without a Play from the viewer: one
         // retune, admitted as the target's first attempt.
+        await { connection.subscribeCount == 2 }
         assertEquals("the recovery the rejected pause deferred stayed stranded", 2, connection.subscribeCount)
         assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
         startSubscription(connection.awaitCollectionRegistered())
@@ -1389,6 +1399,7 @@ class AudioInterruptionRuntimeTest {
         delay(300)
         settle()
         assertEquals(emptyList<Int>(), connection.speeds)
+        await { connection.subscribeCount == 2 }
         assertEquals("the recovery the dropped pause deferred stayed stranded", 2, connection.subscribeCount)
         assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
         startSubscription(connection.awaitCollectionRegistered())
@@ -1408,45 +1419,42 @@ class AudioInterruptionRuntimeTest {
         // The install completes before its stream starts; nothing is emitted before the count.
         await { install.isCompleted }
         assertTrue(install.await()?.isStarted == true)
-        // Bounded, so a dropped escalation still fails on the count below.
-        withTimeoutOrNull(3_000) { await { connection.subscribeCount >= 2 } }
-        delay(300)
-        settle()
-        assertEquals("the first install's own escalation was dropped", 2, connection.subscribeCount)
+        await { installing.size == 2 }
+        startSurvivingInstallation()
+        assertEquals(2, installing.size)
         assertEquals(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L), installing.last())
-        connection.awaitCollectionRegistered()
-        startSubscription(connection.awaitCollectionRegistered())
-        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
+        val subscriptions = connection.subscribeCount
         delay(300)
         settle()
-        assertEquals(2, connection.subscribeCount)
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertEquals(2, installing.size)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
     @Test fun escalationOfAChannelChangesNewSourceRetunesTheNewChannelOnce() = exercise {
         live(timeshift = false)
+        val installingFrom = mutableListOf<AppPlaybackTarget?>()
+        beforeLiveBinding = { installingFrom += runtime.activeTarget.value }
         escalateOnNextSource()
         val zap = scope.async {
             runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
         }
         await { zap.isCompleted }
         assertTrue(zap.await()?.isStarted == true)
-        // Bounded, so a dropped escalation still fails on the count below.
-        withTimeoutOrNull(3_000) { await { connection.subscribeCount >= 3 } }
+        await { installingFrom.size == 2 }
+        startSurvivingInstallation()
+        val subscriptions = connection.subscribeCount
         delay(300)
         settle()
-        assertEquals("channel 2's own escalation was dropped", 3, connection.subscribeCount)
-        connection.awaitCollectionRegistered()
-        startSubscription(connection.awaitCollectionRegistered())
-        await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering }
-        delay(300)
-        settle()
-        assertEquals(3, connection.subscribeCount)
+        assertEquals(subscriptions, connection.subscribeCount)
+        assertEquals(listOf(AppPlaybackTarget.Live(ChannelId(1)), AppPlaybackTarget.Live(ChannelId(2))), installingFrom)
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
 
     @Test fun escalationOfAnInstallThatANewerChannelChangeReplacedIsDropped() = exercise {
         live(timeshift = false)
+        val bindings = mutableListOf<AppPlaybackState>()
+        beforeLiveBinding = { bindings += runtime.state.value }
         // Channel 2's source escalates at once; a change back to channel 1 is already queued.
         var zapBack: Deferred<PlaybackTargetResult?>? = null
         escalateOnNextSource {
@@ -1458,20 +1466,22 @@ class AudioInterruptionRuntimeTest {
             runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
         }
         await { zap.isCompleted && zapBack?.isCompleted == true }
+        assertTrue(zap.await()?.isStarted == true)
+        assertTrue(zapBack?.await()?.isStarted == true)
+        startSurvivingInstallation()
+        val subscriptions = connection.subscribeCount
         delay(300)
         settle()
         // Channel 1 committed after channel 2: channel 2's escalation touches it not.
-        assertEquals(3, connection.subscribeCount)
+        assertEquals(2, bindings.size)
+        assertEquals(subscriptions, connection.subscribeCount)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertFalse(runtime.state.value is AppPlaybackState.Recovering)
         // Channel 1's own first recovery still finds its whole budget.
-        connection.awaitCollectionRegistered()
-        startSubscription(connection.awaitCollectionRegistered())
-        await { player.playWhenReady }
         val installing = mutableListOf<AppPlaybackState>()
         beforeLiveBinding = { installing += runtime.state.value }
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
-        await { connection.subscribeCount == 4 }
+        await { connection.subscribeCount == subscriptions + 1 }
         assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
     }
 
@@ -1655,7 +1665,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun exhaustedRecoveryUsesTheSharedBudgetAndDeduplicatesCallbacks() = exercise(virtualTime = true) {
         live(timeshift = false)
-        for ((index, delayMillis) in DEFAULT_LIVE_RECOVERY_DELAYS_MS.withIndex()) {
+        for ((index, delayMillis) in listOf(0L, 2_000L, 5_000L, 10_000L, 20_000L).withIndex()) {
             exhaust()
             runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED)
             signalPlayIntent()
@@ -1699,6 +1709,8 @@ class AudioInterruptionRuntimeTest {
         }
         await { zap.isCompleted }
         assertTrue(zap.await()?.isStarted == true)
+        await { connection.subscribeCount == 2 }
+        delay(300)
         settle()
         assertEquals(2, connection.subscribeCount)
         assertEquals(stops, coordinatorStops)
@@ -1710,64 +1722,78 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun recoveryInstallExhaustionBeforeCommitIsOwedOnceForTheNewInstallation() = exercise(virtualTime = true) {
         live(timeshift = false)
+        var cleanup: Job? = null
         escalateOnNextSource(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED, reports = 2) {
             suppress(true)
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            cleanup = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 commands.serialize(onClosed = {}) { coordinator.stop() }
             }
         }
         exhaust()
-        assertEquals(2, connection.subscribeCount)
+        await { cleanup?.isCompleted == true && player.mediaItemCount == 0 &&
+            connection.subscribeCount == connection.unsubscribeCount }
+        val subscriptions = connection.subscribeCount
         assertEquals(0, player.mediaItemCount)
         suppress(false)
-        settle()
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        assertEquals(subscriptions, connection.subscribeCount)
         assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
         advanceRecoveryTime(2_001)
-        await { connection.subscribeCount == 3 }
+        await { connection.subscribeCount == subscriptions + 1 }
         settle()
-        assertEquals(3, connection.subscribeCount)
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+        assertEquals(1, connection.subscribeCount - connection.unsubscribeCount)
     }
 
     @Test fun recoveryInstallRetirementFailureBeforeCommitRetiresTheNewInstallationWhileSuppressed() = exercise(virtualTime = true) {
         live(timeshift = false)
+        var escalated = false
         escalateOnNextSource(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED, reports = 2) {
+            escalated = true
             suppress(true)
         }
         exhaust()
-        settle()
-        assertEquals(2, connection.subscribeCount)
+        await { escalated && player.mediaItemCount == 0 &&
+            connection.subscribeCount == connection.unsubscribeCount }
+        val subscriptions = connection.subscribeCount
         assertEquals(0, player.mediaItemCount)
-        assertEquals(2, connection.unsubscribeCount)
+        assertEquals(subscriptions, connection.unsubscribeCount)
         suppress(false)
-        settle()
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        assertEquals(subscriptions, connection.subscribeCount)
         assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
         advanceRecoveryTime(2_001)
-        await { connection.subscribeCount == 3 }
+        await { connection.subscribeCount == subscriptions + 1 }
+        settle()
+        assertEquals(subscriptions + 1, connection.subscribeCount)
+        assertEquals(1, connection.subscribeCount - connection.unsubscribeCount)
     }
 
     @Test fun recoveryInstallCleanupFailureBeforeCommitKeepsCleanupOwedAndVisible() = exercise(virtualTime = true) {
         live(timeshift = false)
+        var cleanup: Job? = null
         escalateOnNextSource(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_PLAYER_CLEANUP_FAILED, reports = 2) {
             suppress(true)
             failCoordinatorStop = true
             failCoordinatorRemoval = true
-            scope.launch(start = CoroutineStart.UNDISPATCHED) {
+            cleanup = scope.launch(start = CoroutineStart.UNDISPATCHED) {
                 commands.serialize(onClosed = {}) { coordinator.stop() }
             }
         }
         exhaust()
-        settle()
-        assertEquals(2, connection.subscribeCount)
+        await { cleanup?.isCompleted == true && runtime.state.value is AppPlaybackState.Failed }
         assertEquals(1, player.mediaItemCount)
         assertEquals(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER), runtime.state.value)
         failCoordinatorStop = false
         failCoordinatorRemoval = false
         suppress(false)
-        settle()
+        await { player.mediaItemCount == 0 && connection.subscribeCount == connection.unsubscribeCount &&
+            (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        val subscriptions = connection.subscribeCount
         assertEquals(0, player.mediaItemCount)
         assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
         advanceRecoveryTime(2_001)
-        await { connection.subscribeCount == 3 }
+        await { connection.subscribeCount == subscriptions + 1 }
         assertFalse(coordinator.playerCleanupPending.value)
     }
 
@@ -2050,6 +2076,7 @@ class AudioInterruptionRuntimeTest {
         val recovered = scope.async { runtime.retryLive(viewerRetry = true) }
         await { recovered.isCompleted }
         assertTrue(recovered.await()?.isStarted == true)
+        await { connection.subscribeCount == subscriptions + 1 }
         assertEquals(subscriptions + 1, connection.subscribeCount)
         assertFalse(coordinator.playerCleanupPending.value)
         assertEquals(1, player.mediaItemCount)
@@ -2188,6 +2215,7 @@ class AudioInterruptionRuntimeTest {
         settle()
         admissionHeld.complete(Unit)
         await { holder?.isCompleted == true }
+        await { connection.subscribeCount == 2 }
         delay(300)
         settle()
         // Reported under the replaced session: dropped, neither retuning nor charging channel 2.
@@ -2214,6 +2242,19 @@ class AudioInterruptionRuntimeTest {
                 repeat(reports) { runtime.onRecoveryRequired(recoveryReason) }
             }
         })
+    }
+
+    /** A replaced source may be cancelled before subscribe or register in either order. */
+    private suspend fun Fixture.startSurvivingInstallation() {
+        val startup = scope.launch {
+            while (isActive) startSubscription(connection.awaitCollectionRegistered())
+        }
+        try {
+            await { player.playWhenReady && runtime.state.value !is AppPlaybackState.Recovering &&
+                connection.subscribeCount - connection.unsubscribeCount == 1 }
+        } finally {
+            startup.cancelAndJoin()
+        }
     }
 
     /** Live timeshift whose second recovery attempt is admitted and waits out its 2 s backoff. */
@@ -2370,7 +2411,7 @@ class AudioInterruptionRuntimeTest {
                 player.removeListener(listener)
             }
         }
-        val startupBuffer = StartupBufferController(StartupBufferLoadControl(androidx.media3.exoplayer.DefaultLoadControl()),
+        val startupBuffer = StartupBufferController(at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer(),
             settings, profiles.startupBufferIdentity(), scope)
         val runtime = AppPlaybackRuntime(runtimePlayer, runtimeSession, coordinator, settings, profiles, scope, output, focus,
             PlaybackRuntimePolicy.fromPlayerSettings(),

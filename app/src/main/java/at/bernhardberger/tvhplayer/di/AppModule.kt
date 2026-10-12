@@ -1,4 +1,5 @@
 @file:androidx.media3.common.util.UnstableApi
+@file:OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 
 package at.bernhardberger.tvhplayer.di
 
@@ -7,10 +8,11 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import at.bernhardberger.tvheadend.sdk.android.TvheadendServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.createTvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendRenderersFactory
-import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
@@ -20,7 +22,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.StartupBufferController
-import at.bernhardberger.tvhplayer.playback.StartupBufferLoadControl
 import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
 import at.bernhardberger.tvhplayer.profiling.ProfilePlaybackTrace
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
@@ -38,6 +39,7 @@ import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import coil3.ImageLoader
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -88,17 +90,17 @@ val appModule = module {
             ioDispatcher = get(qualifier = named("io")),
         )
         val audioOutput = TvheadendAudioOutputProvider(androidContext())
-        val startupBufferLoadControl = StartupBufferLoadControl(createTvheadendLoadControl())
-        val player = ExoPlayer.Builder(androidContext())
+        val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)
+        val loadControl = createTvheadendLoadControl(liveStartBuffer)
+        val player = loadControl.configure(ExoPlayer.Builder(androidContext()))
             .setRenderersFactory(createTvheadendRenderersFactory(androidContext(), audioOutput))
-            .setLoadControl(startupBufferLoadControl)
             .setAudioAttributes(AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
                 .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), false)
             .setHandleAudioBecomingNoisy(false)
             .build()
         val startupBuffer = StartupBufferController(
-            loadControl = startupBufferLoadControl,
+            liveStartBuffer = liveStartBuffer,
             settings = playerSettings,
             serverIdentity = profileOwner.startupBufferIdentity(),
             scope = applicationScope,
@@ -106,6 +108,7 @@ val appModule = module {
         lateinit var playbackRuntime: AppPlaybackRuntime
         val coordinator = createTvheadendPlaybackCoordinator(
             player = player,
+            loadControl = loadControl,
             onRecoveryRequired = { reason -> playbackRuntime.onRecoveryRequired(reason) },
         )
         playbackRuntime = AppPlaybackRuntime(

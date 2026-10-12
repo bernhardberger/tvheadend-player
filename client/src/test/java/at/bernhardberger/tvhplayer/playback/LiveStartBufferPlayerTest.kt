@@ -1,5 +1,6 @@
 @file:androidx.media3.common.util.UnstableApi
 @file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class)
 
 package at.bernhardberger.tvhplayer.playback
@@ -13,17 +14,18 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.BaseRenderer
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.LoadControl
-import androidx.media3.exoplayer.Renderer
-import androidx.media3.exoplayer.RendererCapabilities
-import androidx.media3.exoplayer.source.ProgressiveMediaSource
-import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.ByteArrayDataSource
 import androidx.media3.datasource.DataSpec
+import androidx.media3.decoder.DecoderInputBuffer
+import androidx.media3.exoplayer.BaseRenderer
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.FormatHolder
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.RendererCapabilities
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.source.SampleStream
+import androidx.media3.exoplayer.source.SilenceMediaSource
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -37,10 +39,15 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendLoadControl
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.isTvheadendLive
 import at.bernhardberger.tvheadend.sdk.playback.MuxFrameType
+import at.bernhardberger.tvheadend.sdk.playback.SkipOutcome
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
@@ -52,17 +59,17 @@ import at.bernhardberger.tvheadend.sdk.playback.createSubscriptionManager
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.ScriptedSubscriptionConnection
 import at.bernhardberger.tvheadend.sdk.testing.SubscriptionBinaryFixture
-import java.lang.reflect.Proxy
-import java.util.Collections
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -71,26 +78,19 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * A real ExoPlayer drives the wrapper: prepare, play and release reach the delegate, a start from
- * the SDK's live source waits for the live threshold, and any other item starts by the delegate.
+ * A real ExoPlayer uses the SDK handle: live starts obey the app's mutable threshold,
+ * while other items retain the SDK's ordinary buffering policy.
  */
 @RunWith(org.robolectric.RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
-class StartupBufferLoadControlPlayerTest {
-    private val calls = Collections.synchronizedList(mutableListOf<String>())
-    private val real = DefaultLoadControl()
-    private val delegate = Proxy.newProxyInstance(
-        LoadControl::class.java.classLoader, arrayOf(LoadControl::class.java),
-    ) { _, method, args ->
-        calls += method.name
-        method.invoke(real, *(args ?: emptyArray()))
-    } as LoadControl
-    private val control = StartupBufferLoadControl(delegate)
+class LiveStartBufferPlayerTest {
+    private val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)
+    private val control = createTvheadendLoadControl(liveStartBuffer)
     private val context get() = ApplicationProvider.getApplicationContext<Application>()
 
     @Test
-    fun aRealPlayerPreparesPlaysAndReleasesThroughTheWrapper() {
-        val player = ExoPlayer.Builder(context).setLoadControl(control).build()
+    fun aRealPlayerPreparesPlaysAndReleasesThroughTheSdkHandle() {
+        val player = control.configure(ExoPlayer.Builder(context)).build()
         var error: PlaybackException? = null
         player.addListener(object : Player.Listener {
             override fun onPlayerError(value: PlaybackException) { error = value }
@@ -106,20 +106,15 @@ class StartupBufferLoadControlPlayerTest {
         player.release()
         shadowOf(Looper.getMainLooper()).idleFor(TICK)
         assertNull(error)
-        for (name in listOf(
-            "onPrepared", "onTracksSelected", "getAllocator", "getBackBufferDurationUs",
-            "retainBackBufferFromKeyframe", "shouldContinueLoading", "onStopped", "onReleased",
-        )) assertTrue("$name reached the delegate: ${calls.toSet()}", name in calls)
     }
 
     @Test
     fun aNonLiveStartIsDecidedByTheDelegate() {
-        val player = ExoPlayer.Builder(context)
+        val player = control.configure(ExoPlayer.Builder(context))
             .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(SampleSink(C.TRACK_TYPE_AUDIO)) }
-            .setLoadControl(control)
             .build()
-        // A threshold the wrapper would never meet: only the delegate can start this item.
-        control.setLiveStartBufferMillis(600_000)
+        // A live threshold this file cannot meet: non-live policy must start this item.
+        liveStartBuffer.duration = 600_000.milliseconds
         try {
             // A slowly delivered file keeps loading after the delegate's start buffer, so Media3 asks.
             val wav = pcmWav(seconds = 60)
@@ -132,21 +127,24 @@ class StartupBufferLoadControlPlayerTest {
             assertNull(player.playerError)
             assertTrue(player.isPlaying)
             assertTrue(player.isLoading)
-            assertTrue("The delegate made the start decision: ${calls.toSet()}", "shouldStartPlayback" in calls)
         } finally {
             player.release()
         }
     }
 
     @Test
-    fun aLiveStartFromTheSdkLiveSourceWaitsForTheLiveThreshold() = runBlocking {
+    fun aLiveStartFromTheSdkLiveSourceWaitsForTheLiveThreshold() = liveBufferExercise(skip = false)
+
+    @Test
+    fun aTimeshiftSkipUsesTheLiveThresholdOnceThenOrdinaryRebufferUsesOnePointFiveSeconds() = liveBufferExercise(skip = true)
+
+    private fun liveBufferExercise(skip: Boolean) = runBlocking {
         val scope = CoroutineScope(coroutineContext + SupervisorJob())
-        val player = ExoPlayer.Builder(context)
-            .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(SampleSink()) }
-            .setLoadControl(control)
+        val player = control.configure(ExoPlayer.Builder(context))
+            .setRenderersFactory { _, _, _, _, _ -> arrayOf<Renderer>(SampleSink(consume = skip)) }
             .build()
         val connection = ScriptedSubscriptionConnection().apply {
-            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
         }
         val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
         val session = FakeTvheadendSession(SessionObservation.create(
@@ -155,11 +153,12 @@ class StartupBufferLoadControlPlayerTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).apply { scriptLivePlaybackSuccess(manager) }
-        val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
+        val coordinator = createTvheadendPlaybackCoordinator(player, control).also { it.launchIn(scope) }
         try {
-            // Far more than the delegate's 1 s, so only the wrapper can hold the start.
-            control.setLiveStartBufferMillis(60_000)
-            val result = coordinator.setLiveTarget(session, requireNotNull(session.observation.value.currentSession), ChannelId(1))
+            // Far more than ordinary startup buffering, so the live threshold holds the start.
+            liveStartBuffer.duration = 60_000.milliseconds
+            val result = coordinator.setLiveTarget(session, requireNotNull(session.observation.value.currentSession), ChannelId(1),
+                LivePlaybackOptions(timeshiftPeriod = 120.seconds))
             assertTrue(result is LivePlaybackTargetResult.Bound && result.result.isStarted)
             if (player.playbackState == Player.STATE_IDLE) player.prepare()
             player.play()
@@ -179,15 +178,39 @@ class StartupBufferLoadControlPlayerTest {
             assertNull(player.playerError)
             repeat(20) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(10) }
             assertEquals(Player.STATE_BUFFERING, player.playbackState)
-            assertEquals(SDK_LIVE_MEDIA_ID, player.currentMediaItem?.mediaId)
             assertTrue(requireNotNull(player.currentMediaItem).isTvheadendLive())
 
             // Lowering the live threshold below what is buffered lets the same start begin.
-            control.setLiveStartBufferMillis(2_000)
+            liveStartBuffer.duration = 2_000.milliseconds
             awaitMain { player.playerError != null || player.isPlaying }
             assertNull(player.playerError)
             assertTrue(player.isPlaying)
-            assertFalse("The delegate was asked for a live start: ${calls.toSet()}", "shouldStartPlayback" in calls)
+            if (skip) {
+                connection.emit(SubscriptionEvent.Timeshift(1_000_000, 0, 0, 120_000_000, 100))
+                liveStartBuffer.duration = 60_000.milliseconds
+                val returning = async { coordinator.returnToLive() }
+                awaitMain { connection.seekTargets.isNotEmpty() }
+                connection.emit(SubscriptionEvent.Skipped(true, SkipOutcome.ACCEPTED, 0, null))
+                awaitMain { returning.isCompleted }
+                assertEquals(TimeshiftCommandResult.ACCEPTED, returning.await())
+                awaitMain { player.playbackState == Player.STATE_BUFFERING }
+                repeat(100) { emitPair(connection, it); shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(2) }
+                awaitMain { player.totalBufferedDuration >= 3_000 }
+                assertEquals(Player.STATE_BUFFERING, player.playbackState)
+                liveStartBuffer.duration = 2_000.milliseconds
+                awaitMain { player.isPlaying }
+                // The one-shot mark has been consumed. Withhold packets until an ordinary stall.
+                liveStartBuffer.duration = 60_000.milliseconds
+                awaitMain { player.playbackState == Player.STATE_BUFFERING }
+                repeat(20) { emitPair(connection, 100 + it) }
+                repeat(20) { shadowOf(Looper.getMainLooper()).idleFor(TICK); delay(5) }
+                assertTrue(player.totalBufferedDuration < 1_500)
+                assertEquals(Player.STATE_BUFFERING, player.playbackState)
+                repeat(35) { emitPair(connection, 120 + it) }
+                awaitMain { player.isPlaying }
+                assertTrue(player.totalBufferedDuration < 3_000)
+                assertNull(player.playerError)
+            }
         } finally {
             scope.cancel()
             manager.closeAndJoin()
@@ -197,14 +220,37 @@ class StartupBufferLoadControlPlayerTest {
     }
 
     /** Accepts video samples and is ready whenever the stream has one; decodes nothing. */
-    private class SampleSink(private val type: Int = C.TRACK_TYPE_VIDEO) : BaseRenderer(type) {
+    private class SampleSink(private val type: Int = C.TRACK_TYPE_VIDEO, private val consume: Boolean = false) : BaseRenderer(type) {
+        private val holder = FormatHolder()
+        private val buffer = DecoderInputBuffer(DecoderInputBuffer.BUFFER_REPLACEMENT_MODE_DISABLED)
+        private var heldTimeUs: Long? = null
         override fun getName() = "SampleSink"
         override fun supportsFormat(format: Format): Int = RendererCapabilities.create(
             if (MimeTypes.getTrackType(format.sampleMimeType) == type) C.FORMAT_HANDLED else C.FORMAT_UNSUPPORTED_TYPE,
         )
-        override fun isReady() = isSourceReady
+        override fun isReady() = heldTimeUs != null || isSourceReady
         override fun isEnded() = false
-        override fun render(positionUs: Long, elapsedRealtimeUs: Long) = Unit
+        override fun onPositionReset(positionUs: Long, joining: Boolean, sampleStreamIsResetToKeyFrame: Boolean) {
+            heldTimeUs = null
+        }
+        override fun render(positionUs: Long, elapsedRealtimeUs: Long) {
+            if (!consume) return
+            while (true) {
+                val timeUs = heldTimeUs ?: run {
+                    buffer.clear()
+                    when (readSource(holder, buffer, SampleStream.FLAG_OMIT_SAMPLE_DATA)) {
+                        C.RESULT_FORMAT_READ -> return@run null
+                        C.RESULT_BUFFER_READ -> if (buffer.isEndOfStream) return else buffer.timeUs
+                        else -> return
+                    }
+                } ?: continue
+                if (timeUs > positionUs) {
+                    heldTimeUs = timeUs
+                    return
+                }
+                heldTimeUs = null
+            }
+        }
     }
 
     private companion object {

@@ -4,6 +4,9 @@ package at.bernhardberger.tvhplayer.playback
 
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.playback.LiveRetuneBudget
+import at.bernhardberger.tvheadend.sdk.playback.LiveRetuneDecision
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
@@ -17,6 +20,7 @@ import kotlinx.coroutines.launch
  * attempt was admitted, the attempt budget and the attempt runner. The runtime decides admission
  * and retunes; each way of ending a recovery keeps its own cancel below, and they differ on purpose.
  */
+@OptIn(ExperimentalTvheadendApi::class)
 internal class LiveRecoveryController(
     private val scope: CoroutineScope,
     private val targetCommands: PlaybackTargetCommandSerialization,
@@ -39,7 +43,7 @@ internal class LiveRecoveryController(
      */
     var deferredRecovery: LiveRecoveryFence? = null
         private set
-    private val recoveryBackoff = LiveRecoveryBackoff()
+    private val recoveryBudget = LiveRetuneBudget()
     val recoveryAttempts = LiveRecoveryAttemptRunner(publishResolvedRecoveryPlayerState)
 
     /**
@@ -48,7 +52,7 @@ internal class LiveRecoveryController(
      */
     fun dispatch(
         reason: PlaybackRecoveryReason,
-        admitLocked: suspend (PlaybackRecoveryReason) -> Pair<LiveRecoveryFence, LiveRecoveryAttempt>?,
+        admitLocked: suspend (PlaybackRecoveryReason) -> Pair<LiveRecoveryFence, LiveRetuneDecision.Admitted>?,
         retryLocked: suspend (LiveRecoveryFence) -> PlaybackTargetResult?,
     ) {
         dispatchPlaybackRecovery(scope, reason) { dispatchedReason ->
@@ -69,7 +73,7 @@ internal class LiveRecoveryController(
                 if (admitted != null) {
                     val (fence, attempt) = admitted
                     recoveryAttempts.run(fence) {
-                        if (attempt.delayMillis > 0L) delay(attempt.delayMillis)
+                        delay(attempt.delay)
                         targetCommands.serialize(onClosed = { null }) {
                             retryLocked(fence)
                         }
@@ -156,7 +160,11 @@ internal class LiveRecoveryController(
         deferredRecovery = null
     }
 
-    fun nextAttemptLocked(): LiveRecoveryAttempt? = recoveryBackoff.nextAttempt()
+    fun nextAttemptLocked(): LiveRetuneDecision.Admitted? =
+        when (val decision = recoveryBudget.nextAttempt()) {
+            is LiveRetuneDecision.Admitted -> decision
+            LiveRetuneDecision.Exhausted -> null
+        }
 
     fun admitLocked(fence: LiveRecoveryFence) {
         admittedRecovery = fence
@@ -166,7 +174,7 @@ internal class LiveRecoveryController(
     }
 
     fun resetBackoffLocked() {
-        recoveryBackoff.reset()
+        recoveryBudget.reset()
     }
 
     /**

@@ -1,4 +1,5 @@
 @file:androidx.media3.common.util.UnstableApi
+@file:OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 
 package at.bernhardberger.tvhplayer.playback
 
@@ -8,9 +9,11 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.StartupBufferLearningState
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -24,7 +27,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * Feeds [StartupBufferLoadControl] and learns the Automatic start-up buffer.
+ * Feeds [TvheadendLiveStartBuffer] and learns the Automatic start-up buffer.
  *
  * The playback runtime reports which kind of target it is about to install
  * ([targetInstalling], [targetInstallFinished]), when a live start's play
@@ -41,7 +44,7 @@ import kotlinx.coroutines.launch
  * control classifies each start from the period's own media item.
  */
 class StartupBufferController(
-    private val loadControl: StartupBufferLoadControl,
+    private val liveStartBuffer: TvheadendLiveStartBuffer,
     private val settings: PlayerSettingsStore,
     serverIdentity: Flow<String?>,
     private val scope: CoroutineScope,
@@ -79,7 +82,7 @@ class StartupBufferController(
                 profile = identity
                 StartupBufferPolicy.inEffect(millis, learning, identity)
             }.distinctUntilChanged().collect { effect ->
-                loadControl.setLiveStartBufferMillis(effect.millis)
+                liveStartBuffer.duration = effect.millis.milliseconds
                 mutableInEffect.value = effect
             }
         }
@@ -95,21 +98,19 @@ class StartupBufferController(
         player.addAnalyticsListener(this)
     }
 
-    /** Called before the runtime prepares a target, so the load control knows its kind. */
+    /** Called before the runtime prepares a target, so learning knows its kind. */
     fun targetInstalling(live: Boolean) {
         targetLive = live
-        loadControl.clearLiveSeekStart()
         cut()
     }
 
     /**
      * Called when an install ends, also on failure or cancellation. The target
-     * that stays, of kind [activeIsLive], keeps the load control; the window
+     * that stays, of kind [activeIsLive], determines learning; the window
      * waits for [liveStartApplied].
      */
     fun targetInstallFinished(committed: Boolean, activeIsLive: Boolean) {
         targetLive = activeIsLive
-        loadControl.clearLiveSeekStart()
         cut()
     }
 
@@ -130,7 +131,6 @@ class StartupBufferController(
      * after it is a live start with its own window.
      */
     fun timeshiftSeeking() {
-        loadControl.liveSeekStarting(alreadyBuffering = player?.playbackState == Player.STATE_BUFFERING)
         cut()
         armIfPlayIntended()
     }
@@ -138,23 +138,20 @@ class StartupBufferController(
     /**
      * Called with the outcome of [timeshiftSeeking]'s request, also when it was
      * cancelled or failed; a skip that never ran arms nothing. An accepted skip
-     * that does not rebuffer within [StartupBufferLoadControl.SKIP_REBUFFER_GRACE_MS]
+     * that does not rebuffer within [SKIP_LEARNING_GRACE_MS]
      * was absorbed: the start after it is watched from then, and a later
      * rebuffer is graded normally.
      */
     fun timeshiftSeekFinished(accepted: Boolean) {
         if (!accepted) {
-            loadControl.clearLiveSeekStart()
             cut()
             return
         }
-        loadControl.liveSeekFinished()
         stopSkipGrace()
         skipGrace = scope.launch {
-            delay(StartupBufferLoadControl.SKIP_REBUFFER_GRACE_MS)
+            delay(SKIP_LEARNING_GRACE_MS)
             skipGrace = null
             if (player?.isPlaying != true) return@launch
-            loadControl.clearLiveSeekStart()
             if (window.startIfArmed()) startTimer()
         }
     }
@@ -253,5 +250,10 @@ class StartupBufferController(
                 // A storage failure must not interrupt playback; the level stays as it was.
             }
         }
+    }
+
+    internal companion object {
+        // Presentation/learning grace only; SDK load-control skip marks are independent.
+        const val SKIP_LEARNING_GRACE_MS = 3_000L
     }
 }

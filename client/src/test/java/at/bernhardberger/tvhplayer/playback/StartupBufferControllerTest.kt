@@ -1,27 +1,24 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+@file:OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 
 package at.bernhardberger.tvhplayer.playback
 
 import android.app.Application
 import androidx.media3.common.C
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
-import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.LoadControl
 import androidx.media3.exoplayer.analytics.AnalyticsListener
-import androidx.media3.exoplayer.analytics.PlayerId
-import androidx.media3.exoplayer.source.MediaSource
-import androidx.media3.exoplayer.source.SinglePeriodTimeline
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendLiveStartBuffer
 import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict.CLEAN
 import at.bernhardberger.tvhplayer.playback.StartupBufferVerdict.TROUBLE
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.StartupBufferLearningState
+import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -49,8 +46,8 @@ class StartupBufferControllerTest {
             if (storageFails) throw java.io.IOException("storage full")
         }))
         val identity = MutableStateFlow<String?>("server-a")
-        val loadControl = StartupBufferLoadControl(DefaultLoadControl())
-        val controller = StartupBufferController(loadControl, settings, identity, scope.backgroundScope)
+        val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)
+        val controller = StartupBufferController(liveStartBuffer, settings, identity, scope.backgroundScope)
         var playWhenReady = true
         var state = Player.STATE_IDLE
         var trackParameters: TrackSelectionParameters = TrackSelectionParameters.DEFAULT
@@ -161,6 +158,7 @@ class StartupBufferControllerTest {
         settle()
         assertEquals(StartupBufferLearningState("server-a", 500, listOf(TROUBLE)), harness.learned())
         assertEquals(StartupBufferInEffect(500, automatic = true), harness.controller.inEffect.value)
+        assertEquals(500.milliseconds, harness.liveStartBuffer.duration)
         harness.ready()
         harness.liveStart()
         advanceTimeBy(10_000)
@@ -168,6 +166,7 @@ class StartupBufferControllerTest {
         settle()
         assertEquals(StartupBufferLearningState("server-a", 1000), harness.learned())
         assertEquals(StartupBufferInEffect(1000, automatic = true), harness.controller.inEffect.value)
+        assertEquals(1000.milliseconds, harness.liveStartBuffer.duration)
     }
 
     @Test
@@ -193,7 +192,6 @@ class StartupBufferControllerTest {
         harness.serverSkip()
         settle()
         assertEquals(StartupBufferLearningState(), harness.learned())
-        assertTrue(harness.loadControl.isLiveSeekStartPending)
 
         // Pausing cuts the window: no trouble, and the 30 s never complete.
         harness.pause()
@@ -214,8 +212,6 @@ class StartupBufferControllerTest {
         settle()
         // The window restarts with the start after the skip, not before.
         assertEquals(StartupBufferLearningState(), harness.learned())
-        // Still buffering after the grace: the skip's restart keeps its live threshold.
-        assertTrue(harness.loadControl.isLiveSeekStartPending)
         harness.ready()
         advanceTimeBy(30_001)
         settle()
@@ -245,40 +241,15 @@ class StartupBufferControllerTest {
         // The server skipped, but playback never left READY.
         harness.controller.timeshiftSeeking()
         harness.controller.timeshiftSeekFinished(accepted = true)
-        advanceTimeBy(StartupBufferLoadControl.SKIP_REBUFFER_GRACE_MS - 1)
+        advanceTimeBy(StartupBufferController.SKIP_LEARNING_GRACE_MS - 1)
         runCurrent()
-        assertTrue(harness.loadControl.isLiveSeekStartPending)
         advanceTimeBy(2)
         runCurrent()
-        assertFalse(harness.loadControl.isLiveSeekStartPending)
         // The start after the skip is watched, so a later rebuffer is trouble.
         advanceTimeBy(1_000)
         harness.buffering()
         settle()
         assertEquals(StartupBufferLearningState("server-a", 500, listOf(TROUBLE)), harness.learned())
-    }
-
-    @Test
-    fun aSkipPressedWhileBufferingOwnsTheRebufferInProgress() = runTest {
-        val harness = Harness(this)
-        settle()
-        harness.liveStart()
-        advanceTimeBy(5_000)
-        // A stall began before the skip was pressed; Media3 keeps its start time.
-        harness.buffering()
-        val stalledAtMs = android.os.SystemClock.elapsedRealtime() - 1_000
-        harness.controller.timeshiftSeeking()
-        harness.controller.timeshiftSeekFinished(accepted = true)
-        val item = MediaItem.Builder().setMediaId(SDK_LIVE_MEDIA_ID).build()
-        val timeline = SinglePeriodTimeline(C.TIME_UNSET, false, true, true, null, item)
-        val restart = LoadControl.Parameters(
-            PlayerId.UNSET, timeline, MediaSource.MediaPeriodId(timeline.getUidOfPeriod(0)), 0L,
-            1_500_000L, 1f, true, true, C.TIME_UNSET, stalledAtMs,
-        )
-        // Automatic's 0.5 s start threshold decides, not the delegate's 5 s rebuffer threshold.
-        harness.loadControl.onPrepared(PlayerId.UNSET)
-        assertTrue(harness.loadControl.shouldStartPlayback(restart))
-        assertFalse(harness.loadControl.isLiveSeekStartPending)
     }
 
     @Test
@@ -289,7 +260,7 @@ class StartupBufferControllerTest {
         advanceTimeBy(5_000)
         harness.controller.timeshiftSeeking()
         harness.controller.timeshiftSeekFinished(accepted = true)
-        advanceTimeBy(StartupBufferLoadControl.SKIP_REBUFFER_GRACE_MS + 30_001)
+        advanceTimeBy(StartupBufferController.SKIP_LEARNING_GRACE_MS + 30_001)
         settle()
         assertEquals(StartupBufferLearningState("server-a", 500, listOf(CLEAN)), harness.learned())
     }
@@ -321,7 +292,7 @@ class StartupBufferControllerTest {
     }
 
     @Test
-    fun aRejectedSkipCutsTheWindowAndLeavesNoLiveStartPending() = runTest {
+    fun aRejectedSkipCutsTheLearningWindow() = runTest {
         val harness = Harness(this)
         settle()
         harness.liveStart()
@@ -333,7 +304,6 @@ class StartupBufferControllerTest {
         advanceTimeBy(60_000)
         settle()
         assertEquals(StartupBufferLearningState(), harness.learned())
-        assertFalse(harness.loadControl.isLiveSeekStartPending)
     }
 
     @Test
