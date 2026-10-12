@@ -232,6 +232,8 @@
     <string name="stats_timeshift_live" translatable="false">Live</string>
     <string name="stats_timeshift_behind_live" translatable="false">%1$s behind live</string>
     <string name="stats_video" translatable="false">Video</string>
+    <string name="stats_video_buffers">Video buffers</string>
+    <string name="stats_video_buffers_value">Rendered %1$d · Dropped %2$d · Skipped %3$d</string>
     <string name="stats_video_decoder" translatable="false">Video decoder</string>
     <string name="stats_frames" translatable="false">Frames</string>
     <string name="stats_frame_rate" translatable="false">%1$s fps</string>

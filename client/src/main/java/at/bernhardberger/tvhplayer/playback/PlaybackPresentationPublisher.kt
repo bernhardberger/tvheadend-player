@@ -298,6 +298,7 @@ internal class PlaybackPresentationPublisher(
                     height = it.height.takeIf { height -> height > 0 },
                 )
             },
+            videoDecoderCounters = player.videoDecoderCounters?.snapshotVideoDecoderCounters(),
             audio = audio?.let {
                 AppPlaybackFormatDiagnostics(
                     codec = it.codecs,
@@ -320,4 +321,13 @@ internal class PlaybackPresentationPublisher(
         is AppPlaybackTarget.Recording -> AppPlaybackSource.RECORDING
         else -> AppPlaybackSource.NONE
     }
+}
+
+internal fun androidx.media3.exoplayer.DecoderCounters.snapshotVideoDecoderCounters(): AppVideoDecoderCounters {
+    ensureUpdated()
+    return AppVideoDecoderCounters(
+        renderedOutputBufferCount = renderedOutputBufferCount,
+        droppedBufferCount = droppedBufferCount,
+        skippedOutputBufferCount = skippedOutputBufferCount,
+    )
 }

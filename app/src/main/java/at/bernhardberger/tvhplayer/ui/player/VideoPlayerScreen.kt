@@ -1984,6 +1984,7 @@ fun VideoPlayerScreen(
                         listOfNotNull(
                             failedState?.recoveryReason?.toString(),
                             failedState?.playerErrorCode,
+                            failedState?.playerErrorClassification,
                             failedState?.targetResult?.toString(),
                         ).joinToString(" · ")
                 } else {

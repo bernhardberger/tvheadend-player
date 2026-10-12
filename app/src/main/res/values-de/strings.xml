@@ -1,4 +1,6 @@
 <resources>
+    <string name="stats_video_buffers">Videopuffer</string>
+    <string name="stats_video_buffers_value">Angezeigt %1$d · Verworfen %2$d · Übersprungen %3$d</string>
     <string name="audio_subtitles_section">Ton &amp; Untertitel</string>
     <string name="audio_language_first">Audiosprache</string>
     <string name="audio_language_second">Zweite Audiosprache</string>

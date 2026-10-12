@@ -35,6 +35,8 @@ sealed interface AppPlaybackState {
         val targetResult: PlaybackTargetResult? = null,
         /** Media3 error code name for a player-reported failure; diagnostics only, never a message. */
         val playerErrorCode: String? = null,
+        /** Bounded exception class and top frame only; never an exception message or file name. */
+        val playerErrorClassification: String? = null,
         /** Last TVHeadend subscription issue seen before the target was retired, so the user sees why. */
         val subscriptionIssue: SubscriptionIssue? = null,
         /** Last SDK recovery reason that led to retiring the target. */
@@ -165,6 +167,13 @@ data class AppPlaybackFormatDiagnostics(
     val width: Int? = null,
     val height: Int? = null,
 )
+/** Snapshot of Media3's current video decoder counters, with Media3-owned reset semantics. */
+data class AppVideoDecoderCounters(
+    val renderedOutputBufferCount: Int,
+    val droppedBufferCount: Int,
+    val skippedOutputBufferCount: Int,
+)
+
 data class AppPlaybackDiagnostics(
     val source: AppPlaybackSource = AppPlaybackSource.NONE,
     val state: AppPlaybackState = AppPlaybackState.Idle,
@@ -173,6 +182,7 @@ data class AppPlaybackDiagnostics(
     val durationMs: Long? = null,
     val bufferedMs: Long = 0L,
     val video: AppPlaybackFormatDiagnostics? = null,
+    val videoDecoderCounters: AppVideoDecoderCounters? = null,
     val audio: AppPlaybackFormatDiagnostics? = null,
     val live: LiveSubscriptionDiagnostics? = null,
     /** Start-up buffer the next live start waits for; null outside live playback. */

@@ -852,6 +852,7 @@ class PlayerChromeCaptureTest {
         if (dvb) live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Signal(53739, 12300, null, null, 0, 0, false))
         live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Queue(0, 0, 0, 0, 0, 0))
         return AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV,
+            videoDecoderCounters = at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters(12345, 6, 2),
             video = AppPlaybackFormatDiagnostics("avc1.640028", resolution = "1920 × 1080", frameRate = 25f, sampleMimeType = "video/avc", width = 1920, height = 1080),
             audio = AppPlaybackFormatDiagnostics("ec-3", channelCount = 6, sampleMimeType = "audio/eac3"), live = live)
     }

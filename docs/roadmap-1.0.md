@@ -81,8 +81,8 @@ Source: `defect-ledger.md`, `media3-upgrade-assessment-2026-07-28.md`.
 
 | ID | Item | Exit |
 |---|---|---|
-| P1 | D14: Media3 rendered/dropped/skipped frame counters and A/V offset in diagnostics and the stats overlay | Counters visible; unit coverage of the model |
-| P2 | D24: retain a privacy-safe exception classification (cause class, top frame) with `Failed` | Detail line shows it; unit coverage |
+| P1 | D14: Media3 rendered/dropped/skipped frame counters and A/V offset in diagnostics and the stats overlay | Counters visible; unit coverage of the model **Done 2026-10-12** |
+| P2 | D24: retain a privacy-safe exception classification (cause class, top frame) with `Failed` | Detail line shows it; unit coverage **Done 2026-10-12** |
 | P3 | G10 reliability session: zap stress (D12/D17), ORF1 matrix (D24), timeshift (D15), header fallback (D20), stutter (D14) **[TV]** | Each row attributed, fixed or closed with evidence |
 | P4 | Fixes arising from P3 | Focused regression test per fix |
 | P5 | Media3 1.11.1 device matrix and interlaced-motion comparison (assessment steps 5–6, doc still names 1.10.1) **[TV]** | Assessment updated to the current stack and gate passed |

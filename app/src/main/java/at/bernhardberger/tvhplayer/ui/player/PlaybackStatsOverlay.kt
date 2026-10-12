@@ -30,6 +30,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
@@ -115,6 +116,7 @@ internal fun PlaybackStatsOverlay(
                         is AppPlaybackState.Failed -> listOfNotNull(
                             stringResource(R.string.stats_state_failed),
                             state.playerErrorCode ?: state.targetResult?.toString(),
+                            state.playerErrorClassification,
                         ).joinToString(" · ")
                     },
                 )
@@ -174,6 +176,12 @@ internal fun PlaybackStatsOverlay(
                         stringResource(R.string.stats_unavailable)
                     },
                 )
+                diagnostics.videoDecoderCounters?.let { counters ->
+                    StatLine(
+                        stringResource(R.string.stats_video_buffers),
+                        formatVideoDecoderCounters(counters, stringResource(R.string.stats_video_buffers_value)),
+                    )
+                }
                 StatLine(
                     stringResource(R.string.stats_display_mode),
                     stringResource(
@@ -325,6 +333,15 @@ private fun StatLine(label: String, value: String) {
 }
 
 private fun Float.oneDecimal(locale: Locale): String = formatDecimal(toDouble(), 1, locale)
+
+internal fun formatVideoDecoderCounters(counters: AppVideoDecoderCounters, template: String): String =
+    String.format(
+        Locale.ROOT,
+        template,
+        counters.renderedOutputBufferCount,
+        counters.droppedBufferCount,
+        counters.skippedOutputBufferCount,
+    )
 
 private fun formatCount(value: Long, locale: Locale): String = String.format(locale, "%,d", value)
 
