@@ -40,6 +40,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | Document | Scope and lifecycle |
 |---|---|
 | `roadmap-1.0.md` | Milestone order from the current Player to a signed 1.0; links the plans that own each step. Archive at 1.0. |
+| `ux-inventory-1.0.md` | Per-screen UX inventory (current state, unfinished parts, nits, gaps, questions) feeding the roadmap's UX rework packages. Owner-corrected 2026-10-12; per-screen questions remain open. |
 | `browse-cohesion-proposal.md` | Native browse baseline and accepted shared-grid/Archive-depth follow-up; implementation, verification/review status and remaining physical-TV observations. Separately labeled feature proposals remain deferred. |
 | `responsive-ui-foundations-plan.md` | Current browse-performance contracts, delivered foundation and remaining navigation, Guide/cached-startup and physical acceptance gates. Optimized 0.2.53 deployed; assessment pending. |
 | `programme-window-prototype.md` | Programme-window Player prototype behavior, interaction checks and current experiment boundaries. |
