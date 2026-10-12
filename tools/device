@@ -27,6 +27,7 @@ from typing import NoReturn
 ROOT = Path(__file__).resolve().parents[1]
 LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
 DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
+APPLIANCE_PACKAGE = "at.bernhardberger.tvhplayer.appliance"
 LEGACY_PACKAGE = "at.leoville.tvhstream"
 DEFAULT_APK = ROOT / "app/build/outputs/apk/play/debug/app-play-debug.apk"
 DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/play/debug/app-play-debug-androidTest.apk"
@@ -619,7 +620,7 @@ VIDEO_FRAME_PLANES = ("video", "ui")
 
 
 def video_surface_layer(package_name: str, plane: str = "video") -> str:
-    activity = f"{package_name}/{package_name}.ui.MainActivity"
+    activity = f"{package_name}/at.bernhardberger.tvhplayer.ui.MainActivity"
     if plane == "ui":
         return f"{activity}#0"
     return f"SurfaceView[{activity}](BLAST)#0"
@@ -816,7 +817,7 @@ def show_package_info(adb: str, serial: str, package_name: str) -> None:
 
 
 def show_appliance_status(adb: str, serial: str, package_name: str) -> None:
-    service_class = f"{package_name}.accessibility.ApplianceEntryAccessibilityService"
+    service_class = "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
     component = f"{package_name}/{service_class}"
 
     accessibility_enabled = run(
@@ -1206,6 +1207,39 @@ def run_navigation_back_check(adb: str, serial: str, package_name: str) -> None:
         evidence_keys=NAVIGATION_BACK_EVIDENCE_KEYS,
         expected_evidence={"backDispatchApiLevel": "36"},
     )
+
+
+def require_play_replacement_safe(adb: str, serial: str) -> None:
+    # Include disabled components: the manifest contract, not current enablement,
+    # determines whether replacing this package would remove Appliance entry points.
+    for query, intent in (
+        ("query-services", ("-a", "android.accessibilityservice.AccessibilityService")),
+        ("query-activities", ("-a", "android.intent.action.MAIN", "-c", "android.intent.category.HOME")),
+    ):
+        result = run(
+            adb_command(
+                adb, serial, "shell", "cmd", "package", query,
+                "--brief", "--query-flags", "512", *intent, "-p", DEFAULT_PACKAGE,
+            ),
+            capture=True,
+            check=False,
+        )
+        output = (result.stdout + result.stderr).lower()
+        if result.returncode != 0 or "error" in output or "unknown command" in output:
+            fail("cannot verify installed package entry points; refusing Play release installation")
+        for line in result.stdout.splitlines():
+            package, separator, component = line.strip().partition("/")
+            if package != DEFAULT_PACKAGE or not separator:
+                continue
+            if component.startswith("."):
+                component = package + component
+            if query == "query-activities" or component == (
+                "at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
+            ):
+                fail(
+                    "installed package has Appliance entry points; refusing Play release installation. "
+                    f"Use the Appliance build ({APPLIANCE_PACKAGE}) for this target."
+                )
 
 
 def resolve_verified_release_apk(bundle: Path) -> Path:
@@ -1649,6 +1683,7 @@ def main() -> int:
         if package_name != DEFAULT_PACKAGE:
             fail(f"release installation is available only for package {DEFAULT_PACKAGE}")
         apk = resolve_verified_release_apk(args.bundle)
+        require_play_replacement_safe(adb, serial)
         run(adb_command(adb, serial, "install", "-r", str(apk)))
         show_package_info(adb, serial, package_name)
         return 0
@@ -1847,8 +1882,8 @@ def main() -> int:
         return 0
 
     if args.action == "allow-appliance-autostart":
-        if package_name != DEFAULT_PACKAGE:
-            fail(f"auto-start repair is available only for package {DEFAULT_PACKAGE}")
+        if package_name != APPLIANCE_PACKAGE:
+            fail(f"auto-start repair is available only for package {APPLIANCE_PACKAGE}")
         run(
             adb_command(
                 adb,

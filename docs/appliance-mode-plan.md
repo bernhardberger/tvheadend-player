@@ -234,7 +234,7 @@ reboot matrix before deployment to the production household TV.
 
 ```bash
 ./tools/verify
-aapt dump badging app/build/outputs/apk/debug/app-debug.apk
+aapt dump badging app/build/outputs/apk/appliance/debug/app-appliance-debug.apk
 ```
 
 **Files:** Gradle configuration and string resources.  

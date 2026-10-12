@@ -34,7 +34,7 @@ backs out to those screens.
 ./tools/verify
 # Mutating commands require an explicitly configured test device.
 android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/appliance/debug/app-appliance-debug.apk --use-delta-install=false --install-options=-r,-t
-./tools/device launch
+./tools/device --package at.bernhardberger.tvhplayer.appliance launch
 ```
 
 Final release builds must use a private stable product signing key and must not rely

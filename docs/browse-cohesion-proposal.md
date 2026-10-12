@@ -506,7 +506,7 @@ native focus and no unintended playback/navigation/SDK actions. Fixtures are
 relative to the run clock, which the metadata records; they are not pixel-goldens.
 
 ```sh
-./gradlew :app:testDebugUnitTest \
+./gradlew :app:testPlayDebugUnitTest \
   --tests 'at.bernhardberger.tvhplayer.ui.screens.BrowseCohesionEvidenceTest' \
   --console=plain --no-scan
 ```

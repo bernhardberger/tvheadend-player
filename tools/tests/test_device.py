@@ -123,6 +123,132 @@ class OperatorShortcutsTest(unittest.TestCase):
             "run": Mock(side_effect=AssertionError("unexpected device operation")),
         }
 
+    def test_play_release_refuses_installed_appliance_entry_points(self):
+        service = "at.bernhardberger.tvhplayer/.accessibility.ApplianceEntryAccessibilityService\n"
+        home = "at.bernhardberger.tvhplayer/at.bernhardberger.tvhplayer.ui.MainActivity\n"
+        for service_output, home_output in (
+            (service, ""),
+            (service.replace("/.accessibility", "/at.bernhardberger.tvhplayer.accessibility"), ""),
+            ("", home),
+        ):
+            with self.subTest(service=bool(service_output), home=bool(home_output)):
+                fakes = self.main_fakes(role="production")
+                fakes["resolve_verified_release_apk"] = Mock(return_value=Path("play.apk"))
+                fakes["run"] = Mock(side_effect=[
+                    subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+                    for output in (service_output, home_output)
+                ])
+                error = io.StringIO()
+                with (
+                    patch.dict(DEVICE_GLOBALS, fakes),
+                    patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+                    patch("sys.argv", ["device", "--package", DEVICE["DEFAULT_PACKAGE"],
+                                       "install-release", "--bundle", "bundle", "--confirm-release-install"]),
+                    redirect_stderr(error),
+                    self.assertRaises(SystemExit),
+                ):
+                    DEVICE["main"]()
+                self.assertIn("Use the Appliance build", error.getvalue())
+                self.assertFalse(any("install" in args.args[0] for args in fakes["run"].call_args_list))
+
+    def test_play_release_proceeds_without_installed_appliance_entry_points(self):
+        fakes = self.main_fakes(role="production")
+        fakes["resolve_verified_release_apk"] = Mock(return_value=Path("play.apk"))
+        fakes["show_package_info"] = Mock()
+        # A different package's entry points must never block a Play update.
+        fakes["run"] = Mock(side_effect=[
+            subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+            for output in (
+                "at.bernhardberger.tvhplayer.appliance/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService\n",
+                "other.launcher/.Home\n", "Success\n",
+            )
+        ])
+        with (
+            patch.dict(DEVICE_GLOBALS, fakes),
+            patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+            patch("sys.argv", ["device", "--package", DEVICE["DEFAULT_PACKAGE"],
+                               "install-release", "--bundle", "bundle", "--confirm-release-install"]),
+        ):
+            self.assertEqual(DEVICE["main"](), 0)
+        commands = [args.args[0] for args in fakes["run"].call_args_list]
+        self.assertEqual(commands, [
+            ["adb", "-s", "private-device", "shell", "cmd", "package", "query-services",
+             "--brief", "--query-flags", "512", "-a", "android.accessibilityservice.AccessibilityService",
+             "-p", DEVICE["DEFAULT_PACKAGE"]],
+            ["adb", "-s", "private-device", "shell", "cmd", "package", "query-activities",
+             "--brief", "--query-flags", "512", "-a", "android.intent.action.MAIN",
+             "-c", "android.intent.category.HOME", "-p", DEVICE["DEFAULT_PACKAGE"]],
+            ["adb", "-s", "private-device", "install", "-r", "play.apk"],
+        ])
+
+    def test_play_release_entry_point_check_fails_closed_on_query_failure(self):
+        for result in (
+            subprocess.CompletedProcess([], 1, stdout="", stderr="query failed"),
+            subprocess.CompletedProcess([], 0, stdout="Error: unavailable", stderr=""),
+            subprocess.CompletedProcess([], 0, stdout="Unknown command: query-services", stderr=""),
+        ):
+            with self.subTest(result=result), patch.dict(DEVICE_GLOBALS, {"run": Mock(return_value=result)}):
+                with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                    DEVICE["require_play_replacement_safe"]("adb", "private-device")
+
+    def test_play_release_entry_point_check_accepts_no_matches(self):
+        runner = Mock(side_effect=[
+            subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+            for output in ("No services found\n", "No activities found\n")
+        ])
+        with patch.dict(DEVICE_GLOBALS, {"run": runner}):
+            DEVICE["require_play_replacement_safe"]("adb", "private-device")
+        self.assertEqual(runner.call_count, 2)
+
+    def test_appliance_status_uses_kotlin_namespace_for_both_package_identities(self):
+        for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["APPLIANCE_PACKAGE"]):
+            with self.subTest(package=package):
+                component = f"{package}/at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService"
+                runner = Mock(side_effect=[
+                    subprocess.CompletedProcess([], 0, stdout=output, stderr="")
+                    for output in ("1\n", component, component, "APP_AUTO_START: allow\n")
+                ])
+                output = io.StringIO()
+                with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stdout(output):
+                    DEVICE["show_appliance_status"]("adb", "private-device", package)
+                self.assertIn("serviceEnabled=true\nserviceBound=true", output.getvalue())
+                self.assertEqual(runner.call_args_list[2].args[0][-1], component)
+                activity = f"{package}/at.bernhardberger.tvhplayer.ui.MainActivity"
+                self.assertEqual(DEVICE["video_surface_layer"](package), f"SurfaceView[{activity}](BLAST)#0")
+                self.assertEqual(DEVICE["video_surface_layer"](package, "ui"), f"{activity}#0")
+
+    def test_auto_start_repair_accepts_only_appliance_package(self):
+        for package in (DEVICE["DEFAULT_PACKAGE"], DEVICE["APPLIANCE_PACKAGE"]):
+            with self.subTest(package=package):
+                fakes = self.main_fakes()
+                fakes["show_appliance_status"] = Mock()
+                fakes["run"] = Mock()
+                with (
+                    patch.dict(DEVICE_GLOBALS, fakes),
+                    patch.object(DEVICE_GLOBALS["shutil"], "which", return_value="adb"),
+                    patch("sys.argv", ["device", "--package", package, "allow-appliance-autostart",
+                                       "--confirm-user-enabled-accessibility"]),
+                    redirect_stderr(io.StringIO()),
+                ):
+                    if package == DEVICE["DEFAULT_PACKAGE"]:
+                        with self.assertRaises(SystemExit):
+                            DEVICE["main"]()
+                        fakes["run"].assert_not_called()
+                    else:
+                        self.assertEqual(DEVICE["main"](), 0)
+                        self.assertEqual(fakes["run"].call_args.args[0][-3:], [package, "APP_AUTO_START", "allow"])
+                        fakes["show_appliance_status"].assert_called_once_with("adb", "private-device", package)
+
+    def test_appliance_package_cannot_use_play_instrumentation_apk(self):
+        runner = Mock()
+        with patch.dict(DEVICE_GLOBALS, {"run": runner}), redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit):
+                DEVICE["run_instrumentation_check"](
+                    "adb", "private-device", DEVICE["APPLIANCE_PACKAGE"],
+                    action="navigation-back-check", test_class="ExampleTest",
+                )
+        runner.assert_not_called()
+
     def test_media_key_mapping_and_parser_choices(self):
         parser = DEVICE["build_parser"]()
         for name, code in (("play", "PLAY"), ("pause", "PAUSE"), ("play-pause", "PLAY_PAUSE"), ("stop", "STOP")):

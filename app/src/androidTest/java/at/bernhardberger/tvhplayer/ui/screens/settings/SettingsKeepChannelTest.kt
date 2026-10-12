@@ -82,7 +82,8 @@ class SettingsKeepChannelTest(private val language: String) {
             }
         }
         press(Key.DirectionCenter)
-        repeat(3) { press(Key.DirectionDown) }
+        // Autoplay, three playback switches and four audio-preference rows precede Keep channel.
+        repeat(8) { press(Key.DirectionDown) }
         val parent = composeRule.onNode(hasText(heading) and hasClickAction())
         parent.assertIsFocused()
         press(Key.DirectionCenter)

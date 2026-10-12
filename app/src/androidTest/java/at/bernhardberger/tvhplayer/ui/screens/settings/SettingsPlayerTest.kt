@@ -63,10 +63,14 @@ class SettingsPlayerTest(private val language: String) {
         val context = composeRule.activity.createConfigurationContext(configuration)
         val player = context.getString(R.string.settings_player)
         val category = context.getString(R.string.settings_player_nav)
+        val autoplay = context.getString(R.string.auto_start_playback)
         val timeshift = context.getString(R.string.timeshift_setting)
         val refreshRate = context.getString(R.string.refresh_rate_matching_setting)
         val passthrough = context.getString(R.string.audio_passthrough_setting)
+        val audioRows = listOf(R.string.audio_language_first, R.string.audio_format,
+            R.string.audio_description, R.string.subtitle_language).map(context::getString)
         val keepChannel = context.getString(R.string.keep_channel_setting)
+        val startupBuffer = context.getString(R.string.startup_buffer_setting)
         val serverDefault = context.getString(R.string.profile_server_default)
         val profiles = List(24) { index ->
             StreamProfile(
@@ -104,9 +108,11 @@ class SettingsPlayerTest(private val language: String) {
                             navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name),
                             levels = listOf(settingsRootLevel(), settingsPlayerLevel(
                                 ui = ui,
+                                onAutoStartPlaybackChanged = { switchCalls++ },
                                 onTimeshiftEnabledChanged = { switchCalls++ },
                                 onRefreshRateMatchingEnabledChanged = { switchCalls++ },
                                 onAudioPassthroughEnabledChanged = { switchCalls++ },
+                                onAudioDescriptionChanged = { switchCalls++ },
                                 onProfileSelected = {
                                     selections += it
                                     ui = ui.copy(selectedProfileId = it)
@@ -122,14 +128,22 @@ class SettingsPlayerTest(private val language: String) {
         val heading = composeRule.onNode(hasText(player) and !hasClickAction())
         categoryNode.assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         val headingBounds = heading.fetchSemanticsNode().boundsInRoot
+        composeRule.onNodeWithText(autoplay).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionDown)
         composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
         composeRule.onNodeWithText(profiles.last().name).assertIsNotDisplayed()
         press(Key.DirectionDown)
         composeRule.onNodeWithText(refreshRate).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionDown)
         composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
+        audioRows.forEach { label ->
+            press(Key.DirectionDown)
+            composeRule.onNodeWithText(label).assertIsFocused().assertIsDisplayed()
+        }
         press(Key.DirectionDown)
         composeRule.onNodeWithText(keepChannel).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionDown)
+        composeRule.onNodeWithText(startupBuffer).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionDown)
         composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsNotSelected()
 
@@ -156,7 +170,13 @@ class SettingsPlayerTest(private val language: String) {
         press(Key.DirectionUp)
         composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
+        composeRule.onNodeWithText(startupBuffer).assertIsFocused().assertIsDisplayed()
+        press(Key.DirectionUp)
         composeRule.onNodeWithText(keepChannel).assertIsFocused().assertIsDisplayed()
+        audioRows.asReversed().forEach { label ->
+            press(Key.DirectionUp)
+            composeRule.onNodeWithText(label).assertIsFocused().assertIsDisplayed()
+        }
         press(Key.DirectionUp)
         composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
         press(Key.DirectionUp)
@@ -164,14 +184,17 @@ class SettingsPlayerTest(private val language: String) {
         press(Key.DirectionUp)
         composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
 
+        press(Key.DirectionUp)
+        composeRule.onNodeWithText(autoplay).assertIsFocused().assertIsDisplayed()
+
         // Left must also leave the scrolled bottom through the existing category owner.
-        repeat(profiles.size + 4) { press(Key.DirectionDown) }
+        repeat(profiles.size + 5 + audioRows.size + 1) { press(Key.DirectionDown) }
         composeRule.onNodeWithText(profiles.last().name)
             .assertIsFocused().assertIsDisplayed().assertIsSelected()
         press(Key.DirectionLeft)
         categoryNode.assertIsFocused()
         press(Key.DirectionRight)
-        composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
+        composeRule.onNodeWithText(autoplay).assertIsFocused().assertIsDisplayed()
         composeRule.runOnIdle {
             assertEquals(listOf(profiles.last().id), selections)
             assertEquals(0, switchCalls)

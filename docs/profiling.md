@@ -48,10 +48,10 @@ together, so it does not establish an R8-only speedup. See the
 Build the physical performance baseline explicitly:
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleProfileServer :app:lintProfileServer :app:verifyExternalSdkConsumption -Ptvhplayer.profileMinify=true --offline --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assemblePlayProfileServer :app:lintPlayProfileServer :app:verifyExternalSdkConsumption -Ptvhplayer.profileMinify=true --offline --console=plain --no-scan
 ```
 
-The output is `app/build/outputs/apk/profileServer/app-profileServer.apk`.
+The output is `app/build/outputs/apk/play/profileServer/app-play-profileServer.apk`.
 Archive its exact bytes and R8 outputs before another build; verify its hash
 against the installed package. This command prepares an APK, not permission to
 install or an alternative to the repository's final verification gate.
@@ -81,7 +81,7 @@ background, GPU completion, submitted-buffer contents or physical presentation.
 Cached drawing also makes absence of a witness insufficient to infer unreadiness.
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleProfile :app:assembleProfileServer :app:lintProfile :app:lintProfileServer --offline --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assemblePlayProfile :app:assemblePlayProfileServer :app:lintPlayProfile :app:lintPlayProfileServer --offline --console=plain --no-scan
 ```
 
 The command above builds the **unoptimized diagnostic arm**. For a controlled
@@ -94,7 +94,7 @@ the exact `profileServer` APK on supported targets: see the
 
 The isolated lifecycle regression uses the standard AGP test build type, enabled
 only by `-Ptvhplayer.profileTests=true`. Build with
-`:app:assembleProfile :app:assembleProfileAndroidTest`, install both matching APKs
+`:app:assemblePlayProfile :app:assemblePlayProfileAndroidTest`, install both matching APKs
 on the authorized emulator, and run `ProfileRecreationTest` through
 `at.bernhardberger.tvhplayer.profile.test/androidx.test.runner.AndroidJUnitRunner`.
 Require the named test's success status, `OK (1 test)` and final code `-1`, not
@@ -248,7 +248,7 @@ cannot load saved Player profiles or contact TVHeadend and is not a deployment
 replacement for Player. It adds no libraries or custom profiler.
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:assembleRelease :app:assembleProfile :app:lintProfile --offline --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:assemblePlayRelease :app:assemblePlayProfile :app:lintPlayProfile --offline --console=plain --no-scan
 timeout --kill-after=5s 30m ./tools/verify
 ```
 

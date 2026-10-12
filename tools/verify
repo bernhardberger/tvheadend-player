@@ -76,7 +76,7 @@ printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
 printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "$capture_tests"
 ./gradlew \
     :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest \
-    :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug \
+    :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:lintApplianceDebug \
     :app:compilePlayDebugAndroidTestKotlin \
     :app:assemblePlayDebug :app:assembleApplianceDebug \
     "${provenance_tasks[@]}" \
@@ -95,6 +95,10 @@ apk="app/build/outputs/apk/play/debug/app-play-debug.apk"
 appliance_apk="app/build/outputs/apk/appliance/debug/app-appliance-debug.apk"
 if [[ ! -f "$apk" ]]; then
     printf 'error: expected APK was not produced: %s\n' "$apk" >&2
+    exit 1
+fi
+if [[ ! -f "$appliance_apk" ]]; then
+    printf 'error: expected Appliance APK was not produced: %s\n' "$appliance_apk" >&2
     exit 1
 fi
 
@@ -120,6 +124,10 @@ fi
 
 if ! "$zipalign" -c -P 16 4 "$apk"; then
     printf 'error: APK native libraries are not 16 KB zip-aligned\n' >&2
+    exit 1
+fi
+if ! "$zipalign" -c -P 16 4 "$appliance_apk"; then
+    printf 'error: Appliance APK native libraries are not 16 KB zip-aligned\n' >&2
     exit 1
 fi
 
