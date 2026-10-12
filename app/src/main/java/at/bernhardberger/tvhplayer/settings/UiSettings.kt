@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.map
 
 data class UiSettings(
     val showEpgMenu: Boolean = true,
-    val autoStartPlayback: Boolean = true,
+    val autoStartPlayback: Boolean = false,
     val clockFormat: ClockFormat = ClockFormat.SYSTEM,
 )
 
 fun resolveEpgMenuVisibility(storedValue: Boolean?): Boolean = storedValue ?: true
-fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: true
+fun resolvePlaybackAutoStart(storedValue: Boolean?): Boolean = storedValue ?: false
 
 class UiSettingsStore(private val context: Context) {
     private object Keys {

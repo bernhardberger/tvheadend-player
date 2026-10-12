@@ -17,8 +17,8 @@ class UiSettingsTest {
     }
 
     @Test
-    fun playbackAutoStart_isEnabledWhenNoPreferenceHasBeenSaved() {
-        assertTrue(resolvePlaybackAutoStart(null))
+    fun playbackAutoStart_isDisabledWhenNoPreferenceHasBeenSaved() {
+        assertFalse(resolvePlaybackAutoStart(null))
     }
 
     @Test
