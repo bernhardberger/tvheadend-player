@@ -1,5 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -79,11 +85,13 @@ fun ChannelRow(
     playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
+    onOpenContextMenu: (() -> Unit)? = null,
 ) = profileTrace("P1:compose:channelRow") {
     var focused by remember { mutableStateOf(false) }
     ListItem(
         selected = playingNow,
         onClick = onConfirm,
+        onLongClick = onOpenContextMenu,
         headlineContent = {
             val drawProbe = if (BuildConfig.PROFILE_TRACE) {
                 // The headline inherits the native Surface foreground. Observe it
@@ -169,7 +177,12 @@ fun ChannelRow(
                     .size(width = ChannelPiconWidth, height = ChannelPiconHeight),
             )
         },
-        modifier = modifier
+        modifier = modifier.onPreviewKeyEvent {
+            if (it.key == Key.Menu && onOpenContextMenu != null) {
+                if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onOpenContextMenu()
+                true
+            } else false
+        }
             .profileLayout("channels:row")
             .fillMaxWidth()
             .onFocusChanged {

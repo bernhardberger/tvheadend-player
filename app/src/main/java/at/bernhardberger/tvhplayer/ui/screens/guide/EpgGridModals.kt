@@ -567,53 +567,25 @@ internal fun ConfirmProgrammeActionDialog(
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
+    channelName: String = "",
+    dateAndTime: String = "",
 ) {
-    val safeFocus = remember { FocusRequester() }
-    LaunchedEffect(action) { safeFocus.requestFocus() }
-    DialogScrim(onDismissRequest = onDismiss, onPreviewKeyEvent = onPreviewKeyEvent) {
-        Text(
-            text = stringResource(
-                when (action) {
-                    ProgrammeAction.RECORD -> R.string.record_confirm_title
-                    ProgrammeAction.STOP_RECORDING -> R.string.stop_recording_confirm_title
-                    else -> R.string.cancel_recording_confirm_title
-                },
-                programmeTitle,
-            ),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier.focusRequester(safeFocus),
-            ) {
-                Text(stringResource(R.string.back))
-            }
-            Button(onClick = onConfirm) {
-                Icon(
-                    painter = painterResource(
-                        if (action == ProgrammeAction.RECORD) {
-                            R.drawable.ic_fiber_manual_record
-                        } else {
-                            R.drawable.ic_stop
-                        },
-                    ),
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    stringResource(
-                        when (action) {
-                            ProgrammeAction.RECORD -> R.string.record
-                            ProgrammeAction.STOP_RECORDING -> R.string.stop_recording
-                            else -> R.string.cancel_recording
-                        }
-                    )
-                )
-            }
-        }
-    }
+    at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog(
+        title = stringResource(when (action) {
+            ProgrammeAction.RECORD -> R.string.record_confirm_title
+            ProgrammeAction.STOP_RECORDING -> R.string.stop_recording_confirm_title
+            else -> R.string.cancel_recording_confirm_title
+        }),
+        message = stringResource(when (action) {
+            ProgrammeAction.RECORD -> R.string.record_confirm_message
+            ProgrammeAction.STOP_RECORDING -> R.string.stop_recording_confirm_message
+            else -> R.string.cancel_recording_confirm_message
+        }, programmeTitle, channelName, dateAndTime),
+        firstLabel = stringResource(if (action == ProgrammeAction.RECORD) R.string.dont_record else R.string.keep_recording),
+        secondLabel = programmeActionLabel(action),
+        onFirst = onDismiss, onSecond = onConfirm, onDismiss = onDismiss,
+        onPreviewKeyEvent = onPreviewKeyEvent,
+    )
 }
 
 @Composable

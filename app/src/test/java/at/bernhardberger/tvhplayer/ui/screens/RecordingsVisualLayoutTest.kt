@@ -116,7 +116,8 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionRight)
         focused("recording-list-entry-2")
         compose.onNodeWithTag("recording-details-panel").assertDoesNotExist()
-        key(Key.DirectionCenter)
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-details-panel").assertIsDisplayed()
         key(Key.Back)
         focused("recording-list-entry-2")
@@ -149,7 +150,8 @@ class RecordingsVisualLayoutTest {
         assertEquals(340f, bounds("recording-metadata-pane").width, .1f)
         assertEquals(562f, bounds("recording-metadata-pane").left, .1f)
         capture("focused-recording-metadata", 1f)
-        key(Key.DirectionCenter)
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-details-resume").assertIsFocused()
         compose.onNodeWithContentDescription("Resume from 1 hour, 2 minutes, 3 seconds")
             .assertIsDisplayed()
@@ -406,7 +408,8 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-2")
         publish(entries.filterNot { it.id == DvrEntryId(2) })
         focused("recording-list-entry-3")
-        key(Key.DirectionCenter)
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-details-play").assertIsFocused()
         publish(entries.filterNot { it.id == DvrEntryId(2) }.map { if (it.id == DvrEntryId(1))
             recording(1, "Updated", "recording1.ts") else it })
@@ -419,7 +422,8 @@ class RecordingsVisualLayoutTest {
     @Test fun replacementSessionCannotConfirmAnArchiveDeletionWithCollidingId() {
         show(entries = listOf(recording(9, "Opening recording", "opening.ts")))
         focused("recording-list-entry-9")
-        key(Key.DirectionCenter)
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-details-play").assertIsFocused()
         key(Key.DirectionDown)
         key(Key.DirectionRight)

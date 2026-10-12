@@ -68,6 +68,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
@@ -198,7 +199,8 @@ fun ChannelsScreen(
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
-    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit
+    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onShowGuide: (ChannelId) -> Unit = {},
 ) {
     at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime("channels")
     val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
@@ -234,6 +236,7 @@ fun ChannelsScreen(
         onRetryConnection = onRetryConnection,
         onOpenConnectionSettings = onOpenConnectionSettings,
         onPlay = onPlay,
+        onShowGuide = onShowGuide,
     )
 }
 
@@ -259,6 +262,7 @@ internal fun ChannelsScreenContent(
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onShowGuide: (ChannelId) -> Unit = {},
 ) = profileTrace("P1:compose:channels") {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -293,6 +297,7 @@ internal fun ChannelsScreenContent(
     // One-shot per player return; AppRoot clears the request when the destination changes.
     var playerReturnPending by remember(playerReturn) { mutableStateOf(playerReturn != null) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
+    var contextChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var contentFocusOwned by remember { mutableStateOf(false) }
     var scopeEntryRequested by remember { mutableStateOf(false) }
     val rememberedChannelIds = remember {
@@ -374,6 +379,7 @@ internal fun ChannelsScreenContent(
         preserveVisiblePosition: Boolean = false,
         animatePage: Boolean = false,
     ): Boolean {
+        if (contextChannelId != null) return false
         val index = orderedChannelIds.indexOf(channelId)
         val requester = rowFocusRequesters[channelId]
         if (index < 0 || requester == null) {
@@ -407,6 +413,7 @@ internal fun ChannelsScreenContent(
                 // Widget focus changes precede composition's drawerActive feedback.
                 // A queued initial restore must not take focus back in that interval.
                 if (drawerState?.currentValue == DrawerValue.Open ||
+                    contextChannelId != null ||
                     !contentEntryEnabled || !matchesRequestedRows(currentScope()) ||
                     !matchesRequestedRows(latestRenderedScope) ||
                     restorationGeneration != generation
@@ -450,7 +457,7 @@ internal fun ChannelsScreenContent(
         return scopeFocus.requestFocus()
     }
 
-    BackHandler(enabled = initialFocusEnabled && hasScopeTabs && contentFocusOwned) {
+    BackHandler(enabled = initialFocusEnabled && hasScopeTabs && contentFocusOwned && contextChannelId == null) {
         focusScope()
     }
 
@@ -573,6 +580,7 @@ internal fun ChannelsScreenContent(
     Column(
         Modifier
             .fillMaxSize()
+            .semantics { if (contextChannelId != null) hideFromAccessibility() }
             .onPreviewKeyEvent { event ->
                 if (event.key != Key.Back) return@onPreviewKeyEvent false
                 if (consumeBackRelease) {
@@ -846,7 +854,13 @@ internal fun ChannelsScreenContent(
                                                 ch.name.orEmpty(),
                                             )
                                         }
-                                    }
+                                    },
+                                    onOpenContextMenu = {
+                                        if (owner.isCurrent) {
+                                            cancelRestoration()
+                                            contextChannelId = channelId
+                                        }
+                                    },
                                 )
                             }
                         }
@@ -878,6 +892,20 @@ internal fun ChannelsScreenContent(
                 }
             }
         }
+    }
+    contextChannelId?.let { channelId ->
+        ChannelContextMenu(
+            channelId = channelId,
+            observation = observation,
+            nowSec = kotlin.time.Clock.System.now().epochSeconds,
+            imageLoader = imageLoader,
+            onPlay = onPlay,
+            onShowGuide = onShowGuide,
+            onClose = {
+                contextChannelId = null
+                requestChannelFocus(channelId)
+            },
+        )
     }
 }
 

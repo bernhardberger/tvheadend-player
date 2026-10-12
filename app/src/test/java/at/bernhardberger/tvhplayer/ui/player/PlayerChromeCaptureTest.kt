@@ -362,7 +362,7 @@ class PlayerChromeCaptureTest {
                 compose.onNodeWithTag("details-tabs").assertDoesNotExist()
             }
             if (next == Scene.PROGRAMME_CONFIRM_RECORD) {
-                compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.back)).assertIsFocused()
+                compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.dont_record)).assertIsFocused()
             }
             if (next == Scene.RAIL_PEEK) {
                 val card = hasAnyAncestor(hasTestTag("player-channel-card-1"))
@@ -410,7 +410,6 @@ class PlayerChromeCaptureTest {
             compose.runOnIdle {
                 val canvas = Canvas(bitmap)
                 view.draw(canvas)
-                if (next == Scene.PROGRAMME_CONFIRM_RECORD) ShadowDialog.getLatestDialog().window!!.decorView.draw(canvas)
             }
             val directory = File(if (trialOnly) "/tmp/opencode/rail-round2/captures" else "../artifacts/player-chrome").apply { mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale$clockSuffix.png"

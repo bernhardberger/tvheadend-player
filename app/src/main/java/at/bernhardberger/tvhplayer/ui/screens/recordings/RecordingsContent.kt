@@ -364,6 +364,7 @@ internal fun RecordingSchedule(
     selectedFocus: FocusRequester,
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
+    onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
@@ -494,6 +495,7 @@ internal fun RecordingSchedule(
                         onFocused("recording:${recordingItemKey(entry.id)}")
                     },
                     onClick = { onOpen(entry) },
+                    onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
                     kind = RecordingRowKind.SCHEDULE,
                 )
             }
@@ -509,6 +511,7 @@ internal fun RecordingProblems(
     selectedFocus: FocusRequester,
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
+    onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
@@ -648,6 +651,7 @@ internal fun RecordingProblems(
                             onFocused("recording:${recordingItemKey(entry.id)}")
                         },
                         onClick = { onOpen(entry) },
+                        onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
                         kind = RecordingRowKind.PROBLEM,
                     )
                 }
@@ -675,6 +679,7 @@ internal fun RecordingListRow(
     onFocused: () -> Unit = {},
     onClick: () -> Unit,
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
+    onOpenContextMenu: (() -> Unit)? = null,
 ) {
     val problem = kind == RecordingRowKind.PROBLEM
     val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrEntryState.RECORDING
@@ -683,6 +688,7 @@ internal fun RecordingListRow(
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
+        onLongClick = onOpenContextMenu?.let { open -> { if (owner?.isCurrent != false) open() } },
         headlineContent = {
             Text(
                 text = entry.title.orEmpty(),
@@ -731,6 +737,12 @@ internal fun RecordingListRow(
             .tabFocus()
             .fillMaxWidth()
             .testTag("recording-list-entry-${recordingItemKey(entry.id)}")
+            .onPreviewKeyEvent {
+                if (it.key == Key.Menu && onOpenContextMenu != null && owner?.isCurrent != false) {
+                    if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onOpenContextMenu()
+                    true
+                } else false
+            }
             .then(if (focusTarget && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier)
             .onFocusChanged { if (owner?.isCurrent != false && it.isFocused) onFocused() },
     )

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
+
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 import androidx.compose.animation.AnimatedContent
@@ -516,76 +518,6 @@ internal val PlaybackInfoPanelPadding = PaddingValues(
 
 /** Level-3 elevation of the panel. */
 internal val PlaybackPanelElevation = 6.dp
-
-/**
- * Floating side panel over a full-screen scrim: the end side, inset on three
- * edges, rounded on all corners and clipped to its own shape only, so a scaled
- * focused row may reach into the padding. Content supplies its own padding.
- */
-@Composable
-internal fun PlaybackOptionsOverlayFrame(
-    modifier: Modifier = Modifier,
-    paneTitle: String? = null,
-    panelTag: String = "playback-options-overlay",
-    panelWidth: Dp = PlaybackPanelWidth,
-    content: @Composable () -> Unit,
-) {
-    val shape = MaterialTheme.shapes.large
-    // Inside PlayerPanelVisibility the scrim and the panel animate separately.
-    val motion = LocalPlayerPanelMotion.current
-    val scrimShown = motion?.animateShown(
-        enter = tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
-        exit = tween(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate),
-        label = "panel-scrim",
-    )
-    val panelShown = motion?.animateShown(
-        enter = tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate),
-        exit = tween(PlayerMotion.ShortMs, easing = PlayerMotion.EmphasizedAccelerate),
-        label = "panel",
-    )
-    val frame: @Composable () -> Unit = {
-        Box(
-            modifier = modifier
-                .fillMaxSize()
-                .focusGroup(),
-            contentAlignment = Alignment.CenterEnd,
-        ) {
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .graphicsLayer { alpha = scrimShown?.value ?: 1f }
-                    .background(Color.Black.copy(alpha = TvScrimModalAlpha))
-            )
-            Surface(
-                modifier = Modifier
-                    .padding(PlaybackPanelEdgeInset)
-                    .width(panelWidth)
-                    .fillMaxHeight()
-                    .graphicsLayer {
-                        val shown = panelShown?.value ?: 1f
-                        alpha = shown
-                        translationX = PlayerMotion.PanelOffset.toPx() * (1f - shown)
-                    }
-                    // Shadow before the clip so the clip cannot cut it away.
-                    .shadow(PlaybackPanelElevation, shape)
-                    .clip(shape)
-                    .testTag(panelTag)
-                    .semantics {
-                        dialog()
-                        paneTitle?.let { this.paneTitle = it }
-                    },
-                shape = shape,
-                colors = SurfaceDefaults.colors(
-                    containerColor = TvSurfaceColors.container,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ),
-            ) {
-                content()
-            }
-        }
-    }
-    if (motion == null) frame() else PlayerMotionFrame(leaving = motion.leaving, content = frame)
-}
 
 @Composable
 private fun PlaybackOptionsRoot(

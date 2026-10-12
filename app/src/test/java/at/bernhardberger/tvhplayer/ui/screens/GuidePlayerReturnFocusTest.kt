@@ -1,9 +1,27 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
+
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
+import androidx.activity.OnBackPressedDispatcher
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performKeyPress
+import org.junit.Assert.assertEquals
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -79,6 +97,40 @@ class GuidePlayerReturnFocusTest {
     private lateinit var player: ExoPlayer
     private lateinit var zone: TimeZone
     private val hour = System.currentTimeMillis() / 3_600_000 * 3600
+    private lateinit var back: OnBackPressedDispatcher
+    private lateinit var view: View
+    private var playRequests = 0
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun contextMenuHoldReleaseBackMenuAndWatchChannel() {
+        guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+        focused("Channel 1 hour 0")
+        val row = compose.onNodeWithText("Channel 1 hour 0")
+        fun event(action: Int, repeat: Int = 0) = KeyEvent(android.view.KeyEvent(0, 0, action, android.view.KeyEvent.KEYCODE_DPAD_CENTER, repeat))
+        row.performKeyPress(event(android.view.KeyEvent.ACTION_DOWN))
+        row.performKeyPress(event(android.view.KeyEvent.ACTION_DOWN, 1))
+        compose.onNodeWithText("Details").assertIsFocused()
+        compose.onRoot().performKeyPress(event(android.view.KeyEvent.ACTION_UP))
+        compose.onNodeWithText("Details").assertIsFocused()
+        assertEquals(0, playRequests)
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        val directory = File("build/outputs/u15-context").apply { mkdirs() }
+        File(directory, "guide.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        focused("Channel 1 hour 0")
+        key(Key.Menu)
+        compose.onNodeWithText("Details").assertIsFocused()
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        compose.onNodeWithText("Watch channel").assertIsFocused()
+        key(Key.DirectionCenter)
+        assertEquals(1, playRequests)
+    }
 
     @Before fun before() { zone = TimeZone.getDefault(); TimeZone.setDefault(TimeZone.getTimeZone("UTC")) }
     @After fun after() { models.clear(); scope.cancel(); if (::player.isInitialized) player.release(); TimeZone.setDefault(zone) }
@@ -87,6 +139,17 @@ class GuidePlayerReturnFocusTest {
         // Entered from a past programme on channel 1, then zapped to channel 2.
         guide(PlayerReturnFocus(playingChannelId = ChannelId(2), originChannelId = ChannelId(1)))
         focused("Channel 2 hour 0")
+    }
+
+    @Test fun historicalContextMenuCanWatchTheChannelWithoutRequiringALiveEvent() {
+        guide(PlayerReturnFocus(ChannelId(99), ChannelId(1)))
+        focused("Channel 1 hour -2")
+        key(Key.Menu)
+        compose.onNodeWithText("Details").assertIsFocused()
+        key(Key.DirectionDown)
+        compose.onNodeWithText("Watch channel").assertIsFocused()
+        key(Key.DirectionCenter)
+        assertEquals(1, playRequests)
     }
 
     @Test fun timeshiftedEntryOnSameChannelReturnsToNowNotHistoricalProgramme() {
@@ -200,15 +263,19 @@ class GuidePlayerReturnFocusTest {
         }
         compose.setContent {
             TVHeadendPlayerTheme {
+                back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                view = LocalView.current
+                Box(Modifier.fillMaxSize().background(androidx.tv.material3.MaterialTheme.colorScheme.background)) {
                 EpgGridScreen(
                     initialFocusEnabled = focusEnabled,
                     channelViewModel = model, session = session, playerSession = runtime,
                     selection = ChannelSelectionStore(), guidePositionStore = position,
                     lastPlayedStore = LastPlayedChannelStore(context),
                     imageLoader = ImageLoader.Builder(context).diskCache(null).build(),
-                    playerReturn = playerReturn, onPlay = { _, _ -> },
+                    playerReturn = playerReturn, onPlay = { _, _ -> playRequests++ },
                     notices = notices,
                 )
+                }
             }
         }
         compose.waitForIdle()

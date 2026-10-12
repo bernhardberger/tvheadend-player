@@ -1,5 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.guideContextActions
+import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
+import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.common.formatHm
+import androidx.compose.foundation.layout.width
+
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost
 
@@ -434,6 +441,8 @@ fun EpgGridScreen(
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
+    var showContextMenu by remember { mutableStateOf(false) }
+    var contextReturnAction by remember { mutableStateOf<BrowseContextAction?>(null) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsOpening by remember { mutableStateOf<Any?>(null) }
     var restoreDetailsFocus by remember { mutableStateOf(false) }
@@ -1575,6 +1584,7 @@ fun EpgGridScreen(
     }
 
     fun closeDetails() {
+        showContextMenu = false
         val searchEventId = detailsEvent?.id.takeIf { detailsFromSearch }
         detailsEvent = null
         detailsObservation = null
@@ -2067,6 +2077,22 @@ fun EpgGridScreen(
                                 detailsOpening = Any()
                                 detailsObservation = observation
                                 detailsFromSearch = false
+                                showContextMenu = false
+                            },
+                            onOpenContextMenu = {
+                                if (!owner.isCurrent) return@TimelineChannelRow
+                                if (realizedTarget != selectedTarget || frontierRequest != null ||
+                                    channelFocusRequest != null || windowFocusRequest != null
+                                ) return@TimelineChannelRow
+                                suppressActivationRelease = true
+                                releaseProgrammeFocus()
+                                selectedTarget = EpgFocusTarget(channelIndex, it.id)
+                                detailsEvent = it
+                                detailsOpening = Any()
+                                detailsObservation = observation
+                                detailsFromSearch = false
+                                showContextMenu = true
+                                contextReturnAction = null
                             },
                             visibleRowWidthPx = LocalBrowseVisibleWidthPx.current?.minus(
                                 with(LocalDensity.current) {
@@ -2162,18 +2188,7 @@ fun EpgGridScreen(
             val eventChannelId = event.channelId
             val channel = eventChannelId?.let(selectedObservation::channel)
             val recording = selectedObservation.dvrEntryForProgramme(event)
-            if (pendingAction == null) ProgrammeDetailsPanel(
-                imageLoader = imageLoader,
-                currentSession = selectedObservation.currentSession,
-                onPreviewKeyEvent = confirmationKeyHandler,
-                event = event,
-                channel = channel,
-                recording = recording,
-                nowSecProvider = nowSecProvider,
-                canModifyRecordings = selectedCapability != null && (liveEvent != null || recording != null),
-                liveProgrammeActions = liveEvent != null,
-                notices = { AppShellNoticeHost(queue = notices) },
-                onAction = actionHandler@{ action ->
+            val handleAction: (ProgrammeAction) -> Unit = actionHandler@{ action ->
                     if (
                         selectedObservation.currentSession == null ||
                         selectedObservation.currentSession !== observationState.value.currentSession
@@ -2245,9 +2260,56 @@ fun EpgGridScreen(
                             pendingAction = action
                         }
                     }
-                },
-                onClose = ::closeDetails,
-            )
+                }
+            if (pendingAction == null) {
+                if (showContextMenu) BrowseContextMenu(
+                    initialAction = contextReturnAction,
+                    title = event.title.orEmpty(),
+                    metadata = channel?.name.orEmpty(),
+                    timeRange = "${event.start.epochSeconds.formatDateTime()}–${formatHm(event.stop.epochSeconds)}",
+                    actions = guideContextActions(event, nowSecProvider(), recording,
+                        selectedCapability != null && (liveEvent != null || recording != null) &&
+                            (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
+                                ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED),
+                    watchChannel = true,
+                    onClose = ::closeDetails,
+                    onAction = { action ->
+                        contextReturnAction = action
+                        showContextMenu = action in listOf(BrowseContextAction.RECORD, BrowseContextAction.STOP, BrowseContextAction.CANCEL)
+                        when (action) {
+                            BrowseContextAction.WATCH -> {
+                                if (selectedCapability != null && channel != null &&
+                                    selectedCapability === observationState.value.currentSession
+                                ) {
+                                    closeDetails()
+                                    onPlay(LivePlaybackSelection(selectedCapability, channel.id), channel.name.orEmpty())
+                                } else closeDetails()
+                            }
+                            BrowseContextAction.RECORD -> handleAction(ProgrammeAction.RECORD)
+                            BrowseContextAction.STOP -> handleAction(ProgrammeAction.STOP_RECORDING)
+                            BrowseContextAction.CANCEL -> handleAction(ProgrammeAction.CANCEL_RECORDING)
+                            else -> Unit
+                        }
+                    },
+                    logo = {
+                        PiconBox(imageLoader = imageLoader, currentSession = selectedObservation.currentSession,
+                            piconPath = channel?.icon, modifier = Modifier.width(56.dp).height(40.dp))
+                    },
+                ) else ProgrammeDetailsPanel(
+                    imageLoader = imageLoader,
+                    currentSession = selectedObservation.currentSession,
+                    onPreviewKeyEvent = confirmationKeyHandler,
+                    event = event,
+                    channel = channel,
+                    recording = recording,
+                    nowSecProvider = nowSecProvider,
+                    canModifyRecordings = selectedCapability != null && (liveEvent != null || recording != null),
+                    liveProgrammeActions = liveEvent != null,
+                    notices = { AppShellNoticeHost(queue = notices) },
+                    onAction = handleAction,
+                    onClose = ::closeDetails,
+                )
+            }
         }
 
         val confirmationAction = pendingAction
@@ -2279,6 +2341,9 @@ fun EpgGridScreen(
                 onPreviewKeyEvent = confirmationKeyHandler,
                 action = confirmationAction,
                 programmeTitle = confirmationEvent.title.orEmpty(),
+                channelName = confirmationEvent.channelId?.let(observation::channel)?.name.orEmpty(),
+                dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(confirmationEvent.start.epochSeconds,
+                    confirmationEvent.stop.epochSeconds.takeIf { confirmationAction == ProgrammeAction.RECORD }),
                 onDismiss = {
                     pendingAction = null
                     pendingMutation = null

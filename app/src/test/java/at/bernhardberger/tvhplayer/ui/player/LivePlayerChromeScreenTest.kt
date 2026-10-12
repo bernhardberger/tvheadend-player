@@ -1601,7 +1601,7 @@ class LivePlayerChromeScreenTest {
         key(Key.Info)
         key(Key.DirectionCenter)
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-        compose.onNodeWithText("Back").assertIsFocused()
+        compose.onNodeWithText("Don't record").assertIsFocused()
         confirmInfoAction()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         publishInfoRecording(DvrEntryState.RECORDING)
@@ -1622,7 +1622,7 @@ class LivePlayerChromeScreenTest {
         screen()
         key(Key.Info)
         key(Key.DirectionCenter)
-        compose.onNodeWithText("Back").assertIsFocused()
+        compose.onNodeWithText("Don't record").assertIsFocused()
         compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.Back) }
         settle()
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
@@ -1935,8 +1935,8 @@ class LivePlayerChromeScreenTest {
     }
 
     private fun confirmInfoAction() {
-        compose.onNodeWithText("Back").assertIsFocused()
-        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("two-column-first").assertIsFocused()
+        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionCenter) }
         settle()
     }
 

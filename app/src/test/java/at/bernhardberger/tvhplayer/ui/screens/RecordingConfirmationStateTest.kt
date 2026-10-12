@@ -108,7 +108,8 @@ class RecordingConfirmationStateTest {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus()
-            .performKeyInput { pressKey(Key.DirectionCenter) }
+            .performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         val action = if (before == DvrEntryState.SCHEDULED) "cancel" else "stop"
         compose.onNodeWithTag("recording-details-$action").requestFocus()
             .performKeyInput { pressKey(Key.DirectionCenter) }

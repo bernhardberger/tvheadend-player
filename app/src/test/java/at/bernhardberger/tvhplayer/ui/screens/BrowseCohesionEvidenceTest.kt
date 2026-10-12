@@ -39,6 +39,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -231,7 +232,8 @@ class BrowseCohesionEvidenceTest {
         awaitFocus(hasTestTag("recordings-folder-Documentaries"))
         key(Key.DirectionCenter)
         awaitFocus(hasTestTag("recording-list-entry-1"))
-        key(Key.DirectionCenter)
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-details-panel").assertIsDisplayed()
         compose.onNodeWithContentDescription("Resume from 1 hour, 2 minutes, 3 seconds").assertIsDisplayed()
         capture("recordings-resume-font1.3", 1.3f, "Long recording details; Resume 1:02:03 action", hasTestTag("recording-details-resume"))

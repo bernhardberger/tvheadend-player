@@ -1,4 +1,13 @@
 <resources>
+    <string name="context_watch">Watch</string>
+    <string name="context_channel_now">%1$s · Now: %2$s</string>
+    <string name="context_watch_channel">Watch channel</string>
+    <string name="context_details">Details</string>
+    <string name="context_record">Record</string>
+    <string name="context_show_guide">Show in Guide</string>
+    <string name="context_resume">Resume</string>
+    <string name="context_start_over">Start over</string>
+    <string name="context_delete">Delete</string>
     <string name="audio_subtitles_section">Audio &amp; subtitles</string>
     <string name="audio_language_first">Audio language</string>
     <string name="audio_language_second">Second audio language</string>
@@ -365,8 +374,8 @@
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
     <string name="stop_recording">Stop recording</string>
-    <string name="record_confirm_title">Record “%1$s”?</string>
-    <string name="record_confirm_message">Your Tvheadend server will add this program to your recordings.</string>
+    <string name="record_confirm_title">Record this program?</string>
+    <string name="record_confirm_message">%1$s on %2$s, %3$s.</string>
     <string name="record_confirm_pane_title">Confirm recording</string>
     <string name="record_confirm_cancel">Cancel</string>
     <string name="recording_request_busy_title">Scheduling “%1$s”…</string>
@@ -378,10 +387,10 @@
     <string name="recording_request_failure_message">“%1$s” was not scheduled. %2$s</string>
     <string name="recording_config_title">Choose a recording configuration</string>
     <string name="recording_config_message">This server has several available recording configurations.</string>
-    <string name="cancel_recording_confirm_title">Cancel “%1$s”?</string>
-    <string name="cancel_recording_confirm_message">Your Tvheadend server will remove the scheduled recording.</string>
-    <string name="stop_recording_confirm_title">Stop recording “%1$s”?</string>
-    <string name="stop_recording_confirm_message">Your Tvheadend server will stop recording now and keep the recording made so far.</string>
+    <string name="cancel_recording_confirm_title">Cancel this recording?</string>
+    <string name="cancel_recording_confirm_message">%1$s on %2$s, %3$s, won\'t be recorded.</string>
+    <string name="stop_recording_confirm_title">Stop this recording?</string>
+    <string name="stop_recording_confirm_message">%1$s stops recording now. What\'s recorded so far is kept.</string>
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_failure_reason">Reason: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
@@ -459,8 +468,8 @@
     <string name="recordings_reconnecting">Reconnecting. Saved recording information may be out of date…</string>
     <string name="recordings_server_failure">Recordings are unavailable. Retry the server connection.</string>
     <string name="delete_recording">Delete recording</string>
-    <string name="delete_recording_confirm_title">Delete “%1$s”?</string>
-    <string name="delete_recording_confirm_message">Your Tvheadend server will permanently delete this completed recording.</string>
+    <string name="delete_recording_confirm_title">Delete this recording?</string>
+    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) will be deleted from the server.</string>
     <string name="recording_unavailable_title">Recording unavailable</string>
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_recovering">Restoring recording playback…</string>
@@ -649,4 +658,11 @@
     <string name="details_first_aired">First aired</string>
     <string name="details_new_yes">New program: Yes</string>
     <string name="details_new_no">New program: No</string>
+    <string name="keep_recording">Keep recording</string>
+    <string name="keep">Keep</string>
+    <string name="dont_record">Don\'t record</string>
+    <string name="recording_watched_duration">Watched %1$s of %2$s</string>
+    <string name="duration_minutes_short">%1$d min</string>
+    <string name="duration_hours_minutes_short">%1$d h %2$d min</string>
+    <string name="duration_unknown">unknown duration</string>
 </resources>

@@ -8,6 +8,7 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
@@ -84,7 +85,15 @@ class InProgressRecordingResumeTest {
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
     }
 
-    private fun openDetails(playPositionSeconds: Long?): List<RecordingPlaybackStart> {
+    @Test
+    fun okOnRunningRecordingResumesDirectlyWithoutPrompt() {
+        val starts = openDetails(754L, directly = true)
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("recording-details-panel").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+    }
+
+    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds)
         val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
@@ -114,7 +123,8 @@ class InProgressRecordingResumeTest {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus()
-            .performKeyInput { pressKey(Key.DirectionCenter) }
+            .performKeyInput { pressKey(if (directly) Key.DirectionCenter else Key.Menu) }
+        if (!directly) compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         return starts
     }
 

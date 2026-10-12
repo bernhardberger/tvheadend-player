@@ -1,5 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 import at.bernhardberger.tvhplayer.BuildConfig
@@ -229,6 +235,7 @@ internal fun TimelineChannelRow(
     recordingForEvent: (EventId) -> DvrEntry?,
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
+    onOpenContextMenu: ((EpgEventEntry) -> Unit)? = null,
     visibleRowWidthPx: Int? = null,
     focusStartInset: Dp = 0.dp,
     focusEndInset: Dp = 0.dp,
@@ -317,6 +324,7 @@ internal fun TimelineChannelRow(
                         focusRequester = focusRequester,
                         onFocused = { onFocused(event) },
                         onOpenDetails = { onOpenDetails(event) },
+                        onOpenContextMenu = onOpenContextMenu?.let { open -> { open(event) } },
                         width = width,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
@@ -432,6 +440,7 @@ internal fun TimelineProgrammeCell(
     onOpenDetails: () -> Unit,
     width: Dp,
     modifier: Modifier,
+    onOpenContextMenu: (() -> Unit)? = null,
 ) {
     val stateText = when {
         event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds ->
@@ -462,6 +471,7 @@ internal fun TimelineProgrammeCell(
         ListItem(
             selected = selected,
             onClick = onOpenDetails,
+            onLongClick = onOpenContextMenu,
             headlineContent = {
                 Text(
                     // Always render a label so no focusable cell is visually blank.
@@ -484,6 +494,12 @@ internal fun TimelineProgrammeCell(
                 // library focus scale the surface applies outside this modifier.
                 .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
                 .focusRequester(focusRequester)
+                .onPreviewKeyEvent {
+                    if (it.key == Key.Menu && onOpenContextMenu != null) {
+                        if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onOpenContextMenu()
+                        true
+                    } else false
+                }
                 .onFocusChanged {
                     focused = it.isFocused
                     if (it.isFocused) onFocused()

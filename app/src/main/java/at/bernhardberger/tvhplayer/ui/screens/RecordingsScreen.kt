@@ -1,5 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.recordingContextActions
+import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
+import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.common.formatHm
+import androidx.compose.foundation.layout.width
+
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 
 import androidx.compose.foundation.layout.Box
@@ -202,6 +209,9 @@ internal fun RecordingsScreenContent(
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
+    var showContextMenu by remember { mutableStateOf(false) }
+    var showResumeChoice by remember { mutableStateOf(false) }
+    var contextReturnAction by remember { mutableStateOf<BrowseContextAction?>(null) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsInitialAction by remember {
         mutableStateOf<RecordingDetailsAction?>(null)
@@ -210,6 +220,24 @@ internal fun RecordingsScreenContent(
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
     var pendingDetailsReturn by remember { mutableStateOf(false) }
+
+    fun openRecording(entry: DvrEntry) {
+        val capability = observation.currentSession
+        val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(entry, capability != null)
+        showContextMenu = false
+        if (capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
+                action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)) {
+            onPlayRecording(RecordingPlaybackSelection(capability, entry.id),
+                if (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME) RecordingPlaybackStart.RESUME
+                else RecordingPlaybackStart.START_OVER)
+            return
+        }
+        showResumeChoice = action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
+        contentFocusOwned = false
+        detailsInitialAction = null
+        detailsEntry = entry
+        detailsObservation = observation
+    }
 
     val location = when (mode) {
         DvrLibraryMode.ARCHIVE -> "archive:${archivePath.joinToString("/")}"
@@ -485,13 +513,20 @@ internal fun RecordingsScreenContent(
                     } },
                     onOpenRecording = {
                         if (owner.isCurrent) {
+                            openRecording(it)
+                        }
+                    },
+                    imageLoader = imageLoader,
+                    onOpenContextMenu = {
+                        if (owner.isCurrent) {
                             contentFocusOwned = false
                             detailsInitialAction = null
                             detailsEntry = it
                             detailsObservation = observation
+                            showContextMenu = true
+                            contextReturnAction = null
                         }
                     },
-                    imageLoader = imageLoader,
                     currentSession = currentSession,
                     piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
                     modifier = Modifier.fillMaxSize().onFocusChanged {
@@ -521,12 +556,19 @@ internal fun RecordingsScreenContent(
                             onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
                             onOpen = {
                                 if (!owner.isCurrent) return@RecordingSchedule
-                                contentFocusOwned = false
-                                detailsInitialAction = null
-                                detailsEntry = it
-                                detailsObservation = observation
+                                openRecording(it)
                             },
                             imageLoader = imageLoader,
+                            onOpenContextMenu = {
+                                if (owner.isCurrent) {
+                                    contentFocusOwned = false
+                                    detailsInitialAction = null
+                                    detailsEntry = it
+                                    detailsObservation = observation
+                                    showContextMenu = true
+                                    contextReturnAction = null
+                                }
+                            },
                             currentSession = currentSession,
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
@@ -559,12 +601,19 @@ internal fun RecordingsScreenContent(
                             onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
                             onOpen = {
                                 if (!owner.isCurrent) return@RecordingProblems
-                                contentFocusOwned = false
-                                detailsInitialAction = null
-                                detailsEntry = it
-                                detailsObservation = observation
+                                openRecording(it)
                             },
                             imageLoader = imageLoader,
+                            onOpenContextMenu = {
+                                if (owner.isCurrent) {
+                                    contentFocusOwned = false
+                                    detailsInitialAction = null
+                                    detailsEntry = it
+                                    detailsObservation = observation
+                                    showContextMenu = true
+                                    contextReturnAction = null
+                                }
+                            },
                             currentSession = currentSession,
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
@@ -594,6 +643,7 @@ internal fun RecordingsScreenContent(
     }
     LaunchedEffect(detailsEntry, opened) {
         if (detailsEntry != null && opened == null) {
+            showResumeChoice = false
             pendingAction = null
             pendingMutation = null
             detailsEntry = null
@@ -603,7 +653,92 @@ internal fun RecordingsScreenContent(
         }
     }
     if (opened != null && pendingAction == null) {
-        RecordingDetailsPanel(
+        if (showResumeChoice) {
+            val resources = androidx.compose.ui.platform.LocalContext.current.resources
+            val duration = if (opened.start != null && opened.stop != null) opened.stop!! - opened.start!! else null
+            val closeResume = {
+                showResumeChoice = false
+                detailsEntry = null
+                detailsObservation = null
+                pendingDetailsReturn = true
+            }
+            val play: (RecordingPlaybackStart) -> Unit = { intent ->
+                selectedCapability?.let { capability ->
+                    closeResume()
+                    onPlayRecording(RecordingPlaybackSelection(capability, opened.id), intent)
+                }
+            }
+            LaunchedEffect(selectedCapability, opened.state) {
+                if (selectedCapability == null || opened.state != DvrEntryState.COMPLETED) closeResume()
+            }
+            at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog(
+                title = opened.title.orEmpty(),
+                message = stringResource(R.string.recording_watched_duration,
+                    at.bernhardberger.tvhplayer.ui.common.formatPlaybackDuration(opened.playPosition?.inWholeSeconds ?: 0L, resources),
+                    duration?.let { at.bernhardberger.tvhplayer.ui.common.formatPlaybackDuration(it.inWholeSeconds, resources) }
+                        ?: stringResource(R.string.duration_unknown)),
+                firstLabel = stringResource(R.string.context_resume),
+                secondLabel = stringResource(R.string.context_start_over),
+                firstIcon = R.drawable.ic_play_arrow, secondIcon = R.drawable.ic_replay,
+                firstTag = "recording-resume", secondTag = "recording-start-over",
+                onFirst = { play(RecordingPlaybackStart.RESUME) },
+                onSecond = { play(RecordingPlaybackStart.START_OVER) },
+                onDismiss = closeResume,
+                backEnabled = backEnabled,
+            )
+        } else if (showContextMenu) BrowseContextMenu(
+            initialAction = contextReturnAction,
+            title = opened.title.orEmpty(),
+            metadata = opened.channelId?.let(channelsById::get)?.name ?: opened.channelName.orEmpty(),
+            timeRange = listOfNotNull(opened.start?.epochSeconds?.formatDateTime(), opened.stop?.epochSeconds?.let(::formatHm)).joinToString("–"),
+            actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
+                (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
+                    ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
+                playbackEligible = selectedCapability != null),
+            onClose = {
+                showContextMenu = false
+                pendingDetailsReturn = true
+                detailsEntry = null
+                detailsObservation = null
+                detailsInitialAction = null
+            },
+            onAction = { action ->
+                contextReturnAction = action
+                showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
+                when (action) {
+                    BrowseContextAction.WATCH, BrowseContextAction.PLAY,
+                    BrowseContextAction.RESUME, BrowseContextAction.START_OVER -> selectedCapability?.let {
+                        detailsEntry = null
+                        detailsObservation = null
+                        detailsInitialAction = null
+                        requestContentFocus = true
+                        onPlayRecording(RecordingPlaybackSelection(it, opened.id),
+                            if (action == BrowseContextAction.RESUME) RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
+                    }
+                    BrowseContextAction.STOP -> {
+                        detailsInitialAction = RecordingDetailsAction.STOP
+                        pendingMutation = selectedCapability?.let { DvrMutationAction.Stop(it, opened.id) }
+                        pendingAction = PendingRecordingAction.STOP
+                    }
+                    BrowseContextAction.CANCEL -> {
+                        detailsInitialAction = RecordingDetailsAction.CANCEL
+                        pendingMutation = selectedCapability?.let { DvrMutationAction.Cancel(it, opened.id) }
+                        pendingAction = PendingRecordingAction.CANCEL
+                    }
+                    BrowseContextAction.DELETE -> {
+                        detailsInitialAction = RecordingDetailsAction.DELETE
+                        pendingMutation = selectedCapability?.let { DvrMutationAction.Delete(it, opened.id) }
+                        pendingAction = PendingRecordingAction.DELETE
+                    }
+                    else -> Unit
+                }
+            },
+            logo = {
+                PiconBox(imageLoader = imageLoader, currentSession = selectedCapability,
+                    piconPath = opened.channelId?.let(channelsById::get)?.icon,
+                    modifier = Modifier.width(56.dp).height(40.dp))
+            },
+        ) else RecordingDetailsPanel(
             imageLoader = imageLoader,
             currentSession = selectedCapability,
             channel = opened.channelId?.let(channelsById::get),
@@ -680,6 +815,9 @@ internal fun RecordingsScreenContent(
         RecordingConfirmationDialog(
             action = action,
             title = target.title.orEmpty(),
+            channelName = target.channelId?.let(channelsById::get)?.name ?: target.channelName.orEmpty(),
+            dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(target.start?.epochSeconds,
+                dateOnly = action == PendingRecordingAction.DELETE),
             backEnabled = backEnabled,
             onDismiss = {
                 pendingAction = null

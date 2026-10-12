@@ -64,8 +64,10 @@ internal fun ArchiveDepthContent(
     currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     modifier: Modifier = Modifier,
+    onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
 ) {
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
+    val latestOnOpenContextMenu = rememberUpdatedState(onOpenContextMenu)
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
     val levels = remember(root, imageLoader, currentSession) {
         val levels = linkedMapOf<String, DepthLevel>()
@@ -109,6 +111,7 @@ internal fun ArchiveDepthContent(
                                     entry = item.entry, piconPath = latestPiconForEntry.value(item.entry), imageLoader = imageLoader,
                                     currentSession = currentSession, selected = false, modifier = rowModifier,
                                     onClick = activate,
+                                    onOpenContextMenu = { latestOnOpenContextMenu.value?.invoke(item.entry) },
                                 )
                             }
                         }

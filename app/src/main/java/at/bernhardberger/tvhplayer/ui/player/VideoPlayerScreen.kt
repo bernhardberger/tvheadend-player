@@ -1884,6 +1884,9 @@ fun VideoPlayerScreen(
             )
             infoPendingAction?.let { action ->
                 ConfirmProgrammeActionDialog(action, actionableInfoEvent?.title.orEmpty(),
+                    channelName = shownChannel?.name.orEmpty(),
+                    dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(actionableInfoEvent?.start?.epochSeconds,
+                        actionableInfoEvent?.stop?.epochSeconds?.takeIf { action == ProgrammeAction.RECORD }),
                     onDismiss = ::dismissRecordingDialog, onConfirm = ::confirmInfoRecording,
                     onPreviewKeyEvent = { event ->
                         val code = event.nativeKeyEvent.keyCode

@@ -1,4 +1,13 @@
 <resources>
+    <string name="context_watch">Ansehen</string>
+    <string name="context_channel_now">%1$s · Jetzt: %2$s</string>
+    <string name="context_watch_channel">Sender ansehen</string>
+    <string name="context_details">Details</string>
+    <string name="context_record">Aufnehmen</string>
+    <string name="context_show_guide">Im Programm zeigen</string>
+    <string name="context_resume">Fortsetzen</string>
+    <string name="context_start_over">Von vorne starten</string>
+    <string name="context_delete">Löschen</string>
     <string name="stats_video_buffers">Videopuffer</string>
     <string name="stats_video_buffers_value">Angezeigt %1$d · Verworfen %2$d · Übersprungen %3$d</string>
     <string name="audio_subtitles_section">Ton &amp; Untertitel</string>
@@ -269,8 +278,8 @@
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
     <string name="stop_recording">Aufnahme beenden</string>
-    <string name="record_confirm_title">„%1$s“ aufnehmen?</string>
-    <string name="record_confirm_message">Ihr Tvheadend-Server fügt diese Sendung zu Ihren Aufnahmen hinzu.</string>
+    <string name="record_confirm_title">Diese Sendung aufnehmen?</string>
+    <string name="record_confirm_message">%1$s auf %2$s, %3$s.</string>
     <string name="record_confirm_pane_title">Aufnahme bestätigen</string>
     <string name="record_confirm_cancel">Abbrechen</string>
     <string name="recording_request_busy_title">„%1$s“ wird geplant…</string>
@@ -282,10 +291,10 @@
     <string name="recording_request_failure_message">„%1$s“ wurde nicht geplant. %2$s</string>
     <string name="recording_config_title">Aufnahmekonfiguration wählen</string>
     <string name="recording_config_message">Auf diesem Server sind mehrere Aufnahmekonfigurationen verfügbar.</string>
-    <string name="cancel_recording_confirm_title">„%1$s“ abbrechen?</string>
-    <string name="cancel_recording_confirm_message">Ihr Tvheadend-Server entfernt die geplante Aufnahme.</string>
-    <string name="stop_recording_confirm_title">Aufnahme von „%1$s“ beenden?</string>
-    <string name="stop_recording_confirm_message">Ihr Tvheadend-Server beendet die Aufnahme jetzt und behält das bisher Aufgenommene.</string>
+    <string name="cancel_recording_confirm_title">Diese Aufnahme absagen?</string>
+    <string name="cancel_recording_confirm_message">%1$s auf %2$s, %3$s, wird nicht aufgenommen.</string>
+    <string name="stop_recording_confirm_title">Diese Aufnahme beenden?</string>
+    <string name="stop_recording_confirm_message">Die Aufnahme von %1$s wird jetzt beendet. Das bisher Aufgenommene bleibt erhalten.</string>
     <string name="recording_status">Aufnahme: %1$s</string>
     <string name="recording_failure_reason">Grund: %1$s</string>
     <string name="recording_state_scheduled">Geplant</string>
@@ -363,8 +372,8 @@
     <string name="recordings_reconnecting">Verbindung wird wiederhergestellt. Gespeicherte Aufnahmedaten können veraltet sein…</string>
     <string name="recordings_server_failure">Aufnahmen sind nicht verfügbar. Serververbindung erneut versuchen.</string>
     <string name="delete_recording">Aufnahme löschen</string>
-    <string name="delete_recording_confirm_title">„%1$s“ löschen?</string>
-    <string name="delete_recording_confirm_message">Ihr Tvheadend-Server löscht diese abgeschlossene Aufnahme dauerhaft.</string>
+    <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
+    <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wird vom Server gelöscht.</string>
     <string name="recording_unavailable_title">Aufnahme nicht verfügbar</string>
     <string name="recording_loading">Aufnahme wird geladen…</string>
     <string name="recording_recovering">Aufnahmewiedergabe wird wiederhergestellt…</string>
@@ -552,4 +561,11 @@
     <string name="details_first_aired">Erstausstrahlung</string>
     <string name="details_new_yes">Neue Sendung: Ja</string>
     <string name="details_new_no">Neue Sendung: Nein</string>
+    <string name="keep_recording">Weiter aufnehmen</string>
+    <string name="keep">Behalten</string>
+    <string name="dont_record">Nicht aufnehmen</string>
+    <string name="recording_watched_duration">%1$s von %2$s angesehen</string>
+    <string name="duration_minutes_short">%1$d Min.</string>
+    <string name="duration_hours_minutes_short">%1$d Std. %2$d Min.</string>
+    <string name="duration_unknown">unbekannter Dauer</string>
 </resources>

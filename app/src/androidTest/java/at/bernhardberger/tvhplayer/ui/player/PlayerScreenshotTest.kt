@@ -2,6 +2,8 @@
 
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
+
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint

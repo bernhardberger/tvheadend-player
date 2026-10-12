@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
+
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertContentDescriptionEquals

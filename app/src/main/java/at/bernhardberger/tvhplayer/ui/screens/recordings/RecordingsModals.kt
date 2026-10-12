@@ -266,113 +266,28 @@ internal fun RecordingConfirmationDialog(
     backEnabled: Boolean,
     onDismiss: () -> Unit,
     onConfirm: () -> Unit,
+    channelName: String = "",
+    dateAndTime: String = "",
 ) {
-    val safeFocus = remember { FocusRequester() }
-    val confirmFocus = remember { FocusRequester() }
-    LaunchedEffect(action) {
-        // Wait one frame so Back is ready to draw its focused state.
-        withFrameNanos { }
-        safeFocus.requestFocus()
-    }
-    RecordingDialogSurface(
+    at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog(
+        title = stringResource(when (action) {
+            PendingRecordingAction.STOP -> R.string.stop_recording_confirm_title
+            PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_title
+            PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_title
+        }),
+        message = stringResource(when (action) {
+            PendingRecordingAction.STOP -> R.string.stop_recording_confirm_message
+            PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_message
+            PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_message
+        }, title, channelName, dateAndTime),
+        firstLabel = stringResource(if (action == PendingRecordingAction.DELETE) R.string.keep else R.string.keep_recording),
+        secondLabel = stringResource(when (action) {
+            PendingRecordingAction.STOP -> R.string.stop_recording
+            PendingRecordingAction.CANCEL -> R.string.cancel_recording
+            PendingRecordingAction.DELETE -> R.string.delete_recording
+        }),
+        onFirst = onDismiss, onSecond = onConfirm, onDismiss = onDismiss,
         backEnabled = backEnabled,
-        onBack = onDismiss,
-    ) {
-        Text(
-            text = stringResource(
-                when (action) {
-                    PendingRecordingAction.STOP -> R.string.stop_recording_confirm_title
-                    PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_title
-                    PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_title
-                },
-                title,
-            ),
-            style = MaterialTheme.typography.headlineSmall,
-            modifier = Modifier.semantics { heading() },
-        )
-        Text(
-            text = stringResource(
-                when (action) {
-                    PendingRecordingAction.STOP -> R.string.stop_recording_confirm_message
-                    PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_message
-                    PendingRecordingAction.DELETE -> R.string.delete_recording_confirm_message
-                }
-            ),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .focusRequester(safeFocus)
-                    .focusProperties {
-                        left = FocusRequester.Cancel
-                        right = confirmFocus
-                        up = FocusRequester.Cancel
-                        down = FocusRequester.Cancel
-                    }
-                    .testTag("recording-confirmation-back"),
-            ) {
-                Text(stringResource(R.string.back))
-            }
-            Button(
-                onClick = onConfirm,
-                modifier = Modifier
-                    .focusRequester(confirmFocus)
-                    .focusProperties {
-                        left = safeFocus
-                        right = FocusRequester.Cancel
-                        up = FocusRequester.Cancel
-                        down = FocusRequester.Cancel
-                    }
-                    .testTag("recording-confirmation-confirm"),
-            ) {
-                Text(
-                    stringResource(
-                        when (action) {
-                            PendingRecordingAction.STOP -> R.string.stop_recording
-                            PendingRecordingAction.CANCEL -> R.string.cancel_recording
-                            PendingRecordingAction.DELETE -> R.string.delete_recording
-                        }
-                    )
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecordingDialogSurface(
-    backEnabled: Boolean,
-    onBack: () -> Unit,
-    content: @Composable () -> Unit,
-) {
-    BackHandler(enabled = backEnabled, onBack = onBack)
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = TvScrimModalAlpha))
-            .focusGroup(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Surface(
-            modifier = Modifier.width(720.dp),
-            colors = SurfaceDefaults.colors(
-                containerColor = TvSurfaceColors.containerHigh,
-                contentColor = MaterialTheme.colorScheme.onSurface,
-            ),
-            shape = MaterialTheme.shapes.large,
-        ) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp),
-            ) {
-                content()
-            }
-        }
-    }
+        firstTag = "recording-confirmation-back", secondTag = "recording-confirmation-confirm",
+    )
 }

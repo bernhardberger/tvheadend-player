@@ -59,6 +59,7 @@ internal fun ChannelsRouteContent(
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (LivePlaybackSelection, String) -> Unit,
+    onShowGuide: (ChannelId) -> Unit = {},
 ) {
     StartupGatedChannelsContent(
         contentAllowed = contentAllowed,
@@ -74,6 +75,7 @@ internal fun ChannelsRouteContent(
                 onRetryConnection = onRetryConnection,
                 onOpenConnectionSettings = onOpenConnectionSettings,
                 onPlay = onPlay,
+                onShowGuide = onShowGuide,
             ) }
         }
     }

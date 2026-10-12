@@ -33,7 +33,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
-import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.shadows.ShadowDialog
@@ -128,12 +127,16 @@ class GuideHistoryScreenTest {
         // Programme details own a dialog-window notice host using the shell dependencies.
         val noticeModule = module {
             single { notices }
-            single { profiles }
+            single<AppProfileOwner> { profiles }
             single<TvheadendSession> { session }
         }
+        val noticeApplication = org.koin.dsl.koinApplication { modules(noticeModule) }
         compose.setContent {
             view = LocalView.current
-            KoinApplication(application = { modules(noticeModule) }) {
+            org.koin.compose.KoinIsolatedContext(noticeApplication) {
+                androidx.compose.runtime.DisposableEffect(noticeApplication) {
+                    onDispose { noticeApplication.close() }
+                }
                 CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                     TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
                         playerSession = runtime, selection = selection, guidePositionStore = position,
@@ -168,7 +171,7 @@ class GuideHistoryScreenTest {
                 else -> FakeSessionCall.DVR_SCHEDULE_ENTRY
             }
             compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-            compose.onNodeWithText(context.getString(R.string.back)).assertIsFocused()
+            compose.onNodeWithText(context.getString(if (transition == "airing-record") R.string.dont_record else R.string.keep_recording)).assertIsFocused()
             assertEquals(0, session.calls.count { it == call })
             compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
             compose.waitUntil(5_000) { session.calls.count { it == call } == 1 }
@@ -182,7 +185,7 @@ class GuideHistoryScreenTest {
             if (transition == "cancel" || transition == "stop") {
                 val label = context.getString(if (transition == "cancel") R.string.cancel_recording else R.string.stop_recording)
                 compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-                compose.onNodeWithText(context.getString(R.string.back)).assertIsFocused()
+                compose.onNodeWithText(context.getString(R.string.keep_recording)).assertIsFocused()
                 val downTime = android.os.SystemClock.uptimeMillis()
                 fun activationEvent(action: Int, repeat: Int = 0) = androidx.compose.ui.input.key.KeyEvent(
                     android.view.KeyEvent(downTime, android.os.SystemClock.uptimeMillis(), action, activationKeyCode, repeat))
@@ -192,7 +195,7 @@ class GuideHistoryScreenTest {
                     recordingState = if (transition == "cancel") DvrEntryState.RECORDING else DvrEntryState.COMPLETED
                     session.publish(observation(true))
                 }
-                compose.onNodeWithText(context.getString(R.string.back)).assertDoesNotExist()
+                compose.onNodeWithText(context.getString(R.string.keep_recording)).assertDoesNotExist()
                 compose.onNodeWithText(label).assertDoesNotExist()
                 val nextLabel = context.getString(if (transition == "cancel") R.string.stop_recording else R.string.record)
                 compose.onNodeWithText(nextLabel).assertIsFocused()
@@ -201,17 +204,17 @@ class GuideHistoryScreenTest {
                     assertTrue("interrupted repeat $repeat must be consumed", compose.onNodeWithText(nextLabel)
                         .performKeyPress(activationEvent(android.view.KeyEvent.ACTION_DOWN, repeat)))
                     compose.onNodeWithText(nextLabel).assertIsFocused()
-                    compose.onNodeWithText(context.getString(R.string.back)).assertDoesNotExist()
+                    compose.onNodeWithText(context.getString(R.string.keep_recording)).assertDoesNotExist()
                     assertEquals(before, session.calls.size)
                 }
                 assertTrue("interrupted release must be consumed", compose.onNodeWithText(nextLabel)
                     .performKeyPress(activationEvent(android.view.KeyEvent.ACTION_UP)))
                 compose.onNodeWithText(nextLabel).assertIsFocused()
-                compose.onNodeWithText(context.getString(R.string.back)).assertDoesNotExist()
+                compose.onNodeWithText(context.getString(R.string.keep_recording)).assertDoesNotExist()
                 assertEquals(before, session.calls.size)
                 compose.onNodeWithText(nextLabel).performKeyPress(activationEvent(android.view.KeyEvent.ACTION_DOWN))
                 compose.onNodeWithText(nextLabel).performKeyPress(activationEvent(android.view.KeyEvent.ACTION_UP))
-                compose.onNodeWithText(context.getString(R.string.back)).assertIsFocused()
+                compose.onNodeWithText(context.getString(if (transition == "cancel") R.string.keep_recording else R.string.dont_record)).assertIsFocused()
                 val nextTitle = context.getString(if (transition == "cancel") R.string.stop_recording_confirm_title
                     else R.string.record_confirm_title, "Channel 1 hour 1")
                 compose.onNodeWithText(nextTitle).assertExists()

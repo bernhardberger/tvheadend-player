@@ -76,3 +76,17 @@ fun floorToMinutes(unixSec: Long, minutes: Int): Long {
 }
 
 fun formatHm(unixSec: Long): String = formatClock(unixSec)
+
+fun formatPlaybackDuration(seconds: Long, resources: android.content.res.Resources): String {
+    val minutes = seconds.coerceAtLeast(0L) / 60
+    return if (minutes < 60) resources.getString(at.bernhardberger.tvhplayer.R.string.duration_minutes_short, minutes)
+    else resources.getString(at.bernhardberger.tvhplayer.R.string.duration_hours_minutes_short, minutes / 60, minutes % 60)
+}
+
+fun formatRecordingSchedule(startSec: Long?, stopSec: Long? = null, dateOnly: Boolean = false): String {
+    if (startSec == null) return ""
+    val start = Instant.ofEpochSecond(startSec).atZone(ZoneId.systemDefault())
+    val datePattern = if (Locale.getDefault().language == "de") "EEE, d. MMM," else "EEE, MMM d,"
+    if (dateOnly) return formatter(datePattern.removeSuffix(","), Locale.getDefault()).format(start)
+    return formatDateAndClock(start, datePattern) + (stopSec?.let { "–${formatClock(it)}" } ?: "")
+}

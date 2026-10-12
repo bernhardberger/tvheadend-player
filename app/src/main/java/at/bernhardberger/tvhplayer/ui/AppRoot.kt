@@ -491,8 +491,10 @@ fun AppRoot(
     val currentDestination = backStack.lastOrNull()
     // Live player Back targets the browse destination it returned to, once.
     var livePlayerReturn by remember { mutableStateOf<Pair<AppNavKey, PlayerReturnFocus>?>(null) }
+    var guideChannelRequest by remember { mutableStateOf<PlayerReturnFocus?>(null) }
     LaunchedEffect(currentDestination) {
         if (livePlayerReturn?.first != currentDestination) livePlayerReturn = null
+        if (currentDestination != GuideKey) guideChannelRequest = null
     }
     val playerReturnFor = { destination: AppNavKey ->
         livePlayerReturn?.takeIf { it.first == destination }?.second
@@ -723,6 +725,10 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS),
                     ) {
                         ChannelsRouteContent(
+                            onShowGuide = { channelId ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId)
+                                navigateTopLevel(GuideKey)
+                            },
                             channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
@@ -746,7 +752,7 @@ fun AppRoot(
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
-                            playerReturn = playerReturnFor(GuideKey),
+                            playerReturn = guideChannelRequest ?: playerReturnFor(GuideKey),
                             connectionUiState = connectionUiState,
                             onRetry = appVm::reconnectNow,
                             onOpenConnectionSettings = {

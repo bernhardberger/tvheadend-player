@@ -103,9 +103,7 @@ class PlaybackPanelCaptureTest {
         guide = true
         compose.waitForIdle()
         println("Focus modal-guide-en-font1.0: ${focusedNodes()}")
-        // The guide dialog is its own full-screen window.
-        val dialog = checkNotNull(ShadowDialog.getLatestDialog()) { "No guide dialog" }
-        val guideCapture = capture(checkNotNull(dialog.window).decorView, "modal-guide-en-font1.0", white = true)
+        val guideCapture = capture(view, "modal-guide-en-font1.0", white = true)
         assertScrim(guideCapture.getPixel(0, 0))
         guideCapture.recycle()
     }

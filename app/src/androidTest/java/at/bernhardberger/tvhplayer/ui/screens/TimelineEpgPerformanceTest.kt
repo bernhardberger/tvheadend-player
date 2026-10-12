@@ -301,10 +301,10 @@ class TimelineEpgPerformanceTest {
         }
 
         composeRule.onNodeWithText(
-            "Record “Eine außergewöhnlich lange deutsche Sendungsbezeichnung”?"
+            "Record this program?"
         )
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Back").assertIsFocused()
+        composeRule.onNodeWithText("Don't record").assertIsFocused()
     }
 
     private fun event(id: Int, start: Long, stop: Long) = EpgEvent.create(
