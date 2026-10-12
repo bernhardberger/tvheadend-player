@@ -33,7 +33,7 @@ backs out to those screens.
 ```bash
 ./tools/verify
 # Mutating commands require an explicitly configured test device.
-android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/debug/app-debug.apk --use-delta-install=false --install-options=-r,-t
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/appliance/debug/app-appliance-debug.apk --use-delta-install=false --install-options=-r,-t
 ./tools/device launch
 ```
 
@@ -112,8 +112,8 @@ fun adjacentChannelId(
   keep it unavailable in release builds and on production/unclassified devices.
 - Preserve a route to channel list, EPG, and settings through Back navigation.
 - Keep Google Basic TV and stock Headent installed until all runtime checks pass.
-- Use the distinct `at.bernhardberger.tvhplayer` application ID and a stable
-  signing key.
+- Use the Appliance build's distinct `at.bernhardberger.tvhplayer.appliance`
+  application ID and the stable product signing key.
 - Keep the operator UI on one overscan-safe TV layout grid. Use TV Material
   navigation drawers and list items rather than hand-built focusable replicas;
   focused rows must remain unclipped, and Player details/settings panels must

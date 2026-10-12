@@ -10,6 +10,21 @@ from signing on the isolated owner-controlled signing host. The private key and
 passwords never enter LXC 106, Git, release metadata, or command arguments.
 Publication and production-device mutation still require explicit owner approval.
 
+## Builds
+
+Each release produces two builds from one commit (owner, 2026-10-11): the Play
+build `at.bernhardberger.tvhplayer` and the Appliance build
+`at.bernhardberger.tvhplayer.appliance`, which alone carries the HOME filter, the
+GUIDE accessibility service and the Appliance settings. Both APKs are attached to
+every GitHub release. Play App Signing must use this project's own release key
+("use your own key" at enrollment), so a GitHub APK and a Play install update
+each other.
+
+Until `tools/prepare-release` stages the Appliance APK, it produces the Play APK
+only. Do not install a release on a household Appliance TV (the production G08)
+until the Appliance APK is in the signed bundle: the Play build under the old
+application ID would update that install and drop HOME and GUIDE.
+
 ## Version policy
 
 `at.bernhardberger.tvhplayer` is a clean application ID. Version `0.1.0`

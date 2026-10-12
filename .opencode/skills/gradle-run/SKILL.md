@@ -30,7 +30,7 @@ On the shared Linux host, bound the command with GNU `timeout`, without
 `--foreground`, so interruption/timeout reaches the process group. For example:
 
 ```bash
-timeout --kill-after=5s 20m ./gradlew :app:testDebugUnitTest --console=plain --no-scan
+timeout --kill-after=5s 20m ./gradlew :app:testPlayDebugUnitTest --console=plain --no-scan
 timeout --kill-after=5s 30m ./tools/verify
 ```
 

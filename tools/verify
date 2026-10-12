@@ -75,10 +75,10 @@ python3 tools/static_rules.py
 printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
 printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "$capture_tests"
 ./gradlew \
-    testDebugUnitTest \
-    lintDebug \
-    compileDebugAndroidTestKotlin \
-    assembleDebug \
+    :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest \
+    :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug \
+    :app:compilePlayDebugAndroidTestKotlin \
+    :app:assemblePlayDebug :app:assembleApplianceDebug \
     "${provenance_tasks[@]}" \
     "${gradle_arguments[@]}" \
     "-Ptvhplayer.captureTests=$capture_tests" \
@@ -91,7 +91,8 @@ else
     ./tools/check-native-libs
 fi
 
-apk="app/build/outputs/apk/debug/app-debug.apk"
+apk="app/build/outputs/apk/play/debug/app-play-debug.apk"
+appliance_apk="app/build/outputs/apk/appliance/debug/app-appliance-debug.apk"
 if [[ ! -f "$apk" ]]; then
     printf 'error: expected APK was not produced: %s\n' "$apk" >&2
     exit 1
@@ -123,8 +124,20 @@ if ! "$zipalign" -c -P 16 4 "$apk"; then
 fi
 
 badging="$($aapt dump badging "$apk")"
-manifest_tree="$($aapt dump xmltree "$apk" AndroidManifest.xml)"
-accessibility_tree="$($aapt dump xmltree "$apk" res/xml/appliance_entry_accessibility_service.xml)"
+play_manifest="$($aapt dump xmltree "$apk" AndroidManifest.xml)"
+manifest_tree="$($aapt dump xmltree "$appliance_apk" AndroidManifest.xml)"
+appliance_badging="$($aapt dump badging "$appliance_apk")"
+accessibility_tree="$($aapt dump xmltree "$appliance_apk" res/xml/appliance_entry_accessibility_service.xml)"
+
+if [[ "$play_manifest" != *'android.intent.category.LEANBACK_LAUNCHER'* ||
+      "$play_manifest" == *'android.intent.category.HOME'* ||
+      "$play_manifest" == *'android.accessibilityservice.AccessibilityService'* ||
+      "$play_manifest" == *'ApplianceEntryAccessibilityService'* ||
+      "$appliance_badging" != *"package: name='at.bernhardberger.tvhplayer.appliance'"* ||
+      "$manifest_tree" != *'android.intent.category.LEANBACK_LAUNCHER'* ]]; then
+    printf 'error: Play/Appliance manifest contract failed\n' >&2
+    exit 1
+fi
 
 required_badging=(
     "package: name='at.bernhardberger.tvhplayer'"

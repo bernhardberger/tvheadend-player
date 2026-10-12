@@ -272,7 +272,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -343,7 +343,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -862,7 +862,7 @@ class DevicePolicyTest(unittest.TestCase):
         )
         output = io.StringIO()
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -950,7 +950,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1003,7 +1003,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1080,7 +1080,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1144,7 +1144,7 @@ class DevicePolicyTest(unittest.TestCase):
                         side_effect.append(CLEAR_SUCCESS)
                     run_mock = Mock(side_effect=side_effect)
                     with tempfile.TemporaryDirectory() as directory:
-                        test_apk = Path(directory) / "app-debug-androidTest.apk"
+                        test_apk = Path(directory) / "app-play-debug-androidTest.apk"
                         test_apk.touch()
                         with patch.dict(
                             DEVICE_GLOBALS,
@@ -1200,7 +1200,7 @@ class DevicePolicyTest(unittest.TestCase):
                     ]
                 )
                 with tempfile.TemporaryDirectory() as directory:
-                    test_apk = Path(directory) / "app-debug-androidTest.apk"
+                    test_apk = Path(directory) / "app-play-debug-androidTest.apk"
                     test_apk.touch()
                     with patch.dict(
                         DEVICE_GLOBALS,
@@ -1255,7 +1255,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1333,7 +1333,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1384,7 +1384,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1462,7 +1462,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1531,7 +1531,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1597,7 +1597,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1648,7 +1648,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1683,7 +1683,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1716,7 +1716,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1769,7 +1769,7 @@ class DevicePolicyTest(unittest.TestCase):
             ]
         )
         with tempfile.TemporaryDirectory() as directory:
-            test_apk = Path(directory) / "app-debug-androidTest.apk"
+            test_apk = Path(directory) / "app-play-debug-androidTest.apk"
             test_apk.touch()
             with patch.dict(
                 DEVICE_GLOBALS,
@@ -1832,7 +1832,7 @@ class DevicePolicyTest(unittest.TestCase):
                     ]
                 )
                 with tempfile.TemporaryDirectory() as directory:
-                    test_apk = Path(directory) / "app-debug-androidTest.apk"
+                    test_apk = Path(directory) / "app-play-debug-androidTest.apk"
                     test_apk.touch()
                     with patch.dict(
                         DEVICE_GLOBALS,

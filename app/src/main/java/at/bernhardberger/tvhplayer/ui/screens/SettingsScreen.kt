@@ -6,6 +6,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.*
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.depth.*
@@ -22,26 +23,27 @@ internal fun SettingsScreen(
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
+    applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
 ) {
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(),
+        settingsRootLevel(applianceBuild),
         settingsKeepChannelLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-        settingsApplianceLevel(),
-    )
+    ) + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent)
 }
 
 @Composable
-internal fun settingsRootLevel(): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
+internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
     settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general_nav), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune),
     settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list),
     settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
     settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
+) + if (applianceBuild) listOf(
     settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance_nav), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home),
-))
+) else emptyList())
 
 @Composable
 internal fun SettingsScreenNavigation(

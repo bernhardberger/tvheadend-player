@@ -80,7 +80,8 @@ private fun startupBufferSeconds(millis: Int): String {
 internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
     val ui by vm.ui.collectAsStateWithLifecycle()
     return listOf(settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged,
-        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged)) +
+        vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged,
+        vm::onAutoStartPlaybackChanged)) +
         settingsAudioPreferenceLevels(ui,
             onAudioLanguageSelected = { slot, language -> vm.onAudioLanguageSelected(slot, language); navigation.pop() },
             onAudioFormatSelected = { vm.onAudioFormatSelected(it); navigation.pop() },
@@ -95,10 +96,13 @@ internal fun settingsPlayerLevel(
     onProfileSelected: (StreamProfileId?) -> Unit,
     onAudioPassthroughEnabledChanged: (Boolean) -> Unit,
     onAudioDescriptionChanged: (Boolean) -> Unit = {},
+    onAutoStartPlaybackChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
     val direct = stringResource(R.string.profile_direct_streaming)
     val profileSection = stringResource(R.string.profile)
     return settingsLevel(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), buildList {
+        add(settingsRow("autoplay", stringResource(R.string.auto_start_playback), checked = ui.autoStartPlayback,
+            onClick = { onAutoStartPlaybackChanged(!ui.autoStartPlayback) }))
         add(settingsRow("timeshift", stringResource(R.string.timeshift_setting), checked = ui.timeshiftEnabled,
             onClick = { onTimeshiftEnabledChanged(!ui.timeshiftEnabled) }))
         add(settingsRow("refresh-rate", stringResource(R.string.refresh_rate_matching_setting), checked = ui.refreshRateMatchingEnabled,

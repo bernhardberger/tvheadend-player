@@ -36,11 +36,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
-import at.bernhardberger.tvhplayer.settings.UiSettings
-import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
@@ -48,42 +45,29 @@ import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
 import kotlinx.coroutines.launch
-import org.koin.compose.koinInject
 
 @Composable
-internal fun settingsApplianceLevel(
-    settingsStore: UiSettingsStore = koinInject(),
-): DepthLevel {
+internal fun settingsApplianceLevel(): DepthLevel {
     val context = LocalContext.current
     var serviceEnabled by remember { mutableStateOf(false) }
-    val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
-    val scope = rememberCoroutineScope()
 
     LifecycleResumeEffect(context) {
         serviceEnabled = isApplianceEntryServiceEnabled(context)
         onPauseOrDispose { }
     }
 
-    return settingsApplianceLevel(settings.autoStartPlayback, serviceEnabled,
-        onAutoplayChanged = { scope.launch { settingsStore.setAutoStartPlayback(it) } },
+    return settingsApplianceLevel(serviceEnabled,
         onOpenAccessibility = { context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) })
 }
 
 @Composable
 internal fun settingsApplianceLevel(
-    autoplay: Boolean,
     serviceEnabled: Boolean,
-    onAutoplayChanged: (Boolean) -> Unit,
     onOpenAccessibility: () -> Unit,
 ): DepthLevel = settingsLevel(
     SettingsSection.APPLIANCE.name,
     stringResource(R.string.settings_appliance),
     listOf(
-        settingsRow("autoplay", stringResource(R.string.auto_start_playback),
-            section = stringResource(R.string.appliance_section_app_open),
-            checked = autoplay,
-            onClick = { onAutoplayChanged(!autoplay) },
-        ),
         settingsRow("accessibility", stringResource(R.string.open_accessibility_settings),
             trailingIcon = R.drawable.ic_settings_accessibility,
             section = stringResource(R.string.appliance_section_accessibility),

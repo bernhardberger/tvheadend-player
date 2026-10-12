@@ -81,7 +81,7 @@ class SettingsVisualEvidenceTest {
                         SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
-                                listOf(settingsRootLevel(), settingsApplianceLevel(false, false, {}, { accessibilityCalls++ }),
+                                listOf(settingsRootLevel(applianceBuild = true), settingsApplianceLevel(false, { accessibilityCalls++ }),
                                     settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_overview_connected),
                                         "tvheadend.local", 9982)) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
@@ -165,7 +165,6 @@ class SettingsVisualEvidenceTest {
         press(Key.Back)
         repeat(4) { press(Key.DirectionDown) }
         press(Key.DirectionCenter)
-        press(Key.DirectionDown)
         compose.onNodeWithText(accessLabel).assertIsFocused()
         val accessBounds = compose.onNodeWithText(accessLabel).fetchSemanticsNode().boundsInRoot
         val textBounds = compose.onNodeWithTag("appliance-disclosure").fetchSemanticsNode().boundsInRoot

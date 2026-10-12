@@ -24,7 +24,8 @@ client where that distinction matters.
 
 | Surface | Value |
 |---|---|
-| Application ID | `at.bernhardberger.tvhplayer` |
+| Application ID (Play build) | `at.bernhardberger.tvhplayer` |
+| Application ID (Appliance build) | `at.bernhardberger.tvhplayer.appliance` |
 | Kotlin/Gradle namespace | `at.bernhardberger.tvhplayer` |
 | Root Gradle project | `TVHeadendPlayer` |
 | Compose theme API | `TVHeadendPlayerTheme` |
@@ -38,6 +39,14 @@ client where that distinction matters.
 | Local device config | `.tvhplayer-device.json` |
 | Local credential file | `.tvhplayer-credentials.json` |
 | Device environment prefix | `TVHPLAYER_` |
+
+Two builds come from one code path through the `distribution` flavor dimension
+(owner, 2026-10-11). `play` is the Google Play build: no HOME launcher filter and
+no GUIDE accessibility service. `appliance` is the sideloaded household build: it
+adds both, the Appliance settings section, and its own application ID, so a Play
+update can never replace an Appliance install. Both builds can be installed side
+by side and are configured separately; existing Appliance TVs are set up once
+more.
 
 No compatibility code preserves the former application ID, DataStore files, or
 Keystore alias. The previous package may remain installed as a rollback client

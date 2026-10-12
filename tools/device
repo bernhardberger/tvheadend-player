@@ -28,8 +28,8 @@ ROOT = Path(__file__).resolve().parents[1]
 LOCAL_CONFIG = ROOT / ".tvhplayer-device.json"
 DEFAULT_PACKAGE = "at.bernhardberger.tvhplayer"
 LEGACY_PACKAGE = "at.leoville.tvhstream"
-DEFAULT_APK = ROOT / "app/build/outputs/apk/debug/app-debug.apk"
-DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+DEFAULT_APK = ROOT / "app/build/outputs/apk/play/debug/app-play-debug.apk"
+DEFAULT_TEST_APK = ROOT / "app/build/outputs/apk/androidTest/play/debug/app-play-debug-androidTest.apk"
 CHANNEL_GUIDE_TEST = (
     "at.bernhardberger.tvhplayer.ui.ChannelGuideDeviceAcceptanceTest"
 )

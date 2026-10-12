@@ -195,6 +195,7 @@ val appModule = module {
             playbackRuntime = get(),
             session = get(),
             profileOwner = get(),
+            uiSettingsStore = get(),
         )
     }
 }

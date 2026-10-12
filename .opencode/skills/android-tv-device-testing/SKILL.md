@@ -62,7 +62,7 @@ but the G10's standing authorization in `docs/device-targets.md` covers launchin
 Player there:
 
 ```bash
-android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/debug/app-debug.apk --use-delta-install=false --install-options=-r,-t
+android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/play/debug/app-play-debug.apk --use-delta-install=false --install-options=-r,-t
 ```
 
 The CLI lacks standalone remote-key input. Existing bounded named key commands

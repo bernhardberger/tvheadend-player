@@ -29,6 +29,11 @@ import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import org.robolectric.RuntimeEnvironment
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.DebugVideoBackdrop
@@ -57,6 +62,59 @@ import java.io.File
 class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var captureView: View
+
+    @Test fun playRootHasFourSectionsAndApplianceAddsOnlyTheLastSection() {
+        lateinit var play: DepthLevel
+        lateinit var appliance: DepthLevel
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                play = settingsRootLevel(applianceBuild = false)
+                appliance = settingsRootLevel(applianceBuild = true)
+            }
+        }
+        compose.runOnIdle {
+            val sections = listOf(SettingsSection.GENERAL, SettingsSection.CHANNEL_TAGS,
+                SettingsSection.CONNECTION, SettingsSection.PLAYER).map { it.name }
+            assertEquals(sections, play.rows.map { it.item.id })
+            assertEquals(sections + SettingsSection.APPLIANCE.name, appliance.rows.map { it.item.id })
+        }
+    }
+
+    @Test fun playerAutoplayIsFirstPersistsAndRestoresFocusInBothBuilds() {
+        val store = UiSettingsStore(RuntimeEnvironment.getApplication())
+        runBlocking { store.setAutoStartPlayback(false) }
+        var applianceBuild by mutableStateOf(false)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val settings by store.settings.collectAsState(initial = UiSettings())
+                val scope = rememberCoroutineScope()
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                val player = settingsPlayerLevel(SettingsPlayerUiState(autoStartPlayback = settings.autoStartPlayback),
+                    {}, {}, {}, {}, onAutoStartPlaybackChanged = { enabled ->
+                        scope.launch { store.setAutoStartPlayback(enabled) }
+                    })
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild), player))
+            }
+        }
+        val autoplay = "Start playback when the app opens"
+        for (appliance in listOf(false, true)) {
+            compose.runOnIdle { applianceBuild = appliance }
+            press(Key.DirectionCenter)
+            compose.onNodeWithText(autoplay).assertIsFocused().assertIsOff()
+            assertFalse(runBlocking { store.settings.first().autoStartPlayback })
+            press(Key.DirectionCenter)
+            compose.waitUntil { runBlocking { store.settings.first().autoStartPlayback } }
+            compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
+            press(Key.Back)
+            compose.onNodeWithText("Player").assertIsFocused()
+            press(Key.DirectionCenter)
+            compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
+            press(Key.DirectionCenter)
+            compose.waitUntil { !runBlocking { store.settings.first().autoStartPlayback } }
+            compose.onNodeWithText(autoplay).assertIsFocused().assertIsOff()
+            press(Key.Back)
+        }
+    }
 
     private fun press(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
@@ -501,12 +559,12 @@ class SettingsDepthNavigationTest {
                     WarmPlaybackScrim() // This fixture explicitly models warm playback.
                     SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = true),
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,
                                 { retries++ }, { toggles++ }),
                             settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED)),
                                 { settingsActions++ }, { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
-                            settingsApplianceLevel(false, false, { settingsActions++ }, { settingsActions++ }),
+                            settingsApplianceLevel(false, { settingsActions++ }),
                         ), initialFocusEnabled = ready && !drawerActive, contentPadding = padding)
                     }
                 }
@@ -539,8 +597,6 @@ class SettingsDepthNavigationTest {
         press(Key.Back)
         press(Key.DirectionDown)
         press(Key.DirectionCenter)
-        capture("appliance-autoplay")
-        press(Key.DirectionDown)
         capture("appliance-accessibility")
         assertEquals(1, settingsActions)
         press(Key.DirectionCenter)

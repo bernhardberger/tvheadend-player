@@ -55,6 +55,19 @@ android {
         buildConfigField("boolean", "PROGRAMME_WINDOW_B", providers.gradleProperty("player.programmeWindowB").orElse("true").map { it.toBooleanStrict().toString() }.get())
     }
 
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "APPLIANCE_BUILD", "false")
+        }
+        create("appliance") {
+            dimension = "distribution"
+            applicationIdSuffix = ".appliance"
+            buildConfigField("boolean", "APPLIANCE_BUILD", "true")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
@@ -93,6 +106,13 @@ android {
     }
     providers.gradleProperty("player.offlineMediaAssets").orNull?.let {
         sourceSets.getByName("androidTest").assets.srcDir(it)
+    }
+}
+
+androidComponents.beforeVariants { variant ->
+    if (variant.productFlavors.any { it == "distribution" to "appliance" } &&
+        variant.buildType in setOf("profile", "profileServer")) {
+        variant.enable = false
     }
 }
 
@@ -178,7 +198,7 @@ dependencies {
 }
 
 val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
-    val media3Aar = configurations.getByName("debugRuntimeClasspath").incoming.artifactView {
+    val media3Aar = configurations.getByName("playDebugRuntimeClasspath").incoming.artifactView {
         componentFilter { id ->
             id is ModuleComponentIdentifier &&
                 id.group == "at.bernhardberger.tvheadend" &&
@@ -192,7 +212,7 @@ val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
 tasks.register("verifyExternalSdkConsumption") {
     group = "verification"
     description = "Proves app and client consume only the exact public TVHeadend SDK release."
-    dependsOn("assembleDebug", syncReleasedSdkEvidence)
+    dependsOn("assemblePlayDebug", syncReleasedSdkEvidence)
 
     val sdkGroup = "at.bernhardberger.tvheadend"
     val sdkVersion = libs.versions.tvheadend.sdk.get()
@@ -201,9 +221,10 @@ tasks.register("verifyExternalSdkConsumption") {
         .getOrElse(false)
     evaluationDependsOn(":client")
     evaluationDependsOn(":decoder-ffmpeg")
-    val productionVariants = listOf(":app", ":client").flatMap { owner ->
-        listOf("debug", "release", "profile", "profileServer").map { "$owner:$it" }
-    } + listOf(":decoder-ffmpeg:debug", ":decoder-ffmpeg:release")
+    val productionVariants = listOf("playDebug", "playRelease", "playProfile", "playProfileServer", "applianceDebug", "applianceRelease")
+        .map { ":app:$it" } +
+        listOf("debug", "release", "profile", "profileServer").map { ":client:$it" } +
+        listOf(":decoder-ffmpeg:debug", ":decoder-ffmpeg:release")
     val productionClasspaths = productionVariants.flatMap { variant ->
         val owner = project(variant.substringBeforeLast(":"))
         listOf("CompileClasspath", "RuntimeClasspath").map { suffix ->
@@ -365,7 +386,7 @@ tasks.register("verifyExternalSdkConsumption") {
                 }
             val expectedModules = if (variant.startsWith(":decoder-ffmpeg:")) {
                 emptyMap()
-            } else if (variant == ":app:profile") {
+            } else if (variant == ":app:playProfile") {
                 expectedTvheadendModules + ("sdk-testing" to sdkVersion)
             } else expectedTvheadendModules
             check(resolvedTvheadendModules == expectedModules) {

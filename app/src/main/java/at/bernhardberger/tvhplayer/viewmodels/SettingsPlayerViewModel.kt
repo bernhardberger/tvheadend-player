@@ -11,6 +11,7 @@ import at.bernhardberger.tvhplayer.playback.StartupBufferPolicy
 import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import kotlinx.coroutines.flow.SharingStarted
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class SettingsPlayerUiState(
+    val autoStartPlayback: Boolean = false,
     val audioLanguages: List<String> = emptyList(),
     val audioFormat: AudioFormatPreference = AudioFormatPreference.AUTOMATIC,
     val audioDescription: Boolean = false,
@@ -41,6 +43,7 @@ class SettingsPlayerViewModel(
     private val playbackRuntime: AppPlaybackRuntime,
     session: TvheadendSession,
     private val profileOwner: AppProfileOwner,
+    private val uiSettingsStore: UiSettingsStore,
 ) : ViewModel() {
     val ui = combine(
         settingsStore.playerSettings,
@@ -70,7 +73,13 @@ class SettingsPlayerViewModel(
         },
     ) { state, learnedMillis ->
         state.copy(startupBufferLearnedMillis = learnedMillis)
+    }.combine(uiSettingsStore.settings) { state, settings ->
+        state.copy(autoStartPlayback = settings.autoStartPlayback)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, SettingsPlayerUiState())
+
+    fun onAutoStartPlaybackChanged(enabled: Boolean) {
+        viewModelScope.launch { uiSettingsStore.setAutoStartPlayback(enabled) }
+    }
 
     fun onAudioLanguageSelected(slot: Int, language: String?) {
         viewModelScope.launch { settingsStore.setAudioLanguageSlot(slot, language) }
