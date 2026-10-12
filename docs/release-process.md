@@ -145,7 +145,9 @@ creates `build/release/unsigned/<version>/` containing:
 Transfer that directory to LXC 117 over an authenticated channel. Verify the
 transferred directory and expected source commit before signing.
 
-Local bundletool (SDK standalone JAR or the Gradle cache) must confirm the AAB's
+LXC 106, LXC 117 and the install host require bundletool **1.18.3**, either
+`bundletool-all-1.18.3.jar` under `ANDROID_HOME` or version `1.18.3` in the
+Gradle Maven cache with all runtime dependencies. Local bundletool must confirm the AAB's
 Play identity and uncompressed, 16 KB aligned native-library configuration for
 generated APKs. The native bytes must match the Play APK, with both ARM ABIs and
 16 KB ELF LOAD alignment on 64-bit libraries. The AAB itself is a compressed
@@ -224,8 +226,9 @@ through the bounded wrapper:
   --confirm-release-install
 ```
 
-The wrapper verifies all three artifacts, then selects the APK for `--package`
-(Play by default, Appliance when explicitly selected); it never installs the AAB.
+The wrapper verifies all three artifacts, then selects the APK using the target's
+configured package (overridden by `--package` or `TVHPLAYER_ANDROID_PACKAGE`).
+The Appliance package selects the Appliance APK; it never installs the AAB.
 Play installation refuses to replace an installed package with Appliance HOME
 or GUIDE entry points. It verifies bundle checksums, source continuity, artifact
 identity, alignment, and the pinned signing certificate before rechecking all

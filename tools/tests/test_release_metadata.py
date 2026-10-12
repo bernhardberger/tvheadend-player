@@ -35,12 +35,18 @@ class ReleaseMetadataTest(unittest.TestCase):
                         manifest = self.unsigned_manifest()
                         manifest["stage"] = stage
                         manifest["artifacts"] = self._artifacts(stage)
-                        manifest["artifacts"][stage + binary][field] = wrong
-                        with self.assertRaises(ValueError):
+                        if stage == "signed":
+                            manifest["signing"] = {"keyAlias": release_metadata.CANONICAL_KEY_ALIAS, "certificateSha256": release_metadata.CANONICAL_CERTIFICATE_SHA256}
+                        def validate():
                             if stage == "unsigned":
                                 release_metadata.validate_unsigned_manifest(manifest, application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0")
                             else:
                                 release_metadata.validate_signed_manifest(manifest)
+                        validate()
+                        manifest["artifacts"][stage + binary][field] = wrong
+                        message = {"applicationId": "application ID", "flavor": "flavor", "file": "extension"}[field]
+                        with self.assertRaisesRegex(ValueError, f"^artifact {message} does not match {stage}{binary}$"):
+                            validate()
 
     def test_manifest_requires_exact_three_binaries_and_no_duplicate_files(self) -> None:
         for binary in ("unsignedPlayApk", "unsignedApplianceApk", "unsignedPlayAab"):
@@ -67,7 +73,10 @@ class ReleaseMetadataTest(unittest.TestCase):
     def test_aab_signature_requires_verified_entries_and_pinned_certificate(self) -> None:
         for status, report, fingerprint, accepted in (
             (0, "jar verified.", release_metadata.CANONICAL_CERTIFICATE_SHA256, True),
-            (4, "jar verified, with signer errors.", release_metadata.CANONICAL_CERTIFICATE_SHA256, True),
+            (4, "jar verified, with signer errors. The signer certificate is self-signed.", release_metadata.CANONICAL_CERTIFICATE_SHA256, True),
+            (4, "jar verified, with signer errors.", release_metadata.CANONICAL_CERTIFICATE_SHA256, False),
+            (4, "jar verified. self-signed. certificate has expired.", release_metadata.CANONICAL_CERTIFICATE_SHA256, False),
+            (4, "jar verified. self-signed. certificate is not yet valid.", release_metadata.CANONICAL_CERTIFICATE_SHA256, False),
             (16, "jar verified.", release_metadata.CANONICAL_CERTIFICATE_SHA256, False),
             (20, "jar verified.", release_metadata.CANONICAL_CERTIFICATE_SHA256, False),
             (0, "jar is unsigned.", release_metadata.CANONICAL_CERTIFICATE_SHA256, False),
@@ -94,7 +103,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                 release_metadata.verify_apk_certificate(invalid)
 
     def test_aab_native_and_manifest_contract(self) -> None:
-        for failure in (None, "payload", "alignment", "compression", "identity", "signed", "elf", "abi"):
+        for failure in (None, "payload", "alignment", "compression", "identity", "signed", "elf", "abi", "home", "service"):
             with self.subTest(failure=failure), tempfile.TemporaryDirectory() as directory:
                 apk, aab = Path(directory) / "play.apk", Path(directory) / "play.aab"
                 elf = bytearray(120)
@@ -113,13 +122,85 @@ class ReleaseMetadataTest(unittest.TestCase):
                         b.writestr("META-INF/RELEASE.SF", b"signature")
                 config = {"optimizations": {"uncompressNativeLibraries": {"enabled": failure != "compression", "alignment": "PAGE_ALIGNMENT_4K" if failure == "alignment" else "PAGE_ALIGNMENT_16K"}}}
                 package = "wrong.package" if failure == "identity" else "at.bernhardberger.tvhplayer"
-                xml = f'<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{package}" android:versionCode="1" android:versionName="0.1.0"/>'
+                entry = '<activity><intent-filter><category android:name="android.intent.category.HOME"/></intent-filter></activity>' if failure == "home" else '<service android:name=".accessibility.ApplianceEntryAccessibilityService"/>' if failure == "service" else ''
+                xml = f'<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="{package}" android:versionCode="1" android:versionName="0.1.0"><application>{entry}</application></manifest>'
                 with patch.object(release_metadata, "bundletool_command", return_value=["bundletool"]), patch.object(release_metadata.subprocess, "run", side_effect=[subprocess.CompletedProcess([], 0, stdout=json.dumps(config)), subprocess.CompletedProcess([], 0, stdout=xml)]):
                     if failure is None:
                         release_metadata.validate_aab(aab, apk, 1, "0.1.0", unsigned=True)
                     else:
                         with self.assertRaises(ValueError):
                             release_metadata.validate_aab(aab, apk, 1, "0.1.0", unsigned=True)
+
+    def test_unsigned_apk_requires_absence_of_signing_material_and_valid_zip(self):
+        for kind in ("unsigned", "SF", "RSA", "DSA", "EC", "block", "garbage", "corrupt"):
+            with self.subTest(kind=kind), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "fixture.apk"
+                with zipfile.ZipFile(path, "w") as archive:
+                    archive.writestr("AndroidManifest.xml", b"fixture payload")
+                    if kind in ("SF", "RSA", "DSA", "EC"):
+                        archive.writestr(f"META-INF/RELEASE.{kind}", b"signature fixture")
+                data = bytearray(path.read_bytes())
+                if kind == "block":
+                    end = data.rfind(b"PK\x05\x06")
+                    central = struct.unpack_from("<I", data, end + 16)[0]
+                    block = struct.pack("<Q", 24) * 2 + b"APK Sig Block 42"
+                    data[central:central] = block
+                    struct.pack_into("<I", data, end + len(block) + 16, central + len(block))
+                elif kind == "garbage":
+                    data = b"not a ZIP"
+                elif kind == "corrupt":
+                    data[data.index(b"fixture payload")] ^= 1
+                path.write_bytes(data)
+                if kind == "unsigned":
+                    release_metadata.assert_unsigned_apk(path)
+                else:
+                    expected = "APK Signing Block" if kind == "block" else "malformed APK ZIP" if kind in ("garbage", "corrupt") else "v1 signing material"
+                    with self.assertRaisesRegex(ValueError, expected):
+                        release_metadata.assert_unsigned_apk(path)
+
+    def test_bundletool_requires_pinned_version_and_all_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.dict(release_metadata.os.environ, {"ANDROID_HOME": str(root / "sdk"), "GRADLE_USER_HOME": str(root / "gradle")}):
+                base = root / "gradle/caches/modules-2/files-2.1/com.android.tools.build/bundletool"
+                wrong = base / "99.0/hash/bundletool-99.0.jar"
+                wrong.parent.mkdir(parents=True)
+                wrong.touch()
+                with self.assertRaisesRegex(ValueError, "1.18.3 requires local dependency com.android.tools.build:bundletool"):
+                    release_metadata.bundletool_command()
+                pinned = base / "1.18.3/hash/bundletool-1.18.3.jar"
+                pinned.parent.mkdir(parents=True)
+                pinned.touch()
+                with self.assertRaisesRegex(ValueError, "requires local dependency com.android.tools.build:aapt2-proto"):
+                    release_metadata.bundletool_command()
+                standalone = root / "sdk/bundletool-all-1.18.3.jar"
+                standalone.parent.mkdir()
+                standalone.touch()
+                self.assertEqual(release_metadata.bundletool_command(), ["java", "-jar", str(standalone)])
+
+    def test_apk_entry_point_split_for_each_flavor(self):
+        for flavor in ("play", "appliance"):
+            for home, service in ((False, False), (True, False), (False, True), (True, True)):
+                with self.subTest(flavor=flavor, home=home, service=service):
+                    tree = "  E: manifest\n    E: application\n"
+                    if home:
+                        tree += '      E: activity\n        E: intent-filter\n          E: category\n            A: android:name(0x01010003)="android.intent.category.HOME"\n'
+                    if service:
+                        tree += '      E: service\n        A: android:name(0x01010003)=".accessibility.ApplianceEntryAccessibilityService"\n'
+                    with patch.object(release_metadata.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout=tree)):
+                        if (home, service) == ((True, True) if flavor == "appliance" else (False, False)):
+                            release_metadata.validate_apk_entry_points(Path("fixture.apk"), flavor, Path("aapt"))
+                        else:
+                            with self.assertRaisesRegex(ValueError, f"{flavor} entry-point split is invalid"):
+                                release_metadata.validate_apk_entry_points(Path("fixture.apk"), flavor, Path("aapt"))
+
+    def test_apk_manifest_tool_failure_is_not_an_absent_entry_point(self):
+        with patch.object(release_metadata.subprocess, "run", side_effect=subprocess.CalledProcessError(1, ["aapt"])):
+            with self.assertRaises(subprocess.CalledProcessError):
+                release_metadata.validate_apk_entry_points(Path("fixture.apk"), "play", Path("aapt"))
+        with patch.object(release_metadata.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, stdout="")):
+            with self.assertRaisesRegex(ValueError, "invalid APK manifest tree"):
+                release_metadata.validate_apk_entry_points(Path("fixture.apk"), "play", Path("aapt"))
 
     def test_canonical_signing_identity_is_pinned(self) -> None:
         self.assertEqual(release_metadata.CANONICAL_KEY_ALIAS, "tvhplayer-release")
@@ -280,7 +361,11 @@ class ReleaseMetadataTest(unittest.TestCase):
 
         self.assertNotIn("TVHPLAYER_RELEASE_", prepare)
         self.assertNotIn("apksigner sign", prepare)
-        self.assertIn("apksigner verify", prepare)
+        self.assertEqual(prepare.count("assert-unsigned-apk"), 2)
+        self.assertEqual(sign.count("assert-unsigned-apk"), 1)
+        self.assertIn("validate-apk-entry-points", prepare)
+        self.assertEqual(sign.count("validate-apk-entry-points"), 2)
+        self.assertNotIn('if "$apksigner" verify', prepare + sign)
         self.assertIn("--ks-pass", sign)
         self.assertIn("file:", sign)
         self.assertNotIn("pass:", sign.replace("-storepass:file", "").replace("-keypass:file", ""))

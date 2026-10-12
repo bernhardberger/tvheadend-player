@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import io
+import argparse
 import runpy
 import stat
 import subprocess
 import tempfile
 import unittest
+import zipfile
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from unittest.mock import patch
 
@@ -52,7 +56,7 @@ class ReleaseOrchestratorTest(unittest.TestCase):
                         output = ""
                     return subprocess.CompletedProcess(command, 0, stdout=output)
 
-                with patch.dict(RELEASE["verify_signed_bundle"].__globals__, {"_find_android_tools": lambda: (Path("aapt"), Path("apksigner"), Path("zipalign"))}), patch.dict(RELEASE["verify_signed_bundle"].__globals__, {"_run": fake_run}), patch.object(metadata, "verify_aab_signature") as aab_signature, patch.object(metadata, "validate_aab") as aab_content:
+                with patch.dict(RELEASE["verify_signed_bundle"].__globals__, {"_find_android_tools": lambda: (Path("aapt"), Path("apksigner"), Path("zipalign"))}), patch.dict(RELEASE["verify_signed_bundle"].__globals__, {"_run": fake_run}), patch.object(metadata, "verify_aab_signature") as aab_signature, patch.object(metadata, "validate_aab") as aab_content, patch.object(metadata, "validate_apk_entry_points") as entry_points:
                     if wrong_appliance_id:
                         with self.assertRaisesRegex(ValueError, "identity"):
                             RELEASE["verify_signed_bundle"](bundle)
@@ -61,6 +65,15 @@ class ReleaseOrchestratorTest(unittest.TestCase):
                         self.assertEqual(RELEASE["verify_signed_bundle"](bundle), signed)
                         aab_signature.assert_called_once_with(bundle / "play.aab")
                         aab_content.assert_called_once_with(bundle / "play.aab", bundle / "play.apk", 1, "0.1.0")
+                        self.assertEqual([call.args for call in entry_points.call_args_list], [(bundle / "play.apk", "play", Path("aapt")), (bundle / "appliance.apk", "appliance", Path("aapt"))])
+
+    def test_main_reports_malformed_zip_and_xml_without_traceback(self):
+        for error in (zipfile.BadZipFile("invalid ZIP"), ET.ParseError("invalid XML")):
+            with self.subTest(error=error), patch.dict(RELEASE["main"].__globals__, {"build_parser": lambda: parser}), patch("sys.stderr", new_callable=io.StringIO) as stderr:
+                parser = unittest.mock.Mock()
+                parser.parse_args.return_value = argparse.Namespace(handler=unittest.mock.Mock(side_effect=error))
+                self.assertEqual(RELEASE["main"](), 1)
+                self.assertEqual(stderr.getvalue(), f"error: {error}\n")
 
     def test_config_must_be_owner_only(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

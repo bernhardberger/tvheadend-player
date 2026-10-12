@@ -7,9 +7,11 @@ import json
 import os
 import re
 import runpy
+import struct
 import subprocess
 import sys
 import zipfile
+import zlib
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any
@@ -21,6 +23,7 @@ CANONICAL_CERTIFICATE_SHA256 = (
     "F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9"
 )
 SCHEMA_VERSION = 3
+BUNDLETOOL_VERSION = "1.18.3"
 APPLICATION_IDS = {
     "play": "at.bernhardberger.tvhplayer",
     "appliance": "at.bernhardberger.tvhplayer.appliance",
@@ -371,7 +374,7 @@ def _verify_artifact_files(manifest: dict[str, Any], directory: Path) -> None:
 
 def bundletool_command() -> list[str]:
     sdk = Path(os.environ.get("ANDROID_HOME", "/opt/android-sdk"))
-    standalone = sorted(sdk.glob("**/bundletool*-all*.jar"))
+    standalone = sorted(sdk.glob(f"**/bundletool-all-{BUNDLETOOL_VERSION}.jar"))
     if standalone:
         return ["java", "-jar", str(standalone[-1])]
     cache = Path(os.environ.get("GRADLE_USER_HOME", Path.home() / ".gradle")) / "caches/modules-2/files-2.1"
@@ -391,15 +394,85 @@ def bundletool_command() -> list[str]:
     for group, names in coordinates.items():
         for name in names:
             candidates = sorted(
-                (cache / group / name).glob("*/*/*.jar"),
+                (cache / group / name).glob(f"{BUNDLETOOL_VERSION if name == 'bundletool' else '*'}/*/*.jar"),
                 key=lambda p: tuple(int(n) for n in re.findall(r"\d+", p.parent.parent.name)),
             )
             candidates = [p for p in candidates if not p.name.endswith(("-sources.jar", "-javadoc.jar"))]
             if candidates:
                 jars.append(candidates[-1])
-            elif name == "bundletool":
-                raise ValueError("bundletool is unavailable locally; AAB configuration and identity cannot be verified")
+            else:
+                raise ValueError(f"bundletool {BUNDLETOOL_VERSION} requires local dependency {group}:{name}; install the standalone JAR or populate the Gradle cache")
     return ["java", "-cp", os.pathsep.join(map(str, jars)), "com.android.tools.build.bundletool.BundleToolMain"]
+
+
+def assert_unsigned_apk(apk: Path) -> None:
+    try:
+        with zipfile.ZipFile(apk) as archive:
+            if archive.testzip() is not None:
+                raise zipfile.BadZipFile("entry checksum mismatch")
+            names = archive.namelist()
+            if len(names) != len(set(names)):
+                raise zipfile.BadZipFile("duplicate ZIP entries")
+        with apk.open("rb") as source:
+            size = source.seek(0, os.SEEK_END)
+            source.seek(max(0, size - 65557))
+            tail = source.read()
+            end = tail.rfind(b"PK\x05\x06")
+            if end < 0 or len(tail) - end < 22:
+                raise zipfile.BadZipFile("missing end of central directory")
+            _, disk, cd_disk, count, total, cd_size, cd_offset, comment = struct.unpack_from("<4s4H2IH", tail, end)
+            if (disk or cd_disk or count != total or total == 65535
+                    or end + 22 + comment != len(tail)
+                    or cd_offset + cd_size != size - len(tail) + end):
+                raise zipfile.BadZipFile("invalid or unsupported central directory")
+            source.seek(max(0, cd_offset - 16))
+            signing_block = source.read(16) == b"APK Sig Block 42"
+    except (zipfile.BadZipFile, EOFError, struct.error, zlib.error) as error:
+        raise ValueError(f"malformed APK ZIP: {error}") from error
+    if any(re.fullmatch(r"META-INF/[^/]+\.(SF|RSA|DSA|EC)", name, re.I) for name in names):
+        raise ValueError("APK contains v1 signing material")
+    if signing_block:
+        raise ValueError("APK contains an APK Signing Block")
+
+
+def validate_entry_points(manifest: ET.Element, flavor: str) -> None:
+    name = "{http://schemas.android.com/apk/res/android}name"
+    home = any(category.get(name) == "android.intent.category.HOME"
+               for tag in ("activity", "activity-alias")
+               for category in manifest.findall(f"./application/{tag}/intent-filter/category"))
+    service = any(node.get(name, "").split(".")[-1] == "ApplianceEntryAccessibilityService"
+                  for node in manifest.findall("./application/service"))
+    expected = flavor == "appliance"
+    if home != expected or service != expected:
+        raise ValueError(f"{flavor} entry-point split is invalid: HOME and ApplianceEntryAccessibilityService must both be {'present' if expected else 'absent'}")
+
+
+def validate_apk_entry_points(apk: Path, flavor: str, aapt: Path) -> None:
+    tree = subprocess.run([str(aapt), "dump", "xmltree", str(apk), "AndroidManifest.xml"],
+                          check=True, capture_output=True, text=True).stdout
+    # aapt's indentation encodes the binary XML hierarchy. Only android:name is needed.
+    stack: list[tuple[int, ET.Element]] = []
+    root = None
+    for line in tree.splitlines():
+        element = re.match(r"(\s*)E: ([\w-]+)", line)
+        if element:
+            depth = len(element[1])
+            while stack and stack[-1][0] >= depth:
+                stack.pop()
+            node = ET.Element(element[2])
+            if stack:
+                stack[-1][1].append(node)
+            elif root is None:
+                root = node
+            else:
+                raise ValueError("invalid APK manifest tree")
+            stack.append((depth, node))
+        attribute = re.match(r'\s*A: android:name\([^)]*\)="([^"]+)"', line)
+        if attribute and stack:
+            stack[-1][1].set("{http://schemas.android.com/apk/res/android}name", attribute[1])
+    if root is None or root.tag != "manifest" or root.find("application") is None:
+        raise ValueError("invalid APK manifest tree")
+    validate_entry_points(root, flavor)
 
 
 def validate_aab(aab: Path, play_apk: Path, version_code: int, version_name: str, *, unsigned: bool = False) -> None:
@@ -427,6 +500,7 @@ def validate_aab(aab: Path, play_apk: Path, version_code: int, version_name: str
         raise ValueError("AAB must request uncompressed, 16 KB aligned native libraries in generated APKs")
     xml = subprocess.run(command + ["dump", "manifest", f"--bundle={aab}", "--module=base"], check=True, capture_output=True, text=True).stdout
     manifest = ET.fromstring(xml)
+    validate_entry_points(manifest, "play")
     android = "{http://schemas.android.com/apk/res/android}"
     if (manifest.get("package"), manifest.get(android + "versionCode"), manifest.get(android + "versionName")) != (APPLICATION_IDS["play"], str(version_code), version_name):
         raise ValueError("AAB identity does not match the Play release")
@@ -446,6 +520,11 @@ def verify_aab_signature(aab: Path) -> str:
     # Reject all other strict errors, including unsigned entries (16) and signer errors (32).
     if verification.returncode not in (0, 4) or "jar verified" not in verification.stdout.lower():
         raise ValueError("AAB JAR signature verification failed")
+    report = (verification.stdout + (verification.stderr or "")).lower()
+    if re.search(r"expired|not[- ]yet[- ]valid|not valid until", report):
+        raise ValueError("AAB signing certificate is expired or not yet valid")
+    if verification.returncode == 4 and "self-signed" not in report:
+        raise ValueError("AAB JAR signature error is not a self-signed certificate warning")
     certificates = subprocess.run(["keytool", *locale, "-printcert", "-jarfile", str(aab)], check=True, capture_output=True, text=True).stdout
     fingerprints = re.findall(r"SHA256:\s*([0-9A-Fa-f:]+)", certificates)
     if len(fingerprints) != 1 or normalize_fingerprint(fingerprints[0]) != CANONICAL_CERTIFICATE_SHA256:
@@ -588,6 +667,14 @@ def _parser() -> argparse.ArgumentParser:
     verify_apk = subparsers.add_parser("verify-apk-certificate")
     verify_apk.add_argument("report", type=Path)
     verify_apk.set_defaults(handler=lambda args: print(verify_apk_certificate(args.report.read_text(encoding="utf-8"))))
+    unsigned_apk = subparsers.add_parser("assert-unsigned-apk")
+    unsigned_apk.add_argument("apk", type=Path)
+    unsigned_apk.set_defaults(handler=lambda args: assert_unsigned_apk(args.apk))
+    entry_points = subparsers.add_parser("validate-apk-entry-points")
+    entry_points.add_argument("apk", type=Path)
+    entry_points.add_argument("--flavor", choices=APPLICATION_IDS, required=True)
+    entry_points.add_argument("--aapt", type=Path, required=True)
+    entry_points.set_defaults(handler=lambda args: validate_apk_entry_points(args.apk, args.flavor, args.aapt))
     return parser
 
 

@@ -107,11 +107,10 @@ if [[ "$appliance_badging" != *"package: name='${APPLICATION_ID}.appliance' vers
 fi
 for apk in "$unsigned_apk" "$INCOMING_DIR/$unsigned_appliance_name"; do
     "$zipalign" -c -P 16 4 "$apk"
-    if "$apksigner" verify "$apk" >/dev/null 2>&1; then
-        printf 'error: incoming APK is already signed\n' >&2
-        exit 1
-    fi
+    python3 "$ROOT_DIR/tools/release_metadata.py" assert-unsigned-apk "$apk"
 done
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$unsigned_apk" --flavor play --aapt "$aapt"
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-apk-entry-points "$INCOMING_DIR/$unsigned_appliance_name" --flavor appliance --aapt "$aapt"
 python3 "$ROOT_DIR/tools/release_metadata.py" validate-aab \
     --aab "$INCOMING_DIR/$unsigned_aab_name" --play-apk "$unsigned_apk" \
     --version-code "$version_code" --version-name "$version_name" --unsigned

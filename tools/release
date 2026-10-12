@@ -4,6 +4,8 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import zipfile
+import xml.etree.ElementTree as ET
 import os
 import re
 import secrets
@@ -249,6 +251,7 @@ def verify_signed_bundle(path: Path) -> dict[str, Any]:
             capture=True,
         ).stdout
         release_metadata.verify_apk_certificate(signature)
+        release_metadata.validate_apk_entry_points(apk, artifact["flavor"], aapt)
         badging = _run([str(aapt), "dump", "badging", str(apk)], capture=True).stdout
         identity = re.search(r"package: name='([^']+)' versionCode='([0-9]+)' versionName='([^']+)'", badging)
         if identity is None:
@@ -353,7 +356,7 @@ def main() -> int:
     args = build_parser().parse_args()
     try:
         args.handler(args)
-    except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as error:
+    except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError, zipfile.BadZipFile, ET.ParseError) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0

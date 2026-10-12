@@ -75,20 +75,15 @@ tar \
     "${SDK_SOURCE_FILES[@]}" | gzip -n > "$temporary_dir/$SDK_SOURCE_NAME"
 cp "$ROOT_DIR/decoder-ffmpeg/$NATIVE_SOURCE_NAME" "$temporary_dir/$NATIVE_SOURCE_NAME"
 
-# apksigner verify must fail before and after alignment for both APKs.
+# Prove signing material is absent before and after alignment for both APKs.
 for flavor in play appliance; do
     apk="app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
     aligned="$temporary_dir/$flavor-unsigned.apk"
-    if "$apksigner" verify "$apk" >/dev/null 2>&1; then
-        printf 'error: Gradle unexpectedly produced a signed release APK\n' >&2
-        exit 1
-    fi
+    python3 tools/release_metadata.py assert-unsigned-apk "$apk"
     "$zipalign" -f -P 16 4 "$apk" "$aligned"
     "$zipalign" -c -P 16 4 "$aligned"
-    if "$apksigner" verify "$aligned" >/dev/null 2>&1; then
-        printf 'error: aligned release APK is unexpectedly signed\n' >&2
-        exit 1
-    fi
+    python3 tools/release_metadata.py assert-unsigned-apk "$aligned"
+    python3 tools/release_metadata.py validate-apk-entry-points "$aligned" --flavor "$flavor" --aapt "$aapt"
 done
 aligned_apk="$temporary_dir/play-unsigned.apk"
 
