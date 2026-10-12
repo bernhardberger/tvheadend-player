@@ -53,7 +53,7 @@ class PlayerIdentityCardTest {
         key(Key.DirectionUp); key(Key.DirectionUp)
         assertTrue(description().orEmpty().joinToString().contains("Ridge Earth"))
         val semantics = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true).fetchSemanticsNode().config
-        assertEquals("OK shows the programme info.", semantics[SemanticsProperties.StateDescription])
+        assertEquals("OK shows the program info.", semantics[SemanticsProperties.StateDescription])
         key(Key.DirectionCenter)
         assertEquals(1, infos)
     }

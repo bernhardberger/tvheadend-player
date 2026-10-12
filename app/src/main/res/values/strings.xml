@@ -614,7 +614,7 @@
     <string name="player_channel">Channel</string>
     <string name="player_row_recent">Recent channels</string>
     <string name="player_channel_card_hint">Left or right changes channel, OK shows recent channels.</string>
-    <string name="player_identity_info_hint">OK shows the programme info.</string>
+    <string name="player_identity_info_hint">OK shows the program info.</string>
     <string name="player_channel_card_hint_no_recents">Left or right changes channel.</string>
     <string name="player_rail_watching">Watching</string>
     <!-- Trial: program details -->
