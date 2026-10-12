@@ -385,7 +385,7 @@ class ChannelsProgrammeDetailsTest {
     private fun event(
         title: String = "Across the Blue Planet",
         subtitle: String? = "Worlds of water",
-        image: String? = "imagecache/10",
+        image: ArtworkId? = ArtworkId(10),
         summary: String? = "Follow a small team of naturalists through remote landscapes as they explore the changing seasons and discover the wildlife that survives at the edge of the world.",
         description: String? = null,
         start: Long = 0,

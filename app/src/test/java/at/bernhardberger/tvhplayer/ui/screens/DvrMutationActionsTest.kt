@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
@@ -50,11 +51,11 @@ class DvrMutationActionsTest {
             },
             cancelEntry = { currentSession, id ->
                 cancelled = currentSession to id
-                DvrMutationResult.AccessDenied
+                DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)
             },
             deleteEntry = { currentSession, id ->
                 deleted = currentSession to id
-                DvrMutationResult.TransportUnavailable
+                DvrMutationResult.Failed(TvheadendFailure.TRANSPORT_UNAVAILABLE, mayHaveApplied = false)
             },
         )
         val target = ProgrammeRecordingTarget(
@@ -104,10 +105,10 @@ class DvrMutationActionsTest {
         val capability = currentSession()
         val calls = mutableListOf<String>()
         val actions = DvrMutationActions(
-            scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.NotReady },
+            scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.AcceptedButUnconfirmed(Unit) },
-            cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.NotReady },
-            deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.NotReady },
+            cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         )
 
         val feedback = actions.execute(DvrMutationAction.Stop(capability, DvrEntryId(4)))
@@ -122,19 +123,19 @@ class DvrMutationActionsTest {
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
             stopEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
             cancelEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
             deleteEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
         )
 
@@ -151,15 +152,15 @@ class DvrMutationActionsTest {
             DvrMutationResult.AcceptedButUnconfirmed(Unit) to DvrMutationFeedback.ACCEPTED_UNCONFIRMED,
         )
         val failures = mapOf(
-            DvrMutationResult.AccessDenied to DvrMutationFeedback.PERMISSION_DENIED,
-            DvrMutationResult.ConnectionLimit to DvrMutationFeedback.CONNECTION_LIMIT,
-            DvrMutationResult.ServerRejected to DvrMutationFeedback.REJECTED,
-            DvrMutationResult.NotSupported to DvrMutationFeedback.NOT_SUPPORTED,
-            DvrMutationResult.Timeout to DvrMutationFeedback.TIMEOUT,
-            DvrMutationResult.MalformedResponse to DvrMutationFeedback.UNKNOWN_OUTCOME,
-            DvrMutationResult.NotReady to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
-            DvrMutationResult.ObservationExpired to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
-            DvrMutationResult.TransportUnavailable to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
+            DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false) to DvrMutationFeedback.PERMISSION_DENIED,
+            DvrMutationResult.Failed(TvheadendFailure.CONNECTION_LIMIT, mayHaveApplied = false) to DvrMutationFeedback.CONNECTION_LIMIT,
+            DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, mayHaveApplied = false) to DvrMutationFeedback.REJECTED,
+            DvrMutationResult.Failed(TvheadendFailure.NOT_SUPPORTED, mayHaveApplied = false) to DvrMutationFeedback.NOT_SUPPORTED,
+            DvrMutationResult.Failed(TvheadendFailure.TIMEOUT, mayHaveApplied = true) to DvrMutationFeedback.TIMEOUT,
+            DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) to DvrMutationFeedback.UNKNOWN_OUTCOME,
+            DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
+            DvrMutationResult.Failed(TvheadendFailure.OBSERVATION_EXPIRED, mayHaveApplied = false) to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
+            DvrMutationResult.Failed(TvheadendFailure.TRANSPORT_UNAVAILABLE, mayHaveApplied = false) to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
         )
 
         accepted.forEach { (result, expected) ->
@@ -175,13 +176,28 @@ class DvrMutationActionsTest {
     }
 
     @Test
+    fun connectionChangesAndUnlistedFailuresPreserveMutationStageEvidence() {
+        val cases = listOf(
+            DvrMutationResult.Failed(TvheadendFailure.TRANSPORT_UNAVAILABLE, mayHaveApplied = true) to DvrMutationFeedback.UNKNOWN_OUTCOME,
+            DvrMutationResult.Failed(TvheadendFailure.CONNECTION_CHANGED, mayHaveApplied = true) to DvrMutationFeedback.UNKNOWN_OUTCOME,
+            DvrMutationResult.Failed(TvheadendFailure.CONNECTION_CHANGED, mayHaveApplied = false) to DvrMutationFeedback.CONNECTION_UNAVAILABLE,
+            DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) to DvrMutationFeedback.UNKNOWN_OUTCOME,
+            DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = false) to DvrMutationFeedback.REJECTED,
+        )
+        cases.forEach { (result, expected) ->
+            assertEquals(expected, result.toDvrMutationFeedback())
+            assertTrue(result.toDvrMutationFeedback().isFailure)
+        }
+    }
+
+    @Test
     fun malformedMutationIsUncertainAndNeverRepeated() = runTest {
         val calls = mutableListOf<String>()
         val actions = DvrMutationActions(
-            scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.MalformedResponse },
-            stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.MalformedResponse },
-            cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.MalformedResponse },
-            deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.MalformedResponse },
+            scheduleEntry = { _, _ -> calls += "schedule"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
+            stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
+            cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
+            deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
         )
         val current = currentSession()
         val target = ProgrammeRecordingTarget(EventId(7), null, 100, 200, "News", current)

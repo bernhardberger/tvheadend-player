@@ -120,7 +120,7 @@ fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibra
 fun buildDvrArchive(entries: List<DvrEntry>): DvrArchiveFolder {
     val root = MutableArchiveFolder(name = "", path = emptyList())
     entries.forEach { entry ->
-        val folderPath = recordingFolderPath(entry) ?: listOf("Other")
+        val folderPath = entry.folder ?: listOf("Other")
         var folder = root
         folderPath.forEach { component ->
             folder = folder.children.getOrPut(component) {
@@ -213,28 +213,6 @@ fun recordingListMetadata(
             ?.let(::add)
     }
 }.joinToString(" • ")
-
-private fun recordingFolderPath(entry: DvrEntry): List<String>? {
-    val fileParents = entry.files.orEmpty().mapNotNull { file ->
-        val components = safePathComponents(file.path) ?: return null
-        components.dropLast(1)
-    }
-    if (fileParents.isNotEmpty()) {
-        return fileParents.reduce(::commonPrefix)
-    }
-    val entryPath = safePathComponents(entry.path) ?: return null
-    return entryPath.dropLast(1)
-}
-
-private fun safePathComponents(path: String?): List<String>? {
-    if (path.isNullOrBlank()) return null
-    val components = path.replace('\\', '/').split('/').filter(String::isNotBlank)
-    if (components.isEmpty() || components.any { it == "." || it == ".." }) return null
-    return components
-}
-
-private fun commonPrefix(left: List<String>, right: List<String>): List<String> =
-    left.zip(right).takeWhile { (a, b) -> a == b }.map { it.first }
 
 private class MutableArchiveFolder(
     val name: String,

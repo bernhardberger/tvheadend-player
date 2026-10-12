@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrCutpoint
 import at.bernhardberger.tvheadend.sdk.core.DvrCutpointsResult
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -26,8 +27,9 @@ internal class RecordingMarkerQuery {
         _cutpoints.value = emptyList()
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
     fun isCurrent(value: PlaybackBinding.Recording): Boolean = binding === value && when (value.admission) {
-        is RecordingPlaybackAdmission.Completed, is RecordingPlaybackAdmission.GrowingStartOverOnly -> true
+        is RecordingPlaybackAdmission.Completed, is RecordingPlaybackAdmission.Growing -> true
         else -> false
     }
 

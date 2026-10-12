@@ -7,6 +7,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
@@ -112,7 +113,7 @@ internal fun settingsPlayerLevel(
         add(settingsRow(STARTUP_BUFFER_LEVEL, stringResource(R.string.startup_buffer_setting),
             startupBufferLabel(ui.startupBufferMillis, ui.startupBufferLearnedMillis), child = STARTUP_BUFFER_LEVEL))
         when (val profiles = ui.profiles) {
-            StreamProfilesResult.NotReady -> add(settingsRow("profiles-status",
+            StreamProfilesResult.Failed(TvheadendFailure.NOT_READY) -> add(settingsRow("profiles-status",
                 stringResource(if (ui.connected) R.string.loading_wait else R.string.not_connected), section = profileSection))
             is StreamProfilesResult.Available -> {
                 add(settingsRow("profile-default", stringResource(R.string.profile_server_default), section = profileSection,

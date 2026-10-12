@@ -22,6 +22,7 @@ import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopOutcome
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
@@ -29,6 +30,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
@@ -918,6 +920,7 @@ class AppPlaybackRuntime(
         }
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
     private suspend fun playRecordingLocked(
         recordingId: DvrEntryId,
         start: RecordingPlaybackStart,
@@ -968,7 +971,7 @@ class AppPlaybackRuntime(
                     is PlaybackBindingResult.Bound -> {
                         admission = binding.binding.admission
                         installedBinding = binding.binding
-                        growingRecovery = admission is RecordingPlaybackAdmission.GrowingStartOverOnly
+                        growingRecovery = admission is RecordingPlaybackAdmission.Growing
                         recoverySeekMs = recordingRecoverySeekMs(
                             recovery = recoverAt,
                             recordingId = recordingId,
@@ -1056,7 +1059,7 @@ class AppPlaybackRuntime(
     suspend fun stop(): PlaybackStopResult {
         val intent = playbackRequests.get()
         return targetCommands.serialize(
-            onClosed = { PlaybackStopResult.ShutDown },
+            onClosed = { PlaybackStopResult.SHUT_DOWN },
         ) {
             synchronized(intentLock) { userStopIntent = maxOf(userStopIntent, intent) }
             forgetRecordingRecoveryLocked()
@@ -1070,7 +1073,7 @@ class AppPlaybackRuntime(
      * screen entered afterwards.
      */
     suspend fun stopAfterLoss(): PlaybackStopResult = targetCommands.serialize(
-        onClosed = { PlaybackStopResult.ShutDown },
+        onClosed = { PlaybackStopResult.SHUT_DOWN },
     ) {
         noteRecordingInterruptionLocked()
         targetCommands.runIfOpen { pendingRecordingRecovery = null }
@@ -1082,7 +1085,7 @@ class AppPlaybackRuntime(
         selection: LivePlaybackSelection,
         epoch: Long,
         intent: Long,
-    ): PlaybackStopResult? = targetCommands.serialize(onClosed = { PlaybackStopResult.ShutDown }) {
+    ): PlaybackStopResult? = targetCommands.serialize(onClosed = { PlaybackStopResult.SHUT_DOWN }) {
         val ownsInstall = targetCommands.readIfOpen { installedLiveTargetEpochLocked(selection, intent) == epoch } == true
         if (!ownsInstall) return@serialize null
         val frame = videoPresentation.value
@@ -1174,7 +1177,7 @@ class AppPlaybackRuntime(
     }
 
     private suspend fun stopPlayback(): PlaybackStopResult {
-        if (!targetCommands.isOpen()) return PlaybackStopResult.ShutDown
+        if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
         // A timer executing this stop must not cancel its own serialized cleanup.
         val timer = keepTimer
         keepTimer = null
@@ -1193,7 +1196,7 @@ class AppPlaybackRuntime(
         val currentJob = currentCoroutineContext().job
         liveRecovery.cancelOnStopLocked(currentJob)
         val result = coordinator.stop()
-        if (!targetCommands.isOpen()) return PlaybackStopResult.ShutDown
+        if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
         presentationEpoch.publishIfCurrent(epoch) {
             _activeTarget.value = null
             _recordingSelection.value = null
@@ -1710,10 +1713,10 @@ class AppPlaybackRuntime(
                 presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER))
                 return false
             }
-            when (result) {
-                is PlaybackStopResult.Stopped, is PlaybackStopResult.RetiredAfterDeparture,
-                PlaybackStopResult.AlreadyStopped -> Unit
-                is PlaybackStopResult.PlayerUnavailable -> {
+            when (result.outcome) {
+                PlaybackStopOutcome.STOPPED, PlaybackStopOutcome.RETIRED_AFTER_DEPARTURE,
+                PlaybackStopOutcome.ALREADY_STOPPED -> Unit
+                PlaybackStopOutcome.PLAYER_UNAVAILABLE -> {
                     if (epoch != null && activeTargetEpoch == epoch &&
                         player.currentMediaItem === ownedMediaItem
                     ) presentationEpoch.publishIfCurrent(epoch) {
@@ -1721,7 +1724,7 @@ class AppPlaybackRuntime(
                     }
                     return false
                 }
-                PlaybackStopResult.NotRunning, PlaybackStopResult.ShutDown -> {
+                else -> {
                     presentation.publishFailed(recoveryExhaustedState(result,
                         PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED))
                     return false

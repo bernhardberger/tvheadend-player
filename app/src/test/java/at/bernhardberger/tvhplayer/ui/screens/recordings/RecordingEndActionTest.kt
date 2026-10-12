@@ -14,7 +14,9 @@ class RecordingEndActionTest {
 
     @Test
     fun otherStatesOfferNeitherStopNorCancel() {
-        (DvrEntryState.entries - DvrEntryState.RECORDING - DvrEntryState.SCHEDULED)
+        listOf(DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
+            DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING,
+            DvrEntryState.UNKNOWN)
             .forEach { assertNull(recordingEndAction(it)) }
         assertNull(recordingEndAction(null))
     }

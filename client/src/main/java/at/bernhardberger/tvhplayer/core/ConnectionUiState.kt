@@ -1,9 +1,10 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
-import at.bernhardberger.tvheadend.sdk.core.SessionOperationFailure
+import at.bernhardberger.tvheadend.sdk.core.SessionFailureKind
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
 
@@ -83,25 +84,21 @@ fun SessionState.toConnectionState(): ConnectionState = when (this) {
     )
 }
 
-private fun SessionFailure.toConnectionFailureKind(): ConnectionFailureKind = when (this) {
-    SessionFailure.AuthenticationRejected -> ConnectionFailureKind.AUTHENTICATION
-    SessionFailure.PermissionDenied -> ConnectionFailureKind.PERMISSION_DENIED
-    SessionFailure.IncompatibleServer,
-    SessionFailure.ServerUpgradeRequired -> ConnectionFailureKind.INCOMPATIBLE_SERVER
-    SessionFailure.NoChannels -> ConnectionFailureKind.ZERO_CHANNELS
-    SessionFailure.ServerUnreachable,
-    SessionFailure.NetworkUnavailable,
-    SessionFailure.TransportUnavailable -> ConnectionFailureKind.UNREACHABLE
-    is SessionFailure.SynchronizationFailed -> when {
-        failure == SessionOperationFailure.ACCESS_DENIED ->
-            ConnectionFailureKind.PERMISSION_DENIED
-        failure == SessionOperationFailure.TIMEOUT -> ConnectionFailureKind.TIMEOUT
-        failure == SessionOperationFailure.TRANSPORT_UNAVAILABLE ->
-            ConnectionFailureKind.UNREACHABLE
-        failure == SessionOperationFailure.NOT_SUPPORTED ->
-            ConnectionFailureKind.INCOMPATIBLE_SERVER
+private fun SessionFailure.toConnectionFailureKind(): ConnectionFailureKind = when (kind) {
+    SessionFailureKind.AUTHENTICATION_REJECTED -> ConnectionFailureKind.AUTHENTICATION
+    SessionFailureKind.PERMISSION_DENIED -> ConnectionFailureKind.PERMISSION_DENIED
+    SessionFailureKind.INCOMPATIBLE_SERVER,
+    SessionFailureKind.SERVER_UPGRADE_REQUIRED -> ConnectionFailureKind.INCOMPATIBLE_SERVER
+    SessionFailureKind.NO_CHANNELS -> ConnectionFailureKind.ZERO_CHANNELS
+    SessionFailureKind.SERVER_UNREACHABLE,
+    SessionFailureKind.NETWORK_UNAVAILABLE,
+    SessionFailureKind.TRANSPORT_UNAVAILABLE -> ConnectionFailureKind.UNREACHABLE
+    SessionFailureKind.SYNCHRONIZATION_FAILED -> when (operationFailure) {
+        TvheadendFailure.ACCESS_DENIED -> ConnectionFailureKind.PERMISSION_DENIED
+        TvheadendFailure.TIMEOUT -> ConnectionFailureKind.TIMEOUT
+        TvheadendFailure.TRANSPORT_UNAVAILABLE -> ConnectionFailureKind.UNREACHABLE
+        TvheadendFailure.NOT_SUPPORTED -> ConnectionFailureKind.INCOMPATIBLE_SERVER
         else -> ConnectionFailureKind.OTHER
     }
-    SessionFailure.MetadataOverflow,
-    SessionFailure.UnexpectedFailure -> ConnectionFailureKind.OTHER
+    else -> ConnectionFailureKind.OTHER
 }

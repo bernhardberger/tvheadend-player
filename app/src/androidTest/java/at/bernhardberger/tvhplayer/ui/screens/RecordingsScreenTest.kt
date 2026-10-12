@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.view.KeyEvent
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
@@ -96,15 +97,15 @@ class RecordingsScreenTest {
         onCancelRecording: suspend (
             CurrentSessionObservation,
             DvrEntryId,
-        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         onDeleteRecording: suspend (
             CurrentSessionObservation,
             DvrEntryId,
-        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         onStopRecording: suspend (
             CurrentSessionObservation,
             DvrEntryId,
-        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
     ) {
         val context = LocalContext.current
         val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
@@ -116,7 +117,7 @@ class RecordingsScreenTest {
         }
         val dvrMutationActions = remember(onCancelRecording, onDeleteRecording, onStopRecording) {
             DvrMutationActions(
-                scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
+                scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
                 stopEntry = onStopRecording,
                 cancelEntry = onCancelRecording,
                 deleteEntry = onDeleteRecording,
@@ -1095,7 +1096,7 @@ class RecordingsScreenTest {
         onStopRecording: suspend (
             CurrentSessionObservation,
             DvrEntryId,
-        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.NotReady },
+        ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
     ) {
         val entries = listOf(
             recording(
@@ -1634,7 +1635,7 @@ class RecordingsScreenTest {
         dispatchBack()
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().pressCenter()
         composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
-        composeRule.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
+        composeRule.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         composeRule.onNodeWithTag("recording-details-play").assertIsFocused()
         composeRule.onAllNodesWithText(
             composeRule.activity.getString(R.string.recording_action_failed)
@@ -1671,7 +1672,7 @@ class RecordingsScreenTest {
             observation.value = session.observation.value
         }
         composeRule.onNodeWithTag("recording-details-panel").assertIsFocused()
-        composeRule.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
+        composeRule.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         composeRule.onAllNodesWithText(
             composeRule.activity.getString(R.string.recording_action_failed)
         ).assertCountEquals(0)
@@ -1957,12 +1958,11 @@ class RecordingsScreenTest {
         stop = Instant.fromEpochSeconds(stop),
         title = title,
         state = state,
-        path = path,
+        folder = path?.split('/')?.filter(String::isNotEmpty)?.dropLast(1),
         files = path?.let {
             listOf(
-                DvrRecordingFile(
+                DvrRecordingFile.create(
                     fileId = null,
-                    path = it,
                     start = null,
                     stop = null,
                     sizeBytes = fileSizeBytes,

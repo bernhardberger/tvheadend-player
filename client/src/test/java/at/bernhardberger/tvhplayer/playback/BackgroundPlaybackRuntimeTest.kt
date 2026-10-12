@@ -6,6 +6,7 @@
 )
 
 package at.bernhardberger.tvhplayer.playback
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import android.os.Looper
@@ -108,10 +109,10 @@ class BackgroundPlaybackRuntimeTest {
     @Test fun rejectedPauseAndUnsupportedYieldReleaseWithoutNotice() = exercise {
         for (rejectPause in listOf(true, false)) {
             live()
-            if (rejectPause) connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+            if (rejectPause) connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
             else {
                 connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
-                connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+                connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
             }
             val priorities = connection.priorityChanges.size
             runtime.onAppBackgrounded()
@@ -434,7 +435,7 @@ class BackgroundPlaybackRuntimeTest {
         live()
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
-        connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+        connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         returnAndRetune()
         runtime.onAppForegrounded()
         settle()
@@ -456,7 +457,7 @@ class BackgroundPlaybackRuntimeTest {
                 playTransitions += playWhenReady
             }
         })
-        connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+        connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         // The fresh subscription has no timeshift grant: pause must fail closed, not
         // treat a locally paused player as evidence that the server accepted it.
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
@@ -497,7 +498,7 @@ class BackgroundPlaybackRuntimeTest {
         await { !player.playWhenReady }
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
-        connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+        connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         // Make the real SDK grant available before the replacement pause, rather than
         // exercising the sibling test's Pending/unavailable fail-closed path.
         val previousMediaItem = player.currentMediaItem
@@ -596,7 +597,7 @@ class BackgroundPlaybackRuntimeTest {
         live()
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         returnAndRetune()
         await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
         assertEquals(listOf(LiveSubscriptionPriority.YIELD, LiveSubscriptionPriority.NORMAL), connection.priorityChanges)
@@ -610,7 +611,7 @@ class BackgroundPlaybackRuntimeTest {
         live()
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
-        connection.scriptSpeed(SubscriptionOperationResult.NotSupported)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         returnAndRetune()
         await { runtime.backgroundNotice.value == BackgroundPlaybackNotice.TUNER_LOST }
         assertTrue(player.playWhenReady)

@@ -31,7 +31,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
@@ -168,20 +167,3 @@ private fun UnavailableProgrammeInfo(
         )
     }
 }
-
-@Composable
-internal fun dvrFailureLabel(result: DvrMutationResult<*>): String = stringResource(
-    when (result) {
-        DvrMutationResult.AccessDenied -> R.string.recording_action_permission
-        DvrMutationResult.MalformedResponse -> R.string.recording_action_unknown_outcome
-        DvrMutationResult.ConnectionLimit -> R.string.recording_action_conn_limit
-        DvrMutationResult.ServerRejected,
-        DvrMutationResult.NotSupported -> R.string.recording_action_rejected
-        DvrMutationResult.NotReady,
-        DvrMutationResult.ObservationExpired,
-        DvrMutationResult.Timeout,
-        DvrMutationResult.TransportUnavailable -> R.string.recording_action_connection
-        is DvrMutationResult.Confirmed,
-        is DvrMutationResult.AcceptedButUnconfirmed -> R.string.recording_action_rejected
-    }
-)

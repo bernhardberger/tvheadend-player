@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -503,7 +504,7 @@ class SettingsDepthNavigationTest {
                         SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,
                                 { retries++ }, { toggles++ }),
-                            settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.AccessDenied),
+                            settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED)),
                                 { settingsActions++ }, { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
                             settingsApplianceLevel(false, false, { settingsActions++ }, { settingsActions++ }),
                         ), initialFocusEnabled = ready && !drawerActive, contentPadding = padding)

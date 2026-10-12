@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.StartupBufferPolicy
 import at.bernhardberger.tvhplayer.playback.startupBufferIdentity
@@ -23,7 +24,7 @@ data class SettingsPlayerUiState(
     val audioDescription: Boolean = false,
     val subtitleLanguage: String? = null,
     val connected: Boolean = false,
-    val profiles: StreamProfilesResult = StreamProfilesResult.NotReady,
+    val profiles: StreamProfilesResult = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY),
     val selectedProfileId: StreamProfileId? = null,
     val timeshiftEnabled: Boolean = true,
     val refreshRateMatchingEnabled: Boolean = true,

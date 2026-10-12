@@ -1,6 +1,6 @@
 package at.bernhardberger.tvhplayer.images
 
-import at.bernhardberger.tvheadend.sdk.core.ArtworkFailure
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtworkLoadException
 import android.app.Application
 import android.graphics.Bitmap
@@ -87,8 +87,8 @@ class ChannelAccentsTest {
             try {
                 gates[id]?.await()
                 delay(20)
-                if (id == broken) ErrorResult(null, chain.request, TvheadendArtworkLoadException(ArtworkFailure.TIMEOUT))
-                else if (id == missing) ErrorResult(null, chain.request, TvheadendArtworkLoadException(ArtworkFailure.FILE_UNAVAILABLE))
+                if (id == broken) ErrorResult(null, chain.request, TvheadendArtworkLoadException(TvheadendFailure.TIMEOUT))
+                else if (id == missing) ErrorResult(null, chain.request, TvheadendArtworkLoadException(TvheadendFailure.FILE_UNAVAILABLE))
                 else if (id == corrupt) ErrorResult(null, chain.request, IllegalStateException("synthetic decode failure"))
                 else SuccessResult(picon(id).asImage(), chain.request, DataSource.NETWORK)
             } finally {

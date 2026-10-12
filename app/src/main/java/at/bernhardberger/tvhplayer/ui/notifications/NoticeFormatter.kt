@@ -68,6 +68,7 @@ internal class NoticeFormatter(private val context: Context) {
             DvrChangeKind.MISSED -> R.string.recording_notice_missed to AppNoticeIcon.WARNING
             DvrChangeKind.REMOVED -> if (canceled) R.string.recording_notice_canceled to AppNoticeIcon.CANCEL
                 else R.string.recording_notice_deleted to AppNoticeIcon.DELETE
+            else -> R.string.recording_notice_fallback to AppNoticeIcon.RECORDING
         }
         val entry = notice.entry
         val channel = entry.channelName?.trim()?.takeIf(String::isNotEmpty)
@@ -120,5 +121,5 @@ internal fun DvrSubscriptionError.label(context: Context): String = context.getS
     DvrSubscriptionError.WEAK_STREAM -> R.string.recording_notice_weak_stream
     DvrSubscriptionError.SUBSCRIPTION_OVERRIDDEN -> R.string.recording_notice_subscription_overridden
     DvrSubscriptionError.INVALID_TARGET -> R.string.recording_notice_invalid_target
-    DvrSubscriptionError.UNKNOWN -> R.string.recording_notice_unknown_error
+    else -> R.string.recording_notice_unknown_error
 })

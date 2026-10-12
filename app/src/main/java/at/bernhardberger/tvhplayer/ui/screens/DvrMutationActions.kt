@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -98,7 +99,7 @@ internal class DvrMutationActions(
                 action.currentSession,
                 action.recordingId,
             )
-            null -> DvrMutationResult.NotReady
+            null -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
         }
         return result.toDvrMutationFeedback()
     }

@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.activity.OnBackPressedDispatcher
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.collectAsState
@@ -48,10 +49,10 @@ class RecordingConfirmationStateTest {
         val result = CompletableDeferred<DvrMutationResult<Unit>>()
         var calls = 0
         val actions = DvrMutationActions(
-            scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
-            stopEntry = { _, _ -> DvrMutationResult.NotReady },
+            scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             cancelEntry = { _, _ -> calls++; result.await() },
-            deleteEntry = { _, _ -> DvrMutationResult.NotReady },
+            deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         )
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         compose.setContent {
@@ -71,7 +72,7 @@ class RecordingConfirmationStateTest {
         compose.runOnIdle { backDispatcher.onBackPressed() }
         compose.onNodeWithTag("recording-details-cancel").assertDoesNotExist()
         if (reopen) compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { result.complete(DvrMutationResult.AccessDenied) }
+        compose.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         compose.waitForIdle()
         compose.runOnIdle {
             assertEquals(Notice.DvrActionFailed(DvrMutationKind.CANCEL, DvrMutationFeedback.PERMISSION_DENIED),
@@ -85,10 +86,10 @@ class RecordingConfirmationStateTest {
         val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         var calls = 0
         val actions = DvrMutationActions(
-            scheduleEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
-            stopEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
-            cancelEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
-            deleteEntry = { _, _ -> calls++; DvrMutationResult.NotReady },
+            scheduleEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            stopEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            cancelEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            deleteEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         )
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, session.observation.value.currentSession?.generationIdentity)

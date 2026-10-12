@@ -538,12 +538,13 @@ class RecordingsVisualLayoutTest {
     private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,
         startEpochSeconds: Long = 1_791_000_000 - id * 86400) =
         DvrEntry.create(
-            id = DvrEntryId(id), title = title, path = path, state = state,
+            id = DvrEntryId(id), title = title, state = state,
+            folder = path?.split('/')?.filter(String::isNotEmpty)?.dropLast(1),
             start = Instant.fromEpochSeconds(startEpochSeconds),
             stop = Instant.fromEpochSeconds(startEpochSeconds + 90 * 60),
-            files = path?.let { listOf(DvrRecordingFile(null, it, null, null, 2_400_000_000L)) }.orEmpty(),
+            files = path?.let { listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000L)) }.orEmpty(),
             channelName = "Ridge Earth HD",
-            image = if (id in 1L..5L) "imagecache/${100 + id}" else null,
+            image = if (id in 1L..5L) ArtworkId(100 + id.toInt()) else null,
             subtitle = if (id == 1L) "A winter expedition beyond the Arctic Circle" else null,
             description = "Follow a small team of naturalists through remote landscapes as they explore " +
                 "the changing seasons, meet local communities and discover wildlife at the edge of the world.",

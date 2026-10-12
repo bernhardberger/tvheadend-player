@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.images
 
 import coil3.request.ErrorResult
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
-import at.bernhardberger.tvheadend.sdk.core.ArtworkFailure
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtworkLoadException
 import android.content.Context
 import androidx.palette.graphics.Palette
@@ -127,7 +127,7 @@ private suspend fun samplePicon(imageLoader: ImageLoader, context: Context, pico
             profileTrace("P50:accentFail:${failure ?: "undecodable"}") { }
             // A picon the server does not have, or one that does not decode, has no colour to wait
             // for; whatever else fails may load another time.
-            return@withContext if (failure == null || failure == ArtworkFailure.FILE_UNAVAILABLE) NEUTRAL_ACCENT_RGB else null
+            return@withContext if (failure == null || failure == TvheadendFailure.FILE_UNAVAILABLE) NEUTRAL_ACCENT_RGB else null
         }
         profileTrace("P50:accentSample") {
             val palette = Palette.from(bitmap).clearFilters().generate()

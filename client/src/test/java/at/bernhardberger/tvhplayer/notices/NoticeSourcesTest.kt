@@ -52,7 +52,7 @@ class NoticeSourcesTest {
         observation.value = SessionObservation.create(sessionState = SessionState.Connecting)
         runCurrent(); advanceTimeBy(3_000); runCurrent()
         assertEquals(Notice.Connection(ConnectionNoticeKind.LOST), center.state.value.candidate!!.notice)
-        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AuthenticationRejected))
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
         runCurrent()
         assertEquals(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), center.state.value.candidate!!.notice)
     }
@@ -64,7 +64,7 @@ class NoticeSourcesTest {
         val center = NoticeCenter({ testScheduler.currentTime }) {
             if (advanceDuringPrune) {
                 advanceDuringPrune = false
-                observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AuthenticationRejected))
+                observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
             }
             NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
         }
@@ -97,7 +97,7 @@ class NoticeSourcesTest {
         // First read prunes on collection; second occurs when the outcome is posted.
         readsUntilReplacement = 2
         observation.value = if (restoring) readyObservation() else SessionObservation.create(
-            sessionState = SessionState.Unavailable(SessionFailure.AuthenticationRejected))
+            sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
         runCurrent()
         assertEquals(1L, profile.value)
         assertNull(center.state.value.candidate)
@@ -129,7 +129,7 @@ class NoticeSourcesTest {
         val center = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(profile.value, observation.value.currentSession?.generationIdentity) })
         backgroundScope.launch { ConnectionNoticeSource(observation, profile, center).run() }
         runCurrent()
-        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.TransportUnavailable))
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE))
         runCurrent(); advanceTimeBy(1_000)
         observation.value = SessionObservation.create(sessionState = SessionState.Synchronizing)
         runCurrent(); advanceTimeBy(2_000); runCurrent()
@@ -137,11 +137,11 @@ class NoticeSourcesTest {
         observation.value = readyObservation(); runCurrent()
         profile.value = 1; runCurrent()
         assertNull(center.state.value.candidate)
-        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AuthenticationRejected))
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
         runCurrent()
         assertNull(center.state.value.candidate)
         observation.value = readyObservation(); runCurrent()
-        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AuthenticationRejected))
+        observation.value = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
         runCurrent()
         assertEquals(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED), center.state.value.candidate!!.notice)
     }
@@ -229,7 +229,7 @@ class NoticeSourcesTest {
     }
 
     @Test fun loginRejectionRequiresReadyAndProfileChangeCancelsPendingLoss() = runTest {
-        val rejected = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AuthenticationRejected))
+        val rejected = SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.AUTHENTICATION_REJECTED))
         val observation = MutableStateFlow(rejected)
         val profile = MutableStateFlow(0L)
         val center = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(profile.value, observation.value.currentSession?.generationIdentity) })

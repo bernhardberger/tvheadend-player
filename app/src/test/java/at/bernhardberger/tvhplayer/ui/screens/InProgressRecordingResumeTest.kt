@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
@@ -88,10 +89,10 @@ class InProgressRecordingResumeTest {
         val observation = observation(playPositionSeconds)
         val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         val actions = DvrMutationActions(
-            scheduleEntry = { _, _ -> DvrMutationResult.NotReady },
-            stopEntry = { _, _ -> DvrMutationResult.NotReady },
-            cancelEntry = { _, _ -> DvrMutationResult.NotReady },
-            deleteEntry = { _, _ -> DvrMutationResult.NotReady },
+            scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            cancelEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         )
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
@@ -125,9 +126,9 @@ class InProgressRecordingResumeTest {
             state = DvrEntryState.RECORDING,
             start = Instant.fromEpochMilliseconds(now - 1_800_000),
             stop = Instant.fromEpochMilliseconds(now + 1_800_000),
-            path = "evening-news.ts",
+            folder = emptyList(),
             files = listOf(
-                DvrRecordingFile(fileId = null, path = "evening-news.ts", start = null, stop = null, sizeBytes = null)
+                DvrRecordingFile.create(fileId = null, start = null, stop = null, sizeBytes = null)
             ),
             playPosition = playPositionSeconds?.seconds,
         )

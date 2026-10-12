@@ -40,6 +40,7 @@ import androidx.media3.common.Tracks
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -172,7 +173,7 @@ internal data class QuickZapPreviewSnapshot(
     val metadata: String,
     val summary: String?,
     val next: String?,
-    val image: String?,
+    val image: ArtworkId?,
     val subtitle: String? = null,
 )
 

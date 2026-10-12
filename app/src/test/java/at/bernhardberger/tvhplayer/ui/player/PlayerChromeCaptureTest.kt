@@ -874,7 +874,7 @@ class PlayerChromeCaptureTest {
             title = "Ridge Light: Die außergewöhnliche Reise durch die österreichischen Alpen",
             subtitle = "Eine neue Perspektive auf Menschen und ihre Geschichten",
             summary = "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive.",
-            genre = "Drama", image = "imagecache/1")
+            genre = "Drama", image = ArtworkId(1))
         val next = EpgEvent.create(EventId(43), ChannelId(1), Instant.fromEpochSeconds(START + 90 * 60), Instant.fromEpochSeconds(START + 120 * 60),
             title = "Northline Tonight")
         val richProgramme = EpgEvent.create(programme.id, programme.channelId, programme.start, programme.stop,
@@ -886,7 +886,7 @@ class PlayerChromeCaptureTest {
             firstAired = Instant.fromEpochSeconds(START - 86400 * 180), isNew = true, image = programme.image)
         val schedule = listOf(programme, next,
             EpgEvent.create(EventId(44), ChannelId(1), Instant.fromEpochSeconds(START + 120 * 60), Instant.fromEpochSeconds(START + 165 * 60),
-                title = "Glass Harbor", subtitle = "Storm Over the Ridge", image = "imagecache/7",
+                title = "Glass Harbor", subtitle = "Storm Over the Ridge", image = ArtworkId(7),
                 summary = "A storm traps three hikers below the ridge, and the team has one window to reach them before nightfall. " +
                     "Meanwhile Lena has to decide whether she stays with the team after the season ends.", genre = "Drama"),
             EpgEvent.create(EventId(45), ChannelId(1), Instant.fromEpochSeconds(START + 165 * 60), Instant.fromEpochSeconds(START + 255 * 60),
@@ -897,6 +897,6 @@ class PlayerChromeCaptureTest {
         val trayProgramme = EpgEvent.create(EventId(52), ChannelId(2), Instant.fromEpochSeconds(START), Instant.fromEpochSeconds(START + 90 * 60),
             title = "Harbor Kickoff",
             summary = "Harbor FC empfangen Amber Town unter Flutlicht im städtischen Stadion.",
-            genre = "Sport", image = "imagecache/3")
+            genre = "Sport", image = ArtworkId(3))
     }
 }

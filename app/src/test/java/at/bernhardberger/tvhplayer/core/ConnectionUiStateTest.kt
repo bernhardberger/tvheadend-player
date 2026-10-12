@@ -1,7 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
-import at.bernhardberger.tvheadend.sdk.core.SessionOperationFailure
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
@@ -13,30 +13,30 @@ class ConnectionUiStateTest {
     @Test
     fun unavailableFailureKeepsDetailedCopyKindAndSdkRecoveryGuidance() {
         val cases = listOf(
-            SessionFailure.AuthenticationRejected to ConnectionFailureKind.AUTHENTICATION,
-            SessionFailure.PermissionDenied to ConnectionFailureKind.PERMISSION_DENIED,
-            SessionFailure.IncompatibleServer to ConnectionFailureKind.INCOMPATIBLE_SERVER,
-            SessionFailure.ServerUpgradeRequired to ConnectionFailureKind.INCOMPATIBLE_SERVER,
-            SessionFailure.MetadataOverflow to ConnectionFailureKind.OTHER,
-            SessionFailure.NoChannels to ConnectionFailureKind.ZERO_CHANNELS,
-            SessionFailure.ServerUnreachable to ConnectionFailureKind.UNREACHABLE,
-            SessionFailure.NetworkUnavailable to ConnectionFailureKind.UNREACHABLE,
-            SessionFailure.TransportUnavailable to ConnectionFailureKind.UNREACHABLE,
-            SessionFailure.SynchronizationFailed(SessionOperationFailure.SERVER_REJECTED) to
+            SessionFailure.AUTHENTICATION_REJECTED to ConnectionFailureKind.AUTHENTICATION,
+            SessionFailure.PERMISSION_DENIED to ConnectionFailureKind.PERMISSION_DENIED,
+            SessionFailure.INCOMPATIBLE_SERVER to ConnectionFailureKind.INCOMPATIBLE_SERVER,
+            SessionFailure.SERVER_UPGRADE_REQUIRED to ConnectionFailureKind.INCOMPATIBLE_SERVER,
+            SessionFailure.METADATA_OVERFLOW to ConnectionFailureKind.OTHER,
+            SessionFailure.NO_CHANNELS to ConnectionFailureKind.ZERO_CHANNELS,
+            SessionFailure.SERVER_UNREACHABLE to ConnectionFailureKind.UNREACHABLE,
+            SessionFailure.NETWORK_UNAVAILABLE to ConnectionFailureKind.UNREACHABLE,
+            SessionFailure.TRANSPORT_UNAVAILABLE to ConnectionFailureKind.UNREACHABLE,
+            SessionFailure.synchronizationFailed(TvheadendFailure.SERVER_REJECTED) to
                 ConnectionFailureKind.OTHER,
-            SessionFailure.SynchronizationFailed(SessionOperationFailure.ACCESS_DENIED) to
+            SessionFailure.synchronizationFailed(TvheadendFailure.ACCESS_DENIED) to
                 ConnectionFailureKind.PERMISSION_DENIED,
-            SessionFailure.SynchronizationFailed(SessionOperationFailure.CONNECTION_LIMIT) to
+            SessionFailure.synchronizationFailed(TvheadendFailure.CONNECTION_LIMIT) to
                 ConnectionFailureKind.OTHER,
-            SessionFailure.SynchronizationFailed(SessionOperationFailure.TIMEOUT) to
+            SessionFailure.synchronizationFailed(TvheadendFailure.TIMEOUT) to
                 ConnectionFailureKind.TIMEOUT,
-            SessionFailure.SynchronizationFailed(
-                SessionOperationFailure.TRANSPORT_UNAVAILABLE
+            SessionFailure.synchronizationFailed(
+                TvheadendFailure.TRANSPORT_UNAVAILABLE
             ) to ConnectionFailureKind.UNREACHABLE,
-            SessionFailure.SynchronizationFailed(SessionOperationFailure.NOT_SUPPORTED) to
+            SessionFailure.synchronizationFailed(TvheadendFailure.NOT_SUPPORTED) to
                 ConnectionFailureKind.INCOMPATIBLE_SERVER,
-            SessionFailure.UnexpectedFailure to ConnectionFailureKind.OTHER,
-            SessionFailure.SynchronizationFailed(SessionOperationFailure.MALFORMED_RESPONSE) to
+            SessionFailure.UNEXPECTED_FAILURE to ConnectionFailureKind.OTHER,
+            SessionFailure.synchronizationFailed(TvheadendFailure.MALFORMED_RESPONSE) to
                 ConnectionFailureKind.OTHER,
         )
 
@@ -55,11 +55,11 @@ class ConnectionUiStateTest {
     @Test
     fun recoveryActionUsesSdkDispositionAndKeepsSubscriptionRetry() {
         assertEquals(ConnectionRecoveryAction.RETRY,
-            SessionState.Unavailable(SessionFailure.ServerUpgradeRequired).toConnectionUiState().primaryRecoveryAction())
+            SessionState.Unavailable(SessionFailure.SERVER_UPGRADE_REQUIRED).toConnectionUiState().primaryRecoveryAction())
         assertEquals(ConnectionRecoveryAction.NONE,
-            SessionState.Unavailable(SessionFailure.MetadataOverflow).toConnectionUiState().primaryRecoveryAction())
+            SessionState.Unavailable(SessionFailure.METADATA_OVERFLOW).toConnectionUiState().primaryRecoveryAction())
         assertEquals(ConnectionRecoveryAction.RETRY,
-            SessionState.Unavailable(SessionFailure.SynchronizationFailed(SessionOperationFailure.MALFORMED_RESPONSE))
+            SessionState.Unavailable(SessionFailure.synchronizationFailed(TvheadendFailure.MALFORMED_RESPONSE))
                 .toConnectionUiState().primaryRecoveryAction())
         assertEquals(
             ConnectionRecoveryAction.RETRY,

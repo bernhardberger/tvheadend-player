@@ -1,3 +1,5 @@
+@file:OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
+
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.mutableStateOf

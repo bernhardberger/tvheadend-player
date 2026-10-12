@@ -323,14 +323,14 @@ internal fun PlayerPresentedLiveTimeline(
  */
 @Composable
 private fun ProgrammeArtworkTile(
-    artwork: String?,
+    artwork: ArtworkId?,
     picon: ArtworkId?,
     channelNumber: String,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier,
 ) {
-    val id = ArtworkId.parse(artwork)
+    val id = artwork
     var failed by remember(id, currentSession) { mutableStateOf(false) }
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {

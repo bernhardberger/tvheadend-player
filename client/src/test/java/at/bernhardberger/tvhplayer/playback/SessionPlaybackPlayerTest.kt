@@ -5,6 +5,7 @@
 )
 
 package at.bernhardberger.tvhplayer.playback
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import android.os.Looper
@@ -392,7 +393,7 @@ class SessionPlaybackPlayerTest {
 
     @Test fun rejectedTimeshiftPauseRollsBackLocalIntent() = exercise {
         live(true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         var localPauseBeforeServerCommand = false
         player.addListener(object : Player.Listener {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
@@ -411,7 +412,7 @@ class SessionPlaybackPlayerTest {
     @Test fun deniedFocusDoesNotResumeServerWhenRejectedHoldKeepsMutedVideoRunning() = exercise {
         live(true)
         focusGranted = false
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         wrapper.play()
         await { connection.speeds == listOf(0) }
         settle()
@@ -434,7 +435,7 @@ class SessionPlaybackPlayerTest {
         live(true)
         focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
         await { connection.speeds == listOf(0) && !player.playWhenReady }
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         wrapper.play()
         await { connection.speeds == listOf(0, 100) && focusRequests == 2 }
         settle()
@@ -458,7 +459,7 @@ class SessionPlaybackPlayerTest {
 
     @Test fun pauseWhileInterruptionMutedRestoresSoundWithoutServerCommands() = exercise {
         live(true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
         await { androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes }
         connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
@@ -472,7 +473,7 @@ class SessionPlaybackPlayerTest {
 
     @Test fun pauseWhileInterruptionMutedAndFocusDeniedPreservesMuteWithoutServerPause() = exercise {
         live(true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focusListener?.invoke(AudioInterruption.TRANSIENT_LOSS)
         await { androidx.media3.common.C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes }
         focusGranted = false
@@ -486,7 +487,7 @@ class SessionPlaybackPlayerTest {
 
     @Test fun closeDuringLocalPauseLetsServerRejectionRollbackComplete() = exercise {
         live(true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         val closed = CompletableDeferred<Unit>()
         player.addListener(object : Player.Listener {
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {

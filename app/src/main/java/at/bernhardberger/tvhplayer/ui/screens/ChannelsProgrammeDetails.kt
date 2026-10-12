@@ -30,7 +30,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -187,7 +186,7 @@ private fun ChannelsProgrammePreview(
     modifier: Modifier,
 ) {
     val accent = rememberChannelAccent(imageLoader, currentSession, channel.icon, channel.id)
-    val artwork = ArtworkId.parse(now?.image)
+    val artwork = now?.image
     val timedEvent = now?.takeIf { it.stop > it.start }
     val timing = timedEvent?.let {
         stringResource(R.string.channels_preview_time_range, formatHm(it.start.epochSeconds), formatHm(it.stop.epochSeconds))

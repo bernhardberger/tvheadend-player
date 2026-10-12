@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -179,7 +180,7 @@ class ProgrammeDetailsCaptureTest {
     private fun capture(name: String, guide: Boolean, scheduled: Boolean = false, art: Boolean = true, failed: Boolean = false, player: Boolean = false) {
         val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds,
             title = "Ridge Light", subtitle = "Beyond the Arctic Circle", description = description,
-            image = if (art) "imagecache/2" else null)
+            image = if (art) ArtworkId(2) else null)
         val entry = DvrEntry.create(DvrEntryId(1), eventId = event.id, channelId = channel.id,
             title = event.title, subtitle = event.subtitle, description = description, channelName = channel.name,
             start = event.start, stop = event.stop, image = event.image, playPosition = 3723.seconds,

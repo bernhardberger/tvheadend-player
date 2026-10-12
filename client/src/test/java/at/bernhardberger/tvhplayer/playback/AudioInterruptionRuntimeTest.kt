@@ -6,6 +6,8 @@
 )
 
 package at.bernhardberger.tvhplayer.playback
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopOutcome
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import android.os.Looper
@@ -221,7 +223,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun rejectedServerPauseKeepsConsumingMutedAndGainRetriesServerResume() = exercise {
         live(timeshift = true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { audioDisabled() && player.playWhenReady }
         assertEquals(listOf(0), connection.speeds)
@@ -272,7 +274,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun rejectedPauseIgnoresPausedObservationAndRejectedResumeUnmutes() = exercise {
         live(timeshift = true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { audioDisabled() && player.playWhenReady }
         connection.emit(SubscriptionEvent.Speed(0))
@@ -316,7 +318,7 @@ class AudioInterruptionRuntimeTest {
         live(timeshift = true)
         focus.send(AudioInterruption.PERMANENT_LOSS)
         await { !player.playWhenReady }
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         assertNotEquals(TimeshiftCommandResult.ACCEPTED, runtime.resumeTimeshift())
         assertTrue(player.playWhenReady)
         connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
@@ -366,7 +368,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun pauseQueuedDuringMutedResumePausesLocallyAndOnServer() = exercise {
         live(timeshift = true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.NOISY)
         await { runtime.isInterruptionMuted }
         connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
@@ -396,11 +398,11 @@ class AudioInterruptionRuntimeTest {
         live(timeshift = true)
         beforeSpeed = { withContext(scope.coroutineContext) { assertFalse(player.playWhenReady) } }
         val requests = focus.requests.size
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         assertEquals(TimeshiftCommandResult.SERVER_REJECTED, runtime.pauseTimeshiftPlayback())
         assertTrue(player.playWhenReady)
         assertEquals(requests, focus.requests.size)
-        connection.scriptSpeed(SubscriptionOperationResult.Timeout)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.TIMEOUT))
         assertEquals(TimeshiftCommandResult.TIMEOUT, runtime.pauseTimeshiftPlayback())
         assertFalse(player.playWhenReady)
         assertEquals(requests, focus.requests.size)
@@ -408,7 +410,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun rejectedPauseAfterRuntimeCloseDoesNotRestorePlayback() = exercise {
         live(timeshift = true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         beforeSpeed = {
             withContext(scope.coroutineContext) {
                 scope.launch(start = CoroutineStart.UNDISPATCHED) { runtime.detach() }
@@ -420,7 +422,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun mutedSoundRestorationReleasesUnconfirmedInterruptionHoldOnce() = exercise {
         live(timeshift = true)
-        connection.scriptSpeed(SubscriptionOperationResult.Timeout)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.TIMEOUT))
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { runtime.isInterruptionMuted && player.playWhenReady }
         connection.scriptSpeed(SubscriptionOperationResult.Ok(Unit))
@@ -436,7 +438,7 @@ class AudioInterruptionRuntimeTest {
 
     @Test fun mutedSoundRestorationNeverSendsServerCommandsEvenWithDeniedFocus() = exercise {
         live(timeshift = true)
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.NOISY)
         await { runtime.isInterruptionMuted }
         val speeds = connection.speeds.toList()
@@ -455,7 +457,7 @@ class AudioInterruptionRuntimeTest {
         runtime.pause()
         await { !player.playWhenReady }
         focus.granted = false
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         val requests = focus.requests.size
         assertEquals(TimeshiftCommandResult.UNAVAILABLE, runtime.resumeTimeshift())
         assertTrue(runtime.hasAudioInterruption)
@@ -629,7 +631,7 @@ class AudioInterruptionRuntimeTest {
         awaitSecondRecoveryBackoff()
         val subscriptions = connection.subscribeCount
         val requests = focus.requests.size
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { connection.subscribeCount == subscriptions + 1 }
         startSubscription(connection.awaitCollectionRegistered())
@@ -1032,7 +1034,7 @@ class AudioInterruptionRuntimeTest {
         beforeLiveBinding = { installing += runtime.state.value }
         // A rejected hold goes on muted and resumes the stopped attempt in the same command,
         // while that attempt is still unwinding.
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         focus.send(AudioInterruption.TRANSIENT_LOSS)
         await { connection.subscribeCount == subscriptions + 1 }
         assertEquals(listOf(AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, 0L)), installing)
@@ -1347,7 +1349,7 @@ class AudioInterruptionRuntimeTest {
         assertEquals(1, connection.subscribeCount)
         assertFalse(runtime.state.value is AppPlaybackState.Recovering)
         // The first picture sends the held pause; the server rejects it and playback goes on.
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         val installing = mutableListOf<AppPlaybackState>()
         beforeLiveBinding = { installing += runtime.state.value }
         markReady()
@@ -2095,7 +2097,7 @@ class AudioInterruptionRuntimeTest {
         val subscriptions = connection.subscribeCount
         val blocked = scope.async { runtime.stop() }
         await { blocked.isCompleted }
-        assertTrue(blocked.await() is PlaybackStopResult.PlayerUnavailable)
+        assertTrue(blocked.await().outcome == PlaybackStopOutcome.PLAYER_UNAVAILABLE)
         assertTrue(coordinator.playerCleanupPending.value)
         val replacement = androidx.media3.common.MediaItem.fromUri("file:///replacement")
         player.addMediaItem(replacement)
@@ -2105,7 +2107,7 @@ class AudioInterruptionRuntimeTest {
         failCoordinatorRemoval = false
         val stopped = scope.async { runtime.stop() }
         await { stopped.isCompleted }
-        assertFalse(stopped.await() is PlaybackStopResult.PlayerUnavailable)
+        assertFalse(stopped.await().outcome == PlaybackStopOutcome.PLAYER_UNAVAILABLE)
         assertFalse(coordinator.playerCleanupPending.value)
         assertEquals(1, player.mediaItemCount)
         assertSame(replacement, player.currentMediaItem)
@@ -2114,7 +2116,7 @@ class AudioInterruptionRuntimeTest {
         assertEquals(subscriptions, connection.subscribeCount)
         val again = scope.async { runtime.stop() }
         await { again.isCompleted }
-        assertEquals(PlaybackStopResult.AlreadyStopped, again.await())
+        assertEquals(PlaybackStopResult.ALREADY_STOPPED, again.await())
         assertSame(replacement, player.currentMediaItem)
         assertEquals(12_345L, player.currentPosition)
         assertTrue(player.playWhenReady)
@@ -2448,8 +2450,8 @@ class AudioInterruptionRuntimeTest {
             // finished (or failed Player cleanup) before the application receives the reason.
             val stop = scope.async { coordinator.stop() }
             await { stop.isCompleted }
-            if (reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED) assertTrue(stop.await() is PlaybackStopResult.Stopped)
-            else assertTrue(stop.await() is PlaybackStopResult.PlayerUnavailable)
+            if (reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED) assertTrue(stop.await().outcome == PlaybackStopOutcome.STOPPED)
+            else assertTrue(stop.await().outcome == PlaybackStopOutcome.PLAYER_UNAVAILABLE)
             beforeReport()
             runtime.onRecoveryRequired(reason)
             settle()

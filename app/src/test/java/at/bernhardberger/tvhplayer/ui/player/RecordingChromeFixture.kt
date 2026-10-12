@@ -60,7 +60,7 @@ internal fun RecordingChromeFixture(
     buffering: Boolean = false,
     info: PlayerInfoBarData? = null,
     picon: ArtworkId? = null,
-    artwork: String? = null,
+    artwork: ArtworkId? = null,
     currentSession: at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation? = null,
     markers: List<Long> = emptyList(),
     markerNavigation: RecordingMarkerNavigation = remember { RecordingMarkerNavigation() },

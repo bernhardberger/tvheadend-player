@@ -5,6 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrChangeOrigin
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 
 enum class NoticeSeverity { INFO, FAILURE }
@@ -64,12 +65,15 @@ enum class DvrMutationFeedback(val isFailure: Boolean) {
 fun DvrMutationResult<*>.toDvrMutationFeedback(): DvrMutationFeedback = when (this) {
     is DvrMutationResult.Confirmed -> DvrMutationFeedback.CONFIRMED
     is DvrMutationResult.AcceptedButUnconfirmed -> DvrMutationFeedback.ACCEPTED_UNCONFIRMED
-    DvrMutationResult.AccessDenied -> DvrMutationFeedback.PERMISSION_DENIED
-    DvrMutationResult.ConnectionLimit -> DvrMutationFeedback.CONNECTION_LIMIT
-    DvrMutationResult.ServerRejected -> DvrMutationFeedback.REJECTED
-    DvrMutationResult.NotSupported -> DvrMutationFeedback.NOT_SUPPORTED
-    DvrMutationResult.Timeout -> DvrMutationFeedback.TIMEOUT
-    DvrMutationResult.MalformedResponse -> DvrMutationFeedback.UNKNOWN_OUTCOME
-    DvrMutationResult.NotReady, DvrMutationResult.ObservationExpired,
-    DvrMutationResult.TransportUnavailable -> DvrMutationFeedback.CONNECTION_UNAVAILABLE
+    is DvrMutationResult.Failed -> when (failure) {
+        TvheadendFailure.ACCESS_DENIED -> DvrMutationFeedback.PERMISSION_DENIED
+        TvheadendFailure.CONNECTION_LIMIT -> DvrMutationFeedback.CONNECTION_LIMIT
+        TvheadendFailure.SERVER_REJECTED -> DvrMutationFeedback.REJECTED
+        TvheadendFailure.NOT_SUPPORTED -> DvrMutationFeedback.NOT_SUPPORTED
+        TvheadendFailure.TIMEOUT -> DvrMutationFeedback.TIMEOUT
+        TvheadendFailure.NOT_READY, TvheadendFailure.OBSERVATION_EXPIRED,
+        TvheadendFailure.CONNECTION_CHANGED, TvheadendFailure.TRANSPORT_UNAVAILABLE ->
+            if (mayHaveApplied) DvrMutationFeedback.UNKNOWN_OUTCOME else DvrMutationFeedback.CONNECTION_UNAVAILABLE
+        else -> if (mayHaveApplied) DvrMutationFeedback.UNKNOWN_OUTCOME else DvrMutationFeedback.REJECTED
+    }
 }

@@ -396,7 +396,7 @@ class BrowseCohesionEvidenceTest {
                         else -> "An Evening on ${channel.name}"
                     },
                     summary = DESCRIPTION,
-                    image = if (channel.id == ChannelId(1)) "imagecache/101" else if (channel.id == ChannelId(2)) "imagecache/102" else null,
+                    image = if (channel.id == ChannelId(1)) ArtworkId(101) else if (channel.id == ChannelId(2)) ArtworkId(102) else null,
                     genre = "Documentary",
                     nextEventId = if (offset < 4) EventId(channel.id.value * 100 + offset + 1) else null,
                 )
@@ -438,11 +438,11 @@ class BrowseCohesionEvidenceTest {
             start = Instant.fromEpochSeconds(now - (index + 1) * 86400L),
             stop = Instant.fromEpochSeconds(now - (index + 1) * 86400L + 90 * 60),
             state = DvrEntryState.COMPLETED,
-            path = path,
-            files = listOf(DvrRecordingFile(fileId = null, path = path, start = null, stop = null, sizeBytes = 2_400_000_000L)),
+            folder = path.split('/').filter(String::isNotEmpty).dropLast(1),
+            files = listOf(DvrRecordingFile.create(fileId = null, start = null, stop = null, sizeBytes = 2_400_000_000L)),
             playPosition = if (index == 0) 3723.seconds else null,
             channelName = when (index) { 0 -> "Tide Watch"; 1, 2 -> "Ridge Earth HD"; 5 -> "Harbor Sport"; else -> "Northline News" },
-            image = when (index) { 0 -> "imagecache/103"; 1 -> "imagecache/101"; 5 -> "imagecache/102"; else -> null },
+            image = when (index) { 0 -> ArtworkId(103); 1 -> ArtworkId(101); 5 -> ArtworkId(102); else -> null },
             subtitle = if (index == 0) "Six weeks with the coastguard as the winter storms arrive" else null,
             description = DESCRIPTION,
         )

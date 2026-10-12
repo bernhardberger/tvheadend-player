@@ -6,6 +6,7 @@
 )
 
 package at.bernhardberger.tvhplayer.playback
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import androidx.media3.common.PlaybackException
@@ -208,11 +209,11 @@ class LivePauseRuntimeTest {
     }
 
     @Test fun keptPausedRetuneFailsClosedWhenTheServerRejectsItsPause() = exercise {
-        keptPausedRetuneFailsClosedOnGrantedPause(SubscriptionOperationResult.ServerRejected)
+        keptPausedRetuneFailsClosedOnGrantedPause(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
     }
 
     @Test fun keptPausedRetuneFailsClosedWhenItsPauseTimesOut() = exercise {
-        keptPausedRetuneFailsClosedOnGrantedPause(SubscriptionOperationResult.Timeout)
+        keptPausedRetuneFailsClosedOnGrantedPause(SubscriptionOperationResult.Failed(TvheadendFailure.TIMEOUT))
     }
 
     @Test fun playerErrorDropsPendingPauseSoTheGrantSendsNoServerPause() = exercise {
@@ -476,7 +477,7 @@ class LivePauseRuntimeTest {
         val speeds = connection.speeds.size
         runtime.onAppForegrounded()
         await { runtime.livePause.value == LivePauseState(LivePauseAvailability.READY, pending = true) }
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         settle()
         assertEquals(speeds, connection.speeds.size)
 
@@ -796,7 +797,7 @@ class LivePauseRuntimeTest {
         live()
         val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
         assertNull(runtime.pauseTimeshiftPlayback())
-        connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+        connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
         runtime.notePlaybackIntentServed(intent)
         await { runtime.livePauseNotice.value != null }
         settle()
@@ -893,7 +894,7 @@ class LivePauseRuntimeTest {
         await { !player.playWhenReady }
         runtime.onAppBackgrounded()
         await { connection.priorityChanges.size == 1 }
-        connection.scriptPriority(SubscriptionOperationResult.NotSupported)
+        connection.scriptPriority(SubscriptionOperationResult.Failed(TvheadendFailure.NOT_SUPPORTED))
         connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 120)))
     }
 

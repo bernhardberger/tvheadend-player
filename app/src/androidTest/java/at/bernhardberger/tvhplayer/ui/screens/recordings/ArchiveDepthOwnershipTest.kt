@@ -43,8 +43,9 @@ class ArchiveDepthOwnershipTest {
             val path = "recording$id.ts"
             val entry = DvrEntry.create(
                 id = DvrEntryId(id.toLong()), title = "Episode $id", state = DvrEntryState.COMPLETED,
-                start = Instant.fromEpochSeconds(100), stop = Instant.fromEpochSeconds(200), path = path,
-                files = listOf(DvrRecordingFile(fileId = null, path = path, start = null, stop = null, sizeBytes = null)),
+                start = Instant.fromEpochSeconds(100), stop = Instant.fromEpochSeconds(200),
+                folder = path.split('/').filter(String::isNotEmpty).dropLast(1),
+                files = listOf(DvrRecordingFile.create(fileId = null, start = null, stop = null, sizeBytes = null)),
             )
             buildDvrArchive(listOf(entry))
         }

@@ -879,7 +879,7 @@ class ChannelsStandardLayoutEvidenceTest {
                         subtitle = if (n == LONG_TEXT) {
                             if (isGerman) "Eine Winterexpedition durch die Arktis" else "A winter expedition across the Arctic"
                         } else "Worlds of discovery",
-                        image = if (n == 1 || n == LONG_TEXT) "imagecache/10" else null,
+                        image = if (n == 1 || n == LONG_TEXT) ArtworkId(10) else null,
                         summary = ("Follow a small team of naturalists through remote landscapes as they " +
                             "explore the changing seasons and discover the wildlife that survives at the edge of the world. ").repeat(4),
                         genre = "Drama",

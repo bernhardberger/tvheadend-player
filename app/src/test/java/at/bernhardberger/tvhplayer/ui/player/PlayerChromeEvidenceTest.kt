@@ -387,7 +387,7 @@ class PlayerChromeEvidenceTest {
             add(Interceptor { chain -> ErrorResult(null, chain.request, IllegalStateException("fixture image unavailable")) })
         }.build()
         compose.setContent { TVHeadendPlayerTheme { Column(Modifier.width(800.dp)) {
-            QuickZapPreview("Failed title", "Failed metadata", null, null, "imagecache/1", failing, session)
+            QuickZapPreview("Failed title", "Failed metadata", null, null, ArtworkId(1), failing, session)
             QuickZapPreview("Absent title", "Absent metadata", null, null, null, loader, session)
         } } }
         compose.waitForIdle()
@@ -514,13 +514,13 @@ class PlayerChromeEvidenceTest {
                             }
                             Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
                             Scene.HERO_ART, Scene.HERO_FALLBACK, Scene.HERO_NEUTRAL -> ProgrammeHero(
-                                if (scene == Scene.HERO_ART) "imagecache/1" else null, ChannelId(101), "101",
+                                if (scene == Scene.HERO_ART) ArtworkId(1) else null, ChannelId(101), "101",
                                 if (scene == Scene.HERO_NEUTRAL) null else ArtworkId.parse("imagecache/2"), loader, session,
                             )
                             Scene.PREVIEW_ART, Scene.PREVIEW_TEXT -> QuickZapPreview(
                                 "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45 · ${playerMinutesLeft(38)} · Natur",
                                 "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive.",
-                                "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) "imagecache/1" else null, loader, session, Modifier.fillMaxWidth(),
+                                "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) ArtworkId(1) else null, loader, session, Modifier.fillMaxWidth(),
                             )
                         }
                     }

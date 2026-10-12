@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 import androidx.activity.compose.BackHandler
@@ -345,14 +346,11 @@ private fun epgSearchMessageRes(
     } else {
         null
     }
-    result === EpgSearchResult.InvalidQuery -> R.string.epg_search_invalid
-    result === EpgSearchResult.AccessDenied -> R.string.epg_search_denied
-    result === EpgSearchResult.ConnectionLimit -> R.string.epg_search_connection_limit
-    result === EpgSearchResult.NotSupported -> R.string.epg_search_not_supported
-    result === EpgSearchResult.ObservationExpired ||
-        result === EpgSearchResult.Timeout ||
-        result === EpgSearchResult.TransportUnavailable ||
-        result === EpgSearchResult.ConnectionChanged -> R.string.epg_search_unavailable
+    result !is EpgSearchResult.Failed -> R.string.epg_search_unavailable
+    result.failure == TvheadendFailure.SERVER_REJECTED -> R.string.epg_search_invalid
+    result.failure == TvheadendFailure.ACCESS_DENIED -> R.string.epg_search_denied
+    result.failure == TvheadendFailure.CONNECTION_LIMIT -> R.string.epg_search_connection_limit
+    result.failure == TvheadendFailure.NOT_SUPPORTED -> R.string.epg_search_not_supported
     else -> R.string.epg_search_unavailable
 }
 
@@ -640,8 +638,7 @@ private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         DvrEntryState.RECORDING_ERROR,
         DvrEntryState.COMPLETED_ERROR,
         DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
-        DvrEntryState.UNKNOWN,
-        null -> R.string.recording_state_unknown
+        else -> R.string.recording_state_unknown
     }
 )
 

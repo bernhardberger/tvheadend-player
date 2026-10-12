@@ -37,7 +37,7 @@ internal data class PlayerChromeContent(
     val badges: List<GlanceBadge> = emptyList(),
     val picon: ArtworkId? = null,
     /** The programme's artwork, the identity card's backdrop. */
-    val artwork: String? = null,
+    val artwork: ArtworkId? = null,
     /** The channel whose colour is the identity card's backdrop without [artwork]. */
     val channelId: at.bernhardberger.tvheadend.sdk.core.ChannelId? = null,
 )

@@ -30,7 +30,7 @@ import coil3.compose.SubcomposeAsyncImage
 /** Pass the existing TvheadendArtworkLoader and the current session capability, never a raw URL. */
 @Composable
 fun ProgrammeHero(
-    image: String?,
+    image: ArtworkId?,
     channelId: ChannelId,
     channelNumber: String,
     picon: ArtworkId?,
@@ -40,7 +40,7 @@ fun ProgrammeHero(
     recordingBadge: Boolean = false,
 ) {
     val accent = rememberChannelAccent(imageLoader, currentSession, picon, channelId)
-    val artwork = ArtworkId.parse(image)
+    val artwork = image
     BoxWithConstraints(modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight)
         .clearAndSetSemantics {}) {
         val compact = maxWidth <= PlayerChromeTokens.identityWidth

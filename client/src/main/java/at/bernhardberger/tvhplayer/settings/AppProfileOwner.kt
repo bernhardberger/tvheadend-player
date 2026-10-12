@@ -9,6 +9,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfileStore
 import at.bernhardberger.tvheadend.sdk.core.StreamProfileId
 import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
@@ -86,7 +87,7 @@ class AppProfileOwner(
     private val mutableConfigurationGeneration = MutableStateFlow(0L)
     val configurationGeneration: StateFlow<Long> = mutableConfigurationGeneration.asStateFlow()
     private val mutableStreamProfiles =
-        MutableStateFlow<StreamProfilesResult>(StreamProfilesResult.NotReady)
+        MutableStateFlow<StreamProfilesResult>(StreamProfilesResult.Failed(TvheadendFailure.NOT_READY))
     private val mutableSelectedStreamProfileId = MutableStateFlow<StreamProfileId?>(null)
     private val mutableSettledStreamProfilesFor =
         MutableStateFlow<CurrentSessionObservation?>(null)
@@ -278,7 +279,7 @@ class AppProfileOwner(
                     availableForObservation = null
                     mutableSettledStreamProfilesFor.value = null
                     mutableSelectedStreamProfileId.value = null
-                    mutableStreamProfiles.value = StreamProfilesResult.NotReady
+                    mutableStreamProfiles.value = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY)
                 }
                 if (observation == null) return@collectLatest
 
@@ -287,7 +288,7 @@ class AppProfileOwner(
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
-                    StreamProfilesResult.TransportUnavailable
+                    StreamProfilesResult.Failed(TvheadendFailure.TRANSPORT_UNAVAILABLE)
                 }
                 if (session.observation.value.currentSession !== observation) {
                     return@collectLatest

@@ -7,7 +7,6 @@ import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -49,9 +48,8 @@ class ProgrammeCategoryPolicyTest {
         assertNull(programmeCategory(event(null)))
         assertNull(programmeCategory(event(0x100L)))
         assertNull(programmeCategory(event(0xFFFF_FFFFL)))
-        // The SDK rejects values outside unsigned 32 bits, so they can never reach the policy.
         listOf(-1L, Long.MIN_VALUE, Long.MAX_VALUE).forEach { value ->
-            assertThrows(IllegalArgumentException::class.java) { event(value) }
+            assertNull(programmeCategory(event(value)))
         }
     }
 
@@ -90,6 +88,6 @@ class ProgrammeCategoryPolicyTest {
         start = Instant.fromEpochSeconds(100),
         stop = Instant.fromEpochSeconds(200),
         title = "Programme",
-        contentType = contentType,
+        contentGenre = at.bernhardberger.tvheadend.sdk.core.ContentGenre.fromContentType(contentType),
     )
 }

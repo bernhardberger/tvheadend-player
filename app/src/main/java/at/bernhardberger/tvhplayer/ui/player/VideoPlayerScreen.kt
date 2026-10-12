@@ -1982,7 +1982,7 @@ fun VideoPlayerScreen(
                             ?: if (interruptionMessageShown) R.string.player_playback_interrupted else R.string.player_playback_failed,
                     ) to
                         listOfNotNull(
-                            failedState?.recoveryReason?.name,
+                            failedState?.recoveryReason?.toString(),
                             failedState?.playerErrorCode,
                             failedState?.targetResult?.toString(),
                         ).joinToString(" · ")

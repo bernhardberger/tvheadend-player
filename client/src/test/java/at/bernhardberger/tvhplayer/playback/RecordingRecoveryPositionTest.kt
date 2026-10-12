@@ -1,6 +1,7 @@
 @file:androidx.media3.common.util.UnstableApi
 @file:OptIn(
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
 )
 
@@ -393,7 +394,7 @@ class RecordingRecoveryPositionTest {
         /** The growing recordings as TVHeadend reports them once ended, their files spanning [spanMinutes]. */
         fun completedObservation(spanMinutes: Int) = recordings(
             listOf(FIRST, SECOND), bookmark, DvrEntryState.COMPLETED, growing, files = listOf(
-                DvrRecordingFile(fileId = 1, path = "first.ts", start = RECORDING_START,
+                DvrRecordingFile.create(fileId = 1, start = RECORDING_START,
                     stop = RECORDING_START + spanMinutes.minutes, sizeBytes = null),
             ),
         )
@@ -424,7 +425,7 @@ class RecordingRecoveryPositionTest {
         /** The installed target plays the recording as the growing file TVHeadend still writes. */
         fun assertGrowingTarget() {
             assertTrue("admission: ${runtime.recordingAdmission.value}",
-                runtime.recordingAdmission.value is RecordingPlaybackAdmission.GrowingStartOverOnly)
+                runtime.recordingAdmission.value is RecordingPlaybackAdmission.Growing)
         }
 
         /** The recovered play runs from the start while its recording cannot seek yet. */
@@ -496,6 +497,7 @@ class RecordingRecoveryPositionTest {
      * that follows the recording's state in the observation the binding was made from.
      */
     private class GrowingRecordingSession(private val session: FakeTvheadendSession) : TvheadendSession by session {
+        @OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class)
         override fun bindRecordingPlayback(
             currentSession: CurrentSessionObservation,
             recordingId: DvrEntryId,
@@ -507,15 +509,15 @@ class RecordingRecoveryPositionTest {
             val lease = object : GrowingRecordingFileLease {
                 override val isCurrent: Boolean get() = session.isCurrent(currentSession)
                 override suspend fun open(position: Long): RecordingFileResult<GrowingRecordingFileReader> =
-                    RecordingFileResult.Failed(RecordingFileFailure.NOT_SUPPORTED)
+                    RecordingFileResult.Failed(at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure.NOT_SUPPORTED)
             }
             return GrowingRecordingBindings.bound({
                 val observation = session.observation.value
                 if (observation.currentSession !== currentSession) {
                     RecordingPlaybackAdmission.ObservationExpired
                 } else when (observation.dvrEntry(recordingId)?.state) {
-                    DvrEntryState.RECORDING -> GrowingRecordingBindings.growing()
-                    DvrEntryState.COMPLETED -> GrowingRecordingBindings.completed()
+                    DvrEntryState.RECORDING -> at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.growingRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
+                    DvrEntryState.COMPLETED -> at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory.completedRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
                     else -> RecordingPlaybackAdmission.TargetUnavailable
                 }
             }, lease)
@@ -673,7 +675,8 @@ class RecordingRecoveryPositionTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries.map { id ->
                 DvrEntry.create(id = id, state = state, title = "Recording $id",
-                    channelName = "Recorded Channel", playPosition = bookmark, files = files)
+                    channelName = "Recorded Channel", playPosition = bookmark, files = files,
+                    folder = if (files != null) emptyList() else null)
             })),
             recordingProgressCapability = if (bookmark != null || progressSupported) {
                 RecordingProgressCapability.SUPPORTED

@@ -36,13 +36,13 @@ fun QuickZapPreview(
     metadata: String,
     summary: String?,
     next: String?,
-    image: String?,
+    image: ArtworkId?,
     imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
-    val artwork = ArtworkId.parse(image)
+    val artwork = image
     var artworkFailed by remember(artwork, currentSession) { mutableStateOf(false) }
     val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha)
     val tertiary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)

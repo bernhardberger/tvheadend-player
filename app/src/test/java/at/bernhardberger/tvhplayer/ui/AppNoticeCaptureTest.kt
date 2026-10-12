@@ -59,8 +59,12 @@ class AppNoticeCaptureTest {
             subtitle = if (locale == "de") "Unterwegs in den Alpen" else "Exploring the Alps", channelName = "Documentary HD",
             start = now + 1_800.seconds, subscriptionError = DvrSubscriptionError.NO_DISK_SPACE)
         val formatter = NoticeFormatter(context)
-        val variants = DvrChangeKind.entries.map { kind ->
-            kind.name.lowercase() to formatter.format(Notice.Dvr(kind, entry, DvrChangeOrigin.External), now)
+        val variants = listOf(
+            DvrChangeKind.SCHEDULED, DvrChangeKind.RECORDING_STARTED, DvrChangeKind.RECORDING_COMPLETED,
+            DvrChangeKind.RECORDING_STOPPED, DvrChangeKind.RECORDING_ABORTED, DvrChangeKind.RECORDING_FAILED,
+            DvrChangeKind.MISSED, DvrChangeKind.REMOVED,
+        ).map { kind ->
+            kind.toString().lowercase() to formatter.format(Notice.Dvr(kind, entry, DvrChangeOrigin.External), now)
         } + listOf(
             "series" to formatter.format(Notice.Dvr(DvrChangeKind.SCHEDULED, entry, DvrChangeOrigin.External, 5), now),
             "series-canceled" to formatter.format(Notice.Dvr(DvrChangeKind.REMOVED,

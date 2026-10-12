@@ -28,7 +28,8 @@ class RecordingMarkerPolicyTest {
 
     @Test
     fun otherActionsNeverBecomeNavigationMarkers() {
-        val points = DvrCutpointAction.entries.filter { it != DvrCutpointAction.SCENE_MARKER }
+        val points = listOf(DvrCutpointAction.CUT, DvrCutpointAction.MUTE,
+            DvrCutpointAction.COMMERCIAL_BREAK, DvrCutpointAction.UNKNOWN)
             .map { DvrCutpoint(0.milliseconds, 20.milliseconds, it) }
         assertTrue(recordingMarkerPositions(points, 100).isEmpty())
     }

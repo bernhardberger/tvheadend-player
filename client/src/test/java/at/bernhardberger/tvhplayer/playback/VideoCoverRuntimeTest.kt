@@ -5,6 +5,7 @@
 )
 
 package at.bernhardberger.tvhplayer.playback
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import android.app.Application
 import android.os.Looper
@@ -104,7 +105,7 @@ class VideoCoverRuntimeTest {
             renderFirstFrame()
             val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
             assertEquals(null, runtime.pauseTimeshiftPlayback())
-            connection.scriptSpeed(SubscriptionOperationResult.ServerRejected)
+            connection.scriptSpeed(SubscriptionOperationResult.Failed(TvheadendFailure.SERVER_REJECTED))
             session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
             val install = scope.async {
                 runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))), intent)

@@ -81,8 +81,8 @@ class SdkRuntimeOwnerTest {
 
     @Test
     fun successfulShutdownResultsNeverCancelTheCoordinatorRunBoundary() = runTest {
-        PlaybackShutdownResult.entries
-            .filterNot { it == PlaybackShutdownResult.NOT_RUNNING }
+        listOf(PlaybackShutdownResult.DRAINED, PlaybackShutdownResult.TIMED_OUT,
+            PlaybackShutdownResult.ALREADY_SHUT_DOWN, PlaybackShutdownResult.PLAYER_UNAVAILABLE)
             .forEach { result ->
                 val calls = mutableListOf<String>()
 

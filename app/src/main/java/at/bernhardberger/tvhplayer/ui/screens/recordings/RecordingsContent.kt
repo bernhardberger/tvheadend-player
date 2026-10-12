@@ -227,7 +227,7 @@ internal fun RecordingMetadataPane(
             .testTag("recording-metadata-pane"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val artworkPath = currentSession?.let { ArtworkId.parse(entry.image ?: entry.fanartImage) }
+        val artworkPath = currentSession?.let { entry.image ?: entry.fanartImage }
         PiconBox(
             imageLoader = imageLoader,
             currentSession = currentSession,
@@ -863,8 +863,7 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         DvrEntryState.RECORDING_ERROR,
         DvrEntryState.COMPLETED_ERROR,
         DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
-        DvrEntryState.UNKNOWN,
-        null -> R.string.recording_state_unknown
+        else -> R.string.recording_state_unknown
     }
 )
 

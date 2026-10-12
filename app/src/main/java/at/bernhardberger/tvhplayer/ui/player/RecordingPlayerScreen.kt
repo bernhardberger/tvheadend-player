@@ -45,6 +45,7 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
@@ -91,6 +92,7 @@ private const val RECORDING_LONG_SEEK_MS = 10 * 60_000L
 private const val RECORDING_CONTROLS_AUTO_HIDE_MS = 5_000L
 
 @OptIn(UnstableApi::class)
+@kotlin.OptIn(ExperimentalTvheadendApi::class)
 @Composable
 fun RecordingPlayerScreen(
     recordingId: DvrEntryId,
@@ -154,13 +156,13 @@ fun RecordingPlayerScreen(
     val admission = recordingAdmission.takeIf { retainedSelection != null }
     val playbackAvailable = entry != null && when (admission) {
         is RecordingPlaybackAdmission.Completed,
-        is RecordingPlaybackAdmission.GrowingStartOverOnly -> true
+        is RecordingPlaybackAdmission.Growing -> true
         RecordingPlaybackAdmission.GrowingDeferred,
         RecordingPlaybackAdmission.ObservationExpired,
         RecordingPlaybackAdmission.TargetUnavailable,
         null -> false
     }
-    val growing = admission is RecordingPlaybackAdmission.GrowingStartOverOnly &&
+    val growing = admission is RecordingPlaybackAdmission.Growing &&
         currentRecordingIsGrowing(observation, retainedSelection)
     val recordingResolved = entry != null ||
         admission != null ||

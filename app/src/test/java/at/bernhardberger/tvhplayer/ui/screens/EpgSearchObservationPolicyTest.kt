@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -129,19 +130,19 @@ class EpgSearchObservationPolicyTest {
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
             stopEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
             cancelEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
             deleteEntry = { _, _ ->
                 dispatchCount++
-                DvrMutationResult.NotReady
+                DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
         )
 

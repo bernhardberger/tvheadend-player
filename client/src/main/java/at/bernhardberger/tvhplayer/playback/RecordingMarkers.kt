@@ -7,6 +7,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.PlaybackBinding
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
@@ -55,6 +56,7 @@ internal class RecordingMarkers(
         pendingMarkers?.join()
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
     fun observeRecordingMarkersLocked(binding: PlaybackBinding.Recording) {
         clearRecordingMarkers()
         markerQuery.use(binding)
@@ -64,7 +66,7 @@ internal class RecordingMarkers(
             var initialFetched = false
             session.observation.map { binding.admission::class }.distinctUntilChanged().collectLatest {
                 when (binding.admission) {
-                    is RecordingPlaybackAdmission.GrowingStartOverOnly -> if (!initialFetched) {
+                    is RecordingPlaybackAdmission.Growing -> if (!initialFetched) {
                         initialFetched = true
                         markerQuery.refresh(binding)
                     }

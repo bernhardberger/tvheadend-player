@@ -698,7 +698,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun exhaustedRecoveryReportsTheIssueReturnedByStoppingTheRetiredTarget() {
         val state = recoveryExhaustedState(
-            PlaybackStopResult.Stopped(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
+            PlaybackStopResult.stopped(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
             PlaybackRecoveryReason.LIVE_ENDED,
         )
 
@@ -707,13 +707,13 @@ class AppPlaybackRuntimeTest {
         assertEquals(PlaybackRecoveryReason.LIVE_ENDED, state.recoveryReason)
         assertNull(
             recoveryExhaustedState(
-                PlaybackStopResult.Stopped(finalSubscriptionIssue = null),
+                PlaybackStopResult.stopped(finalSubscriptionIssue = null),
                 PlaybackRecoveryReason.LIVE_ENDED,
             ).subscriptionIssue,
         )
         assertNull(
             recoveryExhaustedState(
-                PlaybackStopResult.AlreadyStopped,
+                PlaybackStopResult.ALREADY_STOPPED,
                 PlaybackRecoveryReason.LIVE_ENDED,
             ).subscriptionIssue,
         )
@@ -722,7 +722,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun exhaustedRecoveryReportsTheRetiredTargetIssueWhenPlayerCleanupFailed() {
         val state = recoveryExhaustedState(
-            PlaybackStopResult.PlayerUnavailable(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
+            PlaybackStopResult.playerUnavailable(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
             PlaybackRecoveryReason.LIVE_ENDED,
         )
 
@@ -731,7 +731,7 @@ class AppPlaybackRuntimeTest {
         assertEquals(PlaybackRecoveryReason.LIVE_ENDED, state.recoveryReason)
         assertNull(
             recoveryExhaustedState(
-                PlaybackStopResult.PlayerUnavailable(finalSubscriptionIssue = null),
+                PlaybackStopResult.playerUnavailable(finalSubscriptionIssue = null),
                 PlaybackRecoveryReason.LIVE_ENDED,
             ).subscriptionIssue,
         )
@@ -740,7 +740,7 @@ class AppPlaybackRuntimeTest {
     @Test
     fun exhaustedRecoveryReportsTheRetiredTargetIssueAfterDeparture() {
         val state = recoveryExhaustedState(
-            PlaybackStopResult.RetiredAfterDeparture(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
+            PlaybackStopResult.retiredAfterDeparture(finalSubscriptionIssue = SubscriptionIssue.NO_FREE_ADAPTER),
             PlaybackRecoveryReason.LIVE_ENDED,
         )
 
@@ -749,7 +749,7 @@ class AppPlaybackRuntimeTest {
         assertEquals(PlaybackRecoveryReason.LIVE_ENDED, state.recoveryReason)
         assertNull(
             recoveryExhaustedState(
-                PlaybackStopResult.RetiredAfterDeparture(finalSubscriptionIssue = null),
+                PlaybackStopResult.retiredAfterDeparture(finalSubscriptionIssue = null),
                 PlaybackRecoveryReason.LIVE_ENDED,
             ).subscriptionIssue,
         )

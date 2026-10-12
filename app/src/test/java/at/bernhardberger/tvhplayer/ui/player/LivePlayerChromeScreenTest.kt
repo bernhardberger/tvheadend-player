@@ -7,6 +7,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
@@ -1669,7 +1670,7 @@ class LivePlayerChromeScreenTest {
 
     @Test fun playerInfoRecordingFailureKeepsRecordAndShowsANonFocusableNotice() {
         screen()
-        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.AccessDenied)
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
         key(Key.DirectionCenter)
         confirmInfoAction()

@@ -17,6 +17,8 @@ class DvrChangeNoticeSource(private val repository: DvrRepository, private val n
         repository.changes.collect { change ->
             val context = notices.context()
             if (context.session !== change.generationIdentity) return@collect
+            // Open set: a kind added by a later SDK has no wording here yet.
+            if (change.kind !in ANNOUNCED_KINDS) return@collect
             val entry = change.current ?: change.previous ?: return@collect
             if (change.kind != DvrChangeKind.SCHEDULED) {
                 // Do not announce a buffered schedule after that entry has already started or gone away.
@@ -49,3 +51,9 @@ class DvrChangeNoticeSource(private val repository: DvrRepository, private val n
         }
     }
 }
+
+private val ANNOUNCED_KINDS = setOf(
+    DvrChangeKind.SCHEDULED, DvrChangeKind.RECORDING_STARTED, DvrChangeKind.RECORDING_COMPLETED,
+    DvrChangeKind.RECORDING_STOPPED, DvrChangeKind.RECORDING_ABORTED, DvrChangeKind.RECORDING_FAILED,
+    DvrChangeKind.MISSED, DvrChangeKind.REMOVED,
+)

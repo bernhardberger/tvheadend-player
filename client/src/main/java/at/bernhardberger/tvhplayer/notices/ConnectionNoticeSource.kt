@@ -54,7 +54,7 @@ class ConnectionNoticeSource(
                         loginRejected = false
                     }
                     ready == null -> Unit
-                    state is SessionState.Unavailable && state.reason == SessionFailure.AuthenticationRejected -> {
+                    state is SessionState.Unavailable && state.reason == SessionFailure.AUTHENTICATION_REJECTED -> {
                         lossJob?.cancel()
                         lossJob = null
                         if (!loginRejected) {
