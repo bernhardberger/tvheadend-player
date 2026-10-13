@@ -906,7 +906,15 @@ internal fun ChannelsScreenContent(
             onClose = {
                 showProgrammeDetails = false
                 contextChannelId = null
-                requestChannelFocus(channelId)
+                if (!requestChannelFocus(channelId)) {
+                    // The menu's channel left the catalog; land where a removed focused row would.
+                    val fallbackId = restoredChannelId(
+                        visibleChannelIds = orderedChannelIds,
+                        rememberedChannelId = rememberedChannelIds[channelScope.activeTagId],
+                        selectedChannelId = selectedId(),
+                    )
+                    if (fallbackId == null || !requestChannelFocus(fallbackId)) focusScope()
+                }
             },
         )
     }

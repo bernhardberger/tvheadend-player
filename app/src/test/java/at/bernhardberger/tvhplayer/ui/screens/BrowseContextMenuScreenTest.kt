@@ -156,10 +156,12 @@ class BrowseContextMenuScreenTest {
         compose.runOnIdle {
             val previous = session.observation.value
             session.publish(SessionObservation.create(previous.sessionState,
-                ChannelRepositoryState.Current(ChannelCatalog.create()), previous.epgState, previous.dvrState))
+                ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(2),
+                    name = "Ridge Earth SD", number = 100, icon = ArtworkId(1))))), previous.epgState, previous.dvrState))
         }
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.onNodeWithTag("channel-row-2").assertIsFocused()
     }
 
     @Test fun absentChannelAtMenuEntryCallsClose() {
