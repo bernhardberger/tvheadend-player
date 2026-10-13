@@ -1625,6 +1625,11 @@ fun EpgGridScreen(
             handoffKey = Triple(channelScopeState, selectedTarget, indexCurrent),
         )
         if (preparedIndex == null) return@content
+        // Keep rendering in separate generated methods. As one body this lambda needed
+        // more than 256 dex registers, and D8/R8 emitted code that API 31 rejected
+        // (VerifyError: an int parameter read from an unassigned register).
+        @Composable
+        fun GuideBrowseContent() {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -2085,6 +2090,10 @@ fun EpgGridScreen(
             }
         }
 
+        }
+        GuideBrowseContent()
+        @Composable
+        fun GuideOverlays() {
         if (showSearchDialog && !detailsFromSearch) {
             EpgSearchDialog(
                 contentPadding = contentPadding,
@@ -2162,6 +2171,8 @@ fun EpgGridScreen(
                 },
             )
         }
+        }
+        GuideOverlays()
 
     }
     }
