@@ -441,6 +441,12 @@
         <item quantity="other">%d recordings canceled</item>
     </plurals>
     <string name="connection_notice_lost">Connection lost</string>
+    <string name="connection_notice_lost_saved">Connection lost · Showing saved channels</string>
+    <string name="connection_problem_label">Settings, connection problem</string>
+    <string name="connection_offline_badge">Offline</string>
+    <string name="connection_offline_saved">Can\'t reach Tvheadend · Showing saved channels</string>
+    <string name="connection_try_again">Try again</string>
+    <string name="connection_retry_description">Tvheadend Player also retries on its own</string>
     <string name="connection_notice_restored">Connection restored</string>
     <string name="connection_notice_login_rejected">Login rejected</string>
     <string name="recording_action_permission">This account is not allowed to manage recordings.</string>

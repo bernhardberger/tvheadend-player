@@ -71,7 +71,11 @@ class AppRootBackNavigationTest {
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }
             single<ImageLoader> { images }
-            viewModel { AppConnectionViewModel(get(), get()) }
+            single {
+                at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(owner.session.observation,
+                    owner.appProfileOwner.configurationGeneration, get())
+            }
+            viewModel { AppConnectionViewModel(get(), get(), get()) }
             viewModel { ChannelsViewModel(get(), get()) }
         }
         compose.runOnIdle { activity.setContent {} }

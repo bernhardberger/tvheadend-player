@@ -41,7 +41,8 @@ internal class NoticeFormatter(private val context: Context) {
                 DvrMutationFeedback.CONFIRMED, DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> error("Not an action failure")
             }), AppNoticeIcon.WARNING)
         is Notice.Connection -> FormattedNotice(context.getString(when (notice.kind) {
-            ConnectionNoticeKind.LOST -> R.string.connection_notice_lost
+            ConnectionNoticeKind.LOST -> if (notice.showingSavedChannels) R.string.connection_notice_lost_saved
+                else R.string.connection_notice_lost
             ConnectionNoticeKind.RESTORED -> R.string.connection_notice_restored
             ConnectionNoticeKind.LOGIN_REJECTED -> R.string.connection_notice_login_rejected
         }))

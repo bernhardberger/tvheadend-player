@@ -145,6 +145,8 @@ internal fun RecordingsRouteContent(
 @Composable
 internal fun SettingsRouteContent(
     channelsVm: ChannelsViewModel,
+    connectionPresentation: at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation,
+    onRetry: () -> Unit,
     contentAllowed: Boolean,
     section: SettingsSection,
     initialFocusEnabled: Boolean,
@@ -156,6 +158,8 @@ internal fun SettingsRouteContent(
         ContentContainer {
             SettingsScreen(
                 channelsVm = channelsVm,
+                connectionPresentation = connectionPresentation,
+                onRetry = onRetry,
                 section = section,
                 initialFocusEnabled = initialFocusEnabled,
                 contentPadding = contentPadding,

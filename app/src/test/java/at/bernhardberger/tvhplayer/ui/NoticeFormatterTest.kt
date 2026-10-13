@@ -23,6 +23,20 @@ import org.robolectric.annotation.Config
 class NoticeFormatterTest {
     private val formatter get() = NoticeFormatter(ApplicationProvider.getApplicationContext<Application>())
 
+    @Test fun lostNoticeOnlyMentionsSavedChannelsWhenPresent() {
+        assertEquals("Connection lost", formatter.format(Notice.Connection(
+            at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST)).headline)
+        assertEquals("Connection lost · Showing saved channels", formatter.format(Notice.Connection(
+            at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST, true)).headline)
+    }
+
+    @Test @Config(qualifiers = "de") fun lostNoticeWithAndWithoutSavedChannelsInGerman() {
+        assertEquals("Verbindung verloren", formatter.format(Notice.Connection(
+            at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST)).headline)
+        assertEquals("Verbindung verloren · Gespeicherte Sender werden angezeigt", formatter.format(Notice.Connection(
+            at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST, true)).headline)
+    }
+
     @Test fun malformedMutationDoesNotClaimRejectionOrSuccess() {
         val result = formatter.format(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.UNKNOWN_OUTCOME))
         assertEquals("Recording action not confirmed", result.headline)

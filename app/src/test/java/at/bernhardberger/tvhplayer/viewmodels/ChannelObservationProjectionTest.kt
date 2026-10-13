@@ -73,6 +73,32 @@ class ChannelObservationProjectionTest {
         Dispatchers.resetMain()
     }
 
+    @Test fun immediateRetryUsesSdkOnceAndPreservesFailurePolicyGuards() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val session = FakeTvheadendSession(observation(ChannelRepositoryState.Stale(catalog)))
+        val owner = AppProfileOwner(session, TvheadendServerProfileStore(contextWithoutAndroidRuntime()),
+            PlayerSettingsStore(InMemoryPreferencesDataStore()), dispatcher)
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ testScheduler.currentTime }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(owner.configurationGeneration.value,
+                session.observation.value.currentSession?.generationIdentity)
+        }
+        val model = AppConnectionViewModel(session, owner,
+            at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(session.observation, owner.configurationGeneration, notices))
+        models.put("connection", model)
+        val failures = listOf(at.bernhardberger.tvheadend.sdk.core.SessionFailure.TRANSPORT_UNAVAILABLE,
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.AUTHENTICATION_REJECTED)
+        for (failure in failures) {
+            session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(failure)))
+            model.reconnectNow()
+            runCurrent()
+        }
+        assertEquals(1, session.calls.count { it == at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.RETRY })
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        model.reconnectNow(); runCurrent()
+        assertEquals(1, session.calls.count { it == at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.RETRY })
+    }
+
     @Test
     fun scopeSurvivesMetadataPublicationsAndStillTracksCatalogAuthorityAndTagSettings() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
@@ -145,7 +171,13 @@ class ChannelObservationProjectionTest {
             playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
             ioDispatcher = dispatcher,
         )
-        val model = AppConnectionViewModel(session, owner)
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ testScheduler.currentTime }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(owner.configurationGeneration.value,
+                session.observation.value.currentSession?.generationIdentity)
+        }
+        val source = at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
+            session.observation, owner.configurationGeneration, notices)
+        val model = AppConnectionViewModel(session, owner, source)
         models.put("connection", model)
         runCurrent()
         assertEquals(CurrentChannelReadiness.Ready(catalog.channels), model.uiState.value.currentChannelReadiness)

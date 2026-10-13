@@ -18,6 +18,8 @@ internal const val SETTINGS_ROOT = "settings-root"
 @Composable
 internal fun SettingsScreen(
     channelsVm: ChannelsViewModel,
+    connectionPresentation: at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation,
+    onRetry: () -> Unit,
     section: SettingsSection = SettingsSection.GENERAL,
     initialFocusEnabled: Boolean = true,
     contentPadding: PaddingValues = TvFullScreenPadding,
@@ -26,7 +28,7 @@ internal fun SettingsScreen(
     applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
 ) {
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
-    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation) + settingsPlayerLevels(navigation) + listOf(
+    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation, connectionPresentation, onRetry) + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(applianceBuild),
         settingsKeepChannelLevel(navigation),
         settingsStartupBufferLevel(navigation),

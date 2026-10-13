@@ -40,7 +40,7 @@ sealed interface Notice {
         override val severity = NoticeSeverity.FAILURE
     }
 
-    data class Connection(val kind: ConnectionNoticeKind) : Notice {
+    data class Connection(val kind: ConnectionNoticeKind, val showingSavedChannels: Boolean = false) : Notice {
         override val key = "connection"
         override val severity = if (kind == ConnectionNoticeKind.RESTORED) NoticeSeverity.INFO else NoticeSeverity.FAILURE
     }

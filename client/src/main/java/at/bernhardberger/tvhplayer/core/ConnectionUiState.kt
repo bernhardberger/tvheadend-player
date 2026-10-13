@@ -27,6 +27,13 @@ enum class ConnectionRecoveryAction {
     SETTINGS,
 }
 
+/** The notice source owns loss detection; initial connection is not a loss. */
+fun ConnectionUiState.isDegraded(lossAnnounced: Boolean): Boolean = when (this) {
+    ConnectionUiState.Ready, ConnectionUiState.NeedsConfiguration -> false
+    ConnectionUiState.CredentialUnavailable, is ConnectionUiState.Error -> true
+    else -> lossAnnounced
+}
+
 fun ConnectionUiState.primaryRecoveryAction(): ConnectionRecoveryAction = when (this) {
     is ConnectionUiState.Error -> when {
         recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY ->

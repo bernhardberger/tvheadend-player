@@ -5,10 +5,16 @@ import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.channelCatalogAuthority
+import at.bernhardberger.tvheadend.sdk.core.channelCatalogForDisplay
+import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
+import at.bernhardberger.tvhplayer.core.deriveCurrentChannelReadiness
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
@@ -18,6 +24,9 @@ class ConnectionNoticeSource(
     private val profileGeneration: StateFlow<Long>,
     private val notices: NoticeCenter,
 ) {
+    private val _lossAnnounced = MutableStateFlow(false)
+    val lossAnnounced: StateFlow<Boolean> = _lossAnnounced.asStateFlow()
+
     suspend fun run(): Unit = coroutineScope {
         var profile = profileGeneration.value
         var ready: SessionGenerationIdentity? = null
@@ -36,6 +45,7 @@ class ConnectionNoticeSource(
                     profile = generation
                     ready = null
                     lost = false
+                    _lossAnnounced.value = false
                     loginRejected = false
                     lossJob?.cancel()
                     lossJob = null
@@ -51,6 +61,7 @@ class ConnectionNoticeSource(
                         }
                         ready = identity
                         lost = false
+                        _lossAnnounced.value = false
                         loginRejected = false
                     }
                     ready == null -> Unit
@@ -76,7 +87,13 @@ class ConnectionNoticeSource(
                                         currentState.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
                                 val currentContext = NoticeContext(expectedProfile, current.currentSession?.generationIdentity)
                                 if (profileGeneration.value == expectedProfile && reconnecting) {
-                                    lost = notices.post(Notice.Connection(ConnectionNoticeKind.LOST), currentContext)
+                                    val saved = deriveCurrentChannelReadiness(
+                                        connected = false,
+                                        authority = current.channelCatalogAuthority,
+                                        channels = current.channelCatalogForDisplay?.channels.orEmpty(),
+                                    ) is CurrentChannelReadiness.Browsable
+                                    lost = notices.post(Notice.Connection(ConnectionNoticeKind.LOST, saved), currentContext)
+                                    _lossAnnounced.value = lost
                                 }
                             }
                         }

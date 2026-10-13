@@ -11,6 +11,36 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class NoticeSourcesTest {
+    @Test fun announcedLossPersistsAfterNoticeExpiryAndClearsOnRecoveryOrProfileChange() = runTest {
+        val observation = MutableStateFlow(readyObservation())
+        val profile = MutableStateFlow(0L)
+        val center = NoticeCenter({ testScheduler.currentTime }) {
+            NoticeContext(profile.value, observation.value.currentSession?.generationIdentity)
+        }
+        val source = ConnectionNoticeSource(observation, profile, center)
+        backgroundScope.launch { source.run() }
+        runCurrent()
+        val catalog = ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Saved channel")))
+        fun lose() {
+            observation.value = SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(catalog))
+        }
+        lose(); runCurrent(); advanceTimeBy(2_999); runCurrent()
+        assertFalse(source.lossAnnounced.value)
+        advanceTimeBy(1); runCurrent()
+        assertTrue(source.lossAnnounced.value)
+        assertEquals(Notice.Connection(ConnectionNoticeKind.LOST, true), center.state.value.candidate!!.notice)
+        center.show(center.state.value.candidate!!.id, 6_000)
+        advanceTimeBy(6_001); center.prune()
+        assertTrue(source.lossAnnounced.value)
+        observation.value = readyObservation(); runCurrent()
+        assertFalse(source.lossAnnounced.value)
+        lose(); runCurrent(); advanceTimeBy(3_000); runCurrent()
+        assertTrue(source.lossAnnounced.value)
+        profile.value = 1; runCurrent()
+        assertFalse(source.lossAnnounced.value)
+    }
+
     @Test fun externalSeriesCancellationsGroupDistinctEntriesSeparatelyFromSchedules() = runTest {
         val session = FakeTvheadendSession(readyObservation())
         val identity = session.observation.value.currentSession!!.generationIdentity

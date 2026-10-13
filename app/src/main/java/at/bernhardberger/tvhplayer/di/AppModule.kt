@@ -67,9 +67,14 @@ val appModule = module {
             )
         }.also { center ->
             scope.launch { at.bernhardberger.tvhplayer.notices.DvrChangeNoticeSource(session.dvrRepository, center).run() }
-            scope.launch { at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
-                session.observation, owner.configurationGeneration, center,
-            ).run() }
+        }
+    }
+
+    single {
+        at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
+            get<SdkRuntimeOwner>().session.observation, get<AppProfileOwner>().configurationGeneration, get(),
+        ).also { source ->
+            get<CoroutineScope>(qualifier = named("application")).launch { source.run() }
         }
     }
 
@@ -176,6 +181,7 @@ val appModule = module {
         AppConnectionViewModel(
             session = get(),
             profileOwner = get(),
+            connectionNotices = get(),
         )
     }
     viewModel {

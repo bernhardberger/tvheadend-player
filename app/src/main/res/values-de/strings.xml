@@ -345,6 +345,12 @@
         <item quantity="other">%d Aufnahmen abgebrochen</item>
     </plurals>
     <string name="connection_notice_lost">Verbindung verloren</string>
+    <string name="connection_notice_lost_saved">Verbindung verloren · Gespeicherte Sender werden angezeigt</string>
+    <string name="connection_problem_label">Einstellungen, Verbindungsproblem</string>
+    <string name="connection_offline_badge">Offline</string>
+    <string name="connection_offline_saved">Tvheadend nicht erreichbar · Gespeicherte Sender werden angezeigt</string>
+    <string name="connection_try_again">Erneut versuchen</string>
+    <string name="connection_retry_description">Tvheadend Player versucht es auch automatisch erneut</string>
     <string name="connection_notice_restored">Verbindung wiederhergestellt</string>
     <string name="connection_notice_login_rejected">Anmeldung abgelehnt</string>
     <string name="recording_action_permission">Dieses Konto darf Aufnahmen nicht verwalten.</string>

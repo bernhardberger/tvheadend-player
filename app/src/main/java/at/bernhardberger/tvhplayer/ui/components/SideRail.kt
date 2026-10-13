@@ -3,6 +3,9 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -49,6 +52,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -171,6 +175,7 @@ internal fun SideRail(
         AppDestination.SETTINGS,
     ),
     rootBackPriority: Boolean = false,
+    connectionDegraded: Boolean = false,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
@@ -178,6 +183,7 @@ internal fun SideRail(
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
     val settingsLabel = stringResource(R.string.nav_settings)
+    val settingsDescription = if (connectionDegraded) stringResource(R.string.connection_problem_label) else settingsLabel
     val mainItems = remember(
         channelsLabel,
         epgLabel,
@@ -391,14 +397,43 @@ internal fun SideRail(
 
                     footerItems.forEach { item ->
                         key(item.route) {
+                            val showConnectionBadge = item.route == AppDestination.SETTINGS && connectionDegraded
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
-                                leadingContent = { PinnedRailIcon(item.icon) },
+                                leadingContent = {
+                                    PinnedRailIcon {
+                                        Box {
+                                            item.icon()
+                                            if (showConnectionBadge && drawerValue == DrawerValue.Closed) {
+                                                Box(
+                                                    Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .offset(x = 2.dp, y = (-2).dp)
+                                                        .size(8.dp)
+                                                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                                                        .testTag("connection-problem-badge")
+                                                        .clearAndSetSemantics {},
+                                                )
+                                            }
+                                        }
+                                    }
+                                },
+                                trailingContent = if (showConnectionBadge) {
+                                    {
+                                        NavigationDrawerItemDefaults.TrailingBadge(
+                                            text = stringResource(R.string.connection_offline_badge),
+                                            containerColor = MaterialTheme.colorScheme.error,
+                                            contentColor = MaterialTheme.colorScheme.onError,
+                                        )
+                                    }
+                                } else null,
                                 colors = drawerColors,
                                 modifier = Modifier
                                     .focusRequester(itemFocus.getValue(item.route))
-                                    .semantics { contentDescription = item.label }
+                                    .semantics {
+                                        contentDescription = if (item.route == AppDestination.SETTINGS) settingsDescription else item.label
+                                    }
                                     .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
                                         if (

@@ -13,6 +13,8 @@ import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.deriveCurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.core.toConnectionState
+import at.bernhardberger.tvhplayer.core.isDegraded
+import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,11 +28,13 @@ import kotlinx.coroutines.launch
 data class AppConnectionPresentation(
     val connection: ConnectionUiState = ConnectionUiState.Connecting,
     val currentChannelReadiness: CurrentChannelReadiness = CurrentChannelReadiness.Waiting,
+    val degraded: Boolean = false,
 )
 
 class AppConnectionViewModel(
     private val session: TvheadendSession,
     profileOwner: AppProfileOwner,
+    connectionNotices: ConnectionNoticeSource,
 ) : ViewModel() {
     val connectionState: StateFlow<ConnectionState> = session.observation
         .map { it.sessionState.toConnectionState() }
@@ -38,14 +42,17 @@ class AppConnectionViewModel(
     val uiState: StateFlow<AppConnectionPresentation> = combine(
         profileOwner.serverProfile,
         session.observation,
-    ) { profile, observation ->
+        connectionNotices.lossAnnounced,
+    ) { profile, observation, lossAnnounced ->
+        val connection = when (profile) {
+            null -> ConnectionUiState.Connecting
+            ServerProfileReadResult.Missing -> ConnectionUiState.NeedsConfiguration
+            ServerProfileReadResult.Unavailable -> ConnectionUiState.CredentialUnavailable
+            is ServerProfileReadResult.Available -> observation.sessionState.toConnectionUiState()
+        }
         AppConnectionPresentation(
-            connection = when (profile) {
-                null -> ConnectionUiState.Connecting
-                ServerProfileReadResult.Missing -> ConnectionUiState.NeedsConfiguration
-                ServerProfileReadResult.Unavailable -> ConnectionUiState.CredentialUnavailable
-                is ServerProfileReadResult.Available -> observation.sessionState.toConnectionUiState()
-            },
+            connection = connection,
+            degraded = profile != null && connection.isDegraded(lossAnnounced),
             currentChannelReadiness = deriveCurrentChannelReadiness(
                 connected = observation.sessionState is SessionState.Ready,
                 authority = observation.channelCatalogAuthority,
@@ -59,7 +66,10 @@ class AppConnectionViewModel(
             val state = session.observation.value.sessionState
             if (
                 state is SessionState.Unavailable &&
-                state.reason.recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY
+                state.reason.recoveryDisposition in setOf(
+                    SessionRecoveryDisposition.EXPLICIT_RETRY,
+                    SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
+                )
             ) {
                 session.retry()
             }

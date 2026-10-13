@@ -129,6 +129,73 @@ import kotlin.time.Instant
 class BrowseCohesionEvidenceTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun offlineChannelsAndNoticeKeepContentAndFocus() {
+        val online = observation()
+        val catalog = (online.channelState as ChannelRepositoryState.Current).catalog
+        val groups = listOf("Favourites", "Entertainment", "News", "Documentaries", "Sport", "Kids", "Movies")
+            .mapIndexed { index, name -> ChannelTag.create(ChannelTagId(index + 1L), name = name,
+                channelIds = catalog.channels.map { it.id }) }
+        val offline = SessionObservation.create(sessionState = SessionState.Connecting,
+            channelState = ChannelRepositoryState.Stale(ChannelCatalog.create(catalog.channels, groups)),
+            epgState = online.epgState)
+        val connected = SessionObservation.create(sessionState = online.sessionState,
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(catalog.channels, groups)),
+            epgState = online.epgState)
+        var disconnected by mutableStateOf(false)
+        var showNotice by mutableStateOf(false)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    val displayed = if (disconnected) offline else connected
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        SideRail(currentRoute = AppDestination.CHANNELS, showEpgMenu = true,
+                            connectionDegraded = disconnected, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                            ChannelsScreenContent(contentPadding = padding, initialFocusEnabled = !drawerActive,
+                                channelScopeState = resolveChannelScopeState(displayed.channelState, null),
+                                observation = displayed, tagNotice = false, selectedId = { null }, imageLoader = imageLoader,
+                                playingChannelId = null, connectionUiState = if (disconnected) ConnectionUiState.Connecting else ConnectionUiState.Ready,
+                                onSelectChannel = {}, onSelectTag = {}, onDismissTagNotice = {},
+                                onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> })
+                        }
+                        if (showNotice) {
+                            val notice = at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter(context()).format(
+                                at.bernhardberger.tvhplayer.notices.Notice.Connection(
+                                    at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST, true))
+                            at.bernhardberger.tvhplayer.ui.notifications.AppNoticePresentation(notice.headline)
+                        }
+                    }
+                }
+            }
+        }
+        awaitFocus(hasText("All channels"))
+        key(Key.DirectionDown)
+        awaitFocus(hasTestTag("channel-row-1"))
+        val connectedBounds = compose.onNodeWithTag("channel-row-1").fetchSemanticsNode().boundsInRoot
+        compose.runOnIdle { disconnected = true }
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+        assertEquals(connectedBounds, compose.onNodeWithTag("channel-row-1").fetchSemanticsNode().boundsInRoot)
+        compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertIsDisplayed()
+        fun save(name: String) {
+            val bitmap = draw(false)
+            assertEquals(1920, bitmap.width)
+            assertEquals(1080, bitmap.height)
+            val directory = File("build/outputs/u15-offline").apply { mkdirs() }
+            File(directory, "$name.png").outputStream().use {
+                assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+            bitmap.recycle()
+        }
+        val rowBounds = compose.onNodeWithTag("channel-row-1").fetchSemanticsNode().boundsInRoot
+        save("channels-offline-collapsed-rail")
+        compose.runOnIdle { showNotice = true }
+        compose.onNodeWithTag("app-notice").assertIsDisplayed()
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+        assertEquals(rowBounds, compose.onNodeWithTag("channel-row-1").fetchSemanticsNode().boundsInRoot)
+        save("notice-connection-lost")
+    }
+
     private val models = ViewModelStore()
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer

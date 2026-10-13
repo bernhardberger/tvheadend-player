@@ -716,16 +716,6 @@ internal fun ChannelsScreenContent(
             return@body
         }
 
-        if (connectionUiState != ConnectionUiState.Ready || !channelScopeState.channelCatalogCurrent) {
-            InlineConnectionState(
-                state = if (connectionUiState == ConnectionUiState.Ready) ConnectionUiState.SyncingChannels else connectionUiState,
-                onRetry = { if (owner.isCurrent) onRetryConnection() },
-                onOpenSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
-                modifier = Modifier.padding(start = startPadding, end = endPadding),
-            )
-            Spacer(Modifier.height(12.dp))
-        }
-
         Row(
                 Modifier
                     .padding(browseViewportPadding)
@@ -1043,61 +1033,6 @@ private fun EmptyChannelsState(
                 }
 
                 ConnectionRecoveryAction.NONE -> Unit
-            }
-        }
-    }
-}
-
-@Composable
-private fun InlineConnectionState(
-    state: ConnectionUiState,
-    onRetry: () -> Unit,
-    onOpenSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val recoveryAction = state.primaryRecoveryAction()
-    Surface(
-        shape = MaterialTheme.shapes.medium,
-        colors = SurfaceDefaults.colors(
-            containerColor = TvSurfaceColors.containerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-        modifier = modifier.fillMaxWidth(),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-        ) {
-            DelayedConnectionProgress(
-                visible = state.isConnectionProgress(),
-                modifier = Modifier.size(28.dp),
-            )
-            Text(
-                text = if (state == ConnectionUiState.SyncingChannels) {
-                    stringResource(R.string.connection_refreshing_channels)
-                } else {
-                    connectionMessage(state)
-                },
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (state.isError()) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (recoveryAction == ConnectionRecoveryAction.RETRY) {
-                Button(onClick = onRetry, modifier = Modifier.tabFocus()) { Text(stringResource(R.string.retry)) }
-                OutlinedButton(onClick = onOpenSettings, modifier = Modifier.tabFocus()) {
-                    Text(stringResource(R.string.connection_settings_short))
-                }
-            } else if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
-                Button(onClick = onOpenSettings, modifier = Modifier.tabFocus()) {
-                    Text(stringResource(R.string.connection_settings_short))
-                }
             }
         }
     }

@@ -834,6 +834,8 @@ fun AppRoot(
                     ) { destination ->
                         SettingsRouteContent(
                             channelsVm = channelsVm,
+                            connectionPresentation = connectionPresentation,
+                            onRetry = appVm::reconnectNow,
                             contentAllowed = contentAllowed,
                             section = destination.section,
                             isCurrent = currentDestination == destination,
@@ -989,6 +991,7 @@ fun AppRoot(
                 rail = {
                     SideRail(
                         currentRoute = currentDestination?.destination,
+                        connectionDegraded = connectionPresentation.degraded,
                         rootRoute = AppDestination.CHANNELS,
                         showEpgMenu = uiSettings.showEpgMenu,
                         availableDestinations = buildSet {
