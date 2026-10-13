@@ -90,6 +90,7 @@ import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import java.time.ZoneId
+import androidx.compose.foundation.lazy.rememberLazyListState
 
 @Composable
 internal fun JumpToTimeDialog(
@@ -190,14 +191,7 @@ internal fun EpgSearchDialog(
         events.associate { event -> event.id to FocusRequester() }
     }
     val canSearch = searchEnabled && query.isNotBlank() && !searching
-
-    LaunchedEffect(Unit) {
-        if (restoreFocusTo == null) queryFocus.requestFocus()
-    }
-    LaunchedEffect(restoreFocusTo, events) {
-        val requester = restoreFocusTo?.let(resultFocusRequesters::get) ?: return@LaunchedEffect
-        if (requester.requestFocus()) onFocusRestored()
-    }
+    val resultsState = rememberLazyListState()
     LaunchedEffect(canSearch) {
         if (!canSearch && searchWasLastFocused) closeFocus.requestFocus()
     }
@@ -209,6 +203,18 @@ internal fun EpgSearchDialog(
         wide = true,
         contentPadding = contentPadding,
     ) {
+        LaunchedEffect(restoreFocusTo, events) {
+            val target = restoreFocusTo ?: return@LaunchedEffect
+            val index = events.indexOfFirst { it.id == target }
+            if (index < 0) return@LaunchedEffect
+            resultsState.scrollToItem(index)
+            // Restore inside the new dialog window, after its lazy result is placed.
+            withFrameNanos { }
+            if (resultFocusRequesters.getValue(target).requestFocus()) onFocusRestored()
+        }
+        LaunchedEffect(Unit) {
+            if (restoreFocusTo == null) queryFocus.requestFocus()
+        }
         Text(
             text = stringResource(R.string.epg_search_title),
             style = MaterialTheme.typography.headlineSmall,
@@ -273,6 +279,7 @@ internal fun EpgSearchDialog(
 
         if (events.isNotEmpty()) {
             LazyColumn(
+                state = resultsState,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)

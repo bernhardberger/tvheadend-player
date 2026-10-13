@@ -38,7 +38,8 @@ class BrowseContextActionsTest {
     }
 
     @Test fun recordingAndScheduledActionsMatchLifecycle() {
-        assertEquals(listOf(WATCH, DETAILS, STOP), recordingContextActions(recording(DvrEntryState.RECORDING, 20), true, true))
+        assertEquals(listOf(WATCH, START_OVER, DETAILS, STOP), recordingContextActions(recording(DvrEntryState.RECORDING, 20), true, true))
+        assertEquals(listOf(WATCH, DETAILS, STOP), recordingContextActions(recording(DvrEntryState.RECORDING), true, true))
         assertEquals(listOf(DETAILS, CANCEL), recordingContextActions(recording(DvrEntryState.SCHEDULED), true, true))
     }
 

@@ -64,10 +64,33 @@ class InProgressRecordingResumeTest {
 
         compose.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("details-start_over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-stop").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         compose.runOnIdle { assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun anInProgressRecordingCanStillBePlayedFromTheBeginning() {
+        val starts = openDetails(754L)
+        compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("details-start_over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
+    }
+
+    @Test fun inProgressMenuWatchResumes() {
+        val starts = openDetails(754L, menuOnly = true)
+        compose.onNodeWithText("Watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+    }
+
+    @Test fun inProgressMenuStartOverStartsFromBeginning() {
+        val starts = openDetails(754L, menuOnly = true)
+        compose.onNodeWithText("Watch").performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithText("Start over").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
     }
 
     @Test
@@ -94,7 +117,7 @@ class InProgressRecordingResumeTest {
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 
-    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false): List<RecordingPlaybackStart> {
+    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds)
         val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
@@ -125,7 +148,7 @@ class InProgressRecordingResumeTest {
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus()
             .performKeyInput { pressKey(if (directly) Key.DirectionCenter else Key.Menu) }
-        if (!directly) compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        if (!directly && !menuOnly) compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         return starts
     }
 

@@ -58,6 +58,8 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
@@ -1592,9 +1594,7 @@ fun EpgGridScreen(
     LaunchedEffect(currentSession, searchGeneration) {
         if (searchGeneration != null && searchGeneration !== currentSession) {
             if (detailsFromSearch) {
-                detailsEvent = null
-                detailsObservation = null
-                detailsFromSearch = false
+                closeDetails()
             }
             closeSearch()
         }
@@ -1629,6 +1629,7 @@ fun EpgGridScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = if (detailsEvent != null && !showContextMenu) 0f else 1f }
+                .semantics { if (detailsEvent != null) hideFromAccessibility() }
                 .focusProperties {
                     onEnter = {
                         if (requestedFocusDirection == FocusDirection.Right) {
@@ -2084,7 +2085,7 @@ fun EpgGridScreen(
             }
         }
 
-        if (showSearchDialog) {
+        if (showSearchDialog && !detailsFromSearch) {
             EpgSearchDialog(
                 contentPadding = contentPadding,
                 query = searchQuery,
@@ -2141,7 +2142,7 @@ fun EpgGridScreen(
             ProgrammeDetailsHost(
                 openingEvent = openingEvent, openingObservation = openingObservation,
                 observation = observation, currentObservation = { observationState.value },
-                nowSec = nowSecProvider(), fromGuide = true, showContextMenu = showContextMenu,
+                nowSecProvider = nowSecProvider, fromGuide = true, showContextMenu = showContextMenu,
                 onShowDetails = { showContextMenu = false }, imageLoader = imageLoader,
                 mutations = dvrMutationActions, notices = notices, onPlay = onPlay,
                 onPlayRecording = onPlayRecording, onClose = ::closeDetails,

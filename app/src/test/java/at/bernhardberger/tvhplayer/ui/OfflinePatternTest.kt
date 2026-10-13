@@ -48,13 +48,40 @@ class OfflinePatternTest {
             }
         }
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Try again").assertIsFocused()
+        compose.onNodeWithText("Try again").assertDoesNotExist()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()
         assertEquals(CONNECTION_EDITOR, navigation.stack.active.levelId)
         assertEquals(0, retries)
         press(Key.Back)
+        compose.onNodeWithText("Edit connection").assertIsFocused()
+    }
+
+    @Test fun retryStaysFocusedButDoesNotDispatchWhileConnecting() {
+        var connecting by mutableStateOf(false)
+        var retries = 0
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                    settingsConnectionOverview("Connection unavailable", null, null,
+                        degraded = true, connecting = connecting, onRetry = { retries++ })))
+            }
+        }
+        press(Key.DirectionCenter)
         compose.onNodeWithText("Try again").assertIsFocused()
+        press(Key.DirectionCenter)
+        assertEquals(1, retries)
+        compose.runOnIdle { connecting = true }
+        compose.onNodeWithText("Try again").assertIsFocused()
+        compose.onNodeWithText("Connecting…").assertIsDisplayed()
+        press(Key.DirectionCenter)
+        assertEquals(1, retries)
+        compose.runOnIdle { connecting = false }
+        compose.onNodeWithText("Try again").assertIsFocused()
+        press(Key.DirectionCenter)
+        assertEquals(2, retries)
     }
 
     @Test fun retryFocusRecoveryAndBadgeAcrossCollapsedAndExpandedRail() {

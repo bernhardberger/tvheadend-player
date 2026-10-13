@@ -135,6 +135,61 @@ class BrowseContextMenuScreenTest {
         assertEquals(0, plays)
     }
 
+    @Test fun contextPublicationPreservesSurvivingActionFocus() {
+        val session = show(recordings = false)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Show in Guide").requestFocus().assertIsFocused()
+        compose.runOnIdle {
+            val previous = session.observation.value
+            session.publish(SessionObservation.create(previous.sessionState, previous.channelState, previous.epgState,
+                DvrRepositoryState.Current(DvrSnapshot.create(listOf(DvrEntry.create(DvrEntryId(9),
+                    eventId = EventId(1), channelId = ChannelId(1), state = DvrEntryState.SCHEDULED))))))
+        }
+        compose.onNodeWithText("Cancel recording").assertExists()
+        compose.onNodeWithText("Show in Guide").assertIsFocused()
+    }
+
+    @Test fun missingMenuChannelClosesInsteadOfTrappingChannels() {
+        val session = show(recordings = false)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("browse-context-menu").assertExists()
+        compose.runOnIdle {
+            val previous = session.observation.value
+            session.publish(SessionObservation.create(previous.sessionState,
+                ChannelRepositoryState.Current(ChannelCatalog.create()), previous.epgState, previous.dvrState))
+        }
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+    }
+
+    @Test fun absentChannelAtMenuEntryCallsClose() {
+        var closes = 0
+        val loader = coil3.ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ChannelContextMenu(ChannelId(99), SessionObservation.create(), 0, loader,
+                    onPlay = { _, _ -> }, onShowGuide = {}, onClose = { closes++ })
+            }
+        }
+        compose.runOnIdle { assertEquals(1, closes) }
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        loader.shutdown()
+    }
+
+    @Test fun confirmationAfterPoppingDetailsRestoresItsActionNotTheCard() {
+        show(recordings = false)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("details-card-2").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("details-record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithText("Don't record").assertIsFocused()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("details-record").assertIsFocused()
+    }
+
     @Test fun recordingsDetailsBackRestoresTheOriginatingRow() {
         show(recordings = true)
         val row = compose.onNodeWithTag("recording-list-entry-1")

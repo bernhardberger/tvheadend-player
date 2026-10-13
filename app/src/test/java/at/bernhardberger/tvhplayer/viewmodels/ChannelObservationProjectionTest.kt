@@ -93,9 +93,16 @@ class ChannelObservationProjectionTest {
             model.reconnectNow()
             runCurrent()
         }
+        assertEquals(0, session.calls.count { it == at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.RETRY })
+        for (failure in failures) {
+            session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(failure)))
+            model.reconnectNow(allowAutomaticBackoff = true)
+            runCurrent()
+        }
         assertEquals(1, session.calls.count { it == at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.RETRY })
         session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
         model.reconnectNow(); runCurrent()
+        model.reconnectNow(allowAutomaticBackoff = true); runCurrent()
         assertEquals(1, session.calls.count { it == at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.RETRY })
     }
 

@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,6 +38,7 @@ import at.bernhardberger.tvhplayer.ui.player.detailsSubtitle
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import kotlinx.coroutines.launch
 
 /** Browse details only; the shell remains the sole owner of the video scrim. */
 @Composable
@@ -53,6 +56,7 @@ internal fun ProgrammeDetailsPage(
     related: List<EpgEvent> = emptyList(),
     onRelated: (EpgEvent) -> Unit = {},
     returnToCard: EventId? = null,
+    onReturnToCardConsumed: () -> Unit = {},
     initialAction: BrowseContextAction? = null,
     backEnabled: Boolean = true,
 ) {
@@ -66,7 +70,13 @@ internal fun ProgrammeDetailsPage(
     val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let(::recordingDetailsFacts).orEmpty()
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
     val panelFocus = remember { FocusRequester() }
+    val readingFocus = remember { FocusRequester() }
+    val readingScroll = rememberScrollState()
+    var readingFocused by remember { mutableStateOf(false) }
+    val pageScroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
     val cardFocus = remember(related.map { it.id }) { related.associate { it.id to FocusRequester() } }
+    val cardBringIntoView = remember(related.map { it.id }) { related.associate { it.id to BringIntoViewRequester() } }
     var more by remember { mutableStateOf(returnToCard != null) }
     var lastAction by remember { mutableStateOf(initialAction ?: actions.firstOrNull()) }
     var lastCard by remember { mutableStateOf(returnToCard ?: related.firstOrNull()?.id) }
@@ -79,9 +89,19 @@ internal fun ProgrammeDetailsPage(
         withFrameNanos { }
         if (more && related.isNotEmpty()) {
             (cardFocus[lastCard] ?: cardFocus.getValue(related.first().id)).requestFocus()
+            if (returnToCard != null) onReturnToCardConsumed()
+        } else if (more && description != null) {
+            readingFocus.requestFocus()
         } else {
             more = false
+            pageScroll.scrollTo(0)
             (lastAction?.takeIf { it in actions }?.let(requesters::get) ?: primary).requestFocus()
+        }
+    }
+    LaunchedEffect(more, lastCard) {
+        if (more) {
+            withFrameNanos { }
+            lastCard?.let { cardBringIntoView[it]?.bringIntoView() }
         }
     }
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
@@ -102,11 +122,11 @@ internal fun ProgrammeDetailsPage(
                         true
                     }
                 }
-                key.key == Key.DirectionDown && !more && related.isNotEmpty() -> {
+                key.key == Key.DirectionDown && !more && (related.isNotEmpty() || description != null) -> {
                     if (key.type == KeyEventType.KeyDown) { transitionKey = key.key; more = true }
                     true
                 }
-                key.key == Key.DirectionUp && more -> {
+                key.key == Key.DirectionUp && more && (related.isNotEmpty() || readingScroll.value == 0) -> {
                     if (key.type == KeyEventType.KeyDown) { transitionKey = key.key; more = false }
                     true
                 }
@@ -132,7 +152,7 @@ internal fun ProgrammeDetailsPage(
                             blendMode = BlendMode.DstIn)
                     })
         }
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+        Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
             .padding(start = 58.dp, end = 58.dp, top = if (more) 40.dp else 116.dp, bottom = 32.dp)) {
             if (more) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -146,7 +166,23 @@ internal fun ProgrammeDetailsPage(
                 Text(stringResource(R.string.details_about), style = MaterialTheme.typography.titleMedium)
                 description?.let {
                     Spacer(Modifier.height(12.dp))
-                    Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = 560.dp).testTag("details-description"))
+                    Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = 560.dp)
+                        .then(if (related.isEmpty()) Modifier.heightIn(max = 320.dp)
+                            .focusRequester(readingFocus)
+                            .onFocusChanged { readingFocused = it.isFocused }
+                            .border(2.dp, if (readingFocused) MaterialTheme.colorScheme.primary else Color.Transparent)
+                            .padding(8.dp)
+                            .onPreviewKeyEvent { event ->
+                                if (event.key == Key.DirectionDown || event.key == Key.DirectionUp) {
+                                    if (event.type == KeyEventType.KeyDown) scope.launch {
+                                        readingScroll.scrollTo((readingScroll.value +
+                                            if (event.key == Key.DirectionDown) 120 else -120).coerceAtLeast(0))
+                                    }
+                                    true
+                                } else false
+                            }
+                            .verticalScroll(readingScroll).focusable() else Modifier)
+                        .testTag("details-description"))
                 }
                 val secondary = listOfNotNull(
                     event?.genre?.takeIf(String::isNotBlank)?.let { stringResource(R.string.details_genre) to it },
@@ -258,7 +294,9 @@ internal fun ProgrammeDetailsPage(
                                 style = MaterialTheme.typography.titleSmall) },
                             subtitle = { Text("${formatHm(item.start.epochSeconds)} · ${formatPlaybackDuration((item.stop - item.start).inWholeSeconds, LocalContext.current.resources)}",
                                 style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            modifier = Modifier.width(180.dp),
+                            modifier = Modifier.width(180.dp)
+                                .bringIntoViewRequester(cardBringIntoView.getValue(item.id))
+                                .padding(bottom = if (more) 45.dp else 0.dp),
                         )
                     }
                 }

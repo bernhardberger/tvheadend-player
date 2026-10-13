@@ -100,6 +100,8 @@ class ProgrammeDetailsPageTest {
         val descriptionBounds = compose.onNodeWithTag("details-description").getUnclippedBoundsInRoot()
         Assert.assertTrue((descriptionBounds.right - descriptionBounds.left).value <= 560f)
         capture("airing-more")
+        val footer = compose.onNodeWithText("21:00 · 1 h").fetchSemanticsNode().boundsInRoot
+        Assert.assertTrue("Keep about 90px below the whole card group", 1080f - footer.bottom in 85f..110f)
         compose.onNodeWithTag("details-card-2").performKeyInput { pressKey(Key.DirectionLeft) }
         compose.onNodeWithTag("details-card-2").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-3").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
@@ -109,6 +111,26 @@ class ProgrammeDetailsPageTest {
     }
     @Test fun futureScheduledWithoutArt() { show(future = true); compose.onNodeWithTag("details-hero").assertDoesNotExist(); capture("future-scheduled-noart") }
     @Test fun recordingPartlyWatched() { show(recording = true); compose.onNodeWithTag("details-resume").assertIsFocused(); capture("recording-partly-watched") }
+    @Test fun recordingWithoutRelatedCanReadAndReturnToActions() = checkReading(recording = true)
+    @Test fun lastProgrammeCanReadAndReturnToActions() = checkReading(recording = false)
+
+    private fun checkReading(recording: Boolean) {
+        show(recording = recording, successors = false)
+        val action = if (recording) "details-resume" else "details-watch"
+        compose.onNodeWithTag(action).assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-description").assertIsFocused().assertIsDisplayed()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-description").assertIsFocused()
+        val scroll = compose.onNodeWithTag("details-description").fetchSemanticsNode()
+            .config[androidx.compose.ui.semantics.SemanticsProperties.VerticalScrollAxisRange]
+        Assert.assertTrue("D-pad scrolls full description", scroll.value() > 0f)
+        // Back always leaves reading, including a scrolled description.
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag(action).assertIsFocused()
+        compose.onNodeWithTag(action).performKeyInput { pressKey(Key.DirectionDown) }
+        repeat(20) { compose.onNodeWithTag("programme-details-page").performKeyInput { pressKey(Key.DirectionUp) } }
+        compose.onNodeWithTag(action).assertIsFocused()
+    }
     @Test fun airingWarm() { show(warm = true); capture("airing-warm") }
     @Test fun airingTwelveHour() {
         AppClock.systemUses24Hour = false; show()
@@ -146,15 +168,22 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals("1 h 52 min", at.bernhardberger.tvhplayer.ui.common.formatPlaybackDuration(6720, resources))
     }
 
-    private fun show(recording: Boolean = false, future: Boolean = false, warm: Boolean = false, fontScale: Float = 1f) {
-        val shown = if (future) EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title) else event
+    private lateinit var back: androidx.activity.OnBackPressedDispatcher
+
+    private fun show(recording: Boolean = false, future: Boolean = false, warm: Boolean = false, fontScale: Float = 1f,
+        successors: Boolean = true) {
+        val shown = if (future) EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title)
+            else if (!successors) EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
+                description = event.description!!.repeat(5)) else event
         val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = event.title,
             start = start, stop = event.stop, image = event.image.takeUnless { future }, summary = event.summary.takeUnless { future },
+            description = event.description?.repeat(5).takeIf { !successors },
             playPosition = 3723.seconds, state = if (future) DvrEntryState.SCHEDULED else DvrEntryState.COMPLETED)
         val now = start.epochSeconds + if (future) -60 else 480
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
                 TVHeadendPlayerTheme {
+                    back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         if (warm) {
@@ -165,7 +194,7 @@ class ProgrammeDetailsPageTest {
                         ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
                             if (recording) recordingDetailsActions(entry, true, true, true)
                             else programmeDetailsActions(shown, now, entry.takeIf { future }, true, true, false),
-                            loader, session, {}, {}, related = if (recording) emptyList() else listOf(next, later))
+                            loader, session, {}, {}, related = if (recording || !successors) emptyList() else listOf(next, later))
                     }
                 }
             }

@@ -66,6 +66,8 @@ internal fun settingsConnectionLevels(
     return listOf(
         settingsConnectionOverview(status, available?.host, available?.port,
             degraded = presentation.degraded, onRetry = onRetry,
+            connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
+                connection == ConnectionUiState.SyncingChannels,
             recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS),
         settingsLevel(CONNECTION_EDITOR, stringResource(R.string.edit_connection),
             listOf(settingsRow("editor-placeholder", stringResource(R.string.edit_connection))),
@@ -83,15 +85,17 @@ internal fun settingsConnectionLevels(
 internal fun settingsConnectionOverview(
     status: String, host: String?, port: Int?, degraded: Boolean = false,
     onRetry: () -> Unit = {}, recoveryRequiresSettings: Boolean = false,
+    connecting: Boolean = false,
 ): DepthLevel {
+    val showRetry = degraded && !recoveryRequiresSettings
+    val retryAction: () -> Unit = { if (!connecting) onRetry() }
     val missing = stringResource(R.string.connection_overview_unavailable)
     val edit = settingsRow(EDIT_CONNECTION, stringResource(R.string.edit_connection),
         supporting = stringResource(R.string.edit_connection_description), trailingIcon = R.drawable.ic_edit)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
-        supporting = stringResource(R.string.connection_retry_description), trailingIcon = R.drawable.ic_refresh,
-        onClick = onRetry)
-    val retryRow = DepthRow(DepthItem(RETRY_CONNECTION), onActivate = onRetry,
-        leafLevelId = if (recoveryRequiresSettings) CONNECTION_EDITOR else null) { modifier, activate ->
+        supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
+        trailingIcon = R.drawable.ic_refresh, onClick = retryAction)
+    val retryRow = DepthRow(DepthItem(RETRY_CONNECTION), onActivate = retryAction) { modifier, activate ->
         Column {
             ConnectionValueRow(stringResource(R.string.connection_overview_status), status)
             retry.content(modifier, activate)
@@ -100,15 +104,15 @@ internal fun settingsConnectionOverview(
     // Information scrolls with its next action; it never becomes a D-pad stop.
     val row = DepthRow(DepthItem(EDIT_CONNECTION), leafLevelId = CONNECTION_EDITOR) { modifier, activate ->
         Column {
-            if (!degraded) ConnectionValueRow(stringResource(R.string.connection_overview_status), status)
+            if (!showRetry) ConnectionValueRow(stringResource(R.string.connection_overview_status), status)
             ConnectionValueRow(stringResource(R.string.connection_overview_server), host ?: missing)
             ConnectionValueRow(stringResource(R.string.port_htsp), port?.toString() ?: missing)
             edit.content(modifier, activate)
         }
     }
     return settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        (if (degraded) listOf(retryRow) else emptyList()) + row,
-        initialItemId = if (degraded) RETRY_CONNECTION else EDIT_CONNECTION)
+        (if (showRetry) listOf(retryRow) else emptyList()) + row,
+        initialItemId = if (showRetry) RETRY_CONNECTION else EDIT_CONNECTION)
 }
 
 @Composable

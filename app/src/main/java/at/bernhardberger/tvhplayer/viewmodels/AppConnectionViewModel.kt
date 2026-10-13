@@ -61,15 +61,13 @@ class AppConnectionViewModel(
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConnectionPresentation())
 
-    fun reconnectNow() {
+    fun reconnectNow(allowAutomaticBackoff: Boolean = false) {
         viewModelScope.launch {
             val state = session.observation.value.sessionState
             if (
                 state is SessionState.Unavailable &&
-                state.reason.recoveryDisposition in setOf(
-                    SessionRecoveryDisposition.EXPLICIT_RETRY,
-                    SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
-                )
+                (state.reason.recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY ||
+                    allowAutomaticBackoff && state.reason.recoveryDisposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
             ) {
                 session.retry()
             }

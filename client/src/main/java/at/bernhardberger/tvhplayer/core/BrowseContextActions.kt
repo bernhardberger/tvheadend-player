@@ -56,7 +56,10 @@ fun recordingContextActions(
     canModifyRecordings: Boolean,
 ): List<BrowseContextAction> = buildList {
     if (playbackEligible) when (entry.state) {
-        DvrEntryState.RECORDING -> add(BrowseContextAction.WATCH)
+        DvrEntryState.RECORDING -> {
+            add(BrowseContextAction.WATCH)
+            if ((entry.playPosition?.inWholeSeconds ?: 0L) > 0L) add(BrowseContextAction.START_OVER)
+        }
         DvrEntryState.COMPLETED -> {
             if ((entry.playPosition?.inWholeSeconds ?: 0L) > 0L) {
                 add(BrowseContextAction.RESUME)

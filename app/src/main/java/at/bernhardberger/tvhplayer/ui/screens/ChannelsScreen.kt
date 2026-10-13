@@ -780,6 +780,8 @@ internal fun ChannelsScreenContent(
                         ) {
                             items(channels, key = { ch -> channelLazyItemKey(ch.id) }) { ch ->
                                 val channelId = ch.id
+                                // A focused lazy item can stay pinned for the publication that removes it.
+                                if (owner.isCurrent && channelId !in rowFocusRequesters) return@items
                                 val nowSec = nowSecProvider()
                                 val now =
                                     remember(channelId, observation, nowSec) {

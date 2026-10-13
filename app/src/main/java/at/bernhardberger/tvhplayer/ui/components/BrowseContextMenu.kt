@@ -17,12 +17,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -55,12 +57,18 @@ internal fun BrowseContextMenu(
     programDetailsLabel: Boolean = false,
     logo: @Composable () -> Unit,
 ) {
-    val requesters = remember(actions) { actions.map { FocusRequester() } }
+    val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
+    var focusedAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    var focusedIndex by remember { mutableStateOf(0) }
     var openingReleasePending by remember { mutableStateOf(true) }
     BackHandler(onBack = onClose)
     LaunchedEffect(actions) {
         withFrameNanos { }
-        requesters.getOrNull(actions.indexOf(initialAction).coerceAtLeast(0))?.requestFocus()
+        if (focusedAction !in actions) {
+            val target = if (focusedAction == null) initialAction?.takeIf { it in actions } ?: actions.firstOrNull()
+                else actions.getOrNull(focusedIndex) ?: actions.firstOrNull()
+            target?.let { requesters.getValue(it).requestFocus() }
+        }
     }
     PlaybackOptionsOverlayFrame(
         paneTitle = title,
@@ -94,12 +102,15 @@ internal fun BrowseContextMenu(
             }
             Spacer(Modifier.height(8.dp))
             actions.forEachIndexed { index, action ->
+                key(action) {
                 Button(
                     onClick = { onAction(action) },
                     modifier = Modifier.fillMaxWidth().height(48.dp)
-                        .focusRequester(requesters[index]).focusProperties {
-                            up = requesters.getOrNull(index - 1) ?: FocusRequester.Cancel
-                            down = requesters.getOrNull(index + 1) ?: FocusRequester.Cancel
+                        .focusRequester(requesters.getValue(action))
+                        .onFocusChanged { if (it.isFocused) { focusedAction = action; focusedIndex = index } }
+                        .focusProperties {
+                            up = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
+                            down = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             left = FocusRequester.Cancel
                             right = FocusRequester.Cancel
                         },
@@ -110,6 +121,7 @@ internal fun BrowseContextMenu(
                     Spacer(Modifier.width(12.dp))
                     Text(stringResource(if (programDetailsLabel && action == BrowseContextAction.DETAILS)
                         R.string.details_program else action.label(watchChannel)), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
                 }
             }
         }

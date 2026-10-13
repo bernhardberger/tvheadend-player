@@ -195,7 +195,8 @@ class GuideRenderingCostContractTest {
             "internal fun TimelineChannelRow(",
             "internal fun TimelineChannelHeader(",
         )
-        val details = screenSource.substringAfter("ProgrammeDetailsHost(")
+        val details = File(repositoryRoot,
+            "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ProgrammeDetailsHost.kt").readText()
         val clock = screenSource.substringAfter("private fun rememberCurrentEpochSeconds()")
 
         assertEquals(1, guide.count("val nowSecProvider = rememberCurrentEpochSeconds()"))
@@ -203,6 +204,9 @@ class GuideRenderingCostContractTest {
         assertTrue(ruler.contains("val nowSec = nowSecProvider()"))
         assertTrue(row.contains("val nowSec = nowSecProvider()"))
         assertTrue(details.contains("nowSec = nowSecProvider()"))
+        assertTrue(guide.substringAfter("ProgrammeDetailsHost(").contains("nowSecProvider = nowSecProvider"))
+        assertFalse(guide.substringAfter("ProgrammeDetailsHost(").substringBefore("if (showJumpDialog)")
+            .contains("nowSecProvider()"))
         assertEquals(1, clock.count("mutableLongStateOf("))
         assertTrue(clock.contains("return remember(nowSec) { { nowSec.longValue } }"))
     }

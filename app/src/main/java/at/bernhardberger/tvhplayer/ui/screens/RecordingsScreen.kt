@@ -720,7 +720,8 @@ internal fun RecordingsScreenContent(
                         detailsInitialAction = null
                         requestContentFocus = true
                         onPlayRecording(RecordingPlaybackSelection(it, opened.id),
-                            if (action == BrowseContextAction.RESUME) RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
+                            if (action == BrowseContextAction.RESUME || action == BrowseContextAction.WATCH)
+                                RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
                     }
                     BrowseContextAction.STOP -> {
                         detailsInitialAction = RecordingDetailsAction.STOP

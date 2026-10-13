@@ -70,7 +70,7 @@ val appModule = module {
         }
     }
 
-    single {
+    single(createdAtStart = true) {
         at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(
             get<SdkRuntimeOwner>().session.observation, get<AppProfileOwner>().configurationGeneration, get(),
         ).also { source ->

@@ -997,9 +997,13 @@ class RecordingsScreenTest {
             .performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionUp); pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("details-start_over").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("details-stop").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionDown); pressKey(Key.DirectionUp) }
         composeRule.onNodeWithTag("details-stop").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionLeft) }
+        composeRule.onNodeWithTag("details-start_over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionLeft) }
         composeRule.onNodeWithTag("details-watch").assertIsFocused().pressCenter()
         composeRule.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
@@ -1013,7 +1017,9 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused()
             .performKeyInput { pressKey(Key.Menu) }
-        composeRule.onNodeWithText("Start over").requestFocus().pressCenter()
+        composeRule.onNodeWithText("Watch").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithText("Start over").assertIsFocused().pressCenter()
         composeRule.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
         composeRule.onAllNodesWithTag("programme-details-page").assertCountEquals(0)
     }
@@ -1032,6 +1038,8 @@ class RecordingsScreenTest {
 
         composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
         composeRule.onNodeWithTag("details-watch").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        composeRule.onNodeWithTag("details-start_over").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionRight) }
         composeRule.onNodeWithTag("details-stop").assertIsFocused().pressCenter()
         composeRule.onNodeWithTag("recording-confirmation-back").assertIsFocused()

@@ -835,7 +835,7 @@ fun AppRoot(
                         SettingsRouteContent(
                             channelsVm = channelsVm,
                             connectionPresentation = connectionPresentation,
-                            onRetry = appVm::reconnectNow,
+                            onRetry = { appVm.reconnectNow(allowAutomaticBackoff = true) },
                             contentAllowed = contentAllowed,
                             section = destination.section,
                             isCurrent = currentDestination == destination,

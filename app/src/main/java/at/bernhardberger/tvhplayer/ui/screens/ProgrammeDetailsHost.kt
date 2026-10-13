@@ -27,7 +27,7 @@ internal fun ProgrammeDetailsHost(
     openingObservation: SessionObservation,
     observation: SessionObservation,
     currentObservation: () -> SessionObservation,
-    nowSec: Long,
+    nowSecProvider: () -> Long,
     fromGuide: Boolean,
     showContextMenu: Boolean,
     onShowDetails: () -> Unit,
@@ -39,6 +39,7 @@ internal fun ProgrammeDetailsHost(
     onShowGuide: (ChannelId) -> Unit = {},
     onClose: () -> Unit,
 ) {
+    val nowSec = nowSecProvider()
     var selected by remember { mutableStateOf(openingEvent) }
     var stack by remember { mutableStateOf<List<Pair<EpgEvent, EventId>>>(emptyList()) }
     var returnCard by remember { mutableStateOf<EventId?>(null) }
@@ -130,7 +131,7 @@ internal fun ProgrammeDetailsHost(
             logo = { PiconBox(imageLoader, channel?.icon, Modifier.size(56.dp, 40.dp), capability) },
         )
     } else if (!showContextMenu && pendingAction == null && configs == null) {
-        key(event.id, returnCard) {
+        key(event.id) {
             ProgrammeDetailsPage(event, recording, channel, nowSec,
                 actions,
                 imageLoader, capability, act,
@@ -149,6 +150,7 @@ internal fun ProgrammeDetailsHost(
                     channelSchedule(observation.nextEvent(ch.id, event.start), { observation.nextEvent(ch.id, it) }, 8)
                 }.orEmpty(),
                 returnToCard = returnCard,
+                onReturnToCardConsumed = { returnCard = null },
                 onRelated = { next ->
                     stack = stack + (event to next.id)
                     selected = next

@@ -28,7 +28,9 @@ internal fun ChannelContextMenu(
     onPlayRecording: ((RecordingPlaybackSelection) -> Unit)? = null,
 ) {
     val opening = remember { observation }
-    val channel = opening.channel(channelId) ?: return
+    val channel = observation.channel(channelId)
+    LaunchedEffect(channel) { if (channel == null) onClose() }
+    if (channel == null) return
     val event = remember { opening.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(nowSec)) }
     val capability = opening.currentSession?.takeIf { it === observation.currentSession }
     val session: TvheadendSession = koinInject()
@@ -36,7 +38,7 @@ internal fun ChannelContextMenu(
     val mutations = remember(session) { DvrMutationActions(session.dvrRepository) }
     LaunchedEffect(capability) { if (capability == null) onClose() }
     if (event != null) {
-        ProgrammeDetailsHost(event, opening, observation, { session.observation.value }, nowSec,
+        ProgrammeDetailsHost(event, opening, observation, { session.observation.value }, { nowSec },
             fromGuide = false, showContextMenu = !showDetails, onShowDetails = onShowDetails,
             imageLoader = imageLoader, mutations = mutations, notices = notices,
             onPlay = onPlay, onPlayRecording = onPlayRecording, onShowGuide = onShowGuide, onClose = onClose)

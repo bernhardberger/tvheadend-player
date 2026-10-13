@@ -78,6 +78,7 @@ class GuideHistoryScreenTest {
     @Test fun airingStopUsesExistingConfirmationAndKeepsPartialRecording() = exercise("en", 1f, "airing-stop")
     @Test fun airingScheduledEntryUsesExistingCancelConfirmation() = exercise("en", 1f, "airing-cancel")
     @Test fun detailsStackBackRestoresGuideOriginAndSuppressesOpeningRelease() = exercise("en", 1f, "stack")
+    @Test fun confirmationAfterPoppingDetailsRestoresActionNotCard() = exercise("en", 1f, "stack-confirm")
 
     private fun exercise(locale: String, scale: Float, transition: String? = null, replaceSession: Boolean = false,
         activationKeyCode: Int = android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
@@ -155,7 +156,7 @@ class GuideHistoryScreenTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
-        if (transition == "stack") {
+        if (transition == "stack" || transition == "stack-confirm") {
             key(Key.DirectionCenter)
             compose.onNodeWithTag("details-watch").assertIsFocused()
             compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
@@ -170,6 +171,12 @@ class GuideHistoryScreenTest {
             compose.onNodeWithTag("details-card-111").assertIsFocused()
             compose.runOnIdle { back.onBackPressed() }
             compose.onNodeWithTag("details-watch").assertIsFocused()
+            if (transition == "stack-confirm") {
+                compose.onNodeWithTag("details-record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText(context.getString(R.string.dont_record)).assertIsFocused()
+                compose.runOnIdle { back.onBackPressed() }
+                compose.onNodeWithTag("details-record").assertIsFocused()
+            }
             compose.runOnIdle { back.onBackPressed() }
             focused("Channel 1 hour 0")
             return
