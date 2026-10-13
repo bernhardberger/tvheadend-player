@@ -193,7 +193,7 @@ class GuideVisualLayoutTest {
         assertReadableFocus()
         bitmap.recycle()
         key(Key.DirectionCenter)
-        compose.onNodeWithTag("programme-details-panel").assertIsDisplayed()
+        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
         compose.onNodeWithText(context().getString(R.string.close)).assertDoesNotExist()
         assertNoPlayback()
     }

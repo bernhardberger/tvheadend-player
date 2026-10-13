@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.guideContextActions
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
@@ -164,7 +166,6 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePassiveNotice
 import at.bernhardberger.tvhplayer.ui.screens.guide.EpgSearchDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.JumpToTimeDialog
-import at.bernhardberger.tvhplayer.ui.screens.guide.ProgrammeDetailsPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
@@ -442,28 +443,9 @@ fun EpgGridScreen(
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
     var showContextMenu by remember { mutableStateOf(false) }
-    var contextReturnAction by remember { mutableStateOf<BrowseContextAction?>(null) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
-    var detailsOpening by remember { mutableStateOf<Any?>(null) }
     var restoreDetailsFocus by remember { mutableStateOf(false) }
     var detailsFromSearch by remember { mutableStateOf(false) }
-    var pendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
-    var confirmationKey by remember(detailsOpening) { mutableStateOf<Key?>(null) }
-    val confirmationKeyHandler: (KeyEvent) -> Boolean = { event ->
-        // Dialog windows do not share preview dispatch. Keep the interrupted
-        // confirmation's key cycle here until the refreshed details sees its release.
-        if (event.key == confirmationKey && pendingAction == null) {
-            if (event.type == KeyEventType.KeyUp) confirmationKey = null
-            true
-        } else {
-            if (pendingAction != null && event.type == KeyEventType.KeyDown) confirmationKey = event.key
-            if (event.key == confirmationKey && event.type == KeyEventType.KeyUp) confirmationKey = null
-            false
-        }
-    }
-    var configChoices by remember { mutableStateOf<List<DvrConfiguration>?>(null) }
-    var pendingRecordingTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
-    var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var showJumpDialog by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
@@ -498,7 +480,7 @@ fun EpgGridScreen(
     val mayFocusProgramme by rememberUpdatedState(
         initialFocusEnabled && programmeFocusOwned &&
             detailsEvent == null && !showSearchDialog && !showJumpDialog &&
-            pendingAction == null && configChoices == null && channelFocusRequest == null
+            channelFocusRequest == null
     )
 
     val displayEvents = remember(observation.epgSnapshotForDisplay) { guideDisplayEvents(observation.epgSnapshotForDisplay) }
@@ -804,8 +786,7 @@ fun EpgGridScreen(
     }
 
     val programmeBackEnabled = indexCurrent && initialFocusEnabled && programmeFocusOwned &&
-        detailsEvent == null && !showSearchDialog && !showJumpDialog &&
-        pendingAction == null && configChoices == null
+        detailsEvent == null && !showSearchDialog && !showJumpDialog
     BackHandler(enabled = programmeBackEnabled) { focusScopeFromProgramme() }
 
     LaunchedEffect(initialFocusEnabled) {
@@ -1588,7 +1569,6 @@ fun EpgGridScreen(
         val searchEventId = detailsEvent?.id.takeIf { detailsFromSearch }
         detailsEvent = null
         detailsObservation = null
-        detailsOpening = null
         if (showSearchDialog && searchEventId != null) {
             restoreSearchResultFocus = searchEventId
         } else {
@@ -1615,10 +1595,6 @@ fun EpgGridScreen(
                 detailsEvent = null
                 detailsObservation = null
                 detailsFromSearch = false
-                pendingAction = null
-                pendingMutation = null
-                pendingRecordingTarget = null
-                configChoices = null
             }
             closeSearch()
         }
@@ -1652,6 +1628,7 @@ fun EpgGridScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .graphicsLayer { alpha = if (detailsEvent != null && !showContextMenu) 0f else 1f }
                 .focusProperties {
                     onEnter = {
                         if (requestedFocusDirection == FocusDirection.Right) {
@@ -2074,7 +2051,6 @@ fun EpgGridScreen(
                                     it.id,
                                 )
                                 detailsEvent = it
-                                detailsOpening = Any()
                                 detailsObservation = observation
                                 detailsFromSearch = false
                                 showContextMenu = false
@@ -2088,11 +2064,9 @@ fun EpgGridScreen(
                                 releaseProgrammeFocus()
                                 selectedTarget = EpgFocusTarget(channelIndex, it.id)
                                 detailsEvent = it
-                                detailsOpening = Any()
                                 detailsObservation = observation
                                 detailsFromSearch = false
                                 showContextMenu = true
-                                contextReturnAction = null
                             },
                             visibleRowWidthPx = LocalBrowseVisibleWidthPx.current?.minus(
                                 with(LocalDensity.current) {
@@ -2152,7 +2126,6 @@ fun EpgGridScreen(
                         if (resultObservation != null) {
                             releaseProgrammeFocus()
                             detailsEvent = event
-                            detailsOpening = Any()
                             detailsObservation = resultObservation
                             detailsFromSearch = true
                             restoreSearchResultFocus = null
@@ -2165,223 +2138,13 @@ fun EpgGridScreen(
 
         detailsEvent?.let { openingEvent ->
             val openingObservation = detailsObservation ?: return@let
-            LaunchedEffect(openingObservation.currentSession, currentSession) {
-                if (openingObservation.currentSession == null || openingObservation.currentSession !== currentSession) {
-                    pendingAction = null
-                    pendingMutation = null
-                    pendingRecordingTarget = null
-                    configChoices = null
-                    closeDetails()
-                    closeSearch()
-                }
-            }
-            val selectedObservation = searchResultObservation(openingObservation, observation)
-                ?: return@let
-            val detailEvents = remember(selectedObservation.epgSnapshotForDisplay) {
-                guideDisplayEvents(selectedObservation.epgSnapshotForDisplay)
-            }
-            val event = detailEvents
-                ?.firstOrNull { it.id == openingEvent.id } ?: openingEvent
-            val selectedCapability = selectedObservation.currentSession
-                ?.takeIf { observation.currentSession === it }
-            val liveEvent = selectedObservation.event(event.id)?.takeIf { it == event }
-            val eventChannelId = event.channelId
-            val channel = eventChannelId?.let(selectedObservation::channel)
-            val recording = selectedObservation.dvrEntryForProgramme(event)
-            val handleAction: (ProgrammeAction) -> Unit = actionHandler@{ action ->
-                    if (
-                        selectedObservation.currentSession == null ||
-                        selectedObservation.currentSession !== observationState.value.currentSession
-                    ) {
-                        closeDetails()
-                        closeSearch()
-                        return@actionHandler
-                    }
-                    when (action) {
-                        ProgrammeAction.WATCH -> {
-                            if (liveEvent != null && selectedCapability != null && channel != null) {
-                                detailsEvent = null
-                                detailsObservation = null
-                                detailsOpening = null
-                                detailsFromSearch = false
-                                onPlay(
-                                    LivePlaybackSelection(selectedCapability, channel.id),
-                                    channel.name.orEmpty(),
-                                )
-                            }
-                        }
-                        ProgrammeAction.WATCH_FROM_START -> {
-                            if (recording != null && selectedCapability != null) {
-                                onPlayRecording(
-                                    RecordingPlaybackSelection(
-                                        selectedCapability,
-                                        recording.id,
-                                    )
-                                )
-                            }
-                        }
-                        ProgrammeAction.RECORD -> if (selectedCapability != null && liveEvent != null) {
-                            when (
-                                val choice = chooseDvrConfig(
-                                    selectedObservation.currentDvrConfigurations()
-                                )
-                            ) {
-                                is DvrConfigChoice.Automatic -> {
-                                    pendingMutation = DvrMutationAction.CreateProgramme(
-                                        target = event.programmeRecordingTarget(selectedCapability),
-                                        configId = choice.configId,
-                                    )
-                                    pendingAction = action
-                                }
-                                is DvrConfigChoice.RequiresSelection -> {
-                                    pendingRecordingTarget = event.programmeRecordingTarget(
-                                        selectedCapability
-                                    )
-                                    configChoices = choice.configs
-                                }
-                            }
-                        }
-                        ProgrammeAction.CANCEL_RECORDING -> if (
-                            selectedCapability != null && recording != null
-                        ) {
-                            pendingMutation = DvrMutationAction.Cancel(
-                                selectedCapability,
-                                recording.id,
-                            )
-                            pendingAction = action
-                        }
-                        ProgrammeAction.STOP_RECORDING -> if (
-                            selectedCapability != null && recording != null
-                        ) {
-                            pendingMutation = DvrMutationAction.Stop(
-                                selectedCapability,
-                                recording.id,
-                            )
-                            pendingAction = action
-                        }
-                    }
-                }
-            if (pendingAction == null) {
-                if (showContextMenu) BrowseContextMenu(
-                    initialAction = contextReturnAction,
-                    title = event.title.orEmpty(),
-                    metadata = channel?.name.orEmpty(),
-                    timeRange = "${event.start.epochSeconds.formatDateTime()}–${formatHm(event.stop.epochSeconds)}",
-                    actions = guideContextActions(event, nowSecProvider(), recording,
-                        selectedCapability != null && (liveEvent != null || recording != null) &&
-                            (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
-                                ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED),
-                    watchChannel = true,
-                    onClose = ::closeDetails,
-                    onAction = { action ->
-                        contextReturnAction = action
-                        showContextMenu = action in listOf(BrowseContextAction.RECORD, BrowseContextAction.STOP, BrowseContextAction.CANCEL)
-                        when (action) {
-                            BrowseContextAction.WATCH -> {
-                                if (selectedCapability != null && channel != null &&
-                                    selectedCapability === observationState.value.currentSession
-                                ) {
-                                    closeDetails()
-                                    onPlay(LivePlaybackSelection(selectedCapability, channel.id), channel.name.orEmpty())
-                                } else closeDetails()
-                            }
-                            BrowseContextAction.RECORD -> handleAction(ProgrammeAction.RECORD)
-                            BrowseContextAction.STOP -> handleAction(ProgrammeAction.STOP_RECORDING)
-                            BrowseContextAction.CANCEL -> handleAction(ProgrammeAction.CANCEL_RECORDING)
-                            else -> Unit
-                        }
-                    },
-                    logo = {
-                        PiconBox(imageLoader = imageLoader, currentSession = selectedObservation.currentSession,
-                            piconPath = channel?.icon, modifier = Modifier.width(56.dp).height(40.dp))
-                    },
-                ) else ProgrammeDetailsPanel(
-                    imageLoader = imageLoader,
-                    currentSession = selectedObservation.currentSession,
-                    onPreviewKeyEvent = confirmationKeyHandler,
-                    event = event,
-                    channel = channel,
-                    recording = recording,
-                    nowSecProvider = nowSecProvider,
-                    canModifyRecordings = selectedCapability != null && (liveEvent != null || recording != null),
-                    liveProgrammeActions = liveEvent != null,
-                    notices = { AppShellNoticeHost(queue = notices) },
-                    onAction = handleAction,
-                    onClose = ::closeDetails,
-                )
-            }
-        }
-
-        val confirmationAction = pendingAction
-        val confirmationEvent = detailsEvent
-        val confirmationMutation = currentDvrMutation(
-            pendingMutation,
-            detailsObservation,
-            observation,
-        )
-        val recordingTargetCurrent = currentGuideRecordingTarget(pendingRecordingTarget, observation) != null
-        LaunchedEffect(confirmationAction, confirmationMutation, configChoices, currentSession, recordingTargetCurrent) {
-            if (
-                confirmationAction != null && confirmationMutation == null ||
-                configChoices != null && (!recordingTargetCurrent || currentSession == null ||
-                    detailsObservation?.currentSession !== currentSession)
-            ) {
-                pendingAction = null
-                pendingMutation = null
-                pendingRecordingTarget = null
-                configChoices = null
-            }
-        }
-        if (
-            confirmationAction != null &&
-            confirmationEvent != null &&
-            confirmationMutation != null
-        ) {
-            ConfirmProgrammeActionDialog(
-                onPreviewKeyEvent = confirmationKeyHandler,
-                action = confirmationAction,
-                programmeTitle = confirmationEvent.title.orEmpty(),
-                channelName = confirmationEvent.channelId?.let(observation::channel)?.name.orEmpty(),
-                dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(confirmationEvent.start.epochSeconds,
-                    confirmationEvent.stop.epochSeconds.takeIf { confirmationAction == ProgrammeAction.RECORD }),
-                onDismiss = {
-                    pendingAction = null
-                    pendingMutation = null
-                },
-                onConfirm = {
-                    pendingAction = null
-                    val mutation = currentDvrMutation(
-                        pendingMutation,
-                        detailsObservation,
-                        observationState.value,
-                    )
-                    pendingMutation = null
-                    pendingRecordingTarget = null
-                    if (mutation != null) {
-                        val openingObservation = detailsObservation
-                        coroutineScope.launch {
-                            val currentMutation = currentDvrMutation(mutation, openingObservation, observationState.value)
-                                ?: return@launch
-                            val noticeContext = notices.context()
-                            val feedback = dvrMutationActions.execute(currentMutation)
-                            notices.postDvrFailure(currentMutation, feedback, noticeContext)
-                        }
-                    }
-                },
-            )
-        }
-
-        configChoices?.takeIf { recordingTargetCurrent }?.let { configs ->
-            DvrConfigDialog(
-                configs = configs,
-                onDismiss = { configChoices = null },
-                onSelect = { config ->
-                    configChoices = null
-                    pendingMutation = currentGuideRecordingTarget(pendingRecordingTarget, observationState.value)?.let { target ->
-                        DvrMutationAction.CreateProgramme(target, config.id)
-                    }
-                    pendingAction = ProgrammeAction.RECORD.takeIf { pendingMutation != null }
-                },
+            ProgrammeDetailsHost(
+                openingEvent = openingEvent, openingObservation = openingObservation,
+                observation = observation, currentObservation = { observationState.value },
+                nowSec = nowSecProvider(), fromGuide = true, showContextMenu = showContextMenu,
+                onShowDetails = { showContextMenu = false }, imageLoader = imageLoader,
+                mutations = dvrMutationActions, notices = notices, onPlay = onPlay,
+                onPlayRecording = onPlayRecording, onClose = ::closeDetails,
             )
         }
 

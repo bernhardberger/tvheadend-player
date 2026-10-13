@@ -37,8 +37,9 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.screens.guide.ProgrammeDetailsPanel
-import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingDetailsPanel
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.core.recordingDetailsActions
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
@@ -97,24 +98,25 @@ class ProgrammeDetailsCaptureTest {
 
     @Test fun guideBackFromMoreInfoReturnsToDetailsThenCloses() {
         var shown by mutableStateOf(true)
+        lateinit var dispatcher: OnBackPressedDispatcher
         val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds,
             title = "Ridge Light", subtitle = "Beyond the Arctic Circle", description = description)
         compose.setContent {
             TVHeadendPlayerTheme {
-                if (shown) ProgrammeDetailsPanel(event, channel, null, { start.epochSeconds - 60 },
-                    true, {}, { shown = false }, loader, session)
+                dispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                if (shown) ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
+                    programmeDetailsActions(event, start.epochSeconds - 60, null, true, true, true),
+                    loader, session, {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
+                        channel.id, event.stop, event.stop + 3600.seconds, title = "Next")))
             }
         }
-        val moreInfo = ApplicationProvider.getApplicationContext<Application>().getString(R.string.details_read_more)
-        compose.onNodeWithText(moreInfo).performSemanticsAction(SemanticsActions.RequestFocus).assertIsFocused()
-            .performSemanticsAction(SemanticsActions.OnClick)
-        compose.onNodeWithText(moreInfo).assertDoesNotExist()
-        val back = { compose.runOnIdle { (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed() } }
-        // Like the player: Back leaves the full description first, with focus back on More info.
+        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        val back = { compose.runOnIdle { dispatcher.onBackPressed() } }
         back()
-        compose.onNodeWithText(moreInfo).assertIsFocused()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
         back()
-        compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.runOnIdle { assertEquals(false, shown) }
     }
 
@@ -124,10 +126,12 @@ class ProgrammeDetailsCaptureTest {
         val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds, title = "Ridge Light")
         compose.setContent {
             TVHeadendPlayerTheme {
-                ProgrammeDetailsPanel(event, channel, null, { now }, canModify, {}, {}, loader, session)
+                ProgrammeDetailsPage(event, null, channel, now,
+                    programmeDetailsActions(event, now, null, canModify, now >= start.epochSeconds, true),
+                    loader, session, {}, {})
             }
         }
-        compose.onNodeWithTag("programme-details-panel").assertIsFocused()
+        compose.onNodeWithTag("programme-details-page").assertIsFocused()
         compose.runOnIdle { canModify = true }
         compose.onNodeWithText("Record").assertIsFocused()
         // The programme starts: Watch joins ahead of Record, and the focused Record stays focused.
@@ -148,15 +152,17 @@ class ProgrammeDetailsCaptureTest {
                 Box(Modifier.fillMaxSize()) {
                     Button(onClick = {}) { Text("Underlying action") }
                     if (shown) {
-                        if (guide) ProgrammeDetailsPanel(event, channel, null, { start.epochSeconds - 60 },
-                            canModify, {}, { shown = false }, loader, session)
-                        else RecordingDetailsPanel(entry, canModify, false, null, true,
-                            {}, {}, {}, {}, { shown = false }, loader, session, channel)
+                        if (guide) ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
+                            programmeDetailsActions(event, start.epochSeconds - 60, null, canModify, false, true),
+                            loader, session, {}, { shown = false })
+                        else ProgrammeDetailsPage(null, entry, channel, 0L,
+                            recordingDetailsActions(entry, false, canModify, false),
+                            loader, session, {}, { shown = false })
                     }
                 }
             }
         }
-        val panel = compose.onNodeWithTag(if (guide) "programme-details-panel" else "recording-details-panel")
+        val panel = compose.onNodeWithTag("programme-details-page")
         panel.assertIsFocused()
         compose.onNodeWithText("Close").assertDoesNotExist()
         // A newly available action takes over, then its removal returns focus to the panel.
@@ -170,8 +176,7 @@ class ProgrammeDetailsCaptureTest {
         }
         // Robolectric key injection does not dispatch platform Back to the activity/dialog.
         compose.runOnIdle {
-            if (guide) (ShadowDialog.getLatestDialog() as ComponentDialog).onBackPressedDispatcher.onBackPressed()
-            else backDispatcher.onBackPressed()
+            backDispatcher.onBackPressed()
         }
         panel.assertDoesNotExist()
         compose.runOnIdle { assertEquals(false, shown) }
@@ -196,33 +201,42 @@ class ProgrammeDetailsCaptureTest {
                                 { shown, modifier -> ProgrammeHero(shown.image, channel.id, "101", channel.icon, loader, session, modifier) },
                                 { null }, true, remember { FocusRequester() }, remember { FocusRequester() }, {})
                         }
-                        else if (guide) ProgrammeDetailsPanel(event, channel,
-                            entry.takeIf { scheduled }, { start.epochSeconds + if (scheduled) -60 else 600 }, true, {}, {}, loader, session)
-                        else RecordingDetailsPanel(entry, true, true, null, true,
-                            {}, {}, {}, {}, {}, loader, session, channel)
+                        else if (guide) ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
+                            start.epochSeconds + if (scheduled) -60 else 600,
+                            programmeDetailsActions(event, start.epochSeconds + if (scheduled) -60 else 600,
+                                entry.takeIf { scheduled }, true, true, true), loader, session, {}, {})
+                        else ProgrammeDetailsPage(null, entry, channel, 0L,
+                            recordingDetailsActions(entry, true, true, true), loader, session, {}, {})
                     }
                 }
             }
         }
         compose.waitForIdle()
         if (!player) compose.onNodeWithText("Close").assertDoesNotExist()
-        if (failed) compose.onNodeWithTag("recording-details-delete").assertIsFocused()
+        if (failed) compose.onNodeWithTag("details-delete").assertIsFocused()
         // xhdpi: all three real hosts share x130/x562, y156 and 268dp slots.
         val reading = compose.onNodeWithTag("details-information", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val actions = compose.onNodeWithTag("details-actions", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(260f, reading.left, .1f)
-        assertEquals(1124f, actions.left, .1f)
-        assertEquals(312f, reading.top, .1f)
-        assertEquals(reading.top, actions.top, .1f)
-        assertEquals(536f, reading.width, .1f)
-        assertEquals(reading.width, actions.width, .1f)
+        if (player) {
+            assertEquals(260f, reading.left, .1f)
+            assertEquals(1124f, actions.left, .1f)
+            assertEquals(312f, reading.top, .1f)
+            assertEquals(reading.top, actions.top, .1f)
+            assertEquals(536f, reading.width, .1f)
+            assertEquals(reading.width, actions.width, .1f)
+        } else {
+            assertEquals(116f, reading.left, .1f)
+            assertEquals(reading.left, actions.left, .1f)
+            assertEquals(232f, reading.top, .1f)
+            org.junit.Assert.assertTrue(actions.top >= reading.bottom + 56f)
+            org.junit.Assert.assertTrue(reading.width <= 968f)
+        }
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle {
             val canvas = Canvas(bitmap)
             view.draw(canvas)
-            if (guide) ShadowDialog.getLatestDialog().window!!.decorView.draw(canvas)
         }
         val directory = File("build/outputs/details-unify").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }

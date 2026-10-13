@@ -115,10 +115,10 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-2")
         key(Key.DirectionRight)
         focused("recording-list-entry-2")
-        compose.onNodeWithTag("recording-details-panel").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         key(Key.Menu)
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-panel").assertIsDisplayed()
+        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
         key(Key.Back)
         focused("recording-list-entry-2")
         key(Key.DirectionLeft)
@@ -152,8 +152,8 @@ class RecordingsVisualLayoutTest {
         capture("focused-recording-metadata", 1f)
         key(Key.Menu)
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-resume").assertIsFocused()
-        compose.onNodeWithContentDescription("Resume from 1 hour, 2 minutes, 3 seconds")
+        compose.onNodeWithTag("details-resume").assertIsFocused()
+        compose.onNodeWithText("Resume")
             .assertIsDisplayed()
         key(Key.Back)
         focused("recording-list-entry-1")
@@ -410,10 +410,10 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-3")
         key(Key.Menu)
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-play").assertIsFocused()
+        compose.onNodeWithTag("details-play").assertIsFocused()
         publish(entries.filterNot { it.id == DvrEntryId(2) }.map { if (it.id == DvrEntryId(1))
             recording(1, "Updated", "recording1.ts") else it })
-        compose.onNodeWithTag("recording-details-play").assertIsFocused()
+        compose.onNodeWithTag("details-play").assertIsFocused()
         key(Key.Back)
         focused("recording-list-entry-3")
         assertNoCommands()
@@ -423,11 +423,7 @@ class RecordingsVisualLayoutTest {
         show(entries = listOf(recording(9, "Opening recording", "opening.ts")))
         focused("recording-list-entry-9")
         key(Key.Menu)
-        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-play").assertIsFocused()
-        key(Key.DirectionDown)
-        key(Key.DirectionRight)
-        key(Key.DirectionCenter)
+        compose.onNodeWithText("Delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         compose.runOnIdle {
             session.replaceGeneration(session.observation.value.let {
@@ -437,9 +433,9 @@ class RecordingsVisualLayoutTest {
         }
         compose.waitForIdle()
         compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
-        focused("recording-details-panel")
-        compose.onNodeWithTag("recording-details-play").assertDoesNotExist()
-        compose.onNodeWithTag("recording-details-delete").assertDoesNotExist()
+        compose.onNodeWithText("Details").assertIsFocused()
+        compose.onNodeWithTag("details-play").assertDoesNotExist()
+        compose.onNodeWithTag("details-delete").assertDoesNotExist()
         key(Key.Back)
         focused("recording-list-entry-9")
         assertNoCommands()

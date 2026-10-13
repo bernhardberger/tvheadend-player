@@ -17,6 +17,8 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.guideDisplayEvents
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.guide.*
 import coil3.ImageLoader
@@ -63,8 +65,8 @@ class GuideHistoryCompositionTest {
             val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
-                    if (details) ProgrammeDetailsPanel(a, null, null, { 4000 }, false,
-                        {}, { details = false }, loader, null, liveProgrammeActions = false)
+                    if (details) ProgrammeDetailsPage(a, null, null, 4000, emptyList(),
+                        loader, null, {}, { details = false })
                     else Column(Modifier.fillMaxSize()) {
                         listOf(1L, 2L).forEach { channel -> TimelineChannelRow(
                             channel = Channel.create(ChannelId(channel), name = "Documentary $channel"),
@@ -90,7 +92,7 @@ class GuideHistoryCompositionTest {
         compose.onNodeWithText("Programme 1").assertIsFocused()
         capture("$locale-font$scale-past-guide", "Programme 1")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("programme-details-panel").assertIsFocused()
+        compose.onNodeWithTag("programme-details-page").assertIsFocused()
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.onNodeWithText(label(R.string.watch_from_start)).assertDoesNotExist()
         capture("$locale-font$scale-historical-details", "Details panel")
@@ -101,18 +103,19 @@ class GuideHistoryCompositionTest {
         var live by mutableStateOf(false)
         var recording by mutableStateOf<DvrEntry?>(null)
         compose.setContent { TVHeadendPlayerTheme {
-            ProgrammeDetailsPanel(selected, null, recording, { 4000 }, true,
-                {}, {}, remember { ImageLoader.Builder(context).diskCache(null).build() }, null, liveProgrammeActions = live)
+            ProgrammeDetailsPage(selected, recording, null, 4000,
+                programmeDetailsActions(selected, 4000, recording, true, false, true, liveProgramme = live),
+                remember { ImageLoader.Builder(context).diskCache(null).build() }, null, {}, {})
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.runOnIdle { live = true }
         compose.onNodeWithText(label(R.string.record)).assertExists()
         compose.runOnIdle { selected = event(2, 1, 0, 3600); live = false }
-        compose.onNodeWithText(label(R.string.watch_from_start)).assertDoesNotExist()
+        compose.onNodeWithTag("details-play").assertDoesNotExist()
         compose.runOnIdle { recording = DvrEntry.create(id = DvrEntryId(7), eventId = selected.id, state = DvrEntryState.COMPLETED) }
-        compose.onNodeWithText(label(R.string.watch_from_start)).assertExists()
+        compose.onNodeWithTag("details-play").assertExists()
         compose.runOnIdle { recording = null }
-        compose.onNodeWithText(label(R.string.watch_from_start)).assertDoesNotExist()
+        compose.onNodeWithTag("details-play").assertDoesNotExist()
     }
 
     private fun capture(name: String, focus: String) {

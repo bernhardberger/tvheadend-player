@@ -48,6 +48,7 @@ class BrowseContextMenuScreenTest {
     private var plays = 0
     private var guideRequest: ChannelId? = null
     private var start: RecordingPlaybackStart? = null
+    private var watchedChannel: ChannelId? = null
 
     @Test fun channelsHoldMenuBackAndWatch() {
         show(recordings = false)
@@ -115,13 +116,13 @@ class BrowseContextMenuScreenTest {
     @Test fun scheduledConfirmationBackRestoresCancelAction() {
         show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithText("Keep recording").assertIsFocused()
         compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
         compose.onNodeWithText("Keep recording").assertIsFocused()
         capture("cancel-recording", "u15-dialogs")
         compose.runOnIdle { back.onBackPressed() }
-        compose.onNodeWithTag("recording-details-cancel").assertIsFocused()
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithTag("recording-list-entry-1").assertIsFocused()
     }
@@ -139,9 +140,57 @@ class BrowseContextMenuScreenTest {
         val row = compose.onNodeWithTag("recording-list-entry-1")
         row.requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-resume").assertIsFocused()
+        compose.onNodeWithTag("details-resume").assertIsFocused()
+        compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
+        compose.onNodeWithTag("details-resume").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
         row.assertIsFocused()
+        assertEquals(0, plays)
+    }
+
+    @Test fun channelsDetailsStackBackAndOpeningReleaseRestoreExactOrigin() {
+        show(recordings = false)
+        val row = compose.onNodeWithTag("channel-row-1").requestFocus()
+        row.performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
+        assertEquals(0, plays)
+        compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.onNodeWithTag("details-card-2").assertDoesNotExist()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        compose.runOnIdle { back.onBackPressed() }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.runOnIdle { back.onBackPressed() }
+        row.assertIsFocused()
+        assertEquals(0, plays)
+    }
+
+    @Test fun channelsDetailsCanPlayItsCompletedRecording() {
+        val session = show(recordings = false, channelRecording = true)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle {
+            val previous = session.observation.value
+            val event = requireNotNull(previous.event(EventId(1)))
+            session.publish(SessionObservation.create(previous.sessionState, previous.channelState,
+                EpgRepositoryState.Current(EpgSnapshot.create(listOf(EpgEvent.create(event.id, event.channelId,
+                    event.start, Instant.fromEpochMilliseconds(System.currentTimeMillis()) - 60.seconds,
+                    title = event.title)))), previous.dvrState))
+        }
+        compose.onNodeWithTag("details-play").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+        assertEquals(RecordingPlaybackStart.START_OVER, start)
+    }
+
+    @Test fun scheduledDetailsWatchChannelUsesLivePlayback() {
+        show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(ChannelId(1), watchedChannel)
         assertEquals(0, plays)
     }
 
@@ -195,14 +244,16 @@ class BrowseContextMenuScreenTest {
     }
 
     private fun show(recordings: Boolean, dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED,
-        recordingState: DvrEntryState = DvrEntryState.COMPLETED): FakeTvheadendSession {
+        recordingState: DvrEntryState = DvrEntryState.COMPLETED, channelRecording: Boolean = false): FakeTvheadendSession {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = Instant.fromEpochMilliseconds(System.currentTimeMillis())
         val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
         val otherChannel = Channel.create(ChannelId(2), name = "Ridge Earth SD", number = 100, icon = ArtworkId(1))
         val event = EpgEvent.create(EventId(1), channel.id, now - 1800.seconds, now + 1800.seconds,
             title = "Ridge Light", image = ArtworkId(2))
-        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id,
+        val next = EpgEvent.create(EventId(2), channel.id, event.stop, event.stop + 3600.seconds,
+            title = "Northern Journey", image = ArtworkId(2))
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, eventId = event.id,
             title = if (recordingState == DvrEntryState.COMPLETED) "Ridge Light: The remarkable journey along the mountain ridge in winter" else "Ridge Light",
             folder = emptyList(),
             channelName = channel.name, state = recordingState, playPosition = 3720.seconds,
@@ -214,8 +265,9 @@ class BrowseContextMenuScreenTest {
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(otherChannel, channel))),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(event))),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (recordings) listOf(otherEntry, entry) else emptyList())),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(event, next))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (recordings) listOf(otherEntry, entry)
+                else if (channelRecording) listOf(entry) else emptyList())),
         ))
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         val dependencies = module { single<TvheadendSession> { session }; single { notices } }
@@ -238,6 +290,7 @@ class BrowseContextMenuScreenTest {
                             observation = observation, state = state, imageLoader = loader,
                             dvrMutationActions = DvrMutationActions(session.dvrRepository), notices = notices,
                             onPlayRecording = { _, intent -> plays++; start = intent },
+                            onWatchChannel = { selection, _ -> watchedChannel = selection.channelId },
                         ) else ChannelsScreenContent(
                             channelScopeState = resolveChannelScopeState(observation.channelState, null),
                             observation = observation, tagNotice = false, selectedId = { channel.id },
@@ -245,6 +298,7 @@ class BrowseContextMenuScreenTest {
                             onSelectChannel = {}, onSelectTag = {}, onDismissTagNotice = {},
                             onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> plays++ },
                             onShowGuide = { guideRequest = it },
+                            onPlayRecording = { plays++; start = RecordingPlaybackStart.START_OVER },
                         )
                     }
                 }

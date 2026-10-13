@@ -52,6 +52,7 @@ class GuideHistoryScreenTest {
     private lateinit var player: ExoPlayer
     private lateinit var view: View
     private lateinit var zone: TimeZone
+    private lateinit var back: androidx.activity.OnBackPressedDispatcher
     @Before fun before() { zone = TimeZone.getDefault(); TimeZone.setDefault(TimeZone.getTimeZone("UTC")) }
     @After fun after() { models.clear(); scope.cancel(); if (::player.isInitialized) player.release(); TimeZone.setDefault(zone) }
     private fun preferences() = object : DataStore<Preferences> {
@@ -76,6 +77,7 @@ class GuideHistoryScreenTest {
     @Test fun airingRecordUsesExistingConfirmationAndScheduleExecution() = exercise("en", 1f, "airing-record")
     @Test fun airingStopUsesExistingConfirmationAndKeepsPartialRecording() = exercise("en", 1f, "airing-stop")
     @Test fun airingScheduledEntryUsesExistingCancelConfirmation() = exercise("en", 1f, "airing-cancel")
+    @Test fun detailsStackBackRestoresGuideOriginAndSuppressesOpeningRelease() = exercise("en", 1f, "stack")
 
     private fun exercise(locale: String, scale: Float, transition: String? = null, replaceSession: Boolean = false,
         activationKeyCode: Int = android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
@@ -133,6 +135,7 @@ class GuideHistoryScreenTest {
         val noticeApplication = org.koin.dsl.koinApplication { modules(noticeModule) }
         compose.setContent {
             view = LocalView.current
+            back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             org.koin.compose.KoinIsolatedContext(noticeApplication) {
                 androidx.compose.runtime.DisposableEffect(noticeApplication) {
                     onDispose { noticeApplication.close() }
@@ -140,7 +143,7 @@ class GuideHistoryScreenTest {
                 CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                     TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
                         playerSession = runtime, selection = selection, guidePositionStore = position,
-                        lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> }) }
+                        lastPlayedStore = lastPlayed, imageLoader = loader, onPlayRecording = {}, onPlay = { _, _ -> }) }
                 }
             }
         }
@@ -152,6 +155,25 @@ class GuideHistoryScreenTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
+        if (transition == "stack") {
+            key(Key.DirectionCenter)
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+            compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
+                android.view.KeyEvent(0, 0, android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER, 0)))
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+            key(Key.DirectionDown)
+            compose.onNodeWithTag("details-card-111").assertIsFocused()
+            key(Key.DirectionCenter)
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+            compose.onNodeWithTag("details-card-111").assertDoesNotExist()
+            compose.runOnIdle { back.onBackPressed() }
+            compose.onNodeWithTag("details-card-111").assertIsFocused()
+            compose.runOnIdle { back.onBackPressed() }
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+            compose.runOnIdle { back.onBackPressed() }
+            focused("Channel 1 hour 0")
+            return
+        }
         if (transition?.startsWith("airing-") == true) {
             key(Key.DirectionCenter)
             compose.onNodeWithText(context.getString(R.string.watch)).assertIsFocused()
@@ -222,16 +244,16 @@ class GuideHistoryScreenTest {
                 return
             }
             if (transition == "details") {
-                compose.onNodeWithText(context.getString(R.string.watch_from_start)).assertExists()
+                compose.onNodeWithTag("details-play").assertExists()
                 compose.runOnIdle { session.replaceGeneration(observation(false)) }
-                compose.waitUntil(10_000) { compose.onAllNodes(hasText(context.getString(R.string.watch_from_start))).fetchSemanticsNodes().isEmpty() }
-                compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
+                compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("details-play")).fetchSemanticsNodes().isEmpty() }
+                compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
                 compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
                 key(Key.DirectionCenter)
                 focused("Channel 1 hour 0")
             } else {
-                compose.onNodeWithText(context.getString(R.string.record)).performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText(context.getString(R.string.record)).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
                 val dialogTitle = if (transition == "config") context.getString(R.string.recording_config_title)
                     else context.getString(R.string.record_confirm_title, "Channel 1 hour 1")
                 compose.onNodeWithText(dialogTitle).assertExists()
@@ -242,15 +264,7 @@ class GuideHistoryScreenTest {
                 }
                 compose.waitUntil(10_000) { compose.onAllNodes(hasText(dialogTitle)).fetchSemanticsNodes().isEmpty() }
                 compose.onNodeWithText(context.getString(R.string.record)).assertDoesNotExist()
-                if (replaceSession) compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
-                else {
-                    compose.onNodeWithTag("programme-details-panel").assertIsFocused()
-                    compose.runOnIdle {
-                        (ShadowDialog.getShownDialogs().last { it.isShowing } as ComponentDialog)
-                            .onBackPressedDispatcher.onBackPressed()
-                    }
-                    compose.onNodeWithTag("programme-details-panel").assertDoesNotExist()
-                }
+                compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
                 assertEquals(before, session.calls.size)
                 // Session replacement dismisses the dialog before background guide preparation finishes.
                 // The loading anchor can own focus meanwhile, so wait for the actual header action.

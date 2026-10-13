@@ -66,11 +66,11 @@ class RecordingConfirmationStateTest {
             }
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(1, calls) }
         compose.runOnIdle { backDispatcher.onBackPressed() }
-        compose.onNodeWithTag("recording-details-cancel").assertDoesNotExist()
+        compose.onNodeWithTag("details-cancel").assertDoesNotExist()
         if (reopen) compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         compose.waitForIdle()
@@ -111,7 +111,7 @@ class RecordingConfirmationStateTest {
             .performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         val action = if (before == DvrEntryState.SCHEDULED) "cancel" else "stop"
-        compose.onNodeWithTag("recording-details-$action").requestFocus()
+        compose.onNodeWithTag("details-$action").requestFocus()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         val confirm = compose.onNodeWithTag("recording-confirmation-confirm").requestFocus()
@@ -127,7 +127,7 @@ class RecordingConfirmationStateTest {
         }
         compose.onNodeWithTag("recording-confirmation-confirm").assertDoesNotExist()
         if (after == DvrEntryState.RECORDING) {
-            compose.onNodeWithTag("recording-details-stop").assertIsFocused()
+            compose.onNodeWithTag("details-stop").assertIsFocused()
         }
         compose.onAllNodes(isFocused()).assertCountEquals(1)
         if (!clickBeforeRecomposition) compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }

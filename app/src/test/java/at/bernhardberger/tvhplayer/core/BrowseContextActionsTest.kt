@@ -19,13 +19,13 @@ class BrowseContextActionsTest {
 
     @Test fun channelsWithoutProgrammeOrPermissionDoNotOfferRecording() {
         assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 100, null, true))
-        assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(event, 100, null, false))
+        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 100, null, false))
     }
 
     @Test fun channelsAndGuideReuseProgrammeRecordingPolicy() {
         listOf(null to RECORD, DvrEntryState.RECORDING to STOP, DvrEntryState.SCHEDULED to CANCEL).forEach { (state, action) ->
             val recording = state?.let { recording(it) }
-            assertEquals(listOf(WATCH, action, SHOW_GUIDE), channelContextActions(event, 100, recording, true))
+            assertEquals(listOf(WATCH, DETAILS, action, SHOW_GUIDE), channelContextActions(event, 100, recording, true))
             assertEquals(listOf(DETAILS, action, WATCH), guideContextActions(event, 100, recording, true))
             assertEquals(listOf(DETAILS, WATCH), guideContextActions(event, 100, recording, false))
         }

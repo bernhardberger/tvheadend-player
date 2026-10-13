@@ -195,17 +195,14 @@ class GuideRenderingCostContractTest {
             "internal fun TimelineChannelRow(",
             "internal fun TimelineChannelHeader(",
         )
-        val details = modalSource.section(
-            "internal fun ProgrammeDetailsPanel(",
-            "internal fun DvrConfigDialog(",
-        )
+        val details = screenSource.substringAfter("ProgrammeDetailsHost(")
         val clock = screenSource.substringAfter("private fun rememberCurrentEpochSeconds()")
 
         assertEquals(1, guide.count("val nowSecProvider = rememberCurrentEpochSeconds()"))
         assertFalse(guide.contains("var nowSec by remember"))
         assertTrue(ruler.contains("val nowSec = nowSecProvider()"))
         assertTrue(row.contains("val nowSec = nowSecProvider()"))
-        assertTrue(details.contains("val nowSec = nowSecProvider()"))
+        assertTrue(details.contains("nowSec = nowSecProvider()"))
         assertEquals(1, clock.count("mutableLongStateOf("))
         assertTrue(clock.contains("return remember(nowSec) { { nowSec.longValue } }"))
     }

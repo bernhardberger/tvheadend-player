@@ -52,21 +52,22 @@ class InProgressRecordingResumeTest {
     fun anInProgressRecordingWithASavedPositionResumesThere() {
         val starts = openDetails(playPositionSeconds = 754L)
 
-        compose.onNodeWithContentDescription("Resume from 12 minutes, 34 seconds").assertExists()
-        compose.onNodeWithTag("recording-details-resume").assertIsFocused()
+        compose.onNodeWithText("Watch").assertExists()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 
     @Test
-    fun anInProgressRecordingCanStillBePlayedFromTheBeginning() {
+    fun anInProgressRecordingOffersStopBesideWatch() {
         val starts = openDetails(playPositionSeconds = 754L)
 
-        compose.onNodeWithTag("recording-details-resume").assertIsFocused()
-            .performKeyInput { pressKey(Key.DirectionDown) }
-        compose.onNodeWithTag("recording-details-beginning").assertIsFocused()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+            .performKeyInput { pressKey(Key.DirectionRight) }
+        compose.onNodeWithTag("details-stop").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
+        compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+        compose.runOnIdle { assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
     }
 
     @Test
@@ -78,18 +79,18 @@ class InProgressRecordingResumeTest {
     private fun assertPlayOnly(playPositionSeconds: Long?) {
         val starts = openDetails(playPositionSeconds)
 
-        compose.onNodeWithTag("recording-details-resume").assertDoesNotExist()
-        compose.onNodeWithTag("recording-details-beginning").assertDoesNotExist()
-        compose.onNodeWithTag("recording-details-play").assertIsFocused()
+        compose.onNodeWithTag("details-resume").assertDoesNotExist()
+        compose.onNodeWithTag("details-start_over").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.START_OVER), starts) }
+        compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 
     @Test
     fun okOnRunningRecordingResumesDirectlyWithoutPrompt() {
         val starts = openDetails(754L, directly = true)
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
-        compose.onNodeWithTag("recording-details-panel").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 

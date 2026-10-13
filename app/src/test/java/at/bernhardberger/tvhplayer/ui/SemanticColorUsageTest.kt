@@ -19,8 +19,8 @@ class SemanticColorUsageTest {
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
         )
         assertContains(
-            "ui/screens/guide/EpgGridModals.kt",
-            "DvrEntryState.RECORDING -> TvRecordingColor",
+            "ui/components/ProgrammeDetailsPage.kt",
+            "DetailsStatus.RECORDING, DetailsStatus.SCHEDULED -> TvRecordingColor",
         )
         assertContains("ui/player/PlayerBarStatusView.kt", "color = TvRecordingColor")
 
@@ -34,6 +34,7 @@ class SemanticColorUsageTest {
             "ui/screens/guide/EpgGridContent.kt",
             "ui/screens/guide/EpgGridModals.kt",
             "ui/components/ProgrammeDetailsLayout.kt",
+            "ui/components/ProgrammeDetailsPage.kt",
             "ui/screens/ChannelsScreen.kt",
             "ui/player/LiveProgrammeInfoOverlay.kt",
             "ui/player/PlayerChromeControls.kt",

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -200,6 +202,7 @@ fun ChannelsScreen(
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     onShowGuide: (ChannelId) -> Unit = {},
 ) {
     at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime("channels")
@@ -236,6 +239,7 @@ fun ChannelsScreen(
         onRetryConnection = onRetryConnection,
         onOpenConnectionSettings = onOpenConnectionSettings,
         onPlay = onPlay,
+        onPlayRecording = onPlayRecording,
         onShowGuide = onShowGuide,
     )
 }
@@ -262,6 +266,7 @@ internal fun ChannelsScreenContent(
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     onShowGuide: (ChannelId) -> Unit = {},
 ) = profileTrace("P1:compose:channels") {
     val layoutDirection = LocalLayoutDirection.current
@@ -298,6 +303,7 @@ internal fun ChannelsScreenContent(
     var playerReturnPending by remember(playerReturn) { mutableStateOf(playerReturn != null) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
     var contextChannelId by remember { mutableStateOf<ChannelId?>(null) }
+    var showProgrammeDetails by remember { mutableStateOf(false) }
     var contentFocusOwned by remember { mutableStateOf(false) }
     var scopeEntryRequested by remember { mutableStateOf(false) }
     val rememberedChannelIds = remember {
@@ -580,6 +586,7 @@ internal fun ChannelsScreenContent(
     Column(
         Modifier
             .fillMaxSize()
+            .graphicsLayer { alpha = if (showProgrammeDetails) 0f else 1f }
             .semantics { if (contextChannelId != null) hideFromAccessibility() }
             .onPreviewKeyEvent { event ->
                 if (event.key != Key.Back) return@onPreviewKeyEvent false
@@ -895,6 +902,9 @@ internal fun ChannelsScreenContent(
     }
     contextChannelId?.let { channelId ->
         ChannelContextMenu(
+            onPlayRecording = onPlayRecording,
+            showDetails = showProgrammeDetails,
+            onShowDetails = { showProgrammeDetails = true },
             channelId = channelId,
             observation = observation,
             nowSec = kotlin.time.Clock.System.now().epochSeconds,
@@ -902,6 +912,7 @@ internal fun ChannelsScreenContent(
             onPlay = onPlay,
             onShowGuide = onShowGuide,
             onClose = {
+                showProgrammeDetails = false
                 contextChannelId = null
                 requestChannelFocus(channelId)
             },

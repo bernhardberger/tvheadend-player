@@ -741,6 +741,17 @@ fun AppRoot(
                                 navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                             },
                             onPlay = requestLivePlayer,
+                            onPlayRecording = { selection ->
+                                playbackSelectionScope.launch {
+                                    val target = playbackOrchestrator.requestRecordingPlayer(
+                                        activeChannelId = activeChannelId,
+                                        activeRecordingId = activeRecordingId,
+                                        requestedRecordingId = selection.recordingId,
+                                        startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
+                                    ) ?: return@launch
+                                    backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.START_OVER))
+                                }
+                            },
                         )
                     }
 
@@ -788,6 +799,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.RECORDINGS),
                     ) {
                         RecordingsRouteContent(
+                            onWatchChannel = requestLivePlayer,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == RecordingsKey,

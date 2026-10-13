@@ -3,6 +3,18 @@
     <string name="context_channel_now">%1$s · Now: %2$s</string>
     <string name="context_watch_channel">Watch channel</string>
     <string name="context_details">Details</string>
+    <string name="details_program">Program details</string>
+    <string name="details_about">About this program</string>
+    <string name="details_next_on">Next on %1$s</string>
+    <string name="details_status_on_now">On now</string>
+    <string name="details_status_scheduled">Recording scheduled</string>
+    <string name="details_status_failed">Recording failed</string>
+    <string name="details_starts">Starts</string>
+    <string name="details_started">Started</string>
+    <string name="details_recorded">Recorded</string>
+    <string name="details_length">Length</string>
+    <string name="details_left">Left</string>
+    <string name="details_tomorrow">Tomorrow %1$s</string>
     <string name="context_record">Record</string>
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
@@ -663,6 +675,7 @@
     <string name="dont_record">Don\'t record</string>
     <string name="recording_watched_duration">Watched %1$s of %2$s</string>
     <string name="duration_minutes_short">%1$d min</string>
+    <string name="duration_hours_short">%1$d h</string>
     <string name="duration_hours_minutes_short">%1$d h %2$d min</string>
     <string name="duration_unknown">unknown duration</string>
 </resources>

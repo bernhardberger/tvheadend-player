@@ -204,7 +204,7 @@ class BrowseCohesionEvidenceTest {
         capture("guide-current", 1f, "Guide first channel current programme", hasText(CURRENT_TITLE))
         key(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()
-        capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"), dialog = true)
+        capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"))
         compose.onNodeWithText("Close").assertDoesNotExist()
     }
 
@@ -234,9 +234,10 @@ class BrowseCohesionEvidenceTest {
         awaitFocus(hasTestTag("recording-list-entry-1"))
         key(Key.Menu)
         compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-        compose.onNodeWithTag("recording-details-panel").assertIsDisplayed()
-        compose.onNodeWithContentDescription("Resume from 1 hour, 2 minutes, 3 seconds").assertIsDisplayed()
-        capture("recordings-resume-font1.3", 1.3f, "Long recording details; Resume 1:02:03 action", hasTestTag("recording-details-resume"))
+        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
+        compose.onNodeWithText("Resume").assertIsDisplayed()
+        compose.onNodeWithTag("details-resume").assertIsFocused()
+        compose.onNodeWithTag("details-start_over").assertIsDisplayed()
     }
 
     @Test

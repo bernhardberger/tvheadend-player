@@ -59,6 +59,7 @@ internal fun ChannelsRouteContent(
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (LivePlaybackSelection, String) -> Unit,
+    onPlayRecording: (RecordingPlaybackSelection) -> Unit,
     onShowGuide: (ChannelId) -> Unit = {},
 ) {
     StartupGatedChannelsContent(
@@ -75,6 +76,7 @@ internal fun ChannelsRouteContent(
                 onRetryConnection = onRetryConnection,
                 onOpenConnectionSettings = onOpenConnectionSettings,
                 onPlay = onPlay,
+                onPlayRecording = onPlayRecording,
                 onShowGuide = onShowGuide,
             ) }
         }
@@ -121,6 +123,7 @@ internal fun RecordingsRouteContent(
     connectionUiState: ConnectionUiState,
     onRetry: () -> Unit,
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit,
+    onWatchChannel: (LivePlaybackSelection, String) -> Unit,
     state: RecordingsScreenState,
 ) {
     if (contentAllowed) {
@@ -132,6 +135,7 @@ internal fun RecordingsRouteContent(
                 connectionUiState = connectionUiState,
                 onRetry = onRetry,
                 onPlayRecording = onPlayRecording,
+                onWatchChannel = onWatchChannel,
                 state = state,
             )
         }

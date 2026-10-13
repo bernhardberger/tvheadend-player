@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.ui.graphics.graphicsLayer
+
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
@@ -91,7 +93,8 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.recordings.PendingRecordingAction
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingConfirmationDialog
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingDetailsAction
-import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingDetailsPanel
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.core.recordingDetailsActions
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
@@ -146,6 +149,7 @@ fun RecordingsScreen(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
+    onWatchChannel: ((at.bernhardberger.tvhplayer.playback.LivePlaybackSelection, String) -> Unit)? = null,
     state: RecordingsScreenState? = null,
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
@@ -161,6 +165,7 @@ fun RecordingsScreen(
         connectionUiState = connectionUiState,
         onRetry = onRetry,
         onPlayRecording = onPlayRecording,
+        onWatchChannel = onWatchChannel,
         state = state,
         dvrMutationActions = dvrMutationActions,
         currentObservation = { session.observation.value },
@@ -177,6 +182,7 @@ internal fun RecordingsScreenContent(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
+    onWatchChannel: ((at.bernhardberger.tvhplayer.playback.LivePlaybackSelection, String) -> Unit)? = null,
     state: RecordingsScreenState? = null,
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
@@ -393,6 +399,7 @@ internal fun RecordingsScreenContent(
         modifier = Modifier
             .fillMaxSize()
             .semantics { if (detailsEntry != null) hideFromAccessibility() }
+            .graphicsLayer { alpha = if (detailsEntry != null && !showContextMenu && !showResumeChoice) 0f else 1f }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
                     if (event.type == KeyEventType.KeyUp) relocatingKey = null
@@ -738,55 +745,67 @@ internal fun RecordingsScreenContent(
                     piconPath = opened.channelId?.let(channelsById::get)?.icon,
                     modifier = Modifier.width(56.dp).height(40.dp))
             },
-        ) else RecordingDetailsPanel(
+        ) else ProgrammeDetailsPage(
+            event = null,
+            recording = opened,
+            nowSec = 0L,
             imageLoader = imageLoader,
             currentSession = selectedCapability,
             channel = opened.channelId?.let(channelsById::get),
-            entry = opened,
-            canModifyRecordings = selectedCapability != null,
-            playbackEligible = selectedCapability != null,
+            actions = recordingDetailsActions(opened, selectedCapability != null,
+                canModifyRecordings = selectedCapability != null &&
+                (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
+                    ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
+                canWatchChannel = selectedCapability != null && opened.channelId?.let(channelsById::get) != null && onWatchChannel != null),
             initialAction = when (detailsInitialAction) {
                 RecordingDetailsAction.CANCEL,
                 RecordingDetailsAction.STOP -> when (opened.state) {
-                    DvrEntryState.SCHEDULED -> RecordingDetailsAction.CANCEL
-                    DvrEntryState.RECORDING -> RecordingDetailsAction.STOP
+                    DvrEntryState.SCHEDULED -> BrowseContextAction.CANCEL
+                    DvrEntryState.RECORDING -> BrowseContextAction.STOP
                     else -> null
                 }
-                else -> detailsInitialAction
+                RecordingDetailsAction.RESUME -> BrowseContextAction.RESUME
+                RecordingDetailsAction.BEGINNING -> BrowseContextAction.START_OVER
+                RecordingDetailsAction.PLAY -> BrowseContextAction.PLAY
+                RecordingDetailsAction.DELETE -> BrowseContextAction.DELETE
+                null -> null
             },
             backEnabled = backEnabled,
-            onPlay = { intent ->
-                selectedCapability?.let { capability ->
+            onAction = { action ->
+                val current = currentObservation()
+                val capability = selectedCapability?.takeIf { current.currentSession === it }
+                when (action) {
+                BrowseContextAction.WATCH, BrowseContextAction.RESUME, BrowseContextAction.PLAY,
+                BrowseContextAction.START_OVER -> capability?.let {
                     detailsEntry = null
                     detailsObservation = null
                     detailsInitialAction = null
                     requestContentFocus = true
-                    onPlayRecording(
-                        RecordingPlaybackSelection(capability, opened.id),
-                        intent,
-                    )
+                    if (action == BrowseContextAction.WATCH && opened.state == DvrEntryState.SCHEDULED) {
+                        opened.channelId?.let(current::channel)?.let { ch ->
+                            onWatchChannel?.invoke(at.bernhardberger.tvhplayer.playback.LivePlaybackSelection(it, ch.id), ch.name.orEmpty())
+                        }
+                    } else onPlayRecording(RecordingPlaybackSelection(it, opened.id),
+                        if (action == BrowseContextAction.RESUME || action == BrowseContextAction.WATCH)
+                            RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
                 }
-            },
-            onStop = {
+                BrowseContextAction.STOP -> {
                 detailsInitialAction = RecordingDetailsAction.STOP
-                pendingMutation = selectedCapability?.let { capability ->
-                    DvrMutationAction.Stop(capability, opened.id)
-                }
+                pendingMutation = capability?.let { DvrMutationAction.Stop(it, opened.id) }
                 pendingAction = PendingRecordingAction.STOP
-            },
-            onCancel = {
+                }
+                BrowseContextAction.CANCEL -> {
                 detailsInitialAction = RecordingDetailsAction.CANCEL
-                pendingMutation = selectedCapability?.let { capability ->
-                    DvrMutationAction.Cancel(capability, opened.id)
-                }
+                pendingMutation = capability?.let { DvrMutationAction.Cancel(it, opened.id) }
                 pendingAction = PendingRecordingAction.CANCEL
-            },
-            onDelete = {
-                detailsInitialAction = RecordingDetailsAction.DELETE
-                pendingMutation = selectedCapability?.let { capability ->
-                    DvrMutationAction.Delete(capability, opened.id)
                 }
+                BrowseContextAction.DELETE -> {
+                detailsInitialAction = RecordingDetailsAction.DELETE
+                pendingMutation = capability?.let { DvrMutationAction.Delete(it, opened.id) }
                 pendingAction = PendingRecordingAction.DELETE
+                }
+                else -> Unit
+                }
             },
             onClose = {
                 val restoredBeforeDismissal = runCatching {

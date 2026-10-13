@@ -16,6 +16,8 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
@@ -34,13 +36,15 @@ class ProgrammeDetailsPanelTest {
     private fun showPanel(withDescription: Boolean = false) {
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                ProgrammeDetailsPanel(
+                ProgrammeDetailsPage(
                     event = if (withDescription) EpgEvent.create(
                         id = event.id, title = event.title, start = event.start, stop = event.stop,
                         description = "A programme description",
                     ) else event, channel = null,
-                    recording = recording.value, nowSecProvider = { 1_000 },
-                    canModifyRecordings = canModify.value,
+                    recording = recording.value, nowSec = 1_000,
+                    actions = programmeDetailsActions(event, 1_000, recording.value, canModify.value, false, true),
+                    related = if (withDescription) listOf(EpgEvent.create(EventId(22), title = "Next programme",
+                        start = event.stop, stop = Instant.fromEpochSeconds(4_000))) else emptyList(),
                     onAction = {}, onClose = {},
                     imageLoader = androidx.compose.runtime.remember { coil3.ImageLoader.Builder(context).build() },
                     currentSession = null,
@@ -50,13 +54,13 @@ class ProgrammeDetailsPanelTest {
     }
 
     @Test
-    fun moreInfoKeepsFocusWhenPublicationReplacesRecordWithCancel() {
+    fun relatedCardKeepsFocusWhenPublicationReplacesRecordWithCancel() {
         showPanel(withDescription = true)
         composeRule.onNodeWithText(context.getString(R.string.record)).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
-        composeRule.onNodeWithText(context.getString(R.string.details_read_more)).assertIsFocused()
+        composeRule.onNodeWithTag("details-card-22").assertIsFocused()
         publishScheduledRecording()
-        composeRule.onNodeWithText(context.getString(R.string.details_read_more)).assertIsFocused()
+        composeRule.onNodeWithTag("details-card-22").assertIsFocused()
     }
 
     @Test
@@ -72,7 +76,7 @@ class ProgrammeDetailsPanelTest {
         showPanel()
         composeRule.onNodeWithText(context.getString(R.string.record)).assertIsFocused()
         composeRule.runOnIdle { canModify.value = false }
-        composeRule.onNodeWithTag("programme-details-panel").assertIsFocused()
+        composeRule.onNodeWithTag("programme-details-page").assertIsFocused()
     }
 
     private fun publishScheduledRecording() {

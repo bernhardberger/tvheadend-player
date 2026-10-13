@@ -52,6 +52,7 @@ internal fun BrowseContextMenu(
     modifier: Modifier = Modifier,
     watchChannel: Boolean = false,
     initialAction: BrowseContextAction? = null,
+    programDetailsLabel: Boolean = false,
     logo: @Composable () -> Unit,
 ) {
     val requesters = remember(actions) { actions.map { FocusRequester() } }
@@ -107,14 +108,15 @@ internal fun BrowseContextMenu(
                 ) {
                     Icon(painterResource(action.icon()), null, Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
-                    Text(stringResource(action.label(watchChannel)), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(stringResource(if (programDetailsLabel && action == BrowseContextAction.DETAILS)
+                        R.string.details_program else action.label(watchChannel)), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
     }
 }
 
-private fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this) {
+internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this) {
     BrowseContextAction.WATCH -> if (watchChannel) R.string.context_watch_channel else R.string.context_watch
     BrowseContextAction.DETAILS -> R.string.context_details
     BrowseContextAction.RECORD -> R.string.context_record
@@ -127,7 +129,7 @@ private fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this) 
     BrowseContextAction.DELETE -> R.string.context_delete
 }
 
-private fun BrowseContextAction.icon(): Int = when (this) {
+internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
     BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop

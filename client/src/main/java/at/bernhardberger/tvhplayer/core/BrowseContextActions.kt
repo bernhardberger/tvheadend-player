@@ -17,6 +17,7 @@ fun channelContextActions(
 ): List<BrowseContextAction> = buildList {
     add(BrowseContextAction.WATCH)
     if (event != null) {
+        add(BrowseContextAction.DETAILS)
         addAll(programmeContextRecordingActions(event, nowSec, recording, canModifyRecordings))
     }
     add(BrowseContextAction.SHOW_GUIDE)
