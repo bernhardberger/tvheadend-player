@@ -65,6 +65,19 @@ Player there:
 android --no-metrics install --device="$TVHPLAYER_ADB_SERIAL" --apks=app/build/outputs/apk/play/debug/app-play-debug.apk --use-delta-install=false --install-options=-r,-t
 ```
 
+JVM tests never run the Android bytecode verifier, and a rejected class only fails
+when it is first loaded. After installing a changed build on an API 31 target,
+open every changed screen and read only the crash buffer for Player:
+
+```bash
+adb -s "$TVHPLAYER_ADB_SERIAL" logcat -b crash -d | grep -A3 'Process: at.bernhardberger.tvhplayer'
+```
+
+A `VerifyError` means D8/R8 emitted invalid code; 2026-10-13 it hit a Compose
+lambda above 256 dex registers. Split the composable rather than relying on a
+keep rule. For an optimized build, re-run the profile install and
+`compile -m speed-profile` afterward.
+
 The CLI lacks standalone remote-key input. Existing bounded named key commands
 remain useful for separately authorized navigation:
 
