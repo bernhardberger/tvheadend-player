@@ -23,6 +23,10 @@ class ChannelAccentPolicyTest {
         assertTrue(isUsableAccent(0xE2001A)) // ORF red
         assertTrue(isUsableAccent(0x0057B8)) // a broadcaster blue
         assertTrue(isUsableAccent(0x00A3A1)) // teal
+        // Full-brightness brand colours are colours too, not white.
+        assertTrue(isUsableAccent(0xFF6A00)) // bright orange
+        assertTrue(isUsableAccent(0xFF0000))
+        assertTrue(isUsableAccent(0xFFD200))
     }
 
     @Test

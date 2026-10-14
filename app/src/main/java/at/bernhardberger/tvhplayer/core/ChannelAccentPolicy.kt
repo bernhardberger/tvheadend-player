@@ -19,7 +19,6 @@ import kotlin.math.min
 /** Minimum saturation before a sampled colour counts as a brand colour rather than grey. */
 private const val MIN_ACCENT_SATURATION = 0.15f
 private const val MIN_ACCENT_VALUE = 0.10f
-private const val MAX_ACCENT_VALUE = 0.95f
 
 /** Dark-theme band every accent is normalized into. */
 private const val ACCENT_MIN_SATURATION = 0.35f
@@ -31,11 +30,12 @@ const val NEUTRAL_ACCENT_RGB: Int = 0x2E3440
 
 /**
  * True when [rgb] is saturated and mid-toned enough to read as a brand colour.
- * Rejects the white/black/grey that dominates most picons.
+ * Rejects the white/black/grey that dominates most picons; white already fails the saturation
+ * check, so a full-brightness brand colour stays usable.
  */
 fun isUsableAccent(rgb: Int): Boolean {
     val (_, s, v) = rgbToHsv(rgb)
-    return s >= MIN_ACCENT_SATURATION && v >= MIN_ACCENT_VALUE && v <= MAX_ACCENT_VALUE
+    return s >= MIN_ACCENT_SATURATION && v >= MIN_ACCENT_VALUE
 }
 
 /**
