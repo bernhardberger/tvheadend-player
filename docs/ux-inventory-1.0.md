@@ -255,9 +255,11 @@ This supersedes the round-3 points above where they conflict. Reference frames:
   buttons (268×48dp, leading icon). Channels: Watch · Program details · Record ·
   Show in Guide. The kit navigation drawer with list items was rejected: it
   reads as app navigation.
-- **Details page** follows JetFit's info block over JetStream's hero (full
-  width, 432dp, three two-stop gradients; over warm playback the hero fades
-  into the scrimmed video):
+- **Details page** follows JetFit's info block over JetStream's hero. Changed
+  2026-10-14: the art is a top-right 16:9 frame (815×458 of 960×540) with
+  faded left and bottom edges; scrolled down or reading, it grows to cover the
+  screen and crossfades into a full-screen blurred, darkened backdrop. Over warm
+  playback the page draws no art (see "Warm playback and browse backgrounds"):
   - eyebrow: logo · number · channel | genre, plus one status chip for the
     broadcast state ("On now", red-dot "Recording scheduled");
   - title (dominant), one quiet episode line, two-line synopsis;
@@ -284,6 +286,33 @@ This supersedes the round-3 points above where they conflict. Reference frames:
   built with the Recordings rework (U6).
 - Physical-TV checks: hero over live video and bright art, badge legibility
   from the couch, focus feel of the button row and cards.
+
+### Warm playback and browse backgrounds (draft, 2026-10-14)
+
+Product principle (owner): playback stays available while browsing. Without
+one rule, every screen would invent its own art/video handling, so the shell
+decides and screens only ask.
+
+- **Inputs:** what plays behind the browse screens (live, a recording, or
+  nothing; the shell's warm-playback target), and later the settings below.
+- **Output, decided once in the shell:** the background of a browse surface is
+  the video, programme art, or the plain theme, plus the scrim strength (today
+  one 0.84 black scrim, `DESIGN.md` §4).
+- **Rules agreed so far:**
+  - Video plays behind → the video is the background; surfaces draw no art.
+    This holds for details pages (built 2026-10-14) and, probably, Home (owner:
+    "probably no" art while video plays).
+  - A recording playing behind behaves like live (owner, 2026-10-14).
+  - Nothing plays → surfaces may use their art (details: top-right hero) or the
+    theme background.
+- **Later settings (U7):** switch warm playback off; possibly prefer art over
+  the video on details pages. With warm playback off, leaving the player
+  stops playback (owner leans "stop"): it frees the tuner, network and decoder;
+  a muted stream would keep a tuner busy that recordings or other clients may
+  need. The cost is a fresh tune when returning to the player.
+- **Code today:** the shell passes one flag (`LocalWarmPlayback` in
+  `ui/AppRoot.kt`, on the U15 polish branch); it grows into the richer output
+  above only when the settings arrive.
 
 ## Splash, startup and app-wide feedback
 
