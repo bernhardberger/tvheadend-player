@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.viewmodels
 
+import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
@@ -15,11 +16,13 @@ import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.core.toConnectionState
 import at.bernhardberger.tvhplayer.core.isDegraded
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
+import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -60,6 +63,36 @@ class AppConnectionViewModel(
             ),
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConnectionPresentation())
+
+    init {
+        if (at.bernhardberger.tvhplayer.client.BuildConfig.PROFILE_TRACE) {
+            // Profiling builds only: one trace marker per startup stage change, for cold-start breakdowns.
+            viewModelScope.launch {
+                combine(profileOwner.serverProfile, session.observation) { profile, observation ->
+                    val profileStage = when (profile) {
+                        null -> "loading"
+                        ServerProfileReadResult.Missing -> "missing"
+                        ServerProfileReadResult.Unavailable -> "unavailable"
+                        is ServerProfileReadResult.Available -> "available"
+                    }
+                    val sessionStage = when (observation.sessionState) {
+                        SessionState.Disconnected -> "disconnected"
+                        SessionState.Connecting -> "connecting"
+                        SessionState.Synchronizing -> "synchronizing"
+                        is SessionState.Ready -> "ready"
+                        is SessionState.Unavailable -> "unavailable"
+                    }
+                    // Trace section names are limited to 127 characters.
+                    "P51:startup:$profileStage:$sessionStage" +
+                        ":catalog:${observation.channelCatalogAuthority.ordinal}" +
+                        ":channels:${observation.channelCatalogForDisplay?.channels?.size ?: 0}" +
+                        ":events:${observation.epgSnapshotForDisplay?.events?.size ?: 0}"
+                }.distinctUntilChanged().collect { stage ->
+                    profileTrace("$stage:uptime:${SystemClock.uptimeMillis()}") { }
+                }
+            }
+        }
+    }
 
     fun reconnectNow(allowAutomaticBackoff: Boolean = false) {
         viewModelScope.launch {
