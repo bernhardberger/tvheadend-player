@@ -956,8 +956,9 @@ class ProgrammeDetailsPageTest {
         Assert.assertTrue(at.bernhardberger.tvhplayer.ui.components.programmeCreditFacts(null, context.resources).isEmpty())
         val credited = EpgEvent.create(event.id, channel.id, start, event.stop, credits = listOf(
             EpgCredit("Director One", EpgCreditRole.DIRECTOR), EpgCredit("Actor One", EpgCreditRole.ACTOR),
-            EpgCredit("Actor Two", EpgCreditRole.ACTOR), EpgCredit("Director Two", EpgCreditRole.DIRECTOR)))
-        Assert.assertEquals(listOf("Cast" to "Actor One, Actor Two", "Directors" to "Director One, Director Two"),
+            EpgCredit("Actor Two", EpgCreditRole.ACTOR), EpgCredit("Actor Two", EpgCreditRole.ACTOR),
+            EpgCredit("Actor One", EpgCreditRole.DIRECTOR), EpgCredit("Director Two", EpgCreditRole.DIRECTOR)))
+        Assert.assertEquals(listOf("Cast" to "Actor One, Actor Two", "Directors" to "Director One, Actor One, Director Two"),
             at.bernhardberger.tvhplayer.ui.components.programmeCreditFacts(credited, context.resources))
     }
 

@@ -775,7 +775,8 @@ internal fun programmeCreditFacts(event: EpgEvent?, resources: Resources): List<
     listOf(EpgCreditRole.ACTOR to R.plurals.details_cast, EpgCreditRole.GUEST to R.plurals.details_guests,
         EpgCreditRole.PRESENTER to R.plurals.details_presenters, EpgCreditRole.DIRECTOR to R.plurals.details_directors,
         EpgCreditRole.WRITER to R.plurals.details_writers).forEach { (role, label) ->
-        val names = credits.filter { it.role == role }.map { it.name.trim() }.filter(String::isNotEmpty)
+        // One entry per name and role; a person can hold several roles, and the wire may repeat a pair.
+        val names = credits.filter { it.role == role }.map { it.name.trim() }.filter(String::isNotEmpty).distinct()
         if (names.isNotEmpty()) add(resources.getQuantityString(label, names.size) to names.joinToString(", "))
     }
 }
