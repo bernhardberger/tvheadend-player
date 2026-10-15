@@ -18,7 +18,11 @@ not a reason to run it; reuse unchanged successful checks.
 Compilation of Android tests is not execution on a device.
 
 Builds reuse warm Gradle daemons, which exit after 10 idle minutes; the Kotlin
-compile daemon is bounded the same way. Never run `./gradlew --stop` or kill a
+compile daemon is bounded the same way. On the shared LXC the installed
+`gradlew` hook runs each build in the bounded `tvhbuild.slice` without a daemon,
+so every run starts cold. Routine app test runs pass
+`-Ptvhplayer.captureTests=exclude` (two test forks, no capture PNGs); keep the
+default only when you need the visual captures. Never run `./gradlew --stop` or kill a
 daemon you did not start: daemons are shared, so that aborts other agents' builds.
 The build cache is on and shared across worktrees, so compile, resource and lint
 outputs built elsewhere are restored instead of rebuilt. Client unit tests are

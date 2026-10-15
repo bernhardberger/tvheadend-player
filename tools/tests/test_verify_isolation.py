@@ -46,7 +46,7 @@ class VerifyIsolationTest(unittest.TestCase):
         result = self.run_verify(installed=True, isolated=True)
         self.assertEqual(result.returncode, 23)
         self.assertIn("ARG=--no-daemon", result.stdout)
-        self.assertIn("ARG=--max-workers=1", result.stdout)
+        self.assertIn("ARG=--max-workers=2", result.stdout)
         self.assertIn("ARG=-Pkotlin.compiler.execution.strategy=in-process", result.stdout)
         self.assertIn("ARG=-Ptvhplayer.captureTests=exclude", result.stdout)
         self.assertNotIn("LAUNCH=", result.stdout)
