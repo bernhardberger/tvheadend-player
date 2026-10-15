@@ -27,6 +27,9 @@ require(testForks in setOf("1", "2")) { "tvhplayer.testForks must be 1 or 2" }
 tasks.withType<Test>().configureEach {
     // Separate JVMs isolate Robolectric/Compose globals. Keep visual capture runs serial.
     maxParallelForks = if (captureTests == "exclude") testForks.toInt() else 1
+    // Robolectric sandboxes grow each fork's native memory and metaspace for its whole life
+    // (~3 GiB RSS after ~85 classes at -Xmx512m); recycling forks keeps two inside the 8 GiB build slice.
+    forkEvery = 30
     // Motion regressions still render/assert every sampled frame in the routine lane.
     // Encoding their diagnostic PNGs belongs to explicit visual-evidence runs.
     systemProperty("tvhplayer.writeMotionCaptures", captureTests != "exclude")
