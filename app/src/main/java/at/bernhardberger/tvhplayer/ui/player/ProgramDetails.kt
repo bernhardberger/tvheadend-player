@@ -103,8 +103,8 @@ import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.guide.programmeActionLabel
 import kotlinx.coroutines.launch
-import java.text.DateFormat
-import java.util.Date
+import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
+import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 
@@ -610,7 +610,7 @@ internal fun programmeReadingFields(event: EpgEventEntry, locale: Locale): List<
     fun text(label: Int, value: String?) {
         value?.replace("\\r\\n", "\n")?.replace("\\n", "\n")?.trim()?.takeIf(String::isNotEmpty)?.let { add(label to it) }
     }
-    fun number(label: Int, value: Long?) = text(label, value?.toString())
+    fun number(label: Int, value: Long?) = text(label, value?.let { formatMetadataNumber(it, locale) })
     text(R.string.details_description, event.description)
     if (event.summary?.trim() != event.description?.trim()) text(R.string.details_summary, event.summary)
     text(R.string.details_genre, event.genre)
@@ -637,7 +637,7 @@ internal fun programmeReadingFields(event: EpgEventEntry, locale: Locale): List<
     }
     number(R.string.details_copyright_year, event.copyrightYear)
     event.firstAired?.let {
-        text(R.string.details_first_aired, DateFormat.getDateInstance(DateFormat.MEDIUM, locale).format(Date(it.toEpochMilliseconds())))
+        text(R.string.details_first_aired, formatFirstAired(it.toEpochMilliseconds(), locale))
     }
 }
 

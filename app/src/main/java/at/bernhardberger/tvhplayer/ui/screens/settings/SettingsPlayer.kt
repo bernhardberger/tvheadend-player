@@ -69,11 +69,8 @@ internal fun startupBufferLabel(millis: Int, learnedMillis: Int): String =
 
 @Composable
 private fun startupBufferSeconds(millis: Int): String {
-    val format = java.text.NumberFormat.getNumberInstance(LocalConfiguration.current.locales[0]).apply {
-        minimumFractionDigits = 0
-        maximumFractionDigits = 1
-    }
-    return stringResource(R.string.startup_buffer_seconds, format.format(millis / 1000.0))
+    return stringResource(R.string.startup_buffer_seconds,
+        at.bernhardberger.tvhplayer.ui.common.formatDecimal(millis / 1000.0, LocalConfiguration.current.locales[0], 0, 1))
 }
 
 @Composable

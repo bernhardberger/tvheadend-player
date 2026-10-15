@@ -91,8 +91,9 @@ import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import coil3.ImageLoader
-import java.time.format.DateTimeFormatter
-import java.util.Locale
+import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
+import at.bernhardberger.tvhplayer.ui.common.formatFileSize
+import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -175,7 +176,7 @@ internal fun FolderListRow(
                         )
                     )
                     if (summary.totalSizeBytes > 0) {
-                        append(" • ").append(formatFileSize(summary.totalSizeBytes))
+                        append(" • ").append(formatFileSize(summary.totalSizeBytes, LocalContext.current))
                     }
                 },
                 maxLines = 1,
@@ -834,9 +835,7 @@ private fun scheduleSectionLabel(section: DvrScheduleSection): String {
         DvrScheduleSectionKind.RECORDING_NOW -> stringResource(R.string.recordings_recording_now)
         DvrScheduleSectionKind.TODAY -> stringResource(R.string.today)
         DvrScheduleSectionKind.TOMORROW -> stringResource(R.string.tomorrow)
-        DvrScheduleSectionKind.DATE -> section.date?.format(
-            DateTimeFormatter.ofPattern("EEEE d MMMM", locale)
-        ).orEmpty()
+        DvrScheduleSectionKind.DATE -> section.date?.let { formatDayHeader(it, locale) }.orEmpty()
     }
 }
 
@@ -863,23 +862,4 @@ private fun recordingDurationMinutes(entry: DvrEntry): Long? {
     val start = entry.start ?: return null
     val stop = entry.stop ?: return null
     return (stop - start).inWholeMinutes.coerceAtLeast(0L)
-}
-
-private fun formatFileSize(sizeBytes: Long): String = when {
-    sizeBytes >= 1_000_000_000_000L -> String.format(
-        Locale.getDefault(),
-        "%.1f TB",
-        sizeBytes / 1_000_000_000_000.0,
-    )
-    sizeBytes >= 1_000_000_000L -> String.format(
-        Locale.getDefault(),
-        "%.1f GB",
-        sizeBytes / 1_000_000_000.0,
-    )
-    sizeBytes >= 1_000_000L -> String.format(
-        Locale.getDefault(),
-        "%.1f MB",
-        sizeBytes / 1_000_000.0,
-    )
-    else -> String.format(Locale.getDefault(), "%.1f KB", sizeBytes / 1_000.0)
 }

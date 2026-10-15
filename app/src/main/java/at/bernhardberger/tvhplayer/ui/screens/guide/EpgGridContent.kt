@@ -456,7 +456,7 @@ internal fun TimelineProgrammeCell(
     val startSec = event.start.epochSeconds
     val stopSec = event.stop.epochSeconds
     val uses24Hour = AppClock.uses24Hour
-    val startDate = remember(startSec, locale, formattingZone, uses24Hour) { startSec.formatDateTime() }
+    val startDate = remember(startSec, locale, formattingZone, uses24Hour) { startSec.formatDateTime(locale) }
     val startTime = remember(startSec, locale, formattingZone, uses24Hour) { formatHm(startSec) }
     val stopTime = remember(stopSec, locale, formattingZone, uses24Hour) { formatHm(stopSec) }
     var focused by remember { mutableStateOf(false) }

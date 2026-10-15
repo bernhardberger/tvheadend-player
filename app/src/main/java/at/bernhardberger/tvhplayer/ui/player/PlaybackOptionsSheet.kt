@@ -160,6 +160,7 @@ internal fun PlaybackOptionsSheet(
     val surround51 = stringResource(R.string.track_surround_5_1)
     val surround71 = stringResource(R.string.track_surround_7_1)
     val channelsTemplate = stringResource(R.string.track_channels_count)
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val audioDescription = stringResource(R.string.audio_description)
     val clearDialogue = stringResource(R.string.track_clear_dialogue)
     val currentTracks = rememberPlayerTracks(player)
@@ -172,6 +173,7 @@ internal fun PlaybackOptionsSheet(
         surround51,
         surround71,
         channelsTemplate,
+        locale,
         audioDescription,
         clearDialogue,
     ) {
@@ -184,7 +186,7 @@ internal fun PlaybackOptionsSheet(
             stereoLabel = stereo,
             surround51Label = surround51,
             surround71Label = surround71,
-            channelsLabel = { count -> channelsTemplate.format(count) },
+            channelsLabel = { count -> channelsTemplate.format(locale, count) },
             audioDescriptionLabel = audioDescription,
             clearDialogueLabel = clearDialogue,
         )
@@ -198,6 +200,7 @@ internal fun PlaybackOptionsSheet(
         surround51,
         surround71,
         channelsTemplate,
+        locale,
     ) {
         collectTracks(
             tracks = currentTracks,
@@ -208,7 +211,7 @@ internal fun PlaybackOptionsSheet(
             stereoLabel = stereo,
             surround51Label = surround51,
             surround71Label = surround71,
-            channelsLabel = { count -> channelsTemplate.format(count) },
+            channelsLabel = { count -> channelsTemplate.format(locale, count) },
         )
     }
     val audioTracks = remember(audioChoices) { audioChoices.map(UiTrack::toPlaybackOptionTrack) }

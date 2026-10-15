@@ -73,8 +73,9 @@ import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
-import java.text.DateFormat
-import java.util.Date
+import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
+import at.bernhardberger.tvhplayer.ui.common.formatFileSize
+import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -740,7 +741,7 @@ internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<Dv
         value?.takeIf(String::isNotBlank)?.let { add(resources.getString(label) to it) }
     }
     recordingSizeBytes(recording)?.let {
-        fact(R.string.details_size, android.text.format.Formatter.formatShortFileSize(context, it))
+        fact(R.string.details_size, formatFileSize(it, context))
     }
     if (configurations.size > 1) fact(R.string.details_recording_profile,
         configurations.firstOrNull { it.id == recording.configId }?.name?.trim())
@@ -786,7 +787,7 @@ internal fun programmeAboutFacts(event: EpgEvent?, recording: DvrEntry?, resourc
             value?.trim()?.takeIf(String::isNotEmpty)?.let { add(resources.getString(label) to it) }
         }
         fun count(label: Int, number: Long?, total: Long?) = fact(label, number?.let { n ->
-            total?.takeIf { it >= n }?.let { resources.getString(R.string.details_count_of, n.toInt(), it.toInt()) } ?: n.toString()
+            total?.takeIf { it >= n }?.let { resources.getString(R.string.details_count_of, n.toInt(), it.toInt()) } ?: formatMetadataNumber(n, locale)
         })
         fact(R.string.details_genre, event?.genre?.takeIf(String::isNotBlank)
             ?: programmeCategory(event?.contentGenre ?: recording?.contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) })
@@ -796,13 +797,13 @@ internal fun programmeAboutFacts(event: EpgEvent?, recording: DvrEntry?, resourc
             else fact(R.string.details_episode, it.onscreen)
             count(R.string.details_part, it.partNumber, it.partCount)
         }
-        fact(R.string.details_year, (event?.copyrightYear ?: recording?.copyrightYear)?.toString())
+        fact(R.string.details_year, (event?.copyrightYear ?: recording?.copyrightYear)?.let { formatMetadataNumber(it, locale) })
         (event?.rating ?: recording?.rating)?.let { rating ->
             fact(R.string.details_age_rating, programmeAgeRating(rating.label, rating.age))
-            fact(R.string.details_stars, rating.stars?.toString())
+            fact(R.string.details_stars, rating.stars?.let { formatMetadataNumber(it, locale) })
         }
         event?.firstAired?.let {
-            fact(R.string.details_first_aired, DateFormat.getDateInstance(DateFormat.MEDIUM, locale).format(Date(it.toEpochMilliseconds())))
+            fact(R.string.details_first_aired, formatFirstAired(it.toEpochMilliseconds(), locale))
         }
         event?.isNew?.let {
             fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))

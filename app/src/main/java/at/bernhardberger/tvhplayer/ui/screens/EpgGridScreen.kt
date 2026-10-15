@@ -1708,7 +1708,7 @@ fun EpgGridScreen(
                                 }
                             },
                     ) {
-                        Text(windowStartSec.formatDateTime())
+                        Text(windowStartSec.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
                     }
                     OutlinedButton(
                         onClick = {

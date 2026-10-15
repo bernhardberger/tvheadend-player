@@ -67,6 +67,14 @@ fun formatClock(
 fun formatShortDate(time: TemporalAccessor, locale: Locale = Locale.getDefault()): String =
     formatter(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMd"), locale).format(time)
 
+/** Full weekday and month for schedule section headings, in locale-specific order. */
+fun formatDayHeader(time: TemporalAccessor, locale: Locale): String =
+    formatter(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMMEEEEd"), locale).format(time)
+
+/** Labeled premiere facts retain the medium date; compact metadata uses [formatShortDate]. */
+fun formatFirstAired(epochMillis: Long, locale: Locale): String =
+    java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM, locale).format(java.util.Date(epochMillis))
+
 /** Formatters are immutable and the guide formats several times per cell, so each pattern is built once. */
 private val formatters = ConcurrentHashMap<Pair<String, Locale>, DateTimeFormatter>()
 

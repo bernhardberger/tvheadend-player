@@ -98,7 +98,7 @@ internal fun JumpToTimeDialog(
             style = MaterialTheme.typography.headlineSmall,
         )
         Text(
-            text = targetSec.formatDateTime(),
+            text = targetSec.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             style = MaterialTheme.typography.titleLarge,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -277,7 +277,7 @@ internal fun EpgSearchDialog(
                     val schedule = stringResource(
                         R.string.epg_search_result_schedule,
                         channel,
-                        event.start.epochSeconds.formatDateTime(),
+                        event.start.epochSeconds.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
                         formatHm(event.stop.epochSeconds),
                     )
                     val description = stringResource(
