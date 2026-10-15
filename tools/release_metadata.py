@@ -22,7 +22,7 @@ CANONICAL_CERTIFICATE_SHA256 = (
     "1E:18:48:62:F5:BB:A2:D1:C8:40:6D:6A:7A:79:65:7F:"
     "F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9"
 )
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 BUNDLETOOL_VERSION = "1.18.3"
 APPLICATION_IDS = {
     "play": "at.bernhardberger.tvhplayer",
@@ -156,6 +156,8 @@ def build_unsigned_manifest(
             "unsignedPlayApk",
             "unsignedApplianceApk",
             "unsignedPlayAab",
+            "playR8Mapping",
+            "applianceR8Mapping",
             "sourceTarGz",
             "sourceZip",
             "nativeSourceTarGz",
@@ -211,6 +213,8 @@ def validate_unsigned_manifest(
             "unsignedPlayApk",
             "unsignedApplianceApk",
             "unsignedPlayAab",
+            "playR8Mapping",
+            "applianceR8Mapping",
             "sourceTarGz",
             "sourceZip",
             "nativeSourceTarGz",
@@ -245,6 +249,8 @@ def validate_signed_manifest(manifest: dict[str, Any]) -> None:
             "signedPlayApk",
             "signedApplianceApk",
             "signedPlayAab",
+            "playR8Mapping",
+            "applianceR8Mapping",
             "sourceTarGz",
             "sourceZip",
             "nativeSourceTarGz",
@@ -264,6 +270,8 @@ def build_signed_manifest(
     signed_play_apk: Path,
     signed_appliance_apk: Path,
     signed_play_aab: Path,
+    play_r8_mapping: Path,
+    appliance_r8_mapping: Path,
     certificate_sha256: str,
     source_tar_gz: Path,
     source_zip: Path,
@@ -283,6 +291,8 @@ def build_signed_manifest(
         "signedPlayApk": _binary_artifact(signed_play_apk, "play"),
         "signedApplianceApk": _binary_artifact(signed_appliance_apk, "appliance"),
         "signedPlayAab": _binary_artifact(signed_play_aab, "play"),
+        "playR8Mapping": _artifact(play_r8_mapping),
+        "applianceR8Mapping": _artifact(appliance_r8_mapping),
         "sourceTarGz": _artifact(source_tar_gz),
         "sourceZip": _artifact(source_zip),
         "nativeSourceTarGz": _artifact(native_source_tar_gz),
@@ -294,12 +304,17 @@ def build_signed_manifest(
             "signedPlayApk",
             "signedApplianceApk",
             "signedPlayAab",
+            "playR8Mapping",
+            "applianceR8Mapping",
             "sourceTarGz",
             "sourceZip",
             "nativeSourceTarGz",
             "sdkSourceTarGz",
         },
     )
+    for name in ("playR8Mapping", "applianceR8Mapping"):
+        if artifacts[name] != unsigned_manifest["artifacts"][name]:
+            raise ValueError(f"signed bundle changed mapping artifact: {name}")
     manifest = _build_manifest(
         stage="signed",
         application_id=unsigned_manifest["applicationId"],
@@ -328,11 +343,13 @@ def validate_source_lineage(
         "sourceZip",
         "nativeSourceTarGz",
         "sdkSourceTarGz",
+        "playR8Mapping",
+        "applianceR8Mapping",
     ):
         unsigned_artifact = unsigned_manifest.get("artifacts", {}).get(name)
         signed_artifact = signed_manifest.get("artifacts", {}).get(name)
         if unsigned_artifact != signed_artifact:
-            raise ValueError(f"signed bundle changed source artifact: {name}")
+            raise ValueError(f"signed bundle changed source or mapping artifact: {name}")
 
 
 def _artifact(path: Path) -> dict[str, str]:
@@ -537,6 +554,8 @@ def _create_unsigned(args: argparse.Namespace) -> None:
         "unsignedPlayApk": _binary_artifact(args.unsigned_play_apk, "play"),
         "unsignedApplianceApk": _binary_artifact(args.unsigned_appliance_apk, "appliance"),
         "unsignedPlayAab": _binary_artifact(args.unsigned_play_aab, "play"),
+        "playR8Mapping": _artifact(args.play_r8_mapping),
+        "applianceR8Mapping": _artifact(args.appliance_r8_mapping),
         "sourceTarGz": _artifact(args.source_tar_gz),
         "sourceZip": _artifact(args.source_zip),
         "nativeSourceTarGz": _artifact(args.native_source_tar_gz),
@@ -594,6 +613,8 @@ def _create_signed(args: argparse.Namespace) -> None:
             signed_play_apk=args.signed_play_apk,
             signed_appliance_apk=args.signed_appliance_apk,
             signed_play_aab=args.signed_play_aab,
+            play_r8_mapping=args.play_r8_mapping,
+            appliance_r8_mapping=args.appliance_r8_mapping,
             certificate_sha256=args.certificate_sha256,
             source_tar_gz=args.source_tar_gz,
             source_zip=args.source_zip,
@@ -619,6 +640,8 @@ def _parser() -> argparse.ArgumentParser:
     create_unsigned.add_argument("--unsigned-play-apk", required=True, type=Path)
     create_unsigned.add_argument("--unsigned-appliance-apk", required=True, type=Path)
     create_unsigned.add_argument("--unsigned-play-aab", required=True, type=Path)
+    create_unsigned.add_argument("--play-r8-mapping", required=True, type=Path)
+    create_unsigned.add_argument("--appliance-r8-mapping", required=True, type=Path)
     create_unsigned.add_argument("--source-tar-gz", required=True, type=Path)
     create_unsigned.add_argument("--source-zip", required=True, type=Path)
     create_unsigned.add_argument("--native-source-tar-gz", required=True, type=Path)
@@ -644,6 +667,8 @@ def _parser() -> argparse.ArgumentParser:
     create_signed.add_argument("--signed-play-apk", required=True, type=Path)
     create_signed.add_argument("--signed-appliance-apk", required=True, type=Path)
     create_signed.add_argument("--signed-play-aab", required=True, type=Path)
+    create_signed.add_argument("--play-r8-mapping", required=True, type=Path)
+    create_signed.add_argument("--appliance-r8-mapping", required=True, type=Path)
     create_signed.add_argument("--source-tar-gz", required=True, type=Path)
     create_signed.add_argument("--source-zip", required=True, type=Path)
     create_signed.add_argument("--native-source-tar-gz", required=True, type=Path)

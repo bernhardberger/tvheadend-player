@@ -48,9 +48,17 @@ cd "$ROOT_DIR"
 built_apk="app/build/outputs/apk/play/release/app-play-release-unsigned.apk"
 built_appliance_apk="app/build/outputs/apk/appliance/release/app-appliance-release-unsigned.apk"
 built_aab="app/build/outputs/bundle/playRelease/app-play-release.aab"
+built_play_mapping="app/build/outputs/mapping/playRelease/mapping.txt"
+built_appliance_mapping="app/build/outputs/mapping/applianceRelease/mapping.txt"
 for artifact in "$built_apk" "$built_appliance_apk" "$built_aab"; do
     if [[ ! -f "$artifact" ]]; then
         printf 'error: expected release artifact was not produced: %s\n' "$artifact" >&2
+        exit 1
+    fi
+done
+for mapping in "$built_play_mapping" "$built_appliance_mapping"; do
+    if [[ ! -f "$mapping" || ! -s "$mapping" || -L "$mapping" ]]; then
+        printf 'error: release R8 mapping is missing, empty, or a symbolic link: %s\n' "$mapping" >&2
         exit 1
     fi
 done
@@ -127,11 +135,15 @@ mkdir -p "$release_dir"
 apk_name="tvheadend-player-${version_name}-play-unsigned.apk"
 appliance_apk_name="tvheadend-player-${version_name}-appliance-unsigned.apk"
 aab_name="tvheadend-player-${version_name}-play-unsigned.aab"
+play_mapping_name="tvheadend-player-${version_name}-play-mapping.txt"
+appliance_mapping_name="tvheadend-player-${version_name}-appliance-mapping.txt"
 source_tar_name="tvheadend-player-${version_name}-source.tar.gz"
 source_zip_name="tvheadend-player-${version_name}-source.zip"
 cp "$aligned_apk" "$release_dir/$apk_name"
 cp "$temporary_dir/appliance-unsigned.apk" "$release_dir/$appliance_apk_name"
 cp "$built_aab" "$release_dir/$aab_name"
+cp "$built_play_mapping" "$release_dir/$play_mapping_name"
+cp "$built_appliance_mapping" "$release_dir/$appliance_mapping_name"
 cp "$temporary_dir/$NATIVE_SOURCE_NAME" "$release_dir/$NATIVE_SOURCE_NAME"
 cp "$temporary_dir/$SDK_SOURCE_NAME" "$release_dir/$SDK_SOURCE_NAME"
 git archive --format=tar.gz --prefix="tvheadend-player-${version_name}/" \
@@ -148,6 +160,8 @@ python3 tools/release_metadata.py create-unsigned \
     --unsigned-play-apk "$release_dir/$apk_name" \
     --unsigned-appliance-apk "$release_dir/$appliance_apk_name" \
     --unsigned-play-aab "$release_dir/$aab_name" \
+    --play-r8-mapping "$release_dir/$play_mapping_name" \
+    --appliance-r8-mapping "$release_dir/$appliance_mapping_name" \
     --source-tar-gz "$release_dir/$source_tar_name" \
     --source-zip "$release_dir/$source_zip_name" \
     --native-source-tar-gz "$release_dir/$NATIVE_SOURCE_NAME" \
@@ -159,6 +173,8 @@ python3 tools/release_metadata.py create-unsigned \
         "$apk_name" \
         "$appliance_apk_name" \
         "$aab_name" \
+        "$play_mapping_name" \
+        "$appliance_mapping_name" \
         "$source_tar_name" \
         "$source_zip_name" \
         "$NATIVE_SOURCE_NAME" \

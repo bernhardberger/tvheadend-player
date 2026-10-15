@@ -71,6 +71,8 @@ source_tar_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]
 source_zip_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["sourceZip"]["file"])' "$manifest")"
 native_source_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["nativeSourceTarGz"]["file"])' "$manifest")"
 sdk_source_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["sdkSourceTarGz"]["file"])' "$manifest")"
+play_mapping_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["playR8Mapping"]["file"])' "$manifest")"
+appliance_mapping_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["artifacts"]["applianceR8Mapping"]["file"])' "$manifest")"
 unsigned_apk="$INCOMING_DIR/$unsigned_apk_name"
 
 badging="$($aapt dump badging "$unsigned_apk")"
@@ -207,6 +209,8 @@ cp "$INCOMING_DIR/$source_tar_name" "$staged_output/$source_tar_name"
 cp "$INCOMING_DIR/$source_zip_name" "$staged_output/$source_zip_name"
 cp "$INCOMING_DIR/$native_source_name" "$staged_output/$native_source_name"
 cp "$INCOMING_DIR/$sdk_source_name" "$staged_output/$sdk_source_name"
+cp "$INCOMING_DIR/$play_mapping_name" "$staged_output/$play_mapping_name"
+cp "$INCOMING_DIR/$appliance_mapping_name" "$staged_output/$appliance_mapping_name"
 cp "$manifest" "$staged_output/unsigned-release-manifest.json"
 cat "$temporary_dir/play-verify.txt" "$temporary_dir/appliance-verify.txt" > "$staged_output/APKSIGNER-VERIFY.txt"
 cp "$temporary_dir/aab-verify.txt" "$staged_output/JARSIGNER-VERIFY.txt"
@@ -223,6 +227,8 @@ python3 "$ROOT_DIR/tools/release_metadata.py" create-signed \
     --source-zip "$staged_output/$source_zip_name" \
     --native-source-tar-gz "$staged_output/$native_source_name" \
     --sdk-source-tar-gz "$staged_output/$sdk_source_name" \
+    --play-r8-mapping "$staged_output/$play_mapping_name" \
+    --appliance-r8-mapping "$staged_output/$appliance_mapping_name" \
     --certificate-sha256 "$certificate_sha256" \
     --output "$staged_output/release-manifest.json"
 (
@@ -235,6 +241,8 @@ python3 "$ROOT_DIR/tools/release_metadata.py" create-signed \
         "$source_zip_name" \
         "$native_source_name" \
         "$sdk_source_name" \
+        "$play_mapping_name" \
+        "$appliance_mapping_name" \
         unsigned-release-manifest.json \
         APKSIGNER-VERIFY.txt \
         JARSIGNER-VERIFY.txt \

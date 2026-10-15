@@ -63,6 +63,25 @@ class ReleaseMetadataTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, error):
                 release_metadata.validate_unsigned_manifest(manifest, application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0")
 
+    def test_both_stages_require_each_mapping_and_current_schema(self) -> None:
+        for stage in ("unsigned", "signed"):
+            for missing in ("playR8Mapping", "applianceR8Mapping", "oldSchema"):
+                with self.subTest(stage=stage, missing=missing):
+                    manifest = self.unsigned_manifest()
+                    self.assertEqual(manifest["schemaVersion"], 4)
+                    manifest["stage"] = stage
+                    manifest["artifacts"] = self._artifacts(stage)
+                    manifest["signing"] = {"keyAlias": release_metadata.CANONICAL_KEY_ALIAS, "certificateSha256": release_metadata.CANONICAL_CERTIFICATE_SHA256}
+                    if missing == "oldSchema":
+                        manifest["schemaVersion"] = 3
+                    else:
+                        del manifest["artifacts"][missing]
+                    with self.assertRaisesRegex(ValueError, "supported|exactly"):
+                        if stage == "unsigned":
+                            release_metadata.validate_unsigned_manifest(manifest, application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0")
+                        else:
+                            release_metadata.validate_signed_manifest(manifest)
+
     def test_json_loader_rejects_duplicate_artifact_keys(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "manifest.json"
@@ -278,6 +297,8 @@ class ReleaseMetadataTest(unittest.TestCase):
                     signed_play_apk=signed_apk,
                     signed_appliance_apk=signed_apk,
                     signed_play_aab=signed_apk,
+                    play_r8_mapping=signed_apk,
+                    appliance_r8_mapping=signed_apk,
                     certificate_sha256="00" * 32,
                     source_tar_gz=signed_apk,
                     source_zip=signed_apk,
@@ -309,12 +330,12 @@ class ReleaseMetadataTest(unittest.TestCase):
                 artifacts=self._artifacts("unsigned"),
             )
 
-    def test_signed_manifest_preserves_exact_sdk_source(self) -> None:
+    def test_signed_manifest_preserves_exact_sdk_source_and_mappings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             files = {}
-            for name in ("play.apk", "appliance.apk", "play.aab", "source.tar.gz", "source.zip", "native.tar.gz", "sdk.tar.gz"):
+            for name in ("play.apk", "appliance.apk", "play.aab", "source.tar.gz", "source.zip", "native.tar.gz", "sdk.tar.gz", "play-mapping.txt", "appliance-mapping.txt"):
                 files[name] = Path(directory) / name
-                files[name].write_bytes(b"artifact")
+                files[name].write_bytes(name.encode())
             unsigned = release_metadata.build_unsigned_manifest(
                 application_id="at.bernhardberger.tvhplayer",
                 version_code=1,
@@ -324,23 +345,49 @@ class ReleaseMetadataTest(unittest.TestCase):
                 artifacts=self._artifacts("unsigned"),
             )
 
-            signed = release_metadata.build_signed_manifest(
+            for flavor in ("play", "appliance"):
+                unsigned["artifacts"][flavor + "R8Mapping"] = release_metadata._artifact(files[flavor + "-mapping.txt"])
+            arguments = dict(
                 unsigned_manifest=unsigned,
                 signed_play_apk=files["play.apk"],
                 signed_appliance_apk=files["appliance.apk"],
                 signed_play_aab=files["play.aab"],
+                play_r8_mapping=files["play-mapping.txt"],
+                appliance_r8_mapping=files["appliance-mapping.txt"],
                 certificate_sha256=release_metadata.CANONICAL_CERTIFICATE_SHA256,
                 source_tar_gz=files["source.tar.gz"],
                 source_zip=files["source.zip"],
                 native_source_tar_gz=files["native.tar.gz"],
                 sdk_source_tar_gz=files["sdk.tar.gz"],
             )
+            signed = release_metadata.build_signed_manifest(**arguments)
 
             self.assertEqual(signed["sdkSourceCommit"], "b" * 40)
             self.assertEqual(
                 signed["artifacts"]["sdkSourceTarGz"]["sha256"],
                 release_metadata.sha256_file(files["sdk.tar.gz"]),
             )
+            for flavor in ("play", "appliance"):
+                key = flavor + "R8Mapping"
+                self.assertEqual(signed["artifacts"][key], unsigned["artifacts"][key])
+                mapping = files[flavor + "-mapping.txt"]
+                original = mapping.read_bytes()
+                mapping.write_bytes(b"different build mapping")
+                with self.assertRaisesRegex(ValueError, f"changed mapping artifact: {key}"):
+                    release_metadata.build_signed_manifest(**arguments)
+                mapping.write_bytes(original)
+
+    def test_signed_lineage_rejects_mapping_substitution(self) -> None:
+        unsigned = self.unsigned_manifest()
+        signed = json.loads(json.dumps(unsigned))
+        release_metadata.validate_source_lineage(unsigned, signed)
+        for key in ("playR8Mapping", "applianceR8Mapping"):
+            for field in ("file", "sha256"):
+                with self.subTest(key=key, field=field):
+                    signed = json.loads(json.dumps(unsigned))
+                    signed["artifacts"][key][field] = "substituted"
+                    with self.assertRaisesRegex(ValueError, key):
+                        release_metadata.validate_source_lineage(unsigned, signed)
 
     def test_checksum_file_rejects_paths_outside_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -433,6 +480,8 @@ class ReleaseMetadataTest(unittest.TestCase):
             f"{stage}PlayApk": {"file": f"{stage}-play.apk", "sha256": "1" * 64, "flavor": "play", "applicationId": "at.bernhardberger.tvhplayer"},
             f"{stage}ApplianceApk": {"file": f"{stage}-appliance.apk", "sha256": "6" * 64, "flavor": "appliance", "applicationId": "at.bernhardberger.tvhplayer.appliance"},
             f"{stage}PlayAab": {"file": f"{stage}-play.aab", "sha256": "7" * 64, "flavor": "play", "applicationId": "at.bernhardberger.tvhplayer"},
+            "playR8Mapping": {"file": "play-mapping.txt", "sha256": "8" * 64},
+            "applianceR8Mapping": {"file": "appliance-mapping.txt", "sha256": "9" * 64},
             "sourceTarGz": {"file": "source.tar.gz", "sha256": "2" * 64},
             "sourceZip": {"file": "source.zip", "sha256": "3" * 64},
             "nativeSourceTarGz": {

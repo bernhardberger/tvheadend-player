@@ -25,7 +25,7 @@ class ReleaseOrchestratorTest(unittest.TestCase):
             with self.subTest(wrong_appliance_id=wrong_appliance_id), tempfile.TemporaryDirectory() as directory:
                 bundle = Path(directory)
                 artifacts = {}
-                for key, name in (("sourceTarGz", "source.tar.gz"), ("sourceZip", "source.zip"), ("nativeSourceTarGz", "native.tar.gz"), ("sdkSourceTarGz", "sdk.tar.gz")):
+                for key, name in (("sourceTarGz", "source.tar.gz"), ("sourceZip", "source.zip"), ("nativeSourceTarGz", "native.tar.gz"), ("sdkSourceTarGz", "sdk.tar.gz"), ("playR8Mapping", "play-mapping.txt"), ("applianceR8Mapping", "appliance-mapping.txt")):
                     (bundle / name).write_bytes(b"source")
                     artifacts[key] = metadata._artifact(bundle / name)
                 for flavor, kind in (("play", "Apk"), ("appliance", "Apk"), ("play", "Aab")):
@@ -35,6 +35,7 @@ class ReleaseOrchestratorTest(unittest.TestCase):
                 unsigned = metadata.build_unsigned_manifest(application_id=RELEASE["APPLICATION_ID"], version_code=1, version_name="0.1.0", source_commit="a" * 40, sdk_source_commit="b" * 40, artifacts=artifacts)
                 signed = metadata.build_signed_manifest(
                     unsigned_manifest=unsigned, signed_play_apk=bundle / "play.apk", signed_appliance_apk=bundle / "appliance.apk", signed_play_aab=bundle / "play.aab",
+                    play_r8_mapping=bundle / "play-mapping.txt", appliance_r8_mapping=bundle / "appliance-mapping.txt",
                     certificate_sha256=metadata.CANONICAL_CERTIFICATE_SHA256, source_tar_gz=bundle / "source.tar.gz", source_zip=bundle / "source.zip", native_source_tar_gz=bundle / "native.tar.gz", sdk_source_tar_gz=bundle / "sdk.tar.gz",
                 )
                 metadata._write_manifest(bundle / "release-manifest.json", signed)
