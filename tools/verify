@@ -30,8 +30,6 @@ fi
 gradle_arguments=()
 if [[ "${TVHPLAYER_VERIFY_ISOLATED:-}" == 1 ]]; then
     # Reusing a daemon outside the unit would bypass its budget and cancellation.
-    # Two workers (Gradle at 2 GiB plus two 512 MiB Robolectric forks or a lint
-    # worker) stay inside the shared 8 GiB build ceiling.
     gradle_arguments+=(--no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process)
 fi
 provenance_tasks=(:app:verifyExternalSdkConsumption)
@@ -75,15 +73,21 @@ python3 tools/static_rules.py
 
 printf '==> JVM tests, lint, Android test compilation, and debug APK\n'
 printf '    Visual capture matrix: %s (use --visual-captures to include it)\n' "$capture_tests"
+# Three invocations: on a full rebuild, compilation memory held by the Gradle
+# JVM plus Robolectric forks plus lint analysis exceeded the 8 GiB build slice.
+gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests" --console=plain --no-scan)
+./gradlew \
+    :client:compileDebugUnitTestSources :decoder-ffmpeg:compileDebugUnitTestSources \
+    :app:compilePlayDebugUnitTestSources :app:compilePlayDebugAndroidTestKotlin \
+    "${gradle_common[@]}"
 ./gradlew \
     :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest \
+    "${gradle_common[@]}"
+./gradlew \
     :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:lintApplianceDebug \
-    :app:compilePlayDebugAndroidTestKotlin \
     :app:assemblePlayDebug :app:assembleApplianceDebug \
     "${provenance_tasks[@]}" \
-    "${gradle_arguments[@]}" \
-    "-Ptvhplayer.captureTests=$capture_tests" \
-    --console=plain --no-scan
+    "${gradle_common[@]}"
 
 printf '==> External native dependency and packaged APK integrity\n'
 if [[ "$staged_sdk" == true ]]; then
