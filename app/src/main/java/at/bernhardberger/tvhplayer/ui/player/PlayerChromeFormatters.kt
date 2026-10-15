@@ -1,16 +1,17 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.stringArrayResource
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
 import java.time.LocalDate
 
 @Composable
-fun playerMinutesLeft(minutes: Int, spoken: Boolean = false): String = if (spoken) {
-    pluralStringResource(R.plurals.player_minutes_left_spoken, minutes, minutes)
-} else stringResource(R.string.player_minutes_left, minutes)
+fun playerMinutesLeft(minutes: Int, spoken: Boolean = false): String = stringResource(
+    R.string.player_minutes_left, formatDurationMinutes(minutes.toLong(), LocalResources.current, spoken),
+)
 
 @Composable
 internal fun playerSpokenTimeRange(range: String): String {

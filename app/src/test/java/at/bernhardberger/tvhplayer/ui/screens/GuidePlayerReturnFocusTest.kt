@@ -100,11 +100,12 @@ class GuidePlayerReturnFocusTest {
     private lateinit var back: OnBackPressedDispatcher
     private lateinit var view: View
     private var playRequests = 0
+    private lateinit var settingsApplication: org.koin.core.KoinApplication
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
     @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun contextMenuHoldReleaseBackMenuAndWatchChannel() {
+    fun contextMenuHoldReleaseBackMenuAndWatchRunningProgramme() {
         guide(PlayerReturnFocus(ChannelId(1), ChannelId(1)))
         focused("Channel 1 hour 0")
         val row = compose.onNodeWithText("Channel 1 hour 0")
@@ -127,17 +128,33 @@ class GuidePlayerReturnFocusTest {
         compose.onNodeWithText("Details").assertIsFocused()
         key(Key.DirectionDown)
         key(Key.DirectionDown)
-        compose.onNodeWithText("Watch channel").assertIsFocused()
+        compose.onNodeWithText("Watch").assertIsFocused()
         key(Key.DirectionCenter)
         assertEquals(1, playRequests)
     }
 
-    @Before fun before() { zone = TimeZone.getDefault(); TimeZone.setDefault(TimeZone.getTimeZone("UTC")) }
-    @After fun after() { models.clear(); scope.cancel(); if (::player.isInitialized) player.release(); TimeZone.setDefault(zone) }
+    @Before fun before() {
+        zone = TimeZone.getDefault(); TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
+        settingsApplication = org.koin.dsl.koinApplication { modules(org.koin.dsl.module {
+            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(preferences()) }
+        }) }
+    }
+    @After fun after() { models.clear(); scope.cancel(); if (::player.isInitialized) player.release(); TimeZone.setDefault(zone); settingsApplication.close() }
 
     @Test fun timeshiftedEntryReturnsToNowOnChangedPlayingChannel() {
         // Entered from a past programme on channel 1, then zapped to channel 2.
         guide(PlayerReturnFocus(playingChannelId = ChannelId(2), originChannelId = ChannelId(1)))
+        focused("Channel 2 hour 0")
+    }
+
+    @Test fun programmeRequestFromChannelsLandsOnFutureProgramme() {
+        val programme = event(2, 3)
+        guide(PlayerReturnFocus(ChannelId(2), ChannelId(2), programme.id, programme.start.epochSeconds))
+        focused("Channel 2 hour 3")
+    }
+
+    @Test fun missingProgrammeRequestFallsBackToChannelAtNow() {
+        guide(PlayerReturnFocus(ChannelId(2), ChannelId(2), EventId(999), hour + 3 * 3600))
         focused("Channel 2 hour 0")
     }
 
@@ -262,6 +279,7 @@ class GuidePlayerReturnFocusTest {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
         compose.setContent {
+            org.koin.compose.KoinIsolatedContext(settingsApplication) {
             TVHeadendPlayerTheme {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 view = LocalView.current
@@ -277,6 +295,7 @@ class GuidePlayerReturnFocusTest {
                 )
                 }
             }
+        }
         }
         compose.waitForIdle()
         return session

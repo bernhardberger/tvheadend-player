@@ -4,22 +4,23 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.semantics.dialog
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -40,7 +41,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -49,18 +49,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Button
-import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
-import at.bernhardberger.tvheadend.sdk.core.DvrEntry
-import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -69,23 +65,9 @@ import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
 import at.bernhardberger.tvhplayer.core.moveGuideWindowByDays
-import at.bernhardberger.tvhplayer.core.programmeActions
-import at.bernhardberger.tvhplayer.core.programmeHasAired
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsLayout
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsButton
-import at.bernhardberger.tvhplayer.ui.components.programmeDetailsFrame
-import at.bernhardberger.tvhplayer.ui.player.ProgrammeInformation
-import at.bernhardberger.tvhplayer.ui.player.FullDescription
-import at.bernhardberger.tvhplayer.ui.player.ProgrammeHero
-import at.bernhardberger.tvhplayer.ui.player.programmeReadingFields
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
-import coil3.ImageLoader
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.runtime.withFrameNanos
-import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
@@ -138,13 +120,13 @@ internal fun JumpToTimeDialog(
                 onClick = { targetSec = previousHourSec },
                 enabled = previousHourSec != targetSec,
             ) {
-                Text(stringResource(R.string.previous_hour))
+                Text(stringResource(R.string.previous_hour, at.bernhardberger.tvhplayer.ui.common.formatWholeHours(1, androidx.compose.ui.platform.LocalResources.current)))
             }
             OutlinedButton(
                 onClick = { targetSec = nextHourSec },
                 enabled = nextHourSec != targetSec,
             ) {
-                Text(stringResource(R.string.next_hour))
+                Text(stringResource(R.string.next_hour, at.bernhardberger.tvhplayer.ui.common.formatWholeHours(1, androidx.compose.ui.platform.LocalResources.current)))
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -361,46 +343,7 @@ private fun epgSearchMessageRes(
     else -> R.string.epg_search_unavailable
 }
 
-@Composable
-internal fun DvrConfigDialog(
-    configs: List<DvrConfiguration>,
-    onDismiss: () -> Unit,
-    onSelect: (DvrConfiguration) -> Unit,
-) {
-    val initialFocus = remember { FocusRequester() }
-    LaunchedEffect(configs) { initialFocus.requestFocus() }
-    DialogScrim(onDismissRequest = onDismiss) {
-        Text(
-            text = stringResource(R.string.recording_config_title),
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(
-            text = stringResource(R.string.recording_config_message),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        configs.forEachIndexed { index, config ->
-            OutlinedButton(
-                onClick = { onSelect(config) },
-                modifier = if (index == 0) {
-                    Modifier.focusRequester(initialFocus)
-                } else {
-                    Modifier
-                },
-            ) {
-                Column {
-                    Text(config.name)
-                    config.comment.takeIf(String::isNotBlank)?.let {
-                        Text(it, style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-        OutlinedButton(onClick = onDismiss) {
-            Text(stringResource(R.string.back))
-        }
-    }
-}
-
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 internal fun ConfirmProgrammeActionDialog(
     action: ProgrammeAction,
@@ -410,23 +353,46 @@ internal fun ConfirmProgrammeActionDialog(
     onPreviewKeyEvent: (KeyEvent) -> Boolean = { false },
     channelName: String = "",
     dateAndTime: String = "",
+    entries: at.bernhardberger.tvheadend.sdk.core.DvrEventEntries? = null,
+    configurations: List<DvrConfiguration> = emptyList(),
+    visibility: androidx.compose.animation.core.MutableTransitionState<Boolean> = remember {
+        androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true }
+    },
 ) {
-    at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog(
-        title = stringResource(when (action) {
-            ProgrammeAction.RECORD -> R.string.record_confirm_title
-            ProgrammeAction.STOP_RECORDING -> R.string.stop_recording_confirm_title
-            else -> R.string.cancel_recording_confirm_title
-        }),
-        message = stringResource(when (action) {
-            ProgrammeAction.RECORD -> R.string.record_confirm_message
-            ProgrammeAction.STOP_RECORDING -> R.string.stop_recording_confirm_message
-            else -> R.string.cancel_recording_confirm_message
-        }, programmeTitle, channelName, dateAndTime),
-        firstLabel = stringResource(if (action == ProgrammeAction.RECORD) R.string.dont_record else R.string.keep_recording),
+    val target = programmeConfirmationTarget(entries, configurations,
+        stringResource(R.string.recording_profile_default))
+    val message = stringResource(if (action == ProgrammeAction.STOP_RECORDING) R.string.stop_recording_confirm_message else R.string.cancel_recording_confirm_message,
+        programmeTitle, channelName, dateAndTime)
+    at.bernhardberger.tvhplayer.ui.components.CentredDialog(
+        visibility = visibility,
+        title = stringResource(if (action == ProgrammeAction.STOP_RECORDING) R.string.stop_recording_confirm_title else R.string.cancel_recording_confirm_title),
+        message = if (target == null) message else "$message ${stringResource(target.first, target.second)}",
+        firstLabel = stringResource(R.string.keep_recording),
         secondLabel = programmeActionLabel(action),
-        onFirst = onDismiss, onSecond = onConfirm, onDismiss = onDismiss,
+        onFirst = onDismiss,
+        onSecond = onConfirm,
+        onDismiss = onDismiss,
         onPreviewKeyEvent = onPreviewKeyEvent,
     )
+}
+
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+internal fun programmeConfirmationTarget(
+    entries: at.bernhardberger.tvheadend.sdk.core.DvrEventEntries?,
+    configurations: List<DvrConfiguration>,
+    defaultProfileLabel: String,
+): Pair<Int, String>? {
+    if (entries == null || entries.otherActive.isEmpty()) return null
+    val selected = entries.selected
+    val profileId = selected.configId?.value?.takeIf(String::isNotBlank)
+    if (entries.otherActive.any { it.configId?.value?.takeIf(String::isNotBlank) != profileId }) {
+        val name = configurations.firstOrNull { it.id == selected.configId }?.name?.takeIf(String::isNotBlank)
+            ?: defaultProfileLabel
+        return R.string.recording_confirmation_profile to name
+    }
+    val owner = selected.owner?.takeIf(String::isNotBlank) ?: selected.creator?.takeIf(String::isNotBlank)
+        ?: return null
+    return R.string.recording_confirmation_owner to owner
 }
 
 @Composable
@@ -437,21 +403,6 @@ internal fun programmeActionLabel(action: ProgrammeAction): String = stringResou
         ProgrammeAction.CANCEL_RECORDING -> R.string.cancel_recording
         ProgrammeAction.STOP_RECORDING -> R.string.stop_recording
         ProgrammeAction.WATCH_FROM_START -> R.string.watch_from_start
-    }
-)
-
-@Composable
-private fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
-    when (state) {
-        DvrEntryState.SCHEDULED -> R.string.recording_state_scheduled
-        DvrEntryState.RECORDING -> R.string.recording_state_recording
-        DvrEntryState.COMPLETED -> R.string.recording_state_completed
-        DvrEntryState.MISSED,
-        DvrEntryState.INVALID -> R.string.recording_state_cancelled
-        DvrEntryState.RECORDING_ERROR,
-        DvrEntryState.COMPLETED_ERROR,
-        DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
-        else -> R.string.recording_state_unknown
     }
 )
 

@@ -690,7 +690,7 @@ class PlayerMotionTest {
     ) {
         PlayerChrome(
             mode = mode,
-            content = PlayerChromeContent("", liveInfoBarData(1, channelName, null, null, false, nowSec, title)),
+            content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, channelName, null, null, false, nowSec, title)),
             timeline = PlayerChromeTimeline.Live(timeshiftState, nowSec, nowEvent, motionKey = channelId),
             actions = PlayerChromeActions(
                 active = !optionsOpen,

@@ -34,10 +34,19 @@ sealed interface Notice {
         }
     }
 
-    data class DvrActionFailed(val action: DvrMutationKind, val failure: DvrMutationFeedback) : Notice {
-        init { require(failure.isFailure) }
+    data class DvrActionFailed(
+        val action: DvrMutationKind,
+        val failure: DvrMutationFeedback,
+        /** SDK-sanitized, display-only text; never include in diagnostics. */
+        val serverMessage: String? = null,
+    ) : Notice {
+        init {
+            require(failure.isFailure)
+            require(serverMessage == null || failure == DvrMutationFeedback.REJECTED)
+        }
         override val key = "dvr-action"
         override val severity = NoticeSeverity.FAILURE
+        override fun toString(): String = "DvrActionFailed(action=$action, failure=$failure)"
     }
 
     data class Connection(val kind: ConnectionNoticeKind, val showingSavedChannels: Boolean = false) : Notice {

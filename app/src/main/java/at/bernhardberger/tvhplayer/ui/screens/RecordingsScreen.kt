@@ -1,11 +1,26 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.tween
+import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import at.bernhardberger.tvhplayer.ui.player.animateShown
+
 import androidx.compose.ui.graphics.graphicsLayer
 
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import androidx.compose.foundation.layout.width
 
@@ -20,9 +35,11 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -37,6 +54,8 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -46,10 +65,17 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.tv.material3.Button
+import androidx.tv.material3.Icon
+import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -187,6 +213,7 @@ internal fun RecordingsScreenContent(
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
     notices: NoticeCenter = koinInject(),
+    nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
 ) {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -217,12 +244,15 @@ internal fun RecordingsScreenContent(
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
     var showContextMenu by remember { mutableStateOf(false) }
     var showResumeChoice by remember { mutableStateOf(false) }
-    var contextReturnAction by remember { mutableStateOf<BrowseContextAction?>(null) }
+    var menuConsumed by remember(detailsEntry?.id) { mutableStateOf(false) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var detailsInitialAction by remember {
         mutableStateOf<RecordingDetailsAction?>(null)
     }
     var pendingAction by remember { mutableStateOf<PendingRecordingAction?>(null) }
+    val confirmationVisibility = remember(pendingAction) {
+        MutableTransitionState(false).apply { targetState = pendingAction != null }
+    }
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
     var pendingDetailsReturn by remember { mutableStateOf(false) }
@@ -395,11 +425,12 @@ internal fun RecordingsScreenContent(
     }
 
     val modeMotion = rememberTabContentMotion(mode) { screenState.mode.value }
+    val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Column(
         modifier = Modifier
             .fillMaxSize()
             .semantics { if (detailsEntry != null) hideFromAccessibility() }
-            .graphicsLayer { alpha = if (detailsEntry != null && !showContextMenu && !showResumeChoice) 0f else 1f }
+            .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
                     if (event.type == KeyEventType.KeyUp) relocatingKey = null
@@ -531,7 +562,6 @@ internal fun RecordingsScreenContent(
                             detailsEntry = it
                             detailsObservation = observation
                             showContextMenu = true
-                            contextReturnAction = null
                         }
                     },
                     currentSession = currentSession,
@@ -573,7 +603,6 @@ internal fun RecordingsScreenContent(
                                     detailsEntry = it
                                     detailsObservation = observation
                                     showContextMenu = true
-                                    contextReturnAction = null
                                 }
                             },
                             currentSession = currentSession,
@@ -618,7 +647,6 @@ internal fun RecordingsScreenContent(
                                     detailsEntry = it
                                     detailsObservation = observation
                                     showContextMenu = true
-                                    contextReturnAction = null
                                 }
                             },
                             currentSession = currentSession,
@@ -659,10 +687,11 @@ internal fun RecordingsScreenContent(
             pendingDetailsReturn = true
         }
     }
-    if (opened != null && pendingAction == null) {
+    if (opened != null) {
+        val nowSec = at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds(nowSecProvider)
         if (showResumeChoice) {
             val resources = androidx.compose.ui.platform.LocalContext.current.resources
-            val duration = if (opened.start != null && opened.stop != null) opened.stop!! - opened.start!! else null
+            val channel = opened.channelId?.let(channelsById::get)
             val closeResume = {
                 showResumeChoice = false
                 detailsEntry = null
@@ -678,39 +707,106 @@ internal fun RecordingsScreenContent(
             LaunchedEffect(selectedCapability, opened.state) {
                 if (selectedCapability == null || opened.state != DvrEntryState.COMPLETED) closeResume()
             }
-            at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog(
+            val resumeFocus = remember { FocusRequester() }
+            val startOverFocus = remember { FocusRequester() }
+            var startOverFocused by remember(opened.id) { mutableStateOf(false) }
+            val durationMs = at.bernhardberger.tvhplayer.core.recordingDetailsFacts(opened)
+                .firstOrNull { it.kind == at.bernhardberger.tvhplayer.core.DetailsFactKind.LENGTH }?.seconds?.times(1000L)
+            val positionMs = opened.playPosition?.inWholeMilliseconds ?: 0L
+            val resumeEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, positionMs, durationMs)
+                ?.let { stringResource(R.string.recording_ends_at, at.bernhardberger.tvhplayer.ui.common.formatClock(it)) }.orEmpty()
+            val startOverEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, 0L, durationMs)
+                ?.let { stringResource(R.string.recording_ends_at, at.bernhardberger.tvhplayer.ui.common.formatClock(it)) }.orEmpty()
+            val spokenResume = stringResource(R.string.recording_resume_from,
+                at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(positionMs / 60_000L, resources, spoken = true))
+            at.bernhardberger.tvhplayer.ui.components.CentredDialog(
                 title = opened.title.orEmpty(),
-                message = stringResource(R.string.recording_watched_duration,
-                    at.bernhardberger.tvhplayer.ui.common.formatPlaybackDuration(opened.playPosition?.inWholeSeconds ?: 0L, resources),
-                    duration?.let { at.bernhardberger.tvhplayer.ui.common.formatPlaybackDuration(it.inWholeSeconds, resources) }
-                        ?: stringResource(R.string.duration_unknown)),
-                firstLabel = stringResource(R.string.context_resume),
-                secondLabel = stringResource(R.string.context_start_over),
-                firstIcon = R.drawable.ic_play_arrow, secondIcon = R.drawable.ic_replay,
-                firstTag = "recording-resume", secondTag = "recording-start-over",
-                onFirst = { play(RecordingPlaybackStart.RESUME) },
-                onSecond = { play(RecordingPlaybackStart.START_OVER) },
+                secondaryText = programmeEpisodeLine(opened.episode, opened.subtitle, resources),
+                text = if (startOverFocused) startOverEnd else resumeEnd,
+                eyebrow = {
+                    at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow(channel, listOfNotNull(
+                    (channel?.let { at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty()) }
+                        ?: opened.channelName)?.takeIf(String::isNotBlank),
+                    opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
+                    ).joinToString(" · "), imageLoader, observation.currentSession,
+                        Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
+                },
                 onDismiss = closeResume,
                 backEnabled = backEnabled,
-            )
-        } else if (showContextMenu) BrowseContextMenu(
-            initialAction = contextReturnAction,
+            ) {
+                LaunchedEffect(Unit) { withFrameNanos { }; resumeFocus.requestFocus() }
+                Button(onClick = { play(RecordingPlaybackStart.RESUME) },
+                    modifier = Modifier.height(40.dp).focusRequester(resumeFocus)
+                        .onFocusChanged { if (it.isFocused) startOverFocused = false }
+                        .semantics { contentDescription = spokenResume; if (resumeEnd.isNotBlank()) stateDescription = resumeEnd }
+                        .focusProperties { left = FocusRequester.Cancel; right = startOverFocus }
+                        .testTag("recording-resume")) {
+                    Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.recording_resume_from,
+                        at.bernhardberger.tvhplayer.core.formatPlaybackDuration(opened.playPosition?.inWholeMilliseconds ?: 0L)),
+                        maxLines = 1, softWrap = false)
+                }
+                OutlinedButton(onClick = { play(RecordingPlaybackStart.START_OVER) },
+                    modifier = Modifier.height(40.dp).focusRequester(startOverFocus)
+                        .onFocusChanged { if (it.isFocused) startOverFocused = true }
+                        .semantics { if (startOverEnd.isNotBlank()) stateDescription = startOverEnd }
+                        .focusProperties { left = resumeFocus; right = FocusRequester.Cancel }
+                        .testTag("recording-start-over")) {
+                    Icon(painterResource(R.drawable.ic_replay), null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.context_start_over), maxLines = 1, softWrap = false)
+                }
+            }
+        } else {
+        val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
+        val closing = !visibility.targetState
+        BackHandler(enabled = backEnabled && closing) { }
+        LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
+            if (closing && visibility.isIdle && !visibility.currentState) {
+                val restoredBeforeDismissal = runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+                pendingDetailsReturn = !restoredBeforeDismissal
+                detailsEntry = null
+                detailsObservation = null
+                detailsInitialAction = null
+            }
+        }
+        AnimatedVisibility(visibleState = visibility, modifier = Modifier.browseDetailsViewport(),
+            enter = EnterTransition.None, exit = ExitTransition.None) {
+        val detailAlpha = animateShown(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "recording-details-layer")
+        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = closing,
+            modifier = Modifier.onPreviewKeyEvent { closing }) {
+        // Match ProgrammeDetailsHost: keep both pages drawn while details owns its alpha.
+        AnimatedContent(targetState = showContextMenu, transitionSpec = {
+            (if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)
+                .togetherWith(if (initialState) fadeOut(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else ExitTransition.None)
+                .using(null)
+        }, label = "recording-menu-details") { menu ->
+        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = closing || menu != showContextMenu) {
+        if (menu) {
+        AnimatedVisibility(visible = !closing && !menuConsumed,
+            enter = EnterTransition.None, exit = ExitTransition.None) {
+        androidx.compose.runtime.CompositionLocalProvider(
+            at.bernhardberger.tvhplayer.ui.player.LocalPlayerPanelMotion provides this) {
+        at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = pendingAction != null) {
+        BrowseContextMenu(
+            backEnabled = backEnabled && !closing && menu == showContextMenu && pendingAction == null,
             title = opened.title.orEmpty(),
-            metadata = opened.channelId?.let(channelsById::get)?.name ?: opened.channelName.orEmpty(),
-            timeRange = listOfNotNull(opened.start?.epochSeconds?.formatDateTime(), opened.stop?.epochSeconds?.let(::formatHm)).joinToString("–"),
+            channel = opened.channelId?.let(channelsById::get)?.let {
+                at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty())
+            } ?: opened.channelName.orEmpty(),
+            episode = programmeEpisodeLine(opened.episode, opened.subtitle, androidx.compose.ui.platform.LocalContext.current.resources),
+            time = listOfNotNull(opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
+                opened.stop?.epochSeconds?.let(::formatHm)).joinToString("–"),
+            summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
                 playbackEligible = selectedCapability != null),
-            onClose = {
-                showContextMenu = false
-                pendingDetailsReturn = true
-                detailsEntry = null
-                detailsObservation = null
-                detailsInitialAction = null
-            },
+            onClose = { visibility.targetState = false },
             onAction = { action ->
-                contextReturnAction = action
+                menuConsumed = action != BrowseContextAction.DETAILS
                 showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
                 when (action) {
                     BrowseContextAction.WATCH, BrowseContextAction.PLAY,
@@ -741,15 +837,27 @@ internal fun RecordingsScreenContent(
                     else -> Unit
                 }
             },
-            logo = {
-                PiconBox(imageLoader = imageLoader, currentSession = selectedCapability,
-                    piconPath = opened.channelId?.let(channelsById::get)?.icon,
-                    modifier = Modifier.width(56.dp).height(40.dp))
+            artwork = {
+                val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
+                ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null, imageLoader,
+                    selectedCapability, Modifier.fillMaxSize().testTag(if (artwork != null)
+                        "browse-context-artwork" else "browse-context-picon"),
+                    plateModifier = Modifier.testTag("browse-context-plate"))
             },
-        ) else ProgrammeDetailsPage(
+        )
+        }
+        }
+        }
+        } else {
+        val menuAlpha = animateShown(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "recording-details-from-menu")
+        val alpha = remember(detailAlpha, menuAlpha) { derivedStateOf { detailAlpha.value * menuAlpha.value } }
+        ProgrammeDetailsPage(
             event = null,
             recording = opened,
-            nowSec = 0L,
+            nowSec = nowSec,
+            recordingEvent = opened.eventId?.takeIf { selectedCapability != null }?.let(observation::event),
+            recordingConfigurations = observation.currentDvrConfigurations().takeIf { selectedCapability != null }.orEmpty(),
             imageLoader = imageLoader,
             currentSession = selectedCapability,
             channel = opened.channelId?.let(channelsById::get),
@@ -771,7 +879,8 @@ internal fun RecordingsScreenContent(
                 RecordingDetailsAction.DELETE -> BrowseContextAction.DELETE
                 null -> null
             },
-            backEnabled = backEnabled,
+            backEnabled = backEnabled && !closing && menu == showContextMenu && pendingAction == null,
+            visibilityAlpha = alpha,
             onAction = { action ->
                 val current = currentObservation()
                 val capability = selectedCapability?.takeIf { current.currentSession === it }
@@ -808,20 +917,28 @@ internal fun RecordingsScreenContent(
                 else -> Unit
                 }
             },
-            onClose = {
-                val restoredBeforeDismissal = runCatching {
-                    contentFocus.requestFocus()
-                }.getOrDefault(false)
-                pendingDetailsReturn = !restoredBeforeDismissal
-                detailsEntry = null
-                detailsObservation = null
-                detailsInitialAction = null
-            },
+            onClose = { visibility.targetState = false },
         )
+        }
+        }
+        }
+        }
+        }
+        }
     }
 
     val action = pendingAction
     val target = opened
+    val closeConsumedMenu = {
+        if (showContextMenu && menuConsumed) {
+            // Match details dismissal: restore the mounted card before removing the dialog.
+            pendingDetailsReturn = !runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+            showContextMenu = false
+            detailsEntry = null
+            detailsObservation = null
+            detailsInitialAction = null
+        }
+    }
     val mutationStateCurrent = pendingMutation?.recordingStateIsCurrent(observation) == true
     LaunchedEffect(action, selectedCapability, mutationStateCurrent) {
         if (action != null && (selectedCapability == null || !mutationStateCurrent)) {
@@ -829,25 +946,30 @@ internal fun RecordingsScreenContent(
             pendingMutation = null
             // The dismissed dialog must not restore focus to an action whose authority expired.
             if (selectedCapability == null) detailsInitialAction = null
+            closeConsumedMenu()
         }
     }
     if (action != null && target != null && selectedCapability != null && mutationStateCurrent) {
         RecordingConfirmationDialog(
+            visibility = confirmationVisibility,
             action = action,
             title = target.title.orEmpty(),
             channelName = target.channelId?.let(channelsById::get)?.name ?: target.channelName.orEmpty(),
             dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(target.start?.epochSeconds,
-                dateOnly = action == PendingRecordingAction.DELETE),
+                dateOnly = action == PendingRecordingAction.DELETE,
+                locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             backEnabled = backEnabled,
             onDismiss = {
                 pendingAction = null
                 pendingMutation = null
+                closeConsumedMenu()
             },
             onConfirm = {
                 pendingAction = null
                 val mutation = pendingMutation
                 pendingMutation = null
                 val mutationObservation = detailsObservation
+                closeConsumedMenu()
                 scope.launch {
                     val latestObservation = latestObservationProvider()
                     if (mutation == null ||

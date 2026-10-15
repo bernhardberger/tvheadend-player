@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
@@ -55,6 +56,7 @@ import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Instant
 
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class TimelineEpgPerformanceTest {
     @get:Rule
     val composeRule = createComposeRule()
@@ -288,11 +290,11 @@ class TimelineEpgPerformanceTest {
     }
 
     @Test
-    fun recordingConfirmationDefaultsToSafeBackAction() {
+    fun stopRecordingConfirmationDefaultsToKeep() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 ConfirmProgrammeActionDialog(
-                    action = ProgrammeAction.RECORD,
+                    action = ProgrammeAction.STOP_RECORDING,
                     programmeTitle = "Eine außergewöhnlich lange deutsche Sendungsbezeichnung",
                     onDismiss = {},
                     onConfirm = {},
@@ -301,10 +303,11 @@ class TimelineEpgPerformanceTest {
         }
 
         composeRule.onNodeWithText(
-            "Record this program?"
+            "Stop this recording?"
         )
             .assertIsDisplayed()
-        composeRule.onNodeWithText("Don't record").assertIsFocused()
+        composeRule.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
+        composeRule.onNodeWithTag("two-column-second").assertTextEquals("Stop recording")
     }
 
     private fun event(id: Int, start: Long, stop: Long) = EpgEvent.create(

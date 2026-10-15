@@ -7,11 +7,16 @@ class ChannelTitleTest {
 
     @Test
     fun includesChannelNumberInlineWhenAvailable() {
-        assertEquals("12  ORF III", channelTitleText(number = 12, name = "ORF III"))
+        assertEquals("12 ORF III", channelTitleText(number = 12, name = "ORF III"))
     }
 
     @Test
     fun omitsNumberSpacingWhenNumberIsUnavailable() {
         assertEquals("ORF III", channelTitleText(number = null, name = "ORF III"))
+    }
+
+    @Test
+    fun omitsNameSpacingWhenNameIsBlank() {
+        assertEquals("12", channelTitleText(number = 12, name = "  "))
     }
 }

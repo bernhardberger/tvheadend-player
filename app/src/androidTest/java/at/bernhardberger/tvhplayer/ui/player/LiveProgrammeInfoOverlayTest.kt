@@ -92,7 +92,7 @@ class LiveProgrammeInfoOverlayTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("", liveInfoBarData(7, "Das Erste", null, null, false, 0, "")),
+                    content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 7, "Das Erste", null, null, false, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         AppTimeshiftState(),
                         nowSec = 1_500L,

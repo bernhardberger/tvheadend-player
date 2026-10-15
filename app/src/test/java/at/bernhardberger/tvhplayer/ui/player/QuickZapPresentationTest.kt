@@ -742,7 +742,7 @@ class QuickZapPresentationTest {
                         val chrome: @Composable () -> Unit = {
                         PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
-                            content = PlayerChromeContent("", liveInfoBarData(playing?.value,
+                            content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, playing?.value,
                                 playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
                             actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),

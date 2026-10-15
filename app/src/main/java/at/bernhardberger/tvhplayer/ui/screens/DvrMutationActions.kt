@@ -77,8 +77,8 @@ internal class DvrMutationActions(
         deleteEntry = repository::deleteEntry,
     )
 
-    suspend fun execute(action: DvrMutationAction?): DvrMutationFeedback {
-        val result = when (action) {
+    suspend fun execute(action: DvrMutationAction?): DvrMutationResult<*> =
+        when (action) {
             is DvrMutationAction.CreateProgramme -> scheduleEntry(
                 action.target.currentSession,
                 DvrScheduleRequest(
@@ -101,11 +101,11 @@ internal class DvrMutationActions(
             )
             null -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
         }
-        return result.toDvrMutationFeedback()
-    }
 }
 
-internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, feedback: DvrMutationFeedback, context: NoticeContext) {
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrMutationResult<*>, context: NoticeContext) {
+    val feedback = result.toDvrMutationFeedback()
     if (!feedback.isFailure) return
     val kind = when (action) {
         is DvrMutationAction.CreateProgramme -> DvrMutationKind.SCHEDULE
@@ -113,5 +113,5 @@ internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, feedback: Dv
         is DvrMutationAction.Cancel -> DvrMutationKind.CANCEL
         is DvrMutationAction.Delete -> DvrMutationKind.DELETE
     }
-    post(Notice.DvrActionFailed(kind, feedback), context)
+    post(Notice.DvrActionFailed(kind, feedback, (result as? DvrMutationResult.Failed)?.serverMessage), context)
 }

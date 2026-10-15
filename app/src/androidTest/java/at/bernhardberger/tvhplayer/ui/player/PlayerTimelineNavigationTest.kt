@@ -52,7 +52,7 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
                         onCommitSeek = { commits++ },
                     ) else PlayerChrome(
                         mode = PlayerChromeMode.CONTROLS,
-                        content = PlayerChromeContent("", liveInfoBarData(1, "Channel", null, null, false, 0, "")),
+                        content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Channel", null, null, false, 0, "")),
                         timeline = PlayerChromeTimeline.Live(
                             AppTimeshiftState(available = true, bufferStartMs = 0, positionMs = 60_000, liveEdgeMs = 120_000),
                             nowSec = 0,

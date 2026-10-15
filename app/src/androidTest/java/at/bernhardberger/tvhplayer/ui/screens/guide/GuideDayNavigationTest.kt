@@ -78,7 +78,8 @@ class GuideDayNavigationTest {
         }
 
         composeRule.onNodeWithText(context.getString(R.string.next_day)).assertIsNotEnabled()
-        composeRule.onNodeWithText(context.getString(R.string.next_hour)).assertIsNotEnabled()
+        composeRule.onNodeWithText(context.getString(R.string.next_hour,
+            at.bernhardberger.tvhplayer.ui.common.formatWholeHours(1, context.resources))).assertIsNotEnabled()
         composeRule.onNodeWithText(context.getString(R.string.previous_day)).assertIsEnabled()
     }
 }

@@ -38,7 +38,7 @@ internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): De
 
 @Composable
 private fun keepChannelLabel(minutes: Int): String = if (minutes == 0) stringResource(R.string.keep_channel_off)
-    else stringResource(R.string.keep_channel_minutes, minutes)
+    else at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), androidx.compose.ui.platform.LocalResources.current)
 
 internal const val STARTUP_BUFFER_LEVEL = "startup-buffer"
 

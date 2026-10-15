@@ -60,7 +60,7 @@ internal fun ChannelsRouteContent(
     onOpenConnectionSettings: () -> Unit,
     onPlay: (LivePlaybackSelection, String) -> Unit,
     onPlayRecording: (RecordingPlaybackSelection) -> Unit,
-    onShowGuide: (ChannelId) -> Unit = {},
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) {
     StartupGatedChannelsContent(
         contentAllowed = contentAllowed,

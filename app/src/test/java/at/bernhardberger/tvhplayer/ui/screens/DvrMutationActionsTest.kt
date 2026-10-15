@@ -71,19 +71,19 @@ class DvrMutationActionsTest {
 
         assertEquals(
             DvrMutationFeedback.ACCEPTED_UNCONFIRMED,
-            actions.execute(DvrMutationAction.CreateProgramme(target, configId)),
+            actions.execute(DvrMutationAction.CreateProgramme(target, configId)).toDvrMutationFeedback(),
         )
         assertEquals(
             DvrMutationFeedback.CONFIRMED,
-            actions.execute(DvrMutationAction.Stop(capability, recordingId)),
+            actions.execute(DvrMutationAction.Stop(capability, recordingId)).toDvrMutationFeedback(),
         )
         assertEquals(
             DvrMutationFeedback.PERMISSION_DENIED,
-            actions.execute(DvrMutationAction.Cancel(capability, recordingId)),
+            actions.execute(DvrMutationAction.Cancel(capability, recordingId)).toDvrMutationFeedback(),
         )
         assertEquals(
             DvrMutationFeedback.CONNECTION_UNAVAILABLE,
-            actions.execute(DvrMutationAction.Delete(capability, recordingId)),
+            actions.execute(DvrMutationAction.Delete(capability, recordingId)).toDvrMutationFeedback(),
         )
 
         assertSame(capability, scheduledCapability)
@@ -111,7 +111,7 @@ class DvrMutationActionsTest {
             deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
         )
 
-        val feedback = actions.execute(DvrMutationAction.Stop(capability, DvrEntryId(4)))
+        val feedback = actions.execute(DvrMutationAction.Stop(capability, DvrEntryId(4))).toDvrMutationFeedback()
 
         assertEquals(listOf("stop"), calls)
         assertEquals(DvrMutationFeedback.ACCEPTED_UNCONFIRMED, feedback)
@@ -139,7 +139,7 @@ class DvrMutationActionsTest {
             },
         )
 
-        val feedback = actions.execute(null)
+        val feedback = actions.execute(null).toDvrMutationFeedback()
 
         assertEquals(DvrMutationFeedback.CONNECTION_UNAVAILABLE, feedback)
         assertEquals(0, dispatchCount)
@@ -208,7 +208,7 @@ class DvrMutationActionsTest {
             DvrMutationAction.Delete(current, DvrEntryId(4)),
         )
         actionsToRun.forEach { action ->
-            assertEquals(DvrMutationFeedback.UNKNOWN_OUTCOME, actions.execute(action))
+            assertEquals(DvrMutationFeedback.UNKNOWN_OUTCOME, actions.execute(action).toDvrMutationFeedback())
         }
         assertEquals(listOf("schedule", "stop", "cancel", "delete"), calls)
     }

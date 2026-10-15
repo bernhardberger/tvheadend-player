@@ -38,6 +38,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
@@ -80,6 +81,13 @@ import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
+import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigurationsState
+import at.bernhardberger.tvheadend.sdk.core.DvrRepository
+import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
@@ -179,6 +187,7 @@ class LivePlayerChromeScreenTest {
     private lateinit var view: View
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var session: FakeTvheadendSession
+    private val scheduleRequests = mutableListOf<DvrScheduleRequest>()
     private val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
     private lateinit var video: VideoPlayerViewModel
     private val owner = object : LifecycleOwner {
@@ -606,7 +615,7 @@ class LivePlayerChromeScreenTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("20:15", liveInfoBarData(1, "One", null, null, false, 1_800, "Programme"), state = state),
+                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = state),
                     timeline = PlayerChromeTimeline.Live(
                         at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
                             positionMs = -behindLiveMs, liveEdgeMs = 0, timingKnown = true),
@@ -1595,15 +1604,14 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("live-info-panel"))
     }
 
-    @Test fun playerInfoConfirmsCurrentRecordingThenOffersStopFromObservedState() {
-        screen()
+    @Test fun playerInfoRecordsDirectlyThenOffersStopFromObservedState() {
+        screen(recordingProfile = DvrConfigId("archive"))
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
         key(Key.Info)
         key(Key.DirectionCenter)
-        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-        compose.onNodeWithText("Don't record").assertIsFocused()
-        confirmInfoAction()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        assertEquals(DvrConfigId("archive"), scheduleRequests.single().configId)
         publishInfoRecording(DvrEntryState.RECORDING)
         assertEquals("Stop recording", texts("live-info-record"))
         assertEquals(listOf("live-info-record"), focused())
@@ -1612,20 +1620,21 @@ class LivePlayerChromeScreenTest {
         session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
         key(Key.DirectionCenter)
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
-        confirmInfoAction()
+        confirmInfoAction(destructive = true)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
         assertEquals(listOf("live-info-record"), focused())
     }
 
     @Test fun playerInfoConfirmationBackIsSafeAndDoesNotCloseDetails() {
-        screen()
+        screen(recordingScheduled = true)
         key(Key.Info)
         key(Key.DirectionCenter)
-        compose.onNodeWithText("Don't record").assertIsFocused()
+        compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
         compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.Back) }
         settle()
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
         assertTrue(exists("live-info-panel"))
         assertEquals(listOf("live-info-record"), focused())
         assertTrue(notices.state.value.pending.isEmpty())
@@ -1639,13 +1648,24 @@ class LivePlayerChromeScreenTest {
             .config[SemanticsActions.OnClick].action!!
         compose.runOnIdle { click(); click() }
         settle()
-        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-        confirmInfoAction()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         assertEquals(listOf("live-info-record"), focused())
     }
 
-    @Test fun playerInfoConfirmsFutureRecordingThenCanCancelTheSchedule() {
+    @Test fun playerInfoStopKeepReturnsToTheInvokingButtonWithoutSending() {
+        screen()
+        publishInfoRecording(DvrEntryState.RECORDING)
+        key(Key.Info)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        settle()
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
+        assertEquals(listOf("live-info-record"), focused())
+    }
+
+    @Test fun playerInfoRecordsFutureProgrammeDirectlyThenCanCancelTheSchedule() {
         screen()
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(8)))
         key(Key.Info)
@@ -1655,14 +1675,14 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionDown)
         key(Key.DirectionCenter)
         key(Key.DirectionCenter)
-        confirmInfoAction()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         publishInfoRecording(DvrEntryState.SCHEDULED, EventId(12))
         assertEquals("Cancel recording", texts("details-record"))
         assertEquals(listOf("details-record"), focused())
         session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
         key(Key.DirectionCenter)
-        confirmInfoAction()
+        confirmInfoAction(destructive = true)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
         key(Key.Back)
         assertEquals(listOf("details-schedule-12"), focused())
@@ -1673,7 +1693,7 @@ class LivePlayerChromeScreenTest {
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
         key(Key.DirectionCenter)
-        confirmInfoAction()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals("Record", texts("live-info-record"))
         assertEquals(listOf("live-info-record"), focused())
         val notice = notices.state.value.pending.single().notice
@@ -1715,7 +1735,8 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionCenter)
         assertEquals(listOf("player-info-reading"), focused())
         assertTrue(texts("details-title").contains("Now showing"))
-        assertTrue("facts use one separator and non-breaking episodes", texts("details-facts").contains("Drama · S2\u00a0E3/6"))
+        assertTrue(texts("details-facts").contains("Drama"))
+        assertFalse("episode already used as subtitle is not duplicated", texts("details-facts").contains("S2"))
         assertFalse(texts("details-facts").contains("•"))
         val text = texts("details-full-description")
         listOf(description.trim(), "Summary", "A separate summary", "Categories", "Documentary", "Keywords", "Mountains", "Copyright year", "2024")
@@ -1934,9 +1955,12 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-channel-card-1"), focused())
     }
 
-    private fun confirmInfoAction() {
+    private fun confirmInfoAction(destructive: Boolean = false) {
         compose.onNodeWithTag("two-column-first").assertIsFocused()
-        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionCenter) }
+        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput {
+            if (destructive) pressKey(Key.DirectionRight)
+            pressKey(Key.DirectionCenter)
+        }
         settle()
     }
 
@@ -2095,6 +2119,7 @@ class LivePlayerChromeScreenTest {
         events: List<EpgEvent>,
         recordings: List<DvrEntry> = emptyList(),
         missingRequestedChannel: Boolean = false,
+        recordingProfiles: List<DvrConfiguration> = emptyList(),
     ) =
         SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -2103,6 +2128,7 @@ class LivePlayerChromeScreenTest {
             )),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = events)),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = recordings)),
+            dvrConfigurationsState = DvrConfigurationsState.Current.create(recordingProfiles),
         )
 
     private fun screen(
@@ -2112,6 +2138,7 @@ class LivePlayerChromeScreenTest {
         epg: Boolean = true,
         opener: SubscriptionOpener? = null,
         recordingScheduled: Boolean = false,
+        recordingProfile: DvrConfigId? = null,
         settingsData: DataStore<Preferences> = InMemoryData(),
         settleOnEntry: Boolean = true,
         contentAllowed: () -> Boolean = { true },
@@ -2130,7 +2157,9 @@ class LivePlayerChromeScreenTest {
             EpgEvent.create(EventId(12L), ChannelId(1L), Instant.fromEpochSeconds(now + 3_600L),
                 Instant.fromEpochSeconds(now + 7_200L), title = "Later"),
         ), recordings = if (recordingScheduled) listOf(DvrEntry.create(DvrEntryId(1L), eventId = EventId(11L), state = DvrEntryState.SCHEDULED))
-            else emptyList(), missingRequestedChannel = missingRequestedChannel)).apply {
+            else emptyList(), missingRequestedChannel = missingRequestedChannel,
+            recordingProfiles = if (recordingProfile == null) emptyList() else listOf(
+                DvrConfiguration(DvrConfigId("default"), "", ""), DvrConfiguration(recordingProfile, "Archive", "")))).apply {
             // The subscription never becomes playable: the channel stays tuning, as on a slow tune.
             // Failing: the scripted stream cannot be decoded, so the channel becomes unavailable.
             if (opener != null) scriptLivePlaybackSuccess(opener)
@@ -2138,6 +2167,16 @@ class LivePlayerChromeScreenTest {
             else scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
         }
         val settings = PlayerSettingsStore(settingsData)
+        val uiSettings = at.bernhardberger.tvhplayer.settings.UiSettingsStore(InMemoryData())
+        recordingProfile?.let { runBlocking { uiSettings.setRecordingProfile(it) } }
+        val screenSession = object : TvheadendSession by session {
+            override val dvrRepository = object : DvrRepository by session.dvrRepository {
+                override suspend fun scheduleEntry(currentSession: CurrentSessionObservation, request: DvrScheduleRequest): DvrMutationResult<DvrEntryId> {
+                    scheduleRequests += request
+                    return session.dvrRepository.scheduleEntry(currentSession, request)
+                }
+            }
+        }
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
@@ -2184,8 +2223,8 @@ class LivePlayerChromeScreenTest {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
-                            channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, onClose, runtime,
-                            contentAllowed = contentAllowed(), notices = notices,
+                            channels, ImageLoader.Builder(context).build(), screenSession, ChannelId(1), "Name 1", {}, onClose, runtime,
+                            contentAllowed = contentAllowed(), notices = notices, uiSettingsStore = uiSettings,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
                         scrimUnderTest.value?.let { Box(Modifier.fillMaxSize().background(Color.White).then(it)) }

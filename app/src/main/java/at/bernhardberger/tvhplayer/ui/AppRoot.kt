@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -223,10 +225,12 @@ internal fun MainStartupComposition(
         if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
         val startDestination = state.navigationStartDestination
         if (state.navigationAllowed && startDestination != null) {
-            navigation(
-                startDestination,
-                state.contentAllowed,
-            )
+            CompositionLocalProvider(LocalWarmPlayback provides showWarmPlaybackScrim) {
+                navigation(
+                    startDestination,
+                    state.contentAllowed,
+                )
+            }
         }
         if (renderedPresentation != MainStartupPresentation.Inactive) {
             MainStartupScreen(
@@ -252,6 +256,9 @@ internal fun MainStartupComposition(
         onBack = { brandIntro?.finish(); onBack() },
     )
 }
+
+/** True while live playback continues behind the browse screens under [WarmPlaybackScrim]. */
+internal val LocalWarmPlayback = compositionLocalOf { false }
 
 @Composable
 internal fun WarmPlaybackScrim(
@@ -725,8 +732,9 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS),
                     ) {
                         ChannelsRouteContent(
-                            onShowGuide = { channelId ->
-                                guideChannelRequest = PlayerReturnFocus(channelId, channelId)
+                            onShowGuide = { channelId, programme ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId,
+                                    programme?.id, programme?.start?.epochSeconds)
                                 navigateTopLevel(GuideKey)
                             },
                             channelsVm = channelsVm,

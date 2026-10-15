@@ -110,6 +110,11 @@ class ProgrammeDetailsCaptureTest {
                         channel.id, event.stop, event.stop + 3600.seconds, title = "Next")))
             }
         }
+        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("details-about-description").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        compose.runOnIdle { dispatcher.onBackPressed() }
+        compose.onNodeWithTag("details-about-description").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertIsFocused()
         val back = { compose.runOnIdle { dispatcher.onBackPressed() } }
@@ -213,7 +218,11 @@ class ProgrammeDetailsCaptureTest {
         }
         compose.waitForIdle()
         if (!player) compose.onNodeWithText("Close").assertDoesNotExist()
-        if (failed) compose.onNodeWithTag("details-delete").assertIsFocused()
+        if (failed) {
+            compose.onNodeWithTag("details-delete").assertIsFocused()
+            compose.onNodeWithTag("details-delete").assertIsFocused()
+            compose.onNodeWithTag("details-description").assertDoesNotExist()
+        }
         // xhdpi: all three real hosts share x130/x562, y156 and 268dp slots.
         val reading = compose.onNodeWithTag("details-information", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val actions = compose.onNodeWithTag("details-actions", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -227,9 +236,13 @@ class ProgrammeDetailsCaptureTest {
         } else {
             assertEquals(116f, reading.left, .1f)
             assertEquals(reading.left, actions.left, .1f)
-            assertEquals(232f, reading.top, .1f)
+            // The block ends at one bottom anchor (540 - 96 peek - 32 gap) and grows upward; a page
+            // without lower sections that outgrows it (the failure text) extends to the safe edge.
+            if (failed) org.junit.Assert.assertTrue(actions.bottom in 824f..984f) else assertEquals(824f, actions.bottom, .1f)
+            org.junit.Assert.assertTrue(reading.top >= 96f)
             org.junit.Assert.assertTrue(actions.top >= reading.bottom + 56f)
-            org.junit.Assert.assertTrue(reading.width <= 968f)
+            // The title spans the page while the other header rows retain their narrow column.
+            assertEquals(1688f, reading.width, .1f)
         }
         compose.mainClock.advanceTimeBy(1000)
         compose.waitForIdle()

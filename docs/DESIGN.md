@@ -170,6 +170,26 @@ branded startup wait or change internal screen loading in the present work.
 
 ## 3. Components and indication
 
+### Shared patterns → component
+
+Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
+
+| Shared pattern | Component |
+|---|---|
+| Row/section emphasis | `components/RowEmphasis.kt` — one 300 ms position clock, deferred header scale/alpha and content dimming |
+| Progress bar | `components/ProgressStrip.kt` |
+| Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
+| Picon | `components/PiconBox.kt` |
+| Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
+| Context menu | `components/BrowseContextMenu.kt` |
+| Two-column dialog | `components/TwoColumnDialog.kt` |
+| Centred prompt/confirmation card | `components/CentredDialog.kt` |
+| Details page | `components/ProgrammeDetailsPage.kt` |
+| Quick-zap cards | `player/QuickZapPreview.kt` |
+
+New screens use these shared patterns; a private copy of a size, timing or alpha
+they own is a review finding.
+
 Focus, pressed, selected and disabled indication come from the TV Material
 components and their `*Defaults` (scale, colour, border, glow, shape). The app
 uses **library defaults**. Call sites do not override `scale(...)`,
@@ -759,7 +779,7 @@ colour and indication rules above apply here. Remote keys follow §6.
 
 ### Modal side panel (accepted 2026-09-25)
 
-- Player options, recording options and programme info float as one panel:
+- Player options and programme info float as one panel:
   320dp wide (programme info 400dp), inset 24dp from the end, top and bottom
   edges, 16dp corners, 20dp padding and a level-3 shadow, over a 60% black
   scrim.
@@ -768,6 +788,22 @@ colour and indication rules above apply here. Remote keys follow §6.
 - The Audio and Subtitle short lists: focus switches the track after 300 ms,
   OK keeps it and closes, Back reverts, and the list closes 5 s after the last
   key and keeps the track. Menu opens the full panel.
+
+### Context menus and dialogs (accepted 2026-10-15)
+
+- **Context menu** (hold OK or Menu on any card): full-screen, opaque app
+  background, rail hidden. Kit Two Column / JetFit more-options layout: item
+  card 268dp left, 268dp WideButton column right, columns top-aligned, the
+  container centred. An action that needs a confirmation closes the menu for
+  good; Keep, Cancel and Back return focus to the originating card. Details
+  opened from a menu return to the card on Back, never to the menu.
+- **Prompts and confirmations** (resume or start over; cancel, stop or delete a
+  recording): kit Standard card centred over a 60% black scrim, drawn in the
+  window so the screen beneath stays visible. Text only, buttons in one row.
+  Destructive confirmations focus the safe choice; Back equals it.
+- **Record** acts immediately, without a confirmation; the recording profile
+  comes from Settings → Recordings.
+- Option lists inside the player stay in the modal side panel above.
 
 ## 11. Icons
 

@@ -106,7 +106,7 @@ class PlayerChromeEvidenceTest {
         } }
         val bar = compose.onNodeWithTag("bar").fetchSemanticsNode()
         val spoken = bar.config[SemanticsProperties.ContentDescription].joinToString(" ")
-        assertTrue(spoken.contains("Channel 101, Ridge Earth HD"))
+        assertTrue(spoken.contains("Channel 101 Ridge Earth HD"))
         assertTrue(spoken.contains("Now:"))
         assertTrue(spoken.contains("Recording scheduled"))
         assertFalse("the info bar carries no stream badges", spoken.contains("1080 lines"))

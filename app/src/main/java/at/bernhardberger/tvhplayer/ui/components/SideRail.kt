@@ -36,9 +36,11 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -46,6 +48,7 @@ import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.testTag
@@ -159,6 +162,20 @@ internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
 /** Read the widget's current focus ownership at deferred focus-request time. */
 internal val LocalBrowseDrawerState = staticCompositionLocalOf<DrawerState?> { null }
 internal val LocalBrowseNavigationFocus = staticCompositionLocalOf<FocusRequester?> { null }
+private val LocalBrowseFullWidth = staticCompositionLocalOf<Dp?> { null }
+
+/** Only the overlay expands over the closed rail; its parent keeps the browse constraints. */
+@Composable
+internal fun Modifier.browseDetailsViewport(): Modifier {
+    val fullWidth = LocalBrowseFullWidth.current ?: return this
+    return layout { measurable, constraints ->
+        val width = fullWidth.roundToPx()
+        val page = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+        layout(constraints.maxWidth, page.height) {
+            page.placeRelative(constraints.maxWidth - width, 0)
+        }
+    }
+}
 
 @Composable
 internal fun SideRail(
@@ -240,6 +257,9 @@ internal fun SideRail(
     val items = mainItems + footerItems
     val itemFocus = remember(items) { items.associate { it.route to FocusRequester() } }
     val drawerState = rememberDrawerState(DrawerValue.Closed)
+    val layering = remember { BrowseContentLayering() }
+    val detailsOpen = layering.details.isNotEmpty()
+    val modalOpen = layering.modalScrims.isNotEmpty()
     var requestedRoute by remember { mutableStateOf(currentRoute) }
     var pendingRoute by remember { mutableStateOf<AppDestination?>(null) }
     val requestRoute: (AppDestination) -> Unit = { route ->
@@ -349,6 +369,19 @@ internal fun SideRail(
                     modifier = Modifier
                         .profileLayout("sidebar")
                         .fillMaxHeight()
+                        .graphicsLayer {
+                            alpha = 1f - layering.detailsAlpha()
+                            compositingStrategy = if (modalOpen) androidx.compose.ui.graphics.CompositingStrategy.Offscreen
+                                else androidx.compose.ui.graphics.CompositingStrategy.Auto
+                        }
+                        .drawWithContent {
+                            drawContent()
+                            // NavigationDrawer paints the rail above content. Dim only its ink;
+                            // the full-screen modal already covers the backdrop beneath it.
+                            if (modalOpen) drawRect(androidx.compose.ui.graphics.Color.Black,
+                                alpha = layering.modalScrimAlpha(), blendMode = androidx.compose.ui.graphics.BlendMode.SrcAtop)
+                        }
+                        .then(if (detailsOpen || modalOpen) Modifier.clearAndSetSemantics { } else Modifier)
                         .testTag("global-drawer-surface")
                         // The surface reaches the edge; content retains the same safe inset.
                         // Kit drawer: 12dp on every edge; header and footer are 56dp
@@ -373,6 +406,7 @@ internal fun SideRail(
                                 leadingContent = { PinnedRailIcon(item.icon) },
                                 colors = drawerColors,
                                 modifier = Modifier
+                                    .focusProperties { canFocus = !detailsOpen && !modalOpen }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
@@ -430,6 +464,7 @@ internal fun SideRail(
                                 } else null,
                                 colors = drawerColors,
                                 modifier = Modifier
+                                    .focusProperties { canFocus = !detailsOpen && !modalOpen }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics {
                                         contentDescription = if (item.route == AppDestination.SETTINGS) settingsDescription else item.label
@@ -451,14 +486,15 @@ internal fun SideRail(
                 }
             },
             content = {
-                BrowseViewport(width = browseWidth) {
+                BrowseViewport(width = browseWidth, layering = layering) {
                     CompositionLocalProvider(
                         LocalBrowseDrawerState provides drawerState,
-                        LocalBrowseNavigationFocus provides activeItemFocus,
+                        LocalBrowseNavigationFocus provides activeItemFocus.takeUnless { detailsOpen || modalOpen },
+                        LocalBrowseFullWidth provides maxWidth,
                     ) {
                         content(
                             TvScreenPadding,
-                            drawerState.currentValue == DrawerValue.Open,
+                            !detailsOpen && drawerState.currentValue == DrawerValue.Open,
                         )
                     }
                 }
@@ -539,9 +575,9 @@ private val AppDestination.testTag: String
 @Composable
 private fun BrowseViewport(
     width: Dp,
+    layering: BrowseContentLayering,
     content: @Composable () -> Unit,
 ) {
-    val layering = remember { BrowseContentLayering() }
     SubcomposeLayout(
         modifier = Modifier
             .fillMaxSize()

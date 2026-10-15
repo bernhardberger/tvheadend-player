@@ -20,7 +20,7 @@ internal fun QuickStepBanner(
 ) {
     PlayerChrome(
         mode = PlayerChromeMode.BANNER_STEP,
-        content = PlayerChromeContent("", liveInfoBarData(1, "Fixture TV", null, null, false, 0, "")),
+        content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture TV", null, null, false, 0, "")),
         timeline = PlayerChromeTimeline.Live(
             state, nowSec = 0, step = decision, programmeWindow = programmeWindow,
             feedback = feedback, feedbackIsError = feedbackIsError,

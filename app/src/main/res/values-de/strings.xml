@@ -1,11 +1,25 @@
 <resources>
+    <string name="episode_season_compact">S%1$d</string>
+    <string name="episode_number_compact">E%1$d</string>
+    <string name="episode_part">Teil %1$d</string>
+    <string name="episode_season_spoken">Staffel %1$d</string>
+    <string name="episode_number_spoken">Folge %1$d</string>
+    <string name="recording_profile_default">Standardprofil</string>
+    <string name="recording_confirmation_profile">Aufnahmeprofil: %1$s</string>
+    <string name="recording_confirmation_owner">Aufnahmebesitzer: %1$s</string>
     <string name="context_watch">Ansehen</string>
     <string name="context_channel_now">%1$s · Jetzt: %2$s</string>
     <string name="context_watch_channel">Sender ansehen</string>
     <string name="context_details">Details</string>
     <string name="details_program">Sendungsdetails</string>
     <string name="details_about">Über diese Sendung</string>
-    <string name="details_next_on">Als Nächstes auf %1$s</string>
+    <string name="details_about_heading">Über %1$s</string>
+    <string name="details_other_airings">Weitere Ausstrahlungen von %1$s</string>
+    <string name="details_year">Jahr</string>
+    <string name="details_count_of">%1$d von %2$d</string>
+    <string name="details_broadcast">Ausstrahlung</string>
+    <string name="details_broadcast_new">Erstausstrahlung</string>
+    <string name="details_broadcast_repeat">Wiederholung</string>
     <string name="details_status_on_now">Läuft jetzt</string>
     <string name="details_status_scheduled">Aufnahme geplant</string>
     <string name="details_status_failed">Aufnahme fehlgeschlagen</string>
@@ -13,7 +27,7 @@
     <string name="details_started">Begonnen</string>
     <string name="details_recorded">Aufgenommen</string>
     <string name="details_length">Länge</string>
-    <string name="details_left">Verbleibend</string>
+    <string name="details_recording_progress_spoken">%1$s von %2$s, %3$s</string>
     <string name="details_tomorrow">Morgen %1$s</string>
     <string name="context_record">Aufnehmen</string>
     <string name="context_show_guide">Im Programm zeigen</string>
@@ -83,9 +97,9 @@
     <string name="epg_next">Danach um %1$s</string>
     <string name="select_channel_hint">Wählen Sie links einen Sender aus, um Details anzuzeigen.</string>
 
-    <string name="epg_time_duration">Zeit: %1$s – %2$s • Dauer: %3$d Min.</string>
+    <string name="epg_time_duration">Zeit: %1$s – %2$s • Dauer: %3$s</string>
 
-    <string name="channel_details_timing">%1$s – %2$s · %3$d Min.</string>
+    <string name="channel_details_timing">%1$s – %2$s · %3$s</string>
     <string name="channels_preview_time_range">%1$s – %2$s</string>
 
     <string name="settings_server">Verbindung</string>
@@ -266,8 +280,8 @@
     <string name="yesterday">Gestern</string>
     <string name="previous_day">Vorheriger Tag</string>
     <string name="next_day">Nächster Tag</string>
-    <string name="previous_hour">−1 Stunde</string>
-    <string name="next_hour">+1 Stunde</string>
+    <string name="previous_hour">−%1$s</string>
+    <string name="next_hour">+%1$s</string>
     <string name="now">Jetzt</string>
     <string name="epg_state_ready">Programmdaten verfügbar</string>
     <string name="epg_no_data">Keine Programmdaten für diesen Sender</string>
@@ -290,10 +304,6 @@
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
     <string name="stop_recording">Aufnahme beenden</string>
-    <string name="record_confirm_title">Diese Sendung aufnehmen?</string>
-    <string name="record_confirm_message">%1$s auf %2$s, %3$s.</string>
-    <string name="record_confirm_pane_title">Aufnahme bestätigen</string>
-    <string name="record_confirm_cancel">Abbrechen</string>
     <string name="recording_request_busy_title">„%1$s“ wird geplant…</string>
     <string name="recording_request_busy_message">Die Antwort Ihres Tvheadend-Servers wird abgewartet. Das Schließen dieser Meldung bricht die Anfrage nicht ab.</string>
     <string name="recording_request_busy_action">Wird geplant…</string>
@@ -301,8 +311,6 @@
     <string name="recording_request_success_message">Ihr Tvheadend-Server hat die Aufnahmeanfrage für „%1$s“ angenommen.</string>
     <string name="recording_request_failure_title">Aufnahmeanfrage fehlgeschlagen</string>
     <string name="recording_request_failure_message">„%1$s“ wurde nicht geplant. %2$s</string>
-    <string name="recording_config_title">Aufnahmekonfiguration wählen</string>
-    <string name="recording_config_message">Auf diesem Server sind mehrere Aufnahmekonfigurationen verfügbar.</string>
     <string name="cancel_recording_confirm_title">Diese Aufnahme absagen?</string>
     <string name="cancel_recording_confirm_message">%1$s auf %2$s, %3$s, wird nicht aufgenommen.</string>
     <string name="stop_recording_confirm_title">Diese Aufnahme beenden?</string>
@@ -375,10 +383,9 @@
         <item quantity="other">%1$d Aufnahmen</item>
     </plurals>
     <string name="recordings_folder_recent_in">Neueste in %1$s</string>
-    <string name="recordings_minutes_short">Min.</string>
     <string name="recordings_play_count">%1$d-mal abgespielt</string>
     <string name="recordings_recording_now">Laufende Aufnahme</string>
-    <string name="recordings_schedule_end_duration">bis %1$s • %2$d Min.</string>
+    <string name="recordings_schedule_end_duration">bis %1$s • %2$s</string>
     <string name="recordings_failed">Fehlgeschlagen</string>
     <string name="recordings_cancelled">Abgebrochen</string>
     <string name="recordings_problem_indicator">Aufnahmeproblem</string>
@@ -401,18 +408,7 @@
     <string name="recording_file_unavailable">Ihr Tvheadend-Server stellt für diese Aufnahme keine abspielbare Datei bereit.</string>
     <string name="recording_read_failed">Ihr Tvheadend-Server konnte diese Aufnahme nicht weiterlesen.</string>
     <string name="recording_resume_from">Fortsetzen ab %1$s</string>
-    <plurals name="recording_duration_hours">
-        <item quantity="one">%1$d Stunde</item>
-        <item quantity="other">%1$d Stunden</item>
-    </plurals>
-    <plurals name="recording_duration_minutes">
-        <item quantity="one">%1$d Minute</item>
-        <item quantity="other">%1$d Minuten</item>
-    </plurals>
-    <plurals name="recording_duration_seconds">
-        <item quantity="one">%1$d Sekunde</item>
-        <item quantity="other">%1$d Sekunden</item>
-    </plurals>
+    <string name="recording_ends_at">Endet um %1$s</string>
     <string name="recording_play_from_beginning">Von Anfang an abspielen</string>
     <string name="recording_progress_read_only">Der vorhandene Wiedergabestand ist verfügbar. Neuer Fortschritt wird nicht gespeichert.</string>
     <string name="recording_progress_unsupported">Dieser Server unterstützt die Wiedergabe ab Anfang, aber keinen synchronisierten Fortschritt.</string>
@@ -463,6 +459,7 @@
     <string name="audio_passthrough_failed">Modus konnte nicht übernommen werden.</string>
     <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
     <string name="play">Abspielen</string>
+    <string name="play_recording">Aufnahme abspielen</string>
 
     <string name="tvh_target_invalid">Ungültiges Streaming-Ziel</string>
     <string name="tvh_no_free_adapter">Kein freier Tuner verfügbar</string>
@@ -498,7 +495,6 @@
     <string name="recording_marker_next">Nächste Marke</string>
     <string name="keep_channel_setting">Sender nach Verlassen der App beibehalten</string>
     <string name="keep_channel_off">Aus</string>
-    <string name="keep_channel_minutes">%1$d Min.</string>
     <string name="startup_buffer_setting">Startpuffer</string>
     <string name="startup_buffer_automatic">Automatisch · %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>
@@ -523,9 +519,9 @@
     <string name="player_recording_until">Aufnahme bis %1$s</string>
     <string name="player_playing">Wiedergabe</string>
     <string name="player_next">Danach · %1$s</string>
-    <string name="player_minutes_left">Noch %1$d Min.</string>
+    <string name="player_minutes_left">Noch %1$s</string>
     <string name="player_scheduled">Aufnahme geplant</string>
-    <string name="player_channel_spoken">Sender %1$s, %2$s</string>
+    <string name="player_channel_spoken">Sender %1$s</string>
     <string name="player_now_spoken">Jetzt: %1$s, %2$s</string>
     <string name="player_ad_short">AD</string>
     <string name="player_sub_short">UT</string>
@@ -537,10 +533,6 @@
         <item>Jan.</item><item>Feb.</item><item>März</item><item>Apr.</item><item>Mai</item><item>Juni</item>
         <item>Juli</item><item>Aug.</item><item>Sep.</item><item>Okt.</item><item>Nov.</item><item>Dez.</item>
     </string-array>
-    <plurals name="player_minutes_left_spoken">
-        <item quantity="one">Noch %1$d Minute</item>
-        <item quantity="other">Noch %1$d Minuten</item>
-    </plurals>
     <string name="player_channel">Sender</string>
     <string name="player_row_recent">Zuletzt gesehene Sender</string>
     <string name="player_channel_card_hint">Links oder rechts wechselt den Sender, OK zeigt zuletzt gesehene Sender.</string>
@@ -554,8 +546,41 @@
     <string name="details_action_remind">Erinnern</string>
     <string name="details_action_other_airings">Wiederholungen</string>
     <string name="details_read_more">Mehr Infos</string>
+    <string name="details_important_information">Details</string>
+    <string name="details_available_until">Verfügbar bis %1$s</string>
+    <string name="details_size">Größe</string>
+    <string name="details_recording_profile">Aufnahmeprofil</string>
+    <string name="details_picture">Bild</string>
+    <string name="details_audio">Audio</string>
+    <string name="details_errors">Fehler</string>
+    <string name="details_no_errors">Keine Fehler</string>
+    <string name="details_retention">Aufbewahrung</string>
+    <string name="details_kept_until_space_needed">Bis Speicherplatz benötigt wird</string>
+    <plurals name="details_error_count">
+        <item quantity="one">%1$d Fehler</item>
+        <item quantity="other">%1$d Fehler</item>
+    </plurals>
+    <plurals name="details_cast">
+        <item quantity="one">Besetzung</item>
+        <item quantity="other">Besetzung</item>
+    </plurals>
+    <plurals name="details_guests">
+        <item quantity="one">Gast</item>
+        <item quantity="other">Gäste</item>
+    </plurals>
+    <plurals name="details_presenters">
+        <item quantity="one">Moderator</item>
+        <item quantity="other">Moderatoren</item>
+    </plurals>
+    <plurals name="details_directors">
+        <item quantity="one">Regisseur</item>
+        <item quantity="other">Regisseure</item>
+    </plurals>
+    <plurals name="details_writers">
+        <item quantity="one">Drehbuchautor</item>
+        <item quantity="other">Drehbuchautoren</item>
+    </plurals>
     <string name="details_on_now">Jetzt</string>
-    <string name="details_minutes">%1$d Min.</string>
     <string name="details_watch">Ansehen</string>
     <string name="details_back_to_tv">Zurück zum TV</string>
     <string name="details_description">Beschreibung</string>
@@ -581,10 +606,9 @@
     <string name="details_new_no">Neue Sendung: Nein</string>
     <string name="keep_recording">Weiter aufnehmen</string>
     <string name="keep">Behalten</string>
-    <string name="dont_record">Nicht aufnehmen</string>
-    <string name="recording_watched_duration">%1$s von %2$s angesehen</string>
-    <string name="duration_minutes_short">%1$d Min.</string>
-    <string name="duration_hours_short">%1$d Std.</string>
-    <string name="duration_hours_minutes_short">%1$d Std. %2$d Min.</string>
     <string name="duration_unknown">unbekannter Dauer</string>
+    <string name="details_today">Heute %1$s</string>
+    <string name="details_on_now_until">Läuft · bis %1$s</string>
+    <string name="details_more">Mehr</string>
+    <string name="details_age_rating_description">Altersfreigabe %1$s</string>
 </resources>

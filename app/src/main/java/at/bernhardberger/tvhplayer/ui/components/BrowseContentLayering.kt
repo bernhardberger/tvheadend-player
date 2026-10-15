@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
@@ -26,6 +28,10 @@ import androidx.compose.ui.unit.dp
 
 /** The one shell gradient and the outgoing ink that must appear underneath it. */
 internal class BrowseContentLayering {
+    internal val details = mutableStateMapOf<Any, State<Float>>()
+    internal fun detailsAlpha(): Float = details.values.maxOfOrNull { it.value } ?: 0f
+    internal val modalScrims = mutableStateMapOf<Any, State<Float>>()
+    internal fun modalScrimAlpha(): Float = modalScrims.values.maxOfOrNull { it.value } ?: 0f
     internal var shell: BrowseShellNode? = null
     internal val departures = mutableSetOf<BrowseDepartureNode>()
 
@@ -96,7 +102,7 @@ internal class BrowseShellNode(
     }
 
     override fun ContentDrawScope.draw() {
-        drawScrim(frame(), BlendMode.SrcOver)
+        drawScrim(frame(), BlendMode.SrcOver, 1f - layering.detailsAlpha())
         drawContent()
     }
 }
@@ -141,7 +147,7 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering) 
         canvas.saveLayer(mapped.bounds, paint)
         try {
             drawContent()
-            drawScrim(mapped, BlendMode.SrcAtop)
+            drawScrim(mapped, BlendMode.SrcAtop, 1f - layering.detailsAlpha())
         } finally {
             canvas.restore()
         }
@@ -150,7 +156,8 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering) 
 
 internal class BrowseScrimFrame(val bounds: Rect, val start: Offset, val end: Offset)
 
-private fun ContentDrawScope.drawScrim(frame: BrowseScrimFrame, blendMode: BlendMode) {
+private fun ContentDrawScope.drawScrim(frame: BrowseScrimFrame, blendMode: BlendMode, alpha: Float) {
+    if (alpha <= 0f) return
     drawRect(
         brush = Brush.linearGradient(
             colors = listOf(Color.Black.copy(alpha = 0.95f), Color.Transparent),
@@ -160,5 +167,6 @@ private fun ContentDrawScope.drawScrim(frame: BrowseScrimFrame, blendMode: Blend
         topLeft = frame.bounds.topLeft,
         size = frame.bounds.size,
         blendMode = blendMode,
+        alpha = alpha,
     )
 }

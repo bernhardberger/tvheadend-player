@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 
@@ -17,8 +19,10 @@ internal fun RecordingConfirmationDialog(
     onConfirm: () -> Unit,
     channelName: String = "",
     dateAndTime: String = "",
+    visibility: MutableTransitionState<Boolean> = remember { MutableTransitionState(false).apply { targetState = true } },
 ) {
-    at.bernhardberger.tvhplayer.ui.components.TwoColumnDialog(
+    at.bernhardberger.tvhplayer.ui.components.CentredDialog(
+        visibility = visibility,
         title = stringResource(when (action) {
             PendingRecordingAction.STOP -> R.string.stop_recording_confirm_title
             PendingRecordingAction.CANCEL -> R.string.cancel_recording_confirm_title

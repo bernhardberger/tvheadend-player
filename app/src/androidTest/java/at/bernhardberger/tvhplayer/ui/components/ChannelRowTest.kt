@@ -63,7 +63,7 @@ class ChannelRowTest {
             }
         }
 
-        composeTestRule.onNodeWithText("3  ČT1 HD").assertIsDisplayed()
+        composeTestRule.onNodeWithText("3 ČT1 HD").assertIsDisplayed()
         composeTestRule.onNodeWithText("Večerní zprávy").assertIsDisplayed()
 
         composeTestRule.onNodeWithTag("row")

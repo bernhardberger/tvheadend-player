@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ChannelNowIndicators
 import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
@@ -317,21 +318,22 @@ private fun CompactZapCard(
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
 ) {
+    val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onLongClick, menuKey = false)
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
     // The programme leads; without one, the channel does.
     val programme = currentEvent?.title?.takeIf { it.isNotBlank() }
-    val identity = listOfNotNull(number?.toString(), channel.name).joinToString(" ")
+    val identity = channelTitleText(number, channel.name.orEmpty())
     // Preserve the kit's 54dp picon region; let the two text baselines grow with font scale.
     val cardHeight = with(LocalDensity.current) {
         70.dp + MaterialTheme.typography.titleMedium.lineHeight.toDp() + MaterialTheme.typography.bodySmall.lineHeight.toDp()
     }
     CompactCard(
         onClick = onClick,
-        onLongClick = onLongClick,
+        onLongClick = contextMenu.onLongClick,
         border = embeddedProgressCardBorder(),
         // The kit scrim keeps text legible over artwork; this card's text sits on a flat surface.
         scrimBrush = SolidColor(Color.Transparent),
-        modifier = modifier.width(196.dp),
+        modifier = modifier.then(contextMenu.modifier).width(196.dp),
         image = {
             Box(Modifier.fillMaxWidth().height(cardHeight).background(TvSurfaceColors.containerLowest)) {
                 PiconBox(

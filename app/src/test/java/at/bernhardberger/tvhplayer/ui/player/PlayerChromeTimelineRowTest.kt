@@ -251,7 +251,7 @@ class PlayerChromeTimelineRowTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = mode,
-                    content = PlayerChromeContent("20:15", liveInfoBarData(1, "One", null, null, false, now, "Programme")),
+                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, now, "Programme")),
                     timeline = timeline,
                     actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS),
                     imageLoader = remember { ImageLoader(context) },

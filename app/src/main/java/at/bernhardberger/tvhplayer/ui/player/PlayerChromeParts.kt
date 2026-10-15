@@ -65,6 +65,7 @@ internal fun programmeTimeRange(event: EpgEventEntry): String =
 
 /** The info bar for the displayed live programme; missing facts are omitted. */
 internal fun liveInfoBarData(
+    resources: android.content.res.Resources,
     channelNumber: Long?,
     channelName: String,
     event: EpgEventEntry?,
@@ -77,7 +78,7 @@ internal fun liveInfoBarData(
     channelName = channelName,
     title = event?.title?.takeIf(String::isNotBlank) ?: unavailableTitle,
     timeRange = event?.let(::programmeTimeRange).orEmpty(),
-    metadata = event?.let(::programmeMetadata),
+    metadata = event?.let { programmeMetadata(it, resources) },
     subtitle = event?.subtitle,
     remainingMinutes = event?.takeIf { nowSec >= it.start.epochSeconds && nowSec < it.stop.epochSeconds }
         ?.let { ((it.stop.epochSeconds - nowSec + 59) / 60).toInt() },
@@ -163,7 +164,7 @@ internal fun trayPreviewMetadata(event: EpgEventEntry?, nowSec: Long): String = 
     event?.let(::programmeTimeRange),
     event?.takeIf { nowSec >= it.start.epochSeconds && nowSec < it.stop.epochSeconds }
         ?.let { playerMinutesLeft(((it.stop.epochSeconds - nowSec + 59) / 60).toInt()) },
-    event?.let(::programmeMetadata),
+    event?.let { programmeMetadata(it, androidx.compose.ui.platform.LocalContext.current.resources) },
 ).joinToString(" · ")
 
 /** Everything one tray preview renders, so a leaving preview keeps showing its own card. */

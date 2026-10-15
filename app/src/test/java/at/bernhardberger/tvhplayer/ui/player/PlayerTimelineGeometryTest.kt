@@ -309,7 +309,7 @@ class PlayerTimelineGeometryTest {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
         compose.setContent {
             TVHeadendPlayerTheme {
-                val info = liveInfoBarData(1, "One", airing, airing, false, now, "Programme")
+                val info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme")
                 val loader = remember { ImageLoader(context) }
                 PlayerInfoBar(info, Modifier.testTag("player-info-bar"), lastLineEndReserve = reserve) {
                     Box(it.size(124.dp, 70.dp))
@@ -598,6 +598,7 @@ class PlayerTimelineGeometryTest {
         val newNext = event(78L, zapNow + 900, zapNow + 4_500).takeIf { epg }
         val unavailable = "Programme information unavailable"
         fun info(timeline: PlayerChromeTimeline.Live, channel: String, next: EpgEvent?) = liveInfoBarData(
+            androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources,
             if (channel == "One") 1 else 2, channel,
             displayedProgrammeEvent(false, timeline.committedWindow, timeline.committedWindow, timeline.committedTimeshift,
                 timeline.programme, timeline.liveStart),
@@ -1154,7 +1155,7 @@ class PlayerTimelineGeometryTest {
             Box(Modifier.fillMaxSize()) {
             PlayerChrome(
                 mode = frame.mode,
-                content = PlayerChromeContent("20:15", frame.info ?: liveInfoBarData(1, "One", airing, airing, false, now, "Programme"),
+                content = PlayerChromeContent("20:15", frame.info ?: liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme"),
                     state = frame.cell),
                 timeline = frame.timeline,
                 actions = PlayerChromeActions(active = frame.mode == PlayerChromeMode.CONTROLS, paused = frame.cell == PlayerStateCell.PAUSED),

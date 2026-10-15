@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,6 +61,7 @@ internal fun ProgrammeDetailsInformation(
     modifier: Modifier = Modifier,
     tile: @Composable (Modifier) -> Unit,
     status: @Composable () -> Unit = {},
+    subtitleDescription: String? = null,
 ) {
     Column(modifier.width(DetailsColumnWidth).fillMaxHeight().testTag("details-information"),
         verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -71,7 +73,8 @@ internal fun ProgrammeDetailsInformation(
         }
         subtitle?.takeIf(String::isNotBlank)?.let {
             Text(it, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics { subtitleDescription?.let { contentDescription = it } })
         }
         Text(facts, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp).testTag("details-facts"))
@@ -121,6 +124,8 @@ internal fun ProgrammeDetailsButton(
 @Composable
 internal fun ProgrammeDetailsFullDescription(
     modifier: Modifier = Modifier,
+    heading: (@Composable () -> Unit)? = null,
+    title: String? = null,
     reading: @Composable () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
@@ -129,16 +134,21 @@ internal fun ProgrammeDetailsFullDescription(
     val scope = rememberCoroutineScope()
     var focused by remember { mutableStateOf(false) }
     val scrollStep = with(LocalDensity.current) { 60.dp.roundToPx() }
-    val paneTitle = stringResource(R.string.details_read_more)
+    val paneTitle = title ?: stringResource(R.string.details_read_more)
     LaunchedEffect(Unit) { withFrameNanos { }; readingFocus.requestFocus() }
-    Row(modifier.fillMaxSize().padding(bottom = 40.dp), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
+    Column(modifier.fillMaxSize()) {
+    if (heading != null) {
+        heading()
+        Spacer(Modifier.height(24.dp))
+    }
+    Row(Modifier.fillMaxSize().padding(bottom = if (heading == null) 40.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
         reading()
         Surface(modifier = Modifier.weight(1f).fillMaxHeight().testTag("details-full-description"),
-            shape = RoundedCornerShape(12.dp),
+            shape = DetailsReadingShape,
             colors = SurfaceDefaults.colors(
-                containerColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 0.06f else 0.03f),
+                containerColor = detailsReadingFill(focused),
                 contentColor = MaterialTheme.colorScheme.onSurface),
-            border = Border(BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 0.3f else 0.1f)))) {
+            border = detailsReadingBorder(focused)) {
             Box(Modifier.fillMaxSize().testTag("player-info-reading")
                 .semantics { this.paneTitle = paneTitle }
                 .focusRequester(readingFocus).onFocusChanged { focused = it.isFocused }
@@ -157,8 +167,8 @@ internal fun ProgrammeDetailsFullDescription(
                         scroll.scrollTo((scroll.value + delta).coerceIn(0, scroll.maxValue))
                     }
                     true
-                }.focusable().padding(20.dp)) {
-                Column(Modifier.widthIn(max = 560.dp).fillMaxSize()
+                }.focusable().padding(DetailsReadingInset)) {
+                Column(Modifier.widthIn(max = if (heading == null) 560.dp else 760.dp).fillMaxSize()
                     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
                     .drawWithContent {
                         drawContent()
@@ -172,4 +182,17 @@ internal fun ProgrammeDetailsFullDescription(
             }
         }
     }
+    }
 }
+
+internal val DetailsReadingShape = RoundedCornerShape(12.dp)
+internal val DetailsReadingInset = 20.dp
+
+@Composable
+internal fun detailsReadingFill(focused: Boolean): Color =
+    MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 0.06f else 0.03f)
+
+@Composable
+internal fun detailsReadingBorder(focused: Boolean): Border = Border(
+    BorderStroke(if (focused) 2.dp else 1.dp,
+        MaterialTheme.colorScheme.onSurface.copy(alpha = if (focused) 1f else 0.1f)))

@@ -1,128 +1,114 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.key
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
-import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.type
-import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.focus.*
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
-import androidx.tv.material3.ButtonDefaults
-import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 
-/** The opener's held activation is finished here, before any menu button sees it. */
+internal class BrowseContextMenuTrigger(val modifier: Modifier, val onLongClick: (() -> Unit)?)
+
+/** TV Material owns hold detection; the source and destination both consume its trailing release. */
+@Composable
+internal fun rememberBrowseContextMenuTrigger(
+    onOpen: (() -> Unit)?,
+    enabled: () -> Boolean = { true },
+    menuKey: Boolean = true,
+): BrowseContextMenuTrigger {
+    var heldRelease by remember { mutableStateOf(false) }
+    return BrowseContextMenuTrigger(
+        Modifier.onPreviewKeyEvent { event ->
+            val activation = event.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+            if (activation && event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                heldRelease = false
+            }
+            when {
+                menuKey && event.key == Key.Menu && onOpen != null && enabled() -> {
+                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) onOpen()
+                    true
+                }
+                else -> false
+            }
+        }.onKeyEvent { event ->
+            // Let TV Material clear its native long-click state before consuming any unhandled tail.
+            if (heldRelease && event.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)) {
+                if (event.type == KeyEventType.KeyUp) heldRelease = false
+                true
+            } else false
+        },
+        onOpen?.let { open -> { if (enabled()) { heldRelease = true; open() } } },
+    )
+}
+
+/** The shared dialog consumes the opener's held activation before any menu button sees it. */
 @Composable
 internal fun BrowseContextMenu(
     title: String,
-    metadata: String,
-    timeRange: String,
+    channel: String,
+    episode: String,
+    time: String,
     actions: List<BrowseContextAction>,
     onAction: (BrowseContextAction) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
+    summary: String = "",
     watchChannel: Boolean = false,
-    initialAction: BrowseContextAction? = null,
     programDetailsLabel: Boolean = false,
-    logo: @Composable () -> Unit,
+    backEnabled: Boolean = true,
+    artwork: @Composable () -> Unit,
 ) {
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
     var focusedAction by remember { mutableStateOf<BrowseContextAction?>(null) }
-    var focusedIndex by remember { mutableStateOf(0) }
-    var openingReleasePending by remember { mutableStateOf(true) }
-    BackHandler(onBack = onClose)
-    LaunchedEffect(actions) {
+    var focusedIndex by remember { mutableIntStateOf(0) }
+    LaunchedEffect(actions, backEnabled) {
+        if (!backEnabled) return@LaunchedEffect
         withFrameNanos { }
-        if (focusedAction !in actions) {
-            val target = if (focusedAction == null) initialAction?.takeIf { it in actions } ?: actions.firstOrNull()
-                else actions.getOrNull(focusedIndex) ?: actions.firstOrNull()
-            target?.let { requesters.getValue(it).requestFocus() }
-        }
+        val target = if (focusedAction in actions) focusedAction
+            else actions.getOrNull(focusedIndex) ?: actions.firstOrNull()
+        target?.let { requesters.getValue(it).requestFocus() }
     }
-    PlaybackOptionsOverlayFrame(
-        paneTitle = title,
-        panelTag = "browse-context-menu",
-        modifier = modifier.onPreviewKeyEvent { event ->
-            val activation = event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter
-            when {
-                event.key == Key.Menu -> true
-                activation && openingReleasePending -> {
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        openingReleasePending = false
-                        false
-                    } else {
-                        if (event.type == KeyEventType.KeyUp) openingReleasePending = false
-                        true
-                    }
-                }
-                event.key == Key.DirectionLeft || event.key == Key.DirectionRight -> true
-                else -> false
-            }
-        },
-    ) {
-        Column(Modifier.padding(horizontal = 20.dp, vertical = 26.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                logo()
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(metadata, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(timeRange, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    TwoColumnDialog(title, "", onClose, modifier.testTag("browse-context-menu"), backEnabled,
+        onPreviewKeyEvent = { it.key == Key.Menu },
+        itemCardLayout = true,
+        leading = {
+            val subtitle = listOf(channel, time).filter(String::isNotBlank).joinToString(" · ")
+            val description = listOf(episode, summary).filter(String::isNotBlank).joinToString("\n")
+            Column(Modifier.fillMaxWidth().testTag("browse-context-item")) {
+                Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) { artwork() }
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
             }
-            Spacer(Modifier.height(8.dp))
-            actions.forEachIndexed { index, action ->
-                key(action) {
-                Button(
-                    onClick = { onAction(action) },
-                    modifier = Modifier.fillMaxWidth().height(48.dp)
-                        .focusRequester(requesters.getValue(action))
+        }) {
+        actions.forEachIndexed { index, action ->
+            key(action) {
+                TwoColumnDialogButton(
+                    stringResource(if (programDetailsLabel && action == BrowseContextAction.DETAILS)
+                        R.string.details_program else action.label(watchChannel)),
+                    { onAction(action) },
+                    Modifier.focusRequester(requesters.getValue(action))
                         .onFocusChanged { if (it.isFocused) { focusedAction = action; focusedIndex = index } }
                         .focusProperties {
                             up = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             down = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                            left = FocusRequester.Cancel
-                            right = FocusRequester.Cancel
-                        },
-                    shape = ButtonDefaults.shape(shape = RoundedCornerShape(12.dp)),
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                ) {
-                    Icon(painterResource(action.icon()), null, Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Text(stringResource(if (programDetailsLabel && action == BrowseContextAction.DETAILS)
-                        R.string.details_program else action.label(watchChannel)), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                }
+                            left = FocusRequester.Cancel; right = FocusRequester.Cancel
+                        }, action.icon())
             }
         }
     }
@@ -137,7 +123,7 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.SHOW_GUIDE -> R.string.context_show_guide
     BrowseContextAction.RESUME -> R.string.context_resume
     BrowseContextAction.START_OVER -> R.string.context_start_over
-    BrowseContextAction.PLAY -> R.string.play
+    BrowseContextAction.PLAY -> R.string.play_recording
     BrowseContextAction.DELETE -> R.string.context_delete
 }
 

@@ -172,7 +172,11 @@ fun DepthNavigation(
     }
     val level = resolve(stack.active.levelId)
     val identities = level.rows.map { it.item }
-    val reconciled = (if (stack.active.focusedItemId == null && level.initialItemId != null) {
+    var previousInitialItemId by remember(stack.visit) { mutableStateOf(level.initialItemId) }
+    // A late preference may replace the initial fallback, but not a row the viewer moved to.
+    val initialSelectionChanged = previousInitialItemId != level.initialItemId &&
+        stack.active.focusedItemId == previousInitialItemId
+    val reconciled = (if ((stack.active.focusedItemId == null || initialSelectionChanged) && level.initialItemId != null) {
         stack.focus(level.initialItemId, identities)
     } else stack).reconcile(identities)
     val latestLevels by rememberUpdatedState(levels)
@@ -196,7 +200,13 @@ fun DepthNavigation(
     val columnInset = contentPadding.calculateStartPadding(LocalLayoutDirection.current)
     val listStates = remember { mutableMapOf<List<String>, LazyListState>() }
     fun listState(path: List<String>, frame: DepthFrame) =
-        listStates.getOrPut(path) { LazyListState(frame.firstVisibleIndex, frame.scrollOffset) }
+        listStates.getOrPut(path) {
+            val initialLevel = resolve(frame.levelId)
+            val initialIndex = initialLevel.rows.indexOfFirst { it.item.id == initialLevel.initialItemId }
+            // Mount a choice level's selected row in its preview, before the parent loses focus.
+            if (frame.firstVisibleItemId == null && initialIndex >= 0) LazyListState(initialIndex)
+            else LazyListState(frame.firstVisibleIndex, frame.scrollOffset)
+        }
     fun saveViewport() {
         val list = listStates[state.stack.path] ?: return
         val index = list.firstVisibleItemIndex
@@ -233,6 +243,7 @@ fun DepthNavigation(
     }
     SideEffect {
         if (latestIsCurrent.value && state.stack == stack && reconciled != stack) state.update(reconciled)
+        previousInitialItemId = level.initialItemId
     }
     BackHandler(isCurrent && backEnabled && initialFocusEnabled && (stack.canPop || onRootBack != null)) {
         if (stack.canPop) pop() else onRootBack?.invoke()
@@ -525,12 +536,19 @@ private fun DepthStripPane(
     DisposableEffect(active, capturedVisit, initialFocusEnabled, identities) {
         onDispose { pageJob?.cancel(); pageTarget = null }
     }
-    val targetId = focusedItemId
-    LaunchedEffect(capturedVisit, active, initialFocusEnabled, column.level.rows.map { it.item.id }) {
-        if (!active || !initialFocusEnabled) return@LaunchedEffect
+    val targetId = if (active) focusedItemId else column.level.initialItemId
+    LaunchedEffect(capturedVisit, active, initialFocusEnabled, targetId, column.level.rows.map { it.item.id }) {
         if (targetId == null) return@LaunchedEffect
         val targetIndex = column.level.rows.indexOfFirst { it.item.id == targetId }
         if (targetIndex < 0) return@LaunchedEffect
+        if (!active) {
+            // Reused choice previews can outlive a preference change. Prepare the selected
+            // row while inert, so entering never waits for an off-screen focus target.
+            if (isCurrent && column.path.dropLast(1) == activePath &&
+                list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) list.scrollToItem(targetIndex)
+            return@LaunchedEffect
+        }
+        if (!initialFocusEnabled) return@LaunchedEffect
         suspend fun stillThisTarget() =
             latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && latestFocusedId.value == targetId
         if (list.layoutInfo.visibleItemsInfo.none { it.key == targetId }) {

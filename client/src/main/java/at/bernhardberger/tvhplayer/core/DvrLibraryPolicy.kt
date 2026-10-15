@@ -82,15 +82,8 @@ fun summarizeDvrFolder(folder: DvrArchiveFolder): DvrFolderSummary {
 private fun DvrArchiveFolder.descendantRecordings(): List<DvrEntry> =
     recordings + folders.flatMap { it.descendantRecordings() }
 
-sealed interface DvrConfigChoice {
-    data class Automatic(val configId: DvrConfigId?) : DvrConfigChoice
-    data class RequiresSelection(val configs: List<DvrConfiguration>) : DvrConfigChoice
-}
-
-fun chooseDvrConfig(configs: List<DvrConfiguration>): DvrConfigChoice = when {
-        configs.size <= 1 -> DvrConfigChoice.Automatic(configs.singleOrNull()?.id)
-        else -> DvrConfigChoice.RequiresSelection(configs)
-    }
+fun chooseDvrConfig(configs: List<DvrConfiguration>, preferredId: DvrConfigId? = null): DvrConfigId? =
+    (configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id
 
 fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibraryPartition(
     archive = entries

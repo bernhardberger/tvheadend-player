@@ -23,6 +23,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
 /**
  * Presentation strings follow the displayed programme/seek target. Callers pass no next for
@@ -70,7 +71,8 @@ fun PlayerInfoBar(
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
     val scheduled = if (data.nextScheduled && next != null) stringResource(R.string.player_scheduled) else null
     val description = listOfNotNull(
-        if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken, data.channelNumber, data.channelName),
+        if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken,
+            channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
         if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, playerSpokenTimeRange(data.timeRange))
         else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, playerSpokenTimeRange(data.timeRange)),
         remaining, next, scheduled,

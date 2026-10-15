@@ -27,19 +27,23 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [34], application = android.app.Application::class)
 class ProgramDetailsStateTest {
     private val event = EpgEvent.create(EventId(2), ChannelId(1),
         Instant.fromEpochSeconds(100), Instant.fromEpochSeconds(200), title = "Later")
 
     @Test fun subtitleUsesOnlySuppliedSubtitleOrEpisodeFields() {
+        val resources = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources
         val episode = EpgEpisode(null, null, 2, null, 3, null, null, null, "Chapter three")
         fun programme(subtitle: String?, episode: EpgEpisode?) = EpgEvent.create(
             EventId(1), ChannelId(1), event.start, event.stop, subtitle = subtitle, episode = episode)
-        assertEquals("Episode title", detailsSubtitle(programme("Episode title", episode)))
-        assertEquals("Chapter three", detailsSubtitle(programme(" ", episode)))
-        assertEquals("S2 E3", detailsSubtitle(programme(null, episode.copy(onscreen = null))))
-        assertEquals("E3", detailsSubtitle(programme(null, episode.copy(onscreen = null, seasonNumber = null))))
-        assertNull(detailsSubtitle(programme(null, null)))
+        assertEquals("Episode title", detailsSubtitle(programme("Episode title", episode), resources))
+        assertEquals("S2 E3", detailsSubtitle(programme(" ", episode), resources))
+        assertEquals("Chapter three", detailsSubtitle(programme(null, episode.copy(seasonNumber = null, episodeNumber = null)), resources))
+        assertEquals("S2 E3", detailsSubtitle(programme(null, episode.copy(onscreen = null)), resources))
+        assertEquals("E3", detailsSubtitle(programme(null, episode.copy(onscreen = null, seasonNumber = null)), resources))
+        assertNull(detailsSubtitle(programme(null, null), resources))
     }
 
     @Test fun scheduleIncludesTheProgrammeStartingExactlyAtTheCurrentProgrammesEnd() {

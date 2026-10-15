@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 
@@ -25,6 +26,7 @@ fun programmeDetailsActions(
     canWatchChannel: Boolean,
     fromGuide: Boolean,
     liveProgramme: Boolean = true,
+    stacked: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (canWatchChannel) add(BrowseContextAction.WATCH)
     programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings).forEach {
@@ -36,7 +38,7 @@ fun programmeDetailsActions(
             ProgrammeAction.WATCH_FROM_START -> if (recording != null) add(BrowseContextAction.PLAY)
         }
     }
-    if (!fromGuide && canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
+    if ((!fromGuide || stacked) && canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
 }
 
 fun recordingDetailsActions(
@@ -47,9 +49,29 @@ fun recordingDetailsActions(
 ): List<BrowseContextAction> = buildList {
     if (recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
     addAll(recordingContextActions(recording, playbackEligible, canModifyRecordings).filter {
-        it != BrowseContextAction.DETAILS &&
-            (it != BrowseContextAction.DELETE || recording.state != DvrEntryState.COMPLETED)
+        it != BrowseContextAction.DETAILS
     })
+}
+
+/**
+ * Other unended airings of [event] on any channel: series link URI, then series link ID,
+ * otherwise the same title (trimmed, case-insensitive). Simulcasts remain separate, at most [limit].
+ */
+fun otherAirings(event: EpgEvent, events: List<EpgEvent>, nowSec: Long, limit: Int = 20,
+    channelNumber: (ChannelId) -> Long? = { null }): List<EpgEvent> {
+    val seriesLink = event.seriesLinkUri?.takeIf(String::isNotBlank)
+    val seriesLinkId = event.episode?.seriesLinkId
+    val title = event.title?.trim()?.takeIf(String::isNotEmpty)
+    val matches: (EpgEvent) -> Boolean = when {
+        seriesLink != null -> { other -> other.seriesLinkUri == seriesLink }
+        seriesLinkId != null -> { other -> other.episode?.seriesLinkId == seriesLinkId }
+        title != null -> { other -> other.title?.trim().equals(title, ignoreCase = true) }
+        else -> return emptyList()
+    }
+    return events.filter { it.id != event.id && it.stop.epochSeconds > nowSec && matches(it) }
+        .sortedWith(compareBy<EpgEvent> { it.start }
+            .thenBy { it.channelId?.let(channelNumber) ?: Long.MAX_VALUE })
+        .take(limit)
 }
 
 enum class DetailsFactKind { STARTS, STARTED, RECORDED, LENGTH, LEFT }

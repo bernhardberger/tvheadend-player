@@ -72,6 +72,7 @@ fun humanLanguageName(
     languageCode: String?,
     unknownLanguageLabel: String,
     multipleLanguagesLabel: String = unknownLanguageLabel,
+    displayLocale: Locale = Locale.getDefault(),
 ): String? {
     val code = languageCode?.trim().orEmpty()
     if (code.isEmpty()) return null
@@ -80,9 +81,9 @@ fun humanLanguageName(
         isMultipleLanguagesCode(code) -> multipleLanguagesLabel
         else -> {
             val locale = Locale.forLanguageTag(code.replace('_', '-'))
-            locale.getDisplayLanguage(Locale.getDefault())
+            locale.getDisplayLanguage(displayLocale)
                 .takeIf { it.isNotBlank() && !it.equals(code, ignoreCase = true) }
-                ?: locale.getDisplayName(Locale.getDefault())
+                ?: locale.getDisplayName(displayLocale)
                     .takeIf { it.isNotBlank() }
                 ?: code
         }

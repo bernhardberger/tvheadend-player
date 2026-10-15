@@ -726,7 +726,7 @@ class PlayerTimelineTruthfulnessTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("", liveInfoBarData(1, "Channel", null, null, false, 0, "")),
+                    content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Channel", null, null, false, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         AppTimeshiftState(
                         available = true,

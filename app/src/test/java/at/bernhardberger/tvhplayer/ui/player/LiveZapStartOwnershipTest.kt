@@ -270,7 +270,7 @@ class LiveZapStartOwnershipTest {
                 TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                         channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, {}, runtime,
-                        notices = notices)
+                        notices = notices, uiSettingsStore = at.bernhardberger.tvhplayer.settings.UiSettingsStore(settingsData))
                 }
             }
         }

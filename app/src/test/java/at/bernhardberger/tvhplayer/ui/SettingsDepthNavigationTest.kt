@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
+import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
+import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
@@ -62,6 +64,142 @@ import java.io.File
 class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var captureView: View
+
+    @Test fun recordingsLevelRequiresMultipleProfiles() {
+        val profile = at.bernhardberger.tvheadend.sdk.core.DvrConfiguration(
+            at.bernhardberger.tvheadend.sdk.core.DvrConfigId("default"), "", "")
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                assertTrue(settingsRecordingLevels(listOf(profile), null) {}.isEmpty())
+                assertFalse(settingsRootLevel(false, showRecordings = false).rows.any { it.item.id == RECORDINGS_LEVEL })
+                assertTrue(settingsRootLevel(false, showRecordings = true).rows.any { it.item.id == RECORDINGS_LEVEL })
+            }
+        }
+    }
+
+    @Test fun recordingProfileSelectionPersistsAndRestoresFocus() {
+        val default = at.bernhardberger.tvheadend.sdk.core.DvrConfigId("default")
+        val archive = at.bernhardberger.tvheadend.sdk.core.DvrConfigId("archive")
+        val profiles = listOf(at.bernhardberger.tvheadend.sdk.core.DvrConfiguration(default, "", ""),
+            at.bernhardberger.tvheadend.sdk.core.DvrConfiguration(archive, "Archive", ""))
+        val store = UiSettingsStore(RuntimeEnvironment.getApplication())
+        runBlocking { store.setRecordingProfile(at.bernhardberger.tvheadend.sdk.core.DvrConfigId("removed")) }
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val settings by store.settings.collectAsState(initial = UiSettings())
+                val scope = rememberCoroutineScope()
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, RECORDINGS_LEVEL)
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false, showRecordings = true)) +
+                    settingsRecordingLevels(profiles, settings.recordingProfileId) { id ->
+                        scope.launch { store.setRecordingProfile(id); navigation.pop() }
+                    })
+            }
+        }
+        compose.onNodeWithText("Recordings").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Default profile").assertIsFocused().assertIsSelected()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Archive").assertIsFocused().assertIsNotSelected()
+        assertEquals("removed", runBlocking { store.settings.first().recordingProfileId?.value })
+        press(Key.DirectionCenter)
+        compose.waitUntil { runBlocking { store.settings.first().recordingProfileId == archive } }
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        assertEquals(archive, runBlocking { UiSettingsStore(RuntimeEnvironment.getApplication()).settings.first().recordingProfileId })
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Archive").assertIsFocused().assertIsSelected()
+        press(Key.Back)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+    }
+
+    @Test fun recordingProfileBelowFoldKeepsFocusInListOnOkEntry() =
+        recordingProfileBelowFold(Key.DirectionCenter, delayedPreference = false)
+
+    @Test fun recordingProfileBelowFoldKeepsFocusInListOnRightEntry() =
+        recordingProfileBelowFold(Key.DirectionRight, delayedPreference = false)
+
+    @Test fun recordingProfileLoadedAfterEntryFocusesSelectionWithoutDrawerHandoff() =
+        recordingProfileBelowFold(Key.DirectionRight, delayedPreference = true)
+
+    @Test fun recordingProfilesLoadedAfterEntryFocusSelectionWithoutDrawerHandoff() =
+        recordingProfileBelowFold(Key.DirectionRight, delayedPreference = false, delayedProfiles = true)
+
+    @Test fun recordingProfileLatePreferenceDoesNotOverrideViewerNavigation() {
+        val profiles = (0..29).map { index ->
+            DvrConfiguration(DvrConfigId("profile-$index"), "Profile $index", "")
+        }
+        var preferred by mutableStateOf<DvrConfigId?>(null)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState(RECORDING_PROFILE_LEVEL),
+                    settingsRecordingLevels(profiles, preferred) {})
+            }
+        }
+        compose.onNodeWithText("Profile 0").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Profile 1").assertIsFocused()
+        compose.runOnIdle { preferred = profiles[25].id }
+        compose.onNodeWithText("Profile 1").assertIsFocused().assertIsNotSelected()
+    }
+
+    private fun recordingProfileBelowFold(entryKey: Key, delayedPreference: Boolean, delayedProfiles: Boolean = false) {
+        val allProfiles = (0..29).map { index ->
+            DvrConfiguration(DvrConfigId("profile-$index"), "Profile $index", "")
+        }
+        var profiles by mutableStateOf(if (delayedProfiles) allProfiles.take(2) else allProfiles)
+        var preferred by mutableStateOf(if (delayedPreference) null else allProfiles[25].id)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(RECORDINGS_LEVEL)
+                SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                    onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                    SettingsScreenNavigation(navigation,
+                        settingsRecordingLevels(profiles, preferred) { id ->
+                            preferred = id
+                            navigation.pop()
+                        }, initialFocusEnabled = !drawerActive, contentPadding = padding)
+                }
+            }
+        }
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(entryKey) }
+        assertProfileListKeepsFocusEveryFrame()
+        if (delayedPreference || delayedProfiles) {
+            compose.onNodeWithText("Profile 0").assertIsFocused()
+            compose.runOnIdle { preferred = allProfiles[25].id; profiles = allProfiles }
+            assertProfileListKeepsFocusEveryFrame()
+        }
+        compose.onNodeWithText("Profile 25").assertIsFocused().assertIsSelected().assertIsDisplayed()
+        compose.mainClock.autoAdvance = true
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Profile 26").assertIsFocused().assertIsNotSelected()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        assertEquals(profiles[26].id, preferred)
+        press(entryKey)
+        compose.onNodeWithText("Profile 26").assertIsFocused().assertIsSelected()
+        press(Key.Back)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        // A cached preview must also track a selection changed while its parent is active.
+        compose.runOnIdle { preferred = profiles[2].id }
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(entryKey) }
+        assertProfileListKeepsFocusEveryFrame()
+        compose.onNodeWithText("Profile 2").assertIsFocused().assertIsSelected()
+    }
+
+    private fun assertProfileListKeepsFocusEveryFrame() {
+        repeat(75) { frame ->
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            compose.onNodeWithTag("nav-settings").assertIsNotFocused()
+            val focused = compose.onAllNodes(isFocused() and hasAnyAncestor(hasTestTag("depth-active")))
+                .fetchSemanticsNodes()
+            assertEquals("Profile list lost focus at frame $frame", 1, focused.size)
+        }
+    }
 
     @Test fun playRootHasFourSectionsAndApplianceAddsOnlyTheLastSection() {
         lateinit var play: DepthLevel

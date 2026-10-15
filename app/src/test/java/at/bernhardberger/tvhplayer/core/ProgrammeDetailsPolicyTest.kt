@@ -22,13 +22,21 @@ class ProgrammeDetailsPolicyTest {
     }
 
     @Test fun recordingActionsFollowLifecycleAndPlaybackAuthority() {
-        assertEquals(listOf(PLAY), recordingDetailsActions(recording(DvrEntryState.COMPLETED), true, true, true))
-        assertEquals(listOf(RESUME, START_OVER), recordingDetailsActions(recording(DvrEntryState.COMPLETED, 20), true, true, true))
+        assertEquals(listOf(PLAY, DELETE), recordingDetailsActions(recording(DvrEntryState.COMPLETED), true, true, true))
+        assertEquals(listOf(RESUME, START_OVER, DELETE), recordingDetailsActions(recording(DvrEntryState.COMPLETED, 20), true, true, true))
         assertEquals(listOf(WATCH, STOP), recordingDetailsActions(recording(DvrEntryState.RECORDING), true, true, true))
         assertEquals(listOf(WATCH, CANCEL), recordingDetailsActions(recording(DvrEntryState.SCHEDULED), false, true, true))
         assertEquals(listOf(CANCEL), recordingDetailsActions(recording(DvrEntryState.SCHEDULED), false, true, false))
         assertEquals(listOf(DELETE), recordingDetailsActions(recording(DvrEntryState.MISSED), false, true, true))
         assertEquals(emptyList<BrowseContextAction>(), recordingDetailsActions(recording(DvrEntryState.COMPLETED), false, false, false))
+    }
+
+    @Test fun showGuideIsOmittedOnlyOnTheGuideRootPage() {
+        for (fromGuide in listOf(false, true)) for (stacked in listOf(false, true)) {
+            assertEquals(!fromGuide || stacked,
+                SHOW_GUIDE in programmeDetailsActions(event, 50, null, true, true, fromGuide, stacked = stacked))
+        }
+        assertFalse(SHOW_GUIDE in programmeDetailsActions(event, 50, null, true, false, true, stacked = true))
     }
 
     @Test fun factsFollowProgrammeTimeAndPartialRecordingProgress() {

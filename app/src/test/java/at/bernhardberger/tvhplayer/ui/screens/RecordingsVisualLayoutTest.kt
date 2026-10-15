@@ -433,10 +433,9 @@ class RecordingsVisualLayoutTest {
         }
         compose.waitForIdle()
         compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
-        compose.onNodeWithText("Details").assertIsFocused()
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         compose.onNodeWithTag("details-play").assertDoesNotExist()
         compose.onNodeWithTag("details-delete").assertDoesNotExist()
-        key(Key.Back)
         focused("recording-list-entry-9")
         assertNoCommands()
     }

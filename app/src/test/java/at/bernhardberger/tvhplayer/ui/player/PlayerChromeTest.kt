@@ -47,7 +47,7 @@ class PlayerChromeTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = mode,
-                    content = PlayerChromeContent("20:15", liveInfoBarData(1, "One", null, null, false, 1_800, "Programme")),
+                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme")),
                     timeline = PlayerChromeTimeline.Live(
                         AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0),
                         nowSec = 1_800,

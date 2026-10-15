@@ -88,10 +88,11 @@ fun ChannelRow(
     onOpenContextMenu: (() -> Unit)? = null,
 ) = profileTrace("P1:compose:channelRow") {
     var focused by remember { mutableStateOf(false) }
+    val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
     ListItem(
         selected = playingNow,
         onClick = onConfirm,
-        onLongClick = onOpenContextMenu,
+        onLongClick = contextMenu.onLongClick,
         headlineContent = {
             val drawProbe = if (BuildConfig.PROFILE_TRACE) {
                 // The headline inherits the native Surface foreground. Observe it
@@ -177,12 +178,7 @@ fun ChannelRow(
                     .size(width = ChannelPiconWidth, height = ChannelPiconHeight),
             )
         },
-        modifier = modifier.onPreviewKeyEvent {
-            if (it.key == Key.Menu && onOpenContextMenu != null) {
-                if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onOpenContextMenu()
-                true
-            } else false
-        }
+        modifier = modifier.then(contextMenu.modifier)
             .profileLayout("channels:row")
             .fillMaxWidth()
             .onFocusChanged {

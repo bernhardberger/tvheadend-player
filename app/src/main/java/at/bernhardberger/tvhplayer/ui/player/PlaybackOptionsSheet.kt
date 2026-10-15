@@ -883,7 +883,7 @@ internal data class PlaybackListFade(val top: Boolean, val bottom: Boolean)
 /** Test-visible record of the fade drawn on a panel list. */
 internal val PlaybackListFadeKey = SemanticsPropertyKey<PlaybackListFade>("PlaybackListFade")
 
-private fun Modifier.playbackListFade(fade: PlaybackListFade): Modifier = this
+internal fun Modifier.playbackListFade(fade: PlaybackListFade): Modifier = this
     .semantics { this[PlaybackListFadeKey] = fade }
     .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
@@ -1031,7 +1031,7 @@ private fun StatsOptionsPage(
 }
 
 @Composable
-private fun OptionsHeader(
+internal fun OptionsHeader(
     title: String,
     currentValue: String?,
     onBack: (() -> Unit)?,
@@ -1094,7 +1094,7 @@ private fun OptionsHeader(
 }
 
 @Composable
-private fun PlaybackOptionRow(
+internal fun PlaybackOptionRow(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -1104,6 +1104,7 @@ private fun PlaybackOptionRow(
     selected: Boolean = false,
     showChevron: Boolean = false,
     enabled: Boolean = true,
+    radio: Boolean = false,
 ) {
     ListItem(
         enabled = enabled,
@@ -1127,6 +1128,10 @@ private fun PlaybackOptionRow(
         },
         trailingContent = {
             when {
+                radio -> androidx.tv.material3.RadioButton(selected = selected, onClick = null,
+                    colors = androidx.tv.material3.RadioButtonDefaults.colors(
+                        selectedColor = androidx.tv.material3.LocalContentColor.current,
+                        unselectedColor = androidx.tv.material3.LocalContentColor.current))
                 showChevron -> Icon(
                     painterResource(R.drawable.ic_keyboard_arrow_right),
                     contentDescription = null,
@@ -1149,7 +1154,7 @@ private fun PlaybackOptionRow(
     )
 }
 
-private fun Modifier.containedFocus(
+internal fun Modifier.containedFocus(
     requester: FocusRequester,
     orderedFocus: List<FocusRequester>,
     index: Int,

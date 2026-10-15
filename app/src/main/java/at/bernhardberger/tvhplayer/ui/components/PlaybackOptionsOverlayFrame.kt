@@ -41,6 +41,7 @@ internal fun PlaybackOptionsOverlayFrame(
     paneTitle: String? = null,
     panelTag: String = "playback-options-overlay",
     panelWidth: Dp = PlaybackPanelWidth,
+    showScrim: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val shape = MaterialTheme.shapes.large
@@ -57,7 +58,7 @@ internal fun PlaybackOptionsOverlayFrame(
     )
     val frame: @Composable () -> Unit = {
         Box(modifier = modifier.fillMaxSize().focusGroup(), contentAlignment = Alignment.CenterEnd) {
-            Box(Modifier.matchParentSize()
+            if (showScrim) Box(Modifier.matchParentSize()
                 .graphicsLayer { alpha = scrimShown?.value ?: 1f }
                 .background(Color.Black.copy(alpha = TvScrimModalAlpha)))
             Surface(

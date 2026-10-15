@@ -894,7 +894,7 @@ class PlayerFooterLayoutEvidenceTest {
                             markerNavigation = markerNavigation, markerRevision = markerRevision, onSeekMarker = onSeekMarker,
                         ) else PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
-                            content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", programme, null, false, 1_800, "")),
+                            content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programme, null, false, 1_800, "")),
                             timeline = PlayerChromeTimeline.Live(
                                 timeshift = AppTimeshiftState(
                                     available = timeshiftAvailable,
@@ -1083,7 +1083,7 @@ private fun QuickStepBanner(
     val context = androidx.compose.ui.platform.LocalContext.current
     PlayerChrome(
         mode = PlayerChromeMode.BANNER_STEP,
-        content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
+        content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
         timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow),
         actions = PlayerChromeActions(active = false),
         imageLoader = androidx.compose.runtime.remember { ImageLoader(context) },

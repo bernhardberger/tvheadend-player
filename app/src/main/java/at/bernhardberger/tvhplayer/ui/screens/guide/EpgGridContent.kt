@@ -91,6 +91,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
@@ -232,7 +233,7 @@ internal fun TimelineChannelRow(
     hasMatchingCachedEvents: Boolean,
     connectionUiState: ConnectionUiState,
     coveragePending: Boolean,
-    recordingForEvent: (EventId) -> DvrEntry?,
+    recordingForEvent: (EpgEventEntry) -> DvrEntry?,
     onFocused: (EpgEventEntry) -> Unit,
     onOpenDetails: (EpgEventEntry) -> Unit,
     onOpenContextMenu: ((EpgEventEntry) -> Unit)? = null,
@@ -317,7 +318,7 @@ internal fun TimelineChannelRow(
                     TimelineProgrammeCell(
                         event = event,
                         channel = channel,
-                        recording = recordingForEvent(event.id),
+                        recording = recordingForEvent(event),
                         nowSec = nowSec,
                         formattingZone = formattingZone,
                         selected = isFocusTarget,
@@ -373,7 +374,7 @@ internal fun TimelineChannelHeader(
             .width(GuideChannelWidth)
             .fillMaxHeight()
             .semantics(mergeDescendants = true) {
-                contentDescription = listOfNotNull(number?.toString(), channel.name?.takeIf { it.isNotBlank() }).joinToString(" ")
+                contentDescription = channelTitleText(number, channel.name.orEmpty())
             }
             .testTag("epg-channel-header-${channel.id.value}"),
         colors = SurfaceDefaults.colors(
@@ -442,6 +443,7 @@ internal fun TimelineProgrammeCell(
     modifier: Modifier,
     onOpenContextMenu: (() -> Unit)? = null,
 ) {
+    val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onOpenContextMenu)
     val stateText = when {
         event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds ->
             stringResource(R.string.epg_state_now)
@@ -471,7 +473,7 @@ internal fun TimelineProgrammeCell(
         ListItem(
             selected = selected,
             onClick = onOpenDetails,
-            onLongClick = onOpenContextMenu,
+            onLongClick = contextMenu.onLongClick,
             headlineContent = {
                 Text(
                     // Always render a label so no focusable cell is visually blank.
@@ -494,12 +496,7 @@ internal fun TimelineProgrammeCell(
                 // library focus scale the surface applies outside this modifier.
                 .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
                 .focusRequester(focusRequester)
-                .onPreviewKeyEvent {
-                    if (it.key == Key.Menu && onOpenContextMenu != null) {
-                        if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onOpenContextMenu()
-                        true
-                    } else false
-                }
+                .then(contextMenu.modifier)
                 .onFocusChanged {
                     focused = it.isFocused
                     if (it.isFocused) onFocused()

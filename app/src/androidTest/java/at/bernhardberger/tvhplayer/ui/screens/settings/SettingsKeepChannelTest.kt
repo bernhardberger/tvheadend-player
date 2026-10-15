@@ -56,7 +56,7 @@ class SettingsKeepChannelTest(private val language: String) {
         val context = composeRule.activity.createConfigurationContext(configuration)
         val heading = context.getString(R.string.keep_channel_setting)
         fun label(minutes: Int) = if (minutes == 0) context.getString(R.string.keep_channel_off)
-            else context.getString(R.string.keep_channel_minutes, minutes)
+            else at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), context.resources)
         var minutes by mutableStateOf(20)
         val selections = mutableListOf<Int>()
         composeRule.setContent {

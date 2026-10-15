@@ -90,6 +90,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.platform.testTag
@@ -120,6 +121,7 @@ import org.robolectric.shadows.ShadowDialog
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Category(VisualCapture::class)
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class PlayerChromeCaptureTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var loader: ImageLoader
@@ -268,7 +270,7 @@ class PlayerChromeCaptureTest {
     private enum class Scene {
         CONTROLS_LIVE, CONTROLS_NO_LOGO, CONTROLS_BEHIND, CONTROLS_PAUSED, BANNER_TUNING, BANNER_BEHIND, BANNER_STEP, TRAY_ART, TRAY_TEXT,
         PROGRAMME_INFO, PROGRAMME_INFO_NO_EPG, PROGRAMME_INFO_NO_ART, PROGRAMME_INFO_NO_ART_RECORDING, PROGRAMME_SCHEDULE, PROGRAMME_OPENED,
-        PROGRAMME_MORE_INFO, RAIL_SCHEDULE, RAIL_PROGRAMME_OPENED, RAIL_PEEK, PROGRAMME_CONFIRM_RECORD, PROGRAMME_RECORDING_BUSY, PROGRAMME_RECORDING_SCHEDULED,
+        PROGRAMME_MORE_INFO, RAIL_SCHEDULE, RAIL_PROGRAMME_OPENED, RAIL_PEEK, PROGRAMME_CONFIRM_STOP, PROGRAMME_RECORDING_BUSY, PROGRAMME_RECORDING_SCHEDULED,
         // English at font scale 1.0 only (EN_ONLY).
         BANNER_LIVE, CONTROLS_BUFFERING, BANNER_PAUSED, BANNER_NO_EPG_BEHIND, HIDDEN_PAUSED, HIDDEN_BUFFERING, STEP_NEAR_END, STEP_NEAR_END_NO_ICON,
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
@@ -361,8 +363,8 @@ class PlayerChromeCaptureTest {
             if (next == Scene.PROGRAMME_OPENED || next == Scene.RAIL_PROGRAMME_OPENED || next == Scene.RAIL_SCHEDULE) {
                 compose.onNodeWithTag("details-tabs").assertDoesNotExist()
             }
-            if (next == Scene.PROGRAMME_CONFIRM_RECORD) {
-                compose.onNodeWithText(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.dont_record)).assertIsFocused()
+            if (next == Scene.PROGRAMME_CONFIRM_STOP) {
+                compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.keep_recording))
             }
             if (next == Scene.RAIL_PEEK) {
                 val card = hasAnyAncestor(hasTestTag("player-channel-card-1"))
@@ -497,7 +499,7 @@ class PlayerChromeCaptureTest {
         }
         val content = PlayerChromeContent(
             clock = formatClock(NOW),
-            info = liveInfoBarData(101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
+            info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
                 unavailableTitle = "Programme information unavailable"),
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
@@ -568,7 +570,7 @@ class PlayerChromeCaptureTest {
             })
             Scene.PROGRAMME_INFO, Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_SCHEDULE,
             Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_SCHEDULE, Scene.RAIL_PROGRAMME_OPENED,
-            Scene.PROGRAMME_CONFIRM_RECORD, Scene.PROGRAMME_RECORDING_BUSY, Scene.PROGRAMME_RECORDING_SCHEDULED -> {
+            Scene.PROGRAMME_CONFIRM_STOP, Scene.PROGRAMME_RECORDING_BUSY, Scene.PROGRAMME_RECORDING_SCHEDULED -> {
                 val rail = scene == Scene.RAIL_SCHEDULE || scene == Scene.RAIL_PROGRAMME_OPENED
                 val shown = when {
                     rail -> trayProgramme
@@ -625,8 +627,8 @@ class PlayerChromeCaptureTest {
                     nowPlaying = { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW, loader, session,
                         playbackIndicator = ChannelPlaybackIndicator.PLAYING) },
                     player = {}, programme = { panel() }) else panel()
-                if (scene == Scene.PROGRAMME_CONFIRM_RECORD) ConfirmProgrammeActionDialog(
-                    action = ProgrammeAction.RECORD, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
+                if (scene == Scene.PROGRAMME_CONFIRM_STOP) ConfirmProgrammeActionDialog(
+                    action = ProgrammeAction.STOP_RECORDING, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
                 )
             }
             // Back while paused hides the Banner: the paused chip stays alone at the state cell's place.

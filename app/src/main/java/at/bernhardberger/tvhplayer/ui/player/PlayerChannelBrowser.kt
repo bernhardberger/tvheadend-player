@@ -33,16 +33,12 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
-import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
+import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
+import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
+import at.bernhardberger.tvhplayer.ui.components.RowDimAlpha
+import at.bernhardberger.tvhplayer.ui.components.RowHeaderQuietAlpha
+import at.bernhardberger.tvhplayer.ui.components.rowEmphasis
 import coil3.ImageLoader
-import kotlin.math.abs
-
-internal const val ChannelRowDimAlpha = 0.4f
-/** Row change: the column, the headers and the dimming all follow one position on this clock. */
-internal const val ChannelRowChangeMs = 300
-
-/** A row's emphasis at [distance] rows from the column position: 1 focused, 0 one row or more away. */
-internal fun channelRowEmphasis(distance: Float): Float = (1f - abs(distance)).coerceIn(0f, 1f)
 
 /** How much of the next row shows below the focused one: its quiet title and the top of its cards. */
 internal val PlayerChannelRowPeek = 52.dp
@@ -75,8 +71,8 @@ internal fun PlayerChannelBrowserHint(
     AnimatedContent(hasRecent && state.row == PlayerChannelRow.RECENT, modifier, label = "player-channel-hint",
         contentAlignment = Alignment.Center,
         transitionSpec = {
-            (fadeIn(tween(ChannelRowChangeMs, easing = PlayerMotion.Standard)) togetherWith
-                fadeOut(tween(ChannelRowChangeMs / 2, easing = PlayerMotion.StandardAccelerate)))
+            (fadeIn(RowChangeMotion) togetherWith
+                fadeOut(tween(RowChangeMs / 2, easing = PlayerMotion.StandardAccelerate)))
                 .using(SizeTransform(clip = false))
         }) { belowFirst ->
         PlayerDownHint(if (belowFirst) channelsTitle else stringResource(R.string.details_back_to_tv), up = true)
@@ -125,7 +121,7 @@ internal fun PlayerChannelBrowser(
     // Read when called: a retired card's retained click must not act for the row that left.
     fun owns(row: PlayerChannelRow) = row == (state.row.takeIf { it in currentRows } ?: PlayerChannelRow.ON_NOW)
     val position by animateFloatAsState(rows.indexOf(current).toFloat(),
-        tween(ChannelRowChangeMs, easing = PlayerMotion.Standard), label = "player-channel-row")
+        RowChangeMotion, label = "player-channel-row")
     val typography = MaterialTheme.typography
     val density = LocalDensity.current
     val cardHeight = with(density) { 94.dp + typography.titleMedium.lineHeight.toDp() + typography.bodySmall.lineHeight.toDp() }
@@ -176,7 +172,7 @@ internal fun PlayerChannelBrowser(
             .focusTarget())
         rows.forEachIndexed { index, row ->
             key(row) {
-                val emphasis = { channelRowEmphasis(index - position) }
+                val emphasis = { rowEmphasis(index - position) }
                 Column(Modifier.fillMaxWidth()
                     .graphicsLayer {
                         // The focused row keeps one place, the same distance below the preview.
@@ -195,12 +191,12 @@ internal fun PlayerChannelBrowser(
                                 scaleX = lerp(quietScale, 1f, e)
                                 scaleY = scaleX
                                 transformOrigin = TransformOrigin(0f, 1f)
-                                alpha = lerp(TvPassiveAlpha, 1f, e)
+                                alpha = lerp(RowHeaderQuietAlpha, 1f, e)
                             },
                         style = typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(PlayerChannelRowTitleGap))
-                    Box(Modifier.height(cardHeight).graphicsLayer { alpha = lerp(ChannelRowDimAlpha, 1f, emphasis()) }) {
+                    Box(Modifier.height(cardHeight).graphicsLayer { alpha = lerp(RowDimAlpha, 1f, emphasis()) }) {
                         ChannelDrawer(
                             channels = if (row == PlayerChannelRow.ON_NOW) channels else recentChannels,
                             selectedId = state.collection(row).focusedId,

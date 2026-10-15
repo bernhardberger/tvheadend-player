@@ -16,10 +16,7 @@ import at.bernhardberger.tvhplayer.core.selectAccentRgb
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import coil3.ImageLoader
-import coil3.request.CachePolicy
-import coil3.request.ImageRequest
 import coil3.request.SuccessResult
-import coil3.request.allowHardware
 import coil3.toBitmap
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
@@ -113,15 +110,7 @@ private data class FillInTarget(val session: SessionGenerationIdentity, val pico
 /** Neutral for a picon there is no picture of; null when the picon does not load for now. */
 private suspend fun samplePicon(imageLoader: ImageLoader, context: Context, picon: AppArtworkSource): Int? =
     withContext(Dispatchers.Default) {
-        val request = ImageRequest.Builder(context)
-            .data(picon)
-            // Palette cannot read hardware bitmaps, and 64 px is plenty for a dominant colour.
-            .allowHardware(false)
-            .size(64, 64)
-            // The small bitmap is of no use to anything that draws the picon.
-            .memoryCachePolicy(CachePolicy.READ_ONLY)
-            .build()
-        val result = imageLoader.execute(request)
+        val result = loadArtworkSample(imageLoader, context, picon)
         val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: run {
             val failure = ((result as? ErrorResult)?.throwable as? TvheadendArtworkLoadException)?.failure
             profileTrace("P50:accentFail:${failure ?: "undecodable"}") { }

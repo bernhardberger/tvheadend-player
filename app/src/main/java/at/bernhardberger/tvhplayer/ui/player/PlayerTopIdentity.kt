@@ -75,6 +75,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import coil3.ImageLoader
 
 /** The live top identity's test tag. */
@@ -230,12 +231,12 @@ private fun FocusableIdentity(
     }
 }
 
-/** "Channel 1, Ridge Earth". */
+/** "Channel 1 Ridge Earth". */
 @Composable
 private fun identitySpoken(content: PlayerChromeContent): String {
     val info = content.info
     val channel = if (info.channelNumber.isBlank()) info.channelName
-        else stringResource(R.string.player_channel_spoken, info.channelNumber, info.channelName)
+        else stringResource(R.string.player_channel_spoken, channelTitleText(info.channelNumber.toLongOrNull(), info.channelName))
     // The REC badge beside the name says it too.
     return if (content.recordingNow) "$channel, ${stringResource(R.string.player_recording)}" else channel
 }
@@ -260,7 +261,7 @@ private fun IdentityContent(
                     maxLines = 1, modifier = Modifier.testTag("player-top-identity-number"))
             }
         }
-        Text(listOf(info.channelNumber, info.channelName).filter(String::isNotBlank).joinToString("  "),
+        Text(channelTitleText(info.channelNumber.toLongOrNull(), info.channelName),
             // The room's headline: the channel is the player's room, one step below the programme's title.
             style = MaterialTheme.typography.titleLarge, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis,
             // The focusable identity's description, or the Banner's info bar, names the channel.
@@ -366,7 +367,7 @@ private fun RecentChip(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-    val label = listOf(recent.number, recent.name).filter(String::isNotBlank).joinToString(" ")
+    val label = channelTitleText(recent.number.toLongOrNull(), recent.name)
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val onSurface = MaterialTheme.colorScheme.onSurface

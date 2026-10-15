@@ -39,7 +39,7 @@ internal class NoticeFormatter(private val context: Context) {
                 DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_unknown_outcome
                 DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
                 DvrMutationFeedback.CONFIRMED, DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> error("Not an action failure")
-            }), AppNoticeIcon.WARNING)
+            }).let { generic -> notice.serverMessage?.let { "$generic $it" } ?: generic }, AppNoticeIcon.WARNING)
         is Notice.Connection -> FormattedNotice(context.getString(when (notice.kind) {
             ConnectionNoticeKind.LOST -> if (notice.showingSavedChannels) R.string.connection_notice_lost_saved
                 else R.string.connection_notice_lost

@@ -55,6 +55,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,14 +86,11 @@ import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.common.formatDateAndClock
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import coil3.ImageLoader
-import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.Job
@@ -289,21 +287,25 @@ internal fun RecordingMetadataPane(
                 entry.channelName?.takeIf(String::isNotBlank)?.let {
                     append(it).append(" • ")
                 }
-                append(entry.start?.epochSeconds.recordingDateTime())
+                append(entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
                 entry.stop?.epochSeconds?.let { append('–').append(formatHm(it)) }
                 val durationMinutes = recordingDurationMinutes(entry)
                 if (durationMinutes != null) {
-                    append(" • ").append(durationMinutes)
-                    append(' ').append(stringResource(R.string.recordings_minutes_short))
+                    append(" • ").append(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(
+                        durationMinutes.toLong(), androidx.compose.ui.platform.LocalResources.current))
                 }
             },
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
-        recordingEpisodeMetadata(entry)?.let {
+        val resources = androidx.compose.ui.platform.LocalContext.current.resources
+        at.bernhardberger.tvhplayer.ui.common.episodeLabel(entry.episode, resources, onscreenFallback = false)?.let {
             Text(text = it, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.semantics {
+                    contentDescription = at.bernhardberger.tvhplayer.ui.common.episodeLabel(entry.episode, resources, spoken = true).orEmpty()
+                })
         }
         entry.summary?.takeIf(String::isNotBlank)?.let {
             Text(text = it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -329,31 +331,6 @@ internal fun RecordingMetadataPane(
             )
         }
     }
-}
-
-private fun recordingEpisodeMetadata(entry: DvrEntry): String? {
-    val episode = entry.episode ?: return null
-    return buildList {
-        if (episode.seasonNumber != null || episode.episodeNumber != null) {
-            add(
-                buildString {
-                    episode.seasonNumber?.let {
-                        append("S").append(it.toString().padStart(2, '0'))
-                    }
-                    episode.episodeNumber?.let {
-                        append("E").append(it.toString().padStart(2, '0'))
-                    }
-                    episode.episodeCount?.let { append('/').append(it) }
-                }
-            )
-        }
-        episode.partNumber?.let { part ->
-            add(buildString {
-                append("Part ").append(part)
-                episode.partCount?.let { append('/').append(it) }
-            })
-        }
-    }.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -685,10 +662,12 @@ internal fun RecordingListRow(
     val active = kind == RecordingRowKind.SCHEDULE && entry.state == DvrEntryState.RECORDING
     val metadata = recordingListMetadata(entry, problemLabel = entry.subscriptionError?.takeIf { problem }?.label())
     val owner = LocalTabOwner.current
+    val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
+        onOpenContextMenu, enabled = { owner?.isCurrent != false })
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
-        onLongClick = onOpenContextMenu?.let { open -> { if (owner?.isCurrent != false) open() } },
+        onLongClick = contextMenu.onLongClick,
         headlineContent = {
             Text(
                 text = entry.title.orEmpty(),
@@ -737,12 +716,7 @@ internal fun RecordingListRow(
             .tabFocus()
             .fillMaxWidth()
             .testTag("recording-list-entry-${recordingItemKey(entry.id)}")
-            .onPreviewKeyEvent {
-                if (it.key == Key.Menu && onOpenContextMenu != null && owner?.isCurrent != false) {
-                    if (it.type == KeyEventType.KeyDown && it.nativeKeyEvent.repeatCount == 0) onOpenContextMenu()
-                    true
-                } else false
-            }
+            .then(contextMenu.modifier)
             .then(if (focusTarget && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier)
             .onFocusChanged { if (owner?.isCurrent != false && it.isFocused) onFocused() },
     )
@@ -783,9 +757,11 @@ private fun RecordingSupportingMetadata(entry: DvrEntry, metadata: String) {
     ) {
         Text(
             text = buildList {
-                entry.start?.epochSeconds.recordingDateTime().takeIf(String::isNotBlank)?.let(::add)
+                entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
+                    .takeIf(String::isNotBlank)?.let(::add)
                 recordingDurationMinutes(entry)?.let {
-                    add("$it ${stringResource(R.string.recordings_minutes_short)}")
+                    add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(
+                        it.toLong(), androidx.compose.ui.platform.LocalResources.current))
                 }
                 add(dvrStateLabel(entry.state))
             }.joinToString(" • "),
@@ -879,8 +855,8 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
     }
 )
 
-internal fun Long?.recordingDateTime(): String = this?.let {
-    formatDateAndClock(Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault()), "EEE d MMM")
+internal fun Long?.recordingDateTime(locale: java.util.Locale = java.util.Locale.getDefault()): String = this?.let {
+    at.bernhardberger.tvhplayer.ui.common.formatRecordingDate(it, locale = locale)
 }.orEmpty()
 
 private fun recordingDurationMinutes(entry: DvrEntry): Long? {

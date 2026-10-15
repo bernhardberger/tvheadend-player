@@ -1,46 +1,89 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import android.content.res.Resources
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.updateTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.gestures.BringIntoViewSpec
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.*
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.*
+import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.*
-import at.bernhardberger.tvhplayer.ui.player.detailsSubtitle
+import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import coil3.ImageLoader
 import coil3.compose.AsyncImage
+import java.text.DateFormat
+import java.util.Date
+import java.util.Locale
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+
+private enum class DetailsSection { ACTIONS, ABOUT, AIRINGS, FACTS }
 
 /** Browse details only; the shell remains the sole owner of the video scrim. */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun ProgrammeDetailsPage(
     event: EpgEvent?,
@@ -55,312 +98,913 @@ internal fun ProgrammeDetailsPage(
     modifier: Modifier = Modifier,
     related: List<EpgEvent> = emptyList(),
     onRelated: (EpgEvent) -> Unit = {},
+    onRelatedContextMenu: ((EpgEvent) -> Unit)? = null,
+    channelOf: (ChannelId) -> Channel? = { null },
     returnToCard: EventId? = null,
     onReturnToCardConsumed: () -> Unit = {},
     initialAction: BrowseContextAction? = null,
     backEnabled: Boolean = true,
+    onActionFocused: (BrowseContextAction) -> Unit = {},
+    visibilityAlpha: State<Float>? = null,
+    recordingEvent: EpgEvent? = null,
+    recordingConfigurations: List<DvrConfiguration> = emptyList(),
 ) {
+    val layering = LocalBrowseContentLayering.current
+    val pageKey = remember { Any() }
+    val alpha = visibilityAlpha ?: remember { mutableFloatStateOf(1f) }
+    DisposableEffect(layering, alpha) {
+        layering?.details?.set(pageKey, alpha)
+        onDispose { layering?.details?.remove(pageKey) }
+    }
     val title = event?.title ?: recording?.title.orEmpty()
-    val image = event?.image ?: recording?.image
-    val subtitle = event?.let(::detailsSubtitle) ?: recording?.subtitle
-    val synopsis = (event?.summary ?: recording?.summary)?.takeIf(String::isNotBlank)
-        ?: (event?.description ?: recording?.description)?.takeIf(String::isNotBlank)
-    val description = (event?.description ?: recording?.description)?.takeIf(String::isNotBlank) ?: synopsis
-    val status = detailsStatus(event, recording, nowSec)
-    val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let(::recordingDetailsFacts).orEmpty()
+    val summary = event?.summary ?: recording?.summary
+    val description = event?.description ?: recording?.description
+    val synopsis = summary?.takeIf(String::isNotBlank) ?: description?.takeIf(String::isNotBlank)
+    val recordingFailure = recording?.subscriptionError?.label()?.takeIf(String::isNotBlank)
+    val context = LocalContext.current
+    val resources = context.resources
+    val locale = LocalConfiguration.current.locales[0]
+    val aboutText = remember(summary, description) { programmeAboutText(summary, description, false) }
+    val aboutFacts = remember(event, recording, locale) { programmeAboutFacts(event, recording, resources, locale) }
+    val credits = programmeCreditFacts(event ?: recordingEvent, resources)
+    val importantFacts = aboutFacts + (if (event == null && recording != null)
+        recordingMetadataFacts(recording, recordingConfigurations, context, locale, nowSec) else emptyList()) +
+        credits
+    val hasAbout = aboutText.isNotEmpty()
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
     val panelFocus = remember { FocusRequester() }
-    val readingFocus = remember { FocusRequester() }
-    val readingScroll = rememberScrollState()
-    var readingFocused by remember { mutableStateOf(false) }
+    val aboutFocus = remember { FocusRequester() }
+    val factsFocus = remember { FocusRequester() }
+    val ids = remember(related) { related.map { it.id } }
+    val cardFocus = remember(ids) { ids.associateWith { FocusRequester() } }
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = ids.indexOf(returnToCard).coerceAtLeast(0))
     val pageScroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    val cardFocus = remember(related.map { it.id }) { related.associate { it.id to FocusRequester() } }
-    val cardBringIntoView = remember(related.map { it.id }) { related.associate { it.id to BringIntoViewRequester() } }
-    var more by remember { mutableStateOf(returnToCard != null) }
+    val factsScroll = rememberScrollState()
+    var section by remember { mutableStateOf(if (returnToCard in ids) DetailsSection.AIRINGS else DetailsSection.ACTIONS) }
     var lastAction by remember { mutableStateOf(initialAction ?: actions.firstOrNull()) }
-    var lastCard by remember { mutableStateOf(returnToCard ?: related.firstOrNull()?.id) }
+    var lastCard by remember { mutableStateOf(returnToCard ?: ids.firstOrNull()) }
     var openingRelease by remember { mutableStateOf(true) }
     var transitionKey by remember { mutableStateOf<Key?>(null) }
-    val primary = actions.firstOrNull()?.let(requesters::get) ?: panelFocus
-    fun close() { if (more) more = false else onClose() }
-    BackHandler(enabled = backEnabled, onBack = ::close)
-    LaunchedEffect(more, actions, related.map { it.id }) {
+    var reading by remember { mutableStateOf(false) }
+    // Natural section measurements define the fixed lower-section scroll anchors.
+    var viewport by remember { mutableIntStateOf(0) }
+    var heroHeight by remember { mutableIntStateOf(0) }
+    var airingsHeight by remember { mutableIntStateOf(0) }
+    var factsHeadingHeight by remember { mutableIntStateOf(0) }
+    val density = LocalDensity.current
+    val headingKeyline = with(density) { DetailsSectionKeyline.roundToPx() }
+    val scope = rememberCoroutineScope()
+    fun restoreAction() {
+        section = DetailsSection.ACTIONS
+        (lastAction?.takeIf { it in actions }?.let(requesters::get)
+            ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) &&
+                it in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) }?.let(requesters::get)
+            ?: initialAction?.takeIf { it in actions }?.let(requesters::get)
+            ?: actions.firstOrNull()?.let(requesters::get) ?: panelFocus).requestFocus()
+    }
+    suspend fun showCard(target: EventId) {
+        if (listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) listState.scrollToItem(ids.indexOf(target))
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo.any { it.key == target.value } }.first { it }
         withFrameNanos { }
-        if (more && related.isNotEmpty()) {
-            (cardFocus[lastCard] ?: cardFocus.getValue(related.first().id)).requestFocus()
-            if (returnToCard != null) onReturnToCardConsumed()
-        } else if (more && description != null) {
-            readingFocus.requestFocus()
-        } else {
-            more = false
-            pageScroll.scrollTo(0)
-            (lastAction?.takeIf { it in actions }?.let(requesters::get) ?: primary).requestFocus()
-        }
+        cardFocus.getValue(target).requestFocus()
     }
-    LaunchedEffect(more, lastCard) {
-        if (more) {
+    fun enterAirings() { scope.launch { showCard(lastCard?.takeIf { it in ids } ?: ids.first()) } }
+    fun enterFacts() { factsScroll.dispatchRawDelta(-factsScroll.value.toFloat()); factsFocus.requestFocus() }
+    // Back first returns to the actions, with the page at its top; then it closes.
+    fun close() {
+        if (reading) reading = false
+        else if (section == DetailsSection.ACTIONS) onClose() else restoreAction()
+    }
+    BackHandler(enabled = backEnabled, onBack = ::close)
+    LaunchedEffect(reading) {
+        if (!reading && section in listOf(DetailsSection.ABOUT, DetailsSection.FACTS)) {
             withFrameNanos { }
-            lastCard?.let { cardBringIntoView[it]?.bringIntoView() }
+            (if (section == DetailsSection.FACTS) factsFocus else aboutFocus).requestFocus()
         }
     }
+    LaunchedEffect(actions, backEnabled) {
+        if (!backEnabled) return@LaunchedEffect
+        withFrameNanos { }
+        val card = returnToCard?.takeIf { it in ids }
+        if (card != null) {
+            lastCard = card
+            showCard(card)
+            onReturnToCardConsumed()
+        } else if (section == DetailsSection.ACTIONS) restoreAction()
+    }
+    // The section the page has finished scrolling to. A page returned to at its airings row starts
+    // there, so its first layouts only place it; section changes animate.
+    val scrollSection = if (section == DetailsSection.ABOUT) DetailsSection.ACTIONS else section
+    var shownSection by remember { mutableStateOf(scrollSection) }
+    val sections = remember(ids.isNotEmpty(), importantFacts.isNotEmpty()) {
+        buildList {
+            add(DetailsSection.ACTIONS)
+            if (ids.isNotEmpty()) add(DetailsSection.AIRINGS)
+            if (importantFacts.isNotEmpty()) add(DetailsSection.FACTS)
+        }
+    }
+    val anchors = sections.map {
+            when (it) {
+                DetailsSection.ACTIONS, DetailsSection.ABOUT -> 0
+                DetailsSection.AIRINGS -> heroHeight - headingKeyline
+                DetailsSection.FACTS -> heroHeight + airingsHeight - headingKeyline
+            }.coerceAtLeast(0).toFloat()
+    }
+    // One clock, as in the channel rows: the section position drives the page scroll, the headings
+    // and the dimming. Sections that share a scroll target still change emphasis on it.
+    // A changed set of airings starts a new position at the focused section.
+    val sectionPosition = remember(sections) { Animatable(sections.indexOf(scrollSection).toFloat()) }
+    fun emphasis(target: DetailsSection): Float = rowEmphasis(sections.indexOf(target) - sectionPosition.value)
+    fun scrollTarget(position: Float) = scrollAtSectionPosition(position, anchors)
+    // Focus never scrolls the page by itself: the page follows the section position between the
+    // sections' scroll anchors, frame by frame on the position's clock.
+    LaunchedEffect(scrollSection, anchors, sectionPosition) {
+        val target = sections.indexOf(scrollSection).toFloat()
+        if (scrollSection == shownSection) {
+            sectionPosition.snapTo(target)
+            pageScroll.scrollTo(scrollTarget(target).roundToInt())
+        } else {
+            sectionPosition.animateTo(target, RowChangeMotion) {
+                pageScroll.dispatchRawDelta(scrollTarget(value) - pageScroll.value)
+            }
+            shownSection = scrollSection
+        }
+    }
+    fun vertical(down: Boolean): Boolean {
+        when (section) {
+            DetailsSection.ACTIONS -> when {
+                down && ids.isNotEmpty() -> enterAirings()
+                down && importantFacts.isNotEmpty() -> enterFacts()
+                !down && hasAbout -> aboutFocus.requestFocus()
+                else -> return true
+            }
+            DetailsSection.ABOUT -> if (down) restoreAction() else return true
+            DetailsSection.AIRINGS -> if (down) {
+                if (importantFacts.isNotEmpty()) enterFacts()
+            } else restoreAction()
+            DetailsSection.FACTS -> if (down) {
+                scope.launch { factsScroll.animateScrollTo(factsScroll.value + with(density) { 60.dp.roundToPx() }, RowChangeMotion) }
+            } else {
+                if (ids.isNotEmpty()) enterAirings() else restoreAction()
+            }
+        }
+        return true
+    }
+    val readingTransition = updateTransition(reading, label = "details-reading")
+    val readingProgress = readingTransition.animateFloat(
+        transitionSpec = { tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard) }, label = "reading-backdrop") {
+        if (it) 1f else 0f
+    }
+    val warmPlayback = LocalWarmPlayback.current
+    val art = (event?.image ?: recording?.image).takeUnless { warmPlayback }
+    val background = rememberDetailsTint(imageLoader, currentSession, art, channel?.icon.takeUnless { warmPlayback })
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-    Box(modifier.fillMaxSize().semantics { paneTitle = title }.testTag("programme-details-page")
-        .onPreviewKeyEvent { key ->
-            val activation = key.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
-            when {
-                key.key == transitionKey -> {
-                    if (key.type == KeyEventType.KeyUp) transitionKey = null
-                    true
-                }
-                activation && openingRelease -> {
-                    if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
-                        openingRelease = false
-                        false
-                    } else {
-                        if (key.type == KeyEventType.KeyUp) openingRelease = false
+        Box(Modifier.browseDetailsViewport().then(modifier).fillMaxSize()
+             .graphicsLayer { this.alpha = alpha.value }
+             // Warm playback remains transparent to the shell's video and scrim.
+             .drawBehind { if (!warmPlayback) drawRect(background.value) }
+            .semantics { paneTitle = title }.testTag("programme-details-page")
+            .focusProperties { onExit = { if (backEnabled) cancelFocusChange() } }
+            .onSizeChanged { viewport = it.height }
+            .onPreviewKeyEvent { key ->
+                val activation = key.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+                when {
+                    !backEnabled -> true
+                    key.key == transitionKey -> {
+                        if (key.type == KeyEventType.KeyUp) transitionKey = null
                         true
                     }
+                    activation && openingRelease -> {
+                        if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
+                            openingRelease = false; false
+                        } else {
+                            if (key.type == KeyEventType.KeyUp) openingRelease = false
+                            true
+                        }
+                    }
+                     reading -> false
+                     section == DetailsSection.FACTS && activation -> {
+                         if (key.type == KeyEventType.KeyUp) reading = true
+                         true
+                     }
+                     section == DetailsSection.FACTS && (key.key == Key.DirectionLeft || key.key == Key.DirectionRight) -> true
+                    key.key == Key.DirectionLeft && (section == DetailsSection.ABOUT ||
+                        section == DetailsSection.ACTIONS && lastAction == actions.firstOrNull() ||
+                        section == DetailsSection.AIRINGS && lastCard == ids.firstOrNull()) -> true
+                    key.key == Key.DirectionDown || key.key == Key.DirectionUp -> {
+                        if (key.type != KeyEventType.KeyDown) true else {
+                            val before = section
+                            vertical(key.key == Key.DirectionDown).also { if (it && before != section) transitionKey = key.key }
+                        }
+                    }
+                    else -> false
                 }
-                key.key == Key.DirectionDown && !more && (related.isNotEmpty() || description != null) -> {
-                    if (key.type == KeyEventType.KeyDown) { transitionKey = key.key; more = true }
-                    true
-                }
-                key.key == Key.DirectionUp && more && (related.isNotEmpty() || readingScroll.value == 0) -> {
-                    if (key.type == KeyEventType.KeyDown) { transitionKey = key.key; more = false }
-                    true
-                }
-                else -> false
+            }.then(if (actions.isEmpty()) Modifier.focusRequester(panelFocus).onFocusChanged {
+                if (it.isFocused) section = DetailsSection.ACTIONS
+            }.focusProperties {
+                canFocus = backEnabled
+                up = FocusRequester.Cancel; down = FocusRequester.Cancel
+                left = FocusRequester.Cancel; right = FocusRequester.Cancel
+            }.focusable() else Modifier.focusGroup())) {
+            val backdrop: () -> Float = { maxOf(sectionPosition.value.coerceIn(0f, 1f), readingProgress.value) }
+            // With warm playback the live video is the background, so the page draws no art.
+            // Scrolled away (or reading), the still corner art crossfades into the full-screen
+            // blurred backdrop, like Google TV; no zoom.
+            DetailsHero(art, imageLoader, currentSession,
+                Modifier.align(Alignment.TopEnd).graphicsLayer { this.alpha = 1f - backdrop() }, background = background)
+            DetailsHero(art, imageLoader, currentSession,
+                Modifier.graphicsLayer { this.alpha = backdrop() }, blurred = true)
+            readingTransition.AnimatedContent(transitionSpec = {
+                (fadeIn(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard)) togetherWith
+                    fadeOut(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard))).using(null)
+            }) { showingReader ->
+            PlayerMotionFrame(leaving = showingReader != reading) {
+            if (showingReader) ProgrammeDetailsFullDescription(
+                modifier = Modifier.padding(horizontal = DetailsKeyline, vertical = DetailsSafeEdge),
+                // The programme names the reader, for screen readers too.
+                title = title,
+                heading = {
+                    Column(Modifier.testTag("details-reading-heading"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
+                        (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)?.let {
+                            Text(it, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                },
+                reading = {},
+            ) {
+                 if (section == DetailsSection.FACTS) DetailsAboutFacts(importantFacts)
+                 else if (aboutText.isNotEmpty()) Text(aboutText.joinToString("\n\n"),
+                    Modifier.testTag("details-reading-text"), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp, lineHeight = 30.sp))
             }
-        }.then(if (actions.isEmpty()) Modifier.focusRequester(panelFocus).focusProperties {
-            up = FocusRequester.Cancel; down = FocusRequester.Cancel
-            left = FocusRequester.Cancel; right = FocusRequester.Cancel
-        }.focusable() else Modifier.focusGroup())) {
-        if (!more && image != null && currentSession != null) {
-            AsyncImage(AppArtworkSource(currentSession, image), null, imageLoader,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().height(432.dp).testTag("details-hero")
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Transparent),
-                            startY = 300.dp.toPx(), endY = size.height), blendMode = BlendMode.DstIn)
-                        drawRect(Brush.horizontalGradient(listOf(Color.Transparent, Color.Black),
-                            startX = 150.dp.toPx(), endX = 500.dp.toPx()), blendMode = BlendMode.DstIn)
-                        drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.Black),
-                            start = Offset(250.dp.toPx(), 250.dp.toPx()), end = Offset(500.dp.toPx(), 0f)),
-                            blendMode = BlendMode.DstIn)
-                    })
-        }
-        Column(Modifier.fillMaxSize().verticalScroll(pageScroll)
-            .padding(start = 58.dp, end = 58.dp, top = if (more) 40.dp else 116.dp, bottom = 32.dp)) {
-            if (more) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    PiconBox(imageLoader, channel?.icon, Modifier.size(36.dp, 20.dp), currentSession)
-                    Text(title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleLarge,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(channel?.name.orEmpty(), style = MaterialTheme.typography.bodyMedium)
-                    status?.let { DetailsStatusChip(it) }
-                }
-                Spacer(Modifier.height(28.dp))
-                Text(stringResource(R.string.details_about), style = MaterialTheme.typography.titleMedium)
-                description?.let {
-                    Spacer(Modifier.height(12.dp))
-                    Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.widthIn(max = 560.dp)
-                        .then(if (related.isEmpty()) Modifier.heightIn(max = 320.dp)
-                            .focusRequester(readingFocus)
-                            .onFocusChanged { readingFocused = it.isFocused }
-                            .border(2.dp, if (readingFocused) MaterialTheme.colorScheme.primary else Color.Transparent)
-                            .padding(8.dp)
-                            .onPreviewKeyEvent { event ->
-                                if (event.key == Key.DirectionDown || event.key == Key.DirectionUp) {
-                                    if (event.type == KeyEventType.KeyDown) scope.launch {
-                                        readingScroll.scrollTo((readingScroll.value +
-                                            if (event.key == Key.DirectionDown) 120 else -120).coerceAtLeast(0))
-                                    }
-                                    true
-                                } else false
+            else {
+            val pageSpec = LocalBringIntoViewSpec.current
+            CompositionLocalProvider(LocalBringIntoViewSpec provides NoPageScroll) {
+              BoxWithConstraints {
+                val screen = constraints.maxHeight
+                Column(Modifier.fillMaxSize().testTag("details-page-scroll").verticalScroll(pageScroll)
+                    .then(if (!backEnabled) Modifier.clearAndSetSemantics { } else Modifier)) {
+                    DetailsFirstScreen(screen, sections.size > 1,
+                        if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
+                        else stringResource(R.string.details_important_information),
+                        Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { emphasis(DetailsSection.ACTIONS) }) {
+                        DetailsInformation(event, recording, channel, nowSec, imageLoader, currentSession) {
+                            recordingFailure?.let { text ->
+                                Spacer(Modifier.height(20.dp))
+                                Text(text, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.error,
+                                    maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
-                            .verticalScroll(readingScroll).focusable() else Modifier)
-                        .testTag("details-description"))
-                }
-                val secondary = listOfNotNull(
-                    event?.genre?.takeIf(String::isNotBlank)?.let { stringResource(R.string.details_genre) to it },
-                    event?.episode?.let { episode ->
-                        episode.onscreen?.takeIf(String::isNotBlank) ?: listOfNotNull(
-                            episode.seasonNumber?.let { "S$it" },
-                            episode.episodeNumber?.let { "E$it" },
-                            episode.partNumber?.let { part -> stringResource(R.string.details_part) + " $part" +
-                                episode.partCount?.let { "/$it" }.orEmpty() },
-                        ).joinToString(" ").takeIf(String::isNotBlank)
-                    }?.let { stringResource(R.string.details_episode) to it },
-                )
-                if (secondary.isNotEmpty()) {
-                    Spacer(Modifier.height(20.dp))
-                    DetailsFactsRow(secondary)
-                }
-            } else {
-                Column(Modifier.widthIn(max = 484.dp).testTag("details-information")) {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        PiconBox(imageLoader, channel?.icon, Modifier.size(36.dp, 20.dp), currentSession)
-                        Text(listOfNotNull(channel?.number?.toString(), channel?.name).joinToString(" · ") +
-                            event?.genre?.takeIf(String::isNotBlank)?.let { " | $it" }.orEmpty(),
-                            Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        status?.let { DetailsStatusChip(it) }
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(title, style = MaterialTheme.typography.headlineLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    subtitle?.takeIf(String::isNotBlank)?.let {
-                        Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    val recordingFailure = recording?.subscriptionError?.label()?.takeIf(String::isNotBlank)
-                    (recordingFailure ?: synopsis)?.let {
-                        Spacer(Modifier.height(20.dp))
-                        Text(it, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
-                            color = if (recordingFailure != null) MaterialTheme.colorScheme.error else LocalContentColor.current,
-                            maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (facts.isNotEmpty()) {
-                        Spacer(Modifier.height(20.dp))
-                        Column(Modifier.width(IntrinsicSize.Max)) {
-                            DetailsFactsRow(facts.map { stringResource(it.kind.label()) to detailsFactValue(it, nowSec) })
-                            if (event == null && facts.any { it.kind == DetailsFactKind.LEFT }) {
-                                val length = facts.first { it.kind == DetailsFactKind.LENGTH }.seconds
-                                val left = facts.first { it.kind == DetailsFactKind.LEFT }.seconds
-                                Spacer(Modifier.height(8.dp))
-                                Box(Modifier.fillMaxWidth().height(4.dp).background(MaterialTheme.colorScheme.surfaceVariant)) {
-                                    Box(Modifier.fillMaxWidth(1f - left.toFloat() / length).fillMaxHeight()
-                                        .background(MaterialTheme.colorScheme.primary))
-                                }
+                        }
+                         if (hasAbout) {
+                             // Group gap; also clears the 1.05 focus growth (~3dp) and its 2dp outline.
+                             Spacer(Modifier.height(24.dp))
+                            DetailsAbout(synopsis, { reading = true },
+                                Modifier.focusRequester(aboutFocus).onFocusChanged {
+                                    if (it.isFocused) section = DetailsSection.ABOUT
+                                }.focusProperties { canFocus = backEnabled; up = FocusRequester.Cancel; down = FocusRequester.Cancel })
+                        }
+                         // With the action row's 8dp inset, 28dp before the buttons.
+                         Spacer(Modifier.height(20.dp))
+                        CompositionLocalProvider(LocalBringIntoViewSpec provides pageSpec) {
+                            DetailsActions(actions, event, recording, nowSec, requesters, { if (backEnabled) onAction(it) }) {
+                                lastAction = it; section = DetailsSection.ACTIONS; onActionFocused(it)
                             }
                         }
                     }
+                    if (ids.isNotEmpty()) DetailsAirings(related, title, event?.let { detailsSubtitle(it, resources) } ?: recording?.subtitle,
+                        nowSec, imageLoader, currentSession, channelOf, listState, cardFocus, { emphasis(DetailsSection.AIRINGS) },
+                         Modifier.onSizeChanged { airingsHeight = it.height }
+                            .onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS },
+                        onFocused = { lastCard = it }, onClick = { if (backEnabled) onRelated(it) },
+                        onOpenContextMenu = onRelatedContextMenu?.let { open -> { if (backEnabled) open(it) } },
+                        bottomSpace = if (importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge)
+                     if (importantFacts.isNotEmpty()) Column(Modifier.fillMaxWidth()
+                         .padding(horizontal = DetailsKeyline)
+                         .focusRequester(factsFocus).onFocusChanged { if (it.isFocused) section = DetailsSection.FACTS }
+                         .focusProperties {
+                             canFocus = backEnabled
+                             up = FocusRequester.Cancel; down = FocusRequester.Cancel
+                             left = FocusRequester.Cancel; right = FocusRequester.Cancel
+                          }.semantics(mergeDescendants = true) {
+                              onClick { if (backEnabled) reading = true; true }
+                          }.focusable().testTag("details-facts-panel")) {
+                          DetailsSectionHeading(stringResource(R.string.details_important_information),
+                              // Plain labels have their own ink inset, unlike image cards.
+                              { emphasis(DetailsSection.FACTS) }, focusOverflow = (-2).dp,
+                              bottomSpace = DetailsHeadingContentGap - 9.dp,
+                              modifier = Modifier.onSizeChanged { factsHeadingHeight = it.height })
+                           Box(Modifier.heightIn(max = with(density) {
+                               (viewport - headingKeyline - factsHeadingHeight).coerceAtLeast(1).toDp() - DetailsSafeEdge
+                           }.coerceAtLeast(1.dp)).verticalScroll(factsScroll)
+                               .rowContentEmphasis { emphasis(DetailsSection.FACTS) }) {
+                              DetailsAboutFacts(importantFacts, credits.map { it.first }.toSet())
+                          }
+                     } else if (ids.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
+                     if (sections.size > 1) Spacer(Modifier.height(with(density) { (viewport - headingKeyline).coerceAtLeast(0).toDp() }))
                 }
-                Spacer(Modifier.height(28.dp))
-                Row(Modifier.horizontalScroll(rememberScrollState()).padding(8.dp).testTag("details-actions"),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    actions.forEachIndexed { index, action ->
-                        key(action) {
-                            val buttonModifier = Modifier.height(40.dp).focusRequester(requesters.getValue(action))
-                                .onFocusChanged { if (it.isFocused) lastAction = action }
-                                .focusProperties {
-                                    left = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                                    right = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                                    up = FocusRequester.Cancel; down = FocusRequester.Cancel
-                                }.testTag("details-${action.name.lowercase()}")
-                            val content: @Composable RowScope.() -> Unit = {
-                                Icon(painterResource(action.icon()), null, Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
-                                    (event == null && recording?.state == DvrEntryState.SCHEDULED ||
-                                        event != null && (nowSec < event.start.epochSeconds || nowSec >= event.stop.epochSeconds)))),
-                                    maxLines = 1, softWrap = false)
-                            }
-                            if (index == 0) Button(onClick = { onAction(action) }, modifier = buttonModifier, content = content)
-                            else OutlinedButton(onClick = { onAction(action) }, modifier = buttonModifier, content = content)
-                        }
-                    }
-                }
+              }
             }
-            if (related.isNotEmpty()) {
-                Spacer(Modifier.height(if (more) 28.dp else 48.dp))
-                Text(stringResource(R.string.details_next_on, channel?.name.orEmpty()), style = MaterialTheme.typography.titleMedium)
-                Row(Modifier.horizontalScroll(rememberScrollState()).padding(16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(32.dp)) {
-                    related.forEachIndexed { index, item ->
-                        StandardCardContainer(
-                            imageCard = { interaction ->
-                                Card(onClick = { onRelated(item) }, interactionSource = interaction,
-                                    modifier = Modifier.size(180.dp, 101.25.dp).focusRequester(cardFocus.getValue(item.id))
-                                        .onFocusChanged { if (it.isFocused) { lastCard = item.id; more = true } }
-                                        .focusProperties {
-                                            canFocus = more; down = FocusRequester.Cancel
-                                            left = related.getOrNull(index - 1)?.id?.let(cardFocus::get) ?: FocusRequester.Cancel
-                                            right = related.getOrNull(index + 1)?.id?.let(cardFocus::get) ?: FocusRequester.Cancel
-                                        }
-                                        .semantics { contentDescription = "${item.title.orEmpty()}, ${formatHm(item.start.epochSeconds)}" }
-                                        .testTag("details-card-${item.id.value}")) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        if (item.image != null && currentSession != null) AsyncImage(
-                                            AppArtworkSource(currentSession, item.image!!), null, imageLoader,
-                                            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-                                        else PiconBox(imageLoader, channel?.icon, Modifier.size(80.dp, 40.dp), currentSession)
-                                    }
-                                }
-                            },
-                            title = { Text(item.title.orEmpty(), Modifier.padding(top = 16.dp), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.titleSmall) },
-                            subtitle = { Text("${formatHm(item.start.epochSeconds)} · ${formatPlaybackDuration((item.stop - item.start).inWholeSeconds, LocalContext.current.resources)}",
-                                style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                            modifier = Modifier.width(180.dp)
-                                .bringIntoViewRequester(cardBringIntoView.getValue(item.id))
-                                .padding(bottom = if (more) 45.dp else 0.dp),
-                        )
-                    }
-                }
+            }
+            }
             }
         }
     }
+}
+
+/** The page scrolls only where [ProgrammeDetailsPage] says; focus alone never moves it. */
+@OptIn(ExperimentalFoundationApi::class)
+private val NoPageScroll = object : BringIntoViewSpec {
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = 0f
+}
+
+private val DetailsKeyline = 58.dp
+private val DetailsSafeEdge = 48.dp
+// One gap before every section heading: buttons to the airings, airings to the details.
+private val DetailsSectionGap = 32.dp
+// A fixed lower-section heading keyline leaves the preceding action row fully visible.
+private val DetailsSectionKeyline = 160.dp
+// The next section starts this far above the screen bottom: its heading and the top of its cards
+// peek below the first screen's block (JetStream details, Figma 3:432).
+private val DetailsPeek = 96.dp
+// A block up to this much taller still leaves the cards peeking; beyond it, only a hint names them.
+private val DetailsPeekSlack = 16.dp
+// The hint's distance from the screen bottom (JetFit "Navigation" hint, Figma 1155:37100).
+private val DetailsHintEdge = 24.dp
+private val AiringCardWidth = 220.dp
+// Room around the cards for the native focus scale and outline.
+private val AiringCardRoom = 12.dp
+
+@Composable
+private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifier) {
+    Box(Modifier.widthIn(max = 584.dp).testTag("details-about")) {
+        val interaction = remember { MutableInteractionSource() }
+        val focused by interaction.collectIsFocusedAsState()
+        DetailsReadingPanel(onRead, modifier.fillMaxWidth().testTag("details-about-description"), interaction) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                Box(Modifier.weight(1f)) { DetailsSynopsis(synopsis.orEmpty()) }
+                // Like a focused button, the arrow's circle turns white and the arrow dark.
+                Icon(painterResource(R.drawable.ic_arrow_forward), null,
+                    Modifier.size(32.dp).background(
+                        if (focused) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = .12f),
+                        CircleShape).padding(6.dp).testTag("details-about-arrow"),
+                    tint = if (focused) MaterialTheme.colorScheme.inverseOnSurface else MaterialTheme.colorScheme.onSurface)
+            }
+        }
     }
 }
 
 @Composable
-private fun DetailsFactsRow(facts: List<Pair<String, String>>) {
-    Row(Modifier.clearAndSetSemantics { contentDescription = facts.joinToString(", ") { "${it.first} ${it.second}" } },
-        horizontalArrangement = Arrangement.spacedBy(48.dp)) {
+private fun DetailsSynopsis(text: String) {
+    val measurer = rememberTextMeasurer()
+    val style = MaterialTheme.typography.bodyLarge
+    val more = stringResource(R.string.details_more)
+    BoxWithConstraints {
+        val width = with(LocalDensity.current) { maxWidth.roundToPx() }
+        val displayed = remember(text, more, width, style, measurer) {
+            val constraints = Constraints(maxWidth = width)
+            fun measure(value: AnnotatedString) = measurer.measure(value, style,
+                maxLines = 2, overflow = TextOverflow.Clip, constraints = constraints)
+            val full = AnnotatedString(text)
+            if (!measure(full).hasVisualOverflow) full else {
+                fun candidate(end: Int) = buildAnnotatedString {
+                    append(text.take(end).trimEnd())
+                    append("… ")
+                    withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(more) }
+                }
+                var low = 0
+                var high = text.length
+                while (low < high) {
+                    val middle = (low + high + 1) / 2
+                    if (measure(candidate(middle)).hasVisualOverflow) high = middle - 1 else low = middle
+                }
+                candidate(low)
+            }
+        }
+        Text(displayed, Modifier.testTag("details-synopsis"), style = style, maxLines = 2)
+    }
+}
+
+@Composable
+private fun DetailsReadingPanel(onRead: () -> Unit, modifier: Modifier, interactionSource: MutableInteractionSource? = null,
+    content: @Composable ColumnScope.() -> Unit) {
+            val onSurface = MaterialTheme.colorScheme.onSurface
+            Surface(onClick = onRead, modifier = modifier, interactionSource = interactionSource,
+                shape = ClickableSurfaceDefaults.shape(DetailsReadingShape),
+                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                colors = ClickableSurfaceDefaults.colors(
+                    containerColor = detailsReadingFill(false), contentColor = onSurface,
+                    focusedContainerColor = detailsReadingFill(true), focusedContentColor = onSurface),
+                border = ClickableSurfaceDefaults.border(
+                    border = detailsReadingBorder(false), focusedBorder = detailsReadingBorder(true))) {
+                Column(Modifier.padding(DetailsReadingInset), verticalArrangement = Arrangement.spacedBy(10.dp), content = content)
+            }
+}
+
+/** One visible heading/content gap for both lower sections. */
+private val DetailsHeadingContentGap = 16.dp
+
+@Composable
+private fun DetailsSectionHeading(title: String, emphasis: () -> Float, modifier: Modifier = Modifier,
+    focusOverflow: androidx.compose.ui.unit.Dp = AiringCardWidth / (16f / 9f) * .05f + 3.dp,
+    bottomSpace: androidx.compose.ui.unit.Dp = DetailsHeadingContentGap - 4.dp) {
+    Text(title, modifier.layout { measurable, constraints ->
+        val heading = measurable.measure(constraints)
+        layout(heading.width, heading.height + bottomSpace.roundToPx()) { heading.place(0, 0) }
+    }.rowHeaderEmphasis(quietScale = 18f / 28f,
+        focusOverflow = focusOverflow, emphasis = emphasis).semantics { heading() },
+        style = MaterialTheme.typography.headlineMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+/**
+ * The first screen's block sits at one bottom anchor and grows upward, so the next section's heading
+ * and the top of its cards peek below it ([lower]). A block too tall for that peek pushes the section
+ * off the first screen and names it in a hint ([next]) instead. One layout pass, so the section's
+ * height (and the page's scroll anchors) never change after the first frame.
+ */
+@Composable
+private fun DetailsFirstScreen(screen: Int, lower: Boolean, next: String, modifier: Modifier, block: @Composable ColumnScope.() -> Unit) {
+    // The hint is composed only when it is shown, in the same pass that measures the block.
+    SubcomposeLayout(modifier.fillMaxWidth().padding(horizontal = DetailsKeyline)) { constraints ->
+        val loose = constraints.copy(minHeight = 0)
+        val content = subcompose(DetailsFirstScreenPart.BLOCK) { Column(content = block) }.single().measure(loose)
+        val top = DetailsSafeEdge.roundToPx()
+        val gap = DetailsSectionGap.roundToPx()
+        val bounded = screen != Constraints.Infinity
+        // Where the block ends on the first screen: the next section's gap and peek below it.
+        val anchor = if (bounded) screen - DetailsPeek.roundToPx() - gap else 0
+        val hint = if (lower && bounded && top + content.height > anchor + DetailsPeekSlack.roundToPx())
+            subcompose(DetailsFirstScreenPart.HINT) { DetailsNextHint(next) }.single().measure(loose) else null
+        val edge = DetailsHintEdge.roundToPx()
+        val bottom = maxOf(top + content.height, if (hint == null) anchor else screen - edge - hint.height)
+        val height = bottom + (hint?.height?.plus(edge) ?: if (lower) gap else 0)
+        layout(constraints.maxWidth, height) {
+            content.place(0, bottom - content.height)
+            hint?.place(0, bottom)
+        }
+    }
+}
+
+private enum class DetailsFirstScreenPart { BLOCK, HINT }
+
+/** Names the section below a first screen that has no room for its peek; the heading itself is spoken. */
+@Composable
+private fun DetailsNextHint(section: String) {
+    Row(Modifier.padding(top = 20.dp).alpha(.6f).clearAndSetSemantics { testTag = "details-next-hint" },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(section, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Icon(painterResource(R.drawable.ic_expand_more), null, Modifier.size(14.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun DetailsAboutFacts(facts: List<Pair<String, String>>, abbreviatedLabels: Set<String> = emptySet()) {
+    if (facts.isEmpty()) return
+    FlowRow(Modifier.fillMaxWidth().testTag("details-facts"),
+        horizontalArrangement = Arrangement.spacedBy(32.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         facts.forEach { (label, value) ->
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(value, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Column(Modifier.width(192.dp)) {
+                Text(label, Modifier.alpha(0.75f),
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Normal))
+                  Text(value, style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal),
+                      maxLines = if (label in abbreviatedLabels) 2 else Int.MAX_VALUE, overflow = TextOverflow.Ellipsis)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun DetailsAirings(
+    airings: List<EpgEvent>, pageTitle: String, pageEpisode: String?, nowSec: Long, imageLoader: ImageLoader,
+    session: CurrentSessionObservation?,
+    channelOf: (ChannelId) -> Channel?, listState: LazyListState, requesters: Map<EventId, FocusRequester>,
+    emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit, onClick: (EpgEvent) -> Unit,
+    bottomSpace: androidx.compose.ui.unit.Dp,
+    onOpenContextMenu: ((EpgEvent) -> Unit)?,
+) {
+    val keyline = with(LocalDensity.current) { DetailsKeyline.toPx() }
+    // The focused card moves to the text keyline; other cards scroll off the screen normally.
+    val bringIntoView = remember(keyline) { object : BringIntoViewSpec {
+        override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = offset - keyline
+    } }
+    Column(modifier.fillMaxWidth().padding(bottom = bottomSpace - AiringCardRoom)) {
+        DetailsSectionHeading(stringResource(R.string.details_other_airings, pageTitle), emphasis, Modifier.padding(start = DetailsKeyline))
+        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
+            LazyRow(Modifier.fillMaxWidth().rowContentEmphasis(emphasis).testTag("details-airings"),
+                state = listState,
+                contentPadding = PaddingValues(horizontal = DetailsKeyline, vertical = AiringCardRoom),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                itemsIndexed(airings, key = { _, it -> it.id.value }) { index, item ->
+                    AiringCard(item, airingEpisode(item, pageTitle, pageEpisode, LocalContext.current.resources), item.channelId?.let(channelOf), nowSec,
+                        imageLoader, session,
+                        Modifier.focusRequester(requesters.getValue(item.id))
+                            .onFocusChanged { if (it.isFocused) onFocused(item.id) }
+                            .focusProperties {
+                                up = FocusRequester.Cancel; down = FocusRequester.Cancel
+                                if (index == 0) left = FocusRequester.Cancel
+                                if (index == airings.lastIndex) right = FocusRequester.Cancel
+                            }.testTag("details-card-${item.id.value}"),
+                        onOpenContextMenu = onOpenContextMenu?.let { open -> { open(item) } }) { onClick(item) }
+                }
+            }
+        }
+    }
+}
+
+/** What tells this airing apart from the page: a different title, else a different episode line. */
+internal fun airingEpisode(item: EpgEvent, pageTitle: String, pageEpisode: String?, resources: Resources): String? =
+    item.title?.trim()?.takeIf { it.isNotEmpty() && !it.equals(pageTitle.trim(), ignoreCase = true) }
+        ?: detailsSubtitle(item, resources)?.takeIf { it != pageEpisode }
+
+@Composable
+private fun AiringCard(
+    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long, imageLoader: ImageLoader,
+    session: CurrentSessionObservation?, modifier: Modifier, onOpenContextMenu: (() -> Unit)?, onClick: () -> Unit,
+) {
+    val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
+    // The page already names the programme: the card leads with when, then what differs, then where.
+    // A running airing says when it ends; its card shows how far along it is.
+    val running = item.isRunning(nowSec)
+    val time = programmeAiringTime(item, nowSec)
+    val channelName = channel?.let { channelTitleText(it.number, it.name.orEmpty()) }?.takeIf(String::isNotBlank)
+    val resources = LocalContext.current.resources
+    val spokenEpisode = if (episode == episodeLabel(item.episode, resources))
+        episodeLabel(item.episode, resources, spoken = true) else episode
+    StandardCardContainer(
+        modifier = Modifier.width(AiringCardWidth),
+        imageCard = { interaction ->
+            Card(onClick = onClick, onLongClick = contextMenu.onLongClick, interactionSource = interaction,
+                modifier = modifier.then(contextMenu.modifier).fillMaxWidth().aspectRatio(16f / 9f)
+                    .semantics { contentDescription = listOfNotNull(time, spokenEpisode, channelName).joinToString(", ") },
+                colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
+                border = embeddedProgressCardBorder()) {
+                ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running }, imageLoader,
+                    session, Modifier.fillMaxSize(),
+                    plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
+                    progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
+            }
+        },
+        // The text starts below the focused card's scale and outline.
+        title = {
+            Text(time, Modifier.fillMaxWidth().padding(top = AiringTextGap).clearAndSetSemantics { testTag = "details-card-time" },
+                style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        subtitle = {
+            Column(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics { testTag = "details-card-subtitle-${item.id.value}" },
+                verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                episode?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                channelName?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        },
+    )
+}
+
+// Native 1.1 focus scale on a 220dp card adds ~6dp below it, plus the outline.
+private val AiringTextGap = 16.dp
+private const val DetailsBlurredScrimAlpha = 0.6f
+// Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
+private const val DetailsHeroWidthFraction = 758f / 960f
+
+@Composable
+private fun DetailsHero(image: ArtworkId?, loader: ImageLoader, session: CurrentSessionObservation?, modifier: Modifier, blurred: Boolean = false, background: State<Color>? = null) {
+    if (image == null || session == null) return
+    if (blurred) {
+        // Full screen: the blur only reads as a backdrop when it covers the page.
+        AsyncImage(AppArtworkSource(session, image), null, loader, contentScale = ContentScale.Crop,
+            modifier = modifier.fillMaxSize().testTag("details-hero-blurred")
+                .then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(32.dp) else Modifier)
+                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+                .drawWithContent {
+                    drawContent()
+                    drawRect(Color.Black.copy(alpha = DetailsBlurredScrimAlpha), blendMode = BlendMode.SrcAtop)
+                })
+        return
+    }
+    val neutral = MaterialTheme.colorScheme.background
+    val scrim = remember(background, neutral) { derivedStateOf { KitCinematicScrim(background?.value ?: neutral) } }
+    AsyncImage(AppArtworkSource(session, image), null, loader,
+        contentScale = ContentScale.Crop,
+        modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
+            .testTag("details-hero")
+            .drawWithContent {
+                drawContent()
+                drawRect(scrim.value)
+            })
+}
+
+/**
+ * The kit's "Cinematic scrim" (Figma 8689:24742 › Scrim): a radial gradient centred at the frame's
+ * top-right, page background at 10% there and fully opaque from 70.74% of the way to the
+ * bottom-left corner. The matrix is the kit's SVG gradientTransform on its 960×540 viewBox.
+ */
+private class KitCinematicScrim(private val color: Color) : ShaderBrush() {
+    override fun createShader(size: androidx.compose.ui.geometry.Size): Shader {
+        val shader = android.graphics.RadialGradient(0f, 0f, 10f,
+            intArrayOf(color.copy(alpha = .1f).toArgb(), color.toArgb()), floatArrayOf(0f, .7074f),
+            android.graphics.Shader.TileMode.CLAMP)
+        val sx = size.width / 960f
+        val sy = size.height / 540f
+        shader.setLocalMatrix(android.graphics.Matrix().apply {
+            setValues(floatArrayOf(-91.24f * sx, -91.24f * sx, 912.4f * sx, 54f * sy, -50.1f * sy, 0f, 0f, 0f, 1f))
+        })
+        return shader
+    }
+}
+
+/**
+ * Text for the About section: summary, then a different description. The first of them is the top
+ * block's synopsis; when [synopsisShownInFull], About leaves it out rather than repeat it.
+ */
+internal fun programmeAboutText(summary: String?, description: String?, synopsisShownInFull: Boolean): List<String> =
+    listOfNotNull(summary, description).map { it.replace("\\r\\n", "\n").replace("\\n", "\n").trim() }
+        .filter(String::isNotEmpty).distinct().let { if (synopsisShownInFull) it.drop(1) else it }
+
+/** Recording-only facts; the header keeps programme timing rather than padded file timing. */
+@OptIn(ExperimentalTvheadendApi::class)
+@androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<DvrConfiguration>,
+    context: android.content.Context, locale: Locale, nowSec: Long): List<Pair<String, String>> = buildList {
+    val resources = context.resources
+    fun fact(label: Int, value: String?) {
+        value?.takeIf(String::isNotBlank)?.let { add(resources.getString(label) to it) }
+    }
+    recordingSizeBytes(recording)?.let {
+        fact(R.string.details_size, android.text.format.Formatter.formatShortFileSize(context, it))
+    }
+    if (configurations.size > 1) fact(R.string.details_recording_profile,
+        configurations.firstOrNull { it.id == recording.configId }?.name?.trim())
+    fact(R.string.details_picture, recordingPicture(recording))
+    val streams = recording.files.orEmpty().flatMap { it.streams.orEmpty() }
+    fun languages(types: List<SubscriptionStreamType>) = streams.filter { it.type in types }.mapNotNull {
+        humanLanguageName(it.language?.let(androidx.media3.common.util.Util::normalizeLanguageCode), resources.getString(R.string.track_unknown_language),
+            resources.getString(R.string.track_multiple_languages), locale)
+    }.distinct().joinToString(", ")
+    fact(R.string.details_audio, languages(listOf(SubscriptionStreamType.AAC, SubscriptionStreamType.AC3,
+        SubscriptionStreamType.EAC3, SubscriptionStreamType.MPEG2_AUDIO)))
+    fact(R.string.subtitles, languages(listOf(SubscriptionStreamType.DVB_SUBTITLE,
+        SubscriptionStreamType.TEXT_SUBTITLE, SubscriptionStreamType.TELETEXT)))
+    recordingErrorCount(recording)?.let { errors ->
+        fact(R.string.details_errors, if (errors == 0L) resources.getString(R.string.details_no_errors)
+            else resources.getQuantityString(R.plurals.details_error_count, errors.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), errors))
+    }
+    recording.start?.let { start -> recording.stop?.let { stop ->
+        val paddedStart = start - (recording.startExtraMinutes ?: kotlin.time.Duration.ZERO)
+        val paddedStop = stop + (recording.stopExtraMinutes ?: kotlin.time.Duration.ZERO)
+        fact(R.string.details_recorded, formatRecordingDate(paddedStart.epochSeconds, locale = locale, nowSec = nowSec) +
+            " – " + formatRecordingDate(paddedStop.epochSeconds, locale = locale, nowSec = nowSec))
+    } }
+    if (recording.removalDays == RECORDING_REMOVAL_WHEN_SPACE_NEEDED)
+        fact(R.string.details_retention, resources.getString(R.string.details_kept_until_space_needed))
+}
+
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun programmeCreditFacts(event: EpgEvent?, resources: Resources): List<Pair<String, String>> = buildList {
+    val credits = event?.credits.orEmpty()
+    listOf(EpgCreditRole.ACTOR to R.plurals.details_cast, EpgCreditRole.GUEST to R.plurals.details_guests,
+        EpgCreditRole.PRESENTER to R.plurals.details_presenters, EpgCreditRole.DIRECTOR to R.plurals.details_directors,
+        EpgCreditRole.WRITER to R.plurals.details_writers).forEach { (role, label) ->
+        val names = credits.filter { it.role == role }.map { it.name.trim() }.filter(String::isNotEmpty)
+        if (names.isNotEmpty()) add(resources.getQuantityString(label, names.size) to names.joinToString(", "))
+    }
+}
+
+/** Only the EPG facts present, as label to value, in reading order. */
+internal fun programmeAboutFacts(event: EpgEvent?, recording: DvrEntry?, resources: Resources, locale: Locale): List<Pair<String, String>> =
+    buildList {
+        fun fact(label: Int, value: String?) {
+            value?.trim()?.takeIf(String::isNotEmpty)?.let { add(resources.getString(label) to it) }
+        }
+        fun count(label: Int, number: Long?, total: Long?) = fact(label, number?.let { n ->
+            total?.takeIf { it >= n }?.let { resources.getString(R.string.details_count_of, n.toInt(), it.toInt()) } ?: n.toString()
+        })
+        fact(R.string.details_genre, event?.genre?.takeIf(String::isNotBlank)
+            ?: programmeCategory(event?.contentGenre ?: recording?.contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) })
+        (event?.episode ?: recording?.episode)?.let {
+            count(R.string.details_season, it.seasonNumber, it.seasonCount)
+            if (it.episodeNumber != null) count(R.string.details_episode, it.episodeNumber, it.episodeCount)
+            else fact(R.string.details_episode, it.onscreen)
+            count(R.string.details_part, it.partNumber, it.partCount)
+        }
+        fact(R.string.details_year, (event?.copyrightYear ?: recording?.copyrightYear)?.toString())
+        (event?.rating ?: recording?.rating)?.let { rating ->
+            fact(R.string.details_age_rating, programmeAgeRating(rating.label, rating.age))
+            fact(R.string.details_stars, rating.stars?.toString())
+        }
+        event?.firstAired?.let {
+            fact(R.string.details_first_aired, DateFormat.getDateInstance(DateFormat.MEDIUM, locale).format(Date(it.toEpochMilliseconds())))
+        }
+        event?.isNew?.let {
+            fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))
+        }
+        fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" · "))
+        fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" · "))
+    }
+
+/**
+ * Metadata order is shared by live and recorded details; absent fields reserve no separator.
+ * XMLTV guides mostly send category text without a genre code, so the first two categories
+ * stand in for a missing genre.
+ */
+internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resources: Resources,
+    episode: at.bernhardberger.tvheadend.sdk.core.EpgEpisode?, firstAired: kotlin.time.Instant? = null,
+    locale: Locale = resources.configuration.locales[0]): List<String> {
+    val genre = resources.getString(R.string.details_genre)
+    val categories = facts.firstOrNull { it.first == resources.getString(R.string.details_categories) }
+        ?.second?.split(" · ")?.take(2).orEmpty()
+    val year = facts.firstOrNull { it.first == resources.getString(R.string.details_year) }?.second
+    val date = programmeDateLabel(episode, firstAired, year, locale)
+    val label = episodeLabel(episode, resources)
+    return (facts.firstOrNull { it.first == genre }?.second?.let(::listOf) ?: categories) +
+        if (date == year) listOfNotNull(year, label) else listOfNotNull(label, date)
+}
+
+@Composable
+private fun DetailsInformation(
+    event: EpgEvent?, recording: DvrEntry?, channel: Channel?, nowSec: Long,
+    imageLoader: ImageLoader, session: CurrentSessionObservation?, synopsis: @Composable () -> Unit,
+) {
+    // Only the title spans the page; the remaining information keeps its narrow text column.
+    Column(Modifier.fillMaxWidth().testTag("details-information")) {
+        ProgrammeEyebrow(channel, channelTitleText(channel?.number, channel?.name.orEmpty()), imageLoader, session,
+            Modifier.widthIn(max = 470.dp)) {
+            val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
+            if (removal != null) {
+                DetailsStatusChip(null, stringResource(R.string.details_available_until,
+                    formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)))
+            } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusChip(it) }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(event?.title ?: recording?.title.orEmpty(), Modifier.fillMaxWidth().testTag("details-title"),
+            style = MaterialTheme.typography.displaySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        val subtitle = (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)
+        subtitle?.let {
+            Spacer(Modifier.height(4.dp))
+            Text(it, Modifier.widthIn(max = 470.dp).testTag("details-subtitle"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        Column(Modifier.widthIn(max = 470.dp)) { synopsis() }
+        val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let(::recordingDetailsFacts).orEmpty()
+        val resources = LocalContext.current.resources
+        val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
+            LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
+            event?.firstAired, LocalConfiguration.current.locales[0])
+        val timelineVisible = event != null && nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
+        // The timeline already labels start/end; its remaining time is not the total runtime.
+        val segments = facts.filter { it.kind != DetailsFactKind.LEFT &&
+            (!timelineVisible || it.kind == DetailsFactKind.LENGTH) }.map { detailsFactValue(it, nowSec) } + metadata
+        val rating = event?.rating ?: recording?.rating
+        val ratingText = programmeAgeRating(rating?.label, rating?.age)
+        if (segments.isNotEmpty() || ratingText != null) {
+            // Groups: identity, then facts with timeline, then the description panel, then the actions.
+            // A subtitle can now occupy two lines; keep the facts close enough to retain the
+            // first screen's action anchor and airings peek without shrinking either text style.
+            Spacer(Modifier.height(if (subtitle != null) 8.dp else 20.dp))
+            Row(Modifier.widthIn(max = 470.dp).testTag("details-metadata-row"), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (segments.isNotEmpty()) Text(programmeFactsSegments(segments), Modifier.weight(1f, fill = false).testTag("details-metadata"),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (ratingText != null) {
+                val description = stringResource(R.string.details_age_rating_description, ratingText)
+                Text(ratingText, Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.shapes.extraSmall)
+                    .padding(horizontal = 6.dp, vertical = 2.dp).clearAndSetSemantics {
+                        contentDescription = description; testTag = "details-rating"
+                    }, style = MaterialTheme.typography.labelMedium)
+            }
+            }
+        }
+        if (event != null && timelineVisible) {
+            Spacer(Modifier.height(8.dp))
+            val start = formatClock(event.start.epochSeconds)
+            val end = formatClock(event.stop.epochSeconds)
+            val minutesLeft = ((event.stop.epochSeconds - nowSec + 59) / 60).toInt()
+            val progress = ((nowSec - event.start.epochSeconds).toFloat() / (event.stop - event.start).inWholeSeconds).coerceIn(0f, 1f)
+            DetailsTimeline(start, progress, "$end · ${playerMinutesLeft(minutesLeft)}",
+                "${playerSpokenTimeRange("$start–$end")}, ${playerMinutesLeft(minutesLeft, spoken = true)}",
+                Modifier.widthIn(max = 470.dp).fillMaxWidth())
+        } else if (facts.any { it.kind == DetailsFactKind.LEFT }) {
+            Spacer(Modifier.height(8.dp))
+            val length = facts.first { it.kind == DetailsFactKind.LENGTH }.seconds
+            val left = facts.first { it.kind == DetailsFactKind.LEFT }.seconds
+            val position = length - left
+            val minutesLeft = ((left + 59) / 60).toInt()
+            DetailsTimeline(formatPlaybackDuration(position * 1000L), position.toFloat() / length,
+                "${formatPlaybackDuration(length * 1000L)} · ${playerMinutesLeft(minutesLeft)}",
+                stringResource(R.string.details_recording_progress_spoken,
+                    formatDurationMinutes(position / 60, resources, spoken = true),
+                    formatDurationMinutes(length / 60, resources, spoken = true),
+                    playerMinutesLeft(minutesLeft, spoken = true)), Modifier.widthIn(max = 470.dp).fillMaxWidth())
+        }
+    }
+}
+
+@Composable
+internal fun ProgrammeEyebrow(
+    channel: Channel?, text: String, imageLoader: ImageLoader, session: CurrentSessionObservation?,
+    modifier: Modifier = Modifier, piconModifier: Modifier = Modifier,
+    trailing: @Composable () -> Unit = {},
+) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        channel?.icon?.let { PiconBox(imageLoader, it, piconModifier.size(36.dp, 20.dp), session) }
+        Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        trailing()
+    }
+}
+
+@Composable
+private fun DetailsTimeline(
+    startLabel: String, progress: Float, endLabel: String, spokenDescription: String, modifier: Modifier = Modifier,
+) {
+    Row(modifier.testTag("details-timeline").semantics(mergeDescendants = true) {
+        contentDescription = spokenDescription
+    },
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(startLabel, style = MaterialTheme.typography.bodyMedium)
+        ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
+        Text(endLabel, style = MaterialTheme.typography.bodyMedium)
+    }
+}
+
+@Composable
+private fun DetailsActions(
+    actions: List<BrowseContextAction>, event: EpgEvent?, recording: DvrEntry?, nowSec: Long,
+    requesters: Map<BrowseContextAction, FocusRequester>, onAction: (BrowseContextAction) -> Unit,
+    onFocused: (BrowseContextAction) -> Unit,
+) {
+    Row(Modifier.horizontalScroll(rememberScrollState()).padding(8.dp).testTag("details-actions"),
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        actions.forEachIndexed { index, action ->
+            key(action) {
+                val modifier = Modifier.height(40.dp).focusRequester(requesters.getValue(action))
+                    .onFocusChanged { if (it.isFocused) onFocused(action) }
+                    .focusProperties {
+                        left = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
+                        right = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
+                        up = FocusRequester.Cancel; down = FocusRequester.Cancel
+                    }.testTag("details-${action.name.lowercase()}")
+                val content: @Composable RowScope.() -> Unit = {
+                    Icon(painterResource(action.icon()), null, Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
+                        (event == null && recording?.state == DvrEntryState.SCHEDULED ||
+                            event != null && !event.isRunning(nowSec)))),
+                        maxLines = 1, softWrap = false)
+                }
+                 if (index == 0 && action != BrowseContextAction.DELETE) Button(onClick = { onAction(action) }, modifier = modifier, content = content)
+                else OutlinedButton(onClick = { onAction(action) }, modifier = modifier, content = content)
             }
         }
     }
 }
 
 @Composable
-private fun DetailsStatusChip(status: DetailsStatus) {
+private fun DetailsStatusChip(status: DetailsStatus?, label: String? = null) {
     val color = when (status) {
         DetailsStatus.ON_NOW -> MaterialTheme.colorScheme.primary
         DetailsStatus.RECORDING, DetailsStatus.SCHEDULED -> TvRecordingColor
         DetailsStatus.FAILED -> MaterialTheme.colorScheme.error
+        null -> null
     }
     Row(Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Box(Modifier.size(6.dp).background(color, CircleShape))
-        Text(stringResource(when (status) {
+        if (color != null) Box(Modifier.size(6.dp).background(color, CircleShape))
+        Text(label ?: stringResource(when (status) {
             DetailsStatus.ON_NOW -> R.string.details_status_on_now
             DetailsStatus.RECORDING -> R.string.recording_state_recording
             DetailsStatus.SCHEDULED -> R.string.details_status_scheduled
             DetailsStatus.FAILED -> R.string.details_status_failed
+            null -> error("A status-less chip requires a label")
         }), style = MaterialTheme.typography.labelSmall, maxLines = 1)
     }
-}
-
-private fun DetailsFactKind.label(): Int = when (this) {
-    DetailsFactKind.STARTS -> R.string.details_starts
-    DetailsFactKind.STARTED -> R.string.details_started
-    DetailsFactKind.RECORDED -> R.string.details_recorded
-    DetailsFactKind.LENGTH -> R.string.details_length
-    DetailsFactKind.LEFT -> R.string.details_left
 }
 
 @Composable
 internal fun detailsFactValue(fact: DetailsFact, nowSec: Long): String {
     val resources = LocalContext.current.resources
     return when (fact.kind) {
-        DetailsFactKind.LENGTH, DetailsFactKind.LEFT -> formatPlaybackDuration(fact.seconds, resources)
-        DetailsFactKind.RECORDED -> formatRecordingSchedule(fact.seconds, dateOnly = true)
+        DetailsFactKind.LENGTH, DetailsFactKind.LEFT -> formatDurationMinutes(fact.seconds / 60, resources)
+        DetailsFactKind.RECORDED -> formatRecordingSchedule(fact.seconds, dateOnly = true,
+            locale = LocalConfiguration.current.locales[0], nowSec = nowSec)
         DetailsFactKind.STARTS, DetailsFactKind.STARTED -> {
             val zone = java.time.ZoneId.systemDefault()
             val day = java.time.Instant.ofEpochSecond(fact.seconds).atZone(zone).toLocalDate()
             val today = java.time.Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
             when (day) {
-                today -> formatHm(fact.seconds)
+                today -> stringResource(R.string.details_today, formatHm(fact.seconds))
                 today.plusDays(1) -> stringResource(R.string.details_tomorrow, formatHm(fact.seconds))
-                else -> formatRecordingSchedule(fact.seconds)
+                else -> formatRecordingSchedule(fact.seconds, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)
             }
         }
     }

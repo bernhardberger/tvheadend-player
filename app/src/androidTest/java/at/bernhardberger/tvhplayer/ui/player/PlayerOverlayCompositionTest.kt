@@ -75,7 +75,7 @@ class PlayerOverlayCompositionTest {
                 TVHeadendPlayerTheme {
                     PlayerChrome(
                         mode = PlayerChromeMode.CONTROLS,
-                        content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", null, null, false, 0, "")),
+                        content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Documentary", null, null, false, 0, "")),
                         timeline = PlayerChromeTimeline.Live(
                             state.value,
                             nowSec = 1800,
@@ -143,7 +143,7 @@ class PlayerOverlayCompositionTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", null, null, false, 0, "")),
+                    content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Documentary", null, null, false, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         state.value,
                         nowSec = 1800,
@@ -408,7 +408,7 @@ class PlayerOverlayCompositionTest {
     ) {
         PlayerChrome(
             mode = PlayerChromeMode.CONTROLS,
-            content = PlayerChromeContent("", liveInfoBarData(1, "Documentary", null, null, false, 0, "")),
+            content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Documentary", null, null, false, 0, "")),
             timeline = PlayerChromeTimeline.Live(
                 state,
                 nowSec = 1800,
@@ -501,7 +501,7 @@ class PlayerOverlayCompositionTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("", liveInfoBarData(1, "ORF 1 HD", null, null, false, 0, "")),
+                    content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "ORF 1 HD", null, null, false, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         AppTimeshiftState(
                         available = true,
@@ -548,7 +548,7 @@ class PlayerOverlayCompositionTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
-                    content = PlayerChromeContent("", liveInfoBarData(1, "ORF 1 HD", null, null, false, 0, "")),
+                    content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "ORF 1 HD", null, null, false, 0, "")),
                     timeline = PlayerChromeTimeline.Live(
                         AppTimeshiftState(
                         available = true,

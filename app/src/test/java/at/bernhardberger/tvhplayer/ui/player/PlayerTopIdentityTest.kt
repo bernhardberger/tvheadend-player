@@ -68,7 +68,7 @@ class PlayerTopIdentityTest {
         assertTrue(exists(PlayerTopIdentityTag))
         assertEquals(0, compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable(), useUnmergedTree = true)
             .fetchSemanticsNodes().size)
-        assertEquals(listOf("Channel 1, One"), compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode()
+        assertEquals(listOf("Channel 1 One"), compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode()
             .config.getOrNull(SemanticsProperties.ContentDescription))
         assertEquals(emptyList<String>(), focused())
     }
@@ -81,7 +81,7 @@ class PlayerTopIdentityTest {
         key(Key.DirectionUp)
         assertEquals(listOf(PlayerIdentityCardTag), focused())
         val node = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config
-        assertEquals(listOf("Channel 1, One"), node.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals(listOf("Channel 1 One"), node.getOrNull(SemanticsProperties.ContentDescription))
         assertEquals(null, node.getOrNull(SemanticsProperties.Focused))
         assertFalse("no channel-zap arrows", exists("player-top-identity-previous") || exists("player-top-identity-next"))
         key(Key.DirectionUp)
@@ -217,7 +217,7 @@ class PlayerTopIdentityTest {
 
     @Test fun theTopIdentityIsOneLineWithoutStreamBadges() {
         chrome(PlayerChromeMode.CONTROLS, badges = sampleBadges)
-        assertEquals("the identity names the channel only", listOf("Channel 1, One"),
+        assertEquals("the identity names the channel only", listOf("Channel 1 One"),
             compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode()
                 .config.getOrNull(SemanticsProperties.ContentDescription))
         for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER)) {
@@ -268,7 +268,7 @@ class PlayerTopIdentityTest {
         livePause: LivePauseAvailability? = null,
         restore: String? = null,
         recents: List<RecentChannelPeek> = emptyList(),
-        info: PlayerInfoBarData = liveInfoBarData(1, "One", null, null, false, 1_800, "Programme"),
+        info: PlayerInfoBarData = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"),
         badges: List<at.bernhardberger.tvhplayer.core.GlanceBadge> = emptyList(),
         /** Composed beside the chrome. */
         extra: @androidx.compose.runtime.Composable () -> Unit = {},

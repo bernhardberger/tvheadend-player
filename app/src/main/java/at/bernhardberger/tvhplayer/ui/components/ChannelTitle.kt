@@ -8,7 +8,7 @@ import androidx.tv.material3.LocalTextStyle
 import androidx.tv.material3.Text
 
 internal fun channelTitleText(number: Long?, name: String): String =
-    number?.let { "$it  $name" } ?: name
+    number?.let { if (name.isBlank()) it.toString() else "$it $name" } ?: name
 
 @Composable
 fun ChannelTitle(

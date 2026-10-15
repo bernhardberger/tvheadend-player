@@ -8,6 +8,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
@@ -24,6 +25,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
@@ -57,6 +59,7 @@ import org.robolectric.shadows.ShadowDialog
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Category(VisualCapture::class)
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class PlaybackPanelCaptureTest {
     @get:Rule val compose = createComposeRule()
 
@@ -76,7 +79,7 @@ class PlaybackPanelCaptureTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = panels("de", 1.3f)
 
-    /** The shared 60% scrim also sits behind the recording and guide dialogs. */
+    /** Centred confirmations dim the backdrop once and keep the safe pill visibly focused. */
     @Test fun recordingAndGuideModals() {
         lateinit var view: View
         var guide by mutableStateOf(false)
@@ -84,7 +87,7 @@ class PlaybackPanelCaptureTest {
             TVHeadendPlayerTheme {
                 view = LocalView.current
                 if (guide) {
-                    ConfirmProgrammeActionDialog(ProgrammeAction.RECORD, PROGRAMME_TITLE, {}, {})
+                    ConfirmProgrammeActionDialog(ProgrammeAction.STOP_RECORDING, PROGRAMME_TITLE, {}, {})
                 } else {
                     RecordingConfirmationDialog(PendingRecordingAction.DELETE, PROGRAMME_TITLE, true, {}, {})
                 }
@@ -97,14 +100,13 @@ class PlaybackPanelCaptureTest {
         val back = compose.onNodeWithTag("recording-confirmation-back").getUnclippedBoundsInRoot()
         val fill = lightFillShare(recording, back.left.value, back.top.value, back.right.value, back.bottom.value)
         assertTrue("Back draws the focused fill, share $fill", fill > 0.3f)
-        // Over white, as in the kit's reference, a 60% black scrim reads #666666.
-        assertScrim(recording.getPixel(0, 0))
+        assertEquals("Single 60% recording scrim", android.graphics.Color.rgb(102, 102, 102), recording.getPixel(0, 0))
         recording.recycle()
         guide = true
         compose.waitForIdle()
         println("Focus modal-guide-en-font1.0: ${focusedNodes()}")
         val guideCapture = capture(view, "modal-guide-en-font1.0", white = true)
-        assertScrim(guideCapture.getPixel(0, 0))
+        assertEquals("Single 60% guide scrim", android.graphics.Color.rgb(102, 102, 102), guideCapture.getPixel(0, 0))
         guideCapture.recycle()
     }
 
@@ -120,12 +122,6 @@ class PlaybackPanelCaptureTest {
             }
         }
         return light.toFloat() / (pixels.count() * rows.count())
-    }
-
-    private fun assertScrim(corner: Int) {
-        listOf(corner shr 16 and 0xFF, corner shr 8 and 0xFF, corner and 0xFF).forEach {
-            assertEquals("Scrim over white", 102.0, it.toDouble(), 1.0)
-        }
     }
 
     private enum class Surface(val panelTag: String, val width: Dp = PlaybackPanelWidth) {

@@ -48,6 +48,8 @@ class GuideSearchDetailsTest {
             back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             var details by remember { mutableStateOf<EpgEvent?>(null) }
             var restore by remember { mutableStateOf<EventId?>(null) }
+            val mutationScope = androidx.compose.runtime.rememberCoroutineScope()
+            val mutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
             TVHeadendPlayerTheme {
                 if (details == null) EpgSearchDialog(PaddingValues(), "Result", result, false, true,
                     channelName = { channel.name }, onQueryChange = {}, onSearch = {},
@@ -57,8 +59,10 @@ class GuideSearchDetailsTest {
                     ProgrammeDetailsHost(event, observation, observation, { observation }, { 150L },
                         fromGuide = true, showContextMenu = false, onShowDetails = {}, imageLoader = loader,
                         mutations = DvrMutationActions(session.dvrRepository), notices = notices,
+                        mutationScope = mutationScope, mutationInFlight = mutationInFlight,
                         onPlay = { _, _ -> }, onPlayRecording = null,
-                        onClose = { restore = event.id; details = null })
+                        onClose = { restore = event.id; details = null },
+                        settingsStore = at.bernhardberger.tvhplayer.settings.UiSettingsStore(ApplicationProvider.getApplicationContext<Application>()))
                 }
             }
         }

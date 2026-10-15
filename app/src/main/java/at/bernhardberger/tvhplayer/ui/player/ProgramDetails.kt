@@ -398,8 +398,10 @@ internal fun ProgrammeInformation(
     showDescription: Boolean,
     status: (@Composable () -> Unit)? = null,
 ) {
-    ProgrammeDetailsInformation(event.title, detailsSubtitle(event), factsLine(event, channelIdentity),
+    val resources = androidx.compose.ui.platform.LocalContext.current.resources
+    ProgrammeDetailsInformation(event.title, detailsSubtitle(event, resources), factsLine(event, channelIdentity),
         if (showDescription) programmeDetailsBody(event) else null,
+        subtitleDescription = detailsSubtitle(event, resources, spoken = true),
         tile = { ProgrammeTile(event, nowSec, tile, it) }, status = {
             if (status != null) status() else
             when (recording) {
@@ -482,10 +484,16 @@ private fun Schedule(
         itemsIndexed(schedule, key = { _, it -> it.id.value }) { index, event ->
             val airing = airingProgress(event, nowSec)
             val time = if (airing != null) stringResource(R.string.details_on_now) else formatClock(event.start.epochSeconds)
-            val subtitle = detailsSubtitle(event)
+            val resources = androidx.compose.ui.platform.LocalContext.current.resources
+            val subtitle = detailsSubtitle(event, resources)
+            val spokenSubtitle = detailsSubtitle(event, resources, spoken = true)
+            val minutes = (event.stop.epochSeconds - event.start.epochSeconds) / 60
             val meta = buildList {
-                val minutes = ((event.stop.epochSeconds - event.start.epochSeconds) / 60).toInt()
-                if (minutes > 0) add(stringResource(R.string.details_minutes, minutes))
+                if (minutes > 0) add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes, resources))
+                event.genre?.takeIf(String::isNotBlank)?.let(::add)
+            }.joinToString(" · ")
+            val spokenMeta = buildList {
+                if (minutes > 0) add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes, resources, spoken = true))
                 event.genre?.takeIf(String::isNotBlank)?.let(::add)
             }.joinToString(" · ")
             WideCardContainer(
@@ -508,7 +516,7 @@ private fun Schedule(
                                 left = FocusRequester.Cancel
                                 right = FocusRequester.Cancel
                             }
-                            .semantics { contentDescription = listOfNotNull(time, event.title, subtitle, meta.takeIf(String::isNotBlank)).joinToString(", ") }
+                             .semantics { contentDescription = listOfNotNull(time, event.title, spokenSubtitle, spokenMeta.takeIf(String::isNotBlank)).joinToString(", ") }
                             .onPreviewKeyEvent {
                                 if (it.type == KeyEventType.KeyDown && (it.key == Key.DirectionUp || it.key == Key.DirectionDown)) navigating = true
                                 if (index != 0 || it.key != Key.DirectionUp) false
@@ -549,7 +557,8 @@ private fun Schedule(
                 subtitle = {
                     subtitle?.let {
                         Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 1,
-                            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 16.dp))
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 16.dp)
+                                .semantics { spokenSubtitle?.let { contentDescription = it } })
                     }
                 },
                 description = {
@@ -594,7 +603,7 @@ internal fun FullDescription(
     }
 }
 
-private val XmltvRating = Regex("""XMLTV:(.*):([^:]*)""")
+internal val XmltvRating = Regex("""XMLTV:(.*):([^:]*)""")
 
 /** Viewer-facing SDK metadata only: identifiers and artwork/series URIs are not programme facts. */
 internal fun programmeReadingFields(event: EpgEventEntry, locale: Locale): List<Pair<Int, String>> = buildList {
@@ -668,23 +677,20 @@ private fun airingProgress(event: EpgEventEntry, nowSec: Long): Float? {
     return ((nowSec - start).toDouble() / (stop - start)).toFloat()
 }
 
-internal fun detailsSubtitle(event: EpgEventEntry): String? =
+internal fun detailsSubtitle(event: EpgEventEntry, resources: android.content.res.Resources, spoken: Boolean = false): String? =
     event.subtitle?.takeIf(String::isNotBlank)
-        ?: event.episode?.onscreen?.takeIf(String::isNotBlank)
-        ?: buildList {
-            event.episode?.seasonNumber?.let { add("S$it") }
-            event.episode?.episodeNumber?.let { add("E$it") }
-        }.takeIf { it.isNotEmpty() }?.joinToString(" ")
+        ?: at.bernhardberger.tvhplayer.ui.common.episodeLabel(event.episode, resources, spoken = spoken)
 
 @Composable
 private fun factsLine(event: EpgEventEntry, channelIdentity: String): String = programmeFactsSegments(buildList {
     add(channelIdentity)
     add("${formatClock(event.start.epochSeconds)}–${formatClock(event.stop.epochSeconds)}")
     val minutes = ((event.stop.epochSeconds - event.start.epochSeconds) / 60).toInt()
-    if (minutes > 0) add(stringResource(R.string.details_minutes, minutes))
+    if (minutes > 0) add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), androidx.compose.ui.platform.LocalResources.current))
     // The subtitle line may already be the on-screen episode; don't repeat it in the facts.
-    val subtitle = detailsSubtitle(event)?.trim()
-    programmeMetadata(event)?.takeIf(String::isNotBlank)?.split(" • ")
+    val resources = androidx.compose.ui.platform.LocalContext.current.resources
+    val subtitle = detailsSubtitle(event, resources)?.trim()
+    programmeMetadata(event, resources)?.takeIf(String::isNotBlank)?.split(" • ")
         ?.filterNot { it.trim() == subtitle }?.let(::addAll)
 })
 

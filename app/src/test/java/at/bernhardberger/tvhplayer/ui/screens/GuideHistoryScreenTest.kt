@@ -4,7 +4,6 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
-import androidx.activity.ComponentDialog
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.*
@@ -35,7 +34,6 @@ import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
-import org.robolectric.shadows.ShadowDialog
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -43,7 +41,8 @@ import java.util.TimeZone
 import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
+@Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
+    instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideHistoryScreenTest {
     @get:Rule val compose = createComposeRule()
@@ -63,10 +62,6 @@ class GuideHistoryScreenTest {
     @Test fun screenPastFrontierNowAndSessionReplacement() = exercise("en", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun screenPastFrontierGermanLargeText() = exercise("de", 1.3f)
-    @Test fun pendingConfirmationCannotRecordAnArchivedEvent() = exercise("en", 1f, "confirm")
-    @Test fun pendingConfigurationCannotRecordAnArchivedEvent() = exercise("en", 1f, "config")
-    @Test fun pendingConfirmationClearsOnSessionReplacement() = exercise("en", 1f, "confirm", replaceSession = true)
-    @Test fun pendingConfigurationClearsOnSessionReplacement() = exercise("en", 1f, "config", replaceSession = true)
     @Test fun historicalRecordingDetailsCloseOnSessionReplacement() = exercise("en", 1f, "details")
     @Test fun pendingCancelDismissesWhenRecordingStarts() = exercise("en", 1f, "cancel")
     @Test fun pendingStopDismissesWhenRecordingCompletes() = exercise("en", 1f, "stop")
@@ -74,22 +69,95 @@ class GuideHistoryScreenTest {
     @Test fun pendingStopConsumesInterruptedEnter() = exercise("en", 1f, "stop", activationKeyCode = android.view.KeyEvent.KEYCODE_ENTER)
     @Test fun pendingCancelConsumesInterruptedNumpadEnter() = exercise("en", 1f, "cancel", activationKeyCode = android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
     @Test fun pendingStopConsumesInterruptedNumpadEnter() = exercise("en", 1f, "stop", activationKeyCode = android.view.KeyEvent.KEYCODE_NUMPAD_ENTER)
-    @Test fun airingRecordUsesExistingConfirmationAndScheduleExecution() = exercise("en", 1f, "airing-record")
+    @Test fun airingRecordSchedulesWithoutConfirmation() = exercise("en", 1f, "airing-record")
     @Test fun airingStopUsesExistingConfirmationAndKeepsPartialRecording() = exercise("en", 1f, "airing-stop")
     @Test fun airingScheduledEntryUsesExistingCancelConfirmation() = exercise("en", 1f, "airing-cancel")
     @Test fun detailsStackBackRestoresGuideOriginAndSuppressesOpeningRelease() = exercise("en", 1f, "stack")
-    @Test fun confirmationAfterPoppingDetailsRestoresActionNotCard() = exercise("en", 1f, "stack-confirm")
+    @Test fun recordAfterPoppingDetailsKeepsActionFocus() = exercise("en", 1f, "stack-record")
+    @Test fun stackedAiringShowInGuideFocusesItsChannelAndFutureProgramme() = exercise("en", 1f, "stack-guide")
+    @Test fun menuRecordExecutesDirectlyAndRestoresGuideCell() = exercise("en", 1f, "menu-record")
+    @Test fun menuDetailsBackRestoresGuideCellWithoutReopeningMenuEveryFrame() = exercise("en", 1f, "menu-details")
+
+    @Test fun programmeHostSchedulesDirectlyWithStoredProfileAndGuardsDoubleClick() = recordWithStoredProfile(false)
+    @Test fun guideMenuSchedulesDirectlyWithStoredProfileAndGuardsDoubleClick() = recordWithStoredProfile(true)
+
+    private fun recordWithStoredProfile(menu: Boolean) {
+        val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
+        val event = EpgEvent.create(EventId(77), channelId = ChannelId(1), title = "Mountain expedition",
+            start = Instant.fromEpochSeconds(100), stop = Instant.fromEpochSeconds(200))
+        val profiles = listOf(DvrConfiguration(DvrConfigId("default"), "", ""),
+            DvrConfiguration(DvrConfigId("archive"), "Archive", ""))
+        val observation = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Ridge Earth")))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(emptyList())),
+            dvrConfigurationsState = DvrConfigurationsState.Current.create(profiles))
+        var request: DvrScheduleRequest? = null
+        var requests = 0
+        val release = CompletableDeferred<Unit>()
+        val settings = UiSettingsStore(preferences())
+        runBlocking { settings.setRecordingProfile(profiles[1].id) }
+        val mutations = DvrMutationActions(
+            scheduleEntry = { _, value -> requests++; request = value; release.await(); DvrMutationResult.Confirmed(DvrEntryId(1)) },
+            stopEntry = { _, _ -> error("unexpected stop") },
+            cancelEntry = { _, _ -> error("unexpected cancel") },
+            deleteEntry = { _, _ -> error("unexpected delete") })
+        val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
+            NoticeContext(0, observation.currentSession?.generationIdentity)
+        }
+        val loader = ImageLoader.Builder(context).diskCache(null).build()
+        val session = FakeTvheadendSession(observation)
+        val opening = session.observation.value
+        compose.setContent {
+            back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+            TVHeadendPlayerTheme {
+                val current by session.observation.collectAsState()
+                ProgrammeDetailsHost(event, opening, current, { session.observation.value }, { 50 }, fromGuide = true,
+                    showContextMenu = menu, onShowDetails = {}, imageLoader = loader, mutations = mutations,
+                    mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
+                    mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
+                    notices = notices, onPlay = { _, _ -> }, onPlayRecording = null, onClose = {}, settingsStore = settings)
+            }
+        }
+        val record = if (menu) compose.onNodeWithText("Record") else compose.onNodeWithTag("details-record")
+        record.requestFocus()
+        val click = record.fetchSemanticsNode().config[androidx.compose.ui.semantics.SemanticsActions.OnClick].action!!
+        compose.runOnIdle { click(); click() }
+        compose.waitForIdle()
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+        if (!menu) compose.onNodeWithTag("details-record").assertIsFocused()
+        assertEquals(1, requests)
+        compose.runOnIdle { release.complete(Unit) }
+        compose.waitForIdle()
+        assertEquals(DvrScheduleRequest(DvrSchedule.Programme(event.id), configId = profiles[1].id, title = event.title), request)
+        if (!menu) {
+            compose.runOnIdle {
+                session.publish(SessionObservation.create(sessionState = observation.sessionState,
+                    channelState = observation.channelState, epgState = observation.epgState,
+                    dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(
+                        DvrEntry.create(DvrEntryId(1), eventId = event.id, state = DvrEntryState.SCHEDULED)))),
+                    dvrConfigurationsState = observation.dvrConfigurationsState))
+            }
+            compose.onNodeWithTag("details-cancel").assertIsFocused()
+        }
+    }
 
     private fun exercise(locale: String, scale: Float, transition: String? = null, replaceSession: Boolean = false,
         activationKeyCode: Int = android.view.KeyEvent.KEYCODE_DPAD_CENTER) {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
-        val hour = System.currentTimeMillis() / 3_600_000 * 3600
+        val hour = Instant.parse("2026-09-15T19:00:00Z").epochSeconds
+        check(android.os.SystemClock.setCurrentTimeMillis(hour * 1000))
         val channels = listOf(Channel.create(ChannelId(1), name = "Documentary", number = 1),
             Channel.create(ChannelId(2), name = "Culture", number = 2))
         fun event(channel: Long, offset: Int) = EpgEvent.create(EventId(channel * 100 + offset + 10),
-            channelId = ChannelId(channel), title = "Channel $channel hour $offset",
+            channelId = ChannelId(channel), title = "Channel $channel hour $offset", seriesLinkUri = "crid://$channel/$offset",
             start = Instant.fromEpochSeconds(hour + offset * 3600), stop = Instant.fromEpochSeconds(hour + (offset + 1) * 3600))
-        val current = channels.flatMap { channel -> (0..3).map { event(channel.id.value, it) } }
+        // A later airing of "Channel 1 hour 0" for the details page's Upcoming airings row.
+        val repeat = EpgEvent.create(EventId(900), channelId = ChannelId(2), title = "Repeat of channel 1 hour 0",
+            seriesLinkUri = "crid://1/0", start = Instant.fromEpochSeconds(hour + 26 * 3600),
+            stop = Instant.fromEpochSeconds(hour + 27 * 3600))
+        val current = channels.flatMap { channel -> (0..3).map { event(channel.id.value, it) } } + repeat
         val history = channels.flatMap { channel -> (-6..-1).map { event(channel.id.value, it) } }
         var archiveFuture = false
         var recordingState = if (transition == "cancel" || transition == "airing-cancel") DvrEntryState.SCHEDULED else DvrEntryState.RECORDING
@@ -105,7 +173,7 @@ class GuideHistoryScreenTest {
                 else if (transition in listOf("cancel", "stop", "airing-cancel", "airing-stop")) listOf(
                     DvrEntry.create(id = DvrEntryId(42), eventId = event(1, if (transition?.startsWith("airing-") == true) 0 else 1).id, state = recordingState))
                 else emptyList())),
-            dvrConfigurationsState = DvrConfigurationsState.Current.create(if (transition == "config") listOf(
+            dvrConfigurationsState = DvrConfigurationsState.Current.create(if (transition in listOf("config", "details-config", "menu-config")) listOf(
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", "")) else emptyList()),
         )
         val session = FakeTvheadendSession(observation(true))
@@ -129,6 +197,7 @@ class GuideHistoryScreenTest {
         }
         // Programme details own a dialog-window notice host using the shell dependencies.
         val noticeModule = module {
+            single { UiSettingsStore(preferences()) }
             single { notices }
             single<AppProfileOwner> { profiles }
             single<TvheadendSession> { session }
@@ -156,25 +225,62 @@ class GuideHistoryScreenTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
-        if (transition == "stack" || transition == "stack-confirm") {
+        if (transition == "menu-details") {
+            key(Key.Menu)
+            compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+            compose.mainClock.autoAdvance = false
+            try {
+                compose.runOnIdle { back.onBackPressed() }
+                repeat(24) {
+                    compose.mainClock.advanceTimeByFrame()
+                    compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+                }
+                compose.onNodeWithText("Channel 1 hour 0").assertIsFocused()
+                compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+            } finally {
+                compose.mainClock.autoAdvance = true
+            }
+            assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+            return
+        }
+        if (transition?.startsWith("menu-") == true) {
+            session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(42)))
+            key(Key.Menu)
+            compose.onNodeWithText("Record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.waitForIdle()
+            compose.waitUntil(5_000) { session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY } == 1 }
+            compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+            compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+            focused("Channel 1 hour 0")
+            return
+        }
+        if (transition == "stack" || transition == "stack-record" || transition == "stack-guide") {
             key(Key.DirectionCenter)
             compose.onNodeWithTag("details-watch").assertIsFocused()
             compose.onRoot().performKeyPress(androidx.compose.ui.input.key.KeyEvent(
                 android.view.KeyEvent(0, 0, android.view.KeyEvent.ACTION_UP, android.view.KeyEvent.KEYCODE_DPAD_CENTER, 0)))
             compose.onNodeWithTag("details-watch").assertIsFocused()
             key(Key.DirectionDown)
-            compose.onNodeWithTag("details-card-111").assertIsFocused()
+            compose.onNodeWithTag("details-card-900").assertIsFocused()
             key(Key.DirectionCenter)
             compose.onNodeWithTag("details-watch").assertIsFocused()
-            compose.onNodeWithTag("details-card-111").assertDoesNotExist()
+            compose.onNodeWithTag("details-card-900").assertDoesNotExist()
+            if (transition == "stack-guide") {
+                compose.onNodeWithTag("details-show_guide").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                focused("Repeat of channel 1 hour 0")
+                compose.onNodeWithTag("details-watch").assertDoesNotExist()
+                return
+            }
             compose.runOnIdle { back.onBackPressed() }
-            compose.onNodeWithTag("details-card-111").assertIsFocused()
+            compose.onNodeWithTag("details-card-900").assertIsFocused()
             compose.runOnIdle { back.onBackPressed() }
             compose.onNodeWithTag("details-watch").assertIsFocused()
-            if (transition == "stack-confirm") {
+            if (transition == "stack-record") {
+                session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(42)))
                 compose.onNodeWithTag("details-record").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-                compose.onNodeWithText(context.getString(R.string.dont_record)).assertIsFocused()
-                compose.runOnIdle { back.onBackPressed() }
+                compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+                assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
                 compose.onNodeWithTag("details-record").assertIsFocused()
             }
             compose.runOnIdle { back.onBackPressed() }
@@ -200,9 +306,18 @@ class GuideHistoryScreenTest {
                 else -> FakeSessionCall.DVR_SCHEDULE_ENTRY
             }
             compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-            compose.onNodeWithText(context.getString(if (transition == "airing-record") R.string.dont_record else R.string.keep_recording)).assertIsFocused()
-            assertEquals(0, session.calls.count { it == call })
-            compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            if (transition == "airing-record") compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+            else {
+                compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(context.getString(R.string.keep_recording))
+                assertEquals(0, session.calls.count { it == call })
+                // Keep is safe and restores the invoking action.
+                compose.onNodeWithTag("two-column-first").performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText(label).assertIsFocused()
+                assertEquals(0, session.calls.count { it == call })
+                compose.onNodeWithText(label).performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText(label).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            }
+            compose.waitForIdle()
             compose.waitUntil(5_000) { session.calls.count { it == call } == 1 }
             if (transition == "airing-stop") assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
             return
@@ -243,11 +358,14 @@ class GuideHistoryScreenTest {
                 assertEquals(before, session.calls.size)
                 compose.onNodeWithText(nextLabel).performKeyPress(activationEvent(android.view.KeyEvent.ACTION_DOWN))
                 compose.onNodeWithText(nextLabel).performKeyPress(activationEvent(android.view.KeyEvent.ACTION_UP))
-                compose.onNodeWithText(context.getString(if (transition == "cancel") R.string.keep_recording else R.string.dont_record)).assertIsFocused()
-                val nextTitle = context.getString(if (transition == "cancel") R.string.stop_recording_confirm_title
-                    else R.string.record_confirm_title, "Channel 1 hour 1")
-                compose.onNodeWithText(nextTitle).assertExists()
-                assertEquals(before, session.calls.size)
+                if (transition == "cancel") {
+                    compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(context.getString(R.string.keep_recording))
+                    compose.onNodeWithText(context.getString(R.string.stop_recording_confirm_title)).assertExists()
+                    assertEquals(before, session.calls.size)
+                } else {
+                    compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+                    assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+                }
                 return
             }
             if (transition == "details") {
@@ -255,29 +373,8 @@ class GuideHistoryScreenTest {
                 compose.runOnIdle { session.replaceGeneration(observation(false)) }
                 compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("details-play")).fetchSemanticsNodes().isEmpty() }
                 compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-                compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
-                compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
-                key(Key.DirectionCenter)
-                focused("Channel 1 hour 0")
-            } else {
-                compose.onNodeWithText(context.getString(R.string.record)).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-                val dialogTitle = if (transition == "config") context.getString(R.string.recording_config_title)
-                    else context.getString(R.string.record_confirm_title, "Channel 1 hour 1")
-                compose.onNodeWithText(dialogTitle).assertExists()
-                val before = session.calls.size
-                compose.runOnIdle {
-                    if (replaceSession) session.replaceGeneration(observation(true))
-                    else { archiveFuture = true; session.publish(observation(true)) }
-                }
-                compose.waitUntil(10_000) { compose.onAllNodes(hasText(dialogTitle)).fetchSemanticsNodes().isEmpty() }
-                compose.onNodeWithText(context.getString(R.string.record)).assertDoesNotExist()
-                compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-                assertEquals(before, session.calls.size)
-                // Session replacement dismisses the dialog before background guide preparation finishes.
-                // The loading anchor can own focus meanwhile, so wait for the actual header action.
                 compose.waitUntil(10_000) {
-                    compose.onAllNodes(hasText(context.getString(R.string.now)) and isFocusable())
-                        .fetchSemanticsNodes().isNotEmpty()
+                    compose.onAllNodes(hasText(context.getString(R.string.now)) and isFocusable()).fetchSemanticsNodes().isNotEmpty()
                 }
                 compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
                 key(Key.DirectionCenter)

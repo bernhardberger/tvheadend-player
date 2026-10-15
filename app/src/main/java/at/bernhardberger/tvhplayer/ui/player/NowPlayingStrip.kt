@@ -32,6 +32,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import coil3.ImageLoader
 
 /** Passive identity of the playing channel, independent of the programme being browsed. */
@@ -64,7 +65,7 @@ internal fun NowPlayingStrip(
         Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max)) {
             // The playing card's marker: this strip is what plays, not what the rail or details show.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(listOfNotNull(channelNumber, channelName.takeIf { it.isNotBlank() }).joinToString(" "),
+                Text(channelTitleText(channelNumber?.toLongOrNull(), channelName),
                     Modifier.weight(1f, fill = false),
                     style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1, overflow = TextOverflow.Ellipsis)

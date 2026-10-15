@@ -76,7 +76,7 @@ class ChannelShelfCompositionTest {
                 }) {
                     PlayerChrome(
                         mode = if (layers.chrome.controlsVisible || layers.channelDrawerOpen) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
-                        content = PlayerChromeContent("", liveInfoBarData(1, "Channel", null, null, false, 0, "")),
+                        content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Channel", null, null, false, 0, "")),
                         timeline = PlayerChromeTimeline.Live(
                             at.bernhardberger.tvhplayer.playback.AppTimeshiftState(
                             available = true, bufferStartMs = -3_600_000, positionMs = -900_000, liveEdgeMs = 0),

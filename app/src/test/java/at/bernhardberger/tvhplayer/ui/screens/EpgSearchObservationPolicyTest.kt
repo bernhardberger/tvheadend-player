@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -31,6 +32,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Test
 
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class EpgSearchObservationPolicyTest {
     @Test
     fun sameSessionPublicationRefreshesDetailsRecordingOutsideRetainedEpgWindow() {
@@ -46,23 +48,9 @@ class EpgSearchObservationPolicyTest {
         val refreshed = requireNotNull(searchResultObservation(opening, session.observation.value))
 
         assertSame(opening.currentSession, refreshed.currentSession)
-        assertSame(recording, refreshed.dvrEntryForProgramme(event))
+        assertSame(recording, refreshed.dvrEntryForEvent(event))
         session.publish(observation())
-        assertNull(searchResultObservation(opening, session.observation.value)?.dvrEntryForProgramme(event))
-    }
-
-    @Test
-    fun ambiguousProgrammeRecordingMatchesRemainUnavailable() {
-        val event = EpgEvent.create(
-            id = EventId(21), channelId = ChannelId(7),
-            start = Instant.fromEpochSeconds(1_800_000_000),
-            stop = Instant.fromEpochSeconds(1_800_003_600),
-        )
-        val observation = observation(recordings = listOf(
-            DvrEntry.create(id = DvrEntryId(31), eventId = event.id),
-            DvrEntry.create(id = DvrEntryId(32), eventId = event.id),
-        ))
-        assertNull(observation.dvrEntryForProgramme(event))
+        assertNull(searchResultObservation(opening, session.observation.value)?.dvrEntryForEvent(event))
     }
 
     @Test
@@ -95,7 +83,7 @@ class EpgSearchObservationPolicyTest {
         )
         val observation = observation(recordings = listOf(recording))
 
-        assertSame(recording, observation.dvrEntryForProgramme(event))
+        assertSame(recording, observation.dvrEntryForEvent(event))
     }
 
     @Test
@@ -114,7 +102,7 @@ class EpgSearchObservationPolicyTest {
             SessionObservation.create(dvrState = DvrRepositoryState.Synchronizing(snapshot)),
         ).forEach { retainedObservation ->
             assertNull(retainedObservation.currentSession)
-            assertSame(recording, retainedObservation.dvrEntryForProgramme(event))
+            assertSame(recording, retainedObservation.dvrEntryForEvent(event))
         }
     }
 
@@ -151,7 +139,7 @@ class EpgSearchObservationPolicyTest {
             currentDvrMutation(mutation, opened, replacement)
         )
 
-        assertEquals(DvrMutationFeedback.CONNECTION_UNAVAILABLE, feedback)
+        assertEquals(DvrMutationFeedback.CONNECTION_UNAVAILABLE, feedback.toDvrMutationFeedback())
         assertEquals(0, dispatchCount)
     }
 

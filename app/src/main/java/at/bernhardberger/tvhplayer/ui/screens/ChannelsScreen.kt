@@ -87,7 +87,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -132,7 +131,6 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 internal fun channelsBrowseViewportPadding(
@@ -167,6 +165,8 @@ internal fun channelLazyItemMatches(key: Any?, channelId: ChannelId): Boolean =
 data class PlayerReturnFocus(
     val playingChannelId: ChannelId,
     val originChannelId: ChannelId,
+    val programmeId: at.bernhardberger.tvheadend.sdk.core.EventId? = null,
+    val programmeStartSec: Long? = null,
 )
 
 internal fun restoredChannelId(
@@ -203,7 +203,7 @@ fun ChannelsScreen(
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
     onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
-    onShowGuide: (ChannelId) -> Unit = {},
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) {
     at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime("channels")
     val channelScopeState = channelViewModel.scope.collectAsStateWithLifecycle().value
@@ -267,7 +267,7 @@ internal fun ChannelsScreenContent(
     onOpenConnectionSettings: () -> Unit,
     onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
     onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
-    onShowGuide: (ChannelId) -> Unit = {},
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) = profileTrace("P1:compose:channels") {
     val layoutDirection = LocalLayoutDirection.current
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
@@ -341,6 +341,7 @@ internal fun ChannelsScreenContent(
         }
     }
     val coroutineScope = rememberCoroutineScope()
+    val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
 
     fun cancelRestoration() {
         restorationGeneration++
@@ -583,10 +584,11 @@ internal fun ChannelsScreenContent(
         if (scopeEntryRequested && initialFocusEnabled) focusBrowseContent()
     }
 
+    val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Column(
         Modifier
             .fillMaxSize()
-            .graphicsLayer { alpha = if (showProgrammeDetails) 0f else 1f }
+            .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (showProgrammeDetails) 1f else 0f) }
             .semantics { if (contextChannelId != null) hideFromAccessibility() }
             .onPreviewKeyEvent { event ->
                 if (event.key != Key.Back) return@onPreviewKeyEvent false
@@ -894,19 +896,21 @@ internal fun ChannelsScreenContent(
     }
     contextChannelId?.let { channelId ->
         ChannelContextMenu(
+            mutationScope = coroutineScope,
+            mutationInFlight = detailsMutationInFlight,
             onPlayRecording = onPlayRecording,
+            returnFocusRequester = rowFocusRequesters[channelId],
             showDetails = showProgrammeDetails,
             onShowDetails = { showProgrammeDetails = true },
             channelId = channelId,
             observation = observation,
-            nowSec = kotlin.time.Clock.System.now().epochSeconds,
             imageLoader = imageLoader,
             onPlay = onPlay,
             onShowGuide = onShowGuide,
             onClose = {
                 showProgrammeDetails = false
                 contextChannelId = null
-                if (!requestChannelFocus(channelId)) {
+                if (!requestChannelFocus(channelId, preserveVisiblePosition = true)) {
                     // The menu's channel left the catalog; land where a removed focused row would.
                     val fallbackId = restoredChannelId(
                         visibleChannelIds = orderedChannelIds,

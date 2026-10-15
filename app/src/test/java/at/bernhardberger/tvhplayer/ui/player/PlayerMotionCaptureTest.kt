@@ -387,7 +387,7 @@ class PlayerMotionCaptureTest {
         )
         PlayerChrome(
             mode = mode,
-            content = PlayerChromeContent("20:15", liveInfoBarData(if (zapped) 2 else 1,
+            content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, if (zapped) 2 else 1,
                 if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ArtworkId(1)),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,

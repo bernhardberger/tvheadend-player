@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ContentCategory
+import at.bernhardberger.tvheadend.sdk.core.ContentGenre
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import kotlinx.serialization.Serializable
 
@@ -19,8 +20,10 @@ enum class ProgrammeCategory {
     LIFESTYLE_LEISURE,
 }
 
-fun programmeCategory(event: EpgEventEntry): ProgrammeCategory? =
-    when (event.contentGenre?.category) {
+fun programmeCategory(event: EpgEventEntry): ProgrammeCategory? = programmeCategory(event.contentGenre)
+
+fun programmeCategory(genre: ContentGenre?): ProgrammeCategory? =
+    when (genre?.category) {
         ContentCategory.MOVIE_DRAMA -> ProgrammeCategory.FILM_DRAMA
         ContentCategory.NEWS_CURRENT_AFFAIRS -> ProgrammeCategory.NEWS
         ContentCategory.SHOW_GAME_SHOW -> ProgrammeCategory.ENTERTAINMENT

@@ -1,7 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import kotlinx.coroutines.launch
+import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
@@ -26,24 +31,32 @@ internal fun SettingsScreen(
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
     applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
+    settingsStore: UiSettingsStore = koinInject(),
 ) {
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
+    val observation by channelsVm.observation.collectAsStateWithLifecycle()
+    val profiles = observation.currentDvrConfigurations()
+    val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
+    val scope = rememberCoroutineScope()
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation, connectionPresentation, onRetry) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(applianceBuild),
+        settingsRootLevel(applianceBuild, profiles.size > 1),
         settingsKeepChannelLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-    ) + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
+    ) + settingsRecordingLevels(profiles, settings.recordingProfileId) { id ->
+        scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
+    } + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent)
 }
 
 @Composable
-internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
+internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD, showRecordings: Boolean = false): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
     settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general_nav), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune),
     settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list),
     settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
     settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
-) + if (applianceBuild) listOf(
+) + (if (showRecordings) listOf(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
+    icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + if (applianceBuild) listOf(
     settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance_nav), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home),
 ) else emptyList())
 

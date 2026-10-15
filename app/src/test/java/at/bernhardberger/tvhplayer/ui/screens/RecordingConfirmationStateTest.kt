@@ -41,6 +41,119 @@ class RecordingConfirmationStateTest {
     @Test fun actionFailureIsPostedAfterDetailsClose() = delayedFailure(reopen = false)
     @Test fun actionFailureIsPostedAfterDetailsReopen() = delayedFailure(reopen = true)
 
+    @Test fun confirmedDetailsDeleteClosesAndFocusesTheNeighbour() {
+        val neighbour = DvrEntry.create(DvrEntryId(2), title = "Neighbour", state = DvrEntryState.COMPLETED, folder = emptyList())
+        val entry = DvrEntry.create(DvrEntryId(1), title = "Recording", state = DvrEntryState.COMPLETED, folder = emptyList())
+        val initial = observation(DvrEntryState.COMPLETED)
+        fun snapshot(entries: List<DvrEntry>) = SessionObservation.create(
+            sessionState = initial.sessionState, channelState = initial.channelState, epgState = initial.epgState,
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)))
+        val session = FakeTvheadendSession(snapshot(listOf(entry, neighbour)))
+        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
+        var calls = 0
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> error("unexpected schedule") },
+            stopEntry = { _, _ -> error("unexpected stop") },
+            cancelEntry = { _, _ -> error("unexpected cancel") },
+            deleteEntry = { _, _ ->
+                calls++
+                session.publish(snapshot(listOf(neighbour)))
+                DvrMutationResult.Confirmed(Unit)
+            },
+        )
+        val state = RecordingsScreenState()
+        val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                    currentObservation = { session.observation.value }, state = state,
+                    imageLoader = loader, dvrMutationActions = actions, notices = notices)
+            }
+        }
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
+        compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.onNodeWithTag("recording-list-entry-2").assertIsFocused()
+        compose.runOnIdle { assertEquals(1, calls) }
+        loader.shutdown()
+    }
+
+    @Test fun lastInFolderDeleteFromDetailsReturnsToNextParentItem() = lastInFolder("details")
+    @Test fun lastInFolderDeleteFromMenuReturnsToPreviousParentItem() = lastInFolder("menu")
+    @Test fun lastInFolderRemovalFromBrowseReturnsToParentItemAndBackWorks() = lastInFolder("browse")
+    @Test fun lastInFolderDeleteAtEmptyRootFocusesMode() = lastInFolder("details", emptyRoot = true)
+
+    private fun lastInFolder(source: String, emptyRoot: Boolean = false) {
+        val entry = DvrEntry.create(DvrEntryId(1), title = "Recording", state = DvrEntryState.COMPLETED,
+            folder = listOf("Series", "Middle", "Only"))
+        val before = DvrEntry.create(DvrEntryId(2), title = "Before", state = DvrEntryState.COMPLETED,
+            folder = listOf("Series", "Before"))
+        val after = DvrEntry.create(DvrEntryId(3), title = "Next", state = DvrEntryState.COMPLETED,
+            folder = listOf("Series", "Next"))
+        val survivors = if (emptyRoot) emptyList() else if (source == "menu") listOf(before) else listOf(before, after)
+        val initial = observation(DvrEntryState.COMPLETED)
+        fun snapshot(entries: List<DvrEntry>) = SessionObservation.create(initial.sessionState, initial.channelState,
+            initial.epgState, DvrRepositoryState.Current(DvrSnapshot.create(entries)))
+        val session = FakeTvheadendSession(snapshot(survivors + entry))
+        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
+        var calls = 0
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> error("unexpected schedule") },
+            stopEntry = { _, _ -> error("unexpected stop") },
+            cancelEntry = { _, _ -> error("unexpected cancel") },
+            deleteEntry = { _, _ -> calls++; session.publish(snapshot(survivors)); DvrMutationResult.Confirmed(Unit) },
+        )
+        val state = RecordingsScreenState()
+        val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
+        lateinit var back: OnBackPressedDispatcher
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
+                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                    currentObservation = { session.observation.value }, state = state,
+                    imageLoader = loader, dvrMutationActions = actions, notices = notices)
+            }
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Series").fetchSemanticsNodes().isNotEmpty() }
+        listOf("Series", "Middle", "Only").forEach { name ->
+            compose.onNode(hasText(name) and hasClickAction()).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        }
+        val row = compose.onNodeWithTag("recording-list-entry-1").assertIsFocused()
+        if (source == "browse") {
+            // Browse cards open playback; deletion arrives as a repository publication.
+            compose.runOnIdle { session.publish(snapshot(survivors)) }
+            compose.waitUntil(10_000) { state.archivePath == if (emptyRoot) emptyList<String>() else listOf("Series") }
+        } else {
+            row.performKeyInput { pressKey(Key.Menu) }
+            if (source == "details") {
+                compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithTag("details-delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            } else compose.onNodeWithText("Delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("recording-confirmation-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
+            compose.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        }
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        if (emptyRoot) {
+            compose.runOnIdle { assertEquals(emptyList<String>(), state.archivePath) }
+            compose.onNode(hasText("Archive") and hasClickAction()).assertIsFocused()
+        } else {
+            compose.runOnIdle { assertEquals(listOf("Series"), state.archivePath) }
+            compose.onNode(hasText(if (source == "menu") "Before" else "Next") and hasClickAction()).assertIsFocused()
+            compose.runOnIdle { back.onBackPressed() }
+            compose.runOnIdle { assertEquals(emptyList<String>(), state.archivePath) }
+            compose.onNode(hasText("Series") and hasClickAction()).assertIsFocused()
+        }
+        compose.runOnIdle { assertEquals(if (source == "browse") 0 else 1, calls) }
+        loader.shutdown()
+    }
+
     private fun delayedFailure(reopen: Boolean) {
         lateinit var backDispatcher: OnBackPressedDispatcher
         val session = FakeTvheadendSession(observation(DvrEntryState.SCHEDULED))
@@ -143,8 +256,8 @@ class RecordingConfirmationStateTest {
         epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = state?.let {
             listOf(DvrEntry.create(id = DvrEntryId(1), title = "Recording", state = it,
-                start = kotlin.time.Instant.fromEpochMilliseconds(System.currentTimeMillis() + 3_600_000),
-                stop = kotlin.time.Instant.fromEpochMilliseconds(System.currentTimeMillis() + 7_200_000)))
+                start = kotlin.time.Instant.parse("2026-09-15T20:00:00Z"),
+                stop = kotlin.time.Instant.parse("2026-09-15T21:00:00Z")))
         }.orEmpty())),
     )
 }

@@ -15,7 +15,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
@@ -75,7 +74,7 @@ class EpgGridObservationPolicyTest {
 
         assertNotNull(observation.currentSession)
         assertEquals(
-            DvrConfigChoice.Automatic(configId = null),
+            null,
             chooseDvrConfig(observation.currentDvrConfigurations()),
         )
     }
@@ -88,9 +87,26 @@ class EpgGridObservationPolicyTest {
         )
 
         assertEquals(
-            DvrConfigChoice.Automatic(currentConfiguration.id),
+            currentConfiguration.id,
             chooseDvrConfig(observation.currentDvrConfigurations()),
         )
+    }
+
+    @Test fun recordingDefaultPrefersUnnamedOtherwiseFirstProfile() {
+        val first = configuration("first")
+        val unnamed = DvrConfiguration(DvrConfigId("default"), "", "")
+        assertEquals(unnamed.id, chooseDvrConfig(listOf(first, unnamed)))
+        assertEquals(first.id, chooseDvrConfig(listOf(first, configuration("second"))))
+        assertEquals(null, chooseDvrConfig(emptyList()))
+    }
+
+    @Test fun recordingProfileUsesSavedIdOnlyWhileOfferedByCurrentServer() {
+        val first = configuration("first")
+        val unnamed = DvrConfiguration(DvrConfigId("default"), "", "")
+        assertEquals(first.id, chooseDvrConfig(listOf(first, unnamed), first.id))
+        assertEquals(unnamed.id, chooseDvrConfig(listOf(first, unnamed), DvrConfigId("removed")))
+        assertEquals(first.id, chooseDvrConfig(listOf(first), DvrConfigId("removed")))
+        assertEquals(null, chooseDvrConfig(emptyList(), first.id))
     }
 
     private fun currentObservation(

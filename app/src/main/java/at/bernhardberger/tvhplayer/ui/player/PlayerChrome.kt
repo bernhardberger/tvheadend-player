@@ -39,6 +39,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.stateDescription
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -149,7 +150,7 @@ internal fun PlayerChrome(
                         val unavailable = stringResource(R.string.player_info_unavailable_title)
                         val spoken = listOfNotNull(content.info.title, content.info.subtitle,
                             content.info.timeRange, content.info.metadata).filter { it.isNotBlank() }.joinToString(". ")
-                            .ifBlank { listOf(content.info.channelNumber, content.info.channelName, unavailable)
+                            .ifBlank { listOf(channelTitleText(content.info.channelNumber.toLongOrNull(), content.info.channelName), unavailable)
                                 .filter { it.isNotBlank() }.joinToString(". ") }
                         // Focused like the rail's cards: the native outline and scale, nothing over the artwork.
                         Card(onClick = { onInteraction(); onInfo() },

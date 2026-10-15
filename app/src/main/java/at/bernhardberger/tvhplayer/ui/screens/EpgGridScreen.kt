@@ -2,15 +2,9 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.ui.graphics.graphicsLayer
 
-import at.bernhardberger.tvhplayer.core.BrowseContextAction
-import at.bernhardberger.tvhplayer.core.guideContextActions
-import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.common.formatHm
 import androidx.compose.foundation.layout.width
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -66,7 +60,6 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
@@ -95,7 +88,6 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
-import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -103,7 +95,6 @@ import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
-import at.bernhardberger.tvhplayer.core.DvrConfigChoice
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
@@ -114,11 +105,9 @@ import at.bernhardberger.tvhplayer.core.GuideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.GuideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.GuidePendingNavigationAction
 import at.bernhardberger.tvhplayer.core.guidePendingNavigationAction
-import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
-import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
 import at.bernhardberger.tvhplayer.core.firstUnsettledGuidePageIndex
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
@@ -150,7 +139,6 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
-import at.bernhardberger.tvhplayer.ui.common.formatDateAndClock
 import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
@@ -161,8 +149,6 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
-import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
-import at.bernhardberger.tvhplayer.ui.screens.guide.DvrConfigDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideConnectionRecovery
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePassiveNotice
@@ -184,15 +170,12 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.guideViewportFades
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
-import java.time.Instant
 import java.time.ZoneId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant as KotlinInstant
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
-import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
 private data class GuideTabBody(
@@ -264,6 +247,8 @@ private data class WindowFocusRequest(
     val windowStartSec: Long,
     val coverageRequest: GuideCoverageRequestToken,
     val throughSec: Long,
+    val programmeId: EventId? = null,
+    val programmeStartSec: Long? = null,
 )
 
 private data class GuideSearchRequest(
@@ -301,7 +286,7 @@ internal fun guideTimelineContentPadding(
     bottom = maxOf(contentPadding.calculateBottomPadding(), GuideEdgeFade + GuideFocusReserve),
 )
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 fun EpgGridScreen(
     contentPadding: PaddingValues = PaddingValues(),
@@ -347,6 +332,7 @@ fun EpgGridScreen(
         InsetBringIntoViewSpec(platformBringIntoView, verticalFocusInset, verticalFocusInset)
     }
     val coroutineScope = rememberCoroutineScope()
+    val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
     val dvrMutationActions = remember(session.dvrRepository) {
         DvrMutationActions(session.dvrRepository)
     }
@@ -409,6 +395,10 @@ fun EpgGridScreen(
     val pendingPlayerReturn = playerReturn?.takeIf { it !== positionedPlayerReturn }
     val playerReturnChannelId = pendingPlayerReturn?.playingChannelId
         ?.takeIf { id -> channels.any { it.id == id } }
+    val requestedProgramme = pendingPlayerReturn?.programmeId?.let(observation::event)?.takeIf {
+        it.channelId == playerReturnChannelId && it.start.epochSeconds == pendingPlayerReturn.programmeStartSec &&
+            it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
+    }
     val restoredPosition = remember { guidePositionStore.position.value }
     val restoredTimelinePosition = remember(restoredPosition, windowBounds) {
         restoredPosition?.takeIf { it.windowStartSec in
@@ -865,7 +855,8 @@ fun EpgGridScreen(
             return@LaunchedEffect
         }
         if (playerReturnChannelId != null) {
-            val nowWindow = windowBounds.constrain(floorGuideWindowToHour(nowSecProvider(), guideZoneId))
+            val nowWindow = windowBounds.constrain(floorGuideWindowToHour(
+                requestedProgramme?.start?.epochSeconds ?: nowSecProvider(), guideZoneId))
             // Re-enters once the index for the current-hour window is prepared.
             if (windowStartSec != nowWindow) {
                 windowStartSec = nowWindow
@@ -889,8 +880,8 @@ fun EpgGridScreen(
         val target = initialTimelineEpgFocus(
             rows = focusRows,
             preferredChannelIndex = channelIndex,
-            preferredEventId = restored?.eventId,
-            targetSec = restored?.eventStartSec ?: nowSecProvider(),
+            preferredEventId = requestedProgramme?.id ?: restored?.eventId,
+            targetSec = requestedProgramme?.start?.epochSeconds ?: restored?.eventStartSec ?: nowSecProvider(),
         )
 
         val targetChannelIndex = target?.channelIndex ?: channelIndex
@@ -1317,7 +1308,7 @@ fun EpgGridScreen(
             val resolution = resolveGuideWindowFocus(
                 rows = focusRows,
                 preferredChannelId = request.preferredChannelId,
-                targetSec = request.windowStartSec,
+                targetSec = request.programmeStartSec ?: request.windowStartSec,
                 requestedChannelIds = request.coverageRequest.generations.keys,
                 coverages = snapshot?.coverages.orEmpty(),
                 requestedThrough = KotlinInstant.fromEpochSeconds(request.throughSec),
@@ -1330,7 +1321,11 @@ fun EpgGridScreen(
             GuideCoverageFocusResolution.Release -> Unit
             is GuideCoverageFocusResolution.Select -> {
                 pendingInitialChannelIndex = resolution.target.channelIndex
-                selectedTarget = resolution.target
+                selectedTarget = request.programmeId?.let { id ->
+                    initialTimelineEpgFocus(focusRows, resolution.target.channelIndex,
+                        request.programmeStartSec ?: request.windowStartSec, id)
+                } ?: resolution.target
+                channelListState.scrollToItem((resolution.target.channelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE)
             }
         }
         completeWindowFocusRequest(request)
@@ -1381,8 +1376,9 @@ fun EpgGridScreen(
         selectedTarget = target
     }
 
-    fun jumpToWindow(targetSec: Long) {
-        val channelIndex = selectedTarget?.channelIndex
+    fun jumpToWindow(targetSec: Long, channelId: ChannelId? = null, programme: EpgEventEntry? = null) {
+        val channelIndex = channelId?.let { id -> channels.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
+            ?: selectedTarget?.channelIndex
             ?: pendingInitialChannelIndex.takeIf { it >= 0 }
             ?: 0
         val preferredChannelId = channels.getOrNull(channelIndex)?.id ?: return
@@ -1398,6 +1394,8 @@ fun EpgGridScreen(
             windowStartSec = boundedTargetSec,
             coverageRequest = coverageRequest,
             throughSec = boundedTargetSec + visibleWindowSec,
+            programmeId = programme?.id,
+            programmeStartSec = programme?.start?.epochSeconds,
         )
     }
 
@@ -1601,6 +1599,7 @@ fun EpgGridScreen(
     }
 
     val categoryLabel = programmeCategoryLabel(category)
+    val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
         BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = preparedIndex != null,
             onPendingFocus = {
@@ -1633,7 +1632,7 @@ fun EpgGridScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = if (detailsEvent != null && !showContextMenu) 0f else 1f }
+                .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
                 .semantics { if (detailsEvent != null) hideFromAccessibility() }
                 .focusProperties {
                     onEnter = {
@@ -2041,9 +2040,9 @@ fun EpgGridScreen(
                                     }
                                 }
                             },
-                            recordingForEvent = { eventId ->
+                            recordingForEvent = { event ->
                                 profileTrace("P48:guideRecordingLookup") {
-                                    observation.dvrEntryForEvent(eventId)
+                                    observation.dvrEntryForEvent(event)
                                 }
                             },
                             onOpenDetails = {
@@ -2151,10 +2150,22 @@ fun EpgGridScreen(
             ProgrammeDetailsHost(
                 openingEvent = openingEvent, openingObservation = openingObservation,
                 observation = observation, currentObservation = { observationState.value },
-                nowSecProvider = nowSecProvider, fromGuide = true, showContextMenu = showContextMenu,
+                nowSecProvider = { System.currentTimeMillis() / 1000L }, fromGuide = true, showContextMenu = showContextMenu,
+                mutationScope = coroutineScope, mutationInFlight = detailsMutationInFlight,
                 onShowDetails = { showContextMenu = false }, imageLoader = imageLoader,
                 mutations = dvrMutationActions, notices = notices, onPlay = onPlay,
                 onPlayRecording = onPlayRecording, onClose = ::closeDetails,
+                returnFocusRequester = eventFocusRequesters[openingEvent.id].takeUnless { detailsFromSearch },
+                onShowGuide = { channelId, programme ->
+                    showSearchDialog = false
+                    restoreDetailsFocus = false
+                    val available = programme?.id?.let(observation::event)?.takeIf {
+                        it.channelId == channelId &&
+                            it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
+                    }
+                    jumpToWindow(floorGuideWindowToHour(available?.start?.epochSeconds ?: nowSecProvider(), guideZoneId),
+                        channelId, available)
+                },
             )
         }
 
@@ -2209,11 +2220,6 @@ internal fun currentGuideRecordingTarget(target: ProgrammeRecordingTarget?, obse
             observation.event(selected.eventId)?.programmeRecordingTarget(selected.currentSession) == selected
     }
 
-internal fun SessionObservation.dvrEntryForProgramme(event: EpgEventEntry): DvrEntry? =
-    dvrSnapshotForDisplay?.entries?.singleOrNull { entry ->
-        entry.eventId == event.id || event.dvrEntryId == entry.id
-    }
-
 internal fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguration> =
     when (val state = dvrConfigurationsState) {
         is DvrConfigurationsState.Current -> state.configurations
@@ -2257,5 +2263,5 @@ private fun rememberCurrentEpochSeconds(): () -> Long {
     return remember(nowSec) { { nowSec.longValue } }
 }
 
-internal fun Long.formatDateTime(): String =
-    formatDateAndClock(Instant.ofEpochSecond(this).atZone(ZoneId.systemDefault()), "EEE d MMM")
+internal fun Long.formatDateTime(locale: java.util.Locale = java.util.Locale.getDefault()): String =
+    at.bernhardberger.tvhplayer.ui.common.formatRecordingDate(this, locale = locale)

@@ -58,6 +58,7 @@ class ProgrammeDetailsPanelTest {
         showPanel(withDescription = true)
         composeRule.onNodeWithText(context.getString(R.string.record)).assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionDown) }
+        composeRule.onNodeWithTag("details-about").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         composeRule.onNodeWithTag("details-card-22").assertIsFocused()
         publishScheduledRecording()
         composeRule.onNodeWithTag("details-card-22").assertIsFocused()

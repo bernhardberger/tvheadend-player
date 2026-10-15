@@ -22,6 +22,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.positionInRoot
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -200,6 +202,7 @@ class BrowseCohesionEvidenceTest {
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
     private lateinit var view: View
+    private lateinit var back: androidx.activity.OnBackPressedDispatcher
     private lateinit var session: FakeTvheadendSession
     private lateinit var imageLoader: ImageLoader
     private lateinit var originalZone: TimeZone
@@ -271,8 +274,37 @@ class BrowseCohesionEvidenceTest {
         capture("guide-current", 1f, "Guide first channel current programme", hasText(CURRENT_TITLE))
         key(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()
-        capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"))
+        capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"), fullscreenDetails = true)
         compose.onNodeWithText("Close").assertDoesNotExist()
+    }
+
+    @Test fun guideDetailsCrossfadeKeepsTheBrowseViewportStationary() {
+        showGuide(1f)
+        key(Key.DirectionDown)
+        val origin = compose.onNodeWithTag("epg-programme-viewport", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
+        val before = origin.positionInRoot()
+        val width = origin.size.width
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        repeat((PlayerMotion.MediumMs + 96) / 16) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            assertEquals(before, origin.positionInRoot())
+            assertEquals(width, origin.size.width)
+            val page = compose.onNodeWithTag("programme-details-page").fetchSemanticsNode().layoutInfo.coordinates
+            assertEquals(0f, page.positionInRoot().x, .1f)
+        }
+        val page = compose.onNodeWithTag("programme-details-page").fetchSemanticsNode().layoutInfo.coordinates
+        compose.runOnIdle { back.onBackPressed() }
+        repeat((PlayerMotion.MediumMs + 96) / 16) {
+            compose.mainClock.advanceTimeByFrame()
+            compose.waitForIdle()
+            assertEquals(before, origin.positionInRoot())
+            assertEquals(width, origin.size.width)
+            if (page.isAttached) assertEquals(0f, page.positionInRoot().x, .1f)
+        }
+        compose.mainClock.autoAdvance = true
+        awaitFocus(hasText(CURRENT_TITLE))
     }
 
     @Test
@@ -365,6 +397,7 @@ class BrowseCohesionEvidenceTest {
         }
         val noticeModule = module {
             single { notices }
+            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()) }
             single { profiles }
             single<at.bernhardberger.tvheadend.sdk.core.TvheadendSession> { session }
         }
@@ -420,6 +453,7 @@ class BrowseCohesionEvidenceTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
+                    back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     // Deliberate no-video backdrop shared by all three destinations.
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(
@@ -544,6 +578,7 @@ class BrowseCohesionEvidenceTest {
         scenario: String,
         focus: SemanticsMatcher,
         dialog: Boolean = false,
+        fullscreenDetails: Boolean = false,
     ) {
         awaitFocus(focus)
         compose.runOnIdle {
@@ -556,8 +591,11 @@ class BrowseCohesionEvidenceTest {
                 assertFalse(player.playWhenReady)
             }
         }
-        val rail = compose.onNodeWithTag("global-drawer-surface").fetchSemanticsNode().boundsInRoot
-        assertEquals("Production closed push rail", 80f, rail.width, 0.01f)
+        if (fullscreenDetails) compose.onNodeWithTag("global-drawer-surface").assertDoesNotExist()
+        else {
+            val rail = compose.onNodeWithTag("global-drawer-surface").fetchSemanticsNode().boundsInRoot
+            assertEquals("Production closed push rail", 80f, rail.width, 0.01f)
+        }
         val bitmap = draw(dialog)
         assertEquals(960, bitmap.width)
         assertEquals(540, bitmap.height)
@@ -575,7 +613,7 @@ class BrowseCohesionEvidenceTest {
             captureSource=ux/browse-cohesion implementation worktree
             canvas=960x540 dp; pixels=960x540; density=1.0 (mdpi)
             locale=en-US; resourceQualifier=en; fontScale=$scale; timezone=UTC
-            shell=TVHeadendPlayerTheme + SideRail; closedPushRail=80dp; no extra insets
+            shell=TVHeadendPlayerTheme + SideRail; closedPushRail=${if (fullscreenDetails) "hidden for details" else "80dp"}; no extra insets
             shellContentPadding=start ${TvScreenPadding.calculateLeftPadding(LayoutDirection.Ltr)}, end ${TvScreenPadding.calculateRightPadding(LayoutDirection.Ltr)}, top ${TvScreenPadding.calculateTopPadding()}, bottom ${TvScreenPadding.calculateBottomPadding()}
             scenario=$scenario
             assertedNativeFocus=${focus.description}; D-pad input, no painted focus override

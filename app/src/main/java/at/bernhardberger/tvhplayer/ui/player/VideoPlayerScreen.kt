@@ -1,9 +1,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.screens.currentDvrConfigurations
+
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 
 import android.os.SystemClock
@@ -361,6 +364,7 @@ internal suspend fun startInitialLivePlayback(
 }
 
 @OptIn(UnstableApi::class)
+@kotlin.OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 fun VideoPlayerScreen(
     videoPlayerViewModel: VideoPlayerViewModel = koinViewModel(),
@@ -379,6 +383,7 @@ fun VideoPlayerScreen(
     startupTarget: at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget? = null,
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
+    uiSettingsStore: at.bernhardberger.tvhplayer.settings.UiSettingsStore = koinInject(),
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -1119,7 +1124,7 @@ fun VideoPlayerScreen(
     val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
     val actionableInfoEvent = currentProgrammeEvent(observation, programDetails.opened ?: detailsBaseEvent)
     val currentRecording = remember(observation, actionableInfoEvent?.id) {
-        actionableInfoEvent?.let { observation.dvrEntryForEvent(it.id) }
+        actionableInfoEvent?.let { observation.dvrEntryForEvent(it) }
     }
     val currentRecordingTarget = currentSession?.let { capability ->
         actionableInfoEvent?.programmeRecordingTarget(capability)
@@ -1285,24 +1290,7 @@ fun VideoPlayerScreen(
         ) layerState.onProgrammeChanged()
     }
 
-    fun activateInfoRecording(action: ProgrammeAction = ProgrammeAction.RECORD) {
-        if (infoMutation != null || action !in infoActions) return
-        val target = currentRecordingTarget ?: return
-        val mutation = when (action) {
-            ProgrammeAction.RECORD -> DvrMutationAction.CreateProgramme(target, configId = null)
-            ProgrammeAction.STOP_RECORDING -> currentRecording?.let { DvrMutationAction.Stop(target.currentSession, it.id) }
-            ProgrammeAction.CANCEL_RECORDING -> currentRecording?.let { DvrMutationAction.Cancel(target.currentSession, it.id) }
-            else -> null
-        } ?: return
-        infoMutation = mutation
-        infoMutationTarget = target
-        infoMutationObservation = observation
-        infoPendingAction = action
-        layerState.showRecordingConfirmation()
-    }
-
     fun confirmInfoRecording() {
-        if (infoPendingAction == null) return
         val target = infoMutationTarget ?: return
         val openingObservation = infoMutationObservation
         val request = currentDvrMutation(infoMutation, openingObservation, session.observation.value)
@@ -1312,17 +1300,44 @@ fun VideoPlayerScreen(
         layerState.dismissRecordingConfirmation()
         programDetails.focusContent()
         if (request == null) { infoMutation = null; return }
-        scope.launch {
-            val currentRequest = currentDvrMutation(request, openingObservation, session.observation.value)
-                ?: return@launch
-            val feedback = dvrMutationActions.execute(currentRequest)
-            notices.postDvrFailure(currentRequest, feedback, noticeContext)
-            if (detailsRecordingResultIsCurrent(request, infoMutation, target, latestRecordingTarget,
-                    layerState.infoOpen, selectionVersion == programDetails.selectionVersion) &&
-                session.observation.value.currentSession === target.currentSession) {
-                infoMutation = null
+        // Keep the guard set for the whole input dispatch, including synchronous repository results.
+        scope.launch(kotlinx.coroutines.Dispatchers.Main) {
+            try {
+                val preferred = if (request is DvrMutationAction.CreateProgramme)
+                    uiSettingsStore.settings.first().recordingProfileId else null
+                val current = session.observation.value
+                val currentRequest = currentDvrMutation(request, openingObservation, current) ?: return@launch
+                val configured = if (currentRequest is DvrMutationAction.CreateProgramme)
+                    currentRequest.copy(configId = at.bernhardberger.tvhplayer.core.chooseDvrConfig(
+                        current.currentDvrConfigurations(), preferred)) else currentRequest
+                val feedback = dvrMutationActions.execute(configured)
+                notices.postDvrFailure(configured, feedback, noticeContext)
+            } finally {
+                if (detailsRecordingResultIsCurrent(request, infoMutation, target, latestRecordingTarget,
+                        layerState.infoOpen, selectionVersion == programDetails.selectionVersion) &&
+                    session.observation.value.currentSession === target.currentSession) {
+                    infoMutation = null
+                }
             }
         }
+    }
+
+    fun activateInfoRecording(action: ProgrammeAction = ProgrammeAction.RECORD) {
+        if (infoMutation != null || action !in infoActions) return
+        val target = currentRecordingTarget ?: return
+        val mutation = when (action) {
+            ProgrammeAction.RECORD -> DvrMutationAction.CreateProgramme(target, null)
+            ProgrammeAction.STOP_RECORDING -> currentRecording?.let { DvrMutationAction.Stop(target.currentSession, it.id) }
+            ProgrammeAction.CANCEL_RECORDING -> currentRecording?.let { DvrMutationAction.Cancel(target.currentSession, it.id) }
+            else -> null
+        } ?: return
+        infoMutation = mutation
+        infoMutationTarget = target
+        infoMutationObservation = observation
+        if (action != ProgrammeAction.RECORD) {
+            infoPendingAction = action
+            layerState.showRecordingConfirmation()
+        } else confirmInfoRecording()
     }
 
     LaunchedEffect(infoPendingAction, observation) {
@@ -1432,11 +1447,12 @@ fun VideoPlayerScreen(
         clock = formatClock(nowSec),
         state = chromeState,
         info = liveInfoBarData(
+            resources = androidx.compose.ui.platform.LocalContext.current.resources,
             channelNumber = currentChannelNumber,
             channelName = currentChannelName,
             event = controlsEvent,
             next = controlsNext,
-            nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it.id) }?.state ==
+            nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it) }?.state ==
                 at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
             nowSec = nowSec,
             unavailableTitle = unavailableTitle,
@@ -1670,7 +1686,7 @@ fun VideoPlayerScreen(
             dialog = infoRailChannelId != null,
             railHeader = if (programDetails.scheduleEntry && layerState.infoOpen) ({
                 val channel = channels.firstOrNull { it.id == (infoRailChannelId ?: selectedId) }
-                ProgrammeScheduleHeader(listOfNotNull(channel?.visibleChannelNumber?.toString(), channel?.name).joinToString(" · "))
+                ProgrammeScheduleHeader(channelTitleText(channel?.visibleChannelNumber, channel?.name.orEmpty()))
             }) else null,
             player = { keepControls ->
         PlayerChrome(
@@ -1813,8 +1829,7 @@ fun VideoPlayerScreen(
             },
         ) { (shownChannel, shownEvent) ->
             val shownChannelId = shownChannel?.id ?: shownEvent?.channelId ?: currentChannelId
-            val detailsIdentity = listOfNotNull(shownChannel?.visibleChannelNumber?.toString(), shownChannel?.name)
-                .joinToString(" · ")
+            val detailsIdentity = channelTitleText(shownChannel?.visibleChannelNumber, shownChannel?.name.orEmpty())
             val watch: (() -> Unit)? = shownChannel?.takeIf { it.id != currentChannelId }?.let { channel ->
                 {
                     infoRailChannelId = null
@@ -1865,10 +1880,10 @@ fun VideoPlayerScreen(
                                 imageLoader = imageLoader,
                                 currentSession = currentSession,
                                 modifier = tileModifier,
-                                recordingBadge = observation.dvrEntryForEvent(event.id)?.state == DvrEntryState.RECORDING,
+                                recordingBadge = observation.dvrEntryForEvent(event)?.state == DvrEntryState.RECORDING,
                             )
                         },
-                        recordingFor = { event -> observation.dvrEntryForEvent(event.id) },
+                        recordingFor = { event -> observation.dvrEntryForEvent(event) },
                         canModifyRecordings = canModifyRecordings,
                         recordFocus = recordFocus,
                         firstFocus = firstFocus,
@@ -1884,9 +1899,10 @@ fun VideoPlayerScreen(
             )
             infoPendingAction?.let { action ->
                 ConfirmProgrammeActionDialog(action, actionableInfoEvent?.title.orEmpty(),
+                    entries = infoMutationTarget?.eventId?.let { infoMutationObservation?.dvrEntriesForEvent(it) },
+                    configurations = observation.currentDvrConfigurations(),
                     channelName = shownChannel?.name.orEmpty(),
-                    dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(actionableInfoEvent?.start?.epochSeconds,
-                        actionableInfoEvent?.stop?.epochSeconds?.takeIf { action == ProgrammeAction.RECORD }),
+                    dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(actionableInfoEvent?.start?.epochSeconds),
                     onDismiss = ::dismissRecordingDialog, onConfirm = ::confirmInfoRecording,
                     onPreviewKeyEvent = { event ->
                         val code = event.nativeKeyEvent.keyCode
@@ -1895,13 +1911,8 @@ fun VideoPlayerScreen(
                                 if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(code)
                                 true
                             }
-                            event.key == Key.Back -> {
-                                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN && event.nativeKeyEvent.repeatCount == 0) {
-                                    layerState.beginOpeningKeyCycle(code)
-                                    dismissRecordingDialog()
-                                }
-                                true
-                            }
+                            // The confirmation owns Back through its card fade.
+                            event.key == Key.Back -> false
                             event.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
                                 Key.DirectionCenter, Key.Enter, Key.NumPadEnter) -> false
                             else -> true

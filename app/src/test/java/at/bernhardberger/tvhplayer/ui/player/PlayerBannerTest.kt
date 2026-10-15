@@ -22,6 +22,8 @@ import org.junit.Test
 
 /** The Banner layer, programme-change rule and live status/info-bar data. */
 @OptIn(ExperimentalCoroutinesApi::class)
+@org.junit.runner.RunWith(org.robolectric.RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [34], application = android.app.Application::class)
 class PlayerBannerTest {
     @Test
     fun zapWithHiddenControlsShowsTheBannerUntilTheChannelsFrame() = runTest {
@@ -149,7 +151,7 @@ class PlayerBannerTest {
     fun liveInfoBarCarriesTheDisplayedAndNextProgrammeAndOmitsMissingFacts() {
         val now = event(1, 3_600L, 7_200L, "Now", subtitle = "Part one")
         val next = event(2, 7_200L, 9_000L, "Later")
-        val data = liveInfoBarData(101L, "ORF 1 HD", now, next, nextScheduled = true, nowSec = 5_000L, unavailableTitle = "n/a")
+        val data = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101L, "ORF 1 HD", now, next, nextScheduled = true, nowSec = 5_000L, unavailableTitle = "n/a")
         assertEquals("101", data.channelNumber)
         assertEquals("Now", data.title)
         assertEquals("Part one", data.subtitle)
@@ -158,7 +160,7 @@ class PlayerBannerTest {
         assertTrue(data.nextScheduled)
         assertNull(data.recordedDate)
 
-        val bare = liveInfoBarData(null, "ORF 1 HD", null, null, nextScheduled = true, nowSec = 5_000L, unavailableTitle = "n/a")
+        val bare = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, null, "ORF 1 HD", null, null, nextScheduled = true, nowSec = 5_000L, unavailableTitle = "n/a")
         assertEquals("", bare.channelNumber)
         assertEquals("n/a", bare.title)
         assertEquals("", bare.timeRange)

@@ -1001,6 +1001,7 @@ class GuideVisualLayoutTest {
         }
         val noticeModule = module {
             single { notices }
+            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()) }
             single { profiles }
             single<TvheadendSession> { session }
         }

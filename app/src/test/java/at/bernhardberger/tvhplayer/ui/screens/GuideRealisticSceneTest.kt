@@ -93,6 +93,7 @@ class GuideRealisticSceneTest {
     private lateinit var loader: ImageLoader
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
+    private lateinit var layering: at.bernhardberger.tvhplayer.ui.components.BrowseContentLayering
     private lateinit var oldLocale: Locale
     private lateinit var oldZone: TimeZone
     private var playbackRequests = 0
@@ -274,6 +275,58 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-long-german")
     }
 
+    @Test fun guideImmediateRecordReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Record")
+    @Test fun guideStopKeepReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Keep")
+    @Test fun guideStopConfirmReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Stop")
+    @Test fun guideDetailsBackReturnsDirectlyToCellEveryFrame() = guideReturnEveryFrame("Back")
+
+    private fun guideReturnEveryFrame(action: String) {
+        showAt("2026-09-15T19:40:00")
+        if (action == "Keep" || action == "Stop") {
+            moveToChannel(5)
+            seekEvent(eventsByFixtureId.getValue("evt-ch-northline-news-20260915T1930"))
+        } else moveToChannel(1)
+        val cell = compose.onNode(isFocused()).fetchSemanticsNode().id
+        key(Key.Menu)
+        when (action) {
+            "Back" -> {
+                compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithTag("details-watch").assertIsFocused()
+            }
+            "Keep", "Stop" -> {
+                compose.onNodeWithText("Stop recording").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText(if (action == "Keep") "Keep recording" else "Stop recording")
+                    .requestFocus().assertIsFocused()
+            }
+            else -> compose.onNodeWithText("Record").requestFocus().assertIsFocused()
+        }
+        val before = compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().map { it.id }.toSet()
+        val frames = mutableListOf<List<Int>>()
+        var returned = false
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle {
+                val activity = view.context as android.app.Activity
+                val code = if (action == "Back") android.view.KeyEvent.KEYCODE_BACK else android.view.KeyEvent.KEYCODE_DPAD_CENTER
+                activity.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_DOWN, code))
+                activity.dispatchKeyEvent(android.view.KeyEvent(android.view.KeyEvent.ACTION_UP, code))
+            }
+            repeat(36) {
+                compose.mainClock.advanceTimeByFrame()
+                val focused = compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().map { it.id }
+                frames += focused
+                assertTrue("Unexpected focus at frame $it: $frames", focused.all { it == cell || (!returned && it in before) })
+                returned = returned || cell in focused
+                if (compose.runOnIdle { layering.details.isEmpty() && layering.modalScrims.isEmpty() }) {
+                    assertTrue("No cell focus after overlay removal at frame $it: $frames", cell in focused)
+                }
+            }
+            assertEquals(cell, compose.onNode(isFocused()).fetchSemanticsNode().id)
+        } finally { compose.mainClock.autoAdvance = true }
+        assertEquals(0, playbackRequests)
+        assertEquals(0, navigationRequests)
+    }
+
     private fun records(key: String): List<JSONObject> {
         val array = fixture.getJSONArray(key)
         return List(array.length()) { array.getJSONObject(it) }
@@ -343,6 +396,7 @@ class GuideRealisticSceneTest {
         }
         val noticeModule = module {
             single { notices }
+            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()) }
             single { profiles }
             single<TvheadendSession> { session }
         }
@@ -354,6 +408,7 @@ class GuideRealisticSceneTest {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
                                 onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
+                                layering = requireNotNull(at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current)
                                 EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, channelViewModel = model,
                                     session = session, playerSession = runtime, selection = selection, guidePositionStore = position,
                                     lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> playbackRequests++ },
