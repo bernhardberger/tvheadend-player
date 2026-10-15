@@ -68,9 +68,9 @@ Available in SDK 0.24.0 but unused:
 - DVR disk space;
 - server discovery.
 
-Release builds are not minified (`app/build.gradle.kts`, release
-`isMinifyEnabled = false`), so the shipped binary differs from the optimized
-`profileServer` build used for measurement.
+Release builds are R8-minified since R2 (2026-10-15); the optimized
+`profileServer` build used for measurement needs `-Ptvhplayer.profileMinify=true`
+to match them.
 
 ## Workstreams
 
@@ -236,7 +236,7 @@ Source: `release-process.md`, `product-identity-plan.md`,
 | ID | Item | Exit |
 |---|---|---|
 | R1 | Native gate: run `./tools/check-native-libs --release` on the release candidate; correct stale "blocked" claims (appliance plan, codebase audit AUD-008) | Gate passes; docs current |
-| R2 | R8 for release: keep rules for Koin, serialization restoration, native decoders; licenses and corresponding source unaffected | Minified release passes `./tools/verify` and a G10 smoke **[TV]** |
+| R2 | R8 for release: keep rules for Koin, serialization restoration, native decoders; licenses and corresponding source unaffected. Done 2026-10-15: no extra keep rules needed, mappings kept with each release; Play release smoked on the G10, Appliance release smoke is a release-time step | Minified release passes `./tools/verify` and a G10 smoke **[TV]** |
 | R3 | Dependency hygiene §13: Material Components re-parent, Coil OkHttp artifact, extended icons, inert dependencies — each its own package | APK size and visual smoke per package |
 | R4 | Accessibility: TalkBack pass across Channels, Guide, Recordings, Settings, player **[TV]** | Findings fixed or recorded |
 | R5 | Release notes, privacy policy and `NOTICE.md` checked against the artifact (identity plan item 5) | Checked |

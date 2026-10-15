@@ -136,6 +136,9 @@ creates `build/release/unsigned/<version>/` containing:
 - `tvheadend-player-<version>-play-unsigned.apk`;
 - `tvheadend-player-<version>-appliance-unsigned.apk`;
 - `tvheadend-player-<version>-play-unsigned.aab`;
+- `tvheadend-player-<version>-play-mapping.txt` and `-appliance-mapping.txt`, the R8
+  mapping for each flavor (the Play APK and AAB share one), needed to retrace crash
+  reports;
 - `.tar.gz` and `.zip` application corresponding-source archives;
 - exact released SDK source classifiers and the app-owned Media3/FFmpeg
   corresponding-source archive (see `decoder-ffmpeg/README.md`);
@@ -177,6 +180,7 @@ entries are not.
 The signed output contains:
 
 - the signed `-play.apk`, `-appliance.apk`, and `-play.aab` artifacts;
+- both R8 mapping files, unchanged from the unsigned bundle;
 - both application corresponding-source formats;
 - exact released SDK source classifiers and the app-owned Media3/FFmpeg
   corresponding-source archive;
@@ -184,7 +188,11 @@ The signed output contains:
 - a signed `release-manifest.json` with source commit and certificate identity;
 - `SHA256SUMS`, `APKSIGNER-VERIFY.txt` (both APKs), and `JARSIGNER-VERIFY.txt`.
 
-Publish that set together. Review it for private data before upload. The signing
+Publish that set together; the mapping files are published with it (they reveal
+nothing beyond the corresponding source). Release builds are R8-minified, so before
+publishing smoke both a debug-key-signed `playRelease` and `applianceRelease` on the
+G10; for Appliance include HOME launch, the accessibility service and Settings →
+Appliance. Review it for private data before upload. The signing
 fingerprint is public verification material; the private key and passwords are
 never release artifacts.
 

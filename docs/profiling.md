@@ -233,10 +233,10 @@ Its single-activity/no-testing-library inventory predates `JourneyProfileActivit
 
 `profile` is a nondebuggable, shell-profileable variant initialized from `release`.
 It uses the same main Kotlin code, release-only no-op debug backdrop, compiler,
-resources, native libraries and dependencies. Release currently disables R8
-minification and resource shrinking. Profile preserves those settings; it is
-release-like relative to this unoptimized release baseline, not an optimized
-production benchmark. No R8, dependency, codec or product behavior change is included.
+resources, native libraries and dependencies. Release is R8-minified without
+resource shrinking; profile builds minify only with `-Ptvhplayer.profileMinify=true`,
+which is the build to use when comparing against a release binary. No dependency,
+codec or product behavior change is included.
 
 The deliberate fixture differences are an application ID suffix `.profile`, the
 existing local debug signing certificate, a plain Application instead of SDK
