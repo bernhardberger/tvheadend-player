@@ -22,7 +22,10 @@ compile daemon is bounded the same way. On the shared LXC the installed
 `gradlew` hook runs each build in the bounded `tvhbuild.slice` without a daemon,
 so every run starts cold. Routine app test runs pass
 `-Ptvhplayer.captureTests=exclude` (two test forks, no capture PNGs); keep the
-default only when you need the visual captures. Never run `./gradlew --stop` or kill a
+default only when you need the visual captures. The slice has an 8 GiB ceiling:
+after an SDK or dependency change, run compile, app tests and lint as separate
+invocations, or pass `-Ptvhplayer.testForks=1`; one combined rebuild-plus-tests run
+was OOM-killed. Never run `./gradlew --stop` or kill a
 daemon you did not start: daemons are shared, so that aborts other agents' builds.
 The build cache is on and shared across worktrees, so compile, resource and lint
 outputs built elsewhere are restored instead of rebuilt. Client unit tests are
