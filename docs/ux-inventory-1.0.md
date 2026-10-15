@@ -409,8 +409,13 @@ bear on this:
   the HTSP connection, channels and recordings are there, so the existing
   animated splash, its stage messages and its error screen should also run on
   a cold start without autoplay, then enter the browse screens instead of the
-  player. Open: whether "Continue with saved channels" is offered when the
-  server is unreachable, and whether entry waits for the guide.
+  player. Decided the same day: an unreachable server offers only Try again
+  and Edit connection (no "continue with saved channels"); the splash shows
+  stage progress with counts now ("Loading guide 45/120 channels"); entry
+  waits for the guide, but once channels and recordings are loaded a Skip
+  action enters while the guide keeps loading (like Steam's shader-compile
+  skip). Both need SDK support (sync progress and a "critical parts ready"
+  signal), requested 2026-10-16.
 - Colours (owner 2026-10-16): the error colour stays the theme's light error
   tone (`#FFB4AB`) for text and icons, with no filled `#93000A` containers;
   recording red (`TvRecordingColor`, `#FF5449`) gets slightly stronger.
