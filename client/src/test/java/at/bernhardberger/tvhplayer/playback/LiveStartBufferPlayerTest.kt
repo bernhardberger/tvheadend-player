@@ -49,7 +49,6 @@ import at.bernhardberger.tvheadend.sdk.media3.isTvheadendLive
 import at.bernhardberger.tvheadend.sdk.playback.MuxFrameType
 import at.bernhardberger.tvheadend.sdk.playback.SkipOutcome
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
@@ -165,7 +164,7 @@ class LiveStartBufferPlayerTest {
             connection.awaitCollectionRegistered()
             connection.emit(SubscriptionEvent.Started(listOf(
                 stream(1, SubscriptionStreamType.MPEG2_VIDEO), stream(2, SubscriptionStreamType.MPEG2_AUDIO),
-            ), null, SubscriptionCondition.NO_DETAIL))
+            ), null))
             repeat(8) { emitPair(connection, it) }
             // The period exposes its tracks from the first packets; the player selects them before buffering.
             awaitMain { player.playerError != null || !player.currentTracks.isEmpty }
@@ -296,7 +295,7 @@ class LiveStartBufferPlayerTest {
     private fun stream(index: Long, type: SubscriptionStreamType) = SubscriptionStream(
         index = StreamIndex(index), type = type, language = null, compositionId = null, ancillaryId = null,
         width = null, height = null, frameDuration = null, aspectNumerator = null, aspectDenominator = null,
-        audioType = null, audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null,
+        audioType = null, audioVersion = null, channelCount = null, rate = null, rdsUecp = null,
     )
 
     private suspend fun emitPair(connection: ScriptedSubscriptionConnection, index: Int) {

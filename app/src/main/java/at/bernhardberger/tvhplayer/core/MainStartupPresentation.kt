@@ -107,7 +107,6 @@ private fun mainStartupFailureMessage(kind: ConnectionFailureKind): MainStartupM
     ConnectionFailureKind.PERMISSION_DENIED -> MainStartupMessageKind.PERMISSION_DENIED
     ConnectionFailureKind.INCOMPATIBLE_SERVER -> MainStartupMessageKind.INCOMPATIBLE_SERVER
     ConnectionFailureKind.TIMEOUT -> MainStartupMessageKind.TIMEOUT_FAILURE
-    ConnectionFailureKind.ZERO_CHANNELS -> MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS
     ConnectionFailureKind.UNREACHABLE -> MainStartupMessageKind.RETRYABLE_FAILURE
     ConnectionFailureKind.OTHER -> MainStartupMessageKind.SYNCHRONIZATION_FAILURE
 }

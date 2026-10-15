@@ -8,7 +8,6 @@ enum class ConnectionFailureKind {
     TIMEOUT,
     INCOMPATIBLE_SERVER,
     PERMISSION_DENIED,
-    ZERO_CHANNELS,
     OTHER,
 }
 

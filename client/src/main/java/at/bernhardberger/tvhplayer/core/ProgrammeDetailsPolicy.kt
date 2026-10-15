@@ -54,17 +54,15 @@ fun recordingDetailsActions(
 }
 
 /**
- * Other unended airings of [event] on any channel: series link URI, then series link ID,
+ * Other unended airings of [event] on any channel: series link URI,
  * otherwise the same title (trimmed, case-insensitive). Simulcasts remain separate, at most [limit].
  */
 fun otherAirings(event: EpgEvent, events: List<EpgEvent>, nowSec: Long, limit: Int = 20,
     channelNumber: (ChannelId) -> Long? = { null }): List<EpgEvent> {
     val seriesLink = event.seriesLinkUri?.takeIf(String::isNotBlank)
-    val seriesLinkId = event.episode?.seriesLinkId
     val title = event.title?.trim()?.takeIf(String::isNotEmpty)
     val matches: (EpgEvent) -> Boolean = when {
         seriesLink != null -> { other -> other.seriesLinkUri == seriesLink }
-        seriesLinkId != null -> { other -> other.episode?.seriesLinkId == seriesLinkId }
         title != null -> { other -> other.title?.trim().equals(title, ignoreCase = true) }
         else -> return emptyList()
     }

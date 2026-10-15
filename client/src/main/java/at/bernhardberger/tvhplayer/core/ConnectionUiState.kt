@@ -93,10 +93,8 @@ fun SessionState.toConnectionState(): ConnectionState = when (this) {
 
 private fun SessionFailure.toConnectionFailureKind(): ConnectionFailureKind = when (kind) {
     SessionFailureKind.AUTHENTICATION_REJECTED -> ConnectionFailureKind.AUTHENTICATION
-    SessionFailureKind.PERMISSION_DENIED -> ConnectionFailureKind.PERMISSION_DENIED
     SessionFailureKind.INCOMPATIBLE_SERVER,
     SessionFailureKind.SERVER_UPGRADE_REQUIRED -> ConnectionFailureKind.INCOMPATIBLE_SERVER
-    SessionFailureKind.NO_CHANNELS -> ConnectionFailureKind.ZERO_CHANNELS
     SessionFailureKind.SERVER_UNREACHABLE,
     SessionFailureKind.NETWORK_UNAVAILABLE,
     SessionFailureKind.TRANSPORT_UNAVAILABLE -> ConnectionFailureKind.UNREACHABLE

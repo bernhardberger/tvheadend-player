@@ -1099,7 +1099,6 @@ private fun connectionMessage(state: ConnectionUiState): String = stringResource
                 R.string.status_connection_failed_incompatible
             ConnectionFailureKind.PERMISSION_DENIED ->
                 R.string.status_connection_failed_permission
-            ConnectionFailureKind.ZERO_CHANNELS -> R.string.status_connection_failed_zero_channels
             ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
         }
     }

@@ -14,11 +14,9 @@ class ConnectionUiStateTest {
     fun unavailableFailureKeepsDetailedCopyKindAndSdkRecoveryGuidance() {
         val cases = listOf(
             SessionFailure.AUTHENTICATION_REJECTED to ConnectionFailureKind.AUTHENTICATION,
-            SessionFailure.PERMISSION_DENIED to ConnectionFailureKind.PERMISSION_DENIED,
             SessionFailure.INCOMPATIBLE_SERVER to ConnectionFailureKind.INCOMPATIBLE_SERVER,
             SessionFailure.SERVER_UPGRADE_REQUIRED to ConnectionFailureKind.INCOMPATIBLE_SERVER,
             SessionFailure.METADATA_OVERFLOW to ConnectionFailureKind.OTHER,
-            SessionFailure.NO_CHANNELS to ConnectionFailureKind.ZERO_CHANNELS,
             SessionFailure.SERVER_UNREACHABLE to ConnectionFailureKind.UNREACHABLE,
             SessionFailure.NETWORK_UNAVAILABLE to ConnectionFailureKind.UNREACHABLE,
             SessionFailure.TRANSPORT_UNAVAILABLE to ConnectionFailureKind.UNREACHABLE,
@@ -64,7 +62,7 @@ class ConnectionUiStateTest {
         assertEquals(
             ConnectionRecoveryAction.RETRY,
             ConnectionUiState.Error(
-                ConnectionFailureKind.ZERO_CHANNELS,
+                ConnectionFailureKind.OTHER,
                 SessionRecoveryDisposition.EXPLICIT_RETRY,
             ).primaryRecoveryAction(),
         )
@@ -95,7 +93,7 @@ class ConnectionUiStateTest {
                 SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
             ) to PlaybackRetryCommand.NONE,
             ConnectionState.Error(
-                ConnectionFailureKind.ZERO_CHANNELS,
+                ConnectionFailureKind.OTHER,
                 SessionRecoveryDisposition.EXPLICIT_RETRY,
             ) to PlaybackRetryCommand.RECONNECT,
             ConnectionState.Error(

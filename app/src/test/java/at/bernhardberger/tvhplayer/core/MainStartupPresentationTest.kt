@@ -202,12 +202,12 @@ class MainStartupPresentationTest {
     fun sessionFailureActionsFollowSdkRecoveryGuidanceInNormalMode() {
         assertEquals(
             MainStartupPresentation.Actionable(
-                MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
+                MainStartupMessageKind.SYNCHRONIZATION_FAILURE,
                 normalActions,
             ),
             presentation(
                 connectionState = ConnectionUiState.Error(
-                    ConnectionFailureKind.ZERO_CHANNELS,
+                    ConnectionFailureKind.OTHER,
                     SessionRecoveryDisposition.EXPLICIT_RETRY,
                 ),
             ),

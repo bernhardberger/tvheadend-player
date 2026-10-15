@@ -21,7 +21,6 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
@@ -779,8 +778,6 @@ class AppPlaybackRuntimeTest {
                 event = SubscriptionEvent.Started(
                     streams = null,
                     codecMetadata = null,
-                    condition = SubscriptionCondition.NO_DETAIL,
-                    issue = null,
                     source = LiveSubscriptionSource.create(
                         adapterName = "DVB adapter",
                         muxName = null,

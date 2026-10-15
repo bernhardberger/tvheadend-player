@@ -29,7 +29,6 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.playback.LiveFrontendState
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
@@ -221,8 +220,6 @@ class PlaybackStatsOverlayTest {
             event = SubscriptionEvent.Started(
                 streams = null,
                 codecMetadata = null,
-                condition = SubscriptionCondition.NO_DETAIL,
-                issue = null,
                 source = source,
             ),
         )

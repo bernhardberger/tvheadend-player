@@ -98,7 +98,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOperationResult
@@ -787,8 +786,8 @@ class LivePlayerChromeScreenTest {
                     SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                         language = null, compositionId = null, ancillaryId = null, width = 1920, height = 1080,
                         frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
-                        audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null),
-                ), null, SubscriptionCondition.NO_DETAIL))
+                        audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
+                ), null))
                 // 53739 of 65535: 82 %.
                 connection.emit(SubscriptionEvent.Signal(53739, 12300, null, null, 0, 0, false))
             }
@@ -934,8 +933,8 @@ class LivePlayerChromeScreenTest {
                 SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                     language = null, compositionId = null, ancillaryId = null, width = height * 16 / 9, height = height,
                     frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
-                    audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null),
-            ), null, SubscriptionCondition.NO_DETAIL))
+                    audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
+            ), null))
             connection.emit(registration, SubscriptionEvent.Signal(signal, 12300, null, null, 0, 0, false))
             // One minute buffered at the live edge.
             if (timeshift) connection.emit(registration, SubscriptionEvent.Timeshift(60_000_000L, 0L, 0L, 60_000_000L, null, null))

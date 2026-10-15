@@ -153,7 +153,7 @@ class AppPausedSeekRuntimeTest {
                         connection.emit(registration, packet)
                     }
                 }
-                connection.emit(registration, SubscriptionEvent.Started(streams, null, SubscriptionCondition.NO_DETAIL))
+                connection.emit(registration, SubscriptionEvent.Started(streams, null))
                 deliverMedia()
                 assertTrue("App installs the public binding", install.await()?.isStarted == true)
                 await("Initial playing surface") { frames.get() > 0 && images.get() > 0 && position() > 0 }
@@ -296,11 +296,11 @@ class AppPausedSeekRuntimeTest {
             SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                 language = null, compositionId = null, ancillaryId = null, width = null, height = null,
                 frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
-                audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null),
+                audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
             SubscriptionStream(index = StreamIndex(2), type = SubscriptionStreamType.MPEG2_AUDIO,
                 language = "ger", compositionId = null, ancillaryId = null, width = null, height = null,
                 frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
-                audioVersion = null, channelCount = null, rate = 3, rdsUecp = null, codecMetadata = null),
+                audioVersion = null, channelCount = null, rate = 3, rdsUecp = null),
         )
         // Local fixture metadata only, never HTSP parsing. Preserve the recorded packet order.
         val packets = (0 until records.length()).map { index ->

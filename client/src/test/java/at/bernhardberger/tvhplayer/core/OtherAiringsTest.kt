@@ -1,9 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
-import at.bernhardberger.tvheadend.sdk.core.EpgSeriesLinkId
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
@@ -19,12 +17,6 @@ class OtherAiringsTest {
             event(3, 2, title = "Ridge Light"),
             event(4, 1, title = "Other", seriesLink = "crid://ridge"))
         assertEquals(listOf(4L, 2L), ids(otherAirings(shown, events, now)))
-    }
-
-    @Test fun seriesLinkIdMatchesWhenThereIsNoSeriesLinkUri() {
-        val shown = event(1, 0, title = "Ridge Light", seriesLinkId = 7)
-        val events = listOf(shown, event(2, 1, title = "Other", seriesLinkId = 7), event(3, 2, title = "Ridge Light"))
-        assertEquals(listOf(2L), ids(otherAirings(shown, events, now)))
     }
 
     @Test fun titleFallbackIsExactTrimmedAndCaseInsensitive() {
@@ -74,9 +66,8 @@ class OtherAiringsTest {
     private fun ids(events: List<EpgEvent>) = events.map { it.id.value }
 
     /** [hours] from now; each airing lasts an hour. */
-    private fun event(id: Long, hours: Int, title: String?, seriesLink: String? = null, seriesLinkId: Long? = null,
+    private fun event(id: Long, hours: Int, title: String?, seriesLink: String? = null,
         channel: Long = 1) = EpgEvent.create(EventId(id), ChannelId(channel),
         Instant.fromEpochSeconds(now + hours * 3600L), Instant.fromEpochSeconds(now + hours * 3600L + 3600),
-        title = title, seriesLinkUri = seriesLink,
-        episode = seriesLinkId?.let { EpgEpisode(null, EpgSeriesLinkId(it), null, null, null, null, null, null, null) })
+        title = title, seriesLinkUri = seriesLink)
 }

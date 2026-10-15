@@ -94,7 +94,7 @@ class AudioInterruptionBufferContractTest {
             connection.awaitCollectionRegistered()
             connection.emit(SubscriptionEvent.Started(listOf(
                 stream(1, SubscriptionStreamType.MPEG2_VIDEO), stream(2, SubscriptionStreamType.MPEG2_AUDIO),
-            ), null, SubscriptionCondition.NO_DETAIL))
+            ), null))
             repeat(8) { emitPair(connection, it) }
             await { livePeriod.maybeThrowPrepareError(); prepared }
             val groups = livePeriod.trackGroups
@@ -156,7 +156,7 @@ class AudioInterruptionBufferContractTest {
     private fun stream(index: Long, type: SubscriptionStreamType) = SubscriptionStream(
         index = StreamIndex(index), type = type, language = null, compositionId = null, ancillaryId = null,
         width = null, height = null, frameDuration = null, aspectNumerator = null, aspectDenominator = null,
-        audioType = null, audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null,
+        audioType = null, audioVersion = null, channelCount = null, rate = null, rdsUecp = null,
     )
 
     private suspend fun emitPair(connection: ScriptedSubscriptionConnection, index: Int) {

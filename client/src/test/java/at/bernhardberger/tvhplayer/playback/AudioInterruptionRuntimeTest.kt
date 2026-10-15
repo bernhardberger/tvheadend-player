@@ -2514,8 +2514,8 @@ class AudioInterruptionRuntimeTest {
                 SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                     language = null, compositionId = null, ancillaryId = null, width = 320, height = 240,
                     frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
-                    audioVersion = null, channelCount = null, rate = null, rdsUecp = null, codecMetadata = null),
-            ), null, SubscriptionCondition.NO_DETAIL))
+                    audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
+            ), null))
         }
 
         suspend fun await(predicate: () -> Boolean) {

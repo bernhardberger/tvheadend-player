@@ -58,7 +58,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionDiagnostics
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionCondition
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
@@ -848,7 +847,7 @@ class PlayerChromeCaptureTest {
 
     @OptIn(SubscriptionInfrastructureApi::class)
     private fun diagnostics(dvb: Boolean): AppPlaybackDiagnostics {
-        var live = LiveSubscriptionDiagnostics.update(null, SubscriptionEvent.Started(null, null, SubscriptionCondition.NO_DETAIL, null,
+        var live = LiveSubscriptionDiagnostics.update(null, SubscriptionEvent.Started(null, null,
             LiveSubscriptionSource.create(null, null, null, null, "Ridge Earth HD")))
         if (dvb) live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Signal(53739, 12300, null, null, 0, 0, false))
         live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Queue(0, 0, 0, 0, 0, 0))

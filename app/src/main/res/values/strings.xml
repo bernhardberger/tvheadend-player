@@ -588,7 +588,6 @@
     <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
     <string name="status_connection_failed_incompatible">Connection failed: this Tvheadend server version is not supported</string>
     <string name="status_connection_failed_permission">Connection failed: this account cannot read channel metadata</string>
-    <string name="status_connection_failed_zero_channels">Connection succeeded, but this account has no visible channels</string>
     <string name="status_connection_failed_other">Connection failed</string>
     <string name="keep_channel_setting">Keep channel after leaving the app</string>
     <string name="keep_channel_off">Off</string>
