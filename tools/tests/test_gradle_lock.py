@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import fcntl
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -17,6 +18,13 @@ PRODUCTION_LOCK_DIR = "gradle_lock_dir=/tmp/tvheadend-player-gradle-$gradle_lock
 def install_wrapper(fixture: Path) -> Path:
     """Copies the wrapper with its host lock directory moved into the fixture."""
     text = (ROOT / "gradlew").read_text(encoding="utf-8")
+    # A host may splice a launcher into its local wrapper; these tests cover only the lock.
+    text = re.sub(
+        r"^# BEGIN homelab build isolation\n.*?^# END homelab build isolation\n",
+        "",
+        text,
+        flags=re.DOTALL | re.MULTILINE,
+    )
     if PRODUCTION_LOCK_DIR not in text:
         raise AssertionError("gradlew no longer uses the shared host lock directory")
     wrapper = fixture / "gradlew"
