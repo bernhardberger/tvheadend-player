@@ -405,6 +405,16 @@ bear on this:
   splash waits for the whole sync even on a warm start
   (`core/MainStartupPresentation.kt`), which is the startup case to fix (E5).
 
+- Owner (2026-10-16): with autoplay off the app is "borderline unusable" until
+  the HTSP connection, channels and recordings are there, so the existing
+  animated splash, its stage messages and its error screen should also run on
+  a cold start without autoplay, then enter the browse screens instead of the
+  player. Open: whether "Continue with saved channels" is offered when the
+  server is unreachable, and whether entry waits for the guide.
+- Colours (owner 2026-10-16): the error colour stays the theme's light error
+  tone (`#FFB4AB`) for text and icons, with no filled `#93000A` containers;
+  recording red (`TvRecordingColor`, `#FF5449`) gets slightly stronger.
+
 **Questions**
 1. After long backoff, should startup offer Retry and Settings instead of
    waiting indefinitely?
