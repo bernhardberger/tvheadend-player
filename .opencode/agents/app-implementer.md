@@ -1,8 +1,8 @@
 ---
 description: Writable TVHeadend Player implementer for one delegated, bounded code slice with tests and a build gate; never commits, releases, or touches devices
 mode: subagent
-model: openai/gpt-6-astra-fast
-variant: medium
+model: claude-code/claude-sonnet-5-5
+variant: high
 steps: 300
 permission:
   edit: allow
