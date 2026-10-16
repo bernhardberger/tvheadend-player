@@ -15,8 +15,8 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.31.0"
-SDK_VERSION = "0.31.0"
+SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.32.0"
+SDK_VERSION = "0.32.0"
 EVIDENCE_DIRECTORY = ROOT / "app/build/released-sdk-evidence"
 SDK_AAR_NAME = f"sdk-media3-{SDK_VERSION}.aar"
 NATIVE_DIRECTORY = ROOT / "decoder-ffmpeg"
@@ -25,8 +25,8 @@ FFMPEG_SOURCES_NAME = PROVENANCE["sourceArchive"]
 EXPECTED_AAR_SHA256 = "cd856abe0b1e22034b29f88a29279232a5fda95ee0a6a4989df7a2f11d3231e7"
 EXPECTED_FFMPEG_SOURCES_SHA256 = PROVENANCE["sourceArchiveSha256"]
 EXPECTED_STANDARD_SOURCE_SHA256 = {
-    f"sdk-android-{SDK_VERSION}-sources.jar": "47335b3acc71e20707497ddac0808360c61949ff16e11c0866507a82feacbe13",
-    f"sdk-core-{SDK_VERSION}-sources.jar": "6189664a5756ce79108eb0e34be52606c83552d8d8f9b530b5909bc7568fee3e",
+    f"sdk-android-{SDK_VERSION}-sources.jar": "03c63c1d0adf8139297bedfb46a9e881ec0da033d506ec832c9ce7a35e7bb474",
+    f"sdk-core-{SDK_VERSION}-sources.jar": "277135f1d19200c156cfa14c45181de9707156ee8c1241a8f6da0c2af900045d",
     f"sdk-media3-{SDK_VERSION}-sources.jar": "ad487da056ca578536c5677a921c79a99b3c2c833257b2c0645da2703f764e90",
     f"sdk-playback-{SDK_VERSION}-sources.jar": "6e1bd6efd99f4b62b06c51fb806c3810312cb21756be4c3fd799fe9860211f11",
 }
