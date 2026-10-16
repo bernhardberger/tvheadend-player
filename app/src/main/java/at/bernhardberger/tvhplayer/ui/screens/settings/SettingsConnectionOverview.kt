@@ -115,7 +115,7 @@ internal fun settingsConnectionOverview(
 }
 
 @Composable
-internal fun ConnectionValueRow(title: String, value: String) {
+private fun ConnectionValueRow(title: String, value: String) {
     ListItem(selected = false, onClick = {},
         headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
         supportingContent = { Text(value, style = MaterialTheme.typography.bodyMedium) },

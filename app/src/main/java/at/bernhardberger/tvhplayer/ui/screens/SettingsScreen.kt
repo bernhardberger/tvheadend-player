@@ -39,15 +39,16 @@ internal fun SettingsScreen(
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     val scope = rememberCoroutineScope()
+    val recordingLevels = settingsRecordingLevels(profiles, settings.recordingProfileId,
+        recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
+        scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
+    }
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation, connectionPresentation, onRetry) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(applianceBuild, profiles.size > 1),
+        settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty()),
         settingsKeepChannelLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-    ) + settingsRecordingLevels(profiles, settings.recordingProfileId,
-        recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
-        scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
-    } + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
+    ) + recordingLevels + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent)
 }
 

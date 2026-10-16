@@ -66,19 +66,39 @@ class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var captureView: View
 
-    @Test fun recordingsLevelRequiresMultipleProfiles() {
+    @Test fun recordingsLevelNeedsAProfileChoiceOrRecordingSpace() {
         val profile = at.bernhardberger.tvheadend.sdk.core.DvrConfiguration(
             at.bernhardberger.tvheadend.sdk.core.DvrConfigId("default"), "", "")
         compose.setContent {
             TVHeadendPlayerTheme {
                 assertTrue(settingsRecordingLevels(listOf(profile), null) {}.isEmpty())
+                val spaceOnly = settingsRecordingLevels(listOf(profile), null, "412 GB free of 2 TB") {}
+                assertTrue(spaceOnly.single().rows.map { it.item.id } == listOf(RECORDING_SPACE_ROW))
                 assertFalse(settingsRootLevel(false, showRecordings = false).rows.any { it.item.id == RECORDINGS_LEVEL })
                 assertTrue(settingsRootLevel(false, showRecordings = true).rows.any { it.item.id == RECORDINGS_LEVEL })
             }
         }
     }
 
-    @Test fun recordingSpaceRowIsInformationAndNeverAFocusStop() {
+    @Test fun aOneProfileServerOpensRecordingsOnTheReadOnlySpaceRow() {
+        val profiles = listOf(DvrConfiguration(DvrConfigId("default"), "", ""))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, RECORDINGS_LEVEL),
+                    listOf(settingsRootLevel(false, showRecordings = true)) +
+                        settingsRecordingLevels(profiles, null, "412 GB free of 2 TB") {})
+            }
+        }
+        compose.onNodeWithText("Recordings").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Recording space", substring = true).assertIsFocused()
+        compose.onNodeWithText("412 GB free of 2 TB", useUnmergedTree = true).assertIsDisplayed()
+        compose.onAllNodesWithText("Recording profile").assertCountEquals(0)
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Recording space", substring = true).assertIsFocused()
+    }
+
+    @Test fun recordingSpaceFollowsTheProfileChoice() {
         val profiles = listOf(DvrConfiguration(DvrConfigId("default"), "", ""),
             DvrConfiguration(DvrConfigId("archive"), "Archive", ""))
         compose.setContent {
@@ -90,14 +110,11 @@ class SettingsDepthNavigationTest {
         }
         compose.onNodeWithText("Recordings").assertIsFocused()
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Recording profile").assertIsFocused()
-        val space = compose.onNodeWithText("Recording space\n412 GB free of 2 TB")
-        space.assertIsDisplayed()
-            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
-        press(Key.DirectionUp)
-        compose.onNodeWithText("Recording profile").assertIsFocused()
+        compose.onNodeWithText("Recording profile", substring = true).assertIsFocused()
         press(Key.DirectionDown)
-        compose.onNodeWithText("Recording profile").assertIsFocused()
+        compose.onNodeWithText("Recording space", substring = true).assertIsFocused()
+        press(Key.DirectionUp)
+        compose.onNodeWithText("Recording profile", substring = true).assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Default profile").assertIsFocused()
     }
