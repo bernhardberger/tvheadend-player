@@ -57,6 +57,12 @@ Meaning of colour:
 - **Orange** is the contrasting accent: playback position and deliberate
   secondary emphasis. Not restricted to the seekbar, but sparse enough that the
   UI stays cyan-led. Ordinary panels, cards and buttons stay neutral.
+- **Progress colour follows what the bar measures** (accepted 2026-10-16):
+  orange = where *the viewer* is in something they watch (player seek position,
+  resume point, how far a recording has been watched, on cards, details and
+  dialogs alike); cyan = time passing on air, independent of the viewer (how far
+  the current programme or a running recording is). One bar, one meaning; if a
+  surface needs both, show two bars rather than one bar in two colours.
 - **Recording red** means "a recording exists or runs". **`error`** means "a
   failure the user must act on". No component declares its own red.
 - Brand artwork keeps the exact brand cyan `#00BCFA` and orange `#FA7F00`.
@@ -428,9 +434,10 @@ tuner loss and interruption are failures, limit expiry is informational.
 - Rows and cards are TV Material `ListItem`/`Card` with library indication.
   Recording and playing markers are separate data states shown by badge/icon,
   never by overloading focus or selection styling.
-- Passive progress on cards and rows is cyan and has no terminal marker that
-  implies completion. The interactive playback timeline is a separate component
-  with orange playback position.
+- Passive on-air progress on cards and rows is cyan and has no terminal marker
+  that implies completion; watched progress (resume position) is orange, per the
+  progress-colour rule in §2. The interactive playback timeline is a separate
+  component with orange playback position.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
 
