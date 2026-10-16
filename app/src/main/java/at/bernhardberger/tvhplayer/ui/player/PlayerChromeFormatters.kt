@@ -14,12 +14,6 @@ fun playerMinutesLeft(minutes: Int, spoken: Boolean = false): String = stringRes
 )
 
 @Composable
-internal fun playerSpokenTimeRange(range: String): String {
-    val parts = range.split(Regex("\\s*[–—-]\\s*"), limit = 2)
-    return if (parts.size == 2) stringResource(R.string.player_time_range_spoken, parts[0], parts[1]) else range
-}
-
-@Composable
 fun playerRecordedDate(date: LocalDate): String {
     val month = stringArrayResource(R.array.player_month_short)[date.monthValue - 1]
     return stringResource(R.string.player_recorded_date, date.dayOfMonth, month)

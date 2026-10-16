@@ -66,7 +66,7 @@ import at.bernhardberger.tvhplayer.core.ProgrammeAction
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
 import at.bernhardberger.tvhplayer.core.moveGuideWindowByDays
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
-import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.notifications.label
@@ -277,8 +277,8 @@ internal fun EpgSearchDialog(
                     val schedule = stringResource(
                         R.string.epg_search_result_schedule,
                         channel,
-                        event.start.epochSeconds.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
-                        formatHm(event.stop.epochSeconds),
+                        formatTimeInterval(event.start.epochSeconds, event.stop.epochSeconds, withDate = true,
+                            locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
                     )
                     val description = stringResource(
                         R.string.epg_search_result_description,

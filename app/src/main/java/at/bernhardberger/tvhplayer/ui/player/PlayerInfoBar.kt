@@ -40,6 +40,7 @@ data class PlayerInfoBarData(
     val next: String? = null,
     val nextScheduled: Boolean = false,
     val recordedDate: String? = null,
+    val spokenTimeRange: String = "",
 )
 
 /**
@@ -73,8 +74,8 @@ fun PlayerInfoBar(
     val description = listOfNotNull(
         if (data.channelNumber.isBlank()) data.channelName else stringResource(R.string.player_channel_spoken,
             channelTitleText(data.channelNumber.toLongOrNull(), data.channelName)),
-        if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, playerSpokenTimeRange(data.timeRange))
-        else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, playerSpokenTimeRange(data.timeRange)),
+        if (data.recordedDate == null) stringResource(R.string.player_now_spoken, data.title, data.spokenTimeRange)
+        else stringResource(R.string.player_recorded_spoken, data.title, data.recordedDate, data.spokenTimeRange),
         remaining, next, scheduled,
     ).joinToString(". ")
     val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)

@@ -88,6 +88,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -459,6 +460,9 @@ internal fun TimelineProgrammeCell(
     val startDate = remember(startSec, locale, formattingZone, uses24Hour) { startSec.formatDateTime(locale) }
     val startTime = remember(startSec, locale, formattingZone, uses24Hour) { formatHm(startSec) }
     val stopTime = remember(stopSec, locale, formattingZone, uses24Hour) { formatHm(stopSec) }
+    val timeRange = remember(startSec, stopSec, locale, formattingZone, uses24Hour) {
+        formatTimeInterval(startSec, stopSec, locale = locale, uses24Hour = uses24Hour)
+    }
     var focused by remember { mutableStateOf(false) }
     val description = stringResource(
         R.string.epg_cell_description,
@@ -484,7 +488,7 @@ internal fun TimelineProgrammeCell(
                 )
             },
             supportingContent = if (width >= 90.dp) {
-                { ProgrammeTimeText(range = "$startTime–$stopTime", start = startTime) }
+                { ProgrammeTimeText(range = timeRange, start = startTime) }
             } else {
                 null
             },

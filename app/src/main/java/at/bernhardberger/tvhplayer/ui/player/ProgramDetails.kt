@@ -682,9 +682,9 @@ internal fun detailsSubtitle(event: EpgEventEntry, resources: android.content.re
         ?: at.bernhardberger.tvhplayer.ui.common.episodeLabel(event.episode, resources, spoken = spoken)
 
 @Composable
-private fun factsLine(event: EpgEventEntry, channelIdentity: String): String = programmeFactsSegments(buildList {
+private fun factsLine(event: EpgEventEntry, channelIdentity: String): String = programmeFactsSegments(rangeIndex = 1, segments = buildList {
     add(channelIdentity)
-    add("${formatClock(event.start.epochSeconds)}–${formatClock(event.stop.epochSeconds)}")
+    add(programmeTimeRange(event))
     val minutes = ((event.stop.epochSeconds - event.start.epochSeconds) / 60).toInt()
     if (minutes > 0) add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), androidx.compose.ui.platform.LocalResources.current))
     // The subtitle line may already be the on-screen episode; don't repeat it in the facts.
@@ -694,8 +694,11 @@ private fun factsLine(event: EpgEventEntry, channelIdentity: String): String = p
         ?.filterNot { it.trim() == subtitle }?.let(::addAll)
 })
 
-internal fun programmeFactsSegments(segments: List<String>): String =
-    segments.joinToString(" · ") { it.replace(' ', '\u00a0').replace("–", "\u2060–\u2060") }
+/** [rangeIndex] marks the time range, whose separator is where it may break; other dashes are joined to their words. */
+internal fun programmeFactsSegments(segments: List<String>, rangeIndex: Int = -1): String =
+    segments.withIndex().joinToString(" · ") { (index, segment) ->
+        segment.replace(' ', '\u00a0').let { if (index == rangeIndex) it else it.replace("–", "\u2060–\u2060") }
+    }
 
 /** The next programs on a channel from the one airing now, as far as the guide knows them. */
 internal fun channelSchedule(

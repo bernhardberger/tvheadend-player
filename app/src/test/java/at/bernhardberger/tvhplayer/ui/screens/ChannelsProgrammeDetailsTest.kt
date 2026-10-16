@@ -46,7 +46,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import coil3.ImageLoader
 import coil3.asImage
 import coil3.decode.DataSource
@@ -93,7 +93,7 @@ class ChannelsProgrammeDetailsTest {
         assertEquals(340f, image.width, .5f)
         assertEquals(191.25f, image.height, .5f)
         assertMetadataInside(image)
-        detail("channels-detail-timing").assertTextEquals("${formatHm(0)} – ${formatHm(3600)}")
+        detail("channels-detail-timing").assertTextEquals(formatTimeInterval(0, 3600))
         val progress = detail("channels-detail-progress").fetchSemanticsNode()
         assertEquals(2f, progress.boundsInRoot.height, .5f)
         assertEquals(.25f, progress.config[SemanticsProperties.ProgressBarRangeInfo].current, .0001f)

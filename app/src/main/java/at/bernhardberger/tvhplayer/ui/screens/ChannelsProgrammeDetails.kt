@@ -38,6 +38,7 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
@@ -188,9 +189,7 @@ private fun ChannelsProgrammePreview(
     val accent = rememberChannelAccent(imageLoader, currentSession, channel.icon, channel.id)
     val artwork = now?.image
     val timedEvent = now?.takeIf { it.stop > it.start }
-    val timing = timedEvent?.let {
-        stringResource(R.string.channels_preview_time_range, formatHm(it.start.epochSeconds), formatHm(it.stop.epochSeconds))
-    }
+    val timing = timedEvent?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) }
     val metadataStyle = MaterialTheme.typography.bodyMedium
     val textMeasurer = rememberTextMeasurer()
     val density = LocalDensity.current

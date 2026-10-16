@@ -39,7 +39,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.TabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
-import at.bernhardberger.tvhplayer.ui.common.formatHm
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
@@ -190,9 +190,9 @@ class TimelineEpgPerformanceTest {
                 )
             }
         }
-        composeRule.onNodeWithText("${formatHm(0)}–${formatHm(600)}").assertIsDisplayed()
+        composeRule.onNodeWithText(formatTimeInterval(0, 600)).assertIsDisplayed()
         composeRule.runOnIdle { programme.value = event(id = 1, start = 3600, stop = 4200) }
-        composeRule.onNodeWithText("${formatHm(3600)}–${formatHm(4200)}").assertIsDisplayed()
+        composeRule.onNodeWithText(formatTimeInterval(3600, 4200)).assertIsDisplayed()
     }
 
     @Test

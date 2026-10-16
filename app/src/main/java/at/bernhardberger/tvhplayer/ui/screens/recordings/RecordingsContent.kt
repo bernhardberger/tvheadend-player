@@ -85,7 +85,6 @@ import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
@@ -288,8 +287,8 @@ internal fun RecordingMetadataPane(
                 entry.channelName?.takeIf(String::isNotBlank)?.let {
                     append(it).append(" • ")
                 }
-                append(entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
-                entry.stop?.epochSeconds?.let { append('–').append(formatHm(it)) }
+                append(recordingTimeRange(entry.start?.epochSeconds, entry.stop?.epochSeconds,
+                    androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
                 val durationMinutes = recordingDurationMinutes(entry)
                 if (durationMinutes != null) {
                     append(" • ").append(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(
@@ -857,6 +856,15 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
 internal fun Long?.recordingDateTime(locale: java.util.Locale = java.util.Locale.getDefault()): String = this?.let {
     at.bernhardberger.tvhplayer.ui.common.formatRecordingDate(it, locale = locale)
 }.orEmpty()
+
+/** The recording's day and times as one range; without a stop only the start, without a start only the stop's clock. */
+internal fun recordingTimeRange(startSec: Long?, stopSec: Long?, locale: java.util.Locale): String = when {
+    startSec != null && stopSec != null -> at.bernhardberger.tvhplayer.ui.common.formatTimeInterval(
+        startSec, stopSec, withDate = true, locale = locale)
+    startSec != null -> startSec.recordingDateTime(locale)
+    stopSec != null -> at.bernhardberger.tvhplayer.ui.common.formatClock(stopSec)
+    else -> ""
+}
 
 private fun recordingDurationMinutes(entry: DvrEntry): Long? {
     val start = entry.start ?: return null

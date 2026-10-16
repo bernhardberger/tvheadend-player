@@ -97,11 +97,6 @@
     <string name="epg_next">Danach um %1$s</string>
     <string name="select_channel_hint">Wählen Sie links einen Sender aus, um Details anzuzeigen.</string>
 
-    <string name="epg_time_duration">Zeit: %1$s – %2$s • Dauer: %3$s</string>
-
-    <string name="channel_details_timing">%1$s – %2$s · %3$s</string>
-    <string name="channels_preview_time_range">%1$s – %2$s</string>
-
     <string name="settings_server">Verbindung</string>
     <string name="settings_general">Allgemein</string>
     <string name="settings_general_nav">Allgemein</string>
@@ -256,7 +251,7 @@
     <string name="epg_search_unavailable">Die Programmsuche ist nicht verfügbar. Erneut versuchen.</string>
     <string name="epg_search_untitled">Sendung ohne Titel</string>
     <string name="epg_search_unknown_channel">Unbekannter Sender</string>
-    <string name="epg_search_result_schedule">%1$s · %2$s–%3$s</string>
+    <string name="epg_search_result_schedule">%1$s · %2$s</string>
     <string name="epg_search_result_description">%1$s, %2$s. Sendungsdetails öffnen.</string>
     <string name="programme_category_all">Alle</string>
     <string name="programme_category_film_drama">Film &amp; Drama</string>

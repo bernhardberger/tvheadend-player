@@ -149,7 +149,7 @@ internal fun PlayerChrome(
                         val infoHint = stringResource(R.string.player_identity_info_hint)
                         val unavailable = stringResource(R.string.player_info_unavailable_title)
                         val spoken = listOfNotNull(content.info.title, content.info.subtitle,
-                            content.info.timeRange, content.info.metadata).filter { it.isNotBlank() }.joinToString(". ")
+                            content.info.spokenTimeRange, content.info.metadata).filter { it.isNotBlank() }.joinToString(". ")
                             .ifBlank { listOf(channelTitleText(content.info.channelNumber.toLongOrNull(), content.info.channelName), unavailable)
                                 .filter { it.isNotBlank() }.joinToString(". ") }
                         // Focused like the rail's cards: the native outline and scale, nothing over the artwork.

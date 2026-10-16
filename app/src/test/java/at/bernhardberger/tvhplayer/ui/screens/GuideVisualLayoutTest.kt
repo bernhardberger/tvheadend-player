@@ -66,6 +66,7 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimePositionPx
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -461,7 +462,7 @@ class GuideVisualLayoutTest {
         val cell = compose.onNode(hasText(title(2, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("One hour occupies about half the two-hour track", cell.width > ruler.width * .45f)
         val textLayouts = mutableListOf<TextLayoutResult>()
-        compose.onNode(hasText("20:00–21:00") and hasAnyAncestor(isFocused()), useUnmergedTree = true)
+        compose.onNode(hasText(formatTimeInterval(hour, hour + 3600)) and hasAnyAncestor(isFocused()), useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
         assertFalse("The native time line must not be clipped", textLayouts.single().hasVisualOverflow)
         val x = ruler.left + guideTimePositionPx(now, start, start + 2 * 3600, ruler.width)
@@ -1182,7 +1183,7 @@ class GuideVisualLayoutTest {
         assertTrue("Long headlines use single-line ellipsis", programmeText.isLineEllipsized(0))
         assertTrue(programmeText.getLineBottom(0) <= programmeText.size.height)
         val programmeBounds = programme.fetchSemanticsNode().boundsInRoot
-        val timeBounds = compose.onNode(hasText("20:00–21:00") and hasAnyAncestor(hasTestTag("epg-channel-row-2")),
+        val timeBounds = compose.onNode(hasText(formatTimeInterval(hour, hour + 3600)) and hasAnyAncestor(hasTestTag("epg-channel-row-2")),
             useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("Native headline does not overlap its supporting time", programmeBounds.bottom <= timeBounds.top)
         assertTrue("Native ListItem keeps its bottom content padding", timeBounds.bottom <= header.bottom - 12f)

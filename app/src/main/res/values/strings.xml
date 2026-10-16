@@ -97,13 +97,6 @@
     <string name="epg_next">Next %1$s</string>
     <string name="select_channel_hint">Select a channel on the left to see details.</string>
 
-    <!-- EPG detail line -->
-    <string name="epg_time_duration">Time: %1$s – %2$s • Duration: %3$s</string>
-
-    <!-- Channels dense row and focused details (C3b) -->
-    <string name="channel_details_timing">%1$s – %2$s · %3$s</string>
-    <string name="channels_preview_time_range">%1$s – %2$s</string>
-
     <!-- Settings screen -->
     <string name="settings_server">Connection</string>
     <string name="settings_general">General</string>
@@ -352,7 +345,7 @@
     <string name="epg_search_unavailable">Guide search is unavailable. Try again.</string>
     <string name="epg_search_untitled">Untitled program</string>
     <string name="epg_search_unknown_channel">Unknown channel</string>
-    <string name="epg_search_result_schedule">%1$s · %2$s–%3$s</string>
+    <string name="epg_search_result_schedule">%1$s · %2$s</string>
     <string name="epg_search_result_description">%1$s, %2$s. Open program details.</string>
     <string name="programme_category_all">All</string>
     <string name="programme_category_film_drama">Film &amp; Drama</string>

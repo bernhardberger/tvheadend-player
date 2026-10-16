@@ -53,6 +53,8 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderStatusGap
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.common.formatTimeIntervalSpoken
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
 import coil3.ImageLoader
 import java.time.ZoneId
@@ -61,7 +63,7 @@ import kotlinx.coroutines.delay
 /* Player chrome wiring helpers. */
 
 internal fun programmeTimeRange(event: EpgEventEntry): String =
-    "${formatClock(event.start.epochSeconds)}–${formatClock(event.stop.epochSeconds)}"
+    formatTimeInterval(event.start.epochSeconds, event.stop.epochSeconds)
 
 /** The info bar for the displayed live programme; missing facts are omitted. */
 internal fun liveInfoBarData(
@@ -78,6 +80,7 @@ internal fun liveInfoBarData(
     channelName = channelName,
     title = event?.title?.takeIf(String::isNotBlank) ?: unavailableTitle,
     timeRange = event?.let(::programmeTimeRange).orEmpty(),
+    spokenTimeRange = event?.let { formatTimeIntervalSpoken(it.start.epochSeconds, it.stop.epochSeconds, resources) }.orEmpty(),
     metadata = event?.let { programmeMetadata(it, resources) },
     subtitle = event?.subtitle,
     remainingMinutes = event?.takeIf { nowSec >= it.start.epochSeconds && nowSec < it.stop.epochSeconds }
@@ -300,8 +303,9 @@ internal fun recordingInfoBarData(
         channelNumber = channelNumber?.toString().orEmpty(),
         channelName = entry.channelName.orEmpty(),
         title = entry.title.orEmpty(),
-        timeRange = if (start != null && stop != null) {
-            "${formatClock(start.epochSeconds)}–${formatClock(stop.epochSeconds)}"
+        timeRange = if (start != null && stop != null) formatTimeInterval(start.epochSeconds, stop.epochSeconds) else "",
+        spokenTimeRange = if (start != null && stop != null) {
+            formatTimeIntervalSpoken(start.epochSeconds, stop.epochSeconds, androidx.compose.ui.platform.LocalResources.current)
         } else "",
         metadata = when {
             growing -> stop?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) }

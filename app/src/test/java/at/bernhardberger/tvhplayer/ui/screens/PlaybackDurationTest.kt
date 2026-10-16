@@ -31,7 +31,7 @@ class PlaybackDurationTest {
                     epoch(2025), false, locale, now, hour24))
             }
             assertEquals(old, at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(
-                epoch(2025), epoch(2025) + 3600, dateOnly = true, locale = locale, nowSec = now))
+                epoch(2025), dateOnly = true, locale = locale, nowSec = now))
         }
     }
 

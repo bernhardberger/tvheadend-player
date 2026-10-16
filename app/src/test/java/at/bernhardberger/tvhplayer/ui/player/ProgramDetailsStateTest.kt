@@ -145,9 +145,13 @@ class ProgramDetailsStateTest {
         assertTrue("returning to the same event does not revive a request", navigation.selectionVersion > before)
     }
 
-    @Test fun factsOnlyBreakBetweenCompleteSegments() {
-        assertEquals("1\u00a0·\u00a0ORF1\u00a0HD · 20:15\u2060–\u206021:45 · 90\u00a0min · S2\u00a0E4",
-            programmeFactsSegments(listOf("1 · ORF1 HD", "20:15–21:45", "90 min", "S2 E4")))
+    @Test fun factsOnlyBreakBetweenSegmentsAndAtTheRangeSeparator() {
+        // The range arrives already non-breaking inside each endpoint from formatTimeInterval.
+        assertEquals("1\u00a0·\u00a0ORF1\u00a0HD · 20:15\u2009\u2013\u200921:45 · 90\u00a0min · S2\u00a0E4",
+            programmeFactsSegments(listOf("1 · ORF1 HD", "20:15\u2009\u2013\u200921:45", "90 min", "S2 E4"), rangeIndex = 1))
+        // Only the range may break at its dash; an internal dash of any other segment stays with its words.
+        assertEquals("Arte\u00a0\u2060\u2013\u2060\u00a0Europe · 20:15\u2009\u2013\u200921:45 · Sci\u2060\u2013\u2060Fi",
+            programmeFactsSegments(listOf("Arte – Europe", "20:15\u2009\u2013\u200921:45", "Sci–Fi"), rangeIndex = 1))
     }
 
     @Test fun readingIncludesEverySuppliedViewerFieldAndOmitsMissingOrDuplicateText() {

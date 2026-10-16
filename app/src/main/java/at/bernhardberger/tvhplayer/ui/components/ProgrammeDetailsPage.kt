@@ -762,8 +762,8 @@ internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<Dv
     recording.start?.let { start -> recording.stop?.let { stop ->
         val paddedStart = start - (recording.startExtraMinutes ?: kotlin.time.Duration.ZERO)
         val paddedStop = stop + (recording.stopExtraMinutes ?: kotlin.time.Duration.ZERO)
-        fact(R.string.details_recorded, formatRecordingDate(paddedStart.epochSeconds, locale = locale, nowSec = nowSec) +
-            " – " + formatRecordingDate(paddedStop.epochSeconds, locale = locale, nowSec = nowSec))
+        fact(R.string.details_recorded, formatTimeInterval(paddedStart.epochSeconds, paddedStop.epochSeconds,
+            withDate = true, locale = locale, nowSec = nowSec))
     } }
     if (recording.removalDays == RECORDING_REMOVAL_WHEN_SPACE_NEEDED)
         fact(R.string.details_retention, resources.getString(R.string.details_kept_until_space_needed))
@@ -890,10 +890,11 @@ private fun DetailsInformation(
             Spacer(Modifier.height(8.dp))
             val start = formatClock(event.start.epochSeconds)
             val end = formatClock(event.stop.epochSeconds)
+            val spokenRange = formatTimeIntervalSpoken(event.start.epochSeconds, event.stop.epochSeconds, resources)
             val minutesLeft = ((event.stop.epochSeconds - nowSec + 59) / 60).toInt()
             val progress = ((nowSec - event.start.epochSeconds).toFloat() / (event.stop - event.start).inWholeSeconds).coerceIn(0f, 1f)
             DetailsTimeline(start, progress, "$end · ${playerMinutesLeft(minutesLeft)}",
-                "${playerSpokenTimeRange("$start–$end")}, ${playerMinutesLeft(minutesLeft, spoken = true)}",
+                "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}",
                 Modifier.widthIn(max = 470.dp).fillMaxWidth())
         } else if (facts.any { it.kind == DetailsFactKind.LEFT }) {
             Spacer(Modifier.height(8.dp))

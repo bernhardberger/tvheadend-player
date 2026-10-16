@@ -9,10 +9,12 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import kotlinx.coroutines.delay
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.time.temporal.TemporalAccessor
 import java.util.Locale
@@ -146,12 +148,80 @@ fun formatRecordingDate(
 }
 
 fun formatRecordingSchedule(
-    startSec: Long?, stopSec: Long? = null, dateOnly: Boolean = false,
+    startSec: Long?, dateOnly: Boolean = false,
     locale: Locale = Locale.getDefault(), nowSec: Long = System.currentTimeMillis() / 1000L,
+): String = startSec?.let { formatRecordingDate(it, dateOnly, locale, nowSec) }.orEmpty()
+
+/** DateIntervalFormat is mutable and not thread-safe, so each cached instance is used under its own lock. */
+private val intervalFormats = ConcurrentHashMap<Pair<String, Locale>, android.icu.text.DateIntervalFormat>()
+
+private val rangeSeparator = Regex("[\\p{Zs}\\s]*[–—‒―~～-][\\p{Zs}\\s]*")
+private val whitespace = Regex("[\\p{Zs}\\s]")
+
+/**
+ * Breaks may only fall at the range separator, so each endpoint keeps its date and time together.
+ * The separator is the last dash with whitespace on both sides, else the last dash ("18:58–21:05").
+ */
+private fun keepEndpointsTogether(range: String): String {
+    val dashes = rangeSeparator.findAll(range).toList()
+    val separator = dashes.lastOrNull { it.value.first().isWhitespace() && it.value.last().isWhitespace() }
+        ?: dashes.lastOrNull() ?: return range.replace(whitespace, "\u00a0")
+    return range.substring(0, separator.range.first).replace(whitespace, "\u00a0") + separator.value +
+        range.substring(separator.range.last + 1).replace(whitespace, "\u00a0")
+}
+
+/**
+ * A start–end range through ICU's DateIntervalFormat: the shared date or day period appears once,
+ * and dash, spacing and order follow the locale ("Tue, Sep 15, 6:58 – 9:05 PM", "Di., 15. Sept., 18:58–21:05").
+ * The 12/24-hour choice is the app's, not the locale's. [withDate] adds the day, with the year
+ * only when an endpoint is outside the current year, as [formatRecordingDate] does.
+ */
+fun formatTimeInterval(
+    startSec: Long,
+    stopSec: Long,
+    withDate: Boolean = false,
+    locale: Locale = Locale.getDefault(),
+    nowSec: Long = System.currentTimeMillis() / 1000L,
+    uses24Hour: Boolean = AppClock.uses24Hour,
 ): String {
-    if (startSec == null) return ""
-    return formatRecordingDate(startSec, dateOnly, locale, nowSec) +
-        (stopSec?.takeUnless { dateOnly }?.let {
-            "–${formatClock(Instant.ofEpochSecond(it).atZone(ZoneId.systemDefault()), locale)}"
-        } ?: "")
+    val zone = ZoneId.systemDefault()
+    val currentYear = Instant.ofEpochSecond(nowSec).atZone(zone).year
+    val years = listOf(startSec, stopSec).map { Instant.ofEpochSecond(it).atZone(zone).year }
+    val skeleton = (if (!withDate) "" else if (years.all { it == currentYear }) "MMMEd" else "yMMMEd") +
+        if (uses24Hour) "Hm" else "hm"
+    val format = intervalFormats.getOrPut(skeleton to locale) {
+        android.icu.text.DateIntervalFormat.getInstance(skeleton, locale)
+    }
+    val start = Instant.ofEpochSecond(startSec).atZone(zone)
+    val stop = Instant.ofEpochSecond(maxOf(stopSec, startSec)).atZone(zone)
+    // Without a date ICU would add numeric dates to a midnight-crossing range, so a clock range puts both local
+    // times on one fixed UTC day; that also keeps a DST gap from shifting the end.
+    val clockDay = java.time.LocalDate.ofEpochDay(0)
+    val clockStart = clockDay.atTime(start.toLocalTime()).toInstant(ZoneOffset.UTC)
+    val clockStop = clockDay.atTime(stop.toLocalTime()).toInstant(ZoneOffset.UTC)
+    // A whole-day entry (06:00 to 06:00 next day) would collapse to one clock time, so it shows its dates.
+    if (!withDate && stopSec > startSec && clockStart == clockStop) {
+        return formatTimeInterval(startSec, stopSec, true, locale, nowSec, uses24Hour)
+    }
+    val range = synchronized(format) {
+        format.setTimeZone(android.icu.util.TimeZone.getTimeZone(if (withDate) zone.id else "UTC"))
+        if (withDate) format.format(android.icu.util.DateInterval(start.toInstant().toEpochMilli(), stop.toInstant().toEpochMilli()))
+        else format.format(android.icu.util.DateInterval(clockStart.toEpochMilli(), clockStop.toEpochMilli()))
+    }
+    return keepEndpointsTogether(range)
+}
+
+/** The spoken form of [formatTimeInterval] for the clock times alone: built from the instants, never from display text. */
+fun formatTimeIntervalSpoken(
+    startSec: Long,
+    stopSec: Long,
+    resources: android.content.res.Resources,
+    locale: Locale = Locale.getDefault(),
+    uses24Hour: Boolean = AppClock.uses24Hour,
+): String {
+    val zone = ZoneId.systemDefault()
+    fun clock(sec: Long) = formatClock(Instant.ofEpochSecond(sec).atZone(zone), locale, uses24Hour)
+    // A stop that does not follow the start is displayed as the start alone, so it is spoken that way too.
+    return if (stopSec > startSec) resources.getString(R.string.player_time_range_spoken, clock(startSec), clock(stopSec))
+        else clock(startSec)
 }

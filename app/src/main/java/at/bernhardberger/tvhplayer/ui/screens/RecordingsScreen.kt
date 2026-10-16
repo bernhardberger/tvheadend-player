@@ -21,7 +21,6 @@ import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
-import at.bernhardberger.tvhplayer.ui.common.formatHm
 import androidx.compose.foundation.layout.width
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -127,6 +126,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingItemKey
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
 import coil3.ImageLoader
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
@@ -797,8 +797,8 @@ internal fun RecordingsScreenContent(
                 at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty())
             } ?: opened.channelName.orEmpty(),
             episode = programmeEpisodeLine(opened.episode, opened.subtitle, androidx.compose.ui.platform.LocalContext.current.resources),
-            time = listOfNotNull(opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
-                opened.stop?.epochSeconds?.let(::formatHm)).joinToString("–"),
+            time = recordingTimeRange(opened.start?.epochSeconds, opened.stop?.epochSeconds,
+                androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)

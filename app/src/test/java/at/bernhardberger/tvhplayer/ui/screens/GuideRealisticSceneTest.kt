@@ -188,7 +188,8 @@ class GuideRealisticSceneTest {
         AppClock.format = ClockFormat.TWELVE_HOUR
         showAt("2026-09-15T19:40:00")
         capture("guide-fixture-evening-12h")
-        val clock = Regex("""\d{1,2}:\d\d [AP]M""")
+        // ICU keeps the day-period marker attached to its time with a no-break space.
+        val clock = Regex("""\d{1,2}:\d\d[  ][AP]M""")
         val shownTimes = compose.onAllNodes(androidx.compose.ui.test.hasText(":", substring = true), useUnmergedTree = true)
             .fetchSemanticsNodes().filter { node ->
                 node.layoutInfo.isPlaced && node.config.getOrNull(SemanticsProperties.Text).orEmpty()

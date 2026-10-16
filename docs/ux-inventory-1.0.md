@@ -76,7 +76,7 @@ These recur on several screens and are better decided once than per screen.
      passes no category and `onClearCategory = {}`.
    - Unused strings:
      - Guide: `epg_details_action_hint`, which is also wrong now; `epg_jump`;
-       `epg_schedule`; `epg_time_duration`.
+       `epg_schedule`.
      - Recordings: `recordings_folder_recent_in`, `recordings_upcoming_active`,
        `recordings_completed`, `recordings_failed_cancelled`,
        `recordings_schedule_end_duration`.
