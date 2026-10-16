@@ -13,6 +13,7 @@ import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.*
+import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.settings.*
@@ -43,7 +44,8 @@ internal fun SettingsScreen(
         settingsKeepChannelLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-    ) + settingsRecordingLevels(profiles, settings.recordingProfileId) { id ->
+    ) + settingsRecordingLevels(profiles, settings.recordingProfileId,
+        recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     } + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent)

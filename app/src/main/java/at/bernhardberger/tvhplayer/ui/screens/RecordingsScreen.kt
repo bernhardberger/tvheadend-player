@@ -21,6 +21,7 @@ import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
+import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
 import androidx.compose.foundation.layout.width
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
@@ -73,6 +74,8 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
+import androidx.tv.material3.MaterialTheme
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -457,11 +460,29 @@ internal fun RecordingsScreenContent(
                 bottom = contentPadding.calculateBottomPadding(),
             ),
     ) {
+        val spaceValue = recordingSpaceText(observation.dvrDiskSpaceState)
+        val spaceDescription = spaceValue?.let { stringResource(R.string.recording_space_line_description, it) }
         TopLevelBrowseHeader(
             title = stringResource(R.string.recordings_title),
             modifier = Modifier
                 .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
                 .testTag("recordings-header"),
+            // Quiet information in the header's trailing slot: no focus stop, and the tab row
+            // sits below it, so long text can only shorten the title or ellipsize itself.
+            actions = spaceValue?.let { value ->
+                {
+                    Text(
+                        text = value,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .testTag("recordings-space")
+                            .semantics { contentDescription = spaceDescription.orEmpty() },
+                    )
+                }
+            },
         )
         Spacer(Modifier.height(TvSpacing8))
         Box(

@@ -5,6 +5,9 @@
     <string name="episode_season_spoken">Season %1$d</string>
     <string name="episode_number_spoken">Episode %1$d</string>
     <string name="recording_profile_default">Default profile</string>
+    <string name="recording_space_title">Recording space</string>
+    <string name="recording_space_value">%1$s free of %2$s</string>
+    <string name="recording_space_line_description">Recording space: %1$s</string>
     <string name="recording_confirmation_profile">Recording profile: %1$s</string>
     <string name="recording_confirmation_owner">Recording owner: %1$s</string>
     <string name="context_watch">Watch</string>

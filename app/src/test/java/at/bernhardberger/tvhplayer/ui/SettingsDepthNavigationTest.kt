@@ -19,6 +19,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -75,6 +76,30 @@ class SettingsDepthNavigationTest {
                 assertTrue(settingsRootLevel(false, showRecordings = true).rows.any { it.item.id == RECORDINGS_LEVEL })
             }
         }
+    }
+
+    @Test fun recordingSpaceRowIsInformationAndNeverAFocusStop() {
+        val profiles = listOf(DvrConfiguration(DvrConfigId("default"), "", ""),
+            DvrConfiguration(DvrConfigId("archive"), "Archive", ""))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, RECORDINGS_LEVEL),
+                    listOf(settingsRootLevel(false, showRecordings = true)) +
+                        settingsRecordingLevels(profiles, null, "412 GB free of 2 TB") {})
+            }
+        }
+        compose.onNodeWithText("Recordings").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        val space = compose.onNodeWithText("Recording space\n412 GB free of 2 TB")
+        space.assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
+        press(Key.DirectionUp)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Recording profile").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Default profile").assertIsFocused()
     }
 
     @Test fun recordingProfileSelectionPersistsAndRestoresFocus() {

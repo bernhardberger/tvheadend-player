@@ -40,6 +40,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import coil3.ImageLoader
 import java.io.File
@@ -126,6 +127,29 @@ class RecordingsVisualLayoutTest {
         key(Key.Back)
         focused("recordings-folder-Documentaries")
         assertNoCommands()
+    }
+
+    @Test fun recordingSpaceLineIsQuietInformationInTheHeader() {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
+        val expected = "${formatFileSize(412_000_000_000L, context)} free of ${formatFileSize(2_000_000_000_000L, context)}"
+        compose.onNodeWithTag("recordings-space").assertTextEquals(expected)
+        compose.onNodeWithTag("recordings-space").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
+        assertTrue(bounds("recordings-space").bottom <= bounds("recordings-mode-tabs").top)
+        assertEquals(130f, bounds("recordings-header").left, .1f)
+        assertEquals(902f, bounds("recordings-header").right, .1f)
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
+        assertNoCommands()
+    }
+
+    @Test fun recordingSpaceLineIsAbsentWithoutAFigure() {
+        show(diskSpace = DvrDiskSpaceState.Synchronizing(null))
+        compose.onNodeWithTag("recordings-space").assertDoesNotExist()
+        focused("recordings-folder-Documentaries")
     }
 
     @Test fun folderOkEntersInPlaceDetailsAndBackRestoreOrigin() {
@@ -469,7 +493,8 @@ class RecordingsVisualLayoutTest {
         compose.waitForIdle()
     }
 
-    private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null) {
+    private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown) {
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
             recording(2, "Tide Watch", "Documentaries/Expeditions/blue.ts"),
@@ -486,6 +511,7 @@ class RecordingsVisualLayoutTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(emptyList(), emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
+            dvrDiskSpaceState = diskSpace,
             recordingProgressCapability = RecordingProgressCapability.UNSUPPORTED,
         )
         session = FakeTvheadendSession(observation)

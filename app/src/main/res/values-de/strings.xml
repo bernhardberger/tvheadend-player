@@ -5,6 +5,9 @@
     <string name="episode_season_spoken">Staffel %1$d</string>
     <string name="episode_number_spoken">Folge %1$d</string>
     <string name="recording_profile_default">Standardprofil</string>
+    <string name="recording_space_title">Aufnahmespeicher</string>
+    <string name="recording_space_value">%1$s von %2$s frei</string>
+    <string name="recording_space_line_description">Aufnahmespeicher: %1$s</string>
     <string name="recording_confirmation_profile">Aufnahmeprofil: %1$s</string>
     <string name="recording_confirmation_owner">Aufnahmebesitzer: %1$s</string>
     <string name="context_watch">Ansehen</string>
