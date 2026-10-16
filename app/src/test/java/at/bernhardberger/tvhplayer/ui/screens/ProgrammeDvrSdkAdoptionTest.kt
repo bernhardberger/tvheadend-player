@@ -205,8 +205,9 @@ class ProgrammeDvrSdkAdoptionTest {
 
     @Test fun rejectedServerMessageReachesNoticeWithoutEnteringDiagnostics() = rejected("No free adapter")
     @Test fun rejectedWithoutServerMessageKeepsExistingText() = rejected(null)
+    @Test fun aServerMessageOnAnotherFailureKeepsTheAppText() = rejected("No free adapter", TvheadendFailure.TIMEOUT)
 
-    private fun rejected(message: String?) = runTest {
+    private fun rejected(message: String?, failure: TvheadendFailure = TvheadendFailure.SERVER_REJECTED) = runTest {
         val observation = SessionObservation.create(sessionState = SessionState.Ready(ServerCapabilities.create(
             streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
@@ -215,12 +216,16 @@ class ProgrammeDvrSdkAdoptionTest {
         val action = DvrMutationAction.Stop(requireNotNull(observation.currentSession), DvrEntryId(2))
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> error("unexpected schedule") },
-            stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false, message) },
+            stopEntry = { _, _ -> DvrMutationResult.Failed(failure, false, message) },
             cancelEntry = { _, _ -> error("unexpected cancel") }, deleteEntry = { _, _ -> error("unexpected delete") },
         )
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         notices.postDvrFailure(action, actions.execute(action), notices.context())
         val notice = requireNotNull(notices.state.value.candidate).notice
+        if (failure != TvheadendFailure.SERVER_REJECTED) {
+            assertFalse(NoticeFormatter(context).format(notice).detail.orEmpty().contains(message.orEmpty()))
+            return@runTest
+        }
         val generic = context.getString(R.string.recording_action_rejected)
         assertEquals(if (message == null) generic else "$generic $message", NoticeFormatter(context).format(notice).detail)
         if (message != null) assertFalse(notice.toString().contains(message))

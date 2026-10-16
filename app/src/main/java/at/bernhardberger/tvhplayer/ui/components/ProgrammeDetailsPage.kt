@@ -874,7 +874,13 @@ private fun DetailsInformation(
             Spacer(Modifier.height(if (subtitle != null) 8.dp else 20.dp))
             Row(Modifier.widthIn(max = 470.dp).testTag("details-metadata-row"), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (segments.isNotEmpty()) Text(programmeFactsSegments(segments), Modifier.weight(1f, fill = false).testTag("details-metadata"),
+            // Screen readers hear the episode as "Season 5, Episode 10", as on the airing cards.
+            val episode = event?.episode ?: recording?.episode
+            val compactEpisode = episodeLabel(episode, resources)
+            val spokenMetadata = segments.map { if (it == compactEpisode) episodeLabel(episode, resources, spoken = true)!! else it }
+                .joinToString(", ")
+            if (segments.isNotEmpty()) Text(programmeFactsSegments(segments), Modifier.weight(1f, fill = false)
+                .semantics { contentDescription = spokenMetadata }.testTag("details-metadata"),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                  maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (ratingText != null) {

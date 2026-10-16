@@ -113,5 +113,8 @@ internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrM
         is DvrMutationAction.Cancel -> DvrMutationKind.CANCEL
         is DvrMutationAction.Delete -> DvrMutationKind.DELETE
     }
-    post(Notice.DvrActionFailed(kind, feedback, (result as? DvrMutationResult.Failed)?.serverMessage), context)
+    // The server's own text belongs only to a refusal; any other failure keeps the app's wording.
+    val serverMessage = (result as? DvrMutationResult.Failed)?.serverMessage
+        ?.takeIf { feedback == DvrMutationFeedback.REJECTED }
+    post(Notice.DvrActionFailed(kind, feedback, serverMessage), context)
 }

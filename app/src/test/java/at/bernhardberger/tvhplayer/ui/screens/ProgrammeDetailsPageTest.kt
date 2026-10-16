@@ -109,6 +109,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithText("21:00 · 112m left", substring = true).assertExists()
         compose.onNodeWithText("101 Ridge Earth HD").assertExists()
         compose.onNodeWithTag("details-metadata").assertTextEquals("120m · Documentary · S2\u00a0E3")
+            .assertContentDescriptionEquals("120m, Documentary, Season 2, Episode 3")
         compose.onNodeWithTag("details-timeline").assertExists()
         compose.onNodeWithTag("details-progress", useUnmergedTree = true).assertExists()
         // The text column keeps to the left ~55% of the screen, clear of the art's focal area.

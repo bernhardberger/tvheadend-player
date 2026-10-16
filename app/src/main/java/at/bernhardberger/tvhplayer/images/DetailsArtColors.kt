@@ -8,31 +8,30 @@ import coil3.ImageLoader
 import coil3.request.SuccessResult
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /** Small process-only cache, scoped by the captured session and artwork, not by programme title. */
 internal object DetailsArtColors {
-    private val colors = LruCache<AppArtworkSource, Int>(128)
-    private val sampling = Mutex()
+    // Art without a usable colour is remembered too, so it is not decoded again on every focus.
+    private val colors = LruCache<AppArtworkSource, Sample>(128)
 
-    fun stored(source: AppArtworkSource): Int? = colors.get(source)
+    private class Sample(val rgb: Int?)
 
+    fun stored(source: AppArtworkSource): Int? = colors.get(source)?.rgb
+
+    // No shared lock: a slow decode must not hold up other artwork; a duplicate sample is harmless.
     suspend fun sample(loader: ImageLoader, context: Context, source: AppArtworkSource): Int? =
         withContext(Dispatchers.Default) {
-            sampling.withLock {
-                stored(source)?.let { return@withLock it }
-                val result = loadArtworkSample(loader, context, source) as? SuccessResult
-                    ?: return@withLock null
-                // Prefer the colour that stands out (default filters skip skin tones and near
-                // black/white); art without one, such as a black-and-white film, stays neutral.
-                val bitmap = result.image.toBitmap()
-                val vivid = Palette.from(bitmap).generate().let { it.vibrantSwatch ?: it.darkVibrantSwatch }
-                val swatch = vivid ?: Palette.from(bitmap).clearFilters().generate().dominantSwatch
-                val rgb = swatch?.rgb?.and(0xFFFFFF) ?: return@withLock null
-                colors.put(source, rgb)
-                rgb
-            }
+            colors.get(source)?.let { return@withContext it.rgb }
+            val result = loadArtworkSample(loader, context, source) as? SuccessResult
+                ?: return@withContext null
+            // Prefer the colour that stands out (default filters skip skin tones and near
+            // black/white); art without one, such as a black-and-white film, stays neutral.
+            val bitmap = result.image.toBitmap()
+            val vivid = Palette.from(bitmap).generate().let { it.vibrantSwatch ?: it.darkVibrantSwatch }
+            val swatch = vivid ?: Palette.from(bitmap).clearFilters().generate().dominantSwatch
+            val rgb = swatch?.rgb?.and(0xFFFFFF)
+            colors.put(source, Sample(rgb))
+            rgb
         }
 }
