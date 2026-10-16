@@ -15,20 +15,20 @@ from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.30.0"
-SDK_VERSION = "0.30.0"
+SDK_COORDINATE = "at.bernhardberger.tvheadend:sdk-media3:0.31.0"
+SDK_VERSION = "0.31.0"
 EVIDENCE_DIRECTORY = ROOT / "app/build/released-sdk-evidence"
 SDK_AAR_NAME = f"sdk-media3-{SDK_VERSION}.aar"
 NATIVE_DIRECTORY = ROOT / "decoder-ffmpeg"
 PROVENANCE = json.loads((NATIVE_DIRECTORY / "provenance.json").read_text())
 FFMPEG_SOURCES_NAME = PROVENANCE["sourceArchive"]
-EXPECTED_AAR_SHA256 = "2dacc6c6adefa38ee86a8faaf6d079cce0a5c9c62f8fd8c84f3f994f8848d7da"
+EXPECTED_AAR_SHA256 = "cd856abe0b1e22034b29f88a29279232a5fda95ee0a6a4989df7a2f11d3231e7"
 EXPECTED_FFMPEG_SOURCES_SHA256 = PROVENANCE["sourceArchiveSha256"]
 EXPECTED_STANDARD_SOURCE_SHA256 = {
-    f"sdk-android-{SDK_VERSION}-sources.jar": "5d4f4d4b2ff0f5d1f1a1c981c71f4700e2730f1a76e9d903c12245372541236e",
-    f"sdk-core-{SDK_VERSION}-sources.jar": "6e6c611f816bf6c21cd101a91a50108114df2a95b829bcd58621fd1739f77c4f",
-    f"sdk-media3-{SDK_VERSION}-sources.jar": "8e51de8d884558addca84146be94c15d23ebebfb543a6ffca18daf4691d90488",
-    f"sdk-playback-{SDK_VERSION}-sources.jar": "de48c5f557e22d595c298cbf3ec98ff3bfb2baf615d022da025fdf2142c9c95d",
+    f"sdk-android-{SDK_VERSION}-sources.jar": "47335b3acc71e20707497ddac0808360c61949ff16e11c0866507a82feacbe13",
+    f"sdk-core-{SDK_VERSION}-sources.jar": "6189664a5756ce79108eb0e34be52606c83552d8d8f9b530b5909bc7568fee3e",
+    f"sdk-media3-{SDK_VERSION}-sources.jar": "ad487da056ca578536c5677a921c79a99b3c2c833257b2c0645da2703f764e90",
+    f"sdk-playback-{SDK_VERSION}-sources.jar": "6e1bd6efd99f4b62b06c51fb806c3810312cb21756be4c3fd799fe9860211f11",
 }
 EXPECTED_ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 # Android's 16 KiB page-size contract applies to the shipped 64-bit targets.
