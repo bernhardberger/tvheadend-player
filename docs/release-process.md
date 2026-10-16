@@ -12,6 +12,8 @@ Publication and production-device mutation still require explicit owner approval
 
 ## Builds
 
+- [ ] Reminder, not a gate: regenerate the [baseline profile](profiling.md#baseline-profile-generation) after a UI batch changes screens or navigation.
+
 Each release produces two builds from one commit (owner, 2026-10-11): the Play
 build `at.bernhardberger.tvhplayer` and the Appliance build
 `at.bernhardberger.tvhplayer.appliance`, which alone carries the HOME filter, the

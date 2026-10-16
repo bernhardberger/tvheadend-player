@@ -11,6 +11,12 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.baselineprofile)
+}
+
+baselineProfile {
+    automaticGenerationDuringBuild = false
+    mergeIntoMain = true
 }
 
 kotlin {
@@ -113,6 +119,11 @@ android {
 }
 
 androidComponents.beforeVariants { variant ->
+    // Generate only Play release. Both shipping flavors consume the merged main profile.
+    if (variant.buildType?.startsWith("nonMinified") == true ||
+        variant.buildType?.startsWith("benchmark") == true) {
+        variant.enable = variant.name == "playNonMinifiedRelease"
+    }
     if (variant.productFlavors.any { it == "distribution" to "appliance" } &&
         variant.buildType in setOf("profile", "profileServer")) {
         variant.enable = false
@@ -126,6 +137,8 @@ val releasedSdkSources = configurations.create("releasedSdkSources") {
 }
 
 dependencies {
+    baselineProfile(project(":baselineprofile"))
+    implementation(libs.androidx.profileinstaller)
     implementation(libs.tvheadend.sdk.media3) {
         version { strictly(libs.versions.tvheadend.sdk.get()) }
     }
@@ -350,7 +363,8 @@ tasks.register("verifyExternalSdkConsumption") {
             "App/client dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
         check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
-        check(projectPaths == setOf(":", ":app", clientProjectPath, decoderProjectPath)) {
+        // :baselineprofile is a test-only generator; no shipping variant depends on it.
+        check(projectPaths == setOf(":", ":app", clientProjectPath, decoderProjectPath, ":baselineprofile")) {
             "Unexpected Gradle projects: $projectPaths"
         }
 

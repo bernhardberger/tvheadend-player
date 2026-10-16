@@ -1,5 +1,52 @@
 # Player Journey Profiling
 
+## Baseline profile generation
+
+`:baselineprofile` uses Jetpack `BaselineProfileRule` against the real configured
+server with one journey: cold start, connection and initial sync, Channels, tune
+a channel and Back. It produces both baseline and startup rules and covers SDK and
+HTSP code on that path. No credentials are supplied to or inspected by the test.
+Normal builds only package the committed profiles; generation is manual and is
+not part of `tools/verify` or assemble. Add a journey only when a measured screen
+is slow on first use, not hand-written rules.
+
+Use an authorized **Android 13 (API 33)+ or rooted** device/emulator; the LXC 119
+Google TV emulator is the usual target. The unrooted G10 (API 31) **cannot
+generate** profiles; it only consumes them. Before generation, store a reachable
+server profile using a debug-key build with application ID
+`at.bernhardberger.tvhplayer`, disable autoplay, and confirm Channels has playable
+channels. The generator's Play non-minified release target retains that ID and
+debug signing key, is non-debuggable and shell-profileable. Do not uninstall or
+clear its app data; do not use a production-signed installation as the target.
+The target version must be installable as an update over the existing version.
+
+After the usual exact-target identity checks, run from the repository with JDK 21
+inside `android-emulator with-adb-tunnel`, which sets `ANDROID_SERIAL` and
+`ANDROID_ADB_SERVER_PORT` (for a directly connected device set `ANDROID_SERIAL`
+yourself):
+
+```bash
+: "${ANDROID_SERIAL:?Set the explicit authorized device serial first}"
+umask 077
+log=$(mktemp /tmp/opencode/baseline-profile.XXXXXX.log)
+timeout --kill-after=5s 20m ./gradlew :app:generateBaselineProfile \
+  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
+  -Ptvhplayer.testForks=1 --console=plain --no-scan >"$log" 2>&1
+```
+
+AGP's `leaveApksInstalledAfterRun` option preserves the target and its stored
+server profile after the run. Only Play generation is enabled. The plugin writes
+`app/src/main/generated/baselineProfiles/baseline-prof.txt` and `startup-prof.txt`;
+both shipping flavors consume them, and R8 maps them into the minified releases
+(`assets/dexopt/baseline.prof` and `baseline.profm`). Commit the regenerated text.
+
+Play applies the profile on install. A sideloaded install only gets it at the
+next background dexopt, so before timing a sideloaded build run the
+`ProfileInstallReceiver` broadcast and `cmd package compile -m speed-profile -f`
+on physical TVs only (forced compilation hung an emulator's system server).
+Check only the package's dexopt line:
+`adb shell dumpsys package at.bernhardberger.tvhplayer | grep -m1 'status='`.
+
 ## Current capture workflow
 
 Use `tools/profiling/capture` and the standard Perfetto Trace Processor through
