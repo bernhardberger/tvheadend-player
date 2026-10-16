@@ -44,7 +44,7 @@ class ChannelAccents(
     private val failed = ConcurrentHashMap.newKeySet<String>()
 
     /** The stored colour of [picon], from memory. Null before the store was read and for an unknown key. */
-    fun stored(picon: AppArtworkSource): Int? = cacheKey(picon.currentSession, picon.id)?.let { store[it] }
+    fun stored(picon: AppArtworkSource): Int? = picon.currentSession?.let { cacheKey(it, picon.id) }?.let { store[it] }
 
     /**
      * The colour of [picon]: the stored one, else sampled now and stored. A picon without a usable
@@ -53,14 +53,15 @@ class ChannelAccents(
      * replaced meanwhile. Without a key the colour is sampled for this call only.
      */
     suspend fun sample(imageLoader: ImageLoader, context: Context, picon: AppArtworkSource): Int? {
-        val key = cacheKey(picon.currentSession, picon.id) ?: return samplePicon(imageLoader, context, picon)
+        val session = picon.currentSession ?: return null
+        val key = cacheKey(session, picon.id) ?: return samplePicon(imageLoader, context, picon)
         store.load()
         sampling.computeIfAbsent(key) { Mutex() }.withLock {
             store[key]?.let { return it }
             if (key in failed) return null
             val rgb = samplePicon(imageLoader, context, picon)
             // The key holds for the session that loaded the picon: a result that outlived it is dropped.
-            if (cacheKey(picon.currentSession, picon.id) != key) return null
+            if (cacheKey(session, picon.id) != key) return null
             if (rgb == null) failed += key else store.put(key, rgb)
             return rgb
         }

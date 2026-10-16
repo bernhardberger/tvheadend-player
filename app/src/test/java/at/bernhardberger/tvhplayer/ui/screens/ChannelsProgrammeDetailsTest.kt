@@ -167,11 +167,12 @@ class ChannelsProgrammeDetailsTest {
         assertEquals(16f / 9f, detail("channels-preview").bounds().let { it.width / it.height }, .015f)
     }
 
-    @Test fun absentSessionNeverRequestsProgrammeArtOrPicon() {
+    @Test fun absentSessionNeverRequestsProgrammeArtAndAsksOnlyForTheSavedPicon() {
         show(currentSession = null)
         detail("channels-preview-fallback").assertExists()
         detail("channels-preview-artwork").assertDoesNotExist()
-        assertTrue(requested.isEmpty())
+        // Without a session only the picon is tried, from the saved copy (no session in the model).
+        assertEquals(listOf(AppArtworkSource(null, ArtworkId(1))), requested.distinct())
     }
 
     @Test fun titlePunctuationDoesNotCreateASubtitleOrLeaveItsGap() {

@@ -39,8 +39,9 @@ fun PiconBox(
     placeholderTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onError: (() -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
+    // Before a current session the saved copy is tried, so logos show at startup and offline.
     val piconUrl = remember(currentSession, piconPath) {
-        currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
+        piconPath?.let { AppArtworkSource(currentSession, it) }
     }
 
     val icon = painterResource(R.drawable.ic_live_tv_outlined)
@@ -54,10 +55,12 @@ fun PiconBox(
         contentAlignment = alignment
     ) {
         if (piconUrl == null) {
-            // One icon, one size: a logo that cannot load yet looks exactly like one loading,
-            // so it only ever changes once, when the logo fades in. No logo keeps the full icon.
-            Image(if (piconPath != null) loading else failed, null, Modifier.fillMaxSize())
+            Image(failed, null, Modifier.fillMaxSize())
         } else {
+            // One icon, one size: a logo without a saved copy keeps looking like it is loading
+            // until the session can fetch it, so it only ever changes once, when the logo fades
+            // in. Only a failure with a current session is final; no logo keeps the full icon.
+            val waitingForSession = currentSession == null
             AsyncImage(
                 model = piconUrl,
                 imageLoader = imageLoader,
@@ -67,8 +70,8 @@ fun PiconBox(
                 modifier = Modifier.fillMaxSize(),
                 // Painter slots preserve loading/error appearance without image subcomposition.
                 placeholder = loading,
-                error = failed,
-                onError = { onError?.invoke() },
+                error = if (waitingForSession) loading else failed,
+                onError = { if (!waitingForSession) onError?.invoke() },
             )
         }
     }
