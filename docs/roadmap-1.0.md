@@ -171,7 +171,7 @@ screenshot-first UX review.
 | U6 | Recordings rework: folder browse kept; in-progress recordings, watch status, D4 free space, list and details content; one or two more views (genre, channel); Back restores the previous folder; tabs overhauled or removed; D9 entry if in | From U2 |
 | U7 | Settings rework: sliding-depth browse kept, rows restructured; server connection editor. Idea to decide here (owner, 2026-10-14): a setting to opt out of warm playback while browsing, and/or a finer choice to prefer programme art or the warm video on details pages | From U2 |
 | U8 | Player polish and finishing: the gaps from U2, not a single extra feature | From U2 |
-| U9 | Splash and startup: never looks hung. Shape follows E5 (owner, 2026-10-12): if startup waits only for now/next and is fast enough, today's stages with a little more detail; if it still waits for the guide, a guide progress count; if the guide loads behind a usable app, no granular sub-progress | From U2 |
+| U9 | Splash and startup: never looks hung. Decided 2026-10-16 after the G10 cold-start runs: today's splash, stage messages and error screen on every cold start (not only with autoplay) until cached channels and recordings are drawn, or without a cache until the initial sync finishes; unreachable server offers Try again and Edit connection; no counts, guide wait or Skip action | From U2 |
 | U10 | Search: hidden for 1.0 (owner, 2026-10-12). A global search, and what it covers, is a stretch feature after 1.0 | Guide search entry hidden |
 | U11 | Physical acceptance of the reworked screens **[TV]** | Observation only |
 | U12 | Screenshot goldens for production composables once screens settle | After U3–U10 |

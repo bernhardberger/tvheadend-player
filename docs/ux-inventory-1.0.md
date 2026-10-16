@@ -410,12 +410,14 @@ bear on this:
   animated splash, its stage messages and its error screen should also run on
   a cold start without autoplay, then enter the browse screens instead of the
   player. Decided the same day: an unreachable server offers only Try again
-  and Edit connection (no "continue with saved channels"); the splash shows
-  stage progress with counts now ("Loading guide 45/120 channels"); entry
-  waits for the guide, but once channels and recordings are loaded a Skip
-  action enters while the guide keeps loading (like Steam's shader-compile
-  skip). Both need SDK support (sync progress and a "critical parts ready"
-  signal), requested 2026-10-16.
+  and Edit connection (no "continue with saved channels").
+- Revised by the owner the same day after the G10 cold-start runs: the splash
+  stays until the cached channels and recordings are drawn, or without a cache
+  until the initial sync finishes, with today's stage messages. No counts (the
+  app only gets channel and guide counts when the sync finishes) and no guide
+  wait or Skip action (on a fresh start channels and guide arrive together, so
+  there is nothing earlier to enter). This replaces the earlier counts and Skip
+  decision; the sync-progress request to the SDK is not needed for it.
 - Colours (owner 2026-10-16): the error colour stays the theme's light error
   tone (`#FFB4AB`) for text and icons, with no filled `#93000A` containers;
   recording red (`TvRecordingColor`, `#FF5449`) gets slightly stronger.
