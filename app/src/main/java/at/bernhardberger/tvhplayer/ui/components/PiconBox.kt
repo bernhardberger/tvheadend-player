@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.tv.material3.Icon
@@ -42,18 +43,21 @@ fun PiconBox(
         currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
     }
 
+    val icon = painterResource(R.drawable.ic_live_tv_outlined)
+    // Keep the placeholder painters stable across focus changes; only their draw tint changes.
+    val tint = rememberUpdatedState(placeholderTint)
+    val loading = remember(icon) { PiconPlaceholderPainter(icon, tint, PICON_LOADING_ALPHA) }
+    val failed = remember(icon) { PiconPlaceholderPainter(icon, tint, 1f) }
+
     Box(
         modifier = modifier.profileLayout("picon"),
         contentAlignment = alignment
     ) {
         if (piconUrl == null) {
-            PiconPlaceholder(modifier = Modifier.fillMaxSize(0.5f), tint = placeholderTint)
+            // One icon, one size: a logo that cannot load yet looks exactly like one loading,
+            // so it only ever changes once, when the logo fades in. No logo keeps the full icon.
+            Image(if (piconPath != null) loading else failed, null, Modifier.fillMaxSize())
         } else {
-            val icon = painterResource(R.drawable.ic_live_tv_outlined)
-            // Keep Coil's fallback painters stable across focus changes; only their draw tint changes.
-            val tint = rememberUpdatedState(placeholderTint)
-            val loading = remember(icon) { PiconPlaceholderPainter(icon, tint, PICON_LOADING_ALPHA) }
-            val failed = remember(icon) { PiconPlaceholderPainter(icon, tint, 1f) }
             AsyncImage(
                 model = piconUrl,
                 imageLoader = imageLoader,
