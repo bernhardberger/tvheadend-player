@@ -185,7 +185,8 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Row/section emphasis | `components/RowEmphasis.kt` — one 300 ms position clock, deferred header scale/alpha and content dimming |
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
-| Picon | `components/PiconBox.kt` |
+| Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
+| Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
 | Context menu | `components/BrowseContextMenu.kt` |
 | Two-column dialog | `components/TwoColumnDialog.kt` |

@@ -5,9 +5,11 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.android.addTvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
+import coil3.request.crossfade
 
 private class AppArtworkMapper(
     private val session: TvheadendSession,
@@ -23,4 +25,7 @@ fun buildImageLoader(context: Context, session: TvheadendSession): ImageLoader =
             addTvheadendArtwork()
         }
         .diskCache(null)
+        // Every logo and programme picture fades in over its placeholder when it is actually
+        // loaded; Coil shows memory-cache hits and failures at once, so scrolling never fades.
+        .crossfade(PlayerMotion.MediumMs)
         .build()
