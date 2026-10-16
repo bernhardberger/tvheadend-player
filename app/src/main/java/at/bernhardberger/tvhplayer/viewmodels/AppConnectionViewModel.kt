@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.viewmodels
 import android.os.SystemClock
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
@@ -82,11 +83,18 @@ class AppConnectionViewModel(
                         is SessionState.Ready -> "ready"
                         is SessionState.Unavailable -> "unavailable"
                     }
+                    val epgStage = when (observation.epgState) {
+                        EpgRepositoryState.Empty -> "empty"
+                        is EpgRepositoryState.Synchronizing -> "synchronizing"
+                        is EpgRepositoryState.Current -> "current"
+                        is EpgRepositoryState.Stale -> "stale"
+                    }
                     // Trace section names are limited to 127 characters.
                     "P51:startup:$profileStage:$sessionStage" +
                         ":catalog:${observation.channelCatalogAuthority.ordinal}" +
                         ":channels:${observation.channelCatalogForDisplay?.channels?.size ?: 0}" +
-                        ":events:${observation.epgSnapshotForDisplay?.events?.size ?: 0}"
+                        ":events:${observation.epgSnapshotForDisplay?.events?.size ?: 0}" +
+                        ":epg:$epgStage"
                 }.distinctUntilChanged().collect { stage ->
                     profileTrace("$stage:uptime:${SystemClock.uptimeMillis()}") { }
                 }
