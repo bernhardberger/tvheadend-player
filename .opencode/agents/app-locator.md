@@ -1,6 +1,8 @@
 ---
 description: Mechanical app locator for exact files, symbols, usages, declarations, and tests without analysis
 mode: subagent
+model: openai/gpt-6-luna
+variant: low
 permission:
   edit: deny
   shell: deny
