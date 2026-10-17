@@ -1808,6 +1808,9 @@ class LivePlayerChromeScreenTest {
         val clockTop = clock.boundsInRoot.top
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.Info) }
+        // The key's state write reaches the composition through the looper, not the frame clock. Without
+        // draining it, a loaded run steps the manual clock past frames in which nothing could start yet.
+        compose.waitForIdle()
         compose.mainClock.advanceTimeBy(250)
         val second = compose.onNodeWithTag("player-page-second").fetchSemanticsNode().layoutInfo.coordinates
         val tabs = compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
