@@ -163,7 +163,11 @@ val appModule = module {
     single { LastPlayedChannelStore(androidContext()) }
     single { GuidePositionStore() }
 
-    single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session) }
+    single<ImageLoader> {
+        val owner = get<SdkRuntimeOwner>()
+        // Every connection save or clear raises the generation before the session changes profile.
+        buildImageLoader(androidContext(), owner.session) { owner.appProfileOwner.configurationGeneration.value == 0L }
+    }
 
     single { ChannelAccentStore(androidContext()) }
     single {
