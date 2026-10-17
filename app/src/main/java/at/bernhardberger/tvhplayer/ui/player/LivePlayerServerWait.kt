@@ -54,7 +54,6 @@ import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.startup.mainStartupActionResource
 import at.bernhardberger.tvhplayer.ui.startup.mainStartupMessageResource
 import at.bernhardberger.tvhplayer.ui.startup.mainStartupProblemTitleResource
-import coil3.ImageLoader
 
 /**
  * A live screen opened before its session was playable waits here for the server; its entry
@@ -138,7 +137,6 @@ internal fun LivePlayerServerWait(
     state: LivePlayerServerWaitState,
     channel: Channel?,
     channelName: String,
-    imageLoader: ImageLoader,
     rootFocus: FocusRequester,
 ) {
     val presentation = state.presentation
@@ -167,7 +165,7 @@ internal fun LivePlayerServerWait(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            PiconBox(imageLoader, picon, Modifier.size(136.dp, 60.dp))
+            PiconBox(picon, Modifier.size(136.dp, 60.dp))
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,

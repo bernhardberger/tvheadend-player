@@ -21,7 +21,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import coil3.ImageLoader
 
 /** The [PlayerChromeActions.restoreFocus] token that returns focus to the controls' [PlayerTopIdentity]. */
 internal const val PlayerIdentityCardTag = "player-identity-card"
@@ -37,7 +36,6 @@ internal fun BoxScope.ChannelCardFace(
     picon: ArtworkId?,
     channelId: ChannelId?,
     name: String,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     logoTag: String = "player-identity-logo",
     nameTag: String = "player-identity-name",
@@ -52,7 +50,7 @@ internal fun BoxScope.ChannelCardFace(
     val mark = Modifier.align(Alignment.Center).graphicsLayer { translationY = -lift.toPx() / 2 }
         .size(markWidth, markHeight)
     if (picon != null) {
-        PiconBox(imageLoader, picon, mark.testTag(logoTag), currentSession)
+        PiconBox(picon, mark.testTag(logoTag), currentSession)
     } else {
         Box(mark, contentAlignment = Alignment.Center) {
             Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis,

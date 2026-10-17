@@ -65,14 +65,15 @@ import org.robolectric.annotation.GraphicsMode
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /** Real native ListItem drawing; all Coil requests are intercepted before any I/O. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PiconBoxTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
-    private lateinit var loader: ImageLoader
     private lateinit var view: View
     private var requests = 0
     private val loadingGate = CompletableDeferred<Unit>()
@@ -81,10 +82,6 @@ class PiconBoxTest {
     private var focusedBackground = Color.Unspecified
     private var background = Color.Unspecified
     private var passiveTint = Color.Unspecified
-
-    @After fun release() {
-        if (::loader.isInitialized) loader.shutdown()
-    }
 
     @Test fun missingPiconFollowsNativeRowFocusColor() = assertRowFallback(ArtworkState.MISSING)
 
@@ -134,7 +131,7 @@ class PiconBoxTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).captureCurrentSession()
-        loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
             .components {
                 add(Interceptor { chain ->
                     assertTrue(chain.request.data is AppArtworkSource)
@@ -157,6 +154,7 @@ class PiconBoxTest {
             .coroutineContext(Dispatchers.Main.immediate)
             .diskCache(null)
             .build()
+        images.install(loader)
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {
@@ -176,7 +174,6 @@ class PiconBoxTest {
                                 name = "Documentary",
                                 programTitle = "Programme",
                                 progress = null,
-                                imageLoader = loader,
                                 currentSession = session,
                                 piconPath = picon,
                                 onFocus = {},
@@ -192,7 +189,6 @@ class PiconBoxTest {
                             // Passive/player callers must not start inheriting an arbitrary ambient tint.
                             CompositionLocalProvider(LocalContentColor provides Color.Magenta) {
                                 PiconBox(
-                                    imageLoader = loader,
                                     currentSession = session,
                                     piconPath = picon,
                                     modifier = Modifier.size(60.dp, 36.dp).testTag("passive-picon"),

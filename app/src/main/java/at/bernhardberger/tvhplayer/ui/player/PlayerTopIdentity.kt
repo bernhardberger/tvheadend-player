@@ -76,7 +76,6 @@ import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import coil3.ImageLoader
 
 /** The live top identity's test tag. */
 internal const val PlayerTopIdentityTag = "player-top-identity"
@@ -94,7 +93,6 @@ internal const val PlayerTopIdentityTag = "player-top-identity"
 @Composable
 internal fun PlayerTopIdentity(
     content: PlayerChromeContent,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     /** The identity's place in the controls' focus graph; null in the Banner. */
@@ -153,15 +151,15 @@ internal fun PlayerTopIdentity(
                     Box(identityLayer.testTag(PlayerTopIdentityTag).semantics(mergeDescendants = true) {
                         contentDescription = spoken
                     }) {
-                        IdentityContent(content, imageLoader, currentSession, focused = false)
+                        IdentityContent(content, currentSession, focused = false)
                     }
                 } else {
-                    FocusableIdentity(content, imageLoader, currentSession, zaps, recents.isNotEmpty(), onClick,
+                    FocusableIdentity(content, currentSession, zaps, recents.isNotEmpty(), onClick,
                         identityLayer.then(focus).focusRequester(identityFocus))
                 }
                 Box {
                     if (focus != null && recents.isNotEmpty()) RecentRow(recents, rowOpen, onRecentOpenChange, onRecentClick,
-                        onRecentInteraction, identityFocus, onRecentDown, imageLoader, currentSession)
+                        onRecentInteraction, identityFocus, onRecentDown, currentSession)
                 }
             },
             modifier = Modifier.onFocusChanged { onFocusWithinChanged(it.hasFocus) },
@@ -185,7 +183,6 @@ internal fun PlayerTopIdentity(
 @Composable
 private fun FocusableIdentity(
     content: PlayerChromeContent,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     zaps: Boolean,
     hasRecents: Boolean,
@@ -218,7 +215,7 @@ private fun FocusableIdentity(
         },
     ) {
         Box(Modifier.clearAndSetSemantics {}) {
-            IdentityContent(content, imageLoader, currentSession, focused)
+            IdentityContent(content, currentSession, focused)
             if (focused && zaps) {
                 // Faint: Left/Right change channel from here.
                 val tint = LocalContentColor.current.copy(alpha = ArrowAlpha)
@@ -244,7 +241,6 @@ private fun identitySpoken(content: PlayerChromeContent): String {
 @Composable
 private fun IdentityContent(
     content: PlayerChromeContent,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     focused: Boolean,
 ) {
@@ -255,7 +251,7 @@ private fun IdentityContent(
         Box(Modifier.size(ChipWidth, ChipHeight).clip(ChipShape).background(TvSurfaceColors.containerLowest),
             contentAlignment = Alignment.Center) {
             if (content.picon != null) {
-                PiconBox(imageLoader, content.picon, Modifier.padding(4.dp).testTag("player-top-identity-logo"), currentSession)
+                PiconBox(content.picon, Modifier.padding(4.dp).testTag("player-top-identity-logo"), currentSession)
             } else {
                 Text(info.channelNumber, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1, modifier = Modifier.testTag("player-top-identity-number"))
@@ -285,7 +281,6 @@ private fun RecentRow(
     onInteraction: () -> Unit,
     identityFocus: FocusRequester,
     onDown: () -> Unit,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
 ) {
     val first = remember { FocusRequester() }
@@ -326,7 +321,7 @@ private fun RecentRow(
             Row(horizontalArrangement = Arrangement.spacedBy(RecentChipGap)) {
                 recents.forEachIndexed { index, recent ->
                     RecentChip(
-                        recent, imageLoader, currentSession,
+                        recent, currentSession,
                         modifier = (if (index == 0) Modifier.focusRequester(first) else Modifier)
                             .onPreviewKeyEvent { event ->
                                 val down = event.type == KeyEventType.KeyDown
@@ -362,7 +357,6 @@ private fun RecentRow(
 @Composable
 private fun RecentChip(
     recent: RecentChannelPeek,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier,
     onClick: () -> Unit,
@@ -389,7 +383,7 @@ private fun RecentChip(
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 if (recent.picon != null) {
-                    PiconBox(imageLoader, recent.picon, Modifier.size(RecentMarkWidth, RecentMarkHeight)
+                    PiconBox(recent.picon, Modifier.size(RecentMarkWidth, RecentMarkHeight)
                         .testTag("player-identity-recent-logo"), currentSession)
                 } else {
                     Text(recent.name, style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis,

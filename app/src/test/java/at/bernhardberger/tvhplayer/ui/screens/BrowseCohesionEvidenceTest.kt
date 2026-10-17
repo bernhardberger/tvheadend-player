@@ -96,7 +96,6 @@ import at.bernhardberger.tvhplayer.ui.TvScreenPadding
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -119,6 +118,7 @@ import java.util.Locale
 import java.util.TimeZone
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /**
  * Comparable, offline production-composable evidence, not replacement screen mocks.
@@ -129,6 +129,7 @@ import kotlin.time.Instant
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BrowseCohesionEvidenceTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -156,7 +157,7 @@ class BrowseCohesionEvidenceTest {
                             connectionDegraded = disconnected, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             ChannelsScreenContent(contentPadding = padding, initialFocusEnabled = !drawerActive,
                                 channelScopeState = resolveChannelScopeState(displayed.channelState, null),
-                                observation = displayed, tagNotice = false, selectedId = { null }, imageLoader = imageLoader,
+                                observation = displayed, tagNotice = false, selectedId = { null },
                                 playingChannelId = null, connectionUiState = if (disconnected) ConnectionUiState.Connecting else ConnectionUiState.Ready,
                                 onSelectChannel = {}, onSelectTag = {}, onDismissTagNotice = {},
                                 onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> })
@@ -204,7 +205,6 @@ class BrowseCohesionEvidenceTest {
     private lateinit var view: View
     private lateinit var back: androidx.activity.OnBackPressedDispatcher
     private lateinit var session: FakeTvheadendSession
-    private lateinit var imageLoader: ImageLoader
     private lateinit var originalZone: TimeZone
     private lateinit var originalLocale: Locale
     private var fixtureEpochMillis = 0L
@@ -219,7 +219,7 @@ class BrowseCohesionEvidenceTest {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         Locale.setDefault(Locale.US)
         fixtureEpochMillis = System.currentTimeMillis()
-        imageLoader = FixtureArt.imageLoader(context(), mapOf(
+        images.install(FixtureArt.imageLoader(context(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"),
             ArtworkId(2) to FixtureArt.picon("harbor-sport"),
             ArtworkId(4) to FixtureArt.picon("kite-kids"),
@@ -227,7 +227,7 @@ class BrowseCohesionEvidenceTest {
             ArtworkId(101) to FixtureArt.art("ridge-light"),
             ArtworkId(102) to FixtureArt.art("harbor-kickoff"),
             ArtworkId(103) to FixtureArt.art("still-tide-watch"),
-        ))
+        )))
     }
 
     @After
@@ -235,7 +235,6 @@ class BrowseCohesionEvidenceTest {
         models.clear()
         runtimeScope.cancel()
         if (::player.isInitialized) player.release()
-        if (::imageLoader.isInitialized) imageLoader.shutdown()
         TimeZone.setDefault(originalZone)
         Locale.setDefault(originalLocale)
     }
@@ -361,7 +360,6 @@ class BrowseCohesionEvidenceTest {
                 observation = observation,
                 tagNotice = false,
                 selectedId = { selected },
-                imageLoader = imageLoader,
                 playingChannelId = null,
                 connectionUiState = ConnectionUiState.Ready,
                 onSelectChannel = { selected = it },
@@ -412,7 +410,6 @@ class BrowseCohesionEvidenceTest {
                 playerSession = runtime,
                 guidePositionStore = position,
                 lastPlayedStore = lastPlayed,
-                imageLoader = imageLoader,
                 onPlay = { _, _ -> playbackRequests++ },
                 onPlayRecording = { playbackRequests++ },
             )
@@ -435,7 +432,6 @@ class BrowseCohesionEvidenceTest {
                 contentPadding = padding,
                 initialFocusEnabled = !drawerActive,
                 backEnabled = !drawerActive,
-                imageLoader = imageLoader,
                 dvrMutationActions = actions,
                 notices = notices,
                 onRetry = { error("Unexpected recording retry") },

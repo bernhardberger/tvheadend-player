@@ -29,7 +29,6 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.player.*
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import androidx.compose.ui.unit.Density
 import androidx.tv.material3.MaterialTheme
@@ -54,17 +53,18 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /** Matched before/after production details hosts; fictional fixture programme, no services. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ProgrammeDetailsCaptureTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val oldLocale = Locale.getDefault()
     private val oldZone = TimeZone.getDefault()
     private lateinit var view: View
-    private lateinit var loader: ImageLoader
     private val session = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
         channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
@@ -78,13 +78,12 @@ class ProgrammeDetailsCaptureTest {
     @Before fun prepare() {
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-        loader = FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light")))
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"))))
     }
     @After fun release() {
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
-        loader.shutdown()
     }
 
     @Test fun guideArtLongDescription() = capture("guide-art-long", guide = true)
@@ -106,7 +105,7 @@ class ProgrammeDetailsCaptureTest {
                 dispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 if (shown) ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
                     programmeDetailsActions(event, start.epochSeconds - 60, null, true, true, true),
-                    loader, session, {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
+                    session, {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
                         channel.id, event.stop, event.stop + 3600.seconds, title = "Next")))
             }
         }
@@ -133,7 +132,7 @@ class ProgrammeDetailsCaptureTest {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsPage(event, null, channel, now,
                     programmeDetailsActions(event, now, null, canModify, now >= start.epochSeconds, true),
-                    loader, session, {}, {})
+                    session, {}, {})
             }
         }
         compose.onNodeWithTag("programme-details-page").assertIsFocused()
@@ -159,10 +158,10 @@ class ProgrammeDetailsCaptureTest {
                     if (shown) {
                         if (guide) ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
                             programmeDetailsActions(event, start.epochSeconds - 60, null, canModify, false, true),
-                            loader, session, {}, { shown = false })
+                            session, {}, { shown = false })
                         else ProgrammeDetailsPage(null, entry, channel, 0L,
                             recordingDetailsActions(entry, false, canModify, false),
-                            loader, session, {}, { shown = false })
+                            session, {}, { shown = false })
                     }
                 }
             }
@@ -203,15 +202,15 @@ class ProgrammeDetailsCaptureTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         if (player) ProgrammeInfoSheetFrame {
                             ProgramDetails(ProgramDetailsState(), event, emptyList(), start.epochSeconds + 600, channel.name.orEmpty(),
-                                { shown, modifier -> ProgrammeHero(shown.image, channel.id, "101", channel.icon, loader, session, modifier) },
+                                { shown, modifier -> ProgrammeHero(shown.image, channel.id, "101", channel.icon, session, modifier) },
                                 { null }, true, remember { FocusRequester() }, remember { FocusRequester() }, {})
                         }
                         else if (guide) ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
                             start.epochSeconds + if (scheduled) -60 else 600,
                             programmeDetailsActions(event, start.epochSeconds + if (scheduled) -60 else 600,
-                                entry.takeIf { scheduled }, true, true, true), loader, session, {}, {})
+                                entry.takeIf { scheduled }, true, true, true), session, {}, {})
                         else ProgrammeDetailsPage(null, entry, channel, 0L,
-                            recordingDetailsActions(entry, true, true, true), loader, session, {}, {})
+                            recordingDetailsActions(entry, true, true, true), session, {}, {})
                     }
                 }
             }

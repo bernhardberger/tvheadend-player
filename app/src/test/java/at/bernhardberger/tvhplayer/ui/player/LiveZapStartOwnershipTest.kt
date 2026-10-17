@@ -55,7 +55,6 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
-import coil3.ImageLoader
 import java.util.concurrent.atomic.AtomicInteger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -269,7 +268,7 @@ class LiveZapStartOwnershipTest {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
                 TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
-                        channels, ImageLoader.Builder(context).build(), session, ChannelId(1), "Name 1", {}, {}, runtime,
+                        channels, session, ChannelId(1), "Name 1", {}, {}, runtime,
                         notices = notices, uiSettingsStore = at.bernhardberger.tvhplayer.settings.UiSettingsStore(settingsData))
                 }
             }

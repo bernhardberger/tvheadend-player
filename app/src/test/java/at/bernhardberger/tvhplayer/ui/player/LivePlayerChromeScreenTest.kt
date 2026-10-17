@@ -141,7 +141,6 @@ import at.bernhardberger.tvhplayer.ui.performMainStartupBack
 import at.bernhardberger.tvhplayer.ui.ChannelsKey
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
-import coil3.ImageLoader
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -625,7 +624,6 @@ class LivePlayerChromeScreenTest {
 
     /** The live chrome's controls [behindLiveMs] behind the live edge with known timing. */
     private fun liveChrome(behindLiveMs: Long, state: PlayerStateCell = PlayerStateCell.PLAYING) {
-        val loader = ImageLoader(context)
         compose.setContent {
             TVHeadendPlayerTheme {
                 PlayerChrome(
@@ -637,7 +635,7 @@ class LivePlayerChromeScreenTest {
                         nowSec = 1_800,
                     ),
                     actions = PlayerChromeActions(active = true, paused = state == PlayerStateCell.PAUSED),
-                    imageLoader = loader, currentSession = null,
+                    currentSession = null,
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {},
                     onInteraction = {},
                 )
@@ -2241,7 +2239,7 @@ class LivePlayerChromeScreenTest {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
-                            channels, ImageLoader.Builder(context).build(), screenSession, ChannelId(1), "Name 1", {}, onClose, runtime,
+                            channels, screenSession, ChannelId(1), "Name 1", {}, onClose, runtime,
                             contentAllowed = contentAllowed(), notices = notices, uiSettingsStore = uiSettings,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })

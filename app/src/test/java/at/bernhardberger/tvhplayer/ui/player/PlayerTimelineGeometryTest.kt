@@ -11,7 +11,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
@@ -43,7 +42,6 @@ import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.settings.ClockFormat
@@ -310,7 +308,6 @@ class PlayerTimelineGeometryTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 val info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", airing, airing, false, now, "Programme")
-                val loader = remember { ImageLoader(context) }
                 PlayerInfoBar(info, Modifier.testTag("player-info-bar"), lastLineEndReserve = reserve) {
                     Box(it.size(124.dp, 70.dp))
                 }
@@ -1159,7 +1156,6 @@ class PlayerTimelineGeometryTest {
                     state = frame.cell),
                 timeline = frame.timeline,
                 actions = PlayerChromeActions(active = frame.mode == PlayerChromeMode.CONTROLS, paused = frame.cell == PlayerStateCell.PAUSED),
-                imageLoader = remember { ImageLoader(context) },
                 currentSession = null,
                 onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             )

@@ -28,7 +28,6 @@ import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
-import coil3.ImageLoader
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -59,7 +58,6 @@ class ArchiveDepthOwnershipTest {
         try {
             compose.setContent {
                 val context = LocalContext.current
-                val loader = remember(context) { ImageLoader.Builder(context).build() }
                 TVHeadendPlayerTheme {
                     motion = rememberTabContentMotion(selected.intValue)
                     TabContent(motion, selected.intValue, state = { selected.intValue }) { index, owner ->
@@ -71,7 +69,7 @@ class ArchiveDepthOwnershipTest {
                             backEnabled = owner.isCurrent, contentFocus = requester,
                             onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
-                            imageLoader = loader, currentSession = null, piconForEntry = { null },
+                            currentSession = null, piconForEntry = { null },
                         )
                     }
                 }

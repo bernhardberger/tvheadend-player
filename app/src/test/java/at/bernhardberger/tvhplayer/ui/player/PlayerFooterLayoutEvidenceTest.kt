@@ -86,6 +86,8 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * Live footer compaction evidence. Captures are composition only: 960×540 px,
@@ -101,6 +103,7 @@ import kotlin.time.Instant
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerFooterLayoutEvidenceTest {
+    @get:Rule val images = ImageLoaderRule { zapImageLoader(ApplicationProvider.getApplicationContext<Application>()) }
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
     private var defaultZone: TimeZone? = null
@@ -867,7 +870,6 @@ class PlayerFooterLayoutEvidenceTest {
                     dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
                 )).captureCurrentSession()
             }
-            val loader = remember { zapImageLoader(context) }
             CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
                 TVHeadendPlayerTheme {
                     endpointWidths = rememberTimelineEndpointWidths(if (recording) TimelineKind.RECORDING else TimelineKind.LIVE)
@@ -917,7 +919,6 @@ class PlayerFooterLayoutEvidenceTest {
                                 feedbackIsError = error && feedback() != null,
                             ),
                             actions = PlayerChromeActions(active = true, paused = paused()),
-                            imageLoader = loader,
                             currentSession = session,
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             onCommitSeek = onCommitSeek,
@@ -940,7 +941,6 @@ class PlayerFooterLayoutEvidenceTest {
                                             stop = Instant.fromEpochSeconds(3_600),
                                         )
                                     },
-                                    imageLoader = loader,
                                     currentSession = session,
                                     active = false,
                                     nowSec = 1_800,
@@ -1086,7 +1086,6 @@ private fun QuickStepBanner(
         content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
         timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow),
         actions = PlayerChromeActions(active = false),
-        imageLoader = androidx.compose.runtime.remember { ImageLoader(context) },
         currentSession = null,
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
         modifier = modifier,

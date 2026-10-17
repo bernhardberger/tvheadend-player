@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,7 +36,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -165,7 +163,6 @@ class LivePauseControlTest {
         compose.setContent {
             view = LocalView.current
             val context = LocalContext.current
-            val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
             CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize().background(Color(0xFF24384A))) {
@@ -175,7 +172,7 @@ class LivePauseControlTest {
                                 content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 7, "Documentary", null, null, false, 1_800, "")),
                                 timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800, feedback = feedback),
                                 actions = PlayerChromeActions(active = true, paused = paused, livePause = livePause),
-                                imageLoader = loader, currentSession = null,
+                                currentSession = null,
                                 onTogglePause = { toggles++ },
                                 onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                                 onPauseUnavailable = { feedback = it },

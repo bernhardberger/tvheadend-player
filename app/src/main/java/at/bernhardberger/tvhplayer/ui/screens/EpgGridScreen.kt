@@ -168,7 +168,6 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideViewportFades
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import coil3.ImageLoader
 import java.time.ZoneId
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
@@ -297,7 +296,6 @@ fun EpgGridScreen(
     playerSession: AppPlaybackRuntime = koinInject(),
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     guidePositionStore: GuidePositionStore = koinInject(),
-    imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     playerReturn: PlayerReturnFocus? = null,
     onRetry: () -> Unit = {},
@@ -2006,7 +2004,6 @@ fun EpgGridScreen(
                             windowStartSec = renderedWindowStartSec,
                             windowEndSec = windowEndSec,
                             nowSecProvider = nowSecProvider,
-                            imageLoader = imageLoader,
                             currentSession = currentSession,
                             events = eventsByChannel[channel.id].orEmpty(),
                             hasCachedEvents = channel.id in timelineEventIndex.channelsWithEvents,
@@ -2151,7 +2148,7 @@ fun EpgGridScreen(
                 observation = observation, currentObservation = { observationState.value },
                 nowSecProvider = { System.currentTimeMillis() / 1000L }, fromGuide = true, showContextMenu = showContextMenu,
                 mutationScope = coroutineScope, mutationInFlight = detailsMutationInFlight,
-                onShowDetails = { showContextMenu = false }, imageLoader = imageLoader,
+                onShowDetails = { showContextMenu = false },
                 mutations = dvrMutationActions, notices = notices, onPlay = onPlay,
                 onPlayRecording = onPlayRecording, onClose = ::closeDetails,
                 returnFocusRequester = eventFocusRequesters[openingEvent.id].takeUnless { detailsFromSearch },

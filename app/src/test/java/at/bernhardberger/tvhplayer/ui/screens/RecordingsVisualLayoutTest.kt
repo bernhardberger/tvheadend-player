@@ -42,7 +42,6 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.components.SideRail
-import coil3.ImageLoader
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
@@ -57,14 +56,15 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /** Offline production screen and shell, with real D-pad focus and no server/player. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class RecordingsVisualLayoutTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
-    private lateinit var loader: ImageLoader
     private lateinit var session: FakeTvheadendSession
     private lateinit var view: View
     private lateinit var backDispatcher: OnBackPressedDispatcher
@@ -79,17 +79,16 @@ class RecordingsVisualLayoutTest {
         oldZone = TimeZone.getDefault()
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
-        loader = FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
             ArtworkId(101) to FixtureArt.art("ridge-light"),
             ArtworkId(102) to FixtureArt.art("still-tide-watch"),
             ArtworkId(103) to FixtureArt.art("ridge-light"),
             ArtworkId(104) to FixtureArt.art("northline-tonight"),
             ArtworkId(105) to FixtureArt.art("harbor-lights-live"),
-        ))
+        )))
     }
 
     @After fun release() {
-        loader.shutdown()
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
     }
@@ -546,7 +545,6 @@ class RecordingsVisualLayoutTest {
                                 } ?: padding,
                                 initialFocusEnabled = !drawer,
                                 backEnabled = !drawer,
-                                imageLoader = loader,
                                 dvrMutationActions = actions,
                                 notices = notices,
                                 onRetry = { error("Unexpected retry") },

@@ -45,11 +45,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 
 /** Opt-in, offline production composition; the owning emulator script restores its clock. */
 @RunWith(Parameterized::class)
 @OptIn(ExperimentalTestApi::class)
 class ChannelsScreenshotTest(private val scenario: String) {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val composeRule = createComposeRule()
 
     @Test
@@ -128,12 +130,12 @@ class ChannelsScreenshotTest(private val scenario: String) {
             composeRule.setContent {
                 inputMode = LocalInputModeManager.current
                 val context = LocalContext.current
-                val imageLoader = remember {
+                remember {
                     ImageLoader.Builder(context).components {
                         add(object : Mapper<AppArtworkSource, Bitmap> {
                             override fun map(data: AppArtworkSource, options: Options) = artwork
                         })
-                    }.build()
+                    }.build().also(images::install)
                 }
                 var selectedId by remember { mutableStateOf<ChannelId?>(ChannelId(2)) }
                 var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
@@ -144,7 +146,6 @@ class ChannelsScreenshotTest(private val scenario: String) {
                                 contentPadding = padding, initialFocusEnabled = !drawerActive,
                                 channelScopeState = resolveChannelScopeState(ChannelRepositoryState.Current(catalog), activeTag),
                                 observation = observation, tagNotice = false, selectedId = { selectedId },
-                                imageLoader = imageLoader,
                                 playingChannelId = if (scenario == "playing-recording") ChannelId(2) else null,
                                 connectionUiState = if (scenario == "reconnecting") ConnectionUiState.Reconnecting else ConnectionUiState.Ready,
                                 onSelectChannel = { selectedId = it }, onSelectTag = { activeTag = it },

@@ -89,7 +89,6 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
-import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import androidx.compose.ui.platform.LocalContext
@@ -205,7 +204,6 @@ internal fun FolderListRow(
 internal fun RecordingMetadataPane(
     entry: DvrEntry?,
     piconPath: ArtworkId?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
 ) {
     if (entry == null) {
@@ -227,7 +225,6 @@ internal fun RecordingMetadataPane(
     ) {
         val artworkPath = currentSession?.let { entry.image ?: entry.fanartImage }
         PiconBox(
-            imageLoader = imageLoader,
             currentSession = currentSession,
             piconPath = artworkPath ?: piconPath,
             contentScale = if (artworkPath != null) ContentScale.Crop else ContentScale.Fit,
@@ -342,7 +339,6 @@ internal fun RecordingSchedule(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     initialScrollIndex: Int,
@@ -463,7 +459,6 @@ internal fun RecordingSchedule(
                 RecordingListRow(
                     entry = entry,
                     piconPath = piconForEntry(entry),
-                    imageLoader = imageLoader,
                     currentSession = currentSession,
                     selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                     focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
@@ -489,7 +484,6 @@ internal fun RecordingProblems(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     initialScrollIndex: Int,
@@ -618,7 +612,6 @@ internal fun RecordingProblems(
                     RecordingListRow(
                         entry = entry,
                         piconPath = piconForEntry(entry),
-                        imageLoader = imageLoader,
                         currentSession = currentSession,
                         selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                         focusTarget =
@@ -647,7 +640,6 @@ internal enum class RecordingRowKind {
 internal fun RecordingListRow(
     entry: DvrEntry,
     piconPath: ArtworkId?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     selected: Boolean,
     modifier: Modifier = Modifier,
@@ -704,7 +696,6 @@ internal fun RecordingListRow(
                     )
                 }
                 PiconBox(
-                    imageLoader = imageLoader,
                     currentSession = currentSession,
                     piconPath = piconPath,
                     placeholderTint = androidx.tv.material3.LocalContentColor.current,

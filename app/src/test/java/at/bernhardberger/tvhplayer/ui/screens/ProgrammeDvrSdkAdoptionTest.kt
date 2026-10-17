@@ -19,7 +19,6 @@ import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
-import coil3.ImageLoader
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.*
@@ -106,7 +105,6 @@ class ProgrammeDvrSdkAdoptionTest {
         val actions = DvrMutationActions(scheduleEntry = { _, _ -> result() }, stopEntry = { _, _ -> result() },
             cancelEntry = { _, _ -> result() }, deleteEntry = { _, _ -> error("unexpected delete") })
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) }
-        val loader = ImageLoader.Builder(context).build()
         lateinit var back: OnBackPressedDispatcher
         compose.setContent {
             back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -119,7 +117,7 @@ class ProgrammeDvrSdkAdoptionTest {
                     androidx.tv.material3.Text("Origin card")
                 }
                 if (opened) ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 2000L },
-                    fromGuide = true, showContextMenu = !details, onShowDetails = {}, imageLoader = loader,
+                    fromGuide = true, showContextMenu = !details, onShowDetails = {},
                     mutations = actions, notices = notices, mutationScope = scope, mutationInFlight = inFlight,
                     onPlay = { _, _ -> }, onPlayRecording = {}, onClose = { opened = false },
                     returnFocusRequester = origin, settingsStore = UiSettingsStore(context))
@@ -152,7 +150,6 @@ class ProgrammeDvrSdkAdoptionTest {
         compose.waitForIdle()
         if (!stale) compose.waitUntil(5_000) { compose.waitForIdle(); notices.state.value.candidate != null }
         assertFalse(cancelled)
-        loader.shutdown()
     }
 
     private fun stop(details: Boolean, otherProfile: String? = null, unchangedText: Boolean = false) {
@@ -178,11 +175,10 @@ class ProgrammeDvrSdkAdoptionTest {
             deleteEntry = { _, _ -> error("unexpected delete") },
         )
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
-        val loader = ImageLoader.Builder(context).build()
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsHost(event, observation, observation, { observation }, { 2000L },
-                    fromGuide = true, showContextMenu = !details, onShowDetails = {}, imageLoader = loader,
+                    fromGuide = true, showContextMenu = !details, onShowDetails = {},
                     mutations = actions, notices = notices, onPlay = { _, _ -> }, onPlayRecording = {},
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
@@ -200,7 +196,6 @@ class ProgrammeDvrSdkAdoptionTest {
         compose.onNodeWithText("Keep recording").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithText("Stop recording", ignoreCase = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(selected.id, stopped) }
-        loader.shutdown()
     }
 
     @Test fun rejectedServerMessageReachesNoticeWithoutEnteringDiagnostics() = rejected("No free adapter")

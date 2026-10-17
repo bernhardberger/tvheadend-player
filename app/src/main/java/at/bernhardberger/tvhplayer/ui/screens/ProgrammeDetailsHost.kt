@@ -19,7 +19,6 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
 import at.bernhardberger.tvhplayer.ui.player.animateShown
 import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
-import coil3.ImageLoader
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
@@ -40,7 +39,6 @@ internal fun ProgrammeDetailsHost(
     fromGuide: Boolean,
     showContextMenu: Boolean,
     onShowDetails: () -> Unit,
-    imageLoader: ImageLoader,
     mutations: DvrMutationActions,
     notices: NoticeCenter,
     mutationScope: CoroutineScope,
@@ -240,7 +238,7 @@ internal fun ProgrammeDetailsHost(
         CompositionLocalProvider(LocalPlayerPanelMotion provides this) {
         PlayerMotionFrame(leaving = closing || pendingAction != null) {
         ProgrammeContextMenu(
-            event, channel, recording, fromGuide, stack.isNotEmpty(), nowSec, canModify, capability, imageLoader,
+            event, channel, recording, fromGuide, stack.isNotEmpty(), nowSec, canModify, capability,
             modifier = Modifier.onPreviewKeyEvent(keyHandler),
             onAction = act, onClose = closeAnimated,
             backEnabled = !closing && menu == showContextMenu && pendingAction == null,
@@ -274,7 +272,7 @@ internal fun ProgrammeDetailsHost(
             PlayerMotionFrame(leaving = page.id != selected.id || covered) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
                 pageActions,
-                imageLoader, capability, { action -> act(pageEvent, action) },
+                capability, { action -> act(pageEvent, action) },
                 onClose = {
                     val previous = stack.lastOrNull()
                     if (previous == null) closeAnimated() else {
@@ -308,7 +306,7 @@ internal fun ProgrammeDetailsHost(
         val menuEvent = observation.event(airing.id) ?: airing
         ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(observation::channel),
             observation.dvrEntryForEvent(menuEvent), fromGuide = true, stacked = true,
-            nowSec = nowSec, canModify = canModify, currentSession = capability, imageLoader = imageLoader,
+            nowSec = nowSec, canModify = canModify, currentSession = capability,
             onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))
     }

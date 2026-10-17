@@ -76,7 +76,6 @@ import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -492,7 +491,6 @@ class RecordingPlayerChromeScreenTest {
                         recordingId = recording,
                         playbackStart = RecordingPlaybackStart.START_OVER,
                         tvheadendSession = session,
-                        imageLoader = ImageLoader.Builder(context).build(),
                         session = runtime,
                         settingsStore = settings,
                         connectionState = ConnectionState.Connected,

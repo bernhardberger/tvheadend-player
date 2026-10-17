@@ -36,7 +36,6 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerChromeMode
 import at.bernhardberger.tvhplayer.ui.player.PlayerChromeTimeline
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.liveInfoBarData
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -131,7 +130,6 @@ class PlayerEntryMotionTest {
                     nowSec = 1_800,
                 ),
                 actions = PlayerChromeActions(active = false),
-                imageLoader = remember { ImageLoader(context) },
                 currentSession = null,
                 onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             )

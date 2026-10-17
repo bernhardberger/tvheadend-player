@@ -172,11 +172,10 @@ val appModule = module {
     single { ChannelAccentStore(androidContext()) }
     single {
         val session = get<SdkRuntimeOwner>().session
-        val imageLoader = get<ImageLoader>()
         val context = androidContext()
         ChannelAccents(get(), session.artwork::cacheKey).also { accents ->
             get<CoroutineScope>(qualifier = named("application")).launch(Dispatchers.Default) {
-                accents.fillIn(session.observation, imageLoader, context)
+                accents.fillIn(session.observation, context)
             }
         }
     }

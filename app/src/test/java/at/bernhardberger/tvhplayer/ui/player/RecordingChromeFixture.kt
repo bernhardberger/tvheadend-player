@@ -6,12 +6,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Alignment
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.core.playerStateCell
-import coil3.ImageLoader
 import kotlin.time.Instant
 
 /** A finished recording's info bar data, as the recording screen derives it from its entry. */
@@ -75,7 +73,6 @@ internal fun RecordingChromeFixture(
     onActionFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
-    imageLoader: ImageLoader = LocalContext.current.let { context -> remember { ImageLoader(context) } },
 ) {
     Box(Modifier.fillMaxSize()) {
     PlayerChrome(
@@ -99,7 +96,6 @@ internal fun RecordingChromeFixture(
             markerRevision = markerRevision,
         ),
         actions = PlayerChromeActions(active = active, paused = paused, restoreFocus = restoreFocus),
-        imageLoader = imageLoader,
         currentSession = currentSession,
         onTogglePause = onTogglePause,
         onSeek = onSeek,

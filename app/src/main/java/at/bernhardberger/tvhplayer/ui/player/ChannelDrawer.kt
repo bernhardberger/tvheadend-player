@@ -80,7 +80,6 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
-import coil3.ImageLoader
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
@@ -94,7 +93,6 @@ fun ChannelDrawer(
     playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     recordingChannelIds: Set<ChannelId>,
     nowEvent: (ChannelId) -> EpgEvent?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
     active: Boolean = true,
     nowSec: Long = System.currentTimeMillis() / 1000L,
@@ -268,7 +266,6 @@ fun ChannelDrawer(
                     nowSec = nowSec,
                     playbackIndicator = playbackIndicator.takeIf { channel.id == playbackChannelId } ?: ChannelPlaybackIndicator.NONE,
                     recording = channel.id in recordingChannelIds,
-                    imageLoader = imageLoader,
                     currentSession = currentSession,
                     onClick = {
                         if (ownsInput()) {
@@ -312,7 +309,6 @@ private fun CompactZapCard(
     nowSec: Long,
     playbackIndicator: ChannelPlaybackIndicator,
     recording: Boolean,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -337,7 +333,7 @@ private fun CompactZapCard(
         image = {
             Box(Modifier.fillMaxWidth().height(cardHeight).background(TvSurfaceColors.containerLowest)) {
                 PiconBox(
-                    imageLoader = imageLoader, currentSession = currentSession, piconPath = channel.icon,
+                    currentSession = currentSession, piconPath = channel.icon,
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(100.dp, 45.dp)
                         .testTag("player-channel-${channel.id.value}-picon"),
                 )

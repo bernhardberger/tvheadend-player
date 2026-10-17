@@ -105,6 +105,7 @@ import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /** Offline native production composition; never a replacement Guide or a playback test. */
 @RunWith(RobolectricTestRunner::class)
@@ -112,6 +113,7 @@ import kotlin.time.Instant
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideVisualLayoutTest {
+    @get:Rule val images = ImageLoaderRule()
     // v2 keeps effects on the UI scheduler after Guide's Dispatchers.Default work completes.
     @get:Rule val compose = createComposeRule()
     private val models = ViewModelStore()
@@ -149,6 +151,7 @@ class GuideVisualLayoutTest {
             }
             .coroutineContext(Dispatchers.Main.immediate)
             .build()
+        images.install(loader)
     }
 
     @After fun release() {
@@ -236,10 +239,10 @@ class GuideVisualLayoutTest {
                     view = LocalView.current
                     Column {
                         Box(Modifier.height(guideTimelineRowHeight())) {
-                            TimelineChannelHeader(logoChannel, 1001, loader, currentSession)
+                            TimelineChannelHeader(logoChannel, 1001, currentSession)
                         }
                         Box(Modifier.height(guideTimelineRowHeight())) {
-                            TimelineChannelHeader(noLogoChannel, 4567, loader)
+                            TimelineChannelHeader(noLogoChannel, 4567)
                         }
                     }
                 }
@@ -320,7 +323,7 @@ class GuideVisualLayoutTest {
                 view = LocalView.current
                 Box(Modifier.width(732.dp)) {
                     TimelineChannelRow(channel, 0, 1, null, requesters, 0, 7200,
-                        { 0 }, loader, null, events, true, true, ConnectionUiState.Ready, false,
+                        { 0 }, null, events, true, true, ConnectionUiState.Ready, false,
                         { null }, {}, {})
                 }
             }
@@ -367,12 +370,13 @@ class GuideVisualLayoutTest {
             }
             .coroutineContext(Dispatchers.Main.immediate)
             .build()
+        images.install(loader)
         compose.setContent {
             TVHeadendPlayerTheme {
                 Box(Modifier.height(guideTimelineRowHeight())) {
                     TimelineChannelHeader(
                         Channel.create(ChannelId(1), name = name.value, number = 1001, icon = icon.value),
-                        1001, loader, currentSession.value,
+                        1001, currentSession.value,
                     )
                 }
             }
@@ -421,7 +425,7 @@ class GuideVisualLayoutTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 TimelineChannelRow(channel, 0, 1, null, requesters, 0, 10800,
-                    { 0 }, loader, null, emptyList(), false, false, state.value, false,
+                    { 0 }, null, emptyList(), false, false, state.value, false,
                     { null }, {}, {})
             }
         }
@@ -610,7 +614,7 @@ class GuideVisualLayoutTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.width(784.dp)) {
                         TimelineChannelRow(channel, 0, 1, selected.value, requesters, 0, 10800,
-                            { 0 }, loader, null, events, true, true, ConnectionUiState.Ready, false,
+                            { 0 }, null, events, true, true, ConnectionUiState.Ready, false,
                             { null }, {}, {}, visibleRowWidthPx = visibleWidth.value)
                     }
                 }
@@ -1018,7 +1022,7 @@ class GuideVisualLayoutTest {
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                             EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, channelViewModel = model,
                                 session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
-                                lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> playbackRequests++ },
+                                lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
                                 onPlayRecording = { playbackRequests++ }, notices = notices)
                         }
                     }

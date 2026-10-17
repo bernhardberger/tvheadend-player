@@ -14,7 +14,6 @@ import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
 
@@ -25,7 +24,6 @@ internal fun ChannelContextMenu(
     nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
     mutationScope: CoroutineScope,
     mutationInFlight: MutableState<DvrMutationAction?>,
-    imageLoader: ImageLoader,
     onPlay: (ChannelId, String) -> Unit,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onClose: () -> Unit,
@@ -50,7 +48,7 @@ internal fun ChannelContextMenu(
     if (event != null) {
         ProgrammeDetailsHost(event, opening, observation, { session.observation.value }, nowSecProvider,
             fromGuide = false, showContextMenu = !showDetails, onShowDetails = onShowDetails,
-            imageLoader = imageLoader, mutations = mutations, notices = notices,
+            mutations = mutations, notices = notices,
             mutationScope = mutationScope, mutationInFlight = mutationInFlight,
             onPlay = onPlay, onPlayRecording = onPlayRecording, onShowGuide = onShowGuide, onClose = onClose,
             returnFocusRequester = returnFocusRequester)
@@ -70,7 +68,7 @@ internal fun ChannelContextMenu(
                 else -> Unit
             }
         },
-        artwork = { ProgrammeArtwork(null, channel.icon, null, imageLoader, capability,
+        artwork = { ProgrammeArtwork(null, channel.icon, null, capability,
             Modifier.fillMaxSize().testTag("browse-context-picon")) },
     )
 }

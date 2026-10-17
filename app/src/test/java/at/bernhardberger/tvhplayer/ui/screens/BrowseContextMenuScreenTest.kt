@@ -42,12 +42,14 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi",
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class BrowseContextMenuScreenTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private lateinit var back: OnBackPressedDispatcher
     private lateinit var view: View
@@ -675,19 +677,16 @@ class BrowseContextMenuScreenTest {
 
     @Test fun absentChannelAtMenuEntryCallsClose() {
         var closes = 0
-        val loader = coil3.ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         compose.setContent {
             TVHeadendPlayerTheme {
                 ChannelContextMenu(ChannelId(99), SessionObservation.create(), { 0L },
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
-                    imageLoader = loader,
                     onPlay = { _, _ -> }, onShowGuide = { _, _ -> }, onClose = { closes++ })
             }
         }
         compose.runOnIdle { assertEquals(1, closes) }
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-        loader.shutdown()
     }
 
     @Test fun directRecordAfterPoppingDetailsKeepsItsActionFocused() {
@@ -1237,10 +1236,10 @@ class BrowseContextMenuScreenTest {
             single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(context) }
         }
         val application = org.koin.dsl.koinApplication { modules(dependencies) }
-        val loader = FixtureArt.imageLoader(context, if (imageProbe) mapOf(
+        images.install(FixtureArt.imageLoader(context, if (imageProbe) mapOf(
             ArtworkId(1) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.CYAN) },
             ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.RED) },
-        ) else mapOf(ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light")))
+        ) else mapOf(ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"))))
         val state = RecordingsScreenState().apply {
             if (recordingState == DvrEntryState.SCHEDULED || recordingState == DvrEntryState.RECORDING)
                 mode.value = at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE
@@ -1262,14 +1261,14 @@ class BrowseContextMenuScreenTest {
                         if (guideMenu) ProgrammeDetailsHost(
                             openingEvent = event, openingObservation = observation, observation = observation,
                             currentObservation = { session.observation.value }, nowSecProvider = { now.epochSeconds },
-                            fromGuide = true, showContextMenu = !guideDetails, onShowDetails = {}, imageLoader = loader,
+                            fromGuide = true, showContextMenu = !guideDetails, onShowDetails = {},
                             mutations = DvrMutationActions(session.dvrRepository), notices = notices,
                             mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                             mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
                             onPlay = { _, _ -> plays++; requestPlayer() }, onPlayRecording = {}, onClose = {},
                          ) else if (recordings) RecordingsScreenContent(
                              initialFocusEnabled = !drawerActive,
-                            observation = observation, state = state, imageLoader = loader,
+                            observation = observation, state = state,
                              dvrMutationActions = DvrMutationActions(session.dvrRepository), notices = notices,
                              nowSecProvider = { now.epochSeconds },
                             onPlayRecording = { _, intent -> plays++; start = intent; requestPlayer() },
@@ -1278,7 +1277,7 @@ class BrowseContextMenuScreenTest {
                              initialFocusEnabled = !drawerActive,
                             channelScopeState = resolveChannelScopeState(observation.channelState, null),
                             observation = observation, tagNotice = false, selectedId = { channel.id },
-                            imageLoader = loader, playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
+                            playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                             onSelectChannel = {}, onSelectTag = {}, onDismissTagNotice = {},
                             onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> plays++; requestPlayer() },
                             onShowGuide = { channelId, programme -> guideRequest = channelId; guideProgramme = programme },

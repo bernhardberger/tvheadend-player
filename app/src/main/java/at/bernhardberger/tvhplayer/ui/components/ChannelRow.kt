@@ -38,7 +38,6 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
-import coil3.ImageLoader
 
 /**
  * Channels row width. Height is the library's: [ListItem] applies its
@@ -76,7 +75,6 @@ fun ChannelRow(
     name: String,
     programTitle: String,
     progress: Float?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
     piconPath: ArtworkId?,
     programStartSec: Long? = null,
@@ -169,7 +167,6 @@ fun ChannelRow(
         leadingContent = {
             // Bare picon: fitted inside 60x36 with its own aspect ratio, no logo box.
             PiconBox(
-                imageLoader = imageLoader,
                 currentSession = currentSession,
                 piconPath = piconPath,
                 placeholderTint = LocalContentColor.current,

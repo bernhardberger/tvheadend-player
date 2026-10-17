@@ -60,7 +60,6 @@ import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import java.util.Locale
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
@@ -683,7 +682,6 @@ class PlayerTimelineTruthfulnessTest {
                 LocalResources provides germanContext.resources,
                 LocalDensity provides Density(1f, 1.3f),
             ) {
-                val imageLoader = ImageLoader.Builder(LocalContext.current).build()
                 TVHeadendPlayerTheme {
                     Box(
                         Modifier
@@ -722,7 +720,6 @@ class PlayerTimelineTruthfulnessTest {
 
     private fun setLiveOverlay(positionMs: () -> Long) {
         composeRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
@@ -744,7 +741,7 @@ class PlayerTimelineTruthfulnessTest {
                     ),
                     ),
                     actions = PlayerChromeActions(active = true),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},
@@ -758,7 +755,6 @@ class PlayerTimelineTruthfulnessTest {
 
     private fun setRecordingOverlay(durationMs: () -> Long, growing: () -> Boolean) {
         composeRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 RecordingChromeFixture(
                     positionMs = 45_000L,

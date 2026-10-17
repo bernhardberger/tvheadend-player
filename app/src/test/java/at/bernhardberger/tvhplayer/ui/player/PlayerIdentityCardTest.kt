@@ -27,7 +27,6 @@ import androidx.compose.ui.test.withKeyDown
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -77,7 +76,7 @@ class PlayerIdentityCardTest {
                         bufferStartMs = -600_000, positionMs = -60_000, liveEdgeMs = 0), nowSec = 1_800,
                         feedback = "Persistent seek feedback"),
                     actions = PlayerChromeActions(active = true, paused = false),
-                    imageLoader = ImageLoader(ApplicationProvider.getApplicationContext<Application>()), currentSession = null,
+                    currentSession = null,
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = { infos++ }, onOptions = {}, onInteraction = {},
                     onPauseUnavailable = {}, onActionFocused = {}, onFocusRestored = {}, onDownFromActions = {})
             }
@@ -186,7 +185,7 @@ class PlayerIdentityCardTest {
             content = PlayerChromeContent("20:15", info),
             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800),
             actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS, paused = false),
-            imageLoader = ImageLoader(ApplicationProvider.getApplicationContext<Application>()), currentSession = null,
+            currentSession = null,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             onPauseUnavailable = {}, onActionFocused = {}, onFocusRestored = {}, onDownFromActions = {},
             onChannelZap = { _, _, _ -> }, onRecentPick = {},

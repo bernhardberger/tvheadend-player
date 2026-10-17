@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
@@ -31,7 +30,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -55,7 +53,6 @@ class ChannelShelfCompositionTest {
         rule.setContent {
             layers = rememberLivePlayerLayerState()
             val context = LocalContext.current
-            val loader = remember { ImageLoader.Builder(context).build() }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
                     val code = event.nativeKeyEvent.keyCode
@@ -86,7 +83,7 @@ class ChannelShelfCompositionTest {
                             0.25f, 0f, 0.75f, 0.75f, true),
                         ),
                         actions = PlayerChromeActions(active = layers.chrome.controlsVisible, paused = pausedGuard, restoreFocus = layers.restoreChannelAction),
-                        imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                        currentSession = null,
                         onDownFromActions = {
                             layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
                             layers.openChannelDrawer()
@@ -106,7 +103,7 @@ class ChannelShelfCompositionTest {
                                 active = layers.channelDrawerOpen,
                                 channels = if (empty) emptyList() else listOf(Channel.create(id = ChannelId(1), name = "Channel")),
                                 selectedId = ChannelId(1), playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
-                                nowEvent = { null }, imageLoader = loader,
+                                nowEvent = { null },
                                 onFocusChannel = {}, onPickChannel = { activations++ }, onCloseDrawer = { code ->
                                     if (code != null) layers.beginOpeningKeyCycle(code)
                                     layers.dismissChannelDrawer()
@@ -179,7 +176,6 @@ class ChannelShelfCompositionTest {
                         recordingChannelIds = emptySet(),
                         nowEvent = { if (it == ChannelId(1)) event("A long programme about mountains and wildlife") else null },
                         nowSec = 900,
-                        imageLoader = ImageLoader.Builder(LocalContext.current).build(),
                         onFocusChannel = {}, onPickChannel = { picks++ }, onCloseDrawer = { closes++ },
                     )
                 }

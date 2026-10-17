@@ -30,7 +30,6 @@ import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -90,13 +89,12 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         models.put("channels", catalog)
         catalog.channels.first { it.size == if (tagged) 2 else 3 }
         val selection = ChannelSelectionStore().apply { setSelected(ChannelId(1)) }
-        val images = ImageLoader(context)
         val visible = mutableStateOf(true)
         try {
             composeRule.setContent {
                 if (visible.value) TVHeadendPlayerTheme {
                     VideoPlayerScreen(video, selection, LastPlayedChannelStore(context), settings,
-                        catalog, images, session, ChannelId(1), "Offline 1", {}, {}, runtime)
+                        catalog, session, ChannelId(1), "Offline 1", {}, {}, runtime)
                 }
             }
             composeRule.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
@@ -122,7 +120,6 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
             session.shutdown()
             withContext(Dispatchers.Main) { runtime.detach(); controlled.player.release() }
             scope.cancel()
-            images.shutdown()
             tags.save(originalTags)
             profileStore.clearProfile()
         }

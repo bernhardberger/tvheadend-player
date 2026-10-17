@@ -67,11 +67,13 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 
 /** Offline production chrome only; these captures do not establish live video or SDK timing. */
 @RunWith(Parameterized::class)
 @OptIn(ExperimentalTestApi::class)
 class PlayerScreenshotTest(private val scenario: String, private val dark: Boolean) {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val composeRule = createComposeRule()
 
     @Test
@@ -84,7 +86,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
             inputModeManager = LocalInputModeManager.current
             val context = LocalContext.current
             val currentSession = remember { FakeSessionObservation(testSessionObservation()).captureCurrentSession() }
-            val imageLoader = remember {
+            remember {
                 ImageLoader.Builder(context).components {
                     add(object : Mapper<AppArtworkSource, Bitmap> {
                         override fun map(data: AppArtworkSource, options: Options): Bitmap {
@@ -103,7 +105,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             }
                         }
                     })
-                }.build()
+                }.build().also(images::install)
             }
             val density = androidx.compose.ui.platform.LocalDensity.current
             val large = scenario in listOf("long", "shelf-long") || scenario.endsWith("-large")
@@ -171,7 +173,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 programmeWindow = window,
                             ),
                             actions = PlayerChromeActions(active = false, paused = scenario == "shelf-paused"),
-                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},
@@ -187,7 +189,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
                              nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") },
-                                 nowSec = 1_783_020_600L, imageLoader = imageLoader,
+                                 nowSec = 1_783_020_600L,
                                  onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {}, currentSession = currentSession,
                             )
                         }) },
@@ -242,7 +244,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 feedbackIsError = false,
                             ),
                             actions = PlayerChromeActions(active = true, paused = scenario.startsWith("paused") || scenario == "timeline-clamped", restoreFocus = "player-identity-card".takeIf { restoreInfo }),
-                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},

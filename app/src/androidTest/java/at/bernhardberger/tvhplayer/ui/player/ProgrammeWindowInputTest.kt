@@ -28,7 +28,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import java.io.File
 import java.util.TimeZone
 import kotlin.time.Duration.Companion.minutes
@@ -72,7 +71,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                 val scope = rememberCoroutineScope()
                 owner = remember { LiveTimelinePresentationState(scope, { base.toEpochMilliseconds() }, { rule.mainClock.currentTime }) }
                 val context = LocalContext.current
-                val imageLoader = remember { ImageLoader.Builder(context).build() }
                 val unavailable = stringResource(R.string.timeshift_unavailable)
                 val expired = stringResource(R.string.timeshift_target_expired)
                 val replaced = stringResource(R.string.timeshift_target_replaced)
@@ -102,7 +100,7 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                                 feedback = owner.feedback,
                             ),
                             actions = PlayerChromeActions(active = true, paused = paused),
-                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},

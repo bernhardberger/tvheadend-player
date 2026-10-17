@@ -24,7 +24,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
-import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 
 /** Pass the existing TvheadendArtworkLoader and the current session capability, never a raw URL. */
@@ -34,12 +33,11 @@ fun ProgrammeHero(
     channelId: ChannelId,
     channelNumber: String,
     picon: ArtworkId?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     recordingBadge: Boolean = false,
 ) {
-    val accent = rememberChannelAccent(imageLoader, currentSession, picon, channelId)
+    val accent = rememberChannelAccent(currentSession, picon, channelId)
     val artwork = image
     BoxWithConstraints(modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight)
         .clearAndSetSemantics {}) {
@@ -58,7 +56,7 @@ fun ProgrammeHero(
             ))).padding(bottom = bottomRoom, end = endRoom), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(markWidth, markHeight).testTag("programme-fallback-mark"), contentAlignment = Alignment.Center) {
                     if (picon != null && currentSession != null) {
-                        PiconBox(imageLoader, picon, Modifier.fillMaxSize(), currentSession)
+                        PiconBox(picon, Modifier.fillMaxSize(), currentSession)
                     } else Text(channelNumber.ifBlank { stringResource(R.string.player_channel) },
                         style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.headlineSmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
@@ -67,7 +65,7 @@ fun ProgrammeHero(
             }
         }
         if (artwork != null && currentSession != null) {
-            SubcomposeAsyncImage(AppArtworkSource(currentSession, artwork), null, imageLoader,
+            SubcomposeAsyncImage(AppArtworkSource(currentSession, artwork), null,
                 modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop,
                 loading = { fallback() }, error = { fallback() })
         } else fallback()

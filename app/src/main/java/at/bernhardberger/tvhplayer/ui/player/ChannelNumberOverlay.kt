@@ -32,7 +32,6 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
 
@@ -57,7 +56,6 @@ private data class ChannelNumberEntry(val number: String, val target: ChannelNum
 internal fun ChannelNumberOverlay(
     number: String,
     target: ChannelNumberTarget,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     maxDigits: Int = 3,
@@ -105,7 +103,7 @@ internal fun ChannelNumberOverlay(
                         )
                     }
                     if (displayed.target != ChannelNumberTarget.Pending) {
-                        ChannelNumberTargetView(displayed.target, imageLoader, currentSession,
+                        ChannelNumberTargetView(displayed.target, currentSession,
                             Modifier.padding(start = 16.dp))
                     }
                 }
@@ -117,7 +115,6 @@ internal fun ChannelNumberOverlay(
 @Composable
 private fun ChannelNumberTargetView(
     target: ChannelNumberTarget,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
 ) {
@@ -130,7 +127,6 @@ private fun ChannelNumberTargetView(
             SubcomposeAsyncImage(
                 model = AppArtworkSource(currentSession, channel.picon),
                 contentDescription = null,
-                imageLoader = imageLoader,
                 contentScale = ContentScale.Fit,
                 loading = {},
                 error = {},

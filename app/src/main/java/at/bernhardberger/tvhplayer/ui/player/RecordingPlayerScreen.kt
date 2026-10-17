@@ -84,7 +84,6 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
-import coil3.ImageLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
@@ -100,7 +99,6 @@ fun RecordingPlayerScreen(
     recordingId: DvrEntryId,
     playbackStart: RecordingPlaybackStart = RecordingPlaybackStart.RESUME,
     tvheadendSession: TvheadendSession = koinInject(),
-    imageLoader: ImageLoader = koinInject(),
     session: AppPlaybackRuntime = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     connectionState: ConnectionState,
@@ -662,7 +660,6 @@ fun RecordingPlayerScreen(
                         else -> null
                     },
                 ),
-                imageLoader = imageLoader,
                 currentSession = retainedSelection?.currentSession,
                 entry = chrome.controlsEntry,
                 panelOpen = optionsPage != null || infoOpen,

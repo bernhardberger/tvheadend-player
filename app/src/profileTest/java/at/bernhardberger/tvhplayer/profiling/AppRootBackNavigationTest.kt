@@ -32,7 +32,6 @@ import at.bernhardberger.tvhplayer.ui.AppRoot
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import coil3.ImageLoader
 import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -56,8 +55,6 @@ class AppRootBackNavigationTest {
         val activity = compose.activity
         val owner = activity.javaClass.getDeclaredField("runtimeOwner")
             .apply { isAccessible = true }.get(activity) as SdkRuntimeOwner
-        val images = activity.javaClass.getDeclaredField("images")
-            .apply { isAccessible = true }.get(activity) as ImageLoader
         val requests = ApplianceLaunchRequests()
         val server = ServerSettings(host = "offline.invalid")
         val dependencies = module {
@@ -70,7 +67,6 @@ class AppRootBackNavigationTest {
             single { LastPlayedChannelStore(activity) }
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }
-            single<ImageLoader> { images }
             single {
                 at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(owner.session.observation,
                     owner.appProfileOwner.configurationGeneration, get())

@@ -97,6 +97,7 @@ import java.util.TimeZone
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /**
  * Standard Channels evidence: the production [ChannelsScreenContent] on the real
@@ -113,6 +114,7 @@ import kotlin.time.Instant
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @OptIn(ExperimentalFoundationApi::class)
 class ChannelsStandardLayoutEvidenceTest {
+    @get:Rule val images = ImageLoaderRule { testImageLoader(ApplicationProvider.getApplicationContext<Application>()) }
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
     private var videoColor by mutableStateOf(Color.White)
@@ -803,7 +805,6 @@ class ChannelsStandardLayoutEvidenceTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     val context = LocalContext.current
-                    val imageLoader = remember(context) { testImageLoader(context) }
                     val scope = remember(activeTag) {
                         resolveChannelScopeState(observation.channelState, activeTag)
                     }
@@ -826,7 +827,6 @@ class ChannelsStandardLayoutEvidenceTest {
                                 observation = observation,
                                 tagNotice = false,
                                 selectedId = { selected },
-                                imageLoader = imageLoader,
                                 playingChannelId = ChannelId(PLAYING.toLong()),
                                 playerReturn = playerReturn,
                                 playbackIndicator = playbackIndicator,

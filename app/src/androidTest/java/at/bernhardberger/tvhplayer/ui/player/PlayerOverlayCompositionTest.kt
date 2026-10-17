@@ -32,7 +32,6 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -82,7 +81,7 @@ class PlayerOverlayCompositionTest {
                             programme = current.value,
                         ),
                         actions = PlayerChromeActions(active = true),
-                        imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                        currentSession = null,
                         onStop = {},
                         onInteraction = {},
                         onOptions = {},
@@ -150,7 +149,7 @@ class PlayerOverlayCompositionTest {
                         programme = current.value,
                     ),
                     actions = PlayerChromeActions(active = true),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},
@@ -419,7 +418,7 @@ class PlayerOverlayCompositionTest {
                 feedback = feedback,
             ),
             actions = PlayerChromeActions(active = true),
-            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+            currentSession = null,
             onStop = {},
             onInteraction = {},
             onOptions = {},
@@ -497,7 +496,6 @@ class PlayerOverlayCompositionTest {
     @Test
     fun timelineKeepsOneAxisWhetherFocusedOrNot() {
         composeRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
@@ -513,7 +511,7 @@ class PlayerOverlayCompositionTest {
                         programme = event(1, 3_600, 7_200, "Zeit im Bild"),
                     ),
                     actions = PlayerChromeActions(active = true),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},
@@ -544,7 +542,6 @@ class PlayerOverlayCompositionTest {
     @OptIn(ExperimentalTestApi::class)
     fun liveUtilitiesKeepAccessibleNamesAndStableGeometryWithoutCaptions() {
         composeRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
@@ -560,7 +557,7 @@ class PlayerOverlayCompositionTest {
                         programme = null,
                     ),
                     actions = PlayerChromeActions(active = true),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},

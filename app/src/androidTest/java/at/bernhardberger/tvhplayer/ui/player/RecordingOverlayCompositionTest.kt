@@ -42,7 +42,6 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.Density
 import androidx.media3.common.C
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -497,7 +496,6 @@ class RecordingOverlayCompositionTest {
                 LocalResources provides configuredContext.resources,
                 LocalDensity provides Density(density.density, fontScale),
             ) {
-                val imageLoader = ImageLoader.Builder(LocalContext.current).build()
                 TVHeadendPlayerTheme {
                     RecordingChromeFixture(
                         positionMs = 30_000L,

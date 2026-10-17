@@ -56,7 +56,6 @@ import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.formatTimeIntervalSpoken
 import at.bernhardberger.tvhplayer.ui.common.programmeMetadata
-import coil3.ImageLoader
 import java.time.ZoneId
 import kotlinx.coroutines.delay
 
@@ -213,7 +212,6 @@ internal fun QuickZapTrayPreview(
     event: EpgEventEntry?,
     next: EpgEventEntry?,
     nowSec: Long,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     /** Without artwork and summary. */
@@ -241,7 +239,6 @@ internal fun QuickZapTrayPreview(
                 summary = it.summary,
                 next = it.next,
                 image = it.image,
-                imageLoader = imageLoader,
                 currentSession = currentSession,
                 subtitle = it.subtitle,
             )

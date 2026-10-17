@@ -6,7 +6,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -45,7 +44,6 @@ import androidx.media3.common.Tracks
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -328,7 +326,6 @@ class PlaybackOptionsSheetTest {
         var restoreOptionsFocus by mutableStateOf(false)
         composeRule.setContent {
             val context = LocalContext.current
-            val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
             TVHeadendPlayerTheme {
                 PlayerControlsLayer(
                     visible = true,

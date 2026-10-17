@@ -23,7 +23,6 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.notifications.*
 import at.bernhardberger.tvhplayer.ui.player.*
-import coil3.ImageLoader
 import org.junit.After
 import org.junit.Before
 import org.junit.Rule
@@ -86,7 +85,6 @@ class AppNoticeCaptureTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             view = LocalView.current
-            val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.fillMaxSize().background(if (overPlayer) Color(0xFFF2EEDC) else Color(0xFF111822))) {
@@ -95,7 +93,7 @@ class AppNoticeCaptureTest {
                             content = PlayerChromeContent("18:30", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Documentary HD", programme,
                                 null, false, now.epochSeconds, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), now.epochSeconds, programme),
-                            actions = PlayerChromeActions(active = false), imageLoader = loader, currentSession = null,
+                            actions = PlayerChromeActions(active = false), currentSession = null,
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )

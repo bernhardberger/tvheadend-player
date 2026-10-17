@@ -15,7 +15,6 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.guide.EpgSearchDialog
-import coil3.ImageLoader
 import java.io.File
 import kotlin.time.Instant
 import org.junit.Assert.assertTrue
@@ -41,7 +40,6 @@ class GuideSearchDetailsTest {
             DvrRepositoryState.Current(DvrSnapshot.create())))
         val observation = session.observation.value
         val result = EpgSearchResult.Available.create(events, requireNotNull(observation.currentSession))
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         lateinit var back: OnBackPressedDispatcher
         compose.setContent {
@@ -57,7 +55,7 @@ class GuideSearchDetailsTest {
                     restoreFocusTo = restore, onFocusRestored = { restore = null })
                 details?.let { event ->
                     ProgrammeDetailsHost(event, observation, observation, { observation }, { 150L },
-                        fromGuide = true, showContextMenu = false, onShowDetails = {}, imageLoader = loader,
+                        fromGuide = true, showContextMenu = false, onShowDetails = {},
                         mutations = DvrMutationActions(session.dvrRepository), notices = notices,
                         mutationScope = mutationScope, mutationInFlight = mutationInFlight,
                         onPlay = { _, _ -> }, onPlayRecording = null,
@@ -72,7 +70,6 @@ class GuideSearchDetailsTest {
         compose.runOnIdle { back.onBackPressed() }
         compose.onNodeWithText("Result 2").assertIsFocused()
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-        loader.shutdown()
     }
 
     @Test fun hiddenSearchEntryKeepsProductionWindowAndSessionGuards() {

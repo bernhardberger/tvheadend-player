@@ -96,7 +96,6 @@ import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
-import coil3.ImageLoader
 
 private val GuideChannelLogoWidth = 60.dp
 private val GuideChannelLogoHeight = 36.dp
@@ -227,7 +226,6 @@ internal fun TimelineChannelRow(
     windowStartSec: Long,
     windowEndSec: Long,
     nowSecProvider: () -> Long,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     events: List<EpgEventEntry>,
     hasCachedEvents: Boolean,
@@ -260,7 +258,6 @@ internal fun TimelineChannelRow(
         TimelineChannelHeader(
             channel = channel,
             number = number,
-            imageLoader = imageLoader,
             currentSession = currentSession,
             selected = selectedEventId != null,
         )
@@ -365,7 +362,6 @@ internal fun TimelineChannelRow(
 internal fun TimelineChannelHeader(
     channel: Channel,
     number: Long?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation? = null,
     selected: Boolean = false,
 ) {
@@ -406,7 +402,6 @@ internal fun TimelineChannelHeader(
             }
             if (channel.icon != null && currentSession != null && !logoFailed) {
                 PiconBox(
-                    imageLoader = imageLoader,
                     currentSession = currentSession,
                     piconPath = channel.icon,
                     modifier = Modifier

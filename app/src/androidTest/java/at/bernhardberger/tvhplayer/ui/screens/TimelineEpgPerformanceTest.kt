@@ -47,7 +47,6 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineProgrammeCell
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimelineRowHeight
-import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -74,7 +73,6 @@ class TimelineEpgPerformanceTest {
         lateinit var motion: TabContentMotion
         composeRule.setContent {
             val context = LocalContext.current
-            val loader = remember(context) { ImageLoader.Builder(context).build() }
             TVHeadendPlayerTheme {
                 motion = rememberTabContentMotion(selected.value)
                 TabContent(
@@ -84,7 +82,7 @@ class TimelineEpgPerformanceTest {
                     TimelineChannelRow(
                         channel = channel, channelIndex = 0, number = 1, selectedEventId = null,
                         eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 10800,
-                        nowSecProvider = { 0L }, imageLoader = loader, currentSession = null,
+                        nowSecProvider = { 0L }, currentSession = null,
                         events = events, hasCachedEvents = true, hasMatchingCachedEvents = true,
                         connectionUiState = ConnectionUiState.Ready, coveragePending = false,
                         recordingForEvent = { null },
@@ -134,7 +132,6 @@ class TimelineEpgPerformanceTest {
         val selected = mutableStateOf<EpgFocusTarget?>(null)
         composeRule.setContent {
             val context = LocalContext.current
-            val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
             val focusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
             CompositionLocalProvider(LocalLayoutDirection provides direction) {
                 TVHeadendPlayerTheme {
@@ -144,7 +141,7 @@ class TimelineEpgPerformanceTest {
                             selectedEventId = selected.value?.takeIf { it.channelIndex == 0 }?.eventId,
                             eventFocusRequesters = focusRequesters,
                             windowStartSec = 0, windowEndSec = 10800, nowSecProvider = { 0L },
-                            imageLoader = imageLoader, currentSession = null, events = events,
+                            currentSession = null, events = events,
                             hasCachedEvents = true, hasMatchingCachedEvents = true,
                             connectionUiState = ConnectionUiState.Ready, coveragePending = false,
                             recordingForEvent = { null }, onFocused = {}, onOpenDetails = {},
@@ -206,7 +203,6 @@ class TimelineEpgPerformanceTest {
         }
 
         composeRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 LazyColumn(Modifier.testTag("timeline-rows")) {
                     items(channels, key = { it.id.value }) { channel ->
@@ -214,7 +210,6 @@ class TimelineEpgPerformanceTest {
                             TimelineChannelHeader(
                                 channel = channel,
                                 number = channel.number,
-                                imageLoader = imageLoader,
                             )
                         }
                     }

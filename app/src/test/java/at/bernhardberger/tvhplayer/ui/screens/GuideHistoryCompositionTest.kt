@@ -21,7 +21,6 @@ import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.guide.*
-import coil3.ImageLoader
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
@@ -31,6 +30,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
+import org.junit.Rule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -62,17 +62,16 @@ class GuideHistoryCompositionTest {
         var details by mutableStateOf(false)
         compose.setContent {
             view = LocalView.current
-            val loader = remember { ImageLoader.Builder(context).diskCache(null).build() }
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
                     if (details) ProgrammeDetailsPage(a, null, null, 4000, emptyList(),
-                        loader, null, {}, { details = false })
+                        null, {}, { details = false })
                     else Column(Modifier.fillMaxSize()) {
                         listOf(1L, 2L).forEach { channel -> TimelineChannelRow(
                             channel = Channel.create(ChannelId(channel), name = "Documentary $channel"),
                             channelIndex = (channel - 1).toInt(), number = channel, selectedEventId = null,
                             eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 7200,
-                            nowSecProvider = { 4000 }, imageLoader = loader, currentSession = null,
+                            nowSecProvider = { 4000 }, currentSession = null,
                             events = events.filter { it.channelId == ChannelId(channel) }, hasCachedEvents = true,
                             hasMatchingCachedEvents = true, connectionUiState = ConnectionUiState.Ready,
                             coveragePending = false, recordingForEvent = { null }, onFocused = {},
@@ -105,7 +104,7 @@ class GuideHistoryCompositionTest {
         compose.setContent { TVHeadendPlayerTheme {
             ProgrammeDetailsPage(selected, recording, null, 4000,
                 programmeDetailsActions(selected, 4000, recording, true, false, true, liveProgramme = live),
-                remember { ImageLoader.Builder(context).diskCache(null).build() }, null, {}, {})
+                null, {}, {})
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.runOnIdle { live = true }

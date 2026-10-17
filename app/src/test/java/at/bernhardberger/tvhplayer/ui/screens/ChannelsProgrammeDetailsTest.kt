@@ -66,11 +66,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChannelsProgrammeDetailsTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val session = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -310,7 +312,7 @@ class ChannelsProgrammeDetailsTest {
     }
 
     private fun show(picon: ArtworkId? = ArtworkId(1), currentSession: CurrentSessionObservation? = session, height: Dp? = null) {
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+        images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
             .components {
                 add(Interceptor { chain ->
                     val source = chain.request.data as AppArtworkSource
@@ -327,7 +329,7 @@ class ChannelsProgrammeDetailsTest {
             }
             .coroutineContext(Dispatchers.Main.immediate)
             .diskCache(null)
-            .build()
+            .build())
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
@@ -337,7 +339,6 @@ class ChannelsProgrammeDetailsTest {
                             now = programme,
                             next = nextProgramme,
                             nowSec = 900,
-                            imageLoader = loader,
                             currentSession = currentSession,
                         )
                     }

@@ -27,7 +27,6 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.components.depth.*
-import coil3.ImageLoader
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
 
@@ -60,7 +59,6 @@ internal fun ArchiveDepthContent(
     onModeFocus: () -> Unit,
     onDrawerFocus: (() -> Unit)?,
     onOpenRecording: (DvrEntry) -> Unit,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     modifier: Modifier = Modifier,
@@ -69,7 +67,7 @@ internal fun ArchiveDepthContent(
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
     val latestOnOpenContextMenu = rememberUpdatedState(onOpenContextMenu)
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
-    val levels = remember(root, imageLoader, currentSession) {
+    val levels = remember(root, currentSession) {
         val levels = linkedMapOf<String, DepthLevel>()
         fun addFolder(folder: DvrArchiveFolder) {
             val id = archiveLevelId(folder.path)
@@ -99,7 +97,7 @@ internal fun ArchiveDepthContent(
                                 rows = emptyList(),
                                 heading = { ArchiveLevelHeading("", it) },
                                 passiveContent = {
-                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry), imageLoader, currentSession)
+                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry), currentSession)
                                 },
                             )
                             DepthRow(
@@ -108,7 +106,7 @@ internal fun ArchiveDepthContent(
                                 previewLevelId = previewId,
                             ) { rowModifier, activate ->
                                 RecordingListRow(
-                                    entry = item.entry, piconPath = latestPiconForEntry.value(item.entry), imageLoader = imageLoader,
+                                    entry = item.entry, piconPath = latestPiconForEntry.value(item.entry),
                                     currentSession = currentSession, selected = false, modifier = rowModifier,
                                     onClick = activate,
                                     onOpenContextMenu = { latestOnOpenContextMenu.value?.invoke(item.entry) },

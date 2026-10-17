@@ -68,7 +68,6 @@ import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -304,7 +303,6 @@ class GuidePlayerReturnFocusTest {
                     channelViewModel = model, session = session, playerSession = runtime,
                     selection = ChannelSelectionStore(), guidePositionStore = position,
                     lastPlayedStore = LastPlayedChannelStore(context),
-                    imageLoader = ImageLoader.Builder(context).diskCache(null).build(),
                     playerReturn = playerReturn, onPlay = { _, _ -> playRequests++ },
                     notices = notices,
                 )

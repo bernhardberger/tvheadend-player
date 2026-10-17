@@ -50,7 +50,6 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.rememberDrawerState
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -721,7 +720,6 @@ class ChannelsScreenTest {
         playingChannelId: ChannelId? = null,
     ) {
         val context = LocalContext.current
-        val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
         var currentChannels by remember { mutableStateOf(initialChannels) }
         var activeTagId by remember { mutableStateOf<ChannelTagId?>(null) }
         var selectedId by remember { mutableStateOf(initialSelectedId) }
@@ -743,7 +741,6 @@ class ChannelsScreenTest {
             observation = testSessionObservation(channels = currentChannels, tags = tags),
             tagNotice = false,
             selectedId = { selectedId },
-            imageLoader = imageLoader,
             playingChannelId = playingChannelId,
             connectionUiState = connectionUiState,
             onSelectChannel = {

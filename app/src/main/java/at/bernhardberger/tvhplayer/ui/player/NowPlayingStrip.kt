@@ -33,7 +33,6 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import coil3.ImageLoader
 
 /** Passive identity of the playing channel, independent of the programme being browsed. */
 @Composable
@@ -43,7 +42,6 @@ internal fun NowPlayingStrip(
     picon: ArtworkId?,
     programme: EpgEvent?,
     nowSec: Long,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
@@ -53,7 +51,7 @@ internal fun NowPlayingStrip(
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(48.dp, 27.dp).clip(RoundedCornerShape(6.dp))
             .background(TvSurfaceColors.containerLowest), contentAlignment = Alignment.Center) {
-            if (picon != null) PiconBox(imageLoader, picon, Modifier.padding(3.dp), currentSession)
+            if (picon != null) PiconBox(picon, Modifier.padding(3.dp), currentSession)
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
             if (current != null) ProgressStrip(

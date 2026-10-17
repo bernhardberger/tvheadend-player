@@ -69,7 +69,6 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -424,7 +423,6 @@ class StartupOfflineTest {
             single { LastPlayedChannelStore(context) }
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }
-            single<ImageLoader> { ImageLoader.Builder(context).build() }
             single { notices }
             single { ConnectionNoticeSource(session.observation, profiles.configurationGeneration, notices) }
             viewModel { AppConnectionViewModel(get(), get(), get()) }

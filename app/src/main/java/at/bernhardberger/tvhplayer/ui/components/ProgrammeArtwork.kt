@@ -17,26 +17,25 @@ import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.isRunning
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 
 /** Non-focusable artwork shared by airing cards and browse menus. */
 @Composable
 internal fun ProgrammeArtwork(
-    image: ArtworkId?, channelIcon: ArtworkId?, progress: Float?, imageLoader: ImageLoader,
+    image: ArtworkId?, channelIcon: ArtworkId?, progress: Float?,
     session: CurrentSessionObservation?, modifier: Modifier = Modifier,
     plateModifier: Modifier = Modifier, progressModifier: Modifier = Modifier,
 ) {
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
         if (image != null && session != null) {
-            AsyncImage(AppArtworkSource(session, image), null, imageLoader,
+            AsyncImage(AppArtworkSource(session, image), null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            if (channelIcon != null) PiconBox(imageLoader, channelIcon,
+            if (channelIcon != null) PiconBox(channelIcon,
                 Modifier.align(Alignment.BottomStart).padding(8.dp).then(plateModifier)
                     .size(56.dp, 32.dp)
                     .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
                     .padding(horizontal = 4.dp, vertical = 3.dp), session)
-        } else PiconBox(imageLoader, channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp), session)
+        } else PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp), session)
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
             progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = 3.dp)

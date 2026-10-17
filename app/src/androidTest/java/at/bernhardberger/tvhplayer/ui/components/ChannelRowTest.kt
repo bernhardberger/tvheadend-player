@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.Modifier
@@ -31,7 +30,6 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -47,7 +45,6 @@ class ChannelRowTest {
     fun showsChannelAndProgramme_andConfirmsOnClick() {
         var confirmed = false
         composeTestRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 ChannelRow(
                     modifier = Modifier.testTag("row"),
@@ -55,7 +52,6 @@ class ChannelRowTest {
                     name = "ČT1 HD",
                     programTitle = "Večerní zprávy",
                     progress = 0.5f,
-                    imageLoader = imageLoader,
                     piconPath = null,
                     onFocus = {},
                     onConfirm = { confirmed = true }
@@ -76,7 +72,6 @@ class ChannelRowTest {
     @Test
     fun statusMarkersPreserveProgressWidth_andCoexistWithLongTitle() {
         composeTestRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 Column {
                     repeat(3) { index ->
@@ -92,7 +87,6 @@ class ChannelRowTest {
                             },
                             programTitle = "Večerní zprávy",
                             progress = 0.5f,
-                            imageLoader = imageLoader,
                             piconPath = null,
                             recordingNow = index != 1,
                             playingNow = index != 1,
@@ -137,7 +131,6 @@ class ChannelRowTest {
     fun dpadMovesBetweenRowsWithoutAContainerFocusStop() {
         var focusedNumber = 0
         composeTestRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 Column {
                     repeat(2) { index ->
@@ -148,7 +141,6 @@ class ChannelRowTest {
                             name = "Channel $number",
                             programTitle = "Programme $number",
                             progress = 0.5f,
-                            imageLoader = imageLoader,
                             piconPath = null,
                             onFocus = { focusedNumber = number },
                             onConfirm = {},
@@ -176,9 +168,6 @@ class ChannelRowTest {
         val compositionCounts = IntArray(rowNumbers.size)
         composeTestRule.setContent {
             val context = LocalContext.current
-            val imageLoader = remember(context) {
-                ImageLoader.Builder(context).build()
-            }
             TVHeadendPlayerTheme {
                 LazyColumn {
                     items(rowNumbers, key = { it }) { number ->
@@ -189,7 +178,6 @@ class ChannelRowTest {
                             name = "Channel $number",
                             programTitle = "Programme $number",
                             progress = 0.5f,
-                            imageLoader = imageLoader,
                             piconPath = null,
                             onFocus = { selectedNumber.intValue = number },
                             onConfirm = {},
@@ -237,7 +225,6 @@ class ChannelRowTest {
     @Test
     fun ambientProgressDoesNotDrawAStopMarkerAtTheTrackEnd() {
         composeTestRule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 ChannelRow(
                     modifier = Modifier.width(400.dp),
@@ -245,7 +232,6 @@ class ChannelRowTest {
                     name = "Channel",
                     programTitle = "Programme",
                     progress = 0.25f,
-                    imageLoader = imageLoader,
                     piconPath = null,
                     onFocus = {},
                     onConfirm = {},

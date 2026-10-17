@@ -38,7 +38,6 @@ import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
 import at.bernhardberger.tvhplayer.ui.components.RowDimAlpha
 import at.bernhardberger.tvhplayer.ui.components.RowHeaderQuietAlpha
 import at.bernhardberger.tvhplayer.ui.components.rowEmphasis
-import coil3.ImageLoader
 
 /** How much of the next row shows below the focused one: its quiet title and the top of its cards. */
 internal val PlayerChannelRowPeek = 52.dp
@@ -94,7 +93,6 @@ internal fun PlayerChannelBrowser(
     recordingChannelIds: Set<ChannelId>,
     nowEvent: (ChannelId) -> EpgEvent?,
     nowSec: Long,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     active: Boolean,
     onFocusChannel: (ChannelId) -> Unit,
@@ -202,7 +200,7 @@ internal fun PlayerChannelBrowser(
                             selectedId = state.collection(row).focusedId,
                             playingChannelId = playingChannelId,
                             recordingChannelIds = recordingChannelIds, nowEvent = nowEvent, nowSec = nowSec,
-                            imageLoader = imageLoader, currentSession = currentSession,
+                            currentSession = currentSession,
                             active = active && row == current,
                             browserState = state.collection(row),
                             onFocusChannel = { if (owns(row)) onFocusChannel(it) },

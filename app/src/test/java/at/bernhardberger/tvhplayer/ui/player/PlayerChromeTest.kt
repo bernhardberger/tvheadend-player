@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.ui.player
 import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.platform.LocalContext
@@ -15,7 +14,6 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -53,7 +51,6 @@ class PlayerChromeTest {
                         nowSec = 1_800,
                     ),
                     actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS),
-                    imageLoader = remember { ImageLoader(context) },
                     currentSession = null,
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                 )

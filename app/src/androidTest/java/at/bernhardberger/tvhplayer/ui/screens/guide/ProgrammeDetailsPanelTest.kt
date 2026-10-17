@@ -46,7 +46,6 @@ class ProgrammeDetailsPanelTest {
                     related = if (withDescription) listOf(EpgEvent.create(EventId(22), title = "Next programme",
                         start = event.stop, stop = Instant.fromEpochSeconds(4_000))) else emptyList(),
                     onAction = {}, onClose = {},
-                    imageLoader = androidx.compose.runtime.remember { coil3.ImageLoader.Builder(context).build() },
                     currentSession = null,
                 )
             }

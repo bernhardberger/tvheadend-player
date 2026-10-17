@@ -22,7 +22,6 @@ import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
@@ -65,7 +64,7 @@ class TimeshiftCommandConsistencyTest {
                         feedbackIsError = feedbackIsError.value,
                     ),
                     actions = PlayerChromeActions(active = true, paused = true),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},
@@ -131,7 +130,7 @@ class TimeshiftCommandConsistencyTest {
                         programme = null,
                     ),
                     actions = PlayerChromeActions(active = visible.value),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},
@@ -191,7 +190,7 @@ class TimeshiftCommandConsistencyTest {
                                 feedbackIsError = owner.feedbackIsError,
                             ),
                             actions = PlayerChromeActions(active = true, paused = sample.value.paused),
-                            imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},
@@ -297,7 +296,7 @@ class TimeshiftCommandConsistencyTest {
                         feedback = owner.feedback,
                     ),
                     actions = PlayerChromeActions(active = true, paused = sample.value.paused),
-                    imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},

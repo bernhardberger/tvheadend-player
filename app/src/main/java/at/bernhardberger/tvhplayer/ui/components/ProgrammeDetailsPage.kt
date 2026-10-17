@@ -71,7 +71,6 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -92,7 +91,6 @@ internal fun ProgrammeDetailsPage(
     channel: Channel?,
     nowSec: Long,
     actions: List<BrowseContextAction>,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     onAction: (BrowseContextAction) -> Unit,
     onClose: () -> Unit,
@@ -258,7 +256,7 @@ internal fun ProgrammeDetailsPage(
     }
     val warmPlayback = LocalWarmPlayback.current
     val art = (event?.image ?: recording?.image).takeUnless { warmPlayback }
-    val background = rememberDetailsTint(imageLoader, currentSession, art, channel?.icon.takeUnless { warmPlayback })
+    val background = rememberDetailsTint(currentSession, art, channel?.icon.takeUnless { warmPlayback })
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
         Box(Modifier.browseDetailsViewport().then(modifier).fillMaxSize()
              .graphicsLayer { this.alpha = alpha.value }
@@ -311,9 +309,9 @@ internal fun ProgrammeDetailsPage(
             // With warm playback the live video is the background, so the page draws no art.
             // Scrolled away (or reading), the still corner art crossfades into the full-screen
             // blurred backdrop, like Google TV; no zoom.
-            DetailsHero(art, imageLoader, currentSession,
+            DetailsHero(art, currentSession,
                 Modifier.align(Alignment.TopEnd).graphicsLayer { this.alpha = 1f - backdrop() }, background = background)
-            DetailsHero(art, imageLoader, currentSession,
+            DetailsHero(art, currentSession,
                 Modifier.graphicsLayer { this.alpha = backdrop() }, blurred = true)
             readingTransition.AnimatedContent(transitionSpec = {
                 (fadeIn(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard)) togetherWith
@@ -351,7 +349,7 @@ internal fun ProgrammeDetailsPage(
                         if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { emphasis(DetailsSection.ACTIONS) }) {
-                        DetailsInformation(event, recording, channel, nowSec, imageLoader, currentSession) {
+                        DetailsInformation(event, recording, channel, nowSec, currentSession) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
                                 Text(text, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
@@ -376,7 +374,7 @@ internal fun ProgrammeDetailsPage(
                         }
                     }
                     if (ids.isNotEmpty()) DetailsAirings(related, title, event?.let { detailsSubtitle(it, resources) } ?: recording?.subtitle,
-                        nowSec, imageLoader, currentSession, channelOf, listState, cardFocus, { emphasis(DetailsSection.AIRINGS) },
+                        nowSec, currentSession, channelOf, listState, cardFocus, { emphasis(DetailsSection.AIRINGS) },
                          Modifier.onSizeChanged { airingsHeight = it.height }
                             .onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS },
                         onFocused = { lastCard = it }, onClick = { if (backEnabled) onRelated(it) },
@@ -581,7 +579,7 @@ private fun DetailsAboutFacts(facts: List<Pair<String, String>>, abbreviatedLabe
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun DetailsAirings(
-    airings: List<EpgEvent>, pageTitle: String, pageEpisode: String?, nowSec: Long, imageLoader: ImageLoader,
+    airings: List<EpgEvent>, pageTitle: String, pageEpisode: String?, nowSec: Long,
     session: CurrentSessionObservation?,
     channelOf: (ChannelId) -> Channel?, listState: LazyListState, requesters: Map<EventId, FocusRequester>,
     emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit, onClick: (EpgEvent) -> Unit,
@@ -602,7 +600,7 @@ private fun DetailsAirings(
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 itemsIndexed(airings, key = { _, it -> it.id.value }) { index, item ->
                     AiringCard(item, airingEpisode(item, pageTitle, pageEpisode, LocalContext.current.resources), item.channelId?.let(channelOf), nowSec,
-                        imageLoader, session,
+                        session,
                         Modifier.focusRequester(requesters.getValue(item.id))
                             .onFocusChanged { if (it.isFocused) onFocused(item.id) }
                             .focusProperties {
@@ -624,7 +622,7 @@ internal fun airingEpisode(item: EpgEvent, pageTitle: String, pageEpisode: Strin
 
 @Composable
 private fun AiringCard(
-    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long, imageLoader: ImageLoader,
+    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long,
     session: CurrentSessionObservation?, modifier: Modifier, onOpenContextMenu: (() -> Unit)?, onClick: () -> Unit,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
@@ -644,7 +642,7 @@ private fun AiringCard(
                     .semantics { contentDescription = listOfNotNull(time, spokenEpisode, channelName).joinToString(", ") },
                 colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
                 border = embeddedProgressCardBorder()) {
-                ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running }, imageLoader,
+                ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running },
                     session, Modifier.fillMaxSize(),
                     plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
                     progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
@@ -678,11 +676,11 @@ private const val DetailsBlurredScrimAlpha = 0.6f
 private const val DetailsHeroWidthFraction = 758f / 960f
 
 @Composable
-private fun DetailsHero(image: ArtworkId?, loader: ImageLoader, session: CurrentSessionObservation?, modifier: Modifier, blurred: Boolean = false, background: State<Color>? = null) {
+private fun DetailsHero(image: ArtworkId?, session: CurrentSessionObservation?, modifier: Modifier, blurred: Boolean = false, background: State<Color>? = null) {
     if (image == null || session == null) return
     if (blurred) {
         // Full screen: the blur only reads as a backdrop when it covers the page.
-        AsyncImage(AppArtworkSource(session, image), null, loader, contentScale = ContentScale.Crop,
+        AsyncImage(AppArtworkSource(session, image), null, contentScale = ContentScale.Crop,
             modifier = modifier.fillMaxSize().testTag("details-hero-blurred")
                 .then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(32.dp) else Modifier)
                 .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
@@ -694,7 +692,7 @@ private fun DetailsHero(image: ArtworkId?, loader: ImageLoader, session: Current
     }
     val neutral = MaterialTheme.colorScheme.background
     val scrim = remember(background, neutral) { derivedStateOf { KitCinematicScrim(background?.value ?: neutral) } }
-    AsyncImage(AppArtworkSource(session, image), null, loader,
+    AsyncImage(AppArtworkSource(session, image), null,
         contentScale = ContentScale.Crop,
         modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
             .testTag("details-hero")
@@ -834,11 +832,11 @@ internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resource
 @Composable
 private fun DetailsInformation(
     event: EpgEvent?, recording: DvrEntry?, channel: Channel?, nowSec: Long,
-    imageLoader: ImageLoader, session: CurrentSessionObservation?, synopsis: @Composable () -> Unit,
+    session: CurrentSessionObservation?, synopsis: @Composable () -> Unit,
 ) {
     // Only the title spans the page; the remaining information keeps its narrow text column.
     Column(Modifier.fillMaxWidth().testTag("details-information")) {
-        ProgrammeEyebrow(channel, channelTitleText(channel?.number, channel?.name.orEmpty()), imageLoader, session,
+        ProgrammeEyebrow(channel, channelTitleText(channel?.number, channel?.name.orEmpty()), session,
             Modifier.widthIn(max = 470.dp)) {
             val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
             if (removal != null) {
@@ -920,12 +918,12 @@ private fun DetailsInformation(
 
 @Composable
 internal fun ProgrammeEyebrow(
-    channel: Channel?, text: String, imageLoader: ImageLoader, session: CurrentSessionObservation?,
+    channel: Channel?, text: String, session: CurrentSessionObservation?,
     modifier: Modifier = Modifier, piconModifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {},
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        channel?.icon?.let { PiconBox(imageLoader, it, piconModifier.size(36.dp, 20.dp), session) }
+        channel?.icon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp), session) }
         Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing()

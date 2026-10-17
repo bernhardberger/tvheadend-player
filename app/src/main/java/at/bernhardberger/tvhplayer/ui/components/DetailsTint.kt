@@ -11,12 +11,10 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.detailsTintRgb
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
-import coil3.ImageLoader
 
 /** Only the details backdrop changes colour; the content retains the normal theme. */
 @Composable
 internal fun rememberDetailsTint(
-    loader: ImageLoader,
     session: CurrentSessionObservation?,
     art: ArtworkId?,
     picon: ArtworkId?,
@@ -31,16 +29,16 @@ internal fun rememberDetailsTint(
         session?.let { current -> picon?.let { AppArtworkSource(current, it) } }
     }
     // Replacing a page/source must not inherit the previous page's seed or animation.
-    return key(source, piconSource, art != null, accents, loader) {
+    return key(source, piconSource, art != null, accents) {
         var seed by remember { mutableStateOf(source?.let {
             if (art != null) DetailsArtColors.stored(it) else accents.stored(it)
         }) }
         LaunchedEffect(source, context) {
             if (source != null && seed == null) {
-                seed = if (art != null) DetailsArtColors.sample(loader, context, source)
-                    else accents.sample(loader, context, source)
+                seed = if (art != null) DetailsArtColors.sample(context, source)
+                    else accents.sample(context, source)
                 if (seed == null && art != null && piconSource != null) {
-                    seed = accents.stored(piconSource) ?: accents.sample(loader, context, piconSource)
+                    seed = accents.stored(piconSource) ?: accents.sample(context, piconSource)
                 }
             }
         }

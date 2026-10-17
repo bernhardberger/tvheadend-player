@@ -31,7 +31,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -276,7 +275,6 @@ class PlayerTopIdentityTest {
         shownMode = mode
         this.timeshift = timeshift
         restoreFocus = restore
-        val loader = ImageLoader(ApplicationProvider.getApplicationContext<Application>())
         compose.setContent {
             TVHeadendPlayerTheme {
                 PlayerChrome(
@@ -285,7 +283,7 @@ class PlayerTopIdentityTest {
                     timeline = PlayerChromeTimeline.Live(this.timeshift, nowSec = 1_800),
                     actions = PlayerChromeActions(active = shownMode == PlayerChromeMode.CONTROLS, paused = false,
                         livePause = livePause, restoreFocus = restoreFocus),
-                    imageLoader = loader, currentSession = null,
+                    currentSession = null,
                     onTogglePause = { toggles++ }, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {},
                     onInteraction = {},
                     onPauseUnavailable = { toggles++ },

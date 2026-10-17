@@ -26,7 +26,6 @@ import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import coil3.ImageLoader
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.*
@@ -39,6 +38,7 @@ import org.robolectric.annotation.GraphicsMode
 import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
+import org.junit.Rule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
@@ -106,7 +106,6 @@ class GuideHistoryScreenTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(0, observation.currentSession?.generationIdentity)
         }
-        val loader = ImageLoader.Builder(context).diskCache(null).build()
         val session = FakeTvheadendSession(observation)
         val opening = session.observation.value
         compose.setContent {
@@ -114,7 +113,7 @@ class GuideHistoryScreenTest {
             TVHeadendPlayerTheme {
                 val current by session.observation.collectAsState()
                 ProgrammeDetailsHost(event, opening, current, { session.observation.value }, { 50 }, fromGuide = true,
-                    showContextMenu = menu, onShowDetails = {}, imageLoader = loader, mutations = mutations,
+                    showContextMenu = menu, onShowDetails = {}, mutations = mutations,
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
                     notices = notices, onPlay = { _, _ -> }, onPlayRecording = null, onClose = {}, settingsStore = settings)
@@ -191,7 +190,6 @@ class GuideHistoryScreenTest {
         val selection = ChannelSelectionStore()
         val position = GuidePositionStore()
         val lastPlayed = LastPlayedChannelStore(context)
-        val loader = ImageLoader.Builder(context).diskCache(null).build()
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
@@ -213,7 +211,7 @@ class GuideHistoryScreenTest {
                 CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                     TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
                         playerSession = runtime, selection = selection, guidePositionStore = position,
-                        lastPlayedStore = lastPlayed, imageLoader = loader, onPlayRecording = {}, onPlay = { _, _ -> }) }
+                        lastPlayedStore = lastPlayed, onPlayRecording = {}, onPlay = { _, _ -> }) }
                 }
             }
         }

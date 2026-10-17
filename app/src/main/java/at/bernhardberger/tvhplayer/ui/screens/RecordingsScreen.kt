@@ -131,7 +131,6 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingItemKey
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
-import coil3.ImageLoader
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
@@ -175,7 +174,6 @@ fun RecordingsScreen(
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
     session: TvheadendSession = koinInject(),
-    imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
@@ -191,7 +189,6 @@ fun RecordingsScreen(
         contentPadding = contentPadding,
         initialFocusEnabled = initialFocusEnabled,
         backEnabled = backEnabled,
-        imageLoader = imageLoader,
         connectionUiState = connectionUiState,
         onRetry = onRetry,
         onPlayRecording = onPlayRecording,
@@ -208,7 +205,6 @@ internal fun RecordingsScreenContent(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
-    imageLoader: ImageLoader = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
@@ -576,7 +572,6 @@ internal fun RecordingsScreenContent(
                             openRecording(it)
                         }
                     },
-                    imageLoader = imageLoader,
                     onOpenContextMenu = {
                         if (owner.isCurrent) {
                             contentFocusOwned = false
@@ -617,7 +612,6 @@ internal fun RecordingsScreenContent(
                                 if (!owner.isCurrent) return@RecordingSchedule
                                 openRecording(it)
                             },
-                            imageLoader = imageLoader,
                             onOpenContextMenu = {
                                 if (owner.isCurrent) {
                                     contentFocusOwned = false
@@ -661,7 +655,6 @@ internal fun RecordingsScreenContent(
                                 if (!owner.isCurrent) return@RecordingProblems
                                 openRecording(it)
                             },
-                            imageLoader = imageLoader,
                             onOpenContextMenu = {
                                 if (owner.isCurrent) {
                                     contentFocusOwned = false
@@ -751,7 +744,7 @@ internal fun RecordingsScreenContent(
                     (channel?.let { at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty()) }
                         ?: opened.channelName)?.takeIf(String::isNotBlank),
                     opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
-                    ).joinToString(" · "), imageLoader, observation.currentSession,
+                    ).joinToString(" · "), observation.currentSession,
                         Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
                 },
                 onDismiss = closeResume,
@@ -872,7 +865,7 @@ internal fun RecordingsScreenContent(
             },
             artwork = {
                 val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
-                ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null, imageLoader,
+                ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null,
                     selectedCapability, Modifier.fillMaxSize().testTag(if (artwork != null)
                         "browse-context-artwork" else "browse-context-picon"),
                     plateModifier = Modifier.testTag("browse-context-plate"))
@@ -891,7 +884,6 @@ internal fun RecordingsScreenContent(
             nowSec = nowSec,
             recordingEvent = opened.eventId?.takeIf { selectedCapability != null }?.let(observation::event),
             recordingConfigurations = observation.currentDvrConfigurations().takeIf { selectedCapability != null }.orEmpty(),
-            imageLoader = imageLoader,
             currentSession = selectedCapability,
             channel = opened.channelId?.let(channelsById::get),
             actions = recordingDetailsActions(opened, selectedCapability != null,

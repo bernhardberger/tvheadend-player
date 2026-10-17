@@ -59,11 +59,13 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerChromeEvidenceTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private lateinit var loader: ImageLoader
     private lateinit var brightStill: Bitmap
@@ -94,6 +96,7 @@ class PlayerChromeEvidenceTest {
                 SuccessResult(art.asImage(), chain.request, DataSource.MEMORY)
             })
         }.build()
+        images.install(loader)
     }
 
     @Test fun passiveBarBadgesAndSlotHaveMergedSemanticsAndNoFocusActions() {
@@ -234,7 +237,7 @@ class PlayerChromeEvidenceTest {
     }
 
     @Test fun blankHeroIdentityHasLocalizedNeutralFallback() {
-        compose.setContent { TVHeadendPlayerTheme { ProgrammeHero(null, ChannelId(101), "", null, loader, session) } }
+        compose.setContent { TVHeadendPlayerTheme { ProgrammeHero(null, ChannelId(101), "", null, session) } }
         compose.onNodeWithText("Channel", useUnmergedTree = true).assertExists()
     }
 
@@ -355,7 +358,7 @@ class PlayerChromeEvidenceTest {
         var withLogo by mutableStateOf(true)
         compose.setContent { TVHeadendPlayerTheme {
             PlayerTopIdentity(PlayerChromeContent("", info(false), picon = if (withLogo) ArtworkId.parse("imagecache/2") else null),
-                loader, session, Modifier.fillMaxSize())
+                session, Modifier.fillMaxSize())
         } }
         compose.onNodeWithTag("player-top-identity-logo", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("player-top-identity-number", useUnmergedTree = true).assertDoesNotExist()
@@ -386,9 +389,10 @@ class PlayerChromeEvidenceTest {
         val failing = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).components {
             add(Interceptor { chain -> ErrorResult(null, chain.request, IllegalStateException("fixture image unavailable")) })
         }.build()
+        images.install(failing)
         compose.setContent { TVHeadendPlayerTheme { Column(Modifier.width(800.dp)) {
-            QuickZapPreview("Failed title", "Failed metadata", null, null, ArtworkId(1), failing, session)
-            QuickZapPreview("Absent title", "Absent metadata", null, null, null, loader, session)
+            QuickZapPreview("Failed title", "Failed metadata", null, null, ArtworkId(1), session)
+            QuickZapPreview("Absent title", "Absent metadata", null, null, null, session)
         } } }
         compose.waitForIdle()
         val failed = compose.onNodeWithText("Failed title", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -515,12 +519,12 @@ class PlayerChromeEvidenceTest {
                             Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
                             Scene.HERO_ART, Scene.HERO_FALLBACK, Scene.HERO_NEUTRAL -> ProgrammeHero(
                                 if (scene == Scene.HERO_ART) ArtworkId(1) else null, ChannelId(101), "101",
-                                if (scene == Scene.HERO_NEUTRAL) null else ArtworkId.parse("imagecache/2"), loader, session,
+                                if (scene == Scene.HERO_NEUTRAL) null else ArtworkId.parse("imagecache/2"), session,
                             )
                             Scene.PREVIEW_ART, Scene.PREVIEW_TEXT -> QuickZapPreview(
                                 "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45 · ${playerMinutesLeft(38)} · Natur",
                                 "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive.",
-                                "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) ArtworkId(1) else null, loader, session, Modifier.fillMaxWidth(),
+                                "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) ArtworkId(1) else null, session, Modifier.fillMaxWidth(),
                             )
                         }
                     }

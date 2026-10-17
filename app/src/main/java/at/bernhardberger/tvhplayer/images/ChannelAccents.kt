@@ -15,7 +15,6 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.selectAccentRgb
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
-import coil3.ImageLoader
 import coil3.request.SuccessResult
 import coil3.toBitmap
 import java.util.concurrent.ConcurrentHashMap
@@ -52,14 +51,14 @@ class ChannelAccents(
      * colour. Null when the picon did not load for now, which is not stored, or when its session was
      * replaced meanwhile. Without a key the colour is sampled for this call only.
      */
-    suspend fun sample(imageLoader: ImageLoader, context: Context, picon: AppArtworkSource): Int? {
+    suspend fun sample(context: Context, picon: AppArtworkSource): Int? {
         val session = picon.currentSession ?: return null
-        val key = cacheKey(session, picon.id) ?: return samplePicon(imageLoader, context, picon)
+        val key = cacheKey(session, picon.id) ?: return samplePicon(context, picon)
         store.load()
         sampling.computeIfAbsent(key) { Mutex() }.withLock {
             store[key]?.let { return it }
             if (key in failed) return null
-            val rgb = samplePicon(imageLoader, context, picon)
+            val rgb = samplePicon(context, picon)
             // The key holds for the session that loaded the picon: a result that outlived it is dropped.
             if (cacheKey(session, picon.id) != key) return null
             if (rgb == null) failed += key else store.put(key, rgb)
@@ -72,7 +71,7 @@ class ChannelAccents(
      * colour, one after the other. Runs while the session is current and again when the session, the
      * set of picons or, by a clear, the store changes; a clear also forgets the failed loads. Never returns.
      */
-    suspend fun fillIn(observation: StateFlow<SessionObservation>, imageLoader: ImageLoader, context: Context) {
+    suspend fun fillIn(observation: StateFlow<SessionObservation>, context: Context) {
         store.load()
         var clearsSeen = store.clears.value
         observation
@@ -99,7 +98,7 @@ class ChannelAccents(
                     val session = observation.value.currentSession ?: break
                     val key = cacheKey(session, picon) ?: continue
                     if (store[key] != null || key in failed) continue
-                    if (sample(imageLoader, context, AppArtworkSource(session, picon)) != null) sampled++
+                    if (sample(context, AppArtworkSource(session, picon)) != null) sampled++
                 }
                 profileTrace("P50:accentPass:end:$sampled") { }
             }
@@ -109,9 +108,9 @@ class ChannelAccents(
 private data class FillInTarget(val session: SessionGenerationIdentity, val picons: Set<ArtworkId>)
 
 /** Neutral for a picon there is no picture of; null when the picon does not load for now. */
-private suspend fun samplePicon(imageLoader: ImageLoader, context: Context, picon: AppArtworkSource): Int? =
+private suspend fun samplePicon(context: Context, picon: AppArtworkSource): Int? =
     withContext(Dispatchers.Default) {
-        val result = loadArtworkSample(imageLoader, context, picon)
+        val result = loadArtworkSample(context, picon)
         val bitmap = (result as? SuccessResult)?.image?.toBitmap() ?: run {
             val failure = ((result as? ErrorResult)?.throwable as? TvheadendArtworkLoadException)?.failure
             profileTrace("P50:accentFail:${failure ?: "undecodable"}") { }

@@ -43,7 +43,6 @@ import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
-import coil3.ImageLoader
 import coil3.compose.SubcomposeAsyncImage
 import coil3.compose.SubcomposeAsyncImageContent
 import kotlin.math.ceil
@@ -62,7 +61,6 @@ internal fun ChannelsProgrammeDetails(
     now: EpgEvent?,
     next: EpgEvent?,
     nowSec: Long,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
 ) = profileTrace("P1:compose:channelDetails") {
@@ -123,7 +121,6 @@ internal fun ChannelsProgrammeDetails(
                 channel = channel,
                 now = now,
                 nowSec = nowSec,
-                imageLoader = imageLoader,
                 currentSession = currentSession,
                 modifier = Modifier.size(
                     width = with(density) { (imageHeight * 16f / 9f).toDp() },
@@ -182,11 +179,10 @@ private fun ChannelsProgrammePreview(
     channel: Channel,
     now: EpgEvent?,
     nowSec: Long,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier,
 ) {
-    val accent = rememberChannelAccent(imageLoader, currentSession, channel.icon, channel.id)
+    val accent = rememberChannelAccent(currentSession, channel.icon, channel.id)
     val artwork = now?.image
     val timedEvent = now?.takeIf { it.stop > it.start }
     val timing = timedEvent?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) }
@@ -215,7 +211,6 @@ private fun ChannelsProgrammePreview(
                 contentAlignment = Alignment.Center,
             ) {
                 PiconBox(
-                    imageLoader = imageLoader,
                     piconPath = channel.icon,
                     currentSession = currentSession,
                     modifier = Modifier.fillMaxSize(0.6f).testTag("channels-preview-identity"),
@@ -226,7 +221,6 @@ private fun ChannelsProgrammePreview(
             SubcomposeAsyncImage(
                 model = AppArtworkSource(currentSession, artwork),
                 contentDescription = null,
-                imageLoader = imageLoader,
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize(),
                 loading = { fallback() },

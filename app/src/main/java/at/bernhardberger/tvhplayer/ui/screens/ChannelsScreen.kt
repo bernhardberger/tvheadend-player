@@ -90,7 +90,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil3.ImageLoader
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
@@ -194,7 +193,6 @@ fun ChannelsScreen(
     initialFocusEnabled: Boolean = true,
     channelViewModel: ChannelsViewModel,
     selection: ChannelSelectionStore = koinInject(),
-    imageLoader: ImageLoader = koinInject(),
     playingChannelId: ChannelId?,
     playerReturn: PlayerReturnFocus? = null,
     connectionUiState: ConnectionUiState,
@@ -225,7 +223,6 @@ fun ChannelsScreen(
         observation = observation,
         tagNotice = tagNotice,
         selectedId = { selectedId.value },
-        imageLoader = imageLoader,
         playingChannelId = playingChannelId,
         playerReturn = playerReturn,
         playbackChannelId = playbackChannelId,
@@ -253,7 +250,6 @@ internal fun ChannelsScreenContent(
     observation: SessionObservation,
     tagNotice: Boolean,
     selectedId: () -> ChannelId?,
-    imageLoader: ImageLoader,
     playingChannelId: ChannelId?,
     playerReturn: PlayerReturnFocus? = null,
     playbackChannelId: ChannelId? = playingChannelId,
@@ -820,7 +816,6 @@ internal fun ChannelsScreenContent(
                                     name = ch.name.orEmpty(),
                                     programTitle = now?.title ?: stringResource(R.string.no_epg),
                                     progress = if (now != null) prog else null,
-                                    imageLoader = imageLoader,
                                     currentSession = currentSession,
                                     piconPath = ch.icon,
                                     programStartSec = now?.start?.epochSeconds,
@@ -883,7 +878,6 @@ internal fun ChannelsScreenContent(
                         selectedId = frame.entryId,
                         observation = observation,
                         nowSecProvider = nowSecProvider,
-                        imageLoader = imageLoader,
                     )
                 }
             }
@@ -899,7 +893,6 @@ internal fun ChannelsScreenContent(
             onShowDetails = { showProgrammeDetails = true },
             channelId = channelId,
             observation = observation,
-            imageLoader = imageLoader,
             onPlay = onPlay,
             onShowGuide = onShowGuide,
             onClose = {
@@ -1106,7 +1099,6 @@ private fun FocusedChannelDetails(
     selectedId: () -> ChannelId?,
     observation: SessionObservation,
     nowSecProvider: () -> Long,
-    imageLoader: ImageLoader,
 ) {
     // These reads belong to the details composition, not the screen or list.
     // Keep local native focus ahead of shared selection during restoration.
@@ -1151,7 +1143,6 @@ private fun FocusedChannelDetails(
             now = now,
             next = next,
             nowSec = nowSec,
-            imageLoader = imageLoader,
             currentSession = observation.currentSession,
             modifier = Modifier.fillMaxSize(),
         )

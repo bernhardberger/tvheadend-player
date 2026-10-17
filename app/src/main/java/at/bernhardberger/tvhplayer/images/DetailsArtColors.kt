@@ -4,7 +4,6 @@ import android.content.Context
 import android.util.LruCache
 import androidx.palette.graphics.Palette
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import coil3.ImageLoader
 import coil3.request.SuccessResult
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
@@ -20,10 +19,10 @@ internal object DetailsArtColors {
     fun stored(source: AppArtworkSource): Int? = colors.get(source)?.rgb
 
     // No shared lock: a slow decode must not hold up other artwork; a duplicate sample is harmless.
-    suspend fun sample(loader: ImageLoader, context: Context, source: AppArtworkSource): Int? =
+    suspend fun sample(context: Context, source: AppArtworkSource): Int? =
         withContext(Dispatchers.Default) {
             colors.get(source)?.let { return@withContext it.rgb }
-            val result = loadArtworkSample(loader, context, source) as? SuccessResult
+            val result = loadArtworkSample(context, source) as? SuccessResult
                 ?: return@withContext null
             // Prefer the colour that stands out (default filters skip skin tones and near
             // black/white); art without one, such as a black-and-white film, stays neutral.

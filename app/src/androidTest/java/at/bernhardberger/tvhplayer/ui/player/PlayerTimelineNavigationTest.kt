@@ -18,7 +18,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -37,7 +36,6 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
         var shelfOpens = 0
         val channelsAvailable = mutableStateOf(true)
         rule.setContent {
-            val imageLoader = ImageLoader.Builder(LocalContext.current).build()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().onKeyEvent { leakedEvents++; false }) {
                     if (recording) RecordingChromeFixture(
@@ -59,7 +57,7 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
                             programme = null,
                         ),
                         actions = PlayerChromeActions(active = true),
-                        imageLoader = rememberFixtureImageLoader(), currentSession = null,
+                        currentSession = null,
                         onDownFromActions = { if (channelsAvailable.value) ({ shelfOpens++ })() },
                         onStop = {},
                         onInteraction = {},

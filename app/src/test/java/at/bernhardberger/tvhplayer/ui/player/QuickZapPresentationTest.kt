@@ -85,11 +85,29 @@ import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.hypot
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import androidx.test.core.app.ApplicationProvider
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class QuickZapPresentationTest {
+    @get:Rule val images = ImageLoaderRule {
+        ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+            .components { add(object : Mapper<AppArtworkSource, ByteArray> {
+                override fun map(data: AppArtworkSource, options: Options): ByteArray {
+                    // Programme art is "imagecache/<1000 + channel * 10 + index>"; picons use the channel id.
+                    val id = data.id.value.toLong()
+                    val bitmap = if (id >= 1000) FixtureArt.art(programme((id - 1000) / 10, ((id - 1000) % 10).toInt()).art)
+                        else FixtureArt.picon(checkNotNull(lineUp[(id - 1).toInt()].picon))
+                    return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
+                }
+            }) }
+            .coroutineContext(Dispatchers.Main.immediate)
+            .fetcherCoroutineContext(Dispatchers.Main.immediate)
+            .decoderCoroutineContext(Dispatchers.Main.immediate)
+            .diskCache(null).build()
+    }
     @get:Rule val compose = createComposeRule()
     private lateinit var layers: LivePlayerLayerState
     private lateinit var view: View
@@ -702,22 +720,6 @@ class QuickZapPresentationTest {
                     dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
                 )).captureCurrentSession()
             }
-            val loader = remember {
-                ImageLoader.Builder(context)
-                    .components { add(object : Mapper<AppArtworkSource, ByteArray> {
-                        override fun map(data: AppArtworkSource, options: Options): ByteArray {
-                            // Programme art is "imagecache/<1000 + channel * 10 + index>"; picons use the channel id.
-                            val id = data.id.value.toLong()
-                            val bitmap = if (id >= 1000) FixtureArt.art(programme((id - 1000) / 10, ((id - 1000) % 10).toInt()).art)
-                                else FixtureArt.picon(checkNotNull(lineUp[(id - 1).toInt()].picon))
-                            return ByteArrayOutputStream().also { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }.toByteArray()
-                        }
-                    }) }
-                    .coroutineContext(Dispatchers.Main.immediate)
-                    .fetcherCoroutineContext(Dispatchers.Main.immediate)
-                    .decoderCoroutineContext(Dispatchers.Main.immediate)
-                    .diskCache(null).build()
-            }
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     focusColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
@@ -746,7 +748,7 @@ class QuickZapPresentationTest {
                                 playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
                             actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),
-                            imageLoader = loader, currentSession = session,
+                            currentSession = session,
                             onDownFromActions = {
                                 layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
                                 layers.openChannelDrawer()
@@ -765,7 +767,7 @@ class QuickZapPresentationTest {
                                     channels = catalog, selectedId = playing, playingChannelId = playing,
                                     playbackIndicator = indicator,
                                     recordingChannelIds = setOf(ChannelId(4)), nowEvent = { if (it == ChannelId(5)) null else event(it) },
-                                    imageLoader = loader, currentSession = session, active = layers.channelDrawerOpen, nowSec = 900,
+                                    currentSession = session, active = layers.channelDrawerOpen, nowSec = 900,
                                     onFocusChannel = {}, onPickChannel = {
                                         if (it.id == playing) layers.dismissChannelDrawer() else {
                                             if (confirmPicks) playing = it.id

@@ -63,7 +63,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
-import coil3.ImageLoader
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -371,7 +370,6 @@ fun VideoPlayerScreen(
     lastPlayedChannelStore: LastPlayedChannelStore = koinInject(),
     settingsStore: PlayerSettingsStore = koinInject(),
     channelsVm: ChannelsViewModel,
-    imageLoader: ImageLoader = koinInject(),
     session: TvheadendSession = koinInject(),
     channelId: ChannelId,
     channelName: String,
@@ -1688,7 +1686,7 @@ fun VideoPlayerScreen(
             railExpanded = layerState.channelRailPresented,
             nowPlaying = {
                 NowPlayingStrip(currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
-                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec, imageLoader, currentSession,
+                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec, currentSession,
                     playbackIndicator = channelIndicator)
             },
             details = (detailsChannel to detailsBaseEvent).takeIf {
@@ -1744,7 +1742,6 @@ fun VideoPlayerScreen(
                     else -> layerState.restoreChannelAction
                 },
             ),
-            imageLoader = imageLoader,
             currentSession = currentSession,
             entry = layerState.chrome.controlsEntry,
             panelOpen = layerState.optionsPage != null,
@@ -1790,7 +1787,6 @@ fun VideoPlayerScreen(
                             recordingChannelIds = recordingChannelIds,
                             nowSec = nowSec,
                             nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            imageLoader = imageLoader,
                             currentSession = currentSession,
                             onFocusChannel = { selectedId = it },
                             onPickChannel = { tuneChannel(it) },
@@ -1819,7 +1815,7 @@ fun VideoPlayerScreen(
                         QuickZapTrayPreview(previewChannel,
                             previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
                             previewChannel?.let { observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            nowSec, imageLoader, currentSession,
+                            nowSec, currentSession,
                             Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
                             scrolling = channelBrowser.scrolling)
                     },
@@ -1890,7 +1886,6 @@ fun VideoPlayerScreen(
                                 channelId = shownChannelId,
                                 channelNumber = shownChannel?.visibleChannelNumber?.toString().orEmpty(),
                                 picon = shownChannel?.icon,
-                                imageLoader = imageLoader,
                                 currentSession = currentSession,
                                 modifier = tileModifier,
                                 recordingBadge = observation.dvrEntryForEvent(event)?.state == DvrEntryState.RECORDING,
@@ -1986,7 +1981,6 @@ fun VideoPlayerScreen(
             number = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty(),
             target = channelNumberTarget,
             maxDigits = channelNumberDigits,
-            imageLoader = imageLoader,
             currentSession = currentSession,
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -2041,7 +2035,7 @@ fun VideoPlayerScreen(
                 }
             }
         }
-        LivePlayerServerWait(serverWait, currentChannel, currentChannelName, imageLoader, rootFocus)
+        LivePlayerServerWait(serverWait, currentChannel, currentChannelName, rootFocus)
         TvRecoveryOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY && serverWait.presentation == null,
             message = stringResource(

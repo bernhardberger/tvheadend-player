@@ -643,8 +643,6 @@ class PlaybackOptionsRemoteKeyTest {
 
     /** Real recording controls are removed/recomposed exactly as in the screen. */
     private fun showRecording(controlsVisible: Boolean = false) {
-        val loader = coil3.ImageLoader.Builder(androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>())
-            .diskCache(null).build()
         val fake = FakeTrackPlayer(withSubtitles = false)
         fake.selectionChanges = 0
         player = fake
@@ -721,7 +719,6 @@ class PlaybackOptionsRemoteKeyTest {
                         restoreFocus = restoreControl,
                         onFocusRestored = { restoreControl = null },
                         onActionFocused = { lastControl = it },
-                        imageLoader = loader,
                     )
                     optionsPage?.let { page ->
                         PlaybackOptionsSheet(

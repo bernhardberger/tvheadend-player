@@ -31,7 +31,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -120,7 +119,6 @@ class InProgressRecordingResumeTest {
     private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds)
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -136,7 +134,6 @@ class InProgressRecordingResumeTest {
                 RecordingsScreenContent(
                     observation = observation,
                     state = state,
-                    imageLoader = loader,
                     dvrMutationActions = actions,
                     notices = notices,
                     onPlayRecording = { _, start -> starts += start },

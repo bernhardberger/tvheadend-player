@@ -1,12 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
-import coil3.ImageLoader
 
 /** A live quick step on the hidden player, as the screen composes it: the passive Banner's preview timeline. */
 @Composable
@@ -26,16 +24,8 @@ internal fun QuickStepBanner(
             feedback = feedback, feedbackIsError = feedbackIsError,
         ),
         actions = PlayerChromeActions(active = false),
-        imageLoader = rememberFixtureImageLoader(),
         currentSession = null,
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
         modifier = modifier,
     )
-}
-
-/** An image loader for chrome fixtures, which show no artwork. */
-@Composable
-internal fun rememberFixtureImageLoader(): ImageLoader {
-    val context = LocalContext.current
-    return remember { ImageLoader(context) }
 }

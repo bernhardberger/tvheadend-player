@@ -53,6 +53,8 @@ import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreen
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import coil3.ImageLoader
+import coil3.SingletonImageLoader
+import coil3.annotation.DelicateCoilApi
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -64,6 +66,7 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Clock
 
 /** Isolated SDK-domain fixtures feeding the unchanged production screens and state owners. */
+@OptIn(DelicateCoilApi::class)
 class JourneyProfileActivity : AppCompatActivity() {
     private var runtimeOwner: SdkRuntimeOwner? = null
     private var images: ImageLoader? = null
@@ -118,7 +121,8 @@ class JourneyProfileActivity : AppCompatActivity() {
             )[ChannelsViewModel::class]
             val selection = ChannelSelectionStore()
             val lastPlayed = LastPlayedChannelStore(this@JourneyProfileActivity)
-            val imageLoader = ImageLoader(this@JourneyProfileActivity).also { images = it }
+            // The fixture shows no server artwork: its own plain loader replaces the app's for this activity.
+            SingletonImageLoader.setUnsafe(ImageLoader(this@JourneyProfileActivity).also { images = it })
             setContent {
                 val backStack = rememberAppNavBackStack(if (journey == "guide") GuideKey else ChannelsKey)
                 val route = backStack.last()
@@ -161,7 +165,7 @@ class JourneyProfileActivity : AppCompatActivity() {
                                         contentPadding = padding, initialFocusEnabled = !drawerActive && route == GuideKey,
                                         channelViewModel = catalog, selection = selection, session = session,
                                         playerSession = runtime, lastPlayedStore = lastPlayed,
-                                        guidePositionStore = guidePosition, imageLoader = imageLoader,
+                                        guidePositionStore = guidePosition,
                                         onPlay = { _, _ -> },
                                     ) }
                                 }
@@ -171,7 +175,6 @@ class JourneyProfileActivity : AppCompatActivity() {
                                          initialFocusEnabled = !drawerActive && route == RecordingsKey,
                                          backEnabled = !drawerActive && route == RecordingsKey,
                                          session = session,
-                                         imageLoader = imageLoader,
                                      )
                                 }
                                 entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
@@ -181,7 +184,7 @@ class JourneyProfileActivity : AppCompatActivity() {
                                     }
                                     BrowsingScopeContent(catalog, !drawerActive && route == ChannelsKey) { ChannelsScreen(
                                         contentPadding = padding, initialFocusEnabled = !drawerActive && route == ChannelsKey,
-                                        channelViewModel = catalog, selection = selection, imageLoader = imageLoader,
+                                        channelViewModel = catalog, selection = selection,
                                         playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                                         onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> },
                                     ) }
@@ -207,5 +210,6 @@ class JourneyProfileActivity : AppCompatActivity() {
         super.onDestroy()
         runtimeOwner?.requestClose()
         images?.shutdown()
+        SingletonImageLoader.reset()
     }
 }

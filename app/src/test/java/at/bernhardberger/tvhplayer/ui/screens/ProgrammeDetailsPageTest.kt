@@ -40,7 +40,6 @@ import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutText
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import java.io.File
 import java.util.Locale
@@ -52,17 +51,19 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import org.junit.Rule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ProgrammeDetailsPageTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val oldLocale = Locale.getDefault()
     private val oldZone = TimeZone.getDefault()
     private val oldClock = AppClock.systemUses24Hour
     private val oldFormat = AppClock.format
-    private lateinit var loader: ImageLoader
     private lateinit var view: View
     private val start = Instant.parse("2026-09-15T19:00:00Z")
     private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
@@ -92,16 +93,15 @@ class ProgrammeDetailsPageTest {
         TimeZone.setDefault(TimeZone.getTimeZone("UTC"))
         AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.SYSTEM
         AppClock.systemUses24Hour = true
-        loader = FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"),
-            ArtworkId(3) to FixtureArt.art("lantern-road"), ArtworkId(4) to FixtureArt.art("still-ridge-light")))
+            ArtworkId(3) to FixtureArt.art("lantern-road"), ArtworkId(4) to FixtureArt.art("still-ridge-light"))))
     }
     @After fun release() {
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
         AppClock.systemUses24Hour = oldClock
         AppClock.format = oldFormat
-        loader.shutdown()
     }
 
     @Test fun airingTopBlockShowsOwnProgressAndAiringsFollowActions() {
@@ -711,10 +711,9 @@ class ProgrammeDetailsPageTest {
     @Test @Config(sdk = [30]) fun pre31CornerArtRevealsTheBackgroundThenDarkensFullScreen() = uniformScrim()
 
     private fun uniformScrim() {
-        loader.shutdown()
-        loader = FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"),
-            ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) }))
+            ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) })))
         show()
         compose.waitUntil(10_000) {
             at.bernhardberger.tvhplayer.images.DetailsArtColors.stored(AppArtworkSource(requireNotNull(session), ArtworkId(2))) != null
@@ -1108,7 +1107,7 @@ class ProgrammeDetailsPageTest {
                         ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
                             if (recording) recordingDetailsActions(entry, true, true, true)
                             else programmeDetailsActions(shown, now, entry.takeIf { future }, true, true, false),
-                              loader, session, {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
+                              session, {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
                                   listOf(EpgEvent.create(EventId(2), otherChannel.id, start, event.stop, title = event.title)) else if (todayCard)
                                   listOf(EpgEvent.create(EventId(2), channel.id, start + 3600.seconds, event.stop, title = event.title)) else airings,
                             onRelated = onRelated, channelOf = { listOf(channel, otherChannel).firstOrNull { c -> c.id == it } },

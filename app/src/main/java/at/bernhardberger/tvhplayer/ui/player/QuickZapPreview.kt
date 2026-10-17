@@ -22,7 +22,6 @@ import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 
 /**
@@ -37,7 +36,6 @@ fun QuickZapPreview(
     summary: String?,
     next: String?,
     image: ArtworkId?,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
@@ -72,7 +70,7 @@ fun QuickZapPreview(
             }
         }
         if (artwork != null && currentSession != null && !artworkFailed) AsyncImage(
-            AppArtworkSource(currentSession, artwork), null, imageLoader,
+            AppArtworkSource(currentSession, artwork), null,
             modifier = Modifier.size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight)
                 .clip(PreviewArtworkShape),
             contentScale = ContentScale.Crop,

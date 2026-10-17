@@ -11,7 +11,6 @@ import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.components.*
-import coil3.ImageLoader
 
 /** One programme menu for the opening programme and every related airing. */
 @Composable
@@ -24,7 +23,6 @@ internal fun ProgrammeContextMenu(
     nowSec: Long,
     canModify: Boolean,
     currentSession: CurrentSessionObservation?,
-    imageLoader: ImageLoader,
     onAction: (EpgEvent, BrowseContextAction) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -46,7 +44,7 @@ internal fun ProgrammeContextMenu(
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         artwork = {
             ProgrammeArtwork(event.image, channel?.icon, event.progress(nowSec).takeIf { event.isRunning(nowSec) },
-                imageLoader, currentSession,
+                currentSession,
                 Modifier.fillMaxSize().testTag(if (event.image != null && currentSession != null)
                     "browse-context-artwork" else "browse-context-picon"),
                 plateModifier = Modifier.testTag("browse-context-plate"),

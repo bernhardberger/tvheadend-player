@@ -17,7 +17,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import kotlin.time.Instant
 import org.junit.Assert.*
 import org.junit.Rule
@@ -41,7 +40,6 @@ class PlayerChannelBrowserTest {
     private val closes = mutableListOf<Int?>()
 
     private fun screen(events: Boolean = true) {
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         compose.setContent {
             TVHeadendPlayerTheme {
                 Column(Modifier.fillMaxSize()) {
@@ -49,7 +47,7 @@ class PlayerChannelBrowserTest {
                         PlayerChannelBrowser(state, channels, recent, ChannelId(1), emptySet(),
                             { id -> if (events) EpgEvent.create(EventId(id.value), id, Instant.fromEpochSeconds(1),
                                 Instant.fromEpochSeconds(100), title = "Programme ${id.value}") else null },
-                            50, loader, null, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
+                            50, null, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
                             { closes += it }, channelsTitle = "Sport")
                         PlayerChannelBrowserHint(state, recent.isNotEmpty(), "Sport", Modifier.testTag("hint"))
                     }

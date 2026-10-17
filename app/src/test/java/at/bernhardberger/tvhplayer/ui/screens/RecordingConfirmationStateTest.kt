@@ -15,7 +15,6 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -49,7 +48,6 @@ class RecordingConfirmationStateTest {
             sessionState = initial.sessionState, channelState = initial.channelState, epgState = initial.epgState,
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)))
         val session = FakeTvheadendSession(snapshot(listOf(entry, neighbour)))
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         var calls = 0
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> error("unexpected schedule") },
@@ -67,7 +65,7 @@ class RecordingConfirmationStateTest {
             TVHeadendPlayerTheme {
                 RecordingsScreenContent(observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
-                    imageLoader = loader, dvrMutationActions = actions, notices = notices)
+                    dvrMutationActions = actions, notices = notices)
             }
         }
         compose.waitUntil(10_000) {
@@ -81,7 +79,6 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.onNodeWithTag("recording-list-entry-2").assertIsFocused()
         compose.runOnIdle { assertEquals(1, calls) }
-        loader.shutdown()
     }
 
     @Test fun lastInFolderDeleteFromDetailsReturnsToNextParentItem() = lastInFolder("details")
@@ -101,7 +98,6 @@ class RecordingConfirmationStateTest {
         fun snapshot(entries: List<DvrEntry>) = SessionObservation.create(initial.sessionState, initial.channelState,
             initial.epgState, DvrRepositoryState.Current(DvrSnapshot.create(entries)))
         val session = FakeTvheadendSession(snapshot(survivors + entry))
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         var calls = 0
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> error("unexpected schedule") },
@@ -117,7 +113,7 @@ class RecordingConfirmationStateTest {
                 back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 RecordingsScreenContent(observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = state,
-                    imageLoader = loader, dvrMutationActions = actions, notices = notices)
+                    dvrMutationActions = actions, notices = notices)
             }
         }
         compose.waitUntil(10_000) { compose.onAllNodesWithText("Series").fetchSemanticsNodes().isNotEmpty() }
@@ -151,14 +147,12 @@ class RecordingConfirmationStateTest {
             compose.onNode(hasText("Series") and hasClickAction()).assertIsFocused()
         }
         compose.runOnIdle { assertEquals(if (source == "browse") 0 else 1, calls) }
-        loader.shutdown()
     }
 
     private fun delayedFailure(reopen: Boolean) {
         lateinit var backDispatcher: OnBackPressedDispatcher
         val session = FakeTvheadendSession(observation(DvrEntryState.SCHEDULED))
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         val result = CompletableDeferred<DvrMutationResult<Unit>>()
         var calls = 0
         val actions = DvrMutationActions(
@@ -174,7 +168,7 @@ class RecordingConfirmationStateTest {
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
-                    state = state, imageLoader = loader, dvrMutationActions = actions, notices = notices,
+                    state = state, dvrMutationActions = actions, notices = notices,
                 )
             }
         }
@@ -196,7 +190,6 @@ class RecordingConfirmationStateTest {
     private fun transition(before: DvrEntryState, after: DvrEntryState?, clickBeforeRecomposition: Boolean = false) {
         val session = FakeTvheadendSession(observation(before))
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         var calls = 0
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -212,7 +205,7 @@ class RecordingConfirmationStateTest {
                 RecordingsScreenContent(
                     observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value },
-                    state = state, imageLoader = loader, dvrMutationActions = actions,
+                    state = state, dvrMutationActions = actions,
                     notices = notices,
                 )
             }

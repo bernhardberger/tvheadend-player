@@ -29,7 +29,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -140,7 +139,6 @@ class ChannelsPlayerReturnFocusTest {
                     observation = observation,
                     tagNotice = false,
                     selectedId = { selected },
-                    imageLoader = ImageLoader.Builder(context).diskCache(null).build(),
                     playingChannelId = request?.playingChannelId,
                     playerReturn = request,
                     connectionUiState = ConnectionUiState.Ready,

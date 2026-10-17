@@ -17,7 +17,6 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.images.ChannelAccents
-import coil3.ImageLoader
 
 /** The app's channel colours. The default, for a composition outside the app, keeps them in memory only. */
 val LocalChannelAccents = staticCompositionLocalOf { ChannelAccents() }
@@ -31,7 +30,6 @@ val LocalChannelAccents = staticCompositionLocalOf { ChannelAccents() }
  */
 @Composable
 fun rememberChannelAccent(
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     piconPath: ArtworkId?,
     channelId: ChannelId,
@@ -46,7 +44,7 @@ fun rememberChannelAccent(
     }
 
     LaunchedEffect(channelId, model, accents) {
-        rgb = model?.let { accents.stored(it) ?: accents.sample(imageLoader, context, it) } ?: NEUTRAL_ACCENT_RGB
+        rgb = model?.let { accents.stored(it) ?: accents.sample(context, it) } ?: NEUTRAL_ACCENT_RGB
     }
 
     val target = Color(0xFF000000.toInt() or rgb)

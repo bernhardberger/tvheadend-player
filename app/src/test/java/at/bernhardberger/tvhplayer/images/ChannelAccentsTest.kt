@@ -53,12 +53,15 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import org.junit.Rule
 
 /** The shared sampler and the fill-in pass, over a fake session and an image loader that serves fixed picons. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChannelAccentsTest {
+    @get:Rule val images = ImageLoaderRule { loader }
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val red = ArtworkId(1)
     private val stored = ArtworkId(2)
@@ -134,7 +137,7 @@ class ChannelAccentsTest {
         assertNull("a timeout passes and is not stored", store[key(broken)])
         // The next process, over the same store.
         val restarted = ChannelAccents(store) { current, id -> key(id).takeIf { session.isCurrent(current) } }
-        scope.launch { restarted.fillIn(session.observation, loader, app) }
+        scope.launch { restarted.fillIn(session.observation, app) }
         await { loads.size == 4 && running.get() == 0 }
         idle(100)
         assertEquals(listOf(missing, corrupt, broken, broken).ids(), loaded())
@@ -208,9 +211,9 @@ class ChannelAccentsTest {
 
     private fun loaded() = synchronized(loads) { loads.map { it.value } }
 
-    private fun startPass() { scope.launch { accents.fillIn(session.observation, loader, app) } }
+    private fun startPass() { scope.launch { accents.fillIn(session.observation, app) } }
 
-    private fun sampleNow(id: ArtworkId): Deferred<Int?> = scope.async { accents.sample(loader, app, source(id)) }
+    private fun sampleNow(id: ArtworkId): Deferred<Int?> = scope.async { accents.sample(app, source(id)) }
 
     private fun source(id: ArtworkId) = AppArtworkSource(requireNotNull(session.observation.value.currentSession), id)
 

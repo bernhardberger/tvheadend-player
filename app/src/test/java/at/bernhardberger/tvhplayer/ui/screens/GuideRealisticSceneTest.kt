@@ -53,7 +53,6 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
-import coil3.ImageLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -78,6 +77,7 @@ import java.time.ZoneId
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 /** The complete receiver-style fixture in the production guide, driven only with D-pad keys. */
 @RunWith(RobolectricTestRunner::class)
@@ -85,12 +85,12 @@ import kotlin.time.Instant
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideRealisticSceneTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val models = ViewModelStore()
     private val runtimeScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val position = GuidePositionStore()
     private lateinit var player: ExoPlayer
-    private lateinit var loader: ImageLoader
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
     private lateinit var layering: at.bernhardberger.tvhplayer.ui.components.BrowseContentLayering
@@ -142,18 +142,17 @@ class GuideRealisticSceneTest {
         oldZone = TimeZone.getDefault()
         Locale.setDefault(Locale.US)
         TimeZone.setDefault(TimeZone.getTimeZone(fixture.getString("timezone")))
-        loader = FixtureArt.imageLoader(context(), channels.zip(channelRecords).mapNotNull { (channel, record) ->
+        images.install(FixtureArt.imageLoader(context(), channels.zip(channelRecords).mapNotNull { (channel, record) ->
             // Northline World retains its declared icon ID, but its image really fails.
             channel.icon?.takeUnless { record.getString("channel_id") == "ch-northline-world" }
                 ?.let { it to FixtureArt.picon(record.getString("picon").removeSuffix(".png")) }
-        }.toMap())
+        }.toMap()))
     }
 
     @After fun release() {
         models.clear()
         runtimeScope.cancel()
         if (::player.isInitialized) player.release()
-        if (::loader.isInitialized) loader.shutdown()
         Locale.setDefault(oldLocale)
         TimeZone.setDefault(oldZone)
     }
@@ -412,7 +411,7 @@ class GuideRealisticSceneTest {
                                 layering = requireNotNull(at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current)
                                 EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, channelViewModel = model,
                                     session = session, playerSession = runtime, selection = selection, guidePositionStore = position,
-                                    lastPlayedStore = lastPlayed, imageLoader = loader, onPlay = { _, _ -> playbackRequests++ },
+                                    lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
                                     onPlayRecording = { playbackRequests++ }, notices = notices)
                             }
                         }

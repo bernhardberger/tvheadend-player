@@ -78,6 +78,8 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import androidx.test.core.app.ApplicationProvider
 
 /**
  * Design-review captures of the player header, the controls-to-panel handover and zap
@@ -91,6 +93,7 @@ import kotlin.time.Instant
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerMotionCaptureTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
     private var defaultZone: TimeZone? = null
@@ -105,18 +108,18 @@ class PlayerMotionCaptureTest {
     }
 
     @Test fun headerLive() {
-        show { loader, session -> live(loader, session, behind = false) }
+        show { session -> live(session, behind = false) }
         capture("header-live")
     }
 
     @Test fun headerBehindLive() {
-        show { loader, session -> live(loader, session, behind = true) }
+        show { session -> live(session, behind = true) }
         capture("header-behind-live")
     }
 
     @Test fun headerRecording() {
-        show { loader, _ ->
-            RecordingChromeFixture(growing = true, imageLoader = loader)
+        show { _ ->
+            RecordingChromeFixture(growing = true)
         }
         capture("header-recording")
     }
@@ -124,9 +127,9 @@ class PlayerMotionCaptureTest {
     @Test fun numberEntryTransitions() {
         var number by mutableStateOf("")
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
-        show { loader, session ->
+        show { session ->
             Box(Modifier.fillMaxSize()) {
-                ChannelNumberOverlay(number, target, loader, session,
+                ChannelNumberOverlay(number, target, session,
                     Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
             }
         }
@@ -156,9 +159,9 @@ class PlayerMotionCaptureTest {
     /** Controls hand over to the options panel: frames 3, 6 and 9 after opening, then settled. */
     @Test fun controlsToPanelMidTransition() {
         var open by mutableStateOf(false)
-        show { loader, session ->
+        show { session ->
             Box(Modifier.fillMaxSize()) {
-                live(loader, session, behind = false, panelOpen = open)
+                live(session, behind = false, panelOpen = open)
                 PlayerPanelVisibility(Unit.takeIf { open }) {
                     PlaybackOptionsSheetContent(
                         page = PlaybackOptionsPage.ROOT,
@@ -203,16 +206,16 @@ class PlayerMotionCaptureTest {
 
     private fun pageScroll(rail: Boolean, scrollSchedule: Boolean = false) {
         lateinit var layers: LivePlayerLayerState
-        show { loader, session ->
+        show { session ->
             layers = rememberLivePlayerLayerState()
             val details = remember { ProgramDetailsState().apply { reset(startOnSchedule = rail) } }
             LaunchedEffect(Unit) { layers.showControls() }
             PlayerPage(details = Unit.takeIf { layers.infoOpen },
                 railExpanded = layers.channelRailPresented,
-                nowPlaying = { NowPlayingStrip("1", "Documentary", ArtworkId(1), programme, 1_800, loader, session) },
+                nowPlaying = { NowPlayingStrip("1", "Documentary", ArtworkId(1), programme, 1_800, session) },
                 railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
                 player = {
-                    live(loader, session, behind = false,
+                    live(session, behind = false,
                         rail = layers.takeIf { rail }, downHint = "Channels".takeUnless { rail })
                 }) {
                 LiveProgrammeInfoOverlay(
@@ -230,7 +233,7 @@ class PlayerMotionCaptureTest {
                             } else listOf(programme, next),
                             nowSec = 1_800, channelIdentity = "1 · Documentary",
                             tile = { event, modifier ->
-                                ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), loader, session, modifier)
+                                ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), session, modifier)
                             },
                             recordingFor = { null }, canModifyRecordings = true,
                             recordFocus = recordFocus, firstFocus = firstFocus, onAction = {},
@@ -290,8 +293,8 @@ class PlayerMotionCaptureTest {
     /** A zap with the controls up: the header crossfades in place (frames 3 and 6). */
     @Test fun zapWithControlsVisibleCrossfadesInPlace() {
         var zapped by mutableStateOf(false)
-        show { loader, session ->
-            live(loader, session, behind = false, zapped = zapped)
+        show { session ->
+            live(session, behind = false, zapped = zapped)
         }
         compose.mainClock.autoAdvance = false
         compose.runOnIdle {
@@ -305,10 +308,10 @@ class PlayerMotionCaptureTest {
     @Test fun zapRevealsHiddenControlsInPlace() {
         lateinit var layers: LivePlayerLayerState
         var zapped by mutableStateOf(false)
-        show { loader, session ->
+        show { session ->
             layers = rememberLivePlayerLayerState()
             live(
-                loader, session, behind = false, zapped = zapped,
+                session, behind = false, zapped = zapped,
                 mode = if (layers.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
                 entry = layers.chrome.controlsEntry,
             )
@@ -362,7 +365,6 @@ class PlayerMotionCaptureTest {
 
     @Composable
     private fun live(
-        loader: ImageLoader,
         session: CurrentSessionObservation,
         behind: Boolean,
         zapped: Boolean = false,
@@ -398,7 +400,6 @@ class PlayerMotionCaptureTest {
                 motionKey = ChannelId(if (zapped) 2 else 1),
             ),
             actions = PlayerChromeActions(active = true, paused = behind),
-            imageLoader = loader,
             currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             entry = entry,
@@ -411,7 +412,7 @@ class PlayerMotionCaptureTest {
                     QuickZapPresentation(
                         expanded = rail.channelRailPresented,
                         preview = {
-                            QuickZapTrayPreview(channels.first(), programme, null, 1_800, loader, session,
+                            QuickZapTrayPreview(channels.first(), programme, null, 1_800, session,
                                 Modifier.padding(horizontal = TvGridHorizontalMargin))
                         },
                         trayBleeds = true,
@@ -422,7 +423,7 @@ class PlayerMotionCaptureTest {
                                 state = browser, channels = channels, recentChannels = channels.drop(1),
                                 playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
                                 nowEvent = { programme }, nowSec = 1_800,
-                                imageLoader = loader, currentSession = session,
+                                currentSession = session,
                                 onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
                                 onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
                             )
@@ -433,7 +434,8 @@ class PlayerMotionCaptureTest {
         )
     }
 
-    private fun show(content: @Composable (ImageLoader, CurrentSessionObservation) -> Unit) {
+    private fun show(content: @Composable (CurrentSessionObservation) -> Unit) {
+        images.install(piconLoader(ApplicationProvider.getApplicationContext<Application>()))
         compose.setContent {
             view = LocalView.current
             val context = LocalContext.current
@@ -448,12 +450,11 @@ class PlayerMotionCaptureTest {
                     dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
                 )).captureCurrentSession()
             }
-            val loader = remember { piconLoader(context) }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().background(Color(0xFF3A4A5A))) {
                     Image(remember { FixtureArt.art("still-ridge-light").asImageBitmap() }, null,
                         Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                    content(loader, session)
+                    content(session)
                 }
             }
         }

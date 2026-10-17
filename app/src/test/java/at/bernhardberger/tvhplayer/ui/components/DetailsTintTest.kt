@@ -45,11 +45,14 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import org.junit.Rule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class DetailsTintTest {
+    @get:Rule val images = ImageLoaderRule { loader }
     @get:Rule val compose = createComposeRule()
     private val session = requireNotNull(FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
@@ -81,7 +84,7 @@ class DetailsTintTest {
     private val neutral = Color(0xFF111416)
     private val redTint = Color(0xFF000000.toInt() or detailsTintRgb(0xFF0000))
 
-    @After fun close() { releaseSample.complete(Unit); loader.shutdown() }
+    @After fun close() { releaseSample.complete(Unit) }
 
     @Test fun artBackgroundAndOpaqueScrimMatchOutsideAndInsideTheHero() {
         releaseSample.complete(Unit)
@@ -133,7 +136,7 @@ class DetailsTintTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             TVHeadendPlayerTheme {
-                val tint = rememberDetailsTint(loader, session, art, picon).value
+                val tint = rememberDetailsTint(session, art, picon).value
                 SideEffect { returned += tint }
             }
         }
@@ -166,14 +169,14 @@ class DetailsTintTest {
 
     private fun sampleArt(id: ArtworkId): Int? {
         releaseSample.complete(Unit)
-        return runBlocking { DetailsArtColors.sample(loader, ApplicationProvider.getApplicationContext(), AppArtworkSource(session, id)) }
+        return runBlocking { DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, id)) }
     }
 
     @Test fun cachedArtAppearsInTheFirstFrameWithoutAnotherSample() {
         releaseSample.complete(Unit)
         val scope = CoroutineScope(Dispatchers.Default + Job())
         try {
-            val sampled = scope.async { DetailsArtColors.sample(loader, ApplicationProvider.getApplicationContext(), AppArtworkSource(session, art)) }
+            val sampled = scope.async { DetailsArtColors.sample(ApplicationProvider.getApplicationContext(), AppArtworkSource(session, art)) }
             compose.waitUntil(10_000) { sampled.isCompleted }
             assertNotNull(runBlocking { sampled.await() })
         } finally { scope.cancel() }
@@ -181,7 +184,7 @@ class DetailsTintTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             TVHeadendPlayerTheme {
-                val tint = rememberDetailsTint(loader, session, art, picon).value
+                val tint = rememberDetailsTint(session, art, picon).value
                 SideEffect { returned += tint }
             }
         }
@@ -201,7 +204,7 @@ class DetailsTintTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        ProgrammeDetailsPage(event, null, channel, 100, emptyList(), loader, session, {}, {})
+                        ProgrammeDetailsPage(event, null, channel, 100, emptyList(), session, {}, {})
                     }
                 }
             }

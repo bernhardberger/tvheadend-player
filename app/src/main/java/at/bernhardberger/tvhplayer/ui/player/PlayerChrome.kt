@@ -49,7 +49,6 @@ import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -73,7 +72,6 @@ internal fun PlayerChrome(
     content: PlayerChromeContent,
     timeline: PlayerChromeTimeline,
     actions: PlayerChromeActions,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     onTogglePause: () -> Unit,
     onSeek: (deltaMs: Long) -> Unit,
@@ -162,10 +160,10 @@ internal fun PlayerChrome(
                              shape = CardDefaults.shape(ArtworkTileShape),
                              border = embeddedProgressCardBorder()) {
                             ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                                imageLoader, currentSession, Modifier)
+                                currentSession, Modifier)
                         }
                     } else ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                        imageLoader, currentSession, faded)
+                        currentSession, faded)
                 }
                 timelineRow()
             }
@@ -198,7 +196,7 @@ internal fun PlayerChrome(
                 onChannelZap = onChannelZap,
                 downHint = downHint,
                 topIdentity = { placed, _, _ ->
-                    PlayerTopIdentity(content, imageLoader, currentSession, placed)
+                    PlayerTopIdentity(content, currentSession, placed)
                 },
             )
         } else {
@@ -207,7 +205,7 @@ internal fun PlayerChrome(
             PlayerOverlayChrome(
                 headerContent = { placed ->
                     header(placed)
-                    PlayerTopIdentity(content, imageLoader, currentSession, placed)
+                    PlayerTopIdentity(content, currentSession, placed)
                 },
                 footerPadding = PaddingValues(start = TvGridHorizontalMargin, end = TvGridHorizontalMargin,
                     top = TvOverlayFooterGradientRunout, bottom = PlayerBannerBottomPadding),
@@ -327,7 +325,6 @@ private fun ProgrammeArtworkTile(
     artwork: ArtworkId?,
     picon: ArtworkId?,
     channelNumber: String,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
     modifier: Modifier,
 ) {
@@ -337,9 +334,9 @@ private fun ProgrammeArtworkTile(
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
         if (id != null && currentSession != null && !failed) {
             Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLow))
-            AsyncImage(AppArtworkSource(currentSession, id), null, imageLoader,
+            AsyncImage(AppArtworkSource(currentSession, id), null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
-        } else ChannelArtworkFallback(picon, channelNumber, imageLoader, currentSession)
+        } else ChannelArtworkFallback(picon, channelNumber, currentSession)
     }
 }
 
@@ -348,13 +345,12 @@ private fun ProgrammeArtworkTile(
 private fun ChannelArtworkFallback(
     picon: ArtworkId?,
     channelNumber: String,
-    imageLoader: ImageLoader,
     currentSession: CurrentSessionObservation?,
 ) {
     Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLowest).testTag("player-info-artwork-fallback"),
         contentAlignment = Alignment.Center) {
         if (picon != null && currentSession != null) {
-            PiconBox(imageLoader, picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), currentSession)
+            PiconBox(picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), currentSession)
         } else Text(channelNumber, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
             color = MaterialTheme.colorScheme.onSurface)
     }

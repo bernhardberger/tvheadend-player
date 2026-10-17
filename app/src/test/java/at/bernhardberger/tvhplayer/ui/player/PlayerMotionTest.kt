@@ -66,7 +66,6 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
-import coil3.ImageLoader
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -123,9 +122,8 @@ class PlayerMotionTest {
             panelTag = "playback-options-overlay",
             actionTag = "player-settings",
             activations = { settingsPresses },
-            controls = { loader, open, restore, restored ->
+            controls = { open, restore, restored ->
                 liveControls(
-                    loader,
                     optionsOpen = open,
                     restoreOptionsFocus = restore,
                     onOptionsFocusRestored = restored,
@@ -142,7 +140,7 @@ class PlayerMotionTest {
             panelTag = "recording-info-panel",
             actionTag = PlayerIdentityCardTag,
             activations = { infoPresses },
-            controls = { _, open, restore, restored ->
+            controls = { open, restore, restored ->
                 RecordingChromeFixture(
                     positionMs = 600_000, panelOpen = open, onInfo = { infoPresses++ },
                     restoreFocus = PlayerIdentityCardTag.takeIf { restore },
@@ -163,10 +161,9 @@ class PlayerMotionTest {
         val pageRequests = mutableListOf<PlaybackOptionsPage>()
         compose.setContent {
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
-                    liveControls(loader, optionsOpen = open, restoreOptionsFocus = restore, onOptionsFocusRestored = { restore = false })
+                    liveControls(optionsOpen = open, restoreOptionsFocus = restore, onOptionsFocusRestored = { restore = false })
                     PlayerPanelVisibility(Unit.takeIf { open }) {
                         optionsRoot(onPageChange = { pageRequests += it })
                     }
@@ -306,12 +303,11 @@ class PlayerMotionTest {
         var channel by mutableStateOf(ChannelId(1))
         compose.setContent {
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
             layers = rememberLivePlayerLayerState()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     liveControls(
-                        loader, optionsOpen = false, channelId = channel,
+                        optionsOpen = false, channelId = channel,
                         mode = if (layers.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
                         entry = layers.chrome.controlsEntry,
                     )
@@ -362,13 +358,12 @@ class PlayerMotionTest {
         compose.setContent {
             view = LocalView.current
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
             layers = rememberLivePlayerLayerState()
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     // One chrome: the Banner and the controls are two of its modes.
                     liveControls(
-                        loader, optionsOpen = false, channelId = ChannelId(1), title = "Programme",
+                        optionsOpen = false, channelId = ChannelId(1), title = "Programme",
                         mode = playerChromeMode(layers.chrome.controlsVisible, layers.chrome.bannerVisible, stepPreview = false),
                         entry = layers.chrome.controlsEntry,
                     )
@@ -402,8 +397,7 @@ class PlayerMotionTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
         compose.setContent {
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, loader, null, Modifier.testTag("number")) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, null, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         val width = compose.onNodeWithTag("number").fetchSemanticsNode().size.width
@@ -441,8 +435,7 @@ class PlayerMotionTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
         compose.setContent {
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme { ChannelNumberOverlay("123", target, loader, null, Modifier.testTag("number")) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay("123", target, null, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         fun bounds() = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
@@ -488,8 +481,7 @@ class PlayerMotionTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Channel("One", null))
         compose.setContent {
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, loader, null, Modifier.testTag("number")) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, null, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         val shown = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
@@ -583,7 +575,7 @@ class PlayerMotionTest {
         panelTag: String,
         actionTag: String,
         activations: () -> Int,
-        controls: @Composable (loader: ImageLoader, open: Boolean, restore: Boolean, restored: () -> Unit) -> Unit,
+        controls: @Composable (open: Boolean, restore: Boolean, restored: () -> Unit) -> Unit,
         panel: @Composable () -> Unit,
     ) {
         var open by mutableStateOf(true)
@@ -591,11 +583,10 @@ class PlayerMotionTest {
         var panelComposed = false
         compose.setContent {
             val context = LocalContext.current
-            val loader = remember { ImageLoader(context) }
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     // The controls host their own layer, covered while the panel is open.
-                    controls(loader, open, restore) { restore = false }
+                    controls(open, restore) { restore = false }
                     PlayerPanelVisibility(Unit.takeIf { open }) {
                         DisposableEffect(Unit) { panelComposed = true; onDispose { panelComposed = false } }
                         panel()
@@ -670,7 +661,6 @@ class PlayerMotionTest {
 
     @Composable
     private fun liveControls(
-        loader: ImageLoader,
         optionsOpen: Boolean,
         panelOpen: Boolean = optionsOpen,
         mode: PlayerChromeMode = PlayerChromeMode.CONTROLS,
@@ -700,7 +690,6 @@ class PlayerMotionTest {
                     else -> null
                 },
             ),
-            imageLoader = loader,
             currentSession = null,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInteraction = {},
             onInfo = onOpenInfo,

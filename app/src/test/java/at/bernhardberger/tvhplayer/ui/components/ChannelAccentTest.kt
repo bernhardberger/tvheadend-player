@@ -38,11 +38,13 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChannelAccentTest {
+    @get:Rule val images = ImageLoaderRule { loader }
     @get:Rule val compose = createComposeRule()
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val session = FakeSessionObservation(SessionObservation.create(
@@ -69,7 +71,7 @@ class ChannelAccentTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
-                val colour = rememberChannelAccent(loader, session, ArtworkId(1), ChannelId(1))
+                val colour = rememberChannelAccent(session, ArtworkId(1), ChannelId(1))
                 SideEffect { returned += colour }
             }
         }

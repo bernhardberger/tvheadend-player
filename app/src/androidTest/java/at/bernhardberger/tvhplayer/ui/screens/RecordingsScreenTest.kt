@@ -65,7 +65,6 @@ import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.testing.testSessionObservation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
-import coil3.ImageLoader
 import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -108,7 +107,6 @@ class RecordingsScreenTest {
         ) -> DvrMutationResult<Unit> = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
     ) {
         val context = LocalContext.current
-        val imageLoader = remember(context) { ImageLoader.Builder(context).build() }
         val generatedObservation = remember(entries, recordingProgressCapability) {
             testSessionObservation(
                 entries = entries,
@@ -132,7 +130,6 @@ class RecordingsScreenTest {
             contentPadding = contentPadding,
             initialFocusEnabled = initialFocusEnabled,
             backEnabled = backEnabled,
-            imageLoader = imageLoader,
             connectionUiState = connectionUiState,
             onRetry = onRetry,
             onPlayRecording = onPlayRecording,

@@ -21,7 +21,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
-import coil3.ImageLoader
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -30,7 +29,6 @@ import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 @Composable
 fun PiconBox(
-    imageLoader: ImageLoader,
     piconPath: ArtworkId?,
     modifier: Modifier = Modifier,
     currentSession: CurrentSessionObservation? = null,
@@ -63,7 +61,6 @@ fun PiconBox(
             val waitingForSession = currentSession == null
             AsyncImage(
                 model = piconUrl,
-                imageLoader = imageLoader,
                 contentDescription = null,
                 contentScale = contentScale,
                 alignment = alignment,

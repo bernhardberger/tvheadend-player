@@ -16,7 +16,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import coil3.ImageLoader
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Rule
@@ -25,7 +24,6 @@ import org.junit.Test
 class ChannelNumberOverlayTest {
     @get:Rule
     val composeRule = createComposeRule()
-    private val loader = ImageLoader(InstrumentationRegistry.getInstrumentation().targetContext)
 
     @Test
     fun clearingAcceptedDigitsKeepsOutgoingContentSizeUntilFadeCompletes() {
@@ -34,7 +32,7 @@ class ChannelNumberOverlayTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
-                    ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, loader, null,
+                    ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, null,
                         Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
                 }
             }
@@ -58,7 +56,7 @@ class ChannelNumberOverlayTest {
     fun newDigitsDuringExitReplaceOldEntry() {
         val number = mutableStateOf("123")
         composeRule.setContent {
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, loader, null) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, null) }
         }
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { number.value = "" }

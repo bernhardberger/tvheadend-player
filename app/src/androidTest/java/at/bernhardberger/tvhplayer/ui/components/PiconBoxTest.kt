@@ -38,8 +38,10 @@ import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 
 class PiconBoxTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
 
     @Test fun loadingAndFailureKeepTheirTintSizingAndDistinctOpacity() {
@@ -55,11 +57,12 @@ class PiconBoxTest {
                     ErrorResult(null, chain.request, IllegalStateException("Offline test failure"))
                 })
             }.build()
+        images.install(loader)
         try {
             compose.setContent {
                 TVHeadendPlayerTheme {
                     Column {
-                        PiconBox(loader, ArtworkId(1), bounds("subject"), current,
+                        PiconBox(ArtworkId(1), bounds("subject"), current,
                             contentScale = ContentScale.Crop)
                         // The former subcomposition propagated its fixed minimum constraints
                         // to the icon. Preserve that full, centred square for load/error states.
@@ -77,18 +80,16 @@ class PiconBoxTest {
             assertScaledPixels(reference, pixels("subject"), 1f)
         } finally {
             fail.complete(Unit)
-            loader.shutdown()
         }
     }
 
     @Test fun beforeASessionALogoLooksLikeItsLoadingStateAndNoLogoKeepsTheFullIcon() {
-        val loader = ImageLoader.Builder(InstrumentationRegistry.getInstrumentation().targetContext).build()
         try {
             compose.setContent {
                 TVHeadendPlayerTheme {
                     Column {
-                        PiconBox(loader, ArtworkId(1), bounds("pending"), currentSession = null)
-                        PiconBox(loader, null, bounds("missing"), currentSession = null)
+                        PiconBox(ArtworkId(1), bounds("pending"), currentSession = null)
+                        PiconBox(null, bounds("missing"), currentSession = null)
                         Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
                     }
                 }
@@ -98,7 +99,6 @@ class PiconBoxTest {
             assertScaledPixels(reference, pixels("pending"), 0.35f)
             assertScaledPixels(reference, pixels("missing"), 1f)
         } finally {
-            loader.shutdown()
         }
     }
 
@@ -138,10 +138,11 @@ class PiconBoxTest {
                     }
                 })
             }.build()
+        images.install(loader)
         try {
             compose.setContent {
                 TVHeadendPlayerTheme {
-                    PiconBox(loader, ArtworkId(1), bounds("subject"), current.value)
+                    PiconBox(ArtworkId(1), bounds("subject"), current.value)
                 }
             }
             compose.waitUntil(5_000) { started.isCompleted }
@@ -163,7 +164,6 @@ class PiconBoxTest {
             assertEquals(0f, outsidePlaceholder.red + outsidePlaceholder.green + outsidePlaceholder.blue, 0.01f)
         } finally {
             releaseOld.complete(Unit)
-            loader.shutdown()
         }
     }
 

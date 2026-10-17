@@ -21,7 +21,6 @@ import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveDepthContent
 import at.bernhardberger.tvhplayer.ui.screens.recordings.reconcileArchiveStack
-import coil3.ImageLoader
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
@@ -48,7 +47,6 @@ class ArchiveDepthOwnershipTest {
             DepthFrame("archive:Series/Removed", "recording:1"),
         )))
         val opened = mutableListOf<DvrEntryId>()
-        val loader = ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).build()
         compose.mainClock.autoAdvance = false
         try {
             compose.setContent {
@@ -61,14 +59,14 @@ class ArchiveDepthOwnershipTest {
                             initialFocusEnabled = selected.intValue == 0 && focusAllowed.value,
                             backEnabled = selected.intValue == 0,
                             contentFocus = remember { FocusRequester() }, onModeFocus = {}, onDrawerFocus = null,
-                            onOpenRecording = { opened += it.id }, imageLoader = loader,
+                            onOpenRecording = { opened += it.id },
                             currentSession = null, piconForEntry = { null },
                         )
                         if (selected.intValue == 2) ArchiveDepthContent(
                             root = newRoot, navigation = navigation, contentPadding = PaddingValues(24.dp),
                             isCurrent = true, initialFocusEnabled = focusAllowed.value, backEnabled = true,
                             contentFocus = remember { FocusRequester() }, onModeFocus = {}, onDrawerFocus = null,
-                            onOpenRecording = { opened += it.id }, imageLoader = loader,
+                            onOpenRecording = { opened += it.id },
                             currentSession = null, piconForEntry = { null },
                         )
                     }
@@ -109,7 +107,6 @@ class ArchiveDepthOwnershipTest {
             compose.onNodeWithTag("recording-list-entry-3").assertIsFocused()
         } finally {
             compose.mainClock.autoAdvance = true
-            loader.shutdown()
         }
     }
 
