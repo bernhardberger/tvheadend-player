@@ -399,12 +399,13 @@ class LivePlayerChromeScreenTest {
         assertEquals("ordinary adoption keeps its previous contract", epoch, runtime.videoPresentation.value.epoch)
     }
 
-    @Test fun ordinaryUnresolvedChannelKeepsWaitingInsteadOfReportingStartupFailure() {
+    @Test fun ordinaryChannelMissingFromTheCurrentSessionShowsUnavailableWithoutTuning() {
         screen(missingRequestedChannel = true, settleOnEntry = false)
         settle()
         assertNotNull(session.observation.value.currentSession)
         assertEquals(null, runtime.activeTarget.value)
-        assertFalse(exists("player-channel-unavailable"))
+        // Gone after sync, or never there: the existing unavailable state, not an endless wait.
+        assertTrue(exists("player-channel-unavailable"))
         assertTrue(runtime.state.value is AppPlaybackState.Idle)
     }
 

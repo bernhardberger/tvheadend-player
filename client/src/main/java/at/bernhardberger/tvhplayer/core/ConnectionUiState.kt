@@ -34,6 +34,14 @@ fun ConnectionUiState.isDegraded(lossAnnounced: Boolean): Boolean = when (this) 
     else -> lossAnnounced
 }
 
+/**
+ * Once degraded, a connection stays degraded through the automatic attempts that follow, until one
+ * succeeds, so its warning does not blink with each attempt. Missing settings are not degraded.
+ */
+fun ConnectionUiState.isDegraded(lossAnnounced: Boolean, degradedBefore: Boolean): Boolean =
+    isDegraded(lossAnnounced) || degradedBefore &&
+        this != ConnectionUiState.Ready && this != ConnectionUiState.NeedsConfiguration
+
 fun ConnectionUiState.primaryRecoveryAction(): ConnectionRecoveryAction = when (this) {
     is ConnectionUiState.Error -> when {
         recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY ->

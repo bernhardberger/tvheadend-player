@@ -102,6 +102,109 @@ fun mainStartupPresentation(
     }
 }
 
+/**
+ * A cold start without autoplay waits on the startup screen only while no channel can be shown:
+ * saved or current channels, or an authoritative empty catalog (the no-channels screen), end it.
+ * [failure] is the [waitingConnectionFailure] it keeps showing while automatic attempts run.
+ */
+fun coldStartPresentation(
+    connectionState: ConnectionUiState,
+    currentChannelReadiness: CurrentChannelReadiness,
+    failure: ConnectionUiState?,
+): MainStartupPresentation {
+    if (currentChannelReadiness.channelsAvailable() ||
+        currentChannelReadiness is CurrentChannelReadiness.Ready
+    ) return MainStartupPresentation.Inactive
+    failure?.let { return waitingConnectionFailurePresentation(it) }
+    return when (connectionState) {
+        ConnectionUiState.Connecting -> MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
+        ConnectionUiState.SyncingChannels -> MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA)
+        ConnectionUiState.Reconnecting -> MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
+        ConnectionUiState.Ready ->
+            MainStartupPresentation.Passive(MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA)
+        // Failures show only as [failure]: none here is the viewer's retry leaving the old one.
+        ConnectionUiState.NeedsConfiguration,
+        ConnectionUiState.CredentialUnavailable,
+        is ConnectionUiState.Error -> MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
+    }
+}
+
+/** Channels a browse screen can draw now: saved ones before the session is ready, or current ones. */
+fun CurrentChannelReadiness.channelsAvailable(): Boolean = when (this) {
+    CurrentChannelReadiness.Waiting -> false
+    is CurrentChannelReadiness.Browsable -> channels.isNotEmpty()
+    is CurrentChannelReadiness.Ready -> channels.isNotEmpty()
+}
+
+/**
+ * The failure a surface waiting for its first connection shows: the current one, else the one
+ * before while the automatic attempts after it run, so its actions stay put. Synchronizing or
+ * Ready ends it.
+ */
+fun waitingConnectionFailure(
+    connectionState: ConnectionUiState,
+    previous: ConnectionUiState?,
+): ConnectionUiState? = when (connectionState) {
+    ConnectionUiState.NeedsConfiguration,
+    ConnectionUiState.CredentialUnavailable,
+    is ConnectionUiState.Error -> connectionState
+    ConnectionUiState.Connecting,
+    ConnectionUiState.Reconnecting -> previous
+    ConnectionUiState.SyncingChannels,
+    ConnectionUiState.Ready -> null
+}
+
+/**
+ * [waitingConnectionFailure] across observations. The viewer's retry hides the failure it retries
+ * until the connection leaves it, so the next attempt shows as connecting, not as the old failure.
+ */
+data class WaitingConnectionFailure(
+    val latched: ConnectionUiState? = null,
+    val retrying: Boolean = false,
+) {
+    fun shown(connectionState: ConnectionUiState): ConnectionUiState? =
+        if (retrying) null else waitingConnectionFailure(connectionState, latched)
+
+    fun observe(connectionState: ConnectionUiState): WaitingConnectionFailure = when {
+        retrying && waitingConnectionFailure(connectionState, null) != null -> this
+        else -> WaitingConnectionFailure(latched = waitingConnectionFailure(connectionState, latched.takeUnless { retrying }))
+    }
+
+    fun retry(): WaitingConnectionFailure = WaitingConnectionFailure(retrying = true)
+}
+
+/**
+ * Startup's recovery for a [waitingConnectionFailure]. Unlike a pending autoplay, an automatic
+ * backoff is actionable too: the viewer is waiting on this screen, so Retry starts the next
+ * attempt now.
+ */
+fun waitingConnectionFailurePresentation(failure: ConnectionUiState): MainStartupPresentation.Actionable =
+    when (failure) {
+        ConnectionUiState.CredentialUnavailable -> actionableFailure(
+            normalMessageKind = MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
+            normalActions = connectionSettingsAction,
+        )
+        is ConnectionUiState.Error -> actionableFailure(
+            normalMessageKind = mainStartupFailureMessage(failure.kind),
+            normalActions = if (failure.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS) {
+                connectionSettingsAction
+            } else {
+                retryAndConnectionSettingsActions
+            },
+        )
+        else -> actionableFailure(
+            normalMessageKind = MainStartupMessageKind.CONFIGURATION_REQUIRED,
+            normalActions = connectionSettingsAction,
+        )
+    }
+
+/** Shown cold-start screens stay at least this long, so they can be read; one never shown waits for nothing. */
+internal const val ColdStartMinimumVisibleMillis = 500L
+
+/** How much longer a cold-start screen first shown at [shownAtMillis] stays before it may leave. */
+fun coldStartRemainingVisibleMillis(shownAtMillis: Long?, nowMillis: Long): Long =
+    shownAtMillis?.let { (it + ColdStartMinimumVisibleMillis - nowMillis).coerceAtLeast(0L) } ?: 0L
+
 private fun mainStartupFailureMessage(kind: ConnectionFailureKind): MainStartupMessageKind = when (kind) {
     ConnectionFailureKind.AUTHENTICATION -> MainStartupMessageKind.AUTHENTICATION_FAILURE
     ConnectionFailureKind.PERMISSION_DENIED -> MainStartupMessageKind.PERMISSION_DENIED

@@ -18,7 +18,6 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
 import at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
@@ -58,7 +57,7 @@ internal fun ChannelsRouteContent(
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
-    onPlay: (LivePlaybackSelection, String) -> Unit,
+    onPlay: (ChannelId, String) -> Unit,
     onPlayRecording: (RecordingPlaybackSelection) -> Unit,
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) {
@@ -94,7 +93,7 @@ internal fun GuideRouteContent(
     onRetry: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlayRecording: (RecordingPlaybackSelection) -> Unit,
-    onPlay: (LivePlaybackSelection, String) -> Unit,
+    onPlay: (ChannelId, String) -> Unit,
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("guide")) {
@@ -123,7 +122,7 @@ internal fun RecordingsRouteContent(
     connectionUiState: ConnectionUiState,
     onRetry: () -> Unit,
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit,
-    onWatchChannel: (LivePlaybackSelection, String) -> Unit,
+    onWatchChannel: (ChannelId, String) -> Unit,
     state: RecordingsScreenState,
 ) {
     if (contentAllowed) {
@@ -178,6 +177,8 @@ internal fun LivePlayerRouteContent(
     channelName: String,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    onOpenConnectionSettings: () -> Unit = {},
+    connectionUiState: ConnectionUiState? = null,
     startupTarget: ApplianceLaunchTarget? = null,
     onStartupOutcome: (ApplianceLaunchTarget, MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
 ) {
@@ -191,6 +192,8 @@ internal fun LivePlayerRouteContent(
             channelName = channelName,
             onReconnect = onReconnect,
             onClose = onClose,
+            onOpenConnectionSettings = onOpenConnectionSettings,
+            connectionUiState = connectionUiState,
             contentAllowed = contentAllowed,
             startupTarget = startupTarget,
             onStartupOutcome = onStartupOutcome,

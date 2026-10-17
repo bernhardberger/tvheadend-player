@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.scan
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -62,6 +63,12 @@ class AppConnectionViewModel(
                 authority = observation.channelCatalogAuthority,
                 channels = observation.channelCatalogForDisplay?.channels.orEmpty(),
             ),
+        )
+    }.scan(AppConnectionPresentation()) { previous, next ->
+        // A failure keeps its warning through the automatic attempts after it, until one succeeds.
+        next.copy(
+            degraded = next.degraded ||
+                next.connection.isDegraded(lossAnnounced = false, degradedBefore = previous.degraded),
         )
     }.stateIn(viewModelScope, SharingStarted.Eagerly, AppConnectionPresentation())
 

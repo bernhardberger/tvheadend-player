@@ -36,6 +36,7 @@ import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.runCurrent
@@ -71,6 +72,39 @@ class ChannelObservationProjectionTest {
     fun tearDown() {
         models.clear()
         Dispatchers.resetMain()
+    }
+
+    @Test fun railWarningStaysThroughAutomaticRetryAttemptsUntilConnected() = runTest {
+        val dispatcher = StandardTestDispatcher(testScheduler)
+        Dispatchers.setMain(dispatcher)
+        val connecting = SessionObservation.create(sessionState = SessionState.Connecting)
+        val session = FakeTvheadendSession(connecting)
+        val owner = AppProfileOwner(session,
+            at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(
+                at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.anonymous("offline.invalid", 9982)),
+            PlayerSettingsStore(InMemoryPreferencesDataStore()), dispatcher,
+            readProfileForEditing = { at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult.Missing })
+        backgroundScope.launch { owner.run() }
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ testScheduler.currentTime }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(owner.configurationGeneration.value,
+                session.observation.value.currentSession?.generationIdentity)
+        }
+        val model = AppConnectionViewModel(session, owner,
+            at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource(session.observation, owner.configurationGeneration, notices))
+        models.put("connection", model)
+        runCurrent()
+        assertEquals(false, model.uiState.value.degraded)
+        val failed = SessionObservation.create(sessionState = SessionState.Unavailable(
+            at.bernhardberger.tvheadend.sdk.core.SessionFailure.TRANSPORT_UNAVAILABLE))
+        val shown = listOf(failed, connecting, failed, connecting).map { state ->
+            session.publish(state)
+            runCurrent()
+            model.uiState.value.degraded
+        }
+        assertEquals("the warning does not blink with each attempt", listOf(true, true, true, true), shown)
+        session.publish(observation(ChannelRepositoryState.Current(catalog)))
+        runCurrent()
+        assertEquals(false, model.uiState.value.degraded)
     }
 
     @Test fun immediateRetryUsesSdkOnceAndPreservesFailurePolicyGuards() = runTest {

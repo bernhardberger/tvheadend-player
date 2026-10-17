@@ -384,6 +384,8 @@ fun VideoPlayerScreen(
     onStartupOutcome: (at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget, at.bernhardberger.tvhplayer.core.MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
     notices: NoticeCenter = koinInject(),
     uiSettingsStore: at.bernhardberger.tvhplayer.settings.UiSettingsStore = koinInject(),
+    onOpenConnectionSettings: () -> Unit = {},
+    connectionUiState: at.bernhardberger.tvhplayer.core.ConnectionUiState? = null,
 ) {
     val scope = rememberCoroutineScope()
     val layerState = rememberLivePlayerLayerState()
@@ -422,6 +424,8 @@ fun VideoPlayerScreen(
         ?.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.all_channels)
     val observation by videoPlayerViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
+    // Opened before its session was playable: the entry start below tunes once one is current.
+    val serverWait = rememberLivePlayerServerWait(observation, connectionUiState, playerClose, onReconnect, onOpenConnectionSettings)
     val channelBrowser = remember(currentSession) { PlayerChannelBrowserState() }
     val dvrEntries = observation.dvrEntries()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
@@ -755,8 +759,12 @@ fun VideoPlayerScreen(
         liveRequestToken,
         directLiveToken,
         startupTarget,
+        // A session arriving without the channel decides an entry that waited for it.
+        currentSession,
     ) {
         if (screenEntry == null) return@LaunchedEffect
+        // Leaving withdraws an entry still waiting: a session arriving during the exit starts nothing.
+        if (playerClose.requested) return@LaunchedEffect
         // ON_STOP cancelled the outstanding start; the next ON_START restarts it here.
         if (!screenActive) return@LaunchedEffect
         if (startupTarget != null && admittedStartupTarget != startupTarget) {
@@ -804,7 +812,8 @@ fun VideoPlayerScreen(
         }
         if (initialPlaybackResolved && requestedLiveSelection == null) return@LaunchedEffect
         val playbackSelection = authorizedLiveSelection ?: run {
-            if (startupTarget != null && currentSession != null) requestedChannelFailed = true
+            // A current session without the channel: it is gone after sync, or never existed.
+            if (currentSession != null) requestedChannelFailed = true
             return@LaunchedEffect
         }
         // This start supersedes a key's running one and is superseded by the next key's.
@@ -1161,7 +1170,7 @@ fun VideoPlayerScreen(
         playbackFailed = currentPlaybackFailed,
     )
     val recoveryVisible = screenActive &&
-        statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+        (serverWait.presentation != null || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY)
     val recoveryUiModel = playbackRecoveryUiModel(
         surface = PlaybackRecoverySurface.LIVE,
         connectionState = connState,
@@ -1355,7 +1364,9 @@ fun VideoPlayerScreen(
     }
 
     LaunchedEffect(connState, screenActive) {
-        if (!screenActive || screenEntry == null) return@LaunchedEffect
+        // Waiting for the first session with nothing playing is no loss; an active target still is.
+        if (!screenActive || serverWait.presentation != null && playbackRuntime.activeTarget.value == null ||
+            screenEntry == null) return@LaunchedEffect
 
         when (connState) {
             is ConnectionState.Connected -> {
@@ -1469,6 +1480,7 @@ fun VideoPlayerScreen(
         modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
+                if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (layerState.infoOpen) {
                     if (event.key == Key.Back) {
@@ -2027,8 +2039,9 @@ fun VideoPlayerScreen(
                 }
             }
         }
+        LivePlayerServerWait(serverWait, currentChannel, currentChannelName, imageLoader, rootFocus)
         TvRecoveryOverlay(
-            visible = foregroundLayer == PlayerForegroundLayer.RECOVERY,
+            visible = foregroundLayer == PlayerForegroundLayer.RECOVERY && serverWait.presentation == null,
             message = stringResource(
                 when {
                     currentSubscriptionFailure != null ->

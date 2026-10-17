@@ -178,7 +178,7 @@ fun RecordingsScreen(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
-    onWatchChannel: ((at.bernhardberger.tvhplayer.playback.LivePlaybackSelection, String) -> Unit)? = null,
+    onWatchChannel: ((ChannelId, String) -> Unit)? = null,
     state: RecordingsScreenState? = null,
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
@@ -211,7 +211,7 @@ internal fun RecordingsScreenContent(
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
     onRetry: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
-    onWatchChannel: ((at.bernhardberger.tvhplayer.playback.LivePlaybackSelection, String) -> Unit)? = null,
+    onWatchChannel: ((ChannelId, String) -> Unit)? = null,
     state: RecordingsScreenState? = null,
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
@@ -886,7 +886,7 @@ internal fun RecordingsScreenContent(
                 canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-                canWatchChannel = selectedCapability != null && opened.channelId?.let(channelsById::get) != null && onWatchChannel != null),
+                canWatchChannel = opened.channelId?.let(channelsById::get) != null && onWatchChannel != null),
             initialAction = when (detailsInitialAction) {
                 RecordingDetailsAction.CANCEL,
                 RecordingDetailsAction.STOP -> when (opened.state) {
@@ -907,18 +907,24 @@ internal fun RecordingsScreenContent(
                 val capability = selectedCapability?.takeIf { current.currentSession === it }
                 when (action) {
                 BrowseContextAction.WATCH, BrowseContextAction.RESUME, BrowseContextAction.PLAY,
-                BrowseContextAction.START_OVER -> capability?.let {
-                    detailsEntry = null
-                    detailsObservation = null
-                    detailsInitialAction = null
-                    requestContentFocus = true
-                    if (action == BrowseContextAction.WATCH && opened.state == DvrEntryState.SCHEDULED) {
+                BrowseContextAction.START_OVER -> {
+                    // A scheduled entry's channel is live playback: the player waits for the session.
+                    val watchChannel = action == BrowseContextAction.WATCH && opened.state == DvrEntryState.SCHEDULED
+                    if (watchChannel || capability != null) {
+                        detailsEntry = null
+                        detailsObservation = null
+                        detailsInitialAction = null
+                        requestContentFocus = true
+                    }
+                    if (watchChannel) {
                         opened.channelId?.let(current::channel)?.let { ch ->
-                            onWatchChannel?.invoke(at.bernhardberger.tvhplayer.playback.LivePlaybackSelection(it, ch.id), ch.name.orEmpty())
+                            onWatchChannel?.invoke(ch.id, ch.name.orEmpty())
                         }
-                    } else onPlayRecording(RecordingPlaybackSelection(it, opened.id),
-                        if (action == BrowseContextAction.RESUME || action == BrowseContextAction.WATCH)
-                            RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
+                    } else capability?.let {
+                        onPlayRecording(RecordingPlaybackSelection(it, opened.id),
+                            if (action == BrowseContextAction.RESUME || action == BrowseContextAction.WATCH)
+                                RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
+                    }
                 }
                 BrowseContextAction.STOP -> {
                 detailsInitialAction = RecordingDetailsAction.STOP

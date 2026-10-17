@@ -945,6 +945,69 @@ class BrowseContextMenuScreenTest {
         assertEquals(0, plays)
     }
 
+    @Test fun offlineChannelsMenuWatchPlaysTheChannel() {
+        show(recordings = false, offline = true)
+        compose.onNodeWithTag("channel-row-1", useUnmergedTree = true).requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.waitForIdle()
+        compose.onNodeWithText("Watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+    }
+
+    @Test fun offlineChannelsMenuDetailsWatchPlaysTheChannel() {
+        show(recordings = false, offline = true)
+        compose.onNodeWithTag("channel-row-1", useUnmergedTree = true).requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+    }
+
+    @Test fun offlineDetailsOfferRecordingPlaybackOnlyOnceTheSessionIsReady() {
+        val session = show(recordings = false, channelRecording = true, offline = true)
+        compose.onNodeWithTag("channel-row-1", useUnmergedTree = true).requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        // As in channelsDetailsCanPlayItsCompletedRecording: the programme has ended, so its recording plays.
+        fun publish(ready: Boolean) = compose.runOnIdle {
+            val previous = session.observation.value
+            val event = requireNotNull(previous.event(EventId(1)))
+            val epg = EpgSnapshot.create(listOf(EpgEvent.create(event.id, event.channelId,
+                event.start, Instant.parse("2026-09-15T19:00:00Z") - 60.seconds, title = event.title)))
+            val catalog = requireNotNull(previous.channelCatalogForDisplay)
+            val dvr = requireNotNull(previous.dvrSnapshotForDisplay)
+            session.publish(SessionObservation.create(
+                sessionState = if (ready) SessionState.Ready(ServerCapabilities.create(
+                    streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)) else SessionState.Connecting,
+                channelState = if (ready) ChannelRepositoryState.Current(catalog) else ChannelRepositoryState.Stale(catalog),
+                epgState = if (ready) EpgRepositoryState.Current(epg) else EpgRepositoryState.Stale(epg),
+                dvrState = if (ready) DvrRepositoryState.Current(dvr) else DvrRepositoryState.Stale(dvr),
+                dvrConfigurationsState = previous.dvrConfigurationsState,
+            ))
+        }
+        publish(ready = false)
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-watch").assertExists()
+        compose.onNodeWithTag("details-play").assertDoesNotExist()
+        publish(ready = true)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("details-play").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("details-play").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+    }
+
+    @Test fun offlineGuideDetailsWatchPlaysTheChannel() {
+        show(recordings = false, guideMenu = true, guideDetails = true, offline = true)
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+    }
+
+    @Test fun offlineScheduledDetailsWatchChannelUsesLivePlayback() {
+        show(recordings = true, recordingState = DvrEntryState.SCHEDULED, offline = true)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(ChannelId(1), watchedChannel)
+        assertEquals(0, plays)
+    }
+
     @Test fun deniedDvrPermissionKeepsRecordingPlaybackButRemovesDelete() {
         show(recordings = true, dvrWrite = CapabilityAccess.DENIED)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
@@ -1085,7 +1148,8 @@ class BrowseContextMenuScreenTest {
         futureProgramme: Boolean = false, picon: Boolean = true,
         summary: String? = "A winter expedition beyond the Arctic Circle follows the changing light across the ridge.",
         description: String? = null, episodeSubtitle: String? = null, unknownDuration: Boolean = false,
-        fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false): FakeTvheadendSession {
+        fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
+        offline: Boolean = false, guideDetails: Boolean = false): FakeTvheadendSession {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
         check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
@@ -1116,13 +1180,17 @@ class BrowseContextMenuScreenTest {
         val otherEntry = DvrEntry.create(DvrEntryId(2), channelId = channel.id, title = "Ridge Light: Episode 2",
             folder = emptyList(), channelName = channel.name, state = DvrEntryState.COMPLETED,
             start = now - 3500.seconds, stop = now - 100.seconds, image = ArtworkId(2))
+        val catalog = ChannelCatalog.create(listOf(otherChannel, channel),
+            if (scopeTabs) listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = listOf(channel.id))) else emptyList())
+        val epg = EpgSnapshot.create(if (noProgramme) emptyList() else listOf(event, next) + airings)
+        val dvr = DvrSnapshot.create(if (recordings) listOf(otherEntry, entry) else if (channelRecording) listOf(entry) else emptyList())
+        // Offline: saved metadata before the session is ready, as at a warm start without the server.
         val session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(otherChannel, channel),
-                if (scopeTabs) listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = listOf(channel.id))) else emptyList())),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(if (noProgramme) emptyList() else listOf(event, next) + airings)),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (recordings) listOf(otherEntry, entry)
-                else if (channelRecording) listOf(entry) else emptyList())),
+            sessionState = if (offline) SessionState.Connecting
+                else SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite)),
+            channelState = if (offline) ChannelRepositoryState.Stale(catalog) else ChannelRepositoryState.Current(catalog),
+            epgState = if (offline) EpgRepositoryState.Stale(epg) else EpgRepositoryState.Current(epg),
+            dvrState = if (offline) DvrRepositoryState.Stale(dvr) else DvrRepositoryState.Current(dvr),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(if (profiles) listOf(
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", "")) else emptyList()),
         ))
@@ -1155,7 +1223,7 @@ class BrowseContextMenuScreenTest {
                         if (guideMenu) ProgrammeDetailsHost(
                             openingEvent = event, openingObservation = observation, observation = observation,
                             currentObservation = { session.observation.value }, nowSecProvider = { now.epochSeconds },
-                            fromGuide = true, showContextMenu = true, onShowDetails = {}, imageLoader = loader,
+                            fromGuide = true, showContextMenu = !guideDetails, onShowDetails = {}, imageLoader = loader,
                             mutations = DvrMutationActions(session.dvrRepository), notices = notices,
                             mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                             mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
@@ -1166,7 +1234,7 @@ class BrowseContextMenuScreenTest {
                              dvrMutationActions = DvrMutationActions(session.dvrRepository), notices = notices,
                              nowSecProvider = { now.epochSeconds },
                             onPlayRecording = { _, intent -> plays++; start = intent },
-                            onWatchChannel = { selection, _ -> watchedChannel = selection.channelId },
+                            onWatchChannel = { channelId, _ -> watchedChannel = channelId },
                          ) else ChannelsScreenContent(
                              initialFocusEnabled = !drawerActive,
                             channelScopeState = resolveChannelScopeState(observation.channelState, null),
@@ -1188,7 +1256,7 @@ class BrowseContextMenuScreenTest {
         }
         compose.waitForIdle()
         compose.waitUntil(10_000) {
-            compose.onAllNodesWithTag(if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithTag(if (guideDetails) "details-watch" else if (guideMenu) "browse-context-menu" else if (recordings) "recording-list-entry-1" else "channel-row-1").fetchSemanticsNodes().isNotEmpty()
         }
         return session
     }

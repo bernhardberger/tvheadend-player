@@ -426,7 +426,7 @@ private fun mainStartupFocusRequester(
 }
 
 @StringRes
-private fun mainStartupMessageResource(messageKind: MainStartupMessageKind): Int = when (messageKind) {
+internal fun mainStartupMessageResource(messageKind: MainStartupMessageKind): Int = when (messageKind) {
     MainStartupMessageKind.PREPARING -> R.string.main_startup_message_preparing
     MainStartupMessageKind.CONNECTING -> R.string.main_startup_message_connecting
     MainStartupMessageKind.SYNCING_METADATA -> R.string.main_startup_message_syncing_metadata
@@ -449,7 +449,7 @@ private fun mainStartupMessageResource(messageKind: MainStartupMessageKind): Int
 }
 
 @StringRes
-private fun mainStartupProblemTitleResource(messageKind: MainStartupMessageKind): Int = when (messageKind) {
+internal fun mainStartupProblemTitleResource(messageKind: MainStartupMessageKind): Int = when (messageKind) {
     MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS -> R.string.main_startup_title_no_channels
     MainStartupMessageKind.RETRYABLE_FAILURE -> R.string.main_startup_title_retryable_failure
     MainStartupMessageKind.AUTHENTICATION_FAILURE -> R.string.main_startup_title_authentication_failure
@@ -469,7 +469,7 @@ private fun mainStartupProblemTitleResource(messageKind: MainStartupMessageKind)
 }
 
 @StringRes
-private fun mainStartupActionResource(action: MainStartupActionId): Int = when (action) {
+internal fun mainStartupActionResource(action: MainStartupActionId): Int = when (action) {
     MainStartupActionId.RETRY -> R.string.main_startup_action_retry
     MainStartupActionId.CONNECTION_SETTINGS -> R.string.main_startup_action_connection_settings
 }

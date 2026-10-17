@@ -5,6 +5,7 @@ import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 import androidx.activity.compose.BackHandler
 import android.animation.ValueAnimator
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -65,7 +66,9 @@ import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
-import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
+import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
+import at.bernhardberger.tvhplayer.ui.startup.rememberColdStart
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
@@ -179,7 +182,7 @@ internal fun MainStartupComposition(
     val latestOnRevealed by androidx.compose.runtime.rememberUpdatedState(onRevealed)
     LaunchedEffect(revealRequestId, motionEnabled) {
         if (revealRequestId == null) return@LaunchedEffect
-        if (motionEnabled) revealAlpha.animateTo(0f, tween(durationMillis = 200))
+        if (motionEnabled) revealAlpha.animateTo(0f, tween(StartupRevealMs, easing = EaseInOut))
         latestOnRevealed()
     }
     val brandIntro = LocalStartupBrandIntro.current
@@ -213,8 +216,18 @@ internal fun MainStartupComposition(
         is MainStartupPresentation.Actionable -> MainStartupKeyMode.Actionable
         is MainStartupPresentation.Enter -> error("Enter is rendered as passive startup")
     }
-    val keyContract = remember(keyMode) {
-        MainStartupActivityKeyContract(mode = keyMode)
+    val revealScope = rememberCoroutineScope()
+    val keyContract = remember(keyMode, revealRequestId) {
+        MainStartupActivityKeyContract(
+            mode = keyMode,
+            // A key during the reveal ends it at once; the next key reaches the revealed content.
+            onConsumedKeyDown = revealRequestId?.let {
+                {
+                    revealScope.launch { revealAlpha.snapTo(0f) }
+                    latestOnRevealed()
+                }
+            },
+        )
     }
 
     DisposableEffect(registerActivityKeyContract, keyContract) {
@@ -259,6 +272,9 @@ internal fun MainStartupComposition(
         onBack = { brandIntro?.finish(); onBack() },
     )
 }
+
+/** Autoplay handoff: the startup screen dissolves slowly into the first video frames. */
+internal const val StartupRevealMs = 800
 
 /** True while live playback continues behind the browse screens under [WarmPlaybackScrim]. */
 internal val LocalWarmPlayback = compositionLocalOf { false }
@@ -472,6 +488,7 @@ fun AppRoot(
     val connectionState by appVm.connectionState.collectAsStateWithLifecycle()
     val lastPlayedChannelStore: LastPlayedChannelStore = koinInject()
     val playbackRuntime: AppPlaybackRuntime = koinInject()
+    val tvheadendSession: TvheadendSession = koinInject()
     val playbackSelectionScope = rememberCoroutineScope()
     val playbackOrchestrator = remember { AppRootPlaybackOrchestrator() }
     val playerSettingsStore: PlayerSettingsStore = koinInject()
@@ -531,7 +548,15 @@ fun AppRoot(
                 channelName = visibleLivePlayerName,
             )
     } == true
-    val effectiveStartupPresentation = startupPresentation
+    val coldStart = rememberColdStart(
+        launchIdle = applianceLaunchState == ApplianceLaunchState.Idle,
+        connectionState = connectionUiState,
+        currentChannelReadiness = currentChannelReadiness,
+        loadingTiming = startupLoadingTiming,
+    )
+    val coldStartVisible = applianceLaunchState == ApplianceLaunchState.Idle &&
+        coldStart.presentation != MainStartupPresentation.Inactive
+    val effectiveStartupPresentation = if (coldStartVisible) coldStart.presentation else startupPresentation
     val applianceLaunchActive =
         effectiveStartupPresentation != MainStartupPresentation.Inactive || revealingTarget != null
     val navigationAllowed = when (val launchState = applianceLaunchState) {
@@ -696,17 +721,23 @@ fun AppRoot(
     BackHandler(enabled = navigationAllowed && !applianceLaunchActive) {
         if (showRail) browseBackHandler.value() else handleRootBack()
     }
-    val requestLivePlayer: (LivePlaybackSelection, String) -> Unit = { selection, name ->
+    // Every live start from browse: before the session is playable the player opens at once and
+    // waits for it, then its entry start tunes this channel.
+    val requestLivePlayer: (ChannelId, String) -> Unit = { channelId, name ->
+        @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+        val selection = currentLivePlaybackSelection(tvheadendSession.observation.value, channelId)
         val viewingIntent = playbackRuntime.notePlaybackIntent()
         playbackSelectionScope.launch {
             val target = playbackOrchestrator.requestLivePlayer(
                 activeChannelId = activeChannelId,
                 activeRecordingId = activeRecordingId,
-                requestedChannelId = selection.channelId,
+                requestedChannelId = channelId,
                 requestedChannelName = name,
                 viewingIntent = viewingIntent,
-                startPlayback = { playbackRuntime.playLive(selection, it) },
+                startPlayback = { intent -> selection?.let { playbackRuntime.playLive(it, intent) } },
             ) ?: return@launch
+            // A newer request replaces a player another request of this burst opened.
+            if (backStack.lastOrNull() is LivePlayerKey) backStack.popNavigation()
             backStack.pushTransient(
                 LivePlayerKey(target.channelId.value, target.channelName),
             )
@@ -862,7 +893,11 @@ fun AppRoot(
                             contentAllowed = contentAllowed,
                             channelId = ChannelId(destination.channelId),
                             channelName = destination.channelName,
-                            onReconnect = appVm::reconnectNow,
+                            onReconnect = { appVm.reconnectNow(allowAutomaticBackoff = true) },
+                            onOpenConnectionSettings = {
+                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
+                            connectionUiState = connectionUiState,
                             startupTarget = (enteringLaunchTarget ?: revealingTarget)
                                 ?.takeIf { it.matchesPlayerKey(destination) },
                             onStartupOutcome = { target, outcome ->
@@ -972,8 +1007,20 @@ fun AppRoot(
             hideBranding = priorLiveChannelId != null,
         ),
         loadingTiming = startupLoadingTiming,
-        onBack = startupBack,
-        onAction = startupAction,
+        onBack = if (coldStartVisible) onRequestExit else startupBack,
+        onAction = if (coldStartVisible) { action ->
+            performMainStartupAction(
+                action = action,
+                onRetry = {
+                    coldStart.retry()
+                    appVm.reconnectNow(allowAutomaticBackoff = true)
+                },
+                onConnectionSettings = {
+                    coldStart.settle()
+                    selectRoot(SettingsKey(SettingsSection.CONNECTION))
+                },
+            )
+        } else startupAction,
         registerActivityKeyContract = registerActivityKeyContract,
         onRevealed = { startupReveal = null },
         showWarmPlaybackScrim = shouldShowWarmPlaybackScrim(

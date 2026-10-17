@@ -130,7 +130,6 @@ import at.bernhardberger.tvhplayer.core.timelineFrontierFocus
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
-import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
@@ -306,7 +305,7 @@ fun EpgGridScreen(
     onClearCategory: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection) -> Unit = {},
     notices: NoticeCenter = koinInject(),
-    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onPlay: (channelId: ChannelId, channelName: String) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
     val layoutDirection = LocalLayoutDirection.current

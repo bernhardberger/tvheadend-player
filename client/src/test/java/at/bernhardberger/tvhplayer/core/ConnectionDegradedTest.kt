@@ -19,4 +19,14 @@ class ConnectionDegradedTest {
                 SessionRecoveryDisposition.AUTOMATIC_BACKOFF).isDegraded(lost))
         }
     }
+
+    @Test fun failureStaysDegradedThroughRetryAttemptsUntilAConnectionSucceeds() {
+        val failed = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        // Before a failure, initial connecting is not degraded; the backoff loop then alternates.
+        val attempts = listOf(ConnectionUiState.Connecting, failed, ConnectionUiState.Connecting, failed,
+            ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels, ConnectionUiState.Ready, ConnectionUiState.Connecting)
+        val shown = attempts.runningFold(false) { before, state -> state.isDegraded(lossAnnounced = false, degradedBefore = before) }.drop(1)
+        assertEquals(listOf(false, true, true, true, true, true, false, false), shown)
+        assertFalse(ConnectionUiState.NeedsConfiguration.isDegraded(lossAnnounced = false, degradedBefore = true))
+    }
 }

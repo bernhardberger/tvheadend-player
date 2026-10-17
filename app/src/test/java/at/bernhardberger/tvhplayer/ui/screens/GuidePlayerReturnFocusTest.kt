@@ -209,6 +209,17 @@ class GuidePlayerReturnFocusTest {
         focused("Channel 1 hour -2")
     }
 
+    @Test fun offlineGuideOkOpensDetailsWhoseWatchPlaysTheChannel() {
+        guide(PlayerReturnFocus(playingChannelId = ChannelId(1), originChannelId = ChannelId(1)), offline = true)
+        focused("Channel 1 hour 0")
+        key(Key.DirectionCenter)
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(androidx.compose.ui.test.hasTestTag("details-watch") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        key(Key.DirectionCenter)
+        assertEquals(1, playRequests)
+    }
+
     private fun focused(title: String) {
         runCatching { compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() } }
             .onFailure {
@@ -234,28 +245,32 @@ class GuidePlayerReturnFocusTest {
         channelId = ChannelId(channel), title = "Channel $channel hour $offset",
         start = Instant.fromEpochSeconds(hour + offset * 3600), stop = Instant.fromEpochSeconds(hour + (offset + 1) * 3600))
 
-    private fun observation(loaded: Boolean): SessionObservation {
+    private fun observation(loaded: Boolean, offline: Boolean = false): SessionObservation {
         val channels = if (loaded) (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) } else emptyList()
         // Channel 3 has no EPG.
         val withEpg = listOf(1L, 2L)
-        return SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels)),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create(
+        val catalog = ChannelCatalog.create(channels)
+        val epg = EpgSnapshot.create(
                 events = withEpg.flatMap { channel -> (0..3).map { event(channel, it) } },
                 historicalEvents = withEpg.flatMap { channel -> (-4..-1).map { event(channel, it) } },
                 coverages = channels.map {
                     EpgCoverage.create(channelId = it.id, coveredFrom = Instant.fromEpochSeconds(hour),
                         coveredTo = Instant.fromEpochSeconds(hour + 7 * 86400))
                 },
-            )),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+            )
+        // Offline: saved metadata before the session is ready.
+        return SessionObservation.create(
+            sessionState = if (offline) SessionState.Connecting
+                else SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = if (offline) ChannelRepositoryState.Stale(catalog) else ChannelRepositoryState.Current(catalog),
+            epgState = if (offline) EpgRepositoryState.Stale(epg) else EpgRepositoryState.Current(epg),
+            dvrState = if (offline) DvrRepositoryState.Stale(DvrSnapshot.create()) else DvrRepositoryState.Current(DvrSnapshot.create()),
         )
     }
 
-    private fun guide(request: PlayerReturnFocus, channelsLoaded: Boolean = true): FakeTvheadendSession {
+    private fun guide(request: PlayerReturnFocus, channelsLoaded: Boolean = true, offline: Boolean = false): FakeTvheadendSession {
         val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<Application>()
-        val session = FakeTvheadendSession(observation(channelsLoaded))
+        val session = FakeTvheadendSession(observation(channelsLoaded, offline))
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })

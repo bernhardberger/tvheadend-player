@@ -8,7 +8,6 @@ import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
@@ -24,7 +23,7 @@ internal fun ChannelContextMenu(
     mutationScope: CoroutineScope,
     mutationInFlight: MutableState<DvrMutationAction?>,
     imageLoader: ImageLoader,
-    onPlay: (LivePlaybackSelection, String) -> Unit,
+    onPlay: (ChannelId, String) -> Unit,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onClose: () -> Unit,
     showDetails: Boolean = false,
@@ -41,7 +40,8 @@ internal fun ChannelContextMenu(
     val session: TvheadendSession = koinInject()
     val notices: NoticeCenter = koinInject()
     val mutations = remember(session) { DvrMutationActions(session.dvrRepository) }
-    LaunchedEffect(capability) { if (capability == null) onClose() }
+    // Opened before Ready it stays: Watch needs only the channel. A session it opened with is gone.
+    LaunchedEffect(capability) { if (opening.currentSession != null && capability == null) onClose() }
     if (event != null) {
         ProgrammeDetailsHost(event, opening, observation, { session.observation.value }, nowSecProvider,
             fromGuide = false, showContextMenu = !showDetails, onShowDetails = onShowDetails,
@@ -56,9 +56,9 @@ internal fun ChannelContextMenu(
         onClose = onClose,
         onAction = { action ->
             when (action) {
-                BrowseContextAction.WATCH -> capability?.let {
+                BrowseContextAction.WATCH -> {
                     onClose()
-                    onPlay(LivePlaybackSelection(it, channelId), channel.name.orEmpty())
+                    onPlay(channelId, channel.name.orEmpty())
                 }
                 BrowseContextAction.SHOW_GUIDE -> { onClose(); onShowGuide(channelId, null) }
                 else -> Unit

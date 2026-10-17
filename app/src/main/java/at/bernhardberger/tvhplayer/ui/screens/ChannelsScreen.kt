@@ -125,7 +125,6 @@ import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
-import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlinx.coroutines.Job
@@ -201,7 +200,7 @@ fun ChannelsScreen(
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
-    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onPlay: (channelId: ChannelId, channelName: String) -> Unit,
     onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) {
@@ -265,7 +264,7 @@ internal fun ChannelsScreenContent(
     onDismissTagNotice: () -> Unit,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
-    onPlay: (selection: LivePlaybackSelection, channelName: String) -> Unit,
+    onPlay: (channelId: ChannelId, channelName: String) -> Unit,
     onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) = profileTrace("P1:compose:channels") {
@@ -849,12 +848,8 @@ internal fun ChannelsScreenContent(
                                     },
                                     onConfirm = {
                                         if (!owner.isCurrent) return@ChannelRow
-                                        currentSession?.let {
-                                            onPlay(
-                                                LivePlaybackSelection(it, channelId),
-                                                ch.name.orEmpty(),
-                                            )
-                                        }
+                                        // Saved rows play too: the player waits for the session.
+                                        onPlay(channelId, ch.name.orEmpty())
                                     },
                                     onOpenContextMenu = {
                                         if (owner.isCurrent) {

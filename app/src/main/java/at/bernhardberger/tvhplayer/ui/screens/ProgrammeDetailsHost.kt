@@ -11,7 +11,6 @@ import androidx.compose.ui.input.key.*
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
-import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.components.*
@@ -44,7 +43,7 @@ internal fun ProgrammeDetailsHost(
     notices: NoticeCenter,
     mutationScope: CoroutineScope,
     mutationInFlight: MutableState<DvrMutationAction?>,
-    onPlay: (LivePlaybackSelection, String) -> Unit,
+    onPlay: (ChannelId, String) -> Unit,
     onPlayRecording: ((RecordingPlaybackSelection) -> Unit)?,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     onClose: () -> Unit,
@@ -74,17 +73,23 @@ internal fun ProgrammeDetailsHost(
     var menuAiring by remember { mutableStateOf<EpgEvent?>(null) }
     var menuConsumed by remember { mutableStateOf(false) }
     var mutationEvent by remember { mutableStateOf<EpgEvent?>(null) }
-    val capability = openingObservation.currentSession?.takeIf { it === observation.currentSession }
+    // Opened before Ready, the session that arrives later becomes its own, so recording actions appear.
+    val sessionObservation = remember(openingObservation, observation.currentSession) {
+        if (openingObservation.currentSession != null) openingObservation else observation
+    }
+    val capability = sessionObservation.currentSession?.takeIf { it === observation.currentSession }
+    // Opened before Ready it stays: Watch needs only the channel. A session it opened with is gone.
+    val sessionLost = openingObservation.currentSession != null && capability == null
     val live = observation.event(selected.id)
     val event = live ?: selected
     val channel = event.channelId?.let(observation::channel)
     val recording = observation.dvrEntryForEvent(event)
     val canModify = capability != null && observation.dvrState is DvrRepositoryState.Current &&
         (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
-    val currentMutation = currentDvrMutation(pending, openingObservation, observation)
+    val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
     val actions = programmeDetailsActions(event, nowSec, recording, canModify,
-        channel != null && capability != null, fromGuide, liveProgramme = live != null, stacked = stack.isNotEmpty())
-        .filter { it != BrowseContextAction.PLAY || onPlayRecording != null }
+        channel != null, fromGuide, liveProgramme = live != null, stacked = stack.isNotEmpty())
+        .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
     val closeAnimated = { visibility.targetState = false }
@@ -103,7 +108,7 @@ internal fun ProgrammeDetailsHost(
         }
     }
     LaunchedEffect(capability, live, currentMutation) {
-        if (capability == null || (openingObservation.event(selected.id) != null && live == null)) {
+        if (sessionLost || (openingObservation.event(selected.id) != null && live == null)) {
             close()
             return@LaunchedEffect
         }
@@ -130,7 +135,7 @@ internal fun ProgrammeDetailsHost(
                 val preferred = if (mutation is DvrMutationAction.CreateProgramme)
                     settingsStore.settings.first().recordingProfileId else null
                 val current = currentObservation()
-                val request = currentDvrMutation(mutation, openingObservation, current) ?: return@launch
+                val request = currentDvrMutation(mutation, sessionObservation, current) ?: return@launch
                 if (request is DvrMutationAction.CreateProgramme &&
                     current.dvrEntryForEvent(request.target.eventId)?.state in
                     listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING)) return@launch
@@ -147,9 +152,26 @@ internal fun ProgrammeDetailsHost(
         if (inFlight != null && action in listOf(BrowseContextAction.RECORD,
                 BrowseContextAction.STOP, BrowseContextAction.CANCEL)) return@action
         val current = currentObservation()
+        if (action == BrowseContextAction.WATCH || action == BrowseContextAction.SHOW_GUIDE) {
+            // Live playback shares the player's wait for the session, and the guide is browsing:
+            // neither needs more than the channel. Recording actions keep the session guard below.
+            val event = current.event(programme.id) ?: programme
+            event.channelId?.let(current::channel)?.let {
+                close()
+                if (action == BrowseContextAction.WATCH) onPlay(it.id, it.name.orEmpty()) else onShowGuide(it.id, event)
+            }
+            return@action
+        }
+        if (action == BrowseContextAction.DETAILS) {
+            // Details only display: they open before Ready too.
+            val airingMenu = menuAiring != null
+            if (!airingMenu && !showContextMenu) returnAction = action
+            menuAiring = null
+            if (airingMenu) pushPage(current.event(programme.id) ?: programme) else onShowDetails()
+            return@action
+        }
         if (capability == null || capability !== current.currentSession) { close(); return@action }
         val actionEvent = current.event(programme.id) ?: programme
-        val actionChannel = actionEvent.channelId?.let(current::channel)
         val actionRecording = current.dvrEntryForEvent(actionEvent)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
@@ -160,23 +182,17 @@ internal fun ProgrammeDetailsHost(
         menuAiring = null
         mutationEvent = actionEvent
         when (action) {
-            BrowseContextAction.DETAILS -> if (airingMenu) pushPage(actionEvent) else onShowDetails()
-            BrowseContextAction.WATCH -> actionChannel?.let {
-                close()
-                onPlay(LivePlaybackSelection(capability, it.id), it.name.orEmpty())
-            }
             BrowseContextAction.PLAY -> actionRecording?.let {
                 close()
                 onPlayRecording?.invoke(RecordingPlaybackSelection(capability, it.id))
             }
-            BrowseContextAction.SHOW_GUIDE -> actionChannel?.let { close(); onShowGuide(it.id, actionEvent) }
             BrowseContextAction.RECORD -> if (current.event(programme.id) != null && actionCanModify &&
                 actionRecording?.state !in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING)) {
                 executeDirect(DvrMutationAction.CreateProgramme(actionEvent.programmeRecordingTarget(capability), null))
             }
             BrowseContextAction.STOP -> if (actionRecording != null && actionCanModify) {
                 val candidate = DvrMutationAction.Stop(capability, actionRecording.id)
-                if (currentDvrMutation(candidate, openingObservation, current) != null) {
+                if (currentDvrMutation(candidate, sessionObservation, current) != null) {
                     pendingEntries = current.dvrEntriesForEvent(actionEvent)
                     pending = candidate
                     pendingAction = ProgrammeAction.STOP_RECORDING
@@ -184,7 +200,7 @@ internal fun ProgrammeDetailsHost(
             }
             BrowseContextAction.CANCEL -> if (actionRecording != null && actionCanModify) {
                 val candidate = DvrMutationAction.Cancel(capability, actionRecording.id)
-                if (currentDvrMutation(candidate, openingObservation, current) != null) {
+                if (currentDvrMutation(candidate, sessionObservation, current) != null) {
                     pendingEntries = current.dvrEntriesForEvent(actionEvent)
                     pending = candidate
                     pendingAction = ProgrammeAction.CANCEL_RECORDING
@@ -240,9 +256,9 @@ internal fun ProgrammeDetailsHost(
                     channelNumber = { id -> observation.channel(id)?.number }) }.orEmpty()
             }
             val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording, canModify,
-                pageChannel != null && capability != null, fromGuide, liveProgramme = pageLive != null,
+                pageChannel != null, fromGuide, liveProgramme = pageLive != null,
                 stacked = page.id != openingEvent.id || stack.isNotEmpty())
-                .filter { it != BrowseContextAction.PLAY || onPlayRecording != null }
+                .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             PlayerMotionFrame(leaving = page.id != selected.id || covered) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
@@ -300,7 +316,7 @@ internal fun ProgrammeDetailsHost(
                 if (menuConsumed) close()
             },
             onConfirm = {
-                val mutation = currentDvrMutation(pending, openingObservation, currentObservation())
+                val mutation = currentDvrMutation(pending, sessionObservation, currentObservation())
                 pendingAction = null
                 pending = null
                 if (mutation != null) executeDirect(mutation)

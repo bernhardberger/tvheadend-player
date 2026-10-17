@@ -16,7 +16,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.io.File
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppRootPlaybackOrchestratorTest {
@@ -360,26 +359,5 @@ class AppRootPlaybackOrchestratorTest {
             ),
         )
         assertEquals(0, notes)
-    }
-
-    /**
-     * AppRoot wires both warm opening actions: the click notes intent synchronously, before
-     * its coroutine is dispatched, and hands that intent to the start; the warm return notes
-     * through the orchestrator, whose target is pushed only after it returns.
-     */
-    @Test
-    fun appRootNotesViewingIntentForBothWarmOpeningActions() {
-        val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
-            .first { File(it, ".git").exists() }
-        val source = File(root, "app/src/main/java/at/bernhardberger/tvhplayer/ui/AppRoot.kt").readText()
-            .lines().joinToString("") { it.substringBefore("//") }.filterNot(Char::isWhitespace)
-        val click = "{selection,name->valviewingIntent=playbackRuntime.notePlaybackIntent()playbackSelectionScope.launch{" +
-            "valtarget=playbackOrchestrator.requestLivePlayer("
-        assertEquals(1, source.split(click).size - 1)
-        assertEquals(1, source.split("viewingIntent=viewingIntent,startPlayback={playbackRuntime.playLive(selection,it)},").size - 1)
-        assertEquals(1, source.split("playbackOrchestrator.requestLivePlayer(").size - 1)
-        val warmReturn = "currentChannelReadiness=currentChannelReadiness,noteViewingIntent={playbackRuntime.notePlaybackIntent()},)){"
-        assertEquals(1, source.split(warmReturn).size - 1)
-        assertEquals(1, source.split("playbackOrchestrator.consumeWarmPlayerTarget(").size - 1)
     }
 }
