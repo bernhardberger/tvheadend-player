@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import android.os.SystemClock
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.State
@@ -23,6 +24,7 @@ import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.AppVideoPresentation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.*
 import org.junit.Rule
@@ -134,6 +136,40 @@ class PlayerBusyIndicatorTest {
             ring().assertDoesNotExist()
             assertTrue(compose.onAllNodes(hasContentDescription(description), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         }
+    }
+
+    @Test fun ringGoesQuietAfterTheGraceOfSoundUnderTheCoverWithoutReplacingItsAnnouncement() {
+        var cover by mutableStateOf(AppVideoPresentation(epoch = 1L, soundSinceMillis = SystemClock.elapsedRealtime()))
+        lateinit var quiet: State<Boolean>
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            quiet = rememberBusyRingQuiet(cover)
+            Box(Modifier.fillMaxSize()) {
+                PlayerBusyIndicator(PlayerBusyStatus.TUNING, Modifier.align(Alignment.Center), cover = cover)
+            }
+        }
+        settle()
+        compose.runOnIdle { assertTrue(quiet.value) }
+        val id = ring().fetchSemanticsNode().id
+        assertEquals(1, compose.onAllNodes(hasContentDescription("Tuning"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.runOnIdle { cover = AppVideoPresentation(epoch = 1L, soundSinceMillis = null) }
+        settle()
+        compose.runOnIdle { assertFalse("a stopped sound brings the spinning ring back", quiet.value) }
+        assertEquals("quieting never swaps the announcing node", id, ring().fetchSemanticsNode().id)
+        compose.runOnIdle { cover = cover.copy(epoch = 2L, soundSinceMillis = SystemClock.elapsedRealtime()) }
+        compose.mainClock.advanceTimeBy(299, ignoreFrameDuration = true)
+        compose.runOnIdle { assertFalse("the picture may still move within the grace", quiet.value) }
+        compose.runOnIdle { cover = cover.copy(visible = true) }
+        compose.mainClock.advanceTimeBy(1_000, ignoreFrameDuration = true)
+        compose.runOnIdle { assertFalse("a moving picture never quiets the ring", quiet.value) }
+    }
+
+    @Test fun ringWithoutALiveCoverStaysSpinning() {
+        lateinit var quiet: State<Boolean>
+        compose.mainClock.autoAdvance = false
+        compose.setContent { quiet = rememberBusyRingQuiet(null) }
+        compose.mainClock.advanceTimeBy(5_000, ignoreFrameDuration = true)
+        compose.runOnIdle { assertFalse(quiet.value) }
     }
 
     @Test fun onlyAnOwnedUnpresentedTuneWithPlaybackIntentCanStartTheDelay() {

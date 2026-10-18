@@ -8,6 +8,7 @@ import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
@@ -37,6 +38,7 @@ internal class PlaybackPresentationPublisher(
     private val activeTargetEpoch: () -> Long?,
     private val targetInstallationInProgress: () -> Boolean,
     private val publishPlayerErrorFromPlayer: () -> Unit,
+    private val elapsedRealtime: () -> Long,
 ) {
     private val _state = MutableStateFlow<AppPlaybackState>(AppPlaybackState.Idle)
     val state = _state.asStateFlow()
@@ -44,6 +46,11 @@ internal class PlaybackPresentationPublisher(
     private val _videoPresentation = MutableStateFlow(AppVideoPresentation())
     private var diagnosticsEnabled = false
     private var targetFrameListener: Player.Listener? = null
+    private var targetSoundListener: AnalyticsListener? = null
+
+    // Media3 reports the audio position advancing once per resume, and may deliver it before the
+    // player reports isPlaying: that sound waits here for isPlaying instead of being dropped.
+    private var pendingSoundMillis: Long? = null
     private var presentationBeforeInstall: AppVideoPresentation? = null
     private var staleVideoFormat: Format? = null
 
@@ -159,7 +166,9 @@ internal class PlaybackPresentationPublisher(
             staleVideoFormat = player.videoFormat
             frameDuringInstall = false
             installFrameCounters = null
-            _videoPresentation.value = current.copy(visible = false)
+            // The old target's sound must not describe the next target; a failed install clears it too.
+            pendingSoundMillis = null
+            _videoPresentation.value = current.copy(visible = false, soundSinceMillis = null)
             if (policy.trace.enabled) policy.trace.videoCoverShown()
         }
     }
@@ -174,7 +183,7 @@ internal class PlaybackPresentationPublisher(
      */
     fun restoreVideoAfterFailedInstallLocked(resumesPlaying: Boolean) {
         targetCommands.runIfOpen {
-            val previous = presentationBeforeInstall ?: return@runIfOpen
+            val previous = presentationBeforeInstall?.copy(soundSinceMillis = null) ?: return@runIfOpen
             if (frameDuringInstall) {
                 targetFrameRendered = true
                 targetFrameCounters = installFrameCounters
@@ -199,6 +208,8 @@ internal class PlaybackPresentationPublisher(
     fun beginTargetPresentationLocked(epoch: Long) {
         targetCommands.runIfOpen {
             targetFrameListener?.let(player::removeListener)
+            targetSoundListener?.let(player::removeAnalyticsListener)
+            pendingSoundMillis = null
             stopMotionWatch()
             _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
             val staleFormat = staleVideoFormat
@@ -241,8 +252,41 @@ internal class PlaybackPresentationPublisher(
                     if (!targetCommands.isOpen()) return
                     if (!targetInstallationInProgress()) liftCoverOnReadyPicture(epoch)
                 }
+
+                // The sound stops with a pause or a stall: the busy ring may return then. A sound
+                // that was reported before playing was is committed now.
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    targetCommands.runIfOpen {
+                        val pending = pendingSoundMillis
+                        pendingSoundMillis = null
+                        if (!isPlaying) noteSound(epoch, null)
+                        else if (pending != null && !targetInstallationInProgress()) noteSound(epoch, pending)
+                    }
+                }
             }.also(player::addListener)
+            // The audio position advancing is the sound audibly playing out, not merely a ready
+            // player with play intent: Media3 reports it once per resume or position reset.
+            targetSoundListener = object : AnalyticsListener {
+                override fun onAudioPositionAdvancing(eventTime: AnalyticsListener.EventTime, playoutStartSystemTimeMs: Long) {
+                    targetCommands.runIfOpen {
+                        if (targetInstallationInProgress()) return@runIfOpen
+                        if (player.isPlaying) noteSound(epoch, elapsedRealtime())
+                        else pendingSoundMillis = elapsedRealtime()
+                    }
+                }
+            }.also(player::addAnalyticsListener)
         }
+    }
+
+    /**
+     * Records that the sound of the presented target [epoch] plays since [sinceMillis], or stops
+     * (null). Another epoch's sound, and sound under a lifted cover, is not the cover's business.
+     */
+    private fun noteSound(epoch: Long, sinceMillis: Long?) {
+        val current = _videoPresentation.value
+        if (current.epoch != epoch || current.soundSinceMillis == sinceMillis) return
+        if (sinceMillis != null && (current.visible || epoch != activeTargetEpoch())) return
+        _videoPresentation.value = current.copy(soundSinceMillis = sinceMillis)
     }
 
     /**
@@ -360,6 +404,9 @@ internal class PlaybackPresentationPublisher(
         targetCommands.runIfOpen {
             targetFrameListener?.let(player::removeListener)
             targetFrameListener = null
+            targetSoundListener?.let(player::removeAnalyticsListener)
+            targetSoundListener = null
+            pendingSoundMillis = null
             stopMotionWatch()
             presentationBeforeInstall = null
             staleVideoFormat = null
@@ -377,6 +424,9 @@ internal class PlaybackPresentationPublisher(
     fun removeTargetFrameListenerLocked() {
         targetFrameListener?.let(player::removeListener)
         targetFrameListener = null
+        targetSoundListener?.let(player::removeAnalyticsListener)
+        targetSoundListener = null
+        pendingSoundMillis = null
         stopMotionWatch()
     }
 

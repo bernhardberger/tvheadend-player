@@ -1,5 +1,6 @@
 @file:androidx.media3.common.util.UnstableApi
 @file:OptIn(
+    kotlinx.coroutines.ExperimentalCoroutinesApi::class,
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
 )
@@ -447,6 +448,91 @@ class VideoCoverRuntimeTest {
             assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
         }
 
+    @Test fun soundUnderTheCoverIsPublishedForTheBusyRingUntilThePictureMoves() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            renderFirstFrame()
+            renderFrames(counters, 0)
+            forcedPlaying = true
+            scheduler.advanceTimeBy(40)
+            soundAdvancing()
+            val since = scheduler.currentTime
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false, soundSinceMillis = since), runtime.videoPresentation.value)
+            assertEquals(300L, runtime.videoPresentation.value.busyRingQuietInMillis(since))
+            renderFrames(counters)
+            assertTrue(runtime.videoPresentation.value.visible)
+            assertNull("a moving picture never quiets the ring", runtime.videoPresentation.value.busyRingQuietInMillis(since + 1_000))
+        }
+
+    @Test fun soundThatStopsOrStallsBringsTheBusyRingBack() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            renderFirstFrame()
+            forcedPlaying = true
+            soundAdvancing()
+            assertEquals(scheduler.currentTime, runtime.videoPresentation.value.soundSinceMillis)
+            forcedPlaying = false
+            buffering()
+            playerListeners.toList().forEach { it.onIsPlayingChanged(false) }
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            // The position advancing again after the stall is a new sound.
+            forcedPlaying = true
+            playerReady()
+            soundAdvancing()
+            assertEquals(scheduler.currentTime, runtime.videoPresentation.value.soundSinceMillis)
+        }
+
+    @Test fun soundReportedBeforeIsPlayingIsPublishedWhenThePlayerPlays() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            renderFirstFrame()
+            forcedPlaying = false
+            soundAdvancing()
+            val reported = scheduler.currentTime
+            assertNull("not playing yet", runtime.videoPresentation.value.soundSinceMillis)
+            scheduler.advanceTimeBy(25)
+            forcedPlaying = true
+            playerListeners.toList().forEach { it.onIsPlayingChanged(true) }
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false, soundSinceMillis = reported), runtime.videoPresentation.value)
+        }
+
+    @Test fun soundReportedBeforeIsPlayingIsDroppedWhenThePlayerStopsInstead() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            renderFirstFrame()
+            forcedPlaying = false
+            soundAdvancing()
+            playerListeners.toList().forEach { it.onIsPlayingChanged(false) }
+            forcedPlaying = true
+            playerListeners.toList().forEach { it.onIsPlayingChanged(true) }
+            assertNull(runtime.videoPresentation.value.soundSinceMillis)
+        }
+
+    @Test fun replacedTargetsSoundNeverDescribesTheNextTargetsCover() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            renderFirstFrame()
+            forcedPlaying = true
+            soundAdvancing()
+            assertEquals(scheduler.currentTime, runtime.videoPresentation.value.soundSinceMillis)
+            var atPause: AppVideoPresentation? = null
+            afterPause = { if (atPause == null) atPause = runtime.videoPresentation.value }
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            live(channel = 2)
+            assertEquals(AppVideoPresentation(epoch = oldEpoch, visible = false), atPause)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertNotEquals(oldEpoch, epoch)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+        }
+
     @Test fun pausedTargetShowsItsReadyFirstFrameWithoutMotion() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             countVideoFrames()
@@ -885,6 +971,12 @@ class VideoCoverRuntimeTest {
         TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()),
         false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
     )))
+
+    /** The audio output reports that its position advances: the sound is audibly playing out. */
+    private fun BackgroundPlaybackRuntimeTest.Fixture.soundAdvancing() {
+        player.analyticsCollector.onAudioPositionAdvancing(0L)
+        shadowOf(Looper.getMainLooper()).idle()
+    }
 
     private fun BackgroundPlaybackRuntimeTest.Fixture.renderFirstFrame() {
         playerListeners.toList().forEach { it.onRenderedFirstFrame() }

@@ -176,6 +176,7 @@ class AppPlaybackRuntime(
         activeTargetEpoch = { activeTargetEpoch },
         targetInstallationInProgress = { targetInstallationInProgress },
         publishPlayerErrorFromPlayer = ::publishPlayerErrorFromPlayer,
+        elapsedRealtime = elapsedRealtime,
     )
     private val livePauseController = LivePauseController(
         player = player,

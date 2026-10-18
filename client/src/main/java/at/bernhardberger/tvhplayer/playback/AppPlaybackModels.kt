@@ -189,9 +189,15 @@ data class AppPlaybackDiagnostics(
     val startupBuffer: StartupBufferInEffect? = null,
 )
 
+/**
+ * [visible] is the cover. [soundSinceMillis] is when the target [epoch]'s audio began playing out
+ * (the player's clock, [android.os.SystemClock.elapsedRealtime]) while its picture is still
+ * covered; null while no sound plays, so an old target's sound never describes a new one.
+ */
 data class AppVideoPresentation(
     val epoch: Long = 0L,
     val visible: Boolean = false,
+    val soundSinceMillis: Long? = null,
 )
 
 /** One installed live target's presentation evidence, read together under the target access lock. */

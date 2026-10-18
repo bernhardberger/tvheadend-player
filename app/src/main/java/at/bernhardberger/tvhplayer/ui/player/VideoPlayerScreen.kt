@@ -1828,7 +1828,7 @@ fun VideoPlayerScreen(
             },
         )
         // Full recovery and the unavailable message replace even an exiting ring.
-        if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center))
+        if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center), cover = videoPresentation)
         // With the chrome hidden and no Banner, only the paused chip remains.
         PlayerHiddenStatusChip(
             state = hiddenChipState(
