@@ -743,14 +743,14 @@ class MainStartupScreenTest {
             MessageText(MainStartupMessageKind.STARTING_TELEVISION, "Starting playback", "Wiedergabe wird gestartet"),
             MessageText(MainStartupMessageKind.RESUMING_PLAYBACK, "Resuming playback", "Wiedergabe wird fortgesetzt"),
             MessageText(MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS, "Check the channels and access permissions for this account, then try again.", "Prüfen Sie die Sender und Zugriffsrechte dieses Kontos und versuchen Sie es erneut."),
-            MessageText(MainStartupMessageKind.RETRYABLE_FAILURE, "Make sure the server is running and reachable, then try again.", "Prüfen Sie, ob der Server läuft und erreichbar ist, und versuchen Sie es dann erneut."),
+            MessageText(MainStartupMessageKind.RETRYABLE_FAILURE, "Make sure the server is running and reachable, then try again.", "Prüfe, ob der Server läuft und erreichbar ist, und versuche es dann erneut."),
             MessageText(MainStartupMessageKind.AUTHENTICATION_FAILURE, "Check your username and password in connection settings.", "Prüfen Sie Benutzername und Passwort in den Verbindungseinstellungen."),
             MessageText(MainStartupMessageKind.PERMISSION_DENIED, "Check this account’s access permissions in Tvheadend.", "Prüfen Sie die Zugriffsrechte dieses Kontos in Tvheadend."),
             MessageText(MainStartupMessageKind.INCOMPATIBLE_SERVER, "This server does not support the required connection. Check its version and connection settings.", "Dieser Server unterstützt die benötigte Verbindung nicht. Prüfen Sie seine Version und die Verbindungseinstellungen."),
             MessageText(MainStartupMessageKind.TIMEOUT_FAILURE, "Try again. If loading keeps timing out, check your Tvheadend server.", "Versuchen Sie es erneut. Prüfen Sie bei wiederholten Zeitüberschreitungen Ihren Tvheadend-Server."),
             MessageText(MainStartupMessageKind.SYNCHRONIZATION_FAILURE, "Try again, or check your connection settings if the problem continues.", "Versuchen Sie es erneut oder prüfen Sie bei anhaltenden Problemen die Verbindungseinstellungen."),
             MessageText(MainStartupMessageKind.CONFIGURATION_REQUIRED, "Set up your Tvheadend server connection to load channels.", "Richten Sie die Verbindung mit Ihrem Tvheadend-Server ein, um Sender zu laden."),
-            MessageText(MainStartupMessageKind.CREDENTIAL_UNAVAILABLE, "Open connection settings and enter your sign-in again.", "Öffnen Sie die Verbindungseinstellungen und melden Sie sich erneut an."),
+            MessageText(MainStartupMessageKind.CREDENTIAL_UNAVAILABLE, "Open connection settings and enter your sign-in again.", "Öffne die Verbindungseinstellungen und melde dich erneut an."),
         )
 
         val startupBoundsMatrix = listOf(
@@ -792,7 +792,7 @@ class MainStartupScreenTest {
                     settingsOnly,
                 ),
                 title = "Tvheadend Player",
-                message = "Öffnen Sie die Verbindungseinstellungen und melden Sie sich erneut an.",
+                message = "Öffne die Verbindungseinstellungen und melde dich erneut an.",
                 problemTitle = "Gespeicherte Anmeldung nicht verfügbar",
                 actions = listOf(StartupActionLabel(MainStartupActionId.CONNECTION_SETTINGS, "Verbindungseinstellungen")),
             ),
@@ -817,7 +817,7 @@ class MainStartupScreenTest {
                     retryAndSettings,
                 ),
                 title = "Tvheadend Player",
-                message = "Prüfen Sie, ob der Server läuft und erreichbar ist, und versuchen Sie es dann erneut.",
+                message = "Prüfe, ob der Server läuft und erreichbar ist, und versuche es dann erneut.",
                 problemTitle = "Keine Verbindung zu Tvheadend",
                 actions = listOf(
                     StartupActionLabel(MainStartupActionId.RETRY, "Erneut versuchen"),
