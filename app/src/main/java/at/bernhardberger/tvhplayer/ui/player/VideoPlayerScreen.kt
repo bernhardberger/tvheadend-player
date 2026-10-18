@@ -78,7 +78,7 @@ import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.liveInterrupted
 import at.bernhardberger.tvhplayer.core.liveChannelCondition
-import at.bernhardberger.tvhplayer.core.liveRetryRestoresRequestFailure
+import at.bernhardberger.tvhplayer.core.liveRetryRequestFailure
 import at.bernhardberger.tvhplayer.core.livePlayerAlert
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
@@ -1317,11 +1317,13 @@ fun VideoPlayerScreen(
      * while that request is still the current one.
      */
     fun retryLive(viewerRetry: Boolean) {
-        val cleared = requestedChannelFailed && authorizedLiveSelection != null
+        val retunesRequest = authorizedLiveSelection != null
+        val cleared = requestedChannelFailed && retunesRequest
         if (cleared) requestedChannelFailed = false
         val request = liveRequestToken
         videoPlayerViewModel.retryLiveNow(viewerRetry) { result ->
-            if (liveRetryRestoresRequestFailure(cleared, result, request == liveRequestToken)) requestedChannelFailed = true
+            liveRetryRequestFailure(retunesRequest, cleared, result, request == liveRequestToken)
+                ?.let { requestedChannelFailed = it }
         }
     }
 

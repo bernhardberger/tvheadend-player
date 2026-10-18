@@ -90,15 +90,23 @@ private fun ConnectionState.playerConnectionError(): AppError {
 }
 
 /**
- * Whether a live retry gives the channel on screen back the failed request it [cleared]: its
- * retune did not start ([result] is null when there was no channel to retune), and the request
- * it was made for is still the current one ([requestCurrent]).
+ * The failed-request flag a live retry's [result] leaves, or null to keep the flag as it is.
+ * Only a retry made for the request that is still current ([requestCurrent]) and that retunes
+ * that request's channel ([retunesRequest]) decides: a retune that started ends the failure,
+ * even one an earlier overlapping retry gave back; one that did not start ([result] is null
+ * when there was no channel to retune) gives back the failure this retry [cleared].
  */
-fun liveRetryRestoresRequestFailure(
+fun liveRetryRequestFailure(
+    retunesRequest: Boolean,
     cleared: Boolean,
     result: PlaybackTargetResult?,
     requestCurrent: Boolean,
-): Boolean = cleared && requestCurrent && result?.isStarted != true
+): Boolean? = when {
+    !requestCurrent || !retunesRequest -> null
+    result?.isStarted == true -> false
+    cleared -> true
+    else -> null
+}
 
 /**
  * The server stopped the stream of the live channel on screen and has not started it again.

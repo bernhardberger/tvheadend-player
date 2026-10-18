@@ -472,7 +472,7 @@ class LivePlayerChromeScreenTest {
                     (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) }))))
         }
         settle()
-        // The screen gives its request the failure back on this result (liveRetryRestoresRequestFailure).
+        // The screen gives its request the failure back on this result (liveRetryRequestFailure).
         val results = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { video.retryLiveNow(viewerRetry = false) { results += it } }
         compose.waitUntil(5_000) { idleMainLooper(); results.isNotEmpty() }

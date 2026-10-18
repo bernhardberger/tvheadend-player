@@ -236,12 +236,23 @@ class PlaybackStatusPresentationTest {
     fun aRetryThatDoesNotStartGivesTheChannelItsMessageBack() {
         for (result in listOf(null, PlaybackTargetResult.NOT_READY, PlaybackTargetResult.TARGET_UNAVAILABLE,
             PlaybackTargetResult.PLAYER_UNAVAILABLE, PlaybackTargetResult.SHUT_DOWN)) {
-            assertTrue("$result", liveRetryRestoresRequestFailure(cleared = true, result = result, requestCurrent = true))
+            assertEquals("$result", true, liveRetryRequestFailure(true, cleared = true, result = result, requestCurrent = true))
             // A newer request owns the screen now, or the retry cleared nothing: it keeps its state.
-            assertFalse("$result", liveRetryRestoresRequestFailure(cleared = true, result = result, requestCurrent = false))
-            assertFalse("$result", liveRetryRestoresRequestFailure(cleared = false, result = result, requestCurrent = true))
+            assertNull("$result", liveRetryRequestFailure(true, cleared = true, result = result, requestCurrent = false))
+            assertNull("$result", liveRetryRequestFailure(true, cleared = false, result = result, requestCurrent = true))
         }
-        assertFalse(liveRetryRestoresRequestFailure(cleared = true, result = PlaybackTargetResult.STARTED, requestCurrent = true))
+        assertEquals(false, liveRetryRequestFailure(true, cleared = true, result = PlaybackTargetResult.STARTED, requestCurrent = true))
+    }
+
+    @Test
+    fun aStartedRetryEndsAFailureThatAnOverlappingRetryGaveBack() {
+        // Retry A cleared the flag and B saw it cleared; A did not start and gave the failure back.
+        assertEquals(true, liveRetryRequestFailure(true, cleared = true, result = PlaybackTargetResult.NOT_READY, requestCurrent = true))
+        // B then starts the same request's channel: the failure ends although B cleared nothing.
+        assertEquals(false, liveRetryRequestFailure(true, cleared = false, result = PlaybackTargetResult.STARTED, requestCurrent = true))
+        // A retry that retunes some other channel than the request's, or for an old request, decides nothing.
+        assertNull(liveRetryRequestFailure(false, cleared = false, result = PlaybackTargetResult.STARTED, requestCurrent = true))
+        assertNull(liveRetryRequestFailure(true, cleared = false, result = PlaybackTargetResult.STARTED, requestCurrent = false))
     }
 
     @Test
