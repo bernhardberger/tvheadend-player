@@ -196,10 +196,6 @@
     <string name="main_startup_action_connection_settings">Verbindungseinstellungen</string>
 
     <string name="player_programme_progress_description">Programmfortschritt, %1$s von %2$s</string>
-    <string name="player_connection_recovering">Verbindung unterbrochen. Sie wird automatisch wiederhergestellt…</string>
-    <string name="player_playback_recovering">Wiedergabe unterbrochen. Erneuter Versuch läuft automatisch…</string>
-    <string name="player_playback_failed">Wiedergabe beendet.</string>
-    <string name="player_playback_interrupted">Wiedergabe unterbrochen</string>
 
     <string name="loading_wait">Warten auf Ladevorgang…</string>
     <string name="not_connected">Nicht verbunden</string>
@@ -465,14 +461,8 @@
     <string name="play">Abspielen</string>
     <string name="play_recording">Aufnahme abspielen</string>
 
-    <string name="tvh_target_invalid">Ungültiges Streaming-Ziel</string>
     <string name="tvh_no_free_adapter">Kein freier Tuner verfügbar</string>
-    <string name="tvh_mux_not_enabled">Multiplex ist nicht aktiviert</string>
-    <string name="tvh_tuning_failed">Sender konnte nicht eingestellt werden</string>
-    <string name="tvh_bad_signal">Schlechtes Signal</string>
     <string name="tvh_scrambled">Sender ist verschlüsselt</string>
-    <string name="tvh_subscription_overridden">Stream-Anforderung wurde überschrieben</string>
-    <string name="tvh_no_input">Kein Eingangssignal</string>
 
     <string name="status_disconnected_reconnecting">Verbindung getrennt. Neuer Verbindungsversuch\u2026</string>
     <string name="connection_configuration_required">Richte die Verbindung mit deinem Tvheadend-Server ein, um Sender zu laden.</string>

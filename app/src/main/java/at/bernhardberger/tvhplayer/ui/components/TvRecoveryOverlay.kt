@@ -51,6 +51,14 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
 import at.bernhardberger.tvhplayer.ui.player.leaving
 
+/** One button of [TvRecoveryOverlay]'s action row. */
+data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
+
+/**
+ * [actions], when given, replace the primary and secondary action: up to [MaxRecoveryActions]
+ * buttons in order, the first filled and focused when they appear or change. [errorNumber] is a
+ * small line under the hint.
+ */
 @Composable
 fun TvRecoveryOverlay(
     visible: Boolean,
@@ -65,15 +73,31 @@ fun TvRecoveryOverlay(
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
     liveRegionMode: LiveRegionMode = LiveRegionMode.Polite,
+    errorNumber: String? = null,
+    actions: List<TvRecoveryAction> = emptyList(),
 ) {
-    val primaryFocus = remember { FocusRequester() }
-    val secondaryFocus = remember { FocusRequester() }
-    val primaryVisible = primaryActionLabel != null && onPrimaryAction != null
-    val secondaryVisible = secondaryActionLabel != null && onSecondaryAction != null
+    require(actions.size <= MaxRecoveryActions) { "At most $MaxRecoveryActions recovery actions" }
+    val buttons = actions.ifEmpty {
+        val primary = if (primaryActionLabel != null && onPrimaryAction != null) {
+            TvRecoveryAction(primaryActionLabel, onPrimaryAction)
+        } else {
+            null
+        }
+        val secondary = if (secondaryActionLabel != null && onSecondaryAction != null) {
+            TvRecoveryAction(secondaryActionLabel, onSecondaryAction)
+        } else {
+            null
+        }
+        // As before, a secondary action shows only beside a primary one.
+        if (primary == null) emptyList() else listOfNotNull(primary, secondary)
+    }
+    val buttonFocus = remember { List(MaxRecoveryActions) { FocusRequester() } }
+    val primaryVisible = buttons.isNotEmpty()
+    val labels = buttons.map { it.label }
     val holderFocus = remember { FocusRequester() }
     var holding by remember { mutableStateOf(false) }
     var holderFocused by remember { mutableStateOf(false) }
-    LaunchedEffect(visible, primaryActionLabel, primaryVisible) {
+    LaunchedEffect(visible, labels) {
         if (visible && primaryVisible) {
             // Take focus from anything behind the overlay at once, then wait one frame
             // so the action is ready to draw its focused state.
@@ -81,7 +105,7 @@ fun TvRecoveryOverlay(
             try {
                 runCatching { holderFocus.requestFocus() }
                 withFrameNanos { }
-                runCatching { primaryFocus.requestFocus() }
+                runCatching { buttonFocus[0].requestFocus() }
             } finally {
                 holding = false
             }
@@ -154,6 +178,17 @@ fun TvRecoveryOverlay(
                             .widthIn(max = 680.dp),
                     )
                 }
+                if (errorNumber != null) {
+                    Text(
+                        text = errorNumber,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .testTag("tv-recovery-number"),
+                    )
+                }
                 if (primaryVisible) {
                     Row(
                         modifier = Modifier
@@ -162,39 +197,24 @@ fun TvRecoveryOverlay(
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Button(
-                            onClick = requireNotNull(onPrimaryAction),
-                            enabled = primaryActionEnabled,
-                            modifier = Modifier
-                                .focusRequester(primaryFocus)
+                        buttons.forEachIndexed { index, action ->
+                            val buttonModifier = Modifier
+                                .focusRequester(buttonFocus[index])
                                 .focusProperties {
-                                    left = FocusRequester.Cancel
-                                    right = if (secondaryVisible) {
-                                        secondaryFocus
-                                    } else {
-                                        FocusRequester.Cancel
-                                    }
+                                    left = if (index > 0) buttonFocus[index - 1] else FocusRequester.Cancel
+                                    right = if (index < buttons.lastIndex) buttonFocus[index + 1] else FocusRequester.Cancel
                                     up = FocusRequester.Cancel
                                     down = FocusRequester.Cancel
                                 }
-                                .testTag("tv-recovery-primary"),
-                        ) {
-                            Text(requireNotNull(primaryActionLabel))
-                        }
-                        if (secondaryVisible) {
-                            OutlinedButton(
-                                onClick = requireNotNull(onSecondaryAction),
-                                modifier = Modifier
-                                    .focusRequester(secondaryFocus)
-                                    .focusProperties {
-                                        left = primaryFocus
-                                        right = FocusRequester.Cancel
-                                        up = FocusRequester.Cancel
-                                        down = FocusRequester.Cancel
-                                    }
-                                    .testTag("tv-recovery-secondary"),
-                            ) {
-                                Text(requireNotNull(secondaryActionLabel))
+                                .testTag(RecoveryActionTags[index])
+                            if (index == 0) {
+                                Button(onClick = action.onClick, enabled = primaryActionEnabled, modifier = buttonModifier) {
+                                    Text(action.label)
+                                }
+                            } else {
+                                OutlinedButton(onClick = action.onClick, modifier = buttonModifier) {
+                                    Text(action.label)
+                                }
                             }
                         }
                     }
@@ -203,6 +223,10 @@ fun TvRecoveryOverlay(
         }
     }
 }
+
+const val MaxRecoveryActions = 3
+
+private val RecoveryActionTags = listOf("tv-recovery-primary", "tv-recovery-secondary", "tv-recovery-tertiary")
 
 private val HeldKeys = setOf(
     Key.DirectionCenter,

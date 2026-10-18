@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.screens.currentDvrConfigurations
 
-import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
@@ -12,13 +11,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 import android.os.SystemClock
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -45,11 +38,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -59,10 +50,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.media3.common.util.UnstableApi
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -80,7 +69,6 @@ import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
 import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
-import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
@@ -89,9 +77,9 @@ import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
 import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.liveInterrupted
-import at.bernhardberger.tvhplayer.core.liveInterruptionMessageShown
+import at.bernhardberger.tvhplayer.core.liveChannelCondition
+import at.bernhardberger.tvhplayer.core.livePlayerAlert
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
-import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
@@ -113,8 +101,6 @@ import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandDisposition
 import at.bernhardberger.tvheadend.sdk.media3.TimeshiftCommandResult
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
-import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssueCategory
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
@@ -141,7 +127,6 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
@@ -263,26 +248,6 @@ internal suspend fun commitChannelNumberEntry(
 private fun profileZapKey(event: AndroidKeyEvent): Long {
     profileTrace("P49:zap:key:${event.keyCode}:repeat:${event.repeatCount}:time:${event.eventTime}") { }
     return event.eventTime.takeIf { it > 0L } ?: SystemClock.uptimeMillis()
-}
-
-internal fun SubscriptionIssue.messageResource(): Int = when (this) {
-    SubscriptionIssue.NO_INPUT -> R.string.tvh_no_input
-    SubscriptionIssue.INVALID_TARGET -> R.string.tvh_target_invalid
-    SubscriptionIssue.NO_FREE_ADAPTER -> R.string.tvh_no_free_adapter
-    SubscriptionIssue.MUX_NOT_ENABLED -> R.string.tvh_mux_not_enabled
-    SubscriptionIssue.TUNING_FAILED -> R.string.tvh_tuning_failed
-    SubscriptionIssue.BAD_SIGNAL -> R.string.tvh_bad_signal
-    SubscriptionIssue.SCRAMBLED -> R.string.tvh_scrambled
-    SubscriptionIssue.SUBSCRIPTION_OVERRIDDEN -> R.string.tvh_subscription_overridden
-    SubscriptionIssue.USER_ACCESS,
-    SubscriptionIssue.USER_LIMIT,
-    SubscriptionIssue.NO_DISK_SPACE -> R.string.player_playback_failed
-    SubscriptionIssue.WEAK_STREAM -> R.string.tvh_bad_signal
-    else -> if (category == SubscriptionIssueCategory.INPUT_OR_SIGNAL) {
-        R.string.tvh_bad_signal
-    } else {
-        R.string.player_playback_failed
-    }
 }
 
 internal data class TimeshiftCommandCompletion(
@@ -1155,31 +1120,22 @@ fun VideoPlayerScreen(
         shownChannelId = currentChannelId,
     )
     val currentPlaybackFailed = requestedChannelFailed || playbackState is AppPlaybackState.Failed
+    val channelCondition = liveChannelCondition(currentSubscriptionFailure, currentPlaybackFailed, currentLiveInterrupted)
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
         playbackStarting = playbackState is AppPlaybackState.Starting,
         playbackRecovering = playbackState is AppPlaybackState.Recovering,
         playbackPlaying = playbackState.presented,
-        playbackFailed = currentPlaybackFailed || currentSubscriptionFailure != null,
-        liveInterrupted = currentLiveInterrupted,
-    )
-    val interruptionMessageShown = liveInterruptionMessageShown(
-        liveInterrupted = currentLiveInterrupted,
-        subscriptionIssuePresent = currentSubscriptionFailure != null,
-        playbackFailed = currentPlaybackFailed,
+        channelCondition = channelCondition,
     )
     val recoveryVisible = screenActive &&
         (serverWait.presentation != null || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY)
-    val recoveryUiModel = playbackRecoveryUiModel(
-        surface = PlaybackRecoverySurface.LIVE,
-        connectionState = connState,
-        retryTargetAvailable = playingLiveChannelId == currentChannelId &&
-            playbackState is AppPlaybackState.Recovering,
-    )
-    val recoveryHasRetry = recoveryUiModel.retryCommand != PlaybackRetryCommand.NONE
     val channelUnavailable = statusPresentation == PlaybackStatusPresentation.CHANNEL_UNAVAILABLE
-    LaunchedEffect(channelUnavailable) {
-        if (channelUnavailable) {
+    // The box's states plus a connected live TV alert (208): either way the channel's source is gone.
+    val channelFailed = channelCondition != null && connState is ConnectionState.Connected &&
+        playbackState !is AppPlaybackState.Recovering
+    LaunchedEffect(channelFailed) {
+        if (channelFailed) {
             timelineState.invalidateForSourceChange()
             layerState.onChannelUnavailable()
         }
@@ -1353,8 +1309,8 @@ fun VideoPlayerScreen(
                 currentDvrMutation(infoMutation, infoMutationObservation, observation) == null)) dismissRecordingDialog()
     }
 
-    fun dispatchRecoveryRetry() {
-        when (recoveryUiModel.retryCommand) {
+    fun dispatchRecoveryRetry(command: PlaybackRetryCommand) {
+        when (command) {
             PlaybackRetryCommand.RECONNECT -> onReconnect()
             PlaybackRetryCommand.RETRY_LIVE -> videoPlayerViewModel.retryLiveNow(viewerRetry = true)
             PlaybackRetryCommand.RESUME_RECORDING,
@@ -1963,7 +1919,7 @@ fun VideoPlayerScreen(
                 quickList = layerState.quickList.takeIf { layerState.optionsQuickList },
                 onQuickListClose = layerState::closeQuickList,
                 quickListTargetEpoch = videoPresentation.epoch,
-                quickListAvailable = !channelUnavailable && playingLiveChannelId == currentChannelId,
+                quickListAvailable = !channelFailed && playingLiveChannelId == currentChannelId,
                 isQuickListTargetCurrent = { epoch ->
                     playbackRuntime.isQuickListTargetCurrent(epoch) &&
                         videoPlayerViewModel.playingLiveChannelId.value == currentChannelId
@@ -1987,85 +1943,18 @@ fun VideoPlayerScreen(
         )
 
         val unavailableShown = channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)
-        val failedState = playbackState as? AppPlaybackState.Failed
-        AnimatedVisibility(
+        PlayerChannelMessage(
             visible = unavailableShown,
-            enter = fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)),
-            exit = fadeOut(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardAccelerate)),
-            modifier = Modifier.align(Alignment.Center).semanticsWhileShown(unavailableShown),
-            label = "player-channel-unavailable",
-        ) {
-            // The exit keeps the message it showed while the failure state clears.
-            val (message, failureDetail) = rememberLastShown(
-                if (unavailableShown) {
-                    stringResource(
-                        currentSubscriptionFailure?.messageResource()
-                            ?: if (interruptionMessageShown) R.string.player_playback_interrupted else R.string.player_playback_failed,
-                    ) to
-                        listOfNotNull(
-                            failedState?.recoveryReason?.toString(),
-                            failedState?.playerErrorCode,
-                            failedState?.playerErrorClassification,
-                            failedState?.targetResult?.toString(),
-                        ).joinToString(" · ")
-                } else {
-                    null
-                },
-            ) ?: return@AnimatedVisibility
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier
-                    .background(Color.Black.copy(alpha = TvOverlayBoxAlpha), MaterialTheme.shapes.large)
-                    .padding(24.dp)
-                    .testTag("player-channel-unavailable"),
-            ) {
-                Text(
-                    text = message,
-                    style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.onSurface,
-                )
-                if (failureDetail.isNotEmpty()) {
-                    Text(
-                        text = failureDetail,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-            }
-        }
+            condition = channelCondition,
+            modifier = Modifier.align(Alignment.Center),
+        )
         LivePlayerServerWait(serverWait, currentChannel, currentChannelName, rootFocus)
-        TvRecoveryOverlay(
+        LivePlayerAlertOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY && serverWait.presentation == null,
-            message = stringResource(
-                when {
-                    currentSubscriptionFailure != null ->
-                        currentSubscriptionFailure.messageResource()
-                    connState !is ConnectionState.Connected -> R.string.player_connection_recovering
-                    playbackState is AppPlaybackState.Failed -> R.string.player_playback_failed
-                    else -> R.string.player_playback_recovering
-                }
-            ),
-            primaryActionLabel = if (recoveryHasRetry) {
-                stringResource(R.string.retry)
-            } else {
-                stringResource(R.string.close)
-            },
-            onPrimaryAction = if (recoveryHasRetry) {
-                ::dispatchRecoveryRetry
-            } else {
-                playerClose::close
-            },
-            secondaryActionLabel = if (recoveryHasRetry) {
-                stringResource(R.string.close)
-            } else {
-                null
-            },
-            onSecondaryAction = if (!recoveryHasRetry) {
-                null
-            } else {
-                playerClose::close
-            },
+            alert = livePlayerAlert(connState, playbackState, channelCondition),
+            onRetry = ::dispatchRecoveryRetry,
+            onConnectionSettings = serverWait::openConnectionSettings,
+            onClose = playerClose::close,
         )
     } }
 }

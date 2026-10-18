@@ -118,13 +118,12 @@ internal fun PlaybackStatsOverlay(
                         AppPlaybackState.Finished -> stringResource(R.string.stats_state_finished)
                         is AppPlaybackState.Recovering ->
                             stringResource(R.string.stats_state_recovering)
-                        is AppPlaybackState.Failed -> listOfNotNull(
-                            stringResource(R.string.stats_state_failed),
-                            state.playerErrorCode ?: state.targetResult?.toString(),
-                            state.playerErrorClassification,
-                        ).joinToString(" · ")
+                        is AppPlaybackState.Failed -> stringResource(R.string.stats_state_failed)
                     },
                 )
+                (diagnostics.state as? AppPlaybackState.Failed)?.let { failed ->
+                    for ((label, value) in failureStatRows(failed)) StatLine(stringResource(label), value)
+                }
                 StatLine(
                     stringResource(R.string.stats_timing),
                     timeshiftState?.let { state ->
@@ -399,6 +398,14 @@ private fun StatLine(label: String, value: String) {
         )
     }
 }
+
+/** The raw values behind a failure, label and value, each only where the failure carries it. */
+internal fun failureStatRows(failed: AppPlaybackState.Failed): List<Pair<Int, String>> = listOfNotNull(
+    failed.recoveryReason?.let { R.string.stats_recovery_reason to it.toString() },
+    failed.playerErrorCode?.let { R.string.stats_error_code to it },
+    failed.playerErrorClassification?.let { R.string.stats_error_classification to it },
+    failed.targetResult?.let { R.string.stats_target_result to it.toString() },
+)
 
 private fun Float.oneDecimal(locale: Locale): String = formatDecimal(toDouble(), 1, locale)
 

@@ -198,10 +198,6 @@
     <string name="main_startup_action_connection_settings">Connection settings</string>
 
     <string name="player_programme_progress_description">Program progress, %1$s of %2$s</string>
-    <string name="player_connection_recovering">Connection interrupted. Reconnecting automatically…</string>
-    <string name="player_playback_recovering">Playback interrupted. Retrying automatically…</string>
-    <string name="player_playback_failed">Playback stopped.</string>
-    <string name="player_playback_interrupted">Playback interrupted</string>
 
     <string name="loading_wait">Waiting for loading…</string>
     <string name="not_connected">Not connected</string>
@@ -258,6 +254,10 @@
     <string name="stats_state_finished" translatable="false">Finished</string>
     <string name="stats_state_recovering" translatable="false">Recovering</string>
     <string name="stats_state_failed" translatable="false">Failed</string>
+    <string name="stats_recovery_reason" translatable="false">Recovery reason</string>
+    <string name="stats_error_code" translatable="false">Error code</string>
+    <string name="stats_error_classification" translatable="false">Classification</string>
+    <string name="stats_target_result" translatable="false">Target result</string>
     <string name="stats_timing" translatable="false">Position</string>
     <string name="stats_timing_buffered" translatable="false">%1$s · buffer %2$d s</string>
     <string name="stats_timing_buffered_with_duration" translatable="false">%1$s / %2$s · buffer %3$d s</string>
@@ -579,14 +579,8 @@
     <string name="play">Play</string>
     <string name="play_recording">Play recording</string>
 
-    <string name="tvh_target_invalid">Streaming target invalid</string>
     <string name="tvh_no_free_adapter">No free tuner available</string>
-    <string name="tvh_mux_not_enabled">Mux not enabled</string>
-    <string name="tvh_tuning_failed">Tuning failed</string>
-    <string name="tvh_bad_signal">Bad signal</string>
     <string name="tvh_scrambled">Channel is scrambled</string>
-    <string name="tvh_subscription_overridden">Subscription overridden</string>
-    <string name="tvh_no_input">No input</string>
 
     <string name="status_disconnected_reconnecting">Disconnected. Reconnecting\u2026</string>
     <string name="connection_configuration_required">Set up your Tvheadend server connection to load channels.</string>

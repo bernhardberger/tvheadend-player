@@ -25,6 +25,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -41,21 +42,22 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.WaitingConnectionFailure
+import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.core.waitingConnectionFailurePresentation
+import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.startup.mainStartupActionResource
-import at.bernhardberger.tvhplayer.ui.startup.mainStartupMessageResource
-import at.bernhardberger.tvhplayer.ui.startup.mainStartupProblemTitleResource
 
 /**
  * A live screen opened before its session was playable waits here for the server; its entry
@@ -83,6 +85,10 @@ internal class LivePlayerServerWaitState(
             failures.shown(connection.value)?.let(::waitingConnectionFailurePresentation)
                 ?: MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         }
+
+    /** The catalog condition of the failure [presentation] shows; null while connecting or not waiting. */
+    val failureCondition: AppErrorCondition?
+        get() = if (sessionSeen || hasSession.value) null else failures.shown(connection.value)?.toAppError()?.condition
 
     /** Applied after each composition. */
     fun observed() {
@@ -191,19 +197,25 @@ internal fun LivePlayerServerWait(
             )
         }
     }
-    val current = presentation as? MainStartupPresentation.Actionable
+    val current = state.failureCondition?.let { condition ->
+        (presentation as? MainStartupPresentation.Actionable)?.let { it to condition }
+    }
     // The exit keeps the failure it showed, so its actions do not turn into a spinner while it fades.
     val failure = rememberLastShown(current)
-    val primary = failure?.actions?.firstOrNull()
-    val secondary = failure?.actions?.getOrNull(1)
+    val primary = failure?.first?.actions?.firstOrNull()
+    val secondary = failure?.first?.actions?.getOrNull(1)
+    val context = LocalContext.current
+    val text = remember(context) { AppErrorText(context) }
     fun act(action: MainStartupActionId) = when (action) {
         MainStartupActionId.RETRY -> state.retry()
         MainStartupActionId.CONNECTION_SETTINGS -> state.openConnectionSettings()
     }
     TvRecoveryOverlay(
         visible = current != null,
-        message = failure?.let { stringResource(mainStartupProblemTitleResource(it.messageKind)) }.orEmpty(),
-        detail = failure?.let { stringResource(mainStartupMessageResource(it.messageKind)) },
+        message = failure?.let { text.title(it.second) }.orEmpty(),
+        detail = failure?.let { text.reason(it.second) },
+        hint = failure?.let { text.hint(it.second) },
+        errorNumber = failure?.let { text.number(it.second) },
         primaryActionLabel = primary?.let { stringResource(mainStartupActionResource(it)) },
         onPrimaryAction = primary?.let { { act(it) } },
         secondaryActionLabel = secondary?.let { stringResource(mainStartupActionResource(it)) },

@@ -23,14 +23,23 @@ internal class AppErrorText(private val context: Context) {
         reconnectInSeconds: Int? = null,
         startsAt: String? = null,
     ): String = when {
-        condition == AppErrorCondition.RECONNECTING && reconnectInSeconds != null && reconnectInSeconds > 0 ->
-            context.getString(R.string.error_110_reason, reconnectInSeconds)
-        condition == AppErrorCondition.RECONNECTING -> context.getString(R.string.error_110_reason_pending)
+        condition == AppErrorCondition.RECONNECTING -> reconnecting(reconnectInSeconds)
         condition == AppErrorCondition.RECORDING_NOT_STARTED && startsAt != null ->
             context.getString(R.string.error_302_reason, startsAt)
         condition == AppErrorCondition.RECORDING_NOT_STARTED -> context.getString(R.string.error_302_reason_untimed)
         else -> context.getString(condition.reasonRes())
     }
+
+    /**
+     * The passive text while something reconnects by itself, with no number of its own: the
+     * countdown to the next attempt where [inSeconds] is known and positive, else the plain one.
+     */
+    fun reconnecting(inSeconds: Int?): String =
+        if (inSeconds != null && inSeconds > 0) {
+            context.getString(R.string.error_110_reason, inSeconds)
+        } else {
+            context.getString(R.string.error_110_reason_pending)
+        }
 
     /** What helps, or null where it would only repeat the reason (a countdown, a start time, a finish). */
     fun hint(condition: AppErrorCondition): String? = condition.hintRes()?.let(context::getString)
