@@ -498,7 +498,8 @@ bear on this:
 
 **Owner direction (2026-10-18)**
 - Onboarding (`ui/screens/OnboardingScreen.kt`) needs a redo.
-- The Settings dialog needs a redo too.
+- The connection editor (`ui/screens/settings/SettingsConnection.kt`) needs a
+  redo too.
 
 **Questions**
 1. Should saving a connection test it before leaving onboarding?
