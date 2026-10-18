@@ -2,84 +2,73 @@
 
 ## 0.3.0 (unreleased)
 
-Each release now has two builds, Play and Appliance, and the app consumes Tvheadend
-SDK 0.34.0 and HTSP 1.0.0-beta.4.
+### New
 
-### Added
-
-- Play and Appliance builds from one commit. The Appliance build (launcher name
-  "Tvheadend Player Appliance") alone carries the HOME entry, the optional
-  accessibility service and the Appliance section in Settings. The Play build has
-  none of them. The two install side by side.
-- Saved channel logos show at startup and while the server is unreachable. The
-  player opens at once, before the server is ready, and the startup screen works
-  without saved data.
-- Free recording space in Recordings and Settings.
-- Hold OK (or press Menu) on a channel, programme or recording to open a
-  full-screen context menu. Record starts at once; Stop, Cancel and Delete ask
-  for confirmation in a centred dialog.
+- Two builds from one release. **Play** is the normal app, and the one to use
+  every day. **Appliance** is for a TV that should start straight into the app:
+  HOME opens it, and the GUIDE key does too once you turn on its accessibility
+  service in Android settings. The Appliance build is a work in progress: expect
+  rough edges and changes between releases. It installs next to the Play build,
+  and only it has that service.
+- Hold OK, or press Menu, on a channel, programme or recording to open a menu.
+  Record starts at once. Stop, Cancel and Delete ask you to confirm first.
 - One programme details page, shared by the Guide, Recordings and the player.
-- A single notice when the connection is lost, a badge on Settings while the app
-  is offline, and a Try again action.
-- Match content frame rate setting (Always, Only if seamless, Off). The player
-  asks the display for the frame rate the server declares for the stream, so a
+- Free recording space on the server, shown in Recordings and in Settings.
+- Match content frame rate in Settings, with Always, Only if seamless and Off. The
+  player asks the TV for the frame rate the server declares for the stream, so a
   50 Hz channel can switch a TV that offers 50 Hz. Playback statistics show the
-  output mode, the display modes, the declared and the measured frame rate.
-- Tunnelled playback as an experimental player setting, off by default.
-- Video decoder counters and a classification of playback failures in the
-  diagnostics.
-- A two-row channel rail in the player, with a live preview and a programme
-  dialog. The channel identity now sits at the top of the player.
-- Audio and subtitle preferences for language, format and description tracks.
-  Audio and subtitle lists open from the remote's own keys, and every audio track
-  is listed with a name and a format line.
-- System playback controls through a media session, audio focus handling and
-  recovery after headphones are unplugged.
-- Live TV stays tuned for a while after the app moves to the background.
-- Recordings that are still running can be stopped. In-progress recordings resume
-  where you stopped, and recordings have scene-marker navigation.
-- Notices that follow what the server reports about recordings.
-- AC-3, E-AC-3 and MP3 fall back to software decoding through an app-owned
-  Media3 FFmpeg extension with pinned sources and native binaries. Platform
-  decoders stay first.
-- Channels use the standard channel order and show full channel numbers.
-- 12-hour or 24-hour clock that follows the system, with an override in Settings.
-  Dates, times and numbers follow the app language.
+  output mode, the display modes, and the declared and measured frame rate.
+- Saved channel logos appear at startup and while the server is unreachable, and
+  the player opens right away instead of waiting for the server.
+- When the server can't be reached, the app shows one notice and an Offline
+  badge on Settings, and Settings → Connection offers Try again.
+- Clearer error messages in the live player. A problem now shows a title, a
+  reason, a hint when one helps, and a small error number you can quote when
+  asking for help.
+- Stop a recording that is still running. The app asks first and keeps what was
+  recorded so far. Recordings, including ones in progress, resume where you
+  stopped.
+- Keep channel after leaving the app, in Settings under Player: live TV stays
+  tuned for 10, 20 or 30 minutes after you leave the app, or not at all (Off).
+  If it was stopped or restarted while you were away, the app tells you.
+- The TV's system playback controls work with the app, through a media session.
+- AC-3, E-AC-3 and MP3 audio play through a built-in software decoder when the TV
+  has none. The TV's own decoders are used first.
+- Tunnelled playback, an experimental setting that is off by default. It sends
+  video straight to the TV when the decoder supports it and may briefly
+  interrupt the picture.
+- Audio and subtitle preferences for language, format and audio-description
+  tracks. Every audio track is listed with a name and a format.
+- A 12-hour or 24-hour clock. It follows the system unless you choose one in
+  Settings.
 
 ### Changed
 
-- Playback no longer starts when the app opens unless you enable **Start playback
-  when the app opens** in Settings, under Player.
-- The Guide search entry is hidden for the 1.0 release.
-- Channels, Guide, Recordings and Settings follow the Material for TV layout
-  margins. The Guide has denser 64 dp rows, and Settings uses depth navigation.
-- The live start-up buffer is tuned per server.
-- Logos and programme pictures fade in when they load, and the player eases in
-  from the screen that opened it.
-- The German interface addresses users informally.
-- English text uses American spelling.
-- Release builds are minified with R8, and each release ships the mapping files.
-- Tvheadend SDK 0.34.0 and HTSP 1.0.0-beta.4, including SDK-owned retry of failed
-  Player cleanup while preserving unrelated playback items.
+- Playback no longer starts when the app opens. To turn it back on, open Settings,
+  go to Player and switch on **Start playback when the app opens**.
+- The Guide search is hidden for now.
+- Channels, Guide, Recordings and Settings follow the Material for TV margins, and
+  the Guide has denser rows.
+- Logos and programme pictures fade in as they load.
+- The start-up buffer for live TV is tuned per server.
+- The German interface now addresses you informally ("du").
+- Under the hood: built on Tvheadend SDK 0.34.0 and HTSP 1.0.0-beta.4. Release
+  builds are smaller, and each release ships the mapping files that make crash
+  reports readable.
 
 ### Fixed
 
-- Live buffers that run dry recover only when playback can advance, and keep
-  pause, audio interruption and newer channel-selection intent. Viewer pause
-  stays available only with server timeshift.
-- A live stream that the server stops without reporting an issue is handled.
-- A Pause pressed during a channel change is kept, and after a channel change the
-  old or frozen picture stays covered until the new channel's picture is moving.
-  The busy ring fades out once the sound plays.
-- Audio interruptions recover and resume reliably.
-- A recording continues where it stood after Retry or a restore.
-- Unreadable recording-action responses are reported as uncertain outcomes
-  instead of confirmed failures, and servers that need an HTSP upgrade are
-  identified.
-- Stale recording confirmations no longer apply, and a held OK that closes one
-  no longer triggers the item behind it.
-- Programme details list each credited name once per role.
-- 12-hour times stay whole in seekbar rows and narrow Guide cells.
+- After a channel change, the old or frozen picture stays covered until the new
+  channel's picture is moving. A Pause pressed during the change is kept.
+- Audio interruptions recover and playback resumes reliably. A held OK that closes
+  a confirmation no longer triggers the item behind it.
+- When the server stops sending a live channel, the player shows "Playback
+  stopped".
+- If the server's answer to a record, stop or delete cannot be read, the app says
+  the outcome is uncertain and asks you to check the recording, instead of
+  reporting a failure.
+- Programme details list each credited name once per role, and 12-hour times stay
+  whole in seekbar rows and narrow Guide cells.
 
 ## 0.2.13
 

@@ -81,8 +81,11 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 Documentation stays in this repository as Markdown; there is no separate
 documentation site or toolchain.
 
-- [`README.md`](../README.md) is the entry point: what the app is, the Play and
-  Appliance builds, requirements, installation, and building from source.
+- [`README.md`](../README.md) is the entry point for people who use the app: what
+  it is, requirements, features, which APK to install, privacy, and license.
+- [`CONTRIBUTING.md`](../CONTRIBUTING.md) is for people who build or contribute:
+  the technical overview, the Play and Appliance builds, building from source,
+  release integrity, the engineering harness, and upstream contributions.
 - [`CHANGELOG.md`](../CHANGELOG.md) records user-visible changes per release;
   GitHub release notes are taken from its section for that version.
 - [`privacy-policy.md`](../privacy-policy.md) describes what the app stores and
