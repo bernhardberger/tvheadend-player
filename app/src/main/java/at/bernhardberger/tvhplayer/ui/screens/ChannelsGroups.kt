@@ -21,12 +21,3 @@ internal fun channelsGroups(scope: ChannelBrowsingScope): List<ChannelsGroup> = 
         add(ChannelsGroup(tag.id, tag.name, scope.allChannels.filter { tag.id in it.tagIds.orEmpty() }))
     }
 }
-
-/** The Rows layout shows one row per group that has channels. */
-internal fun channelsRows(groups: List<ChannelsGroup>): List<ChannelsGroup> = groups.filter { it.channels.isNotEmpty() }
-
-/** The row [step] rows from [current]'s, or null past either end or without a current row. */
-internal fun adjacentChannelsRow(rows: List<ChannelsGroup>, current: ChannelTagId?, step: Int): ChannelsGroup? {
-    val index = rows.indexOfFirst { it.tagId == current }
-    return if (index < 0) null else rows.getOrNull(index + step)
-}

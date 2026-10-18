@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -15,6 +16,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.tv.material3.Icon
+import androidx.tv.material3.IconButtonDefaults
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
@@ -56,7 +58,7 @@ internal fun ChannelsHeader(
             .testTag("channels-header"),
         actions = {
             if (showGroup) RoundIconButton(
-                icon = { Icon(painterResource(R.drawable.ic_filter_list), stringResource(R.string.channels_group)) },
+                icon = { Icon(painterResource(R.drawable.ic_filter_list), stringResource(R.string.channels_group), Modifier.size(IconButtonDefaults.MediumIconSize)) },
                 onClick = { onOpen(ChannelsPanel.GROUP) },
                 focusRequester = focus.group,
                 onFocused = onFocused,
@@ -68,7 +70,7 @@ internal fun ChannelsHeader(
                     .testTag("channels-group-button"),
             )
             RoundIconButton(
-                icon = { Icon(painterResource(R.drawable.ic_tune), stringResource(R.string.channels_view_options)) },
+                icon = { Icon(painterResource(R.drawable.ic_tune), stringResource(R.string.channels_view_options), Modifier.size(IconButtonDefaults.MediumIconSize)) },
                 onClick = { onOpen(ChannelsPanel.VIEW_OPTIONS) },
                 focusRequester = focus.view,
                 onFocused = onFocused,

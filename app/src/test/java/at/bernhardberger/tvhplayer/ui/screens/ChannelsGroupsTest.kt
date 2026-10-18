@@ -7,7 +7,6 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import at.bernhardberger.tvhplayer.core.resolveChannelScope
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ChannelsGroupsTest {
@@ -42,17 +41,5 @@ class ChannelsGroupsTest {
         val visibility = ChannelScopeVisibility(configured = true, allChannelsVisible = false, visibleTagIds = setOf(news))
         val groups = channelsGroups(resolveChannelScope(channels, tags, requestedTagId = null, visibility))
         assertEquals(listOf(news), groups.map { it.tagId })
-    }
-
-    @Test
-    fun rowsSkipEmptyGroupsAndStepWithinThem() {
-        val rows = channelsRows(channelsGroups(resolveChannelScope(channels, tags, requestedTagId = null)))
-        assertEquals(listOf(null, sport, news), rows.map { it.tagId })
-        assertEquals(sport, adjacentChannelsRow(rows, null, 1)?.tagId)
-        assertEquals(null, adjacentChannelsRow(rows, sport, -1)?.tagId)
-        assertEquals(rows.first(), adjacentChannelsRow(rows, sport, -1))
-        assertNull(adjacentChannelsRow(rows, null, -1))
-        assertNull(adjacentChannelsRow(rows, news, 1))
-        assertNull("An empty group is no row to step from", adjacentChannelsRow(rows, radio, 1))
     }
 }

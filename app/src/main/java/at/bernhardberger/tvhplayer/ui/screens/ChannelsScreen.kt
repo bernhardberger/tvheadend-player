@@ -43,7 +43,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -116,6 +115,7 @@ import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
@@ -127,6 +127,7 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -284,7 +285,6 @@ internal fun ChannelsScreenContent(
         scopeStateProvider().scope.activeTagId
     }
     val groups = remember(channelScope) { channelsGroups(channelScope) }
-    val rows = remember(groups) { channelsRows(groups) }
     val header = remember { ChannelsHeaderFocus() }
     val headerEntryFocus = header.entry(hasGroupChoice = groups.size > 1)
     var openPanel by remember { mutableStateOf<ChannelsPanel?>(null) }
@@ -341,10 +341,7 @@ internal fun ChannelsScreenContent(
         }
     }
     val gridState = rememberLazyGridState()
-    // Every row keeps its own position, as the player rail does.
-    val rowStates = remember { mutableMapOf<ChannelTagId?, LazyListState>() }
-    fun rowState(tagId: ChannelTagId?): LazyListState = rowStates.getOrPut(tagId) { LazyListState() }
-    val rowState = rowState(channelScope.activeTagId)
+    val rowState = rememberLazyListState()
     val rowOffscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
     val coroutineScope = rememberCoroutineScope()
     val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
@@ -391,7 +388,7 @@ internal fun ChannelsScreenContent(
         when (layout) {
             ChannelsLayout.LIST -> ChannelsListViewport(listState, ::channelFocusScrollOffset)
             ChannelsLayout.GRID -> ChannelsGridViewport(gridState, view.gridColumns)
-            ChannelsLayout.ROWS -> ChannelsRowViewport(rowState) { rowOffscreenPx }
+            ChannelsLayout.IMMERSIVE -> ChannelsRowViewport(rowState) { rowOffscreenPx }
         }
     }
     val currentViewport by rememberUpdatedState(viewport)
@@ -498,8 +495,8 @@ internal fun ChannelsScreenContent(
     }
 
     /**
-     * Shows [tagId]'s channels. The group picker enters its remembered channel; a Rows row change
-     * keeps content focus, so the scope publication moves it to the new row's remembered card.
+     * Shows [tagId]'s channels. The group picker enters its remembered channel; otherwise content
+     * focus is kept, so the scope publication moves it to the group's remembered channel.
      */
     fun selectGroup(tagId: ChannelTagId?, enterContent: Boolean) {
         scopeMotion.select(tagId, groups.map { it.tagId })
@@ -659,19 +656,26 @@ internal fun ChannelsScreenContent(
         if (scopeEntryRequested && initialFocusEnabled) focusBrowseContent()
     }
 
-    LaunchedEffect(layout, rows, channelScope.activeTagId) {
-        // Rows show only groups with channels; an empty group gives way to the first row.
-        if (layout == ChannelsLayout.ROWS && rows.isNotEmpty() && rows.none { it.tagId == channelScope.activeTagId }) {
-            selectGroup(rows.first().tagId, enterContent = false)
-        }
-    }
-
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(
         Modifier
             .fillMaxSize()
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (showProgrammeDetails) 1f else 0f) },
     ) {
+        // Behind the header from the screen's top: it follows focus across groups, while the
+        // group's content fades on its own.
+        if (layout == ChannelsLayout.IMMERSIVE && channels.isNotEmpty()) ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
+            ChannelsImmersiveBackground(
+                // The shown channel follows focus after a delay; it may still be the previous group's.
+                channels = channelScope.allChannels,
+                channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
+                observation = observation,
+                nowSec = { nowSec },
+                logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
+                endInset = detailPanePadding.calculateEndPadding(layoutDirection),
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
         Column(
             Modifier
                 .fillMaxSize()
@@ -681,9 +685,8 @@ internal fun ChannelsScreenContent(
                 .padding(top = contentPadding.calculateTopPadding())
         ) {
             ChannelsHeader(
-                title = if (layout == ChannelsLayout.ROWS) stringResource(R.string.nav_channels)
-                    else groups.firstOrNull { it.tagId == channelScope.activeTagId }?.name
-                        ?: stringResource(R.string.all_channels),
+                title = groups.firstOrNull { it.tagId == channelScope.activeTagId }?.name
+                    ?: stringResource(R.string.all_channels),
                 focus = header,
                 showGroup = groups.size > 1,
                 navigationFocus = navigationFocus,
@@ -699,53 +702,8 @@ internal fun ChannelsScreenContent(
                 ),
             )
             Spacer(Modifier.height(8.dp))
-            if (layout == ChannelsLayout.ROWS && channels.isNotEmpty()) Box(Modifier.weight(1f).fillMaxWidth()) {
-                // The rows show their pictures with the session of the observation they were built from.
-                ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
-                ChannelsRowsBackground(
-                    channels = channels,
-                    channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
-                    observation = observation,
-                    nowSec = { nowSec },
-                    endInset = detailPanePadding.calculateEndPadding(layoutDirection),
-                    modifier = Modifier.fillMaxSize(),
-                )
-                Column(Modifier.fillMaxSize()) {
-                    UnavailableTagNotice(
-                        visible = tagNotice,
-                        onDismiss = onDismissTagNotice,
-                        modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, end = detailPanePadding.calculateEndPadding(layoutDirection)),
-                    )
-                    ChannelsRowsBody(
-                        rows = rows,
-                        currentTagId = channelScope.activeTagId,
-                        cards = ChannelsRowsCards(
-                            frame = ChannelsTabBody(
-                                channelScopeState, observation, connectionUiState, orderedChannelIds,
-                                channelNumbers, playingChannelId, recordingChannelIds, tagNotice,
-                                { focusedChannelId }, ::scopeEntryChannelId, { nowSec }, initialFocusEnabled,
-                                playbackChannelId, playbackIndicator,
-                            ),
-                            nowSec = { nowSec },
-                            keyline = startPadding + TvBrowseLeadingInset,
-                            programmePicture = view.cardPicture == ChannelsCardPicture.PROGRAMME,
-                            focusRequesters = rowFocusRequesters,
-                            navigationFocus = navigationFocus,
-                            headerFocus = headerEntryFocus,
-                            onFocusChannel = { onChannelFocused(it, channelScope.activeTagId) },
-                            onPlay = { onPlay(it.id, it.name.orEmpty()) },
-                            onOpenContextMenu = ::openChannelContextMenu,
-                            onExitTowardNavigation = { relinquishContentFocus() },
-                            onPage = ::pageChannels,
-                        ),
-                        rowState = ::rowState,
-                        onChangeRow = { selectGroup(it.tagId, enterContent = false) },
-                        modifier = Modifier.weight(1f).fillMaxWidth(),
-                        currentRowModifier = Modifier.focusProperties { onEnter = { enterFromNavigation() } },
-                    )
-                }
-                }
-            } else TabContent(
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+            TabContent(
                 motion = scopeMotion,
                 selectedKey = channelScope.activeTagId,
                 state = {
@@ -756,7 +714,8 @@ internal fun ChannelsScreenContent(
                         playbackChannelId, playbackIndicator,
                     )
                 },
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+                transform = BrowseMotionPolicy::fadeThroughTransform,
+                modifier = Modifier.fillMaxSize(),
             ) body@{ frame, owner ->
             val channelScopeState = frame.scope
             val channelScope = channelScopeState.scope
@@ -819,7 +778,37 @@ internal fun ChannelsScreenContent(
             // A frame shows its pictures with the session of the observation it was built from, and
             // its cards' saved logos with the observation their scope was resolved from.
             ProvideArtworkSession(currentSession, channelScopeState.observation) {
-            if (layout == ChannelsLayout.GRID) {
+            if (layout == ChannelsLayout.IMMERSIVE) {
+                Column(Modifier.fillMaxSize()) {
+                    UnavailableTagNotice(
+                        visible = tagNotice,
+                        onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
+                        modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, end = detailPanePadding.calculateEndPadding(layoutDirection)),
+                    )
+                    ChannelsImmersiveBody(
+                        channels = channels,
+                        cards = ChannelsImmersiveCards(
+                            frame = frame,
+                            nowSec = nowSecProvider,
+                            keyline = startPadding + TvBrowseLeadingInset,
+                            programmePicture = view.cardPicture == ChannelsCardPicture.PROGRAMME,
+                            focusRequesters = rowFocusRequesters,
+                            navigationFocus = navigationFocus,
+                            headerFocus = headerEntryFocus,
+                            onFocusChannel = { if (owner.isCurrent) onChannelFocused(it, channelScope.activeTagId) },
+                            onPlay = { if (owner.isCurrent) onPlay(it.id, it.name.orEmpty()) },
+                            onOpenContextMenu = { if (owner.isCurrent) openChannelContextMenu(it) },
+                            onExitTowardNavigation = { relinquishContentFocus() },
+                            onPage = ::pageChannels,
+                        ),
+                        state = rememberTabListState(rowState),
+                        current = owner.isCurrent,
+                        bottomInset = contentPadding.calculateBottomPadding(),
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        rowModifier = contentEntry,
+                    )
+                }
+            } else if (layout == ChannelsLayout.GRID) {
                 // Cards keep the list's leading keyline; the grid's edge inset is focus reserve.
                 Column(
                     Modifier
@@ -1002,6 +991,7 @@ internal fun ChannelsScreenContent(
                 }
             }
             }
+            }
         }
     }
     contextChannelId?.let { channelId ->
@@ -1033,7 +1023,7 @@ internal fun ChannelsScreenContent(
     }
     when (openPanel) {
         ChannelsPanel.GROUP -> ChannelsGroupPanel(
-            groups = if (layout == ChannelsLayout.ROWS) rows else groups,
+            groups = groups,
             currentTagId = channelScope.activeTagId,
             onSelect = { tagId ->
                 closePanel()

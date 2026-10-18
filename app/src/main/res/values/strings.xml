@@ -145,7 +145,7 @@
     <string name="settings_clock_format">Clock format</string>
     <string name="channels_layout_list">List</string>
     <string name="channels_layout_grid">Grid</string>
-    <string name="channels_layout_rows">Rows</string>
+    <string name="channels_layout_immersive">Immersive</string>
     <string name="channels_group">Channel group</string>
     <string name="channels_view_options">View options</string>
     <string name="channels_view_layout">Layout</string>

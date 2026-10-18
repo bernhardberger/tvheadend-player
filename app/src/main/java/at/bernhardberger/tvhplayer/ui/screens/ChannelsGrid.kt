@@ -5,6 +5,8 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -31,18 +33,21 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
+import at.bernhardberger.tvhplayer.ui.components.compactZapCardMinHeight
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import kotlin.math.floor
 
-/** Tighter than the columns so three rows and a peek of the fourth fit below the header. */
+/** Tighter than the columns, so more rows fit below the header. */
 private val ChannelsGridRowGap = 16.dp
 
 /** Room on every side for a focused card's native scale and its outer outline. */
@@ -90,6 +95,13 @@ internal fun ChannelsGrid(
     }
     var focusedIndex by remember { mutableIntStateOf(-1) }
     val lastRow = channels.lastIndex / columns
+    BoxWithConstraints(modifier) {
+    val cardHeight = channelsGridCardHeight(
+        columnWidth = (maxWidth - ChannelsGridEdgeInset * 2 - CompactZapCardGap * (columns - 1)) / columns,
+        rowsHeight = maxHeight - ChannelsGridEdgeInset - TvGridVerticalMargin,
+        rowGap = ChannelsGridRowGap,
+        minHeight = compactZapCardMinHeight(),
+    )
     CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -103,7 +115,8 @@ internal fun ChannelsGrid(
                 top = ChannelsGridEdgeInset,
                 bottom = ChannelsGridFadeHeight + ChannelsGridEdgeInset,
             ),
-            modifier = modifier
+            modifier = Modifier
+                .fillMaxSize()
                 .listEdgeFadeMask(ChannelsGridFadeHeight) { state.canScrollBackward }
                 .testTag("channels-grid")
                 .focusGroup()
@@ -147,6 +160,7 @@ internal fun ChannelsGrid(
                     tagPrefix = "channels-grid",
                     menuKey = true,
                     programmePicture = programmePicture,
+                    preferredHeight = cardHeight,
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
@@ -169,6 +183,22 @@ internal fun ChannelsGrid(
             }
         }
     }
+    }
+}
+
+/**
+ * A grid card's height: 16:9 of its column, or the card's [minHeight] when its text needs more.
+ * When that leaves the last row on screen mostly shown and cut off, the cards get just short
+ * enough that one more whole row fits in [rowsHeight], but never below [minHeight] or flatter
+ * than 2:1.
+ */
+internal fun channelsGridCardHeight(columnWidth: Dp, rowsHeight: Dp, rowGap: Dp, minHeight: Dp): Dp {
+    val base = maxOf(columnWidth * 9 / 16, minHeight)
+    val rows = floor((rowsHeight + rowGap) / (base + rowGap))
+    val remainder = rowsHeight + rowGap - (base + rowGap) * rows
+    if (remainder <= base / 2) return base
+    val fitted = (rowsHeight - rowGap * rows) / (rows + 1)
+    return if (fitted >= maxOf(minHeight, columnWidth / 2)) fitted else base
 }
 
 /**

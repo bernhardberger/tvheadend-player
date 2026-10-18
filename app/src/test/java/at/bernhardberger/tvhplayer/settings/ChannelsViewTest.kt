@@ -17,7 +17,7 @@ class ChannelsViewTest {
         )
         assertEquals(
             listOf(ChannelsViewOption.LAYOUT, ChannelsViewOption.CARD_PICTURE),
-            ChannelsView(ChannelsLayout.ROWS).sections,
+            ChannelsView(ChannelsLayout.IMMERSIVE).sections,
         )
     }
 
@@ -46,11 +46,11 @@ class ChannelsViewTest {
     fun missingOrUnknownStoredValuesFallBackToTheDefaults() {
         assertEquals(ChannelsView(), resolveChannelsView(null, null, null))
         assertEquals(ChannelsView(ChannelsLayout.LIST, 4, ChannelsCardPicture.PROGRAMME), ChannelsView())
-        // Round 2's IMMERSIVE and an unoffered column count are unknown values.
-        assertEquals(ChannelsView(), resolveChannelsView("IMMERSIVE", 5, "POSTER"))
+        // Round 3's ROWS and an unoffered column count are unknown values.
+        assertEquals(ChannelsView(), resolveChannelsView("ROWS", 5, "POSTER"))
         assertEquals(
-            ChannelsView(ChannelsLayout.ROWS, 3, ChannelsCardPicture.LOGO),
-            resolveChannelsView("ROWS", 3, "LOGO"),
+            ChannelsView(ChannelsLayout.IMMERSIVE, 3, ChannelsCardPicture.LOGO),
+            resolveChannelsView("IMMERSIVE", 3, "LOGO"),
         )
         assertEquals(ChannelsView(ChannelsLayout.GRID), resolveChannelsView("GRID", null, "unknown"))
     }
@@ -59,7 +59,7 @@ class ChannelsViewTest {
     fun theStoreKeepsEveryValueOfTheView() = runTest {
         val store = UiSettingsStore(InMemoryPreferencesDataStore())
         assertEquals(ChannelsView(), store.settings.first().channelsView)
-        val view = ChannelsView(ChannelsLayout.ROWS, gridColumns = 3, cardPicture = ChannelsCardPicture.LOGO)
+        val view = ChannelsView(ChannelsLayout.IMMERSIVE, gridColumns = 3, cardPicture = ChannelsCardPicture.LOGO)
         store.setChannelsView(view)
         assertEquals(view, store.settings.first().channelsView)
     }

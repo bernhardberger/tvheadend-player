@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ContentTransform
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -144,6 +145,8 @@ internal fun <T> TabContent(
     selectedKey: Any?,
     state: () -> T,
     modifier: Modifier = Modifier,
+    /** A selection's motion from its direction among the keys; null for other replacements. */
+    transform: (direction: Int?) -> ContentTransform = BrowseMotionPolicy::tabTransform,
     content: @Composable ColumnScope.(T, TabOwner) -> Unit,
 ) {
     val generation = motion.externalGeneration
@@ -177,8 +180,7 @@ internal fun <T> TabContent(
             transitionSpec = {
                 val direction = change?.takeIf { it.destination == targetState.destination }?.direction
                 val sign = direction?.takeUnless { initialState.destination == targetState.destination }?.times(rtlSign)
-                val transform = BrowseMotionPolicy.tabTransform(sign)
-                transform.using(null)
+                transform(sign).using(null)
             },
             label = "tabBody",
         ) { body ->

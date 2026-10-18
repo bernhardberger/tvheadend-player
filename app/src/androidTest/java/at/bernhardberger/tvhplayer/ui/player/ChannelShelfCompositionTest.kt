@@ -188,11 +188,13 @@ class ChannelShelfCompositionTest {
         assertEquals(with(rule.density) { 196.dp.toPx() }, unfocusedBounds.width, 1f)
         assertTrue(firstBounds.height <= with(rule.density) { 140.dp.toPx() })
         val picon = rule.onNodeWithTag("player-channel-1-picon", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        // The card node reports layout bounds; its descendants include the native focus scale.
-        val focusScale = picon.width / with(rule.density) { 100.dp.toPx() }
+        val progress = rule.onNodeWithTag("player-channel-1-progress", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        // The card node reports layout bounds; its full-width strip (card 1 has a current programme) includes the native focus scale.
+        val focusScale = progress.width / firstBounds.width
         assertEquals(1.1f, focusScale, .01f)
-        assertEquals(with(rule.density) { 100.dp.toPx() } * focusScale, picon.width, 1f)
-        assertEquals(with(rule.density) { 45.dp.toPx() } * focusScale, picon.height, 1f)
+        // The logo fills the room above the text: at least as large as the rail's former 100x45.
+        assertTrue(picon.width >= with(rule.density) { 100.dp.toPx() } * focusScale - 1f)
+        assertTrue(picon.height >= with(rule.density) { 45.dp.toPx() } * focusScale - 1f)
         val identityLayouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
         rule.onNodeWithTag("player-channel-1-identity", useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(identityLayouts) }

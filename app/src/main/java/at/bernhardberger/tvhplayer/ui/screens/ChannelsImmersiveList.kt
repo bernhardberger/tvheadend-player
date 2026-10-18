@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -11,7 +10,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,27 +30,18 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -62,9 +51,6 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -73,7 +59,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -90,49 +75,45 @@ import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.DetailsHero
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
-import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.navigationEdgeFadeMask
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
-import at.bernhardberger.tvhplayer.ui.components.rowContentEmphasis
-import at.bernhardberger.tvhplayer.ui.components.rowEmphasis
-import at.bernhardberger.tvhplayer.ui.components.rowHeaderEmphasis
+import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import kotlinx.coroutines.delay
-import kotlin.math.ceil
-import kotlin.math.floor
 import kotlin.time.Instant
 
 /** Browsing settles this long before the background follows, so fast steps do not flash art. */
-private const val RowsBackgroundDebounceMillis = 300L
-private const val RowsBackgroundCrossfadeMillis = 300
+private const val ImmersiveBackgroundDebounceMillis = 300L
+private const val ImmersiveBackgroundCrossfadeMillis = 300
 
-/** Room above and below a row's cards for their native focus scale and outline. */
-private val RowsFocusRoom = 12.dp
+/** Room above and below the cards for their native focus scale and outline. */
+private val ImmersiveFocusRoom = 12.dp
 
-/** Between a row's heading and its cards. */
-private val RowsHeadingGap = 8.dp
+/** Between the hero's last line and the row's focus room. */
+private val ImmersiveHeroGap = 4.dp
 
-/** The channel logo standing in for a missing programme picture, clear of the header above. */
-private val RowsFallbackLogoTop = 24.dp
-private val RowsFallbackLogoSize = 240.dp to 135.dp
+/** The channel logo standing in for a missing programme picture, this far below the header. */
+private val ImmersiveFallbackLogoTop = 24.dp
+private val ImmersiveFallbackLogoSize = 240.dp to 135.dp
 
-private val RowsHeroWidth = 480.dp
+private val ImmersiveHeroWidth = 480.dp
 
-private val RowsBackgroundTopFade = 48.dp
 
 /**
- * Background of the Rows layout below the header: the focused channel's programme picture under
- * the kit's cinematic scrim, or its logo on the theme background. Warm playback keeps the video as
+ * Background of the immersive list: the focused channel's programme picture in the screen's top
+ * end corner under the kit's cinematic scrim, as the kit's immersive list has it, or its logo
+ * below the header ([logoTop]) on the theme background. Warm playback keeps the video as
  * the background, so nothing is drawn.
  */
 @Composable
-internal fun ChannelsRowsBackground(
+internal fun ChannelsImmersiveBackground(
     channels: List<Channel>,
     channelId: () -> ChannelId?,
     observation: SessionObservation,
     nowSec: () -> Long,
+    logoTop: Dp,
     endInset: Dp,
     modifier: Modifier = Modifier,
 ) {
@@ -141,15 +122,15 @@ internal fun ChannelsRowsBackground(
     var shown by remember { mutableStateOf(target) }
     LaunchedEffect(target) {
         if (shown != target) {
-            delay(RowsBackgroundDebounceMillis)
+            delay(ImmersiveBackgroundDebounceMillis)
             shown = target
         }
     }
     Crossfade(
         shown,
-        modifier.testTag("channels-rows-background"),
-        tween(RowsBackgroundCrossfadeMillis),
-        label = "rowsBackground",
+        modifier.testTag("channels-immersive-background"),
+        tween(ImmersiveBackgroundCrossfadeMillis),
+        label = "immersiveBackground",
     ) { id ->
         val channel = channels.firstOrNull { it.id == id } ?: return@Crossfade
         val now = nowSec()
@@ -159,29 +140,20 @@ internal fun ChannelsRowsBackground(
         val session = observation.currentSession
         Box(Modifier.fillMaxSize()) {
             if (art != null && session != null) {
-                DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-rows-art")
-                    // The picture starts below the header; its top edge fades in rather than cutting across.
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        drawRect(
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black), endY = RowsBackgroundTopFade.toPx()),
-                            blendMode = BlendMode.DstIn,
-                        )
-                    })
+                DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"))
             } else {
                 PiconBox(channel.icon,
-                    Modifier.align(Alignment.TopEnd).padding(top = RowsFallbackLogoTop, end = endInset)
-                        .size(RowsFallbackLogoSize.first, RowsFallbackLogoSize.second)
-                        .testTag("channels-rows-picon"),
+                    Modifier.align(Alignment.TopEnd).padding(top = logoTop + ImmersiveFallbackLogoTop, end = endInset)
+                        .size(ImmersiveFallbackLogoSize.first, ImmersiveFallbackLogoSize.second)
+                        .testTag("channels-immersive-picon"),
                 )
             }
         }
     }
 }
 
-/** Card-row facts shared by every row; only the current row takes focus and keys. */
-internal class ChannelsRowsCards(
+/** What the immersive list's cards need from the screen. */
+internal class ChannelsImmersiveCards(
     val frame: ChannelsTabBody,
     val nowSec: () -> Long,
     val keyline: Dp,
@@ -197,128 +169,45 @@ internal class ChannelsRowsCards(
 )
 
 /**
- * Rows: the focused channel's programme on top, then one row of compact zap cards per channel
- * group, the current group's row first and the next row peeking below. Up and Down change the row
- * with one [RowChangeMotion]; each row keeps its own position and focused card. Up from the first
- * row reaches the header, Left at a row's start the navigation rail.
+ * The immersive list: the focused channel's programme above one row of compact zap cards along
+ * the bottom, over [ChannelsImmersiveBackground]. Up from the row reaches the header, Left at its
+ * start the navigation rail; Down stays.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun ChannelsRowsBody(
-    rows: List<ChannelsGroup>,
-    currentTagId: ChannelTagId?,
-    cards: ChannelsRowsCards,
-    rowState: (ChannelTagId?) -> LazyListState,
-    onChangeRow: (ChannelsGroup) -> Unit,
+internal fun ChannelsImmersiveBody(
+    channels: List<Channel>,
+    cards: ChannelsImmersiveCards,
+    state: LazyListState,
+    current: Boolean,
+    bottomInset: Dp,
     modifier: Modifier = Modifier,
-    currentRowModifier: Modifier = Modifier,
+    rowModifier: Modifier = Modifier,
 ) {
-    val currentIndex = rows.indexOfFirst { it.tagId == currentTagId }.coerceAtLeast(0)
-    val position by animateFloatAsState(currentIndex.toFloat(), RowChangeMotion, label = "channels-row")
-    val typography = MaterialTheme.typography
-    val density = LocalDensity.current
-    val cardHeight = with(density) { 70.dp + typography.titleMedium.lineHeight.toDp() + typography.bodySmall.lineHeight.toDp() }
-    val rowHeight = with(density) { typography.titleMedium.lineHeight.toDp() } + RowsHeadingGap + cardHeight + RowsFocusRoom * 2
-    val rowPx = with(density) { rowHeight.toPx() }
-    val quietScale = typography.titleSmall.fontSize.value / typography.titleMedium.fontSize.value
-    // Rows within reach of the moving position, plus the current one however far a change went.
-    val composed by remember(rows) {
-        derivedStateOf {
-            ((floor(position).toInt() - 1)..(ceil(position).toInt() + 2)).filter { it in rows.indices }
-        }
-    }
-    // Holds focus while the rows trade places, so the leaving row cannot pass focus along its cards.
-    val handover = remember { FocusRequester() }
-    var handingOver by remember { mutableStateOf(false) }
-    Column(modifier) {
-        ChannelsRowsHero(rows.getOrNull(currentIndex)?.channels.orEmpty(), cards, Modifier.padding(start = cards.keyline, top = 8.dp))
-        Spacer(Modifier.height(8.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .weight(1f)
-                // The previous row leaves upward under the hero rather than across it.
-                .clipToBounds()
-                .testTag("channels-rows")
-                .onPreviewKeyEvent { event ->
-                    val step = when (event.key) {
-                        Key.DirectionDown -> 1
-                        Key.DirectionUp -> -1
-                        else -> 0
-                    }
-                    // Up from the first row is the cards' own: it reaches the header.
-                    if (step == 0 || step < 0 && currentIndex == 0) return@onPreviewKeyEvent false
-                    if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                        adjacentChannelsRow(rows, currentTagId, step)?.let {
-                            handingOver = true
-                            handover.requestFocus()
-                            onChangeRow(it)
-                        }
-                    }
-                    true
-                },
-        ) {
-            Box(Modifier.focusRequester(handover)
-                .onFocusChanged { if (!it.isFocused) handingOver = false }
-                .focusProperties { canFocus = handingOver }
-                .focusable())
-            for (index in (composed + currentIndex).distinct()) {
-                val row = rows[index]
-                key(row.tagId) {
-                    val emphasis = { rowEmphasis(index - position) }
-                    val current = index == currentIndex
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                translationY = (index - position) * rowPx
-                                // The hero owns the room above: the previous row is gone halfway up.
-                                alpha = (1f + 2f * (index - position)).coerceIn(0f, 1f)
-                            }
-                            .testTag("channels-row-${row.tagId?.value ?: "all"}"),
-                    ) {
-                        Text(
-                            row.name ?: stringResource(R.string.all_channels),
-                            style = typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .padding(start = cards.keyline)
-                                .widthIn(max = RowsHeroWidth)
-                                // The row above the current one is invisible, so its heading leaves the tree too.
-                                .then(if (index < currentIndex) Modifier.clearAndSetSemantics { } else Modifier.semantics { heading() })
-                                .rowHeaderEmphasis(quietScale, emphasis = emphasis),
-                        )
-                        Spacer(Modifier.height(RowsHeadingGap - RowsFocusRoom.coerceAtMost(RowsHeadingGap)))
-                        ChannelsCardRow(
-                            channels = row.channels,
-                            cards = cards,
-                            state = rowState(row.tagId),
-                            current = current,
-                            tag = "channels-row-${row.tagId?.value ?: "all"}-cards",
-                            modifier = Modifier
-                                .rowContentEmphasis(emphasis)
-                                .then(if (current) currentRowModifier else Modifier),
-                        )
-                    }
-                }
-            }
-        }
+    Column(modifier.padding(bottom = (bottomInset - ImmersiveFocusRoom).coerceAtLeast(0.dp))) {
+        Spacer(Modifier.weight(1f))
+        ChannelsImmersiveHero(channels, cards, Modifier.padding(start = cards.keyline))
+        Spacer(Modifier.height(ImmersiveHeroGap))
+        ChannelsCardRow(
+            channels = channels,
+            cards = cards,
+            state = state,
+            current = current,
+            modifier = rowModifier,
+        )
     }
 }
 
 /**
  * One overflowing card row; the focused card rests on the start keyline like the player rail.
- * Only the [current] row's cards can take focus.
+ * A leaving group's row ([current] false) takes no focus or keys.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun ChannelsCardRow(
     channels: List<Channel>,
-    cards: ChannelsRowsCards,
+    cards: ChannelsImmersiveCards,
     state: LazyListState,
     current: Boolean,
-    tag: String,
     modifier: Modifier,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
@@ -334,13 +223,13 @@ private fun ChannelsCardRow(
             state = state,
             userScrollEnabled = current,
             horizontalArrangement = Arrangement.spacedBy(CompactZapCardGap),
-            contentPadding = PaddingValues(horizontal = cards.keyline + CompactZapRowOffscreen, vertical = RowsFocusRoom),
+            contentPadding = PaddingValues(horizontal = cards.keyline + CompactZapRowOffscreen, vertical = ImmersiveFocusRoom),
             modifier = modifier
                 .fillMaxWidth()
                 // The card before the keyline passes under the navigation rail: fade it out there.
                 .navigationEdgeFadeMask(cards.keyline - CompactZapCardGap)
                 .overflowingRowViewport(offscreenPx)
-                .testTag(tag)
+                .testTag("channels-immersive-cards")
                 .focusGroup()
                 .focusRestorer()
                 .onPreviewKeyEvent { event ->
@@ -355,6 +244,7 @@ private fun ChannelsCardRow(
                             false
                         }
                         event.key == awayFromNavigation -> index == channels.lastIndex
+                        event.key == Key.DirectionDown -> true
                         else -> ChannelNavigation.pageDirectionForKeyCode(event.nativeKeyEvent.keyCode)?.let(cards.onPage) ?: false
                     }
                 },
@@ -378,7 +268,7 @@ private fun ChannelsCardRow(
                     recording = channelId in frame.recordingIds,
                     onClick = { if (current) cards.onPlay(channel) },
                     onLongClick = { if (current) cards.onOpenContextMenu(channelId) },
-                    tagPrefix = "channels-rows",
+                    tagPrefix = "channels-immersive",
                     menuKey = true,
                     programmePicture = cards.programmePicture,
                     modifier = Modifier
@@ -408,18 +298,22 @@ private fun ChannelsCardRow(
 
 /** The focused channel's identity and programme, passive; it dissolves like the list preview. */
 @Composable
-private fun ChannelsRowsHero(
+private fun ChannelsImmersiveHero(
     channels: List<Channel>,
-    cards: ChannelsRowsCards,
+    cards: ChannelsImmersiveCards,
     modifier: Modifier,
 ) {
     val frame = cards.frame
-    val channelId = frame.focusedId()?.takeIf { id -> channels.any { it.id == id } }
-        ?: browsingFocusChannelId(channels, frame.entryId())
+    // A leaving group keeps showing its own channel while it fades.
+    val focusedId = rememberTabReader(frame.focusedId)
+    val entryId = rememberTabReader(frame.entryId)
+    val channelId = focusedId()?.takeIf { id -> channels.any { it.id == id } }
+        ?: browsingFocusChannelId(channels, entryId())
     val typography = MaterialTheme.typography
-    // A fixed height keeps the rows in place while the hero's text changes length.
+    // A fixed height keeps the row in place while the hero's text changes length; shorter text
+    // sits on the row, so a two-line title grows upward.
     val height = with(LocalDensity.current) {
-        36.dp + 8.dp + typography.headlineSmall.lineHeight.toDp() + 4.dp + typography.bodyMedium.lineHeight.toDp() +
+        36.dp + 8.dp + typography.headlineSmall.lineHeight.toDp() * 2 + 4.dp + typography.bodyMedium.lineHeight.toDp() +
             12.dp + typography.bodyMedium.lineHeight.toDp() * 2
     }
     AnimatedContent(
@@ -429,9 +323,9 @@ private fun ChannelsRowsHero(
                 fadeOut(tween(ChannelsDetailCrossfadeMillis)) using
                 SizeTransform(clip = false) { _, _ -> snap() }
         },
-        contentAlignment = Alignment.TopStart,
-        modifier = modifier.height(height).widthIn(max = RowsHeroWidth).testTag("channels-rows-hero"),
-        label = "rowsHero",
+        contentAlignment = Alignment.BottomStart,
+        modifier = modifier.height(height).widthIn(max = ImmersiveHeroWidth).testTag("channels-immersive-hero"),
+        label = "immersiveHero",
     ) { id ->
         val channel = channels.firstOrNull { it.id == id } ?: return@AnimatedContent
         val now = cards.nowSec()
@@ -450,8 +344,8 @@ private fun ChannelsRowsHero(
             Text(
                 current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
                 style = typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp).testTag("channels-rows-title"),
+                maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 8.dp).testTag("channels-immersive-title"),
             )
             if (current != null) {
                 Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {

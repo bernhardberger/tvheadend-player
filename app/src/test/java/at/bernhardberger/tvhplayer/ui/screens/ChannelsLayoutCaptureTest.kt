@@ -62,11 +62,11 @@ class ChannelsLayoutCaptureTest {
     @Test fun grid3Logo() = grid(3, ChannelsCardPicture.LOGO)
     @Test fun grid4Programme() = grid(4, ChannelsCardPicture.PROGRAMME)
     @Test fun grid4Logo() = grid(4, ChannelsCardPicture.LOGO)
-    @Test fun rowsProgramme() = rows(ChannelsCardPicture.PROGRAMME)
-    @Test fun rowsLogo() = rows(ChannelsCardPicture.LOGO)
+    @Test fun immersiveProgramme() = immersive(ChannelsCardPicture.PROGRAMME)
+    @Test fun immersiveLogo() = immersive(ChannelsCardPicture.LOGO)
     @Test fun viewOptionsList() = viewOptions(ChannelsLayout.LIST)
     @Test fun viewOptionsGrid() = viewOptions(ChannelsLayout.GRID)
-    @Test fun viewOptionsRows() = viewOptions(ChannelsLayout.ROWS)
+    @Test fun viewOptionsImmersive() = viewOptions(ChannelsLayout.IMMERSIVE)
 
     private fun grid(columns: Int, picture: ChannelsCardPicture) {
         check(columns in ChannelsGridColumnCounts)
@@ -78,17 +78,21 @@ class ChannelsLayoutCaptureTest {
         capture("grid-$columns-${picture.slug()}-3-no-epg", card(2 + 2 * columns))
     }
 
-    private fun rows(picture: ChannelsCardPicture) {
-        fixture.show(ChannelsView(ChannelsLayout.ROWS, cardPicture = picture), fixture.fixtureArt())
-        capture("rows-${picture.slug()}-1-first-card", card(1))
+    private fun immersive(picture: ChannelsCardPicture) {
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, cardPicture = picture), fixture.fixtureArt())
+        capture("immersive-${picture.slug()}-1-first-card", card(1))
         fixture.key(Key.DirectionRight)
-        capture("rows-${picture.slug()}-2-long-names", card(2))
+        capture("immersive-${picture.slug()}-2-long-names", card(2))
         repeat(4) { fixture.key(Key.DirectionRight) }
-        capture("rows-${picture.slug()}-3-no-art", card(6))
+        capture("immersive-${picture.slug()}-3-no-art", card(6))
         repeat(2) { fixture.key(Key.DirectionRight) }
-        capture("rows-${picture.slug()}-4-no-epg-logo-fallback", card(8))
-        fixture.key(Key.DirectionDown)
-        capture("rows-${picture.slug()}-5-second-row", card(1))
+        capture("immersive-${picture.slug()}-4-no-epg-logo-fallback", card(8))
+        fixture.key(Key.DirectionUp)
+        fixture.key(Key.DirectionCenter)
+        repeat(2) { fixture.key(Key.DirectionDown) }
+        fixture.awaitFocus(hasTestTag("channels-group-2"))
+        fixture.key(Key.DirectionCenter)
+        capture("immersive-${picture.slug()}-5-other-group", card(7))
     }
 
     @Test fun groupPickerAndEmptyGroup() {

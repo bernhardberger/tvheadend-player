@@ -286,9 +286,9 @@ class QuickZapPresentationTest {
             // The pinned rail keeps card 1 off-screen, left of the keyline; card 3 rests unfocused.
             val native = card(3).fetchSemanticsNode().boundsInRoot
             val focused = card(2).fetchSemanticsNode().boundsInRoot
-            val picon = compose.onNodeWithTag("player-channel-2-picon", useUnmergedTree = true)
-                .fetchSemanticsNode().boundsInRoot
-            val scale = picon.width / 100f
+            // The full-width strip (card 2 has a current programme) carries the focus transform; the card's semantics do not.
+            val scale = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot.width / focused.width
             assertEquals(expectedScale, scale, .01f)
             // Supersample the real production composition, not a copied RoundedCornerShape.
             val sampleScale = 4
@@ -487,8 +487,8 @@ class QuickZapPresentationTest {
         assertEquals(focusColor, pixel(button.center.x, button.top + 8f))
         key(Key.DirectionDown)
         val bounds = card(2).fetchSemanticsNode().boundsInRoot
-        val picon = compose.onNodeWithTag("player-channel-2-picon", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val scale = picon.width / 100f
+        val scale = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.width / bounds.width
         val outlineTop = bounds.center.y - (bounds.height / 2f + 2f) * scale
         assertEquals(focusColor, pixel(bounds.center.x, outlineTop))
         assertEquals(0xFFE1E2E5.toInt(), focusColor)
@@ -507,9 +507,7 @@ class QuickZapPresentationTest {
         val progressBounds = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
         // Card semantics describe its unscaled layout; descendants include the native focus transform.
-        val piconBounds = compose.onNodeWithTag("player-channel-2-picon", useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot
-        val scale = piconBounds.width / 100f
+        val scale = progressBounds.width / focusedBounds.width
         val paintedBottom = focusedBounds.center.y + focusedBounds.height * scale / 2f
         val paintedLeft = focusedBounds.center.x - focusedBounds.width * scale / 2f
         assertEquals("progress stays embedded at the bottom", paintedBottom, progressBounds.bottom, .5f)

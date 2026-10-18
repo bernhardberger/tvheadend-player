@@ -226,13 +226,13 @@ class ChannelsStandardLayoutEvidenceTest {
         // The group's name heads the screen; Group and View options end on the trailing inset.
         val heading = heading().bounds()
         assertEquals("heading x", 130f, heading.left, .5f)
-        assertEquals("heading y", 36f, heading.top, .5f)
+        assertEquals("heading y", 32f, heading.top, .5f)
         val header = header().bounds()
         assertEquals("header y", 28f, header.top, .5f)
         val group = groupButton().bounds()
         val view = compose.onNodeWithTag("channels-view-button").bounds()
         assertEquals("buttons end on the trailing inset", 902f, view.right, .5f)
-        assertEquals("button size", 48f, view.width, .5f)
+        assertEquals("kit medium icon button", 40f, view.width, .5f)
         assertEquals("button gap", 12f, view.left - group.right, .5f)
         assertEquals("buttons share the heading's axis", heading.center.y, view.center.y, 1f)
         // The list column spans the focus reserve and runs to the screen bottom.
@@ -241,12 +241,12 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
 
-        // Rows: 340dp wide at x130, first at y88 below the header, 4dp gaps. Height is the library's
+        // Rows: 340dp wide at x130, first at y80 below the header, 4dp gaps. Height is the library's
         // standard two-line minimum and grows with text scale rather than clipping.
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
-        assertEquals("row y", 88f, first.top, .5f)
+        assertEquals("row y", 80f, first.top, .5f)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
@@ -297,7 +297,7 @@ class ChannelsStandardLayoutEvidenceTest {
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
         assertEquals("details width", 340f, details.width, .5f)
-        assertEquals("details top", 88f, details.top, .5f)
+        assertEquals("details top", 80f, details.top, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
         assertEquals("details bottom inset", 512f, details.bottom, .5f)
     }

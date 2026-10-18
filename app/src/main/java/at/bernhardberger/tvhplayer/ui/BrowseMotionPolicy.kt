@@ -41,4 +41,16 @@ internal object BrowseMotionPolicy {
             (slideOutHorizontally(stepAnimation()) { (-it * slideFraction * direction).toInt() } +
                 fadeOut(stepAnimation()))
     }
+
+    /**
+     * Material's fade through, for content replaced in place from a picker where no direction
+     * is on screen: the old content leaves before the new arrives, so the two never overlap.
+     */
+    fun fadeThroughTransform(direction: Int?): ContentTransform {
+        if (direction == null) return EnterTransition.None togetherWith ExitTransition.None
+        return fadeIn(tween(fadeThroughInMs, delayMillis = fadeThroughOutMs, easing = pageDecelerate)) togetherWith
+            fadeOut(tween(fadeThroughOutMs, easing = pageAccelerate))
+    }
+    const val fadeThroughOutMs = 90
+    const val fadeThroughInMs = 210
 }

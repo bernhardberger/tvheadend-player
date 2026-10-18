@@ -144,7 +144,7 @@ private fun ChannelsViewChoice.label(): String = when (this) {
         when (layout) {
             ChannelsLayout.LIST -> R.string.channels_layout_list
             ChannelsLayout.GRID -> R.string.channels_layout_grid
-            ChannelsLayout.ROWS -> R.string.channels_layout_rows
+            ChannelsLayout.IMMERSIVE -> R.string.channels_layout_immersive
         },
     )
     is ChannelsViewChoice.GridColumns -> pluralStringResource(R.plurals.channels_view_grid_columns_value, count, count)

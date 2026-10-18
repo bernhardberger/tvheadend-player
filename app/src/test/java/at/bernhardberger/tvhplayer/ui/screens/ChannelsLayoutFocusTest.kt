@@ -32,7 +32,7 @@ class ChannelsLayoutFocusTest {
 
     private val list = ChannelsView(ChannelsLayout.LIST)
     private val grid = ChannelsView(ChannelsLayout.GRID)
-    private val rows = ChannelsView(ChannelsLayout.ROWS)
+    private val immersive = ChannelsView(ChannelsLayout.IMMERSIVE)
     private val groupButton = hasTestTag("channels-group-button")
     private val viewButton = hasTestTag("channels-view-button")
 
@@ -184,11 +184,11 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionCenter)
         assertEquals(ChannelsView(ChannelsLayout.GRID, 3, ChannelsCardPicture.LOGO), fixture.channelsView)
         repeat(4) { fixture.key(Key.DirectionUp) }
-        fixture.awaitFocus(option("layout-rows"))
+        fixture.awaitFocus(option("layout-immersive"))
         fixture.key(Key.DirectionCenter)
         compose.onNode(option("columns-3")).assertDoesNotExist()
         compose.onNode(option("picture-logo")).assertExists()
-        assertEquals("Rows keep the grid's columns", ChannelsView(ChannelsLayout.ROWS, 3, ChannelsCardPicture.LOGO), fixture.channelsView)
+        assertEquals("Immersive keeps the grid's columns", ChannelsView(ChannelsLayout.IMMERSIVE, 3, ChannelsCardPicture.LOGO), fixture.channelsView)
     }
 
     @Test fun cardPictureLeadsWithTheProgrammeAndFallsBackToTheLogo() {
@@ -267,24 +267,14 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(card(6))
     }
 
-    @Test fun rowsMoveBetweenGroupsAndEachRowKeepsItsCard() {
-        fixture.show(rows)
+    @Test fun immersiveDownStaysAndUpReachesTheHeader() {
+        fixture.show(immersive)
         fixture.awaitFocus(card(1))
-        assertTitle("Channels")
+        assertTitle("All channels")
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(2))
         fixture.key(Key.DirectionDown)
-        fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-row-1-cards")))
-        repeat(2) { fixture.key(Key.DirectionRight) }
-        fixture.awaitFocus(card(3))
-        fixture.key(Key.DirectionDown)
-        fixture.awaitFocus(card(7) and hasAnyAncestor(hasTestTag("channels-row-2-cards")))
-        fixture.key(Key.DirectionDown)
-        fixture.awaitFocus(card(7))
-        fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(card(3) and hasAnyAncestor(hasTestTag("channels-row-1-cards")))
-        fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(card(2) and hasAnyAncestor(hasTestTag("channels-row-all-cards")))
+        fixture.awaitFocus(card(2))
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(groupButton)
         fixture.key(Key.DirectionDown)
@@ -292,33 +282,40 @@ class ChannelsLayoutFocusTest {
         assertEquals("Focus alone never tunes", 0, fixture.plays)
     }
 
-    @Test fun rowsLeftAtTheRowStartReachesTheRailAndTheRightEdgeStays() {
-        fixture.show(rows, playerReturn = PlayerReturnFocus(ChannelId(18), ChannelId(3)))
+    @Test fun immersiveLeftAtTheRowStartReachesTheRailAndTheRightEdgeStays() {
+        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(18), ChannelId(3)))
         fixture.awaitFocus(card(18))
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(18))
-        fixture.key(Key.DirectionDown)
-        fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-row-1-cards")))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(groupButton)
+        pickGroup(group(1), steps = 1)
+        fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-immersive-cards")))
+        assertTitle("Favorites")
         fixture.key(Key.DirectionLeft)
         awaitRail()
     }
 
-    @Test fun rowsGroupPickerGoesToTheRowAndItsRememberedCard() {
-        fixture.show(rows)
+    @Test fun immersiveGroupPickerReturnsToEachGroupsCard() {
+        fixture.show(immersive)
         fixture.awaitFocus(card(1))
-        repeat(2) { fixture.key(Key.DirectionDown) }
         repeat(3) { fixture.key(Key.DirectionRight) }
-        fixture.awaitFocus(card(10))
-        repeat(2) { fixture.key(Key.DirectionUp) }
-        fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-row-all-cards")))
+        fixture.awaitFocus(card(4))
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(groupButton)
         pickGroup(group(2), steps = 2)
-        fixture.awaitFocus(card(10) and hasAnyAncestor(hasTestTag("channels-row-2-cards")))
+        fixture.awaitFocus(card(7))
+        assertTitle("Entertainment")
+        repeat(3) { fixture.key(Key.DirectionRight) }
+        fixture.awaitFocus(card(10))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(groupButton)
+        pickGroup(group(null), steps = -2)
+        fixture.awaitFocus(card(4))
     }
 
-    @Test fun rowsChannelKeysPageByTheCardsOnScreen() {
-        fixture.show(rows, playerReturn = PlayerReturnFocus(ChannelId(2), ChannelId(2)))
+    @Test fun immersiveChannelKeysPageByTheCardsOnScreen() {
+        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(2), ChannelId(2)))
         fixture.awaitFocus(card(2))
         fixture.key(Key.ChannelDown)
         fixture.awaitFocus(card(5))
@@ -326,21 +323,21 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(card(2))
     }
 
-    @Test fun rowsBackgroundShowsArtThenTheLogoWithoutArt() {
-        fixture.show(rows, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+    @Test fun immersiveBackgroundShowsArtThenTheLogoWithoutArt() {
+        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)))
         fixture.awaitFocus(card(1))
-        compose.onNodeWithTag("channels-rows-art").assertExists()
+        compose.onNodeWithTag("channels-immersive-art").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
-        compose.onNodeWithTag("channels-rows-art").assertDoesNotExist()
-        compose.onNodeWithTag("channels-rows-picon").assertExists()
-        compose.onNodeWithTag("channels-rows-title").assertTextEquals("No EPG")
+        compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
+        compose.onNodeWithTag("channels-immersive-picon").assertExists()
+        compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No EPG")
     }
 
-    @Test fun rowsBackgroundDrawsNothingOverWarmPlayback() {
-        fixture.show(rows, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true)
+    @Test fun immersiveBackgroundDrawsNothingOverWarmPlayback() {
+        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true)
         fixture.awaitFocus(card(1))
-        compose.onNodeWithTag("channels-rows-background").assertDoesNotExist()
-        compose.onNodeWithTag("channels-rows-art").assertDoesNotExist()
+        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
+        compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
     }
 }

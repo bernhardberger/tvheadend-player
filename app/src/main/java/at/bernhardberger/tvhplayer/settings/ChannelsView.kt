@@ -4,7 +4,7 @@ package at.bernhardberger.tvhplayer.settings
 enum class ChannelsLayout {
     LIST,
     GRID,
-    ROWS,
+    IMMERSIVE,
 }
 
 /** Which picture a channel card leads with; without a programme picture it shows the logo. */
@@ -43,7 +43,7 @@ val ChannelsLayout.options: List<ChannelsViewOption>
     get() = when (this) {
         ChannelsLayout.LIST -> emptyList()
         ChannelsLayout.GRID -> listOf(ChannelsViewOption.GRID_COLUMNS, ChannelsViewOption.CARD_PICTURE)
-        ChannelsLayout.ROWS -> listOf(ChannelsViewOption.CARD_PICTURE)
+        ChannelsLayout.IMMERSIVE -> listOf(ChannelsViewOption.CARD_PICTURE)
     }
 
 /**
