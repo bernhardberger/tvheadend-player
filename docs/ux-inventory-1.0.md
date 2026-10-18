@@ -496,6 +496,10 @@ bear on this:
 - Mostly fine. The sliding-depth browse stays.
 - The rows have become cluttered and scattered and need restructuring.
 
+**Owner direction (2026-10-18)**
+- Onboarding (`ui/screens/OnboardingScreen.kt`) needs a redo.
+- The Settings dialog needs a redo too.
+
 **Questions**
 1. Should saving a connection test it before leaving onboarding?
 2. Should onboarding stay one form, or add discovery, language and first-run
@@ -822,6 +826,13 @@ bear on this:
   settled the shared patterns: Record acts immediately and the recording
   profile comes from Settings → Recordings (`docs/DESIGN.md` §10, Context menus
   and dialogs; `ui/screens/ProgrammeDetailsHost.kt:200`).
+
+**Owner direction (2026-10-18)**
+- The programme-details screen in the player (`ui/player/ProgramDetails.kt`:
+  Record, Remind me, Record series, Other airings, More info) needs a
+  redesign (roadmap U8). Its buttons were the only set in the app with a custom
+  fill; the U4 kit-button check resets them to the kit default on
+  `fix/kit-buttons`, and the redesign may replace that.
 
 **Questions**
 1. Should recordings get the same full-screen info as live?
