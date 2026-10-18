@@ -1,0 +1,153 @@
+package at.bernhardberger.tvhplayer.core
+
+import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+
+/** Where a condition is presented: see the error vocabulary rules for the surface each kind uses. */
+enum class AppErrorKind {
+    CONNECTION,
+
+    /** Centred passive message in the player; nothing focusable. */
+    CHANNEL,
+
+    /** Full-screen alert in the live player. */
+    LIVE_TV,
+
+    /** Full-screen alert in the recording player. */
+    RECORDING,
+}
+
+/**
+ * Every user-visible failure with its stable number: 1xx connection, 2xx live TV, 3xx recording
+ * playback. One condition has one text and one number everywhere. Numbers never change when
+ * wording or language does; add a condition with a new number instead of reusing one.
+ */
+enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
+    UNREACHABLE(101, AppErrorKind.CONNECTION),
+    TIMEOUT(102, AppErrorKind.CONNECTION),
+    AUTHENTICATION_REJECTED(103, AppErrorKind.CONNECTION),
+    PERMISSION_DENIED(104, AppErrorKind.CONNECTION),
+    INCOMPATIBLE_SERVER(105, AppErrorKind.CONNECTION),
+    CREDENTIAL_UNAVAILABLE(106, AppErrorKind.CONNECTION),
+    NOT_CONFIGURED(107, AppErrorKind.CONNECTION),
+    NO_CHANNELS(108, AppErrorKind.CONNECTION),
+    LOAD_FAILED(109, AppErrorKind.CONNECTION),
+
+    /** The SDK retries by itself and there is nothing saved to show instead. */
+    RECONNECTING(110, AppErrorKind.CONNECTION),
+
+    NO_FREE_ADAPTER(201, AppErrorKind.CHANNEL),
+    NO_SIGNAL(202, AppErrorKind.CHANNEL),
+    MUX_NOT_ENABLED(203, AppErrorKind.CHANNEL),
+    SCRAMBLED(204, AppErrorKind.CHANNEL),
+    CHANNEL_ACCESS_DENIED(205, AppErrorKind.CHANNEL),
+    CHANNEL_TAKEN_OVER(206, AppErrorKind.CHANNEL),
+
+    /** The server stopped the stream, or any live failure without a more specific cause. */
+    STREAM_STOPPED(207, AppErrorKind.CHANNEL),
+    USER_LIMIT(208, AppErrorKind.LIVE_TV),
+
+    RECORDING_INTERRUPTED(301, AppErrorKind.RECORDING),
+    RECORDING_NOT_STARTED(302, AppErrorKind.RECORDING),
+    RECORDING_FILE_MISSING(303, AppErrorKind.RECORDING),
+    RECORDING_UNAVAILABLE(304, AppErrorKind.RECORDING),
+}
+
+/** Buttons of a full-screen alert, in display order; the first is focused. */
+enum class AppErrorAction { RETRY, CONNECTION_SETTINGS, CLOSE }
+
+data class AppError(val condition: AppErrorCondition, val actions: List<AppErrorAction>)
+
+fun AppErrorCondition.toAppError(
+    disposition: SessionRecoveryDisposition? = null,
+    closable: Boolean = false,
+): AppError = AppError(this, actions(disposition, closable))
+
+/**
+ * Buttons follow the SDK recovery disposition: explicit retry offers Retry; a profile change or no
+ * retry offers Connection settings only; a connection that retries by itself offers Connection
+ * settings only. Without guidance (or with a future disposition) the condition's default applies.
+ * [closable] is a connection condition shown in a player, which adds Close. Live and recording
+ * alerts always carry their own Close; channel messages have no buttons.
+ */
+fun AppErrorCondition.actions(
+    disposition: SessionRecoveryDisposition? = null,
+    closable: Boolean = false,
+): List<AppErrorAction> {
+    val own = when (this) {
+        AppErrorCondition.NOT_CONFIGURED,
+        AppErrorCondition.CREDENTIAL_UNAVAILABLE -> listOf(AppErrorAction.CONNECTION_SETTINGS)
+        AppErrorCondition.NO_CHANNELS -> RETRY_AND_SETTINGS
+        AppErrorCondition.UNREACHABLE,
+        AppErrorCondition.TIMEOUT,
+        AppErrorCondition.LOAD_FAILED -> byDisposition(disposition, retryByDefault = true)
+        AppErrorCondition.AUTHENTICATION_REJECTED,
+        AppErrorCondition.PERMISSION_DENIED,
+        AppErrorCondition.INCOMPATIBLE_SERVER,
+        AppErrorCondition.RECONNECTING -> byDisposition(disposition, retryByDefault = false)
+        AppErrorCondition.NO_FREE_ADAPTER,
+        AppErrorCondition.NO_SIGNAL,
+        AppErrorCondition.MUX_NOT_ENABLED,
+        AppErrorCondition.SCRAMBLED,
+        AppErrorCondition.CHANNEL_ACCESS_DENIED,
+        AppErrorCondition.CHANNEL_TAKEN_OVER,
+        AppErrorCondition.STREAM_STOPPED -> emptyList()
+        AppErrorCondition.USER_LIMIT,
+        AppErrorCondition.RECORDING_INTERRUPTED -> listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)
+        AppErrorCondition.RECORDING_NOT_STARTED,
+        AppErrorCondition.RECORDING_FILE_MISSING,
+        AppErrorCondition.RECORDING_UNAVAILABLE -> listOf(AppErrorAction.CLOSE)
+    }
+    return if (kind == AppErrorKind.CONNECTION && closable) own + AppErrorAction.CLOSE else own
+}
+
+private val RETRY_AND_SETTINGS = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
+
+private fun byDisposition(
+    disposition: SessionRecoveryDisposition?,
+    retryByDefault: Boolean,
+): List<AppErrorAction> = when (disposition) {
+    SessionRecoveryDisposition.EXPLICIT_RETRY -> RETRY_AND_SETTINGS
+    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
+    SessionRecoveryDisposition.NO_RETRY,
+    SessionRecoveryDisposition.AUTOMATIC_BACKOFF -> listOf(AppErrorAction.CONNECTION_SETTINGS)
+    else -> if (retryByDefault) RETRY_AND_SETTINGS else listOf(AppErrorAction.CONNECTION_SETTINGS)
+}
+
+/**
+ * A connection that is still working or Ready has no error. Unknown or future SDK values land on
+ * [AppErrorCondition.LOAD_FAILED] through [ConnectionFailureKind.OTHER].
+ */
+fun ConnectionUiState.toAppError(closable: Boolean = false): AppError? = when (this) {
+    ConnectionUiState.NeedsConfiguration -> AppErrorCondition.NOT_CONFIGURED.toAppError(closable = closable)
+    ConnectionUiState.CredentialUnavailable ->
+        AppErrorCondition.CREDENTIAL_UNAVAILABLE.toAppError(closable = closable)
+    is ConnectionUiState.Error ->
+        kind.toAppErrorCondition(recoveryDisposition).toAppError(recoveryDisposition, closable)
+    ConnectionUiState.Connecting,
+    ConnectionUiState.SyncingChannels,
+    ConnectionUiState.Ready,
+    ConnectionUiState.Reconnecting -> null
+}
+
+/** A Ready session whose authoritative channel catalog is empty. */
+fun noChannelsAppError(closable: Boolean = false): AppError =
+    AppErrorCondition.NO_CHANNELS.toAppError(closable = closable)
+
+/** While the SDK retries on its own, reachability and timeout failures read as one reconnecting state. */
+fun ConnectionFailureKind.toAppErrorCondition(
+    disposition: SessionRecoveryDisposition,
+): AppErrorCondition {
+    val retryingByItself = disposition == SessionRecoveryDisposition.AUTOMATIC_BACKOFF
+    return when (this) {
+        ConnectionFailureKind.AUTHENTICATION -> AppErrorCondition.AUTHENTICATION_REJECTED
+        ConnectionFailureKind.PERMISSION_DENIED -> AppErrorCondition.PERMISSION_DENIED
+        ConnectionFailureKind.INCOMPATIBLE_SERVER -> AppErrorCondition.INCOMPATIBLE_SERVER
+        ConnectionFailureKind.UNREACHABLE ->
+            if (retryingByItself) AppErrorCondition.RECONNECTING else AppErrorCondition.UNREACHABLE
+        ConnectionFailureKind.TIMEOUT ->
+            if (retryingByItself) AppErrorCondition.RECONNECTING else AppErrorCondition.TIMEOUT
+        ConnectionFailureKind.OTHER ->
+            if (retryingByItself) AppErrorCondition.RECONNECTING else AppErrorCondition.LOAD_FAILED
+    }
+}
