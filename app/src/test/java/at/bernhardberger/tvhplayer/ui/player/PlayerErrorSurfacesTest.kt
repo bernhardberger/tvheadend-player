@@ -6,6 +6,7 @@ import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -148,15 +149,72 @@ class PlayerErrorSurfacesTest {
             )
         }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNode(hasText("Reconnecting in 3 s…")).assertExists()
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText("Reconnecting…"))
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 3 s"))
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close"))
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary")).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-number")).fetchSemanticsNodes().size)
 
         compose.mainClock.advanceTimeBy(1_000L)
-        compose.onNode(hasText("Reconnecting in 2 s…")).assertExists()
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 2 s"))
         compose.mainClock.advanceTimeBy(2_000L)
-        compose.onNode(hasText("Reconnecting…")).assertExists()
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText("Reconnecting…"))
+        assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-status")).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun hidingTheAlertDoesNotRestartTheCountdown() {
+        compose.mainClock.autoAdvance = false
+        val visible = mutableStateOf(true)
+        show {
+            LivePlayerAlertOverlay(
+                visible = visible.value,
+                alert = LivePlayerAlert.Recovering(retryDelayMillis = 10_500L),
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = {},
+            )
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 11 s"))
+        compose.mainClock.advanceTimeBy(1_000L)
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 10 s"))
+
+        // A layer over the alert hides it while the attempt's time runs on.
+        compose.runOnIdle { visible.value = false }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(3_800L)
+        compose.runOnIdle { visible.value = true }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(500L)
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 6 s"))
+    }
+
+    @Test
+    fun onlyTheStableTitleIsALiveRegionNotTheCountdown() {
+        compose.mainClock.autoAdvance = false
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = LivePlayerAlert.Recovering(retryDelayMillis = 5_500L),
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = {},
+            )
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val liveRegion = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
+        compose.onNodeWithTag("tv-recovery-title").assert(liveRegion)
+        compose.onNodeWithTag("tv-recovery-status")
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
+            .assert(!hasAnyAncestor(liveRegion))
+        // The pane's title is the stable text too, so the countdown never renames the pane.
+        compose.onNodeWithTag("tv-recovery-overlay")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Reconnecting…"))
+        compose.mainClock.advanceTimeBy(1_000L)
+        compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 5 s"))
+        compose.onNodeWithTag("tv-recovery-overlay")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Reconnecting…"))
     }
 
     @Test

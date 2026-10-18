@@ -83,11 +83,11 @@ class ConnectionUiStateTest {
     }
 
     @Test
-    fun playbackReconnectActionRequiresExplicitRetryFailure() {
+    fun recordingReconnectActionRequiresExplicitRetryFailure() {
         val retryCommandByState = listOf(
             ConnectionState.Disconnected to PlaybackRetryCommand.NONE,
             ConnectionState.Connecting to PlaybackRetryCommand.NONE,
-            ConnectionState.Connected to PlaybackRetryCommand.NONE,
+            ConnectionState.Connected to PlaybackRetryCommand.RESUME_RECORDING,
             ConnectionState.Error(
                 ConnectionFailureKind.OTHER,
                 SessionRecoveryDisposition.AUTOMATIC_BACKOFF,
@@ -108,9 +108,8 @@ class ConnectionUiStateTest {
 
         retryCommandByState.forEach { (connectionState, expectedCommand) ->
             val model = playbackRecoveryUiModel(
-                surface = PlaybackRecoverySurface.LIVE,
                 connectionState = connectionState,
-                retryTargetAvailable = false,
+                retryTargetAvailable = true,
             )
 
             assertEquals(expectedCommand, model.retryCommand)
@@ -121,6 +120,11 @@ class ConnectionUiStateTest {
                     PlaybackRecoveryInitialAction.RETRY
                 },
                 model.initialAction,
+            )
+            // Without a recording to resume nothing retries, whatever the connection.
+            assertEquals(
+                PlaybackRetryCommand.NONE,
+                playbackRecoveryUiModel(connectionState, retryTargetAvailable = false).retryCommand,
             )
         }
     }

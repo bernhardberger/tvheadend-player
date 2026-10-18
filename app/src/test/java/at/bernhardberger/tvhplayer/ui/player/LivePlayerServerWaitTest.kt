@@ -8,11 +8,16 @@ import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -40,6 +45,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
@@ -47,6 +53,8 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -196,7 +204,35 @@ class LivePlayerServerWaitTest {
         compose.waitUntil(10_000) { binds() > before }
     }
 
+    @Test fun aWaitWhoseConnectionRetriesByItselfOffersNoRetry() {
+        screen()
+        compose.runOnIdle {
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        }
+        settle()
+        compose.onNodeWithTag("tv-recovery-number").assert(hasText("Error 110"))
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Connection settings")).assertIsFocused()
+        assertEquals(0, compose.onAllNodes(hasText("Retry"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        // Connection settings leaves through the screen's close.
+        key(Key.DirectionCenter)
+        assertEquals(1, closes)
+    }
+
+    @Test fun aWaitWhoseConnectionNeedsTheViewerOffersRetryFirst() {
+        screen()
+        compose.runOnIdle {
+            connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
+        }
+        settle()
+        compose.onNodeWithTag("tv-recovery-number").assert(hasText("Error 101"))
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
+    }
+
     private val visible = MutableStateFlow(true)
+    /** AppRoot's connection state; null derives it from the observation. */
+    private val connection = mutableStateOf<ConnectionUiState?>(null)
 
     private companion object {
         val LOGO = ArtworkId(1)
@@ -270,7 +306,8 @@ class LivePlayerServerWaitTest {
                         if (visible.collectAsState().value) {
                             VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                                 channels, session, ChannelId(1), "Name 1", {},
-                                { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data))
+                                { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
+                                connectionUiState = connection.value)
                         }
                     }
                 } }

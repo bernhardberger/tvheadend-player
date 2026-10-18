@@ -57,7 +57,8 @@ data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
 /**
  * [actions], when given, replace the primary and secondary action: up to [MaxRecoveryActions]
  * buttons in order, the first filled and focused when they appear or change. [errorNumber] is a
- * small line under the hint.
+ * small line under the hint. [status] is a line under [message] that may change while shown, such
+ * as a countdown; the live region is [message] alone, so [status] changes outside it.
  */
 @Composable
 fun TvRecoveryOverlay(
@@ -75,6 +76,7 @@ fun TvRecoveryOverlay(
     liveRegionMode: LiveRegionMode = LiveRegionMode.Polite,
     errorNumber: String? = null,
     actions: List<TvRecoveryAction> = emptyList(),
+    status: String? = null,
 ) {
     require(actions.size <= MaxRecoveryActions) { "At most $MaxRecoveryActions recovery actions" }
     val buttons = actions.ifEmpty {
@@ -134,7 +136,6 @@ fun TvRecoveryOverlay(
                     .semantics {
                         paneTitle = message
                         if (primaryVisible) dialog()
-                        liveRegion = liveRegionMode
                         isTraversalGroup = true
                     }
                     .testTag("tv-recovery-overlay"),
@@ -152,8 +153,24 @@ fun TvRecoveryOverlay(
                     modifier = Modifier
                         .padding(top = if (primaryVisible) 0.dp else 24.dp)
                         .widthIn(max = 680.dp)
-                        .semantics { heading() },
+                        .semantics {
+                            heading()
+                            liveRegion = liveRegionMode
+                        }
+                        .testTag("tv-recovery-title"),
                 )
+                if (status != null) {
+                    Text(
+                        text = status,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .widthIn(max = 680.dp)
+                            .testTag("tv-recovery-status"),
+                    )
+                }
                 if (detail != null) {
                     Text(
                         text = detail,

@@ -12,8 +12,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -102,7 +104,8 @@ internal fun LivePlayerAlertOverlay(
 ) {
     val shown = rememberLastShown(alert.takeIf { visible })
     val text = rememberAppErrorText()
-    val seconds = rememberReconnectSeconds(shown as? LivePlayerAlert.Recovering, visible)
+    // The current alert's attempt, hidden or not, so hiding the alert does not restart its countdown.
+    val seconds = rememberReconnectSeconds(alert as? LivePlayerAlert.Recovering, visible)
     val condition = (shown as? LivePlayerAlert.Error)?.error?.condition
     val actions = when (shown) {
         is LivePlayerAlert.Error -> shown.error.actions
@@ -114,9 +117,10 @@ internal fun LivePlayerAlertOverlay(
         visible = visible && shown != null,
         message = when {
             condition != null -> text.title(condition)
-            shown is LivePlayerAlert.Recovering -> text.reconnecting(seconds)
+            shown is LivePlayerAlert.Recovering -> text.reconnecting(null)
             else -> ""
         },
+        status = seconds?.takeIf { shown is LivePlayerAlert.Recovering }?.let(text::nextAttempt),
         detail = condition?.let(text::reason),
         hint = condition?.let(text::hint),
         errorNumber = condition?.let(text::number),
@@ -136,25 +140,32 @@ internal fun LivePlayerAlertOverlay(
 internal fun reconnectCountdownSeconds(remainingMillis: Long): Int? =
     if (remainingMillis <= 0L) null else ((remainingMillis + 999L) / 1_000L).toInt()
 
-/** Counts down [recovering]'s delay from when it is shown; a hidden alert keeps its last value. */
+/**
+ * The seconds left until [recovering]'s next attempt. Its deadline is fixed on the first frame that
+ * sees the attempt; while hidden the value stands still, and shown again it reads that deadline.
+ */
 @Composable
 private fun rememberReconnectSeconds(recovering: LivePlayerAlert.Recovering?, visible: Boolean): Int? {
+    var deadline by remember(recovering) { mutableLongStateOf(NoDeadline) }
     var seconds by remember(recovering) {
         mutableIntStateOf(recovering?.let { reconnectCountdownSeconds(it.retryDelayMillis) } ?: 0)
     }
-    LaunchedEffect(recovering, visible) {
-        if (recovering == null || !visible) return@LaunchedEffect
-        var remaining = recovering.retryDelayMillis
-        seconds = reconnectCountdownSeconds(remaining) ?: 0
-        while (remaining > 0L) {
-            val step = (remaining % 1_000L).takeIf { it > 0L } ?: 1_000L
-            delay(step)
-            remaining -= step
+    LaunchedEffect(recovering) {
+        if (recovering != null) deadline = withFrameMillis { it } + recovering.retryDelayMillis
+    }
+    LaunchedEffect(deadline, visible) {
+        if (deadline == NoDeadline || !visible) return@LaunchedEffect
+        while (true) {
+            val remaining = deadline - withFrameMillis { it }
             seconds = reconnectCountdownSeconds(remaining) ?: 0
+            if (remaining <= 0L) break
+            delay((remaining % 1_000L).takeIf { it > 0L } ?: 1_000L)
         }
     }
     return seconds.takeIf { it > 0 }
 }
+
+private const val NoDeadline = Long.MIN_VALUE
 
 @Composable
 private fun rememberAppErrorText(): AppErrorText {

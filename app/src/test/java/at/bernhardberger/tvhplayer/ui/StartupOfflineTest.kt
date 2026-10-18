@@ -37,6 +37,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
+import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -97,7 +98,7 @@ import at.bernhardberger.tvhplayer.ui.startup.StartupBrandIntro
 
 /**
  * Startup and play before the session is ready. OK on a saved channel row opens the player for
- * that channel at once; it waits without an action, tunes that channel on Ready, offers startup's
+ * that channel at once; it waits without an action, tunes that channel on Ready, offers the catalog's
  * recovery when connecting fails, and Back returns to the row without tuning anything later.
  * Without saved channels a cold start shows the startup screen, readable, until channels arrive.
  */
@@ -136,7 +137,7 @@ class StartupOfflineTest {
         assertEquals(0, compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
-    @Test fun failedConnectingOffersStartupRecoveryWithRetryFocused() {
+    @Test fun failedConnectingThatRetriesByItselfOffersConnectionSettingsFocusedAndNoRetry() {
         app()
         confirmRow(1)
         session.publish(SessionObservation.create(
@@ -146,10 +147,9 @@ class StartupOfflineTest {
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("tv-recovery-primary") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Retry", substring = true), useUnmergedTree = false)
+        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true), useUnmergedTree = false)
             .assertIsFocused()
-        compose.onNode(hasTestTag("tv-recovery-secondary") and hasText("Connection settings", substring = true))
-            .fetchSemanticsNode()
+        assertEquals(0, compose.onAllNodes(hasText("Retry", substring = true), useUnmergedTree = true).fetchSemanticsNodes().size)
         // Automatic attempts keep the recovery and its focus in place.
         session.publish(connecting(catalog))
         settle()
@@ -160,8 +160,9 @@ class StartupOfflineTest {
     @Test fun connectionSettingsFromTheFailedWaitLeavesThePlayerForConnectionSettings() {
         app()
         confirmRow(1)
+        // A failure that waits for the viewer: Retry first, Connection settings beside it.
         session.publish(SessionObservation.create(
-            sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE),
+            sessionState = SessionState.Unavailable(SessionFailure.synchronizationFailed(TvheadendFailure.MALFORMED_RESPONSE)),
             channelState = ChannelRepositoryState.Stale(catalog),
         ))
         compose.waitUntil(10_000) {

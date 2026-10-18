@@ -176,6 +176,13 @@ class PlaybackStatusPresentationTest {
         ) as LivePlayerAlert.Error
         assertEquals(AppErrorCondition.AUTHENTICATION_REJECTED, rejected.error.condition)
         assertEquals(listOf(AppErrorAction.CONNECTION_SETTINGS, AppErrorAction.CLOSE), rejected.error.actions)
+
+        val final = livePlayerAlert(
+            ConnectionState.Error(ConnectionFailureKind.OTHER, SessionRecoveryDisposition.NO_RETRY),
+            AppPlaybackState.Idle,
+            null,
+        ) as LivePlayerAlert.Error
+        assertEquals(listOf(AppErrorAction.CONNECTION_SETTINGS, AppErrorAction.CLOSE), final.error.actions)
     }
 
     @Test
@@ -204,7 +211,7 @@ class PlaybackStatusPresentationTest {
     }
 
     @Test
-    fun exhaustedRecovery_offersRetryOrReportsTheChannel() {
+    fun exhaustedRecovery_isAChannelProblemSoPassiveWithoutRetry_unlessTheServerReportsAUserLimit() {
         // The SDK stops retrying the connection by itself and asks for the viewer's retry.
         val connection = livePlayerAlert(
             ConnectionState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY),
@@ -212,7 +219,8 @@ class PlaybackStatusPresentationTest {
             null,
         ) as LivePlayerAlert.Error
         assertEquals(AppErrorAction.RETRY, connection.error.actions.first())
-        // Exhausted live recovery fails the target: the channel message reports it, or 208's alert retries.
+        // Exhausted live recovery fails the target, a channel problem: the passive channel message
+        // without buttons reports it. Only 208, a live TV condition, is the alert with Retry.
         val exhausted = failed(recoveryReason = PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED)
         val condition = liveChannelCondition(exhausted.subscriptionIssue, playbackFailed = true, liveInterrupted = false)
         assertEquals(AppErrorCondition.STREAM_STOPPED, condition)

@@ -646,6 +646,7 @@
     <string name="error_110_title">Tvheadend nicht erreichbar</string>
     <string name="error_110_reason">Neuverbindung in %1$d s…</string>
     <string name="error_110_reason_pending">Verbindung wird neu aufgebaut…</string>
+    <string name="error_reconnect_next_attempt">Nächster Versuch in %1$d s</string>
     <string name="error_201_title">Kein freier Tuner</string>
     <string name="error_201_reason">Gerade ist jeder Tuner belegt.</string>
     <string name="error_202_title">Kein Signal</string>

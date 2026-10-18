@@ -42,9 +42,9 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.MainStartupActionId
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
@@ -55,9 +55,9 @@ import at.bernhardberger.tvhplayer.core.waitingConnectionFailurePresentation
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.TvRecoveryAction
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvhplayer.ui.startup.mainStartupActionResource
 
 /**
  * A live screen opened before its session was playable waits here for the server; its entry
@@ -79,16 +79,19 @@ internal class LivePlayerServerWaitState(
     private var sessionSeen by mutableStateOf(false)
     private var failures by mutableStateOf(WaitingConnectionFailure())
 
-    /** Passive while connecting, Actionable with startup's recovery once it failed; null when not waiting. */
+    /** Passive while connecting, Actionable once it failed (its buttons are [failure]'s); null when not waiting. */
     val presentation: MainStartupPresentation?
         get() = if (sessionSeen || hasSession.value) null else {
             failures.shown(connection.value)?.let(::waitingConnectionFailurePresentation)
                 ?: MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         }
 
-    /** The catalog condition of the failure [presentation] shows; null while connecting or not waiting. */
-    val failureCondition: AppErrorCondition?
-        get() = if (sessionSeen || hasSession.value) null else failures.shown(connection.value)?.toAppError()?.condition
+    /**
+     * The catalog error of the failure [presentation] shows, with the buttons the SDK's guidance
+     * offers: no Retry while the connection retries by itself. Null while connecting or not waiting.
+     */
+    val failure: AppError?
+        get() = if (sessionSeen || hasSession.value) null else failures.shown(connection.value)?.toAppError()
 
     /** Applied after each composition. */
     fun observed() {
@@ -142,7 +145,7 @@ internal fun rememberLivePlayerServerWait(
 
 /**
  * The wait of [state]: the channel, the connecting text and the player's busy ring, with no
- * action, then the player's recovery overlay with startup's actions once connecting failed.
+ * action, then the player's recovery overlay with the catalog's actions once connecting failed.
  */
 @Composable
 internal fun LivePlayerServerWait(
@@ -197,29 +200,25 @@ internal fun LivePlayerServerWait(
             )
         }
     }
-    val current = state.failureCondition?.let { condition ->
-        (presentation as? MainStartupPresentation.Actionable)?.let { it to condition }
-    }
+    val current = state.failure?.takeIf { presentation is MainStartupPresentation.Actionable }
     // The exit keeps the failure it showed, so its actions do not turn into a spinner while it fades.
     val failure = rememberLastShown(current)
-    val primary = failure?.first?.actions?.firstOrNull()
-    val secondary = failure?.first?.actions?.getOrNull(1)
     val context = LocalContext.current
     val text = remember(context) { AppErrorText(context) }
-    fun act(action: MainStartupActionId) = when (action) {
-        MainStartupActionId.RETRY -> state.retry()
-        MainStartupActionId.CONNECTION_SETTINGS -> state.openConnectionSettings()
-    }
     TvRecoveryOverlay(
         visible = current != null,
-        message = failure?.let { text.title(it.second) }.orEmpty(),
-        detail = failure?.let { text.reason(it.second) },
-        hint = failure?.let { text.hint(it.second) },
-        errorNumber = failure?.let { text.number(it.second) },
-        primaryActionLabel = primary?.let { stringResource(mainStartupActionResource(it)) },
-        onPrimaryAction = primary?.let { { act(it) } },
-        secondaryActionLabel = secondary?.let { stringResource(mainStartupActionResource(it)) },
-        onSecondaryAction = secondary?.let { { act(it) } },
+        message = failure?.let { text.title(it.condition) }.orEmpty(),
+        detail = failure?.let { text.reason(it.condition) },
+        hint = failure?.let { text.hint(it.condition) },
+        errorNumber = failure?.let { text.number(it.condition) },
+        actions = failure?.actions.orEmpty().mapNotNull { action ->
+            when (action) {
+                AppErrorAction.RETRY -> state::retry
+                AppErrorAction.CONNECTION_SETTINGS -> state::openConnectionSettings
+                // The wait's errors are not closable; Back closes the screen.
+                AppErrorAction.CLOSE -> null
+            }?.let { TvRecoveryAction(text.label(action), it) }
+        },
     )
 }
 

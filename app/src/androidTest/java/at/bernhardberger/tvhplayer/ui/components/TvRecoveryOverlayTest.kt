@@ -90,14 +90,15 @@ class TvRecoveryOverlayTest {
                     "Recording unavailable",
                 )
             )
+        // The title is the live region, so a line that changes while shown is not announced.
+        composeRule.onNodeWithText("Recording unavailable")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.LiveRegion,
                     LiveRegionMode.Assertive,
                 )
             )
-        composeRule.onNodeWithText("Recording unavailable")
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
     }
 
     @Test

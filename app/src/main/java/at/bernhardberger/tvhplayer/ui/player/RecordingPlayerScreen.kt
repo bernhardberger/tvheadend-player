@@ -53,7 +53,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackRecoveryInitialAction
-import at.bernhardberger.tvhplayer.core.PlaybackRecoverySurface
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
@@ -448,7 +447,6 @@ fun RecordingPlayerScreen(
             (playbackAvailable && retainedSelection != null &&
                 failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED)
     val recoveryUiModel = playbackRecoveryUiModel(
-        surface = PlaybackRecoverySurface.RECORDING,
         connectionState = connectionState,
         retryTargetAvailable = retryTargetAvailable,
     )

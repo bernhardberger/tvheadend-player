@@ -10,11 +10,6 @@ enum class PlaybackRetryCommand {
     NONE,
 }
 
-enum class PlaybackRecoverySurface {
-    LIVE,
-    RECORDING,
-}
-
 enum class PlaybackRecoveryInitialAction {
     RETRY,
     CLOSE,
@@ -25,31 +20,19 @@ data class PlaybackRecoveryUiModel(
     val initialAction: PlaybackRecoveryInitialAction,
 )
 
+/** The recording player's recovery; [retryTargetAvailable] is a recording it can resume. */
 fun playbackRecoveryUiModel(
-    surface: PlaybackRecoverySurface,
     connectionState: ConnectionState,
     retryTargetAvailable: Boolean,
 ): PlaybackRecoveryUiModel {
     val connectionAvailable = connectionState is ConnectionState.Connected
     val connectionRetryAvailable = connectionState is ConnectionState.Error &&
         connectionState.recoveryDisposition == SessionRecoveryDisposition.EXPLICIT_RETRY
-    val retryCommand = when (surface) {
-        PlaybackRecoverySurface.LIVE -> playbackRetryCommand(
-            connectionAvailable = connectionAvailable,
-            connectionRetryAvailable = connectionRetryAvailable,
-            liveRetryAvailable = retryTargetAvailable,
-            recordingResumeAvailable = false,
-        )
-        PlaybackRecoverySurface.RECORDING -> if (retryTargetAvailable) {
-            playbackRetryCommand(
-                connectionAvailable = connectionAvailable,
-                connectionRetryAvailable = connectionRetryAvailable,
-                liveRetryAvailable = false,
-                recordingResumeAvailable = true,
-            )
-        } else {
-            PlaybackRetryCommand.NONE
-        }
+    val retryCommand = when {
+        !retryTargetAvailable -> PlaybackRetryCommand.NONE
+        !connectionAvailable && connectionRetryAvailable -> PlaybackRetryCommand.RECONNECT
+        !connectionAvailable -> PlaybackRetryCommand.NONE
+        else -> PlaybackRetryCommand.RESUME_RECORDING
     }
     return PlaybackRecoveryUiModel(
         retryCommand = retryCommand,
@@ -59,17 +42,4 @@ fun playbackRecoveryUiModel(
             PlaybackRecoveryInitialAction.RETRY
         },
     )
-}
-
-private fun playbackRetryCommand(
-    connectionAvailable: Boolean,
-    connectionRetryAvailable: Boolean,
-    liveRetryAvailable: Boolean,
-    recordingResumeAvailable: Boolean,
-): PlaybackRetryCommand = when {
-    !connectionAvailable && connectionRetryAvailable -> PlaybackRetryCommand.RECONNECT
-    !connectionAvailable -> PlaybackRetryCommand.NONE
-    liveRetryAvailable -> PlaybackRetryCommand.RETRY_LIVE
-    recordingResumeAvailable -> PlaybackRetryCommand.RESUME_RECORDING
-    else -> PlaybackRetryCommand.NONE
 }

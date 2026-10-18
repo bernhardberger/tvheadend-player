@@ -1309,10 +1309,20 @@ fun VideoPlayerScreen(
                 currentDvrMutation(infoMutation, infoMutationObservation, observation) == null)) dismissRecordingDialog()
     }
 
+    /**
+     * Retunes the last live channel. While the session has the channel on screen, its failed
+     * request ends here, so the retune is not covered by that failure's message; a channel the
+     * session lacks keeps it.
+     */
+    fun retryLive(viewerRetry: Boolean) {
+        if (authorizedLiveSelection != null) requestedChannelFailed = false
+        videoPlayerViewModel.retryLiveNow(viewerRetry)
+    }
+
     fun dispatchRecoveryRetry(command: PlaybackRetryCommand) {
         when (command) {
             PlaybackRetryCommand.RECONNECT -> onReconnect()
-            PlaybackRetryCommand.RETRY_LIVE -> videoPlayerViewModel.retryLiveNow(viewerRetry = true)
+            PlaybackRetryCommand.RETRY_LIVE -> retryLive(viewerRetry = true)
             PlaybackRetryCommand.RESUME_RECORDING,
             PlaybackRetryCommand.NONE -> Unit
         }
@@ -1329,7 +1339,7 @@ fun VideoPlayerScreen(
                     connectionLost = false
                     layerState.showControls()
 
-                    videoPlayerViewModel.retryLiveNow(viewerRetry = false)
+                    retryLive(viewerRetry = false)
                     if (restoreToLiveAfterReconnect) {
                         timelineState.showFeedback(timeshiftReconnectLiveText)
                         restoreToLiveAfterReconnect = false

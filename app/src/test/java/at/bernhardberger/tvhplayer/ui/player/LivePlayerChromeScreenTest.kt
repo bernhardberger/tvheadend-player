@@ -437,6 +437,32 @@ class LivePlayerChromeScreenTest {
         assertTrue("existing recovery is actionable after startup releases", exists("player-channel-unavailable"))
     }
 
+    @Test fun theRetuneAfterAReconnectIsNotCoveredByTheFailedRequestsMessage() {
+        val startup = mutableStateOf(true)
+        val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
+        var superseded = false
+        screen(settleOnEntry = false, contentAllowed = { !startup.value }, startupEnabled = { startup.value },
+            afterTargetPlay = {
+                // Only the startup tune loses its receipt; the retune below plays as usual.
+                if (!superseded) runtime.notePlaybackIntent().also(runtime::notePlaybackIntentServed)
+                superseded = true
+            }, onStartupOutcome = { outcomes += it; startup.value = false })
+        settle()
+        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
+        assertTrue(exists("player-channel-unavailable"))
+        val ready = session.observation.value
+        compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(ChannelCatalog.create(
+                    (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) }))))
+        }
+        settle()
+        compose.runOnIdle { session.publish(ready) }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse("the reconnect's retune ends the failed request", exists("player-channel-unavailable"))
+    }
+
     @Test fun backgroundCancellationAtCommitBeforeReceiptRetiresTheUndeliveredStartupTune() {
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
         screen(settleOnEntry = false, contentAllowed = { false }, startup = true,

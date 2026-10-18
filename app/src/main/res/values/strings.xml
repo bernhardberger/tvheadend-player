@@ -759,6 +759,7 @@
     <string name="error_110_title">Can’t reach Tvheadend</string>
     <string name="error_110_reason">Reconnecting in %1$d s…</string>
     <string name="error_110_reason_pending">Reconnecting…</string>
+    <string name="error_reconnect_next_attempt">Next attempt in %1$d s</string>
     <string name="error_201_title">No free tuner</string>
     <string name="error_201_reason">Every tuner is in use right now.</string>
     <string name="error_202_title">No signal</string>
