@@ -15,10 +15,12 @@ import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 class PlayerBusyIndicatorTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
 
     @Test fun bufferingIsACentredPassiveOverlayNotAPauseButtonState() {

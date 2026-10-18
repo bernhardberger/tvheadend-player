@@ -35,11 +35,13 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.launch
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import org.junit.Assert.assertEquals
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalTestApi::class, ExperimentalCoroutinesApi::class)
 class TimeshiftCommandConsistencyTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val rule = createComposeRule()
 
     @Test fun acquisitionRetainsTimelineAndDirectionalRecoveryWithoutResuming() {

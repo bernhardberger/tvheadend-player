@@ -19,6 +19,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -27,6 +28,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @OptIn(ExperimentalTestApi::class)
 class PlayerTimelineNavigationTest(private val recording: Boolean) {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val rule = createComposeRule()
 
     @Test

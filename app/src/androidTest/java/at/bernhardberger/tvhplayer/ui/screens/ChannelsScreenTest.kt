@@ -52,11 +52,13 @@ import androidx.tv.material3.rememberDrawerState
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalTestApi::class)
 class ChannelsScreenTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 

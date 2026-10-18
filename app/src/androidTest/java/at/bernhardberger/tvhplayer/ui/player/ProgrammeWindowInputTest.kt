@@ -34,6 +34,7 @@ import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Instant
 import org.junit.Assert.*
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +44,7 @@ import org.junit.runners.Parameterized
 @RunWith(Parameterized::class)
 @OptIn(ExperimentalTestApi::class)
 class ProgrammeWindowInputTest(private val scenario: String) {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val rule = createComposeRule()
 
     @Test fun captureAndExerciseProgrammeWindow() {

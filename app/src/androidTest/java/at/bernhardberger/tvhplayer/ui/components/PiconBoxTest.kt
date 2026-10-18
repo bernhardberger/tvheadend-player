@@ -84,22 +84,19 @@ class PiconBoxTest {
     }
 
     @Test fun beforeASessionALogoLooksLikeItsLoadingStateAndNoLogoKeepsTheFullIcon() {
-        try {
-            compose.setContent {
-                TVHeadendPlayerTheme {
-                    Column {
-                        PiconBox(ArtworkId(1), bounds("pending"))
-                        PiconBox(null, bounds("missing"))
-                        Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
-                    }
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Column {
+                    PiconBox(ArtworkId(1), bounds("pending"))
+                    PiconBox(null, bounds("missing"))
+                    Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
                 }
             }
-            val reference = pixels("reference")
-            // Same full-height icon as loading and failure, so nothing jumps size between states.
-            assertScaledPixels(reference, pixels("pending"), 0.35f)
-            assertScaledPixels(reference, pixels("missing"), 1f)
-        } finally {
         }
+        val reference = pixels("reference")
+        // Same full-height icon as loading and failure, so nothing jumps size between states.
+        assertScaledPixels(reference, pixels("pending"), 0.35f)
+        assertScaledPixels(reference, pixels("missing"), 1f)
     }
 
     @Test fun retargetingSessionCannotPaintALateResultFromThePreviousSession() {

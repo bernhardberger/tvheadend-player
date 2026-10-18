@@ -31,10 +31,12 @@ import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 class ArchiveDepthOwnershipTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
 
     @Test fun departingArchiveCannotFocusPublishOrActivateAfterItsFrameWait() {

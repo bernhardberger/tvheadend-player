@@ -83,31 +83,29 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
         var infoOpen by mutableStateOf(false)
         var restoreInfo by mutableStateOf(false)
         var tuningComplete by mutableStateOf(false)
+        images.install(ImageLoader.Builder(InstrumentationRegistry.getInstrumentation().targetContext).components {
+            add(object : Mapper<AppArtworkSource, Bitmap> {
+                override fun map(data: AppArtworkSource, options: Options): Bitmap {
+                    val id = data.id.value
+                    val width = if (id % 2 == 0) 240 else 96
+                    return Bitmap.createBitmap(width, 96, Bitmap.Config.ARGB_8888).apply {
+                        Canvas(this).apply {
+                            drawColor(android.graphics.Color.rgb(20, 74, 112))
+                            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = android.graphics.Color.WHITE
+                                textAlign = Paint.Align.CENTER
+                                textSize = if (width > 100) 48f else 34f
+                            }
+                            drawText(if (width > 100) "DOC $id" else "TV", width / 2f, 62f, paint)
+                        }
+                    }
+                }
+            })
+        }.build())
         composeRule.setContent {
             inputModeManager = LocalInputModeManager.current
             val context = LocalContext.current
             val currentSession = remember { FakeSessionObservation(testSessionObservation()).captureCurrentSession() }
-            remember {
-                ImageLoader.Builder(context).components {
-                    add(object : Mapper<AppArtworkSource, Bitmap> {
-                        override fun map(data: AppArtworkSource, options: Options): Bitmap {
-                            val id = data.id.value
-                            val width = if (id % 2 == 0) 240 else 96
-                            return Bitmap.createBitmap(width, 96, Bitmap.Config.ARGB_8888).apply {
-                                Canvas(this).apply {
-                                    drawColor(android.graphics.Color.rgb(20, 74, 112))
-                                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                        color = android.graphics.Color.WHITE
-                                        textAlign = Paint.Align.CENTER
-                                        textSize = if (width > 100) 48f else 34f
-                                    }
-                                    drawText(if (width > 100) "DOC $id" else "TV", width / 2f, 62f, paint)
-                                }
-                            }
-                        }
-                    })
-                }.build().also(images::install)
-            }
             val density = androidx.compose.ui.platform.LocalDensity.current
             val large = scenario in listOf("long", "shelf-long") || scenario.endsWith("-large")
             val configuration = android.content.res.Configuration(androidx.compose.ui.platform.LocalConfiguration.current).apply {

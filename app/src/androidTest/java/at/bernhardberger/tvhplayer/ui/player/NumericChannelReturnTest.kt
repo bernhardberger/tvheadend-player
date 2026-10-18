@@ -42,6 +42,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 import org.junit.Assert.assertEquals
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -50,6 +51,7 @@ import org.junit.runners.Parameterized
 /** Offline production-screen input; fake playback acceptance is not rendered-video evidence. */
 @RunWith(Parameterized::class)
 class NumericChannelReturnTest(private val tagged: Boolean, private val completion: String) {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val composeRule = createComposeRule()
 
     @Test

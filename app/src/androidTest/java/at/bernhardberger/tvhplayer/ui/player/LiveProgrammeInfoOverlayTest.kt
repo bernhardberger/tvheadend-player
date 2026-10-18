@@ -32,12 +32,14 @@ import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Instant
 
 @OptIn(ExperimentalTestApi::class)
 class LiveProgrammeInfoOverlayTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
 

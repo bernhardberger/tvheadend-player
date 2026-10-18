@@ -10,7 +10,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertContentDescriptionEquals
@@ -33,11 +32,13 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 class ChannelRowTest {
 
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeTestRule = createComposeRule()
 
@@ -167,7 +168,6 @@ class ChannelRowTest {
         val selectedNumber = mutableIntStateOf(1)
         val compositionCounts = IntArray(rowNumbers.size)
         composeTestRule.setContent {
-            val context = LocalContext.current
             TVHeadendPlayerTheme {
                 LazyColumn {
                     items(rowNumbers, key = { it }) { number ->

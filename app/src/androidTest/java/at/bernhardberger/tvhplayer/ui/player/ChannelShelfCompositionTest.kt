@@ -33,11 +33,13 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 @OptIn(ExperimentalTestApi::class)
 class ChannelShelfCompositionTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val rule = createComposeRule()
 
     @Test fun shelfUpRestoresControlsAndInvokerThroughTheCompleteKeyCycle() = assertShelfDismissal(Key.DirectionUp)
@@ -52,7 +54,6 @@ class ChannelShelfCompositionTest {
         var activations = 0
         rule.setContent {
             layers = rememberLivePlayerLayerState()
-            val context = LocalContext.current
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().onPreviewKeyEvent { event ->
                     val code = event.nativeKeyEvent.keyCode

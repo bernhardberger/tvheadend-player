@@ -19,10 +19,12 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.core.programmeDetailsActions
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 class ProgrammeDetailsPanelTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule val composeRule = createComposeRule()
     private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val recording = mutableStateOf<DvrEntry?>(null)

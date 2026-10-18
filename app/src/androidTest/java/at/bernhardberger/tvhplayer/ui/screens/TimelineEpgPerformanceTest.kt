@@ -51,12 +51,14 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotSame
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Instant
 
 @OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class TimelineEpgPerformanceTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createComposeRule()
 

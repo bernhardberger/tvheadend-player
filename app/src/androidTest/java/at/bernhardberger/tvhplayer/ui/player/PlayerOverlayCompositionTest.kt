@@ -34,6 +34,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 import kotlin.time.Instant
@@ -449,6 +450,7 @@ class PlayerOverlayCompositionTest {
         composeRule.onNodeWithTag("player-action-context-label").assertDoesNotExist()
     }
 
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createComposeRule()
 

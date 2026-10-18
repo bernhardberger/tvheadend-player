@@ -18,10 +18,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.io.File
 import org.junit.Assert.assertEquals
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
 class ChannelNumberOverlayTest {
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createComposeRule()
 

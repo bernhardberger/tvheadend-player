@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.input.InputMode
 import androidx.compose.ui.input.InputModeManager
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInputModeManager
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -126,17 +125,14 @@ class ChannelsScreenshotTest(private val scenario: String) {
                     drawText("TV", 80f, 61f, paint)
                 }
             }
+            images.install(ImageLoader.Builder(instrumentation.targetContext).components {
+                add(object : Mapper<AppArtworkSource, Bitmap> {
+                    override fun map(data: AppArtworkSource, options: Options) = artwork
+                })
+            }.build())
             lateinit var inputMode: InputModeManager
             composeRule.setContent {
                 inputMode = LocalInputModeManager.current
-                val context = LocalContext.current
-                remember {
-                    ImageLoader.Builder(context).components {
-                        add(object : Mapper<AppArtworkSource, Bitmap> {
-                            override fun map(data: AppArtworkSource, options: Options) = artwork
-                        })
-                    }.build().also(images::install)
-                }
                 var selectedId by remember { mutableStateOf<ChannelId?>(ChannelId(2)) }
                 var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
                 TVHeadendPlayerTheme {

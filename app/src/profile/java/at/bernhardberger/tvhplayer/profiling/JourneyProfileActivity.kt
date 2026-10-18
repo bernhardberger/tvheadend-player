@@ -210,6 +210,6 @@ class JourneyProfileActivity : AppCompatActivity() {
         super.onDestroy()
         runtimeOwner?.requestClose()
         images?.shutdown()
-        SingletonImageLoader.reset()
+        if (SingletonImageLoader.get(this) === images) SingletonImageLoader.reset()
     }
 }

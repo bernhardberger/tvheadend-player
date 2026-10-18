@@ -1,14 +1,16 @@
 package at.bernhardberger.tvhplayer.testing
 
+import androidx.test.platform.app.InstrumentationRegistry
 import coil3.ImageLoader
 import coil3.SingletonImageLoader
 import coil3.annotation.DelicateCoilApi
 import org.junit.rules.ExternalResource
 
 /**
- * The image loader composables and samplers get from Coil's singleton in a test: [loader] or a later
- * [install] when the test needs interceptors, otherwise Coil's default loader. An installed loader is
- * shut down and dropped after the test, so it never reaches the next test of the same JVM.
+ * The image loader composables and samplers get from Coil's singleton in a test: [loader], or a fresh
+ * plain [ImageLoader] when none is given, so a test never reaches the app's production loader. A later
+ * [install] replaces it when the test needs interceptors. The installed loader is shut down and the
+ * singleton reset after the test, so nothing reaches the next test of the same JVM.
  */
 @OptIn(DelicateCoilApi::class)
 class ImageLoaderRule(private val loader: (() -> ImageLoader)? = null) : ExternalResource() {
@@ -22,7 +24,7 @@ class ImageLoaderRule(private val loader: (() -> ImageLoader)? = null) : Externa
 
     override fun before() {
         SingletonImageLoader.reset()
-        loader?.let { install(it()) }
+        install(loader?.invoke() ?: ImageLoader(InstrumentationRegistry.getInstrumentation().targetContext))
     }
 
     override fun after() {

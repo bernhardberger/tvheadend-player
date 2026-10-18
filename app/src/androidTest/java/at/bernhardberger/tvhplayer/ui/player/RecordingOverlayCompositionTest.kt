@@ -45,6 +45,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
 
@@ -359,6 +360,7 @@ class RecordingOverlayCompositionTest {
             .assert(androidx.compose.ui.test.hasText("1:30:00", substring = true)).assertIsDisplayed()
     }
 
+    @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createComposeRule()
 
