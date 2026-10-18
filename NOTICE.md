@@ -38,9 +38,11 @@ recorded in `gradle/libs.versions.toml`.
 
 The project-local Kotlin and Compose engineering skills under `.agents/skills/`
 are selected unmodified files from Chris Banes' `chrisbanes/skills` release
-`2026.7.21`, licensed under Apache License 2.0. Their exact source paths and
-content hashes are recorded in `skills-lock.json`; the upstream release retains
-the applicable Apache License text.
+`2026.7.21`, licensed under Apache License 2.0. The `grounded-writing` skill
+under `.agents/skills/grounded-writing/` is an unmodified copy from release
+`2026.10.8` of the same repository, under the same license. Their exact source
+paths and content hashes are recorded in `skills-lock.json`; the upstream
+release retains the applicable Apache License text.
 
 The `r8-analyzer` engineering skill under `.agents/skills/r8-analyzer/`
 contains unmodified guidance and references from Google LLC's `android/skills`,

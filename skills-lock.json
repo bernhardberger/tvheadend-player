@@ -85,6 +85,13 @@
       "skillPath": "skills/compose-ui-testing-patterns/SKILL.md",
       "computedHash": "eaeb1524dfa939ea561782909dab5df0575e984c6b1676197421d4f580e7d04f"
     },
+    "grounded-writing": {
+      "source": "chrisbanes/skills",
+      "ref": "2026.10.8",
+      "sourceType": "github",
+      "skillPath": "skills/grounded-writing/SKILL.md",
+      "computedHash": "93943e3840ab5ec68735888f18dad2b9e65c2db0c7a6eb4592983b4af0ec003c"
+    },
     "kotlin-control-flow": {
       "source": "chrisbanes/skills",
       "ref": "2026.7.21",

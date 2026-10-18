@@ -81,6 +81,24 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
   prompts, session handoffs, and completion reports. Do not create those files
   in active `docs/`.
 
+## Writing documentation
+
+Documentation stays in this repository as Markdown; there is no separate
+documentation site or toolchain.
+
+- [`README.md`](../README.md) is the entry point: what the app is, the Play and
+  Appliance builds, requirements, installation, and building from source.
+- [`CHANGELOG.md`](../CHANGELOG.md) records user-visible changes per release;
+  GitHub release notes are taken from its section for that version.
+- [`privacy-policy.md`](../privacy-policy.md) describes what the app stores and
+  sends; change it in the same commit as any change to stored or sent data.
+- Specifications and guides live in `docs/` and are listed in this index.
+
+Check every claim against the code on the same branch; documentation never
+promises behavior the app does not have. The `grounded-writing` skill in
+`.agents/skills/` supports README, changelog, release-note and guide prose. Code
+comments and KDoc follow the surrounding code instead.
+
 ## Document lifecycle
 
 1. Put durable accepted behavior in a normative specification, not a handoff.

@@ -65,6 +65,7 @@ entire skill family. Multiple rows apply only when their concerns are affected.
 | AI harness, agents, skills, commands, OpenCode config | `docs/ai-engineering-harness.md`; `customize-opencode` when that external skill is available |
 | Child dispatch or independent review | Relevant Delegation or Review lifecycle sections of `docs/ai-engineering-harness.md`; inline applicable hard requirements for restricted children |
 | Upstream sync or contribution | `tvhstream-upstream-contribution` |
+| README, changelog, privacy policy, release notes, guides | "Writing documentation" in `docs/README.md`; `grounded-writing` |
 
 Focused imported skills are implementation guidance, not authorization for
 opportunistic cleanup. Product and safety specifications take precedence, then

@@ -21,7 +21,7 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/agents/tv-evidence-curator.md` | Optional validator for exact screenshot evidence sets |
 | `.opencode/agents/tv-ux-brief.md` | TV product design specialist when direction is unresolved |
 | `.opencode/agents/tv-ux-reviewer.md` | Final screenshot-first visual-quality reviewer |
-| `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance |
+| `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance and documentation writing guidance |
 | `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
 | `.opencode/commands/` | Verification, device, reviewer, UX, and upstream shortcuts |
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
@@ -328,8 +328,10 @@ human gates.
 
 ## Skills and routing
 
-The 17 retained Chris Banes skills are pinned to `chrisbanes/skills` tag
-`2026.7.21`; `skills-lock.json` records their paths and content hashes. They are
+The 17 retained Chris Banes Kotlin and Compose skills are pinned to
+`chrisbanes/skills` tag `2026.7.21`, and its `grounded-writing` skill for public
+documentation prose to tag `2026.10.8`; `skills-lock.json` records their paths
+and content hashes. They are
 default mechanics only when their concrete trigger matches. Repository-local
 skills provide the TV interaction, TVHeadend DVR, playback, device, and upstream
 constraints plus durable caveats for this product.
