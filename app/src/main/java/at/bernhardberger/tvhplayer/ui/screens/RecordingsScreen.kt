@@ -545,7 +545,7 @@ internal fun RecordingsScreenContent(
                 upFocus = modeFocus,
                 modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
-        } else ProvideArtworkSession(currentSession) {
+        } else ProvideArtworkSession(currentSession, observation) {
             // A frame shows its pictures with the session of the observation it was built from.
             when (mode) {
                 DvrLibraryMode.ARCHIVE -> ArchiveDepthContent(
@@ -738,7 +738,7 @@ internal fun RecordingsScreenContent(
                 title = opened.title.orEmpty(),
                 secondaryText = programmeEpisodeLine(opened.episode, opened.subtitle, resources),
                 text = if (startOverFocused) startOverEnd else resumeEnd,
-                eyebrow = { ProvideArtworkSession(selectedCapability) {
+                eyebrow = { ProvideArtworkSession(selectedCapability, observation) {
                     at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow(channel, listOfNotNull(
                     (channel?.let { at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty()) }
                         ?: opened.channelName)?.takeIf(String::isNotBlank),
@@ -864,7 +864,7 @@ internal fun RecordingsScreenContent(
             },
             artwork = {
                 val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
-                ProvideArtworkSession(selectedCapability) {
+                ProvideArtworkSession(selectedCapability, observation) {
                     ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null,
                         Modifier.fillMaxSize().testTag(if (artwork != null)
                             "browse-context-artwork" else "browse-context-picon"),
@@ -880,7 +880,7 @@ internal fun RecordingsScreenContent(
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "recording-details-from-menu")
         val alpha = remember(detailAlpha, menuAlpha) { derivedStateOf { detailAlpha.value * menuAlpha.value } }
         // Details show their pictures with the session they were opened with.
-        ProvideArtworkSession(selectedCapability) { ProgrammeDetailsPage(
+        ProvideArtworkSession(selectedCapability, observation) { ProgrammeDetailsPage(
             event = null,
             recording = opened,
             nowSec = nowSec,

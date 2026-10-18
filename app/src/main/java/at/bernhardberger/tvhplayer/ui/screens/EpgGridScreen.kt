@@ -1950,7 +1950,7 @@ fun EpgGridScreen(
                         MaterialTheme.colorScheme.primary)
                     .testTag("epg-timeline-content")) {
                 // A frame shows its pictures with the session of the observation it was built from.
-                ProvideArtworkSession(currentSession) { CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
+                ProvideArtworkSession(currentSession, observation) { CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
                 LazyColumn(
                     state = channelListState,
                     userScrollEnabled = owner.isCurrent,

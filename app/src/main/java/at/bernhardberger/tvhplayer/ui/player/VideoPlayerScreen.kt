@@ -1670,7 +1670,7 @@ fun VideoPlayerScreen(
             }
             .focusRequester(rootFocus)
             .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
-    ) { ProvideArtworkSession(currentSession) {
+    ) { ProvideArtworkSession(currentSession, observation) {
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {
             foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||

@@ -23,8 +23,10 @@ import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
@@ -36,6 +38,8 @@ import coil3.request.SuccessResult
 import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
@@ -45,7 +49,11 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
-/** The app's artwork context follows the session, not the observation: guide updates leave logos alone. */
+/**
+ * The app's artwork context follows the session, not the observation: guide updates leave logos
+ * alone, and before Ready so do updates of the same profile.
+ */
+@OptIn(ExperimentalTvheadendApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
 class ArtworkContextTest {
@@ -73,19 +81,39 @@ class ArtworkContextTest {
     }
 
     @Test fun beforeReadyUpdatesOfTheSameProfileNeitherRecomposeALogoNorRequestItAgain() {
-        val session = FakeTvheadendSession(observation(SessionState.Synchronizing, guide = 1))
+        val session = FakeTvheadendSession()
+        session.artwork.scriptCached(FIRST)
+        session.publish(observation(SessionState.Synchronizing, guide = 1), FIRST)
         show(session)
         assertNull(session.observation.value.currentSession)
-        assertEquals(listOf<Any>(AppArtworkSource(null, LOGO)), requests)
+        val saved = requests.single() as AppArtworkSource
+        assertNotNull("the logo is the saved copy of the observation's profile", saved.saved)
         val logos = logoCompositions
         val seen = observationCompositions
 
-        repeat(3) { session.publish(observation(SessionState.Synchronizing, guide = 2 + it)) }
+        repeat(3) { session.publish(observation(SessionState.Synchronizing, guide = 2 + it), FIRST) }
         compose.waitForIdle()
 
         assertTrue("the retained updates reached the composition", observationCompositions > seen)
         assertEquals(logos, logoCompositions)
-        assertEquals(listOf<Any>(AppArtworkSource(null, LOGO)), requests)
+        assertEquals(listOf<Any>(saved), requests)
+    }
+
+    @Test fun beforeReadyAnotherProfilesObservationReplacesTheLogo() {
+        val session = FakeTvheadendSession()
+        session.artwork.scriptCached(FIRST)
+        session.publish(observation(SessionState.Synchronizing, guide = 1), FIRST)
+        show(session)
+        val first = requests.single() as AppArtworkSource
+
+        session.artwork.scriptCached(SECOND)
+        session.publish(observation(SessionState.Synchronizing, guide = 2), SECOND)
+        compose.waitForIdle()
+
+        val second = requests.last() as AppArtworkSource
+        assertEquals(2, requests.size)
+        assertNotNull(second.saved)
+        assertNotEquals(first, second)
     }
 
     @Test fun aNewSessionReachesTheLogo() {
@@ -113,7 +141,7 @@ class ArtworkContextTest {
             .diskCache(null)
             .build())
         compose.setContent {
-            ProvideAppArtwork(session.observation) {
+            ProvideAppArtwork(session) {
                 ObservationReader(session)
                 Logo()
             }
@@ -146,6 +174,8 @@ class ArtworkContextTest {
 
     private companion object {
         val LOGO = ArtworkId(1)
+        val FIRST = ServerProfile("first.tvheadend.test")
+        val SECOND = ServerProfile("second.tvheadend.test")
         val ready = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))
     }
 }

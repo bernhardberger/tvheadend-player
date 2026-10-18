@@ -7,6 +7,8 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
@@ -22,7 +24,6 @@ import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
@@ -35,11 +36,11 @@ fun PiconBox(
     placeholderTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onError: (() -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
-    val currentSession = LocalArtworkContext.current.currentSession
+    val artwork = LocalArtworkContext.current
+    val currentSession = artwork.currentSession
     // Before a current session the saved copy is tried, so logos show at startup and offline.
-    val piconUrl = remember(currentSession, piconPath) {
-        piconPath?.let { AppArtworkSource(currentSession, it) }
-    }
+    // Derived, so an observation of the same profile leaves the logo alone.
+    val piconUrl by remember(artwork, piconPath) { derivedStateOf { piconPath?.let(artwork::logo) } }
 
     val icon = painterResource(R.drawable.ic_live_tv_outlined)
     // Keep the placeholder painters stable across focus changes; only their draw tint changes.

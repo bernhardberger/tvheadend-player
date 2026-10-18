@@ -65,11 +65,14 @@ import at.bernhardberger.tvhplayer.ui.startup.mainStartupProblemTitleResource
 @Stable
 internal class LivePlayerServerWaitState(
     private val hasSession: State<Boolean>,
+    private val observation: State<SessionObservation>,
     private val connection: State<ConnectionUiState>,
     private val close: PlayerClose,
     private val onReconnect: State<() -> Unit>,
     private val onOpenConnectionSettings: State<() -> Unit>,
 ) {
+    /** The observation the wait shows its channel logo for: its profile names the saved copy. */
+    val artworkObservation: SessionObservation get() = observation.value
     private var sessionSeen by mutableStateOf(false)
     private var failures by mutableStateOf(WaitingConnectionFailure())
 
@@ -121,10 +124,11 @@ internal fun rememberLivePlayerServerWait(
     onOpenConnectionSettings: () -> Unit,
 ): LivePlayerServerWaitState {
     val hasSession = rememberUpdatedState(observation.currentSession != null)
+    val latest = rememberUpdatedState(observation)
     val connection = rememberUpdatedState(connectionUiState ?: observation.sessionState.toConnectionUiState())
     val reconnect = rememberUpdatedState(onReconnect)
     val connectionSettings = rememberUpdatedState(onOpenConnectionSettings)
-    val state = remember(close) { LivePlayerServerWaitState(hasSession, connection, close, reconnect, connectionSettings) }
+    val state = remember(close) { LivePlayerServerWaitState(hasSession, latest, connection, close, reconnect, connectionSettings) }
     SideEffect { state.observed() }
     return state
 }
@@ -166,8 +170,8 @@ internal fun LivePlayerServerWait(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            // Only the saved logo, as before a session.
-            ProvideArtworkSession(null) { PiconBox(picon, Modifier.size(136.dp, 60.dp)) }
+            // Only the saved logo of the observation's profile, as before a session.
+            ProvideArtworkSession(null, state.artworkObservation) { PiconBox(picon, Modifier.size(136.dp, 60.dp)) }
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,

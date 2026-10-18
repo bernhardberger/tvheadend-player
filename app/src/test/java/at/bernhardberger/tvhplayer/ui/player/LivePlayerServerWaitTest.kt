@@ -4,6 +4,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
@@ -26,6 +27,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -36,6 +38,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
@@ -43,6 +46,7 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -56,9 +60,16 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
+import coil3.ImageLoader
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.intercept.Interceptor
+import coil3.request.SuccessResult
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -68,6 +79,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,10 +91,12 @@ import org.robolectric.annotation.Config
  * The production live screen opened before its session is ready. The screen stays composed after
  * its close here, as it does through the route's exit transition.
  */
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class LivePlayerServerWaitTest {
     @get:Rule val compose = createComposeRule()
+    @get:Rule val images = ImageLoaderRule()
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val models = ViewModelStore()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -139,6 +154,28 @@ class LivePlayerServerWaitTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
+    // Opened before Ready, after a connection save to this profile: its saved logo shows at once.
+    @Test fun theWaitShowsTheSavedLogoOfTheProfileItsObservationBelongsTo() {
+        val requests = java.util.Collections.synchronizedList(mutableListOf<AppArtworkSource>())
+        images.install(ImageLoader.Builder(context)
+            .components {
+                add(Interceptor { chain ->
+                    (chain.request.data as? AppArtworkSource)?.let(requests::add)
+                    SuccessResult(Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).asImage(), chain.request, DataSource.DISK)
+                })
+            }
+            .coroutineContext(Dispatchers.Main.immediate)
+            .diskCache(null)
+            .build())
+
+        screen(profile = PROFILE)
+
+        val logos = synchronized(requests) { requests.filter { it.id == LOGO }.distinct() }
+        assertEquals(1, logos.size)
+        assertNull(logos.single().currentSession)
+        assertNotNull("the wait's logo is the saved copy of its observation's profile", logos.single().saved)
+    }
+
     @Test fun aRecreatedScreenWithAnActiveTargetStillHandlesTheLossAndRetunesOnReconnect() {
         screen(initial = ready())
         compose.runOnIdle {
@@ -160,6 +197,11 @@ class LivePlayerServerWaitTest {
     }
 
     private val visible = MutableStateFlow(true)
+
+    private companion object {
+        val LOGO = ArtworkId(1)
+        val PROFILE = ServerProfile("tvheadend.test")
+    }
 
     private fun waits() = compose.onAllNodes(hasTestTag(LivePlayerServerWaitTag), useUnmergedTree = true).fetchSemanticsNodes().size
 
@@ -189,8 +231,17 @@ class LivePlayerServerWaitTest {
             sessionState = SessionState.Connecting,
             channelState = ChannelRepositoryState.Stale(catalog),
         ),
+        // The profile the observation is data of, with saved logos and channel one's icon.
+        profile: ServerProfile? = null,
     ) {
         session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
+        if (profile != null) {
+            session.artwork.scriptCached(profile)
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(ChannelCatalog.create((1..3L).map {
+                    Channel.create(ChannelId(it), name = "Name $it", number = it, icon = LOGO.takeIf { _ -> it == 1L })
+                }))), profile)
+        }
         val data = InMemoryData()
         val settings = PlayerSettingsStore(data)
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
@@ -214,7 +265,7 @@ class LivePlayerServerWaitTest {
         }
         compose.setContent {
             CompositionLocalProvider(LocalLifecycleOwner provides owner) {
-                TVHeadendPlayerTheme {
+                TVHeadendPlayerTheme { ProvideAppArtwork(session) {
                     Box(Modifier.onKeyEvent { unconsumed++; false }) {
                         if (visible.collectAsState().value) {
                             VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
@@ -222,7 +273,7 @@ class LivePlayerServerWaitTest {
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data))
                         }
                     }
-                }
+                } }
             }
         }
         settle()

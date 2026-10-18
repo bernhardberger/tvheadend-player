@@ -714,7 +714,7 @@ internal fun ChannelsScreenContent(
         }
 
         // A frame shows its pictures with the session of the observation it was built from.
-        ProvideArtworkSession(currentSession) {
+        ProvideArtworkSession(currentSession, observation) {
         Row(
                 Modifier
                     .padding(browseViewportPadding)

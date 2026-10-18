@@ -1273,7 +1273,7 @@ class BrowseContextMenuScreenTest {
                 androidx.compose.runtime.DisposableEffect(application) {
                     onDispose { application.close() }
                 }
-                TVHeadendPlayerTheme { at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork((rootArtwork ?: session).observation) {
+                TVHeadendPlayerTheme { at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork(rootArtwork ?: session) {
                     back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     view = LocalView.current
                     val observation = session.observation.collectAsState().value

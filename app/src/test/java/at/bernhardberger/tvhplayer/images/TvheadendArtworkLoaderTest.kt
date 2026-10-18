@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.images
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color
+import androidx.compose.runtime.mutableStateOf
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkContent
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
@@ -19,9 +20,12 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.ui.components.ArtworkContext
 import coil3.decode.DataSource
+import coil3.request.CachePolicy
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.ImageResult
@@ -30,6 +34,7 @@ import coil3.toBitmap
 import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,7 +42,10 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
-/** Logos before a current session come from the active profile's saved copy, or not at all. */
+/**
+ * Logos before a current session come from the saved copy of the profile their observation
+ * belongs to, or not at all: never from another profile, neither fetched nor from memory.
+ */
 @OptIn(ExperimentalTvheadendApi::class)
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class)
@@ -45,57 +53,111 @@ import org.robolectric.annotation.GraphicsMode
 class TvheadendArtworkLoaderTest {
     private val app = ApplicationProvider.getApplicationContext<Application>()
     private val session = FakeTvheadendSession()
-    @Volatile private var profileGeneration = 0L
-    private val loader = buildImageLoader(app, session) { profileGeneration == 0L }
+    private val loader = buildImageLoader(app, session)
     private val first = ServerProfile("first.tvheadend.test")
     private val second = ServerProfile("second.tvheadend.test")
 
-    @Test fun beforeASessionALogoLoadsFromTheSavedCopy() {
-        session.artwork.scriptCached(ServerProfile("tvheadend.test"), ArtworkLoadResult.Available(ArtworkContent.create(png())))
+    @Test fun beforeASessionALogoLoadsFromTheSavedCopyOfItsProfile() {
+        val observation = connecting(first)
+        session.artwork.scriptCached(first, saved(Color.RED))
 
-        val result = load(AppArtworkSource(null, ArtworkId(1)))
+        val result = load(logo(observation))
 
-        assertTrue("$result", result is SuccessResult)
+        assertEquals(Color.RED, pixel(result))
         assertEquals(DataSource.DISK, (result as SuccessResult).dataSource)
     }
 
     @Test fun beforeASessionWithoutASavedCopyTheLogoFailsInsteadOfReachingTheServer() {
+        val observation = connecting(first)
         session.artwork.scriptCached(profile = null)
 
-        assertTrue(load(AppArtworkSource(null, ArtworkId(1))) is ErrorResult)
+        assertTrue(load(logo(observation)) is ErrorResult)
+        assertTrue(FakeSessionCall.LOAD_ARTWORK !in session.calls)
     }
 
-    @Test fun afterAProfileChangeAScreenFromTheFirstProfileShowsNeitherProfilesSavedLogoForTheSameId() {
+    @Test fun observationsOfOneProfileGiveOneModelAndAnotherProfilesObservationAnother() {
         session.artwork.scriptCached(first, saved(Color.RED))
-        val firstLogo = AppArtworkSource(null, ArtworkId(1))
+        val logo = logo(connecting(first))
+
+        assertEquals(logo, logo(connecting(first)))
+
+        session.artwork.scriptCached(second, saved(Color.BLUE))
+        assertNotEquals(logo, logo(connecting(second)))
+    }
+
+    @Test fun afterAProfileChangeALogoOfTheFirstProfileNeverShowsTheSecondProfilesBytes() {
+        session.artwork.scriptCached(first, saved(Color.RED))
+        val firstObservation = connecting(first)
+        val firstLogo = logo(firstObservation)
+        val firstKey = memoryKey(load(firstLogo))
+
+        session.artwork.scriptCached(second, saved(Color.BLUE))
+        val secondKey = memoryKey(load(logo(connecting(second))))
+
+        assertNotEquals(firstKey, secondKey)
+        // The model of the first profile is refused once it is no longer active, and a model the
+        // screen still built from the first profile's observation has no saved copy at all.
+        assertTrue(load(firstLogo, memory = false) is ErrorResult)
+        assertTrue(load(logo(firstObservation), memory = false) is ErrorResult)
         assertEquals(Color.RED, pixel(load(firstLogo)))
-
-        switchProfile()
-        session.artwork.scriptCached(second, saved(Color.BLUE))
-
-        val result = load(firstLogo)
-        assertTrue("$result", result is ErrorResult)
     }
 
-    @Test fun afterAProfileChangeTheSecondProfilesLogoComesFromItsCurrentSession() {
+    @Test fun backOnTheFirstProfileItsLogoIsTheSameModelAgain() {
         session.artwork.scriptCached(first, saved(Color.RED))
-        assertEquals(Color.RED, pixel(load(AppArtworkSource(null, ArtworkId(1)))))
-
-        switchProfile()
+        val firstLogo = logo(connecting(first))
+        val firstKey = memoryKey(load(firstLogo))
         session.artwork.scriptCached(second, saved(Color.BLUE))
-        session.replaceGeneration(ready())
+        assertEquals(Color.BLUE, pixel(load(logo(connecting(second)), memory = false)))
+
+        session.artwork.scriptCached(first, saved(Color.RED))
+        val again = logo(connecting(first))
+
+        assertEquals(firstLogo, again)
+        assertEquals(Color.RED, pixel(load(again, memory = false)))
+        assertEquals(firstKey, memoryKey(load(again)))
+    }
+
+    // A connection save before Ready: the new profile's saved logos show without waiting.
+    @Test fun afterAConnectionSaveTheNewProfilesSavedLogosShowBeforeReady() {
+        session.artwork.scriptCached(first, saved(Color.RED))
+        assertEquals(Color.RED, pixel(load(logo(connecting(first)))))
+
+        session.artwork.scriptCached(second, saved(Color.BLUE))
+
+        assertEquals(Color.BLUE, pixel(load(logo(connecting(second)))))
+    }
+
+    @Test fun atReadyTheLogoComesFromTheCurrentSession() {
+        session.artwork.scriptCached(second, saved(Color.BLUE))
+        assertEquals(Color.BLUE, pixel(load(logo(connecting(second)))))
+
+        session.replaceGeneration(ready(), second)
         session.artwork.scriptLoad(saved(Color.BLUE))
+        val live = logo(session.observation.value)
+        val result = load(live, memory = false)
 
-        assertEquals(Color.BLUE, pixel(load(AppArtworkSource(session.captureCurrentSession(), ArtworkId(1)))))
+        assertEquals(AppArtworkSource(session.captureCurrentSession(), ArtworkId(1)), live)
+        assertEquals(DataSource.NETWORK, (result as SuccessResult).dataSource)
     }
 
-    // Like the connection editor: the generation rises before the session connects elsewhere.
-    private fun switchProfile() {
-        profileGeneration++
+    private fun connecting(profile: ServerProfile): SessionObservation {
+        session.publish(SessionObservation.create(sessionState = SessionState.Synchronizing), profile)
+        return session.observation.value
     }
 
-    private fun load(source: AppArtworkSource): ImageResult = runBlocking {
-        loader.execute(ImageRequest.Builder(app).data(source).build())
+    // The model a logo of a surface drawing from [observation] gets.
+    private fun logo(observation: SessionObservation): AppArtworkSource =
+        ArtworkContext(session, mutableStateOf(observation.currentSession), mutableStateOf(observation)).logo(ArtworkId(1))
+
+    // Without [memory] the image is fetched, not read from memory, and still stored there.
+    private fun load(source: AppArtworkSource, memory: Boolean = true): ImageResult = runBlocking {
+        loader.execute(ImageRequest.Builder(app).data(source)
+            .memoryCachePolicy(if (memory) CachePolicy.ENABLED else CachePolicy.WRITE_ONLY).build())
+    }
+
+    private fun memoryKey(result: ImageResult): String {
+        assertTrue("$result", result is SuccessResult)
+        return requireNotNull((result as SuccessResult).memoryCacheKey).key
     }
 
     private fun pixel(result: ImageResult): Int {
@@ -105,7 +167,7 @@ class TvheadendArtworkLoaderTest {
 
     private fun saved(color: Int) = ArtworkLoadResult.Available(ArtworkContent.create(png(color)))
 
-    private fun png(color: Int = Color.RED): ByteArray = ByteArrayOutputStream().also { out ->
+    private fun png(color: Int): ByteArray = ByteArrayOutputStream().also { out ->
         Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).apply { eraseColor(color) }
             .compress(Bitmap.CompressFormat.PNG, 100, out)
     }.toByteArray()

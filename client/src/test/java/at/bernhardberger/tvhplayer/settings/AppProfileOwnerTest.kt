@@ -107,38 +107,6 @@ class AppProfileOwnerTest {
         job.cancelAndJoin()
     }
 
-    // Saved artwork is used before a current session only while the generation is still zero, so
-    // a connection change must count before the session can switch to another profile.
-    @OptIn(ExperimentalCoroutinesApi::class)
-    @Test
-    fun aConnectionChangeIsCountedBeforeTheSessionConnectsToTheNewProfile() = runTest {
-        val fake = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
-        val generationsAtConnect = mutableListOf<Long>()
-        lateinit var owner: AppProfileOwner
-        val session = object : TvheadendSession by fake {
-            override suspend fun connect(profile: ServerProfile): SessionCommandResult {
-                generationsAtConnect += owner.configurationGeneration.value
-                return fake.connect(profile)
-            }
-        }
-        owner = AppProfileOwner(
-            session = session,
-            profileStore = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore(
-                ServerProfileReadResult.anonymous("first.invalid"),
-            ),
-            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
-            ioDispatcher = StandardTestDispatcher(testScheduler),
-            readProfileForEditing = { error("Unexpected editing read") },
-        )
-        val job = backgroundScope.launch { owner.run() }
-        runCurrent()
-
-        owner.saveServer("second.invalid", 9982)
-
-        assertEquals(listOf(0L, 1L), generationsAtConnect)
-        job.cancelAndJoin()
-    }
-
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
     fun cancellationStillWaitsForNonCancellableProfileInitialization() = runTest {

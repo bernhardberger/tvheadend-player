@@ -23,6 +23,7 @@ internal fun ProgrammeContextMenu(
     nowSec: Long,
     canModify: Boolean,
     currentSession: CurrentSessionObservation?,
+    observation: SessionObservation,
     onAction: (EpgEvent, BrowseContextAction) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -44,7 +45,7 @@ internal fun ProgrammeContextMenu(
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         artwork = {
             // The menu shows its pictures with the session it was opened with.
-            ProvideArtworkSession(currentSession) {
+            ProvideArtworkSession(currentSession, observation) {
                 ProgrammeArtwork(event.image, channel?.icon, event.progress(nowSec).takeIf { event.isRunning(nowSec) },
                     Modifier.fillMaxSize().testTag(if (event.image != null && currentSession != null)
                         "browse-context-artwork" else "browse-context-picon"),

@@ -627,7 +627,7 @@ fun RecordingPlayerScreen(
             val entry = requireNotNull(entry)
             val channel = entry.channelId?.let { targetObservation?.channel(it) }
             // The chrome shows its pictures with the session of the recording it plays.
-            ProvideArtworkSession(retainedSelection?.currentSession) { PlayerChrome(
+            ProvideArtworkSession(retainedSelection?.currentSession, targetObservation) { PlayerChrome(
                 mode = chromeMode(foregroundLayer),
                 content = PlayerChromeContent(
                     clock = formatClock(nowSec),

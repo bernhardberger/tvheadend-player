@@ -1056,7 +1056,7 @@ fun AppRoot(
     )
     // Logos and programme pictures load with the latest current session; the provider recomposes
     // nothing for guide or recording updates.
-    ProvideAppArtwork(tvheadendSession.observation) {
+    ProvideAppArtwork(tvheadendSession) {
     MainStartupComposition(
         state = MainStartupCompositionState(
             presentation = effectiveStartupPresentation,

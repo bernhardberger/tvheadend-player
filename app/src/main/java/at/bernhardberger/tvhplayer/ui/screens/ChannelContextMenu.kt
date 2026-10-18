@@ -70,7 +70,7 @@ internal fun ChannelContextMenu(
             }
         },
         artwork = {
-            ProvideArtworkSession(capability) {
+            ProvideArtworkSession(capability, observation) {
                 ProgrammeArtwork(null, channel.icon, null, Modifier.fillMaxSize().testTag("browse-context-picon"))
             }
         },

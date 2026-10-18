@@ -238,7 +238,7 @@ internal fun ProgrammeDetailsHost(
         CompositionLocalProvider(LocalPlayerPanelMotion provides this) {
         PlayerMotionFrame(leaving = closing || pendingAction != null) {
         ProgrammeContextMenu(
-            event, channel, recording, fromGuide, stack.isNotEmpty(), nowSec, canModify, capability,
+            event, channel, recording, fromGuide, stack.isNotEmpty(), nowSec, canModify, capability, observation,
             modifier = Modifier.onPreviewKeyEvent(keyHandler),
             onAction = act, onClose = closeAnimated,
             backEnabled = !closing && menu == showContextMenu && pendingAction == null,
@@ -270,7 +270,7 @@ internal fun ProgrammeDetailsHost(
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             // The page shows its pictures with the session it was opened with.
-            PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability) {
+            PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability, observation) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
                 pageActions,
                 { action -> act(pageEvent, action) },
@@ -307,7 +307,7 @@ internal fun ProgrammeDetailsHost(
         val menuEvent = observation.event(airing.id) ?: airing
         ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(observation::channel),
             observation.dvrEntryForEvent(menuEvent), fromGuide = true, stacked = true,
-            nowSec = nowSec, canModify = canModify, currentSession = capability,
+            nowSec = nowSec, canModify = canModify, currentSession = capability, observation = observation,
             onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))
     }
