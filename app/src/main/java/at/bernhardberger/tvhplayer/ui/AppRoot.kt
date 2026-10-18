@@ -1095,6 +1095,7 @@ fun AppRoot(
                     isPlayerRoute = isPlayer,
                 )
             ) {
+                val requestedFrameRate by playbackRuntime.frameRate.requested.collectAsStateWithLifecycle()
                 PlayerVideoSurface(
                     player = playbackRuntime.player,
                     aspectRatio = playerSettings.aspectRatio,
@@ -1107,6 +1108,9 @@ fun AppRoot(
                         videoVisible = videoPresentation.visible,
                         instant = applianceLaunchActive || !ValueAnimator.areAnimatorsEnabled(),
                     ),
+                    // Browse screens over warm playback leave the TV in its own mode.
+                    frameRate = requestedFrameRate.rate.takeIf { isPlayer },
+                    frameRateMedia3Votes = requestedFrameRate.media3Votes,
                 )
             }
         },

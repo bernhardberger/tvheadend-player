@@ -110,7 +110,6 @@ class SettingsPlayerTest(private val language: String) {
                                 ui = ui,
                                 onAutoStartPlaybackChanged = { switchCalls++ },
                                 onTimeshiftEnabledChanged = { switchCalls++ },
-                                onRefreshRateMatchingEnabledChanged = { switchCalls++ },
                                 onAudioPassthroughEnabledChanged = { switchCalls++ },
                                 onAudioDescriptionChanged = { switchCalls++ },
                                 onProfileSelected = {

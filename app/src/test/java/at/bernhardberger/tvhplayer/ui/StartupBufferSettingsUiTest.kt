@@ -78,7 +78,7 @@ class StartupBufferSettingsUiTest {
                     val navigation = rememberDepthNavigationState("root")
                     val levels = listOf(
                         settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
-                        settingsPlayerLevel(ui, {}, {}, {}, {}),
+                        settingsPlayerLevel(ui, {}, {}, {}),
                         settingsStartupBufferLevel(ui.startupBufferMillis, ui.startupBufferLearnedMillis) {
                             selections++
                             ui = ui.copy(startupBufferMillis = it)

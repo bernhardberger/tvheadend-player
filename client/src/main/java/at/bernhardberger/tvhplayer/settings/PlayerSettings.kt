@@ -17,6 +17,12 @@ import kotlinx.coroutines.flow.map
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 enum class AudioFormatPreference { AUTOMATIC, PREFER_DOLBY, PREFER_STEREO }
 
+/** Whether the TV switches to the video's frame rate: Always may blank the screen briefly. */
+enum class FrameRateSwitching { ALWAYS, SEAMLESS_ONLY, OFF }
+
+fun resolveFrameRateSwitching(storedValue: String?): FrameRateSwitching =
+    FrameRateSwitching.entries.firstOrNull { it.name == storedValue } ?: FrameRateSwitching.ALWAYS
+
 /** Store language identities, not localized display names or duplicate preference slots. */
 fun normalizeAudioLanguages(languages: List<String>): List<String> = languages
     .mapNotNull(::normalizePreferenceLanguage).distinct().take(3)
@@ -72,7 +78,7 @@ data class PlayerSettings(
     val audioDescription: Boolean = false,
     val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
     val timeshiftEnabled: Boolean = true,
-    val refreshRateMatchingEnabled: Boolean = true,
+    val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
     val audioPassthroughEnabled: Boolean = true,
     val keepChannelMinutes: Int = 20,
     /** Live start-up buffer in milliseconds; [STARTUP_BUFFER_AUTOMATIC] learns it per server. */
@@ -122,7 +128,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val SUBTITLE_LANGUAGE = stringPreferencesKey("subtitleLanguage")
         val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
         val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
-        val REFRESH_RATE_MATCHING_ENABLED = booleanPreferencesKey("refreshRateMatchingEnabled")
+        val FRAME_RATE_SWITCHING = stringPreferencesKey("frameRateSwitching")
         val AUDIO_PASSTHROUGH_ENABLED = booleanPreferencesKey("audioPassthroughEnabled")
         val KEEP_CHANNEL_MINUTES = intPreferencesKey("keepChannelMinutes")
         val STARTUP_BUFFER_MILLIS = intPreferencesKey("startupBufferMillis")
@@ -197,10 +203,8 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         }
     }
 
-    suspend fun setRefreshRateMatchingEnabled(enabled: Boolean) {
-        dataStore.edit { p ->
-            p[Keys.REFRESH_RATE_MATCHING_ENABLED] = enabled
-        }
+    suspend fun setFrameRateSwitching(switching: FrameRateSwitching) {
+        dataStore.edit { it[Keys.FRAME_RATE_SWITCHING] = switching.name }
     }
 
     suspend fun setAudioPassthroughEnabled(enabled: Boolean) {
@@ -285,7 +289,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 subtitleLanguage = p[Keys.SUBTITLE_LANGUAGE]?.let(::normalizePreferenceLanguage),
                 aspectRatio = aspect,
                 timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
-                refreshRateMatchingEnabled = p[Keys.REFRESH_RATE_MATCHING_ENABLED] ?: true,
+                frameRateSwitching = resolveFrameRateSwitching(p[Keys.FRAME_RATE_SWITCHING]),
                 audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
                 keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in listOf(0, 10, 20, 30) } ?: 20,
                 startupBufferMillis = p[Keys.STARTUP_BUFFER_MILLIS]

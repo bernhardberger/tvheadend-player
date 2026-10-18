@@ -58,7 +58,7 @@ class SettingsAudioPassthroughTest {
                         SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
                             settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
                             settingsPlayerLevel(SettingsPlayerUiState(audioPassthroughEnabled = enabled,
-                                audioPassthroughChangeFailed = failed), {}, {}, {}, {
+                                audioPassthroughChangeFailed = failed), {}, {}, {
                                 changes++
                                 enabled = it
                             }),

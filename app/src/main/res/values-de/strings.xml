@@ -452,6 +452,10 @@
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Tvheadend Player erlauben, für Live-TV einen Timeshift-Puffer von Ihrem Server anzufordern.</string>
     <string name="refresh_rate_matching_setting">Bildwiederholrate anpassen</string>
+    <string name="frame_rate_switching_always">Immer</string>
+    <string name="frame_rate_switching_seamless_only">Nur wenn nahtlos</string>
+    <string name="frame_rate_switching_off">Aus</string>
+    <string name="frame_rate_switching_description">Immer schaltet den Fernseher auf die Bildrate des Videos um, auch wenn das Bild dabei kurz schwarz wird.</string>
     <string name="audio_passthrough_setting">Audio-Passthrough</string>
     <string name="audio_passthrough_description">Kann den Ton kurz unterbrechen.</string>
     <string name="audio_passthrough_failed">Modus konnte nicht übernommen werden.</string>

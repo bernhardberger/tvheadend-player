@@ -268,6 +268,8 @@
     <string name="stats_video_decoder" translatable="false">Video decoder</string>
     <string name="stats_frames" translatable="false">Frames</string>
     <string name="stats_frame_rate" translatable="false">%1$s fps</string>
+    <string name="stats_frame_rate_measured" translatable="false">%1$s fps (measured)</string>
+    <string name="stats_same_time_frames" translatable="false">%1$d%% same-time frames</string>
     <string name="stats_frames_value" translatable="false">%1$s rendered · %2$s dropped</string>
     <string name="stats_frames_value_with_percentage" translatable="false">%1$s rendered · %2$s dropped (%3$s%%)</string>
     <string name="stats_audio" translatable="false">Audio</string>
@@ -305,8 +307,14 @@
     <string name="stats_server_drops_value" translatable="false">I %1$s · P %2$s · B %3$s</string>
     <string name="stats_client_drops" translatable="false">Client packet drops</string>
     <string name="stats_system" translatable="false">System</string>
-    <string name="stats_output" translatable="false">Display output</string>
-    <string name="stats_output_value" translatable="false">%1$dx%2$d @ %3$s Hz</string>
+    <string name="stats_output" translatable="false">Output</string>
+    <string name="stats_output_value" translatable="false">%1$d×%2$d · %3$s Hz</string>
+    <string name="stats_output_requested" translatable="false">Requested %1$s Hz</string>
+    <string name="stats_refresh_rates" translatable="false">Refresh rates</string>
+    <string name="stats_match_frame_rate" translatable="false">Match frame rate</string>
+    <string name="stats_match_frame_rate_never" translatable="false">Never</string>
+    <string name="stats_match_frame_rate_seamless" translatable="false">Seamless only</string>
+    <string name="stats_match_frame_rate_always" translatable="false">Always</string>
     <string name="stats_thermal" translatable="false">Thermal</string>
     <string name="stats_app_memory" translatable="false">App memory</string>
     <string name="stats_low_memory" translatable="false">Low-memory state</string>
@@ -551,6 +559,10 @@
     <string name="timeshift_setting">Timeshift</string>
     <string name="timeshift_setting_description">Allow Tvheadend Player to request a live TV timeshift buffer from your server.</string>
     <string name="refresh_rate_matching_setting">Match content frame rate</string>
+    <string name="frame_rate_switching_always">Always</string>
+    <string name="frame_rate_switching_seamless_only">Only if seamless</string>
+    <string name="frame_rate_switching_off">Off</string>
+    <string name="frame_rate_switching_description">Always switches the TV to the video’s frame rate, even if the screen goes dark for a moment.</string>
     <string name="audio_passthrough_setting">Audio passthrough</string>
     <string name="audio_passthrough_description">May briefly interrupt audio.</string>
     <string name="audio_passthrough_failed">Couldn’t apply this mode.</string>

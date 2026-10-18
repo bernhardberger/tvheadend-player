@@ -33,6 +33,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionPriority
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
@@ -194,6 +195,7 @@ class AppPlaybackRuntime(
     )
     val livePause = livePauseController.livePause
     val livePauseNotice = livePauseController.livePauseNotice
+    val frameRate = PlaybackFrameRate()
     private val audioTracks = PlaybackAudioTracks(
         player = player,
         settings = settings,
@@ -206,6 +208,7 @@ class AppPlaybackRuntime(
         targetInstallationInProgress = { targetInstallationInProgress },
         interruptionMuted = { audioInterruptions.interruptionMuted },
         preserveInterruptionMute = { audioInterruptions.preserveInterruptionMute() },
+        frameRate = frameRate,
     )
     val audioPassthroughChangeFailed = audioTracks.audioPassthroughChangeFailed
     val audioAutomatic = audioTracks.audioAutomatic
@@ -368,6 +371,10 @@ class AppPlaybackRuntime(
         }
 
         override fun onTracksChanged(tracks: Tracks) {
+            // Known tracks without video (radio): nothing to request. Empty tracks during a zap keep the rate.
+            if (tracks.groups.isNotEmpty() && !tracks.containsType(androidx.media3.common.C.TRACK_TYPE_VIDEO)) {
+                frameRate.reset()
+            }
             if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTracksChanged()
         }
 
@@ -402,6 +409,7 @@ class AppPlaybackRuntime(
     init {
         targetCommands.runIfOpen {
             player.addListener(listener)
+            player.setVideoFrameMetadataListener(frameRate.listener)
             presentation.seekDiagnosticsListener?.let(player::addAnalyticsListener)
         }
     }
@@ -1144,6 +1152,7 @@ class AppPlaybackRuntime(
         if (!targetCommands.isOpen()) return PlaybackStopResult.SHUT_DOWN
         presentationEpoch.publishIfCurrent(epoch) {
             _activeTarget.value = null
+            frameRate.reset()
             _recordingSelection.value = null
             _recordingAdmission.value = null
             activeTargetEpoch = null
@@ -1446,8 +1455,8 @@ class AppPlaybackRuntime(
     fun setDiagnosticsEnabled(enabled: Boolean) {
         presentation.setDiagnosticsEnabled(enabled)
     }
-    fun setRefreshRateMatchingEnabled(enabled: Boolean) {
-        audioTracks.setRefreshRateMatchingEnabled(enabled)
+    fun setFrameRateSwitching(switching: FrameRateSwitching) {
+        audioTracks.setFrameRateSwitching(switching)
     }
     fun onRecoveryRequired(reason: PlaybackRecoveryReason) {
         // The escalation belongs to the target playing when the SDK reports it, not to a
@@ -1694,6 +1703,7 @@ class AppPlaybackRuntime(
         activeTargetEpoch = null
         activeLiveSelection = null
         _activeTarget.value = null
+        frameRate.reset()
         _recordingSelection.value = null
         _recordingAdmission.value = null
         livePauseController.dropPendingLivePauseLocked()
@@ -1777,6 +1787,8 @@ class AppPlaybackRuntime(
             audioInterruptions.clearAudioInterruptionLocked()
             presentation.removeTargetFrameListenerLocked()
             player.removeListener(listener)
+            player.clearVideoFrameMetadataListener(frameRate.listener)
+            frameRate.close()
             presentation.seekDiagnosticsListener?.let(player::removeAnalyticsListener)
             audioTracks.clearSessionAudioLocked()
         }
@@ -1916,6 +1928,7 @@ class AppPlaybackRuntime(
             activeTargetEpoch = null
             livePauseController.dropPendingLivePauseLocked()
             _activeTarget.value = null
+            frameRate.reset()
             livePauseController.publishLivePause()
             _recordingSelection.value = null
             _recordingAdmission.value = recordingAdmission

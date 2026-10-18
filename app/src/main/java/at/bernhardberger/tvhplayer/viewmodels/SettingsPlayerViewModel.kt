@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
+import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -29,7 +30,7 @@ data class SettingsPlayerUiState(
     val profiles: StreamProfilesResult = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY),
     val selectedProfileId: StreamProfileId? = null,
     val timeshiftEnabled: Boolean = true,
-    val refreshRateMatchingEnabled: Boolean = true,
+    val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
     val audioPassthroughEnabled: Boolean = true,
     val audioPassthroughChangeFailed: Boolean = false,
     val keepChannelMinutes: Int = 20,
@@ -61,7 +62,7 @@ class SettingsPlayerViewModel(
             profiles = profiles,
             selectedProfileId = selectedProfileId,
             timeshiftEnabled = settings.timeshiftEnabled,
-            refreshRateMatchingEnabled = settings.refreshRateMatchingEnabled,
+            frameRateSwitching = settings.frameRateSwitching,
             audioPassthroughEnabled = settings.audioPassthroughEnabled,
             audioPassthroughChangeFailed = audioPassthroughChangeFailed,
             keepChannelMinutes = settings.keepChannelMinutes,
@@ -109,10 +110,10 @@ class SettingsPlayerViewModel(
         }
     }
 
-    fun onRefreshRateMatchingEnabledChanged(enabled: Boolean) {
+    fun onFrameRateSwitchingChanged(switching: FrameRateSwitching) {
         viewModelScope.launch {
-            settingsStore.setRefreshRateMatchingEnabled(enabled)
-            playbackRuntime.setRefreshRateMatchingEnabled(enabled)
+            settingsStore.setFrameRateSwitching(switching)
+            playbackRuntime.setFrameRateSwitching(switching)
         }
     }
 

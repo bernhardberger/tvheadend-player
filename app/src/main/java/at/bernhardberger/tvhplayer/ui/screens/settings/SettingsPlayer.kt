@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
+import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_FIXED_MILLIS
 import at.bernhardberger.tvhplayer.ui.SettingsSection
@@ -39,6 +40,31 @@ internal fun settingsKeepChannelLevel(minutes: Int, onSelect: (Int) -> Unit): De
 @Composable
 private fun keepChannelLabel(minutes: Int): String = if (minutes == 0) stringResource(R.string.keep_channel_off)
     else at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), androidx.compose.ui.platform.LocalResources.current)
+
+internal const val FRAME_RATE_LEVEL = "frame-rate"
+
+@Composable
+internal fun settingsFrameRateLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    return settingsFrameRateLevel(ui.frameRateSwitching) { switching ->
+        vm.onFrameRateSwitchingChanged(switching)
+        navigation.pop()
+    }
+}
+
+@Composable
+internal fun settingsFrameRateLevel(switching: FrameRateSwitching, onSelect: (FrameRateSwitching) -> Unit): DepthLevel =
+    settingsLevel(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting), FrameRateSwitching.entries.map { value ->
+        settingsRow(value.name, frameRateSwitchingLabel(value), selected = switching == value, onClick = { onSelect(value) })
+    }, initialItemId = switching.name,
+        description = stringResource(R.string.frame_rate_switching_description))
+
+@Composable
+private fun frameRateSwitchingLabel(switching: FrameRateSwitching): String = stringResource(when (switching) {
+    FrameRateSwitching.ALWAYS -> R.string.frame_rate_switching_always
+    FrameRateSwitching.SEAMLESS_ONLY -> R.string.frame_rate_switching_seamless_only
+    FrameRateSwitching.OFF -> R.string.frame_rate_switching_off
+})
 
 internal const val STARTUP_BUFFER_LEVEL = "startup-buffer"
 
@@ -76,7 +102,7 @@ private fun startupBufferSeconds(millis: Int): String {
 @Composable
 internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): List<DepthLevel> {
     val ui by vm.ui.collectAsStateWithLifecycle()
-    return listOf(settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged, vm::onRefreshRateMatchingEnabledChanged,
+    return listOf(settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged,
         vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged,
         vm::onAutoStartPlaybackChanged)) +
         settingsAudioPreferenceLevels(ui,
@@ -89,7 +115,6 @@ internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: Settings
 internal fun settingsPlayerLevel(
     ui: SettingsPlayerUiState,
     onTimeshiftEnabledChanged: (Boolean) -> Unit,
-    onRefreshRateMatchingEnabledChanged: (Boolean) -> Unit,
     onProfileSelected: (StreamProfileId?) -> Unit,
     onAudioPassthroughEnabledChanged: (Boolean) -> Unit,
     onAudioDescriptionChanged: (Boolean) -> Unit = {},
@@ -102,8 +127,8 @@ internal fun settingsPlayerLevel(
             onClick = { onAutoStartPlaybackChanged(!ui.autoStartPlayback) }))
         add(settingsRow("timeshift", stringResource(R.string.timeshift_setting), checked = ui.timeshiftEnabled,
             onClick = { onTimeshiftEnabledChanged(!ui.timeshiftEnabled) }))
-        add(settingsRow("refresh-rate", stringResource(R.string.refresh_rate_matching_setting), checked = ui.refreshRateMatchingEnabled,
-            onClick = { onRefreshRateMatchingEnabledChanged(!ui.refreshRateMatchingEnabled) }))
+        add(settingsRow(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting),
+            frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL))
         add(settingsRow("audio-passthrough", stringResource(R.string.audio_passthrough_setting),
             supporting = if (ui.audioPassthroughChangeFailed) stringResource(R.string.audio_passthrough_failed)
                 else stringResource(R.string.audio_passthrough_description), checked = ui.audioPassthroughEnabled,

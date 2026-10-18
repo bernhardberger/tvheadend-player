@@ -820,6 +820,48 @@ class BackgroundPlaybackRuntimeTest {
         return release
     }
 
+    @Test fun frameRateIsRequestedForVideoAndForgottenForRadioAndStop() = exercise {
+        live()
+        renderFrames(spacingUs = 20_000L)
+        assertEquals(50f, runtime.frameRate.requested.value.rate)
+
+        // The same target's known tracks turn out audio-only (radio): nothing to ask for.
+        playerListeners.toList().forEach { it.onTracksChanged(audioOnlyTracks()) }
+        assertNull(runtime.frameRate.requested.value.rate)
+
+        renderFrames(spacingUs = 40_000L, startUs = 10_000_000L)
+        assertEquals(25f, runtime.frameRate.requested.value.rate)
+        val stopped = scope.async { runtime.stop() }
+        await { stopped.isCompleted }
+        assertNull(runtime.frameRate.requested.value.rate)
+    }
+
+    @Test fun detachRemovesTheFrameListenerAndForgetsTheRequest() = exercise {
+        live()
+        val installed = requireNotNull(frameListener)
+        renderFrames(spacingUs = 20_000L)
+        assertEquals(50f, runtime.frameRate.requested.value.rate)
+
+        val detach = scope.async { runtime.detach() }
+        await { detach.isCompleted }
+        assertNull(frameListener)
+        assertNull(runtime.frameRate.requested.value.rate)
+
+        // A frame the player still delivers to the old listener changes nothing.
+        renderFrames(spacingUs = 20_000L, startUs = 10_000_000L, listener = installed)
+        assertNull(runtime.frameRate.requested.value.rate)
+        assertNull(runtime.frameRate.measured())
+    }
+
+    private fun audioOnlyTracks() = androidx.media3.common.Tracks(listOf(androidx.media3.common.Tracks.Group(
+        androidx.media3.common.TrackGroup(
+            androidx.media3.common.Format.Builder().setSampleMimeType(androidx.media3.common.MimeTypes.AUDIO_AAC).build(),
+        ),
+        false,
+        intArrayOf(androidx.media3.common.C.FORMAT_HANDLED),
+        booleanArrayOf(true),
+    )))
+
     private fun exercise(block: suspend Fixture.() -> Unit) = exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
 
     companion object {
@@ -931,6 +973,22 @@ class BackgroundPlaybackRuntimeTest {
         var beforePlay: () -> Unit = {}
         /** Runs after the runtime registers a player listener. */
         var onListenerAdded: () -> Unit = {}
+        /** The frame metadata listener the runtime installed on the player, if any. */
+        var frameListener: androidx.media3.exoplayer.video.VideoFrameMetadataListener? = null
+
+        /** Feeds [frames] rendered frames [spacingUs] apart, enough for a stable rate. */
+        fun renderFrames(
+            spacingUs: Long,
+            startUs: Long = 0L,
+            frames: Int = 80,
+            listener: androidx.media3.exoplayer.video.VideoFrameMetadataListener = requireNotNull(frameListener),
+        ) {
+            val format = androidx.media3.common.Format.Builder().build()
+            repeat(frames) {
+                val presentationTimeUs = startUs + it * spacingUs
+                listener.onVideoFrameAboutToBeRendered(presentationTimeUs, presentationTimeUs * 1_000L, format, null)
+            }
+        }
         /** Runs inside a live target install, before the session binds the channel. */
         var beforeLiveBinding: () -> Unit = {}
         private val runtimeSession = object : TvheadendSession by session {
@@ -965,6 +1023,14 @@ class BackgroundPlaybackRuntimeTest {
             override fun removeListener(listener: Player.Listener) {
                 playerListeners -= listener
                 player.removeListener(listener)
+            }
+            override fun setVideoFrameMetadataListener(listener: androidx.media3.exoplayer.video.VideoFrameMetadataListener) {
+                frameListener = listener
+                player.setVideoFrameMetadataListener(listener)
+            }
+            override fun clearVideoFrameMetadataListener(listener: androidx.media3.exoplayer.video.VideoFrameMetadataListener) {
+                if (frameListener === listener) frameListener = null
+                player.clearVideoFrameMetadataListener(listener)
             }
         }, runtimeSession, coordinator, settings, profiles, scope,
             audioOutput = TvheadendAudioOutputProvider(context), audioFocus = focus, policy = policy, elapsedRealtime = { scheduler.currentTime })

@@ -725,6 +725,7 @@ fun RecordingPlayerScreen(
                 PlaybackStatsOverlay(
                     diagnostics = diagnostics,
                     aspectRatio = aspectRatio,
+                    frameRate = session.frameRate,
                 )
             }
 

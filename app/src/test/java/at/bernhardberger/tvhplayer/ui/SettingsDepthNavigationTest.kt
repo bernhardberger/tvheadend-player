@@ -270,7 +270,7 @@ class SettingsDepthNavigationTest {
                 val scope = rememberCoroutineScope()
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
                 val player = settingsPlayerLevel(SettingsPlayerUiState(autoStartPlayback = settings.autoStartPlayback),
-                    {}, {}, {}, {}, onAutoStartPlaybackChanged = { enabled ->
+                    {}, {}, {}, onAutoStartPlaybackChanged = { enabled ->
                         scope.launch { store.setAutoStartPlayback(enabled) }
                     })
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild), player))
@@ -743,7 +743,7 @@ class SettingsDepthNavigationTest {
                             settingsChannelTagsLevel(emptyList(), ChannelScopeVisibility(), loaded, failed,
                                 { retries++ }, { toggles++ }),
                             settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED)),
-                                { settingsActions++ }, { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
+                                { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
                             settingsApplianceLevel(false, { settingsActions++ }),
                         ), initialFocusEnabled = ready && !drawerActive, contentPadding = padding)
                     }

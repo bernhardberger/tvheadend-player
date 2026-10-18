@@ -70,7 +70,7 @@ class SettingsKeepChannelTest(private val language: String) {
                         val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
                         SettingsScreenNavigation(navigation, listOf(
                             settingsRootLevel(),
-                            settingsPlayerLevel(SettingsPlayerUiState(keepChannelMinutes = minutes), {}, {}, {}, {}),
+                            settingsPlayerLevel(SettingsPlayerUiState(keepChannelMinutes = minutes), {}, {}, {}),
                             settingsKeepChannelLevel(minutes) {
                                 selections += it
                                 minutes = it

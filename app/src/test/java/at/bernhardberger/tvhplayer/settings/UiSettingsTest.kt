@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.settings
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -28,12 +29,12 @@ class UiSettingsTest {
     }
 
     @Test
-    fun refreshRateMatching_isEnabledByDefault() {
+    fun frameRateSwitching_isAlwaysByDefault() {
         val settings = PlayerSettings(
             audioLanguages = emptyList(),
             subtitleLanguage = null,
         )
 
-        assertTrue(settings.refreshRateMatchingEnabled)
+        assertEquals(FrameRateSwitching.ALWAYS, settings.frameRateSwitching)
     }
 }

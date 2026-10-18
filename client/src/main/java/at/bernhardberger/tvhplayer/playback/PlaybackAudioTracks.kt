@@ -2,6 +2,7 @@
 
 package at.bernhardberger.tvhplayer.playback
 
+import android.os.Build
 import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.ExoPlayer
@@ -9,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import kotlinx.coroutines.CoroutineScope
@@ -37,6 +39,7 @@ internal class PlaybackAudioTracks(
     private val targetInstallationInProgress: () -> Boolean,
     private val interruptionMuted: () -> Boolean,
     private val preserveInterruptionMute: () -> Unit,
+    private val frameRate: PlaybackFrameRate,
 ) {
     private var audioOutputConfigured = false
     private var audioOutputChanging = false
@@ -135,13 +138,13 @@ internal class PlaybackAudioTracks(
         audioWriteJob?.join()
     }
 
-    fun setRefreshRateMatchingEnabled(enabled: Boolean) {
-        targetCommands.runIfOpen {
-            player.setVideoChangeFrameRateStrategy(
-                if (enabled) C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
-                else C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF,
-            )
-        }
+    fun setFrameRateSwitching(switching: FrameRateSwitching) {
+        targetCommands.runIfOpen { applyFrameRateSwitching(switching) }
+    }
+
+    private fun applyFrameRateSwitching(switching: FrameRateSwitching) {
+        player.setVideoChangeFrameRateStrategy(media3FrameRateStrategy(switching, Build.VERSION.SDK_INT))
+        frameRate.setSwitching(switching)
     }
 
     fun configureAudioOutputBeforeFirstTargetLocked(value: PlayerSettings) {
@@ -205,13 +208,7 @@ internal class PlaybackAudioTracks(
             player.trackSelectionParameters = trackPreferences(
                 player.trackSelectionParameters, value,
             )
-            player.setVideoChangeFrameRateStrategy(
-                if (value.refreshRateMatchingEnabled) {
-                    C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS
-                } else {
-                    C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF
-                },
-            )
+            applyFrameRateSwitching(value.frameRateSwitching)
         }
     }
 }

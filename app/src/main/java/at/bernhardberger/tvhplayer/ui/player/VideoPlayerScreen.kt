@@ -1944,6 +1944,7 @@ fun VideoPlayerScreen(
                 diagnostics = diagnostics,
                 aspectRatio = aspectRatio,
                 timeshiftState = effectiveTimeshiftState,
+                frameRate = playbackRuntime.frameRate,
             )
         }
 

@@ -19,6 +19,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -30,6 +31,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.PlaybackFrameRate
 import at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
@@ -60,8 +62,10 @@ internal fun PlaybackStatsOverlay(
     aspectRatio: AspectRatioMode,
     modifier: Modifier = Modifier,
     timeshiftState: AppTimeshiftState? = null,
+    frameRate: PlaybackFrameRate? = null,
 ) {
     val locale = Locale.ROOT
+    val measuredFrameRate = rememberMeasuredFrameRate(frameRate)
     val video = diagnostics.video
     val audio = diagnostics.audio
     val live = diagnostics.live
@@ -153,6 +157,15 @@ internal fun PlaybackStatsOverlay(
                         video?.resolution,
                         video?.frameRate?.let {
                             stringResource(R.string.stats_frame_rate, it.oneDecimal(locale))
+                        } ?: measuredFrameRate?.let { measured ->
+                            listOfNotNull(
+                                measured.framesPerSecond?.let {
+                                    stringResource(R.string.stats_frame_rate_measured, formatRefreshRate(it))
+                                },
+                                measured.sameTimePercent?.let {
+                                    stringResource(R.string.stats_same_time_frames, it)
+                                },
+                            ).joinToString(" · ").ifEmpty { null }
                         },
                     ).joinToString(" · ").ifBlank {
                         stringResource(R.string.stats_unavailable)
@@ -192,6 +205,7 @@ internal fun PlaybackStatsOverlay(
                         },
                     ),
                 )
+                DisplayOutputStatLines(frameRate)
                 diagnostics.startupBuffer?.let { buffer ->
                     StatLine(
                         stringResource(R.string.stats_startup_buffer),
@@ -294,6 +308,37 @@ internal fun PlaybackStatsOverlay(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun DisplayOutputStatLines(frameRate: PlaybackFrameRate?) {
+    val output = rememberDisplayOutput() ?: return
+    val requested = frameRate?.requested?.collectAsStateWithLifecycle()?.value?.rate
+    StatLine(
+        stringResource(R.string.stats_output),
+        listOfNotNull(
+            stringResource(R.string.stats_output_value, output.width, output.height, output.refreshRate),
+            requested?.let { stringResource(R.string.stats_output_requested, formatRefreshRate(it)) },
+        ).joinToString(" · "),
+    )
+    if (output.refreshRatesByResolution.isNotEmpty()) {
+        StatLine(
+            stringResource(R.string.stats_refresh_rates),
+            output.refreshRatesByResolution,
+        )
+    }
+    output.matchFrameRate?.let { preference ->
+        StatLine(
+            stringResource(R.string.stats_match_frame_rate),
+            stringResource(
+                when (preference) {
+                    MatchFrameRatePreference.NEVER -> R.string.stats_match_frame_rate_never
+                    MatchFrameRatePreference.SEAMLESS_ONLY -> R.string.stats_match_frame_rate_seamless
+                    MatchFrameRatePreference.ALWAYS -> R.string.stats_match_frame_rate_always
+                },
+            ),
+        )
     }
 }
 

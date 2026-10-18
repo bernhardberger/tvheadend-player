@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import android.view.SurfaceView
 import android.view.View
 import androidx.annotation.OptIn
 import androidx.compose.animation.core.Animatable
@@ -44,8 +45,13 @@ fun PlayerVideoSurface(
     debugVideoBackdropVisible: Boolean = false,
     /** How long the black cover takes to clear a first picture; 0 removes it at once. */
     coverFadeMillis: Int = 0,
+    /** Display rate to ask for in Hz while the player is shown, or null for none. */
+    frameRate: Float? = null,
+    /** Media3 votes on the surface itself, so a withdrawn [frameRate] is not cleared over it. */
+    frameRateMedia3Votes: Boolean = false,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val surfaceFrameRate = remember { VideoSurfaceFrameRate() }
     var keepScreenOn by remember(player, lifecycle, videoVisible) { mutableStateOf(false) }
     DisposableEffect(player, lifecycle, videoVisible) {
         fun updateScreenOn() {
@@ -83,11 +89,13 @@ fun PlayerVideoSurface(
                     importantForAccessibility =
                         View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                     this.keepScreenOn = false
+                    (videoSurfaceView as? SurfaceView)?.let(surfaceFrameRate::attach)
                 }
             },
             update = { view ->
                 view.player = player
                 view.keepScreenOn = keepScreenOn
+                surfaceFrameRate.request(frameRate, frameRateMedia3Votes)
                 view.alpha = if (videoVisible) 1f else 0f
                 view.resizeMode = when (aspectRatio) {
                     AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -105,6 +113,7 @@ fun PlayerVideoSurface(
             onRelease = { view ->
                 view.player = null
                 view.keepScreenOn = false
+                surfaceFrameRate.release()
             },
         )
         // View alpha does not hide a SurfaceView's content: cover the old picture until the

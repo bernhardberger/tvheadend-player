@@ -46,6 +46,7 @@ internal fun SettingsScreen(
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation, connectionPresentation, onRetry) + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty()),
         settingsKeepChannelLevel(navigation),
+        settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
     ) + recordingLevels + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()

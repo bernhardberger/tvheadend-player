@@ -108,7 +108,7 @@ class AudioPreferenceUiTest {
                     val navigation = rememberDepthNavigationState("root")
                     val levels = listOf(
                         settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
-                        settingsPlayerLevel(ui, {}, {}, {}, {}, { ui = ui.copy(audioDescription = it) }),
+                        settingsPlayerLevel(ui, {}, {}, {}, { ui = ui.copy(audioDescription = it) }),
                     ) + settingsAudioPreferenceLevels(ui,
                         { slot, language -> selections++; ui = ui.copy(audioLanguages = audioLanguagesWithSlot(ui.audioLanguages, slot, language)); navigation.pop() },
                         { selections++; ui = ui.copy(audioFormat = it); navigation.pop() },
