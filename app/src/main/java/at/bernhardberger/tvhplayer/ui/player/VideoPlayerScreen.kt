@@ -78,6 +78,7 @@ import at.bernhardberger.tvhplayer.core.channelPickAction
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.liveInterrupted
 import at.bernhardberger.tvhplayer.core.liveChannelCondition
+import at.bernhardberger.tvhplayer.core.liveRetryRestoresRequestFailure
 import at.bernhardberger.tvhplayer.core.livePlayerAlert
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
@@ -1312,11 +1313,16 @@ fun VideoPlayerScreen(
     /**
      * Retunes the last live channel. While the session has the channel on screen, its failed
      * request ends here, so the retune is not covered by that failure's message; a channel the
-     * session lacks keeps it.
+     * session lacks keeps it. A retune that does not start gives the request its failure back
+     * while that request is still the current one.
      */
     fun retryLive(viewerRetry: Boolean) {
-        if (authorizedLiveSelection != null) requestedChannelFailed = false
-        videoPlayerViewModel.retryLiveNow(viewerRetry)
+        val cleared = requestedChannelFailed && authorizedLiveSelection != null
+        if (cleared) requestedChannelFailed = false
+        val request = liveRequestToken
+        videoPlayerViewModel.retryLiveNow(viewerRetry) { result ->
+            if (liveRetryRestoresRequestFailure(cleared, result, request == liveRequestToken)) requestedChannelFailed = true
+        }
     }
 
     fun dispatchRecoveryRetry(command: PlaybackRetryCommand) {

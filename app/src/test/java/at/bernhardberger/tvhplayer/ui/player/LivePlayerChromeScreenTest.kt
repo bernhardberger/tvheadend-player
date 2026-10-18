@@ -97,6 +97,7 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.playback.StreamIndex
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionConfirmation
@@ -461,6 +462,21 @@ class LivePlayerChromeScreenTest {
         settle()
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertFalse("the reconnect's retune ends the failed request", exists("player-channel-unavailable"))
+    }
+
+    @Test fun aRetryWithoutACurrentSessionReportsToTheScreenThatItDidNotStart() {
+        screen()
+        compose.runOnIdle {
+            session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
+                channelState = ChannelRepositoryState.Stale(ChannelCatalog.create(
+                    (1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) }))))
+        }
+        settle()
+        // The screen gives its request the failure back on this result (liveRetryRestoresRequestFailure).
+        val results = mutableListOf<PlaybackTargetResult?>()
+        compose.runOnIdle { video.retryLiveNow(viewerRetry = false) { results += it } }
+        compose.waitUntil(5_000) { idleMainLooper(); results.isNotEmpty() }
+        assertEquals(listOf(PlaybackTargetResult.NOT_READY), results)
     }
 
     @Test fun backgroundCancellationAtCommitBeforeReceiptRetiresTheUndeliveredStartupTune() {

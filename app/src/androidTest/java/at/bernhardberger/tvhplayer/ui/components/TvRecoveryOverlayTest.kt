@@ -8,6 +8,9 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertHasNoClickAction
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -90,15 +93,19 @@ class TvRecoveryOverlayTest {
                     "Recording unavailable",
                 )
             )
-        // The title is the live region, so a line that changes while shown is not announced.
-        composeRule.onNodeWithText("Recording unavailable")
-            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
+        // One live region holds the title and the hint; only a changing status line stays outside it.
+        composeRule.onNodeWithTag("tv-recovery-announcement")
             .assert(
                 SemanticsMatcher.expectValue(
                     SemanticsProperties.LiveRegion,
                     LiveRegionMode.Assertive,
                 )
             )
+        for (text in listOf("Recording unavailable", "The file cannot be played.")) {
+            composeRule.onNode(hasText(text) and hasAnyAncestor(hasTestTag("tv-recovery-announcement"))).assertExists()
+        }
+        composeRule.onNodeWithText("Recording unavailable")
+            .assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
     }
 
     @Test

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -87,6 +88,17 @@ private fun ConnectionState.playerConnectionError(): AppError {
     return failure?.let { ConnectionUiState.Error(it.kind, it.recoveryDisposition).toAppError(closable = true) }
         ?: AppErrorCondition.RECONNECTING.toAppError(closable = true)
 }
+
+/**
+ * Whether a live retry gives the channel on screen back the failed request it [cleared]: its
+ * retune did not start ([result] is null when there was no channel to retune), and the request
+ * it was made for is still the current one ([requestCurrent]).
+ */
+fun liveRetryRestoresRequestFailure(
+    cleared: Boolean,
+    result: PlaybackTargetResult?,
+    requestCurrent: Boolean,
+): Boolean = cleared && requestCurrent && result?.isStarted != true
 
 /**
  * The server stopped the stream of the live channel on screen and has not started it again.

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.viewmodels
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvhplayer.core.toConnectionState
 import at.bernhardberger.tvhplayer.playback.LivePlaybackSelection
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -52,9 +53,12 @@ class VideoPlayerViewModel(
         playbackRuntime.stopAfterLoss()
     }
 
-    /** [viewerRetry]: the viewer pressed Retry (a fresh start); otherwise automatic reconnect recovery. */
-    fun retryLiveNow(viewerRetry: Boolean) {
-        viewModelScope.launch { playbackRuntime.retryLive(viewerRetry) }
+    /**
+     * [viewerRetry]: the viewer pressed Retry (a fresh start); otherwise automatic reconnect recovery.
+     * [onResult] receives the retune's result, null when there was no live channel to retune.
+     */
+    fun retryLiveNow(viewerRetry: Boolean, onResult: (PlaybackTargetResult?) -> Unit = {}) {
+        viewModelScope.launch { onResult(playbackRuntime.retryLive(viewerRetry)) }
     }
 
     suspend fun pauseTimeshift() = playbackRuntime.pauseTimeshift()

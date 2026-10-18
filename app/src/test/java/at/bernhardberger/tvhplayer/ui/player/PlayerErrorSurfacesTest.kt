@@ -35,6 +35,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.common.hintRes
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Before
@@ -191,7 +192,7 @@ class PlayerErrorSurfacesTest {
     }
 
     @Test
-    fun onlyTheStableTitleIsALiveRegionNotTheCountdown() {
+    fun theAlertTextIsOneLiveRegionAndTheCountdownStaysOutsideIt() {
         compose.mainClock.autoAdvance = false
         show {
             LivePlayerAlertOverlay(
@@ -204,7 +205,8 @@ class PlayerErrorSurfacesTest {
         }
         compose.mainClock.advanceTimeByFrame()
         val liveRegion = SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)
-        compose.onNodeWithTag("tv-recovery-title").assert(liveRegion)
+        compose.onNodeWithTag("tv-recovery-announcement").assert(liveRegion)
+        compose.onNodeWithTag("tv-recovery-title").assert(hasAnyAncestor(hasTestTag("tv-recovery-announcement")))
         compose.onNodeWithTag("tv-recovery-status")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.LiveRegion))
             .assert(!hasAnyAncestor(liveRegion))
@@ -215,6 +217,28 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 5 s"))
         compose.onNodeWithTag("tv-recovery-overlay")
             .assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Reconnecting…"))
+    }
+
+    @Test
+    fun theLiveRegionHoldsTheTitleReasonHintAndNumber() {
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = livePlayerAlert(ConnectionState.Connected, AppPlaybackState.Playing, AppErrorCondition.USER_LIMIT),
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = {},
+            )
+        }
+        val inLiveRegion = hasAnyAncestor(
+            hasTestTag("tv-recovery-announcement") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion),
+        )
+        for (text in listOf(string(R.string.error_208_title), string(R.string.error_208_reason), "Error 208") +
+            listOfNotNull(AppErrorCondition.USER_LIMIT.hintRes()?.let(::string))) {
+            compose.onNode(hasText(text) and inLiveRegion).assertExists()
+        }
+        // The buttons are not part of it.
+        compose.onNodeWithTag("tv-recovery-primary").assert(!hasAnyAncestor(hasTestTag("tv-recovery-announcement")))
     }
 
     @Test

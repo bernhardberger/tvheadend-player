@@ -57,8 +57,8 @@ data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
 /**
  * [actions], when given, replace the primary and secondary action: up to [MaxRecoveryActions]
  * buttons in order, the first filled and focused when they appear or change. [errorNumber] is a
- * small line under the hint. [status] is a line under [message] that may change while shown, such
- * as a countdown; the live region is [message] alone, so [status] changes outside it.
+ * small line under the hint. [status] is a line under those that may change while shown, such as
+ * a countdown; the live region holds [message], [detail], [hint] and [errorNumber], not [status].
  */
 @Composable
 fun TvRecoveryOverlay(
@@ -145,20 +145,60 @@ fun TvRecoveryOverlay(
                 if (!primaryVisible) {
                     CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
                 }
-                Text(
-                    text = message,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    style = MaterialTheme.typography.headlineSmall,
-                    textAlign = TextAlign.Center,
+                // One live region for the alert's text; a changing [status] stays outside it.
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .padding(top = if (primaryVisible) 0.dp else 24.dp)
-                        .widthIn(max = 680.dp)
-                        .semantics {
-                            heading()
-                            liveRegion = liveRegionMode
-                        }
-                        .testTag("tv-recovery-title"),
-                )
+                        .semantics { liveRegion = liveRegionMode }
+                        .testTag("tv-recovery-announcement"),
+                ) {
+                    Text(
+                        text = message,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.headlineSmall,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(top = if (primaryVisible) 0.dp else 24.dp)
+                            .widthIn(max = 680.dp)
+                            .semantics { heading() }
+                            .testTag("tv-recovery-title"),
+                    )
+                    if (detail != null) {
+                        Text(
+                            text = detail,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            style = MaterialTheme.typography.titleMedium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .widthIn(max = 680.dp),
+                        )
+                    }
+                    if (hint != null) {
+                        Text(
+                            text = hint,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodyLarge,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .widthIn(max = 680.dp),
+                        )
+                    }
+                    if (errorNumber != null) {
+                        Text(
+                            text = errorNumber,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .padding(top = 12.dp)
+                                .testTag("tv-recovery-number"),
+                        )
+                    }
+                }
                 if (status != null) {
                     Text(
                         text = status,
@@ -169,41 +209,6 @@ fun TvRecoveryOverlay(
                             .padding(top = 12.dp)
                             .widthIn(max = 680.dp)
                             .testTag("tv-recovery-status"),
-                    )
-                }
-                if (detail != null) {
-                    Text(
-                        text = detail,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleMedium,
-                        textAlign = TextAlign.Center,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .widthIn(max = 680.dp),
-                    )
-                }
-                if (hint != null) {
-                    Text(
-                        text = hint,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodyLarge,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .widthIn(max = 680.dp),
-                    )
-                }
-                if (errorNumber != null) {
-                    Text(
-                        text = errorNumber,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        style = MaterialTheme.typography.bodySmall,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .padding(top = 12.dp)
-                            .testTag("tv-recovery-number"),
                     )
                 }
                 if (primaryVisible) {

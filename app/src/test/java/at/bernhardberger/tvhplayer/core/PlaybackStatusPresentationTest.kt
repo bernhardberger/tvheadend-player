@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -229,6 +230,18 @@ class PlaybackStatusPresentationTest {
         val limited = failed(SubscriptionIssue.USER_LIMIT, PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED)
         val limitAlert = livePlayerAlert(ConnectionState.Connected, limited, limited.toLiveErrorCondition()) as LivePlayerAlert.Error
         assertEquals(AppErrorAction.RETRY, limitAlert.error.actions.first())
+    }
+
+    @Test
+    fun aRetryThatDoesNotStartGivesTheChannelItsMessageBack() {
+        for (result in listOf(null, PlaybackTargetResult.NOT_READY, PlaybackTargetResult.TARGET_UNAVAILABLE,
+            PlaybackTargetResult.PLAYER_UNAVAILABLE, PlaybackTargetResult.SHUT_DOWN)) {
+            assertTrue("$result", liveRetryRestoresRequestFailure(cleared = true, result = result, requestCurrent = true))
+            // A newer request owns the screen now, or the retry cleared nothing: it keeps its state.
+            assertFalse("$result", liveRetryRestoresRequestFailure(cleared = true, result = result, requestCurrent = false))
+            assertFalse("$result", liveRetryRestoresRequestFailure(cleared = false, result = result, requestCurrent = true))
+        }
+        assertFalse(liveRetryRestoresRequestFailure(cleared = true, result = PlaybackTargetResult.STARTED, requestCurrent = true))
     }
 
     @Test
