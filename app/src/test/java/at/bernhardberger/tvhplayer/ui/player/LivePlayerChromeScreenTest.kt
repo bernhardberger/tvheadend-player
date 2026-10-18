@@ -2197,7 +2197,7 @@ class LivePlayerChromeScreenTest {
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.channels.value.size == if (missingRequestedChannel) 2 else 3 }
+        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == if (missingRequestedChannel) 2 else 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val base = player

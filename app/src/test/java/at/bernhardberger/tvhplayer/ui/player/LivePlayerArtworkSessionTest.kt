@@ -138,7 +138,7 @@ class LivePlayerArtworkSessionTest {
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(playerSession, ChannelTagSettingsStore(InMemoryData()))
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.channels.value.size == 1 }
+        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == 1 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         val runtime = AppPlaybackRuntime(player, playerSession, coordinator, settings, profiles, scope,

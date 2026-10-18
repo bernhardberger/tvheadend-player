@@ -89,7 +89,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         val catalog = withContext(Dispatchers.Main) { ChannelsViewModel(session, tags) }
         models.put("video", video)
         models.put("channels", catalog)
-        catalog.channels.first { it.size == if (tagged) 2 else 3 }
+        catalog.scope.first { it.scope.visibleChannels.size == if (tagged) 2 else 3 }
         val selection = ChannelSelectionStore().apply { setSelected(ChannelId(1)) }
         val visible = mutableStateOf(true)
         try {

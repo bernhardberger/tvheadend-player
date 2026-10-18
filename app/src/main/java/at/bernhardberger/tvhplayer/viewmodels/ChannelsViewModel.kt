@@ -30,11 +30,9 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 data class ChannelScopeState(
@@ -69,11 +67,6 @@ class ChannelsViewModel(
     private val mutableUnavailableTagNotice = MutableStateFlow(false)
     val unavailableTagNotice = mutableUnavailableTagNotice.asStateFlow()
 
-    val channels = scope.map { it.scope.visibleChannels }.stateIn(
-        scope = viewModelScope,
-        started = SharingStarted.Eagerly,
-        initialValue = emptyList(),
-    )
     init {
         loadSettings()
         viewModelScope.launch {

@@ -29,6 +29,7 @@ class ArtworkContext(
     internal val tvheadend: TvheadendSession?,
     private val session: State<CurrentSessionObservation?>,
     private val observation: State<SessionObservation?>,
+    internal val latest: State<SessionObservation?> = observation,
 ) {
     val currentSession: CurrentSessionObservation? get() = session.value
 
@@ -36,11 +37,15 @@ class ArtworkContext(
      * The model of logo [id]: with the current session, else the saved copy of the observation's
      * profile. A saved copy is the SDK's model, equal for every observation of the same profile, so
      * a retained update leaves the logo alone while another profile's observation replaces it.
+     * Before Ready it also follows the [latest] observation: a copy missing while the SDK had
+     * cleared the profile's saved logos shows once that profile is active again.
      */
     @OptIn(ExperimentalTvheadendApi::class)
     internal fun logo(id: ArtworkId): AppArtworkSource {
         val current = session.value
         val saved = if (current != null) null else tvheadend?.let { tvheadend ->
+            // Read only to resolve again on each emission; the copy stays the [observation]'s profile's.
+            latest.value
             observation.value?.let { TvheadendArtwork.cached(tvheadend, it, id) }
         }
         return AppArtworkSource(current, id, saved)
@@ -70,8 +75,11 @@ fun ProvideArtworkSession(
     observation: SessionObservation? = null,
     content: @Composable () -> Unit,
 ) {
-    val tvheadend = LocalArtworkContext.current.tvheadend
+    val parent = LocalArtworkContext.current
     val named = rememberUpdatedState(observation)
-    val context = remember(tvheadend, currentSession) { ArtworkContext(tvheadend, mutableStateOf(currentSession), named) }
+    // The app's latest observation passes down unchanged, so its saved logos re-resolve on every emission.
+    val context = remember(parent.tvheadend, parent.latest, currentSession) {
+        ArtworkContext(parent.tvheadend, mutableStateOf(currentSession), named, parent.latest)
+    }
     CompositionLocalProvider(LocalArtworkContext provides context, content = content)
 }

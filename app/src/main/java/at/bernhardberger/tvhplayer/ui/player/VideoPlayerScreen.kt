@@ -416,8 +416,9 @@ fun VideoPlayerScreen(
     val sdkTimeshiftState = activeLivePlayback?.timeshiftState ?: LiveTimeshiftState.Unavailable
     val subscriptionFailure = activeLivePlayback?.subscriptionIssue
     val diagnostics by videoPlayerViewModel.diagnostics.collectAsStateWithLifecycle()
-    val channels by channelsVm.channels.collectAsStateWithLifecycle()
     val channelScope by channelsVm.scope.collectAsStateWithLifecycle()
+    // One source: the rows come from the scope whose observation their saved logos use.
+    val channels = channelScope.scope.visibleChannels
     val channelsTitle = channelScope.scope.let { scope -> scope.tags.firstOrNull { it.id == scope.activeTagId } }
         ?.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.all_channels)
     val observation by videoPlayerViewModel.observation.collectAsStateWithLifecycle()

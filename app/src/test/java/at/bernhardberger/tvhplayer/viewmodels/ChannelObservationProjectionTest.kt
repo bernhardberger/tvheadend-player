@@ -156,12 +156,12 @@ class ChannelObservationProjectionTest {
         model.scope.first { it.channelCatalogCurrent && it.scope.activeTagId == firstTag.id }
         runCurrent()
         assertEquals(listOf(seven, nine), model.scope.value.scope.allChannels)
-        assertEquals(listOf(seven), model.channels.value)
+        assertEquals(listOf(seven), model.scope.value.scope.visibleChannels)
 
         publishUnrelatedMetadata(session) {
             runCurrent()
             assertTrue(model.scope.value.channelCatalogCurrent)
-            assertEquals(listOf(seven), model.channels.value)
+            assertEquals(listOf(seven), model.scope.value.scope.visibleChannels)
             assertEquals(firstTag.id, model.scope.value.scope.activeTagId)
         }
 
@@ -176,26 +176,26 @@ class ChannelObservationProjectionTest {
         runCurrent()
         assertEquals(listOf(nine, changedSeven), model.scope.value.scope.allChannels)
         assertEquals(listOf(changedTag, secondTag), model.scope.value.scope.tags)
-        assertTrue(model.channels.value.isEmpty())
+        assertTrue(model.scope.value.scope.visibleChannels.isEmpty())
 
         model.selectTag(secondTag.id)
         model.scope.first { it.scope.activeTagId == secondTag.id }
         runCurrent()
-        assertEquals(listOf(nine, changedSeven), model.channels.value)
+        assertEquals(listOf(nine, changedSeven), model.scope.value.scope.visibleChannels)
         model.setScopeVisible(firstTag.id, false)
         model.scope.first { it.scope.tags == listOf(secondTag) }
         runCurrent()
-        assertEquals(listOf(nine, changedSeven), model.channels.value)
+        assertEquals(listOf(nine, changedSeven), model.scope.value.scope.visibleChannels)
 
         session.publish(observation(ChannelRepositoryState.Synchronizing(changedCatalog)))
         runCurrent()
         assertFalse(model.scope.value.channelCatalogCurrent)
-        assertEquals(listOf(nine, changedSeven), model.channels.value)
+        assertEquals(listOf(nine, changedSeven), model.scope.value.scope.visibleChannels)
         session.publish(observation(ChannelRepositoryState.Current(changedCatalog)))
         runCurrent()
         assertTrue(model.scope.value.channelCatalogCurrent)
         assertEquals(secondTag.id, model.scope.value.scope.activeTagId)
-        assertEquals(listOf(nine, changedSeven), model.channels.value)
+        assertEquals(listOf(nine, changedSeven), model.scope.value.scope.visibleChannels)
         models.clear()
         context.dataStore.edit { it.clear() }
     }

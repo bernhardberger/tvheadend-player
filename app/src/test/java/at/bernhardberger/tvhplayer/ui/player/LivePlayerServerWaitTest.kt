@@ -249,7 +249,7 @@ class LivePlayerServerWaitTest {
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))
         models.put("channels", channels)
-        compose.waitUntil(10_000) { channels.channels.value.size == 3 }
+        compose.waitUntil(10_000) { channels.scope.value.scope.visibleChannels.size == 3 }
         player = ExoPlayer.Builder(context).build()
         val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
         runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,

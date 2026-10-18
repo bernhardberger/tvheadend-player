@@ -129,7 +129,31 @@ class ArtworkContextTest {
         assertEquals(listOf<Any>(AppArtworkSource(null, LOGO), AppArtworkSource(current, LOGO)), requests)
     }
 
-    private fun show(session: FakeTvheadendSession) {
+    @Test fun aPinnedObservationShowsItsSavedLogoAgainOnceItsProfileIsActiveAfterAClear() {
+        val session = FakeTvheadendSession()
+        session.artwork.scriptCached(FIRST)
+        session.publish(observation(SessionState.Synchronizing, guide = 1), FIRST)
+        val pinned = session.observation.value
+        // An explicit retry: the SDK clears the profile's saved logos while disconnected.
+        session.artwork.scriptCached(null)
+        session.publish(observation(SessionState.Disconnected, guide = 1), FIRST)
+        show(session) { ProvideArtworkSession(null, pinned) { Logo() } }
+        assertNull("no saved copy while cleared", (requests.single() as AppArtworkSource).saved)
+
+        session.artwork.scriptCached(FIRST)
+        session.publish(observation(SessionState.Synchronizing, guide = 2), FIRST)
+        compose.waitForIdle()
+
+        assertNotNull("the pinned observation's saved copy is back", (requests.last() as AppArtworkSource).saved)
+    }
+
+    private fun show(
+        session: FakeTvheadendSession,
+        content: @Composable () -> Unit = {
+            ObservationReader(session)
+            Logo()
+        },
+    ) {
         images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
             .components {
                 add(Interceptor { chain ->
@@ -141,10 +165,7 @@ class ArtworkContextTest {
             .diskCache(null)
             .build())
         compose.setContent {
-            ProvideAppArtwork(session) {
-                ObservationReader(session)
-                Logo()
-            }
+            ProvideAppArtwork(session, content)
         }
         compose.waitForIdle()
     }

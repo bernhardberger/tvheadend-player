@@ -25,7 +25,7 @@ class ProfileRecreationTest {
             oldCatalog = ViewModelProvider(activity)[ChannelsViewModel::class.java]
             oldSession = session(activity)
             assertSame(oldSession.observation, oldCatalog.observation)
-            assertEquals(60, oldCatalog.channels.value.size)
+            assertEquals(60, oldCatalog.scope.value.scope.visibleChannels.size)
         }
         compose.activityRule.scenario.recreate()
         compose.waitUntilAtLeastOneExists(hasText("Offline channel 1", substring = true), 15_000)
@@ -36,7 +36,7 @@ class ProfileRecreationTest {
             assertNotSame(oldCatalog, catalog)
             assertNotSame(oldSession, newSession)
             assertSame(newSession.observation, catalog.observation)
-            assertEquals(60, catalog.channels.value.size)
+            assertEquals(60, catalog.scope.value.scope.visibleChannels.size)
         }
         compose.waitUntil(10_000) { oldSession.calls.count { it == FakeSessionCall.SHUTDOWN } == 1 }
         assertEquals(0, newSession.calls.count { it == FakeSessionCall.SHUTDOWN })
