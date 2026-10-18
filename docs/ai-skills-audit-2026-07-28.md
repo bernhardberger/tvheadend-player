@@ -8,7 +8,7 @@ routing and caveats; this file is not mandatory implementation reading.
 
 Use the reviewed Chris Banes skills as the default implementation guidance for
 their focused Kotlin and Compose concerns. Keep repository-local skills as thin
-product overlays for Android TV interaction, TVHeadend DVR semantics, playback
+product overlays for Android TV interaction, Tvheadend DVR semantics, playback
 safety, device safety, and upstream contribution boundaries.
 
 Do not adopt the external suite as an unchecked workflow. It contains strong

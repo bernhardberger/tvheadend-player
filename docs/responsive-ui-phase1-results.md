@@ -1,5 +1,7 @@
 # Responsive UI Phase 1 — first measured baseline
 
+Status: Dated measurement record, 2026-09-12; superseded by later outcomes in `responsive-ui-implementation-record.md`.
+
 Date: 2026-09-12. Scope: Player-specific profiling on `main`, based on `e3e683d`
 plus the Phase 1 changes. This is a baseline and attribution result, **not a
 fluency fix or approval to enable R8 for releases**.

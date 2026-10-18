@@ -4,6 +4,14 @@ Date: 2026-07-28
 Status: dated decision record for the named upgrade and its remaining device
 gate; not general playback authority.
 
+Note (2026-10-18): the list of coupled paths under "Coupled change surface" is outdated. The
+packaged decoder no longer comes from `app/libs/` or `tools/build-media3-ffmpeg`
+(neither exists); it lives in the `decoder-ffmpeg/` module with `provenance.json`,
+`README.md`, `rebuild.py` and `import-sources.py`, and `tools/check-native-libs`
+checks it (`tools/check-native-libs:22`). Media3 versions are pinned in
+`gradle/libs.versions.toml`. The version decision and the device gate below are
+kept as recorded, without rewrite.
+
 ## Decision
 
 Upgrade the source and packaged native extension from Media3 `1.9.2` to stable

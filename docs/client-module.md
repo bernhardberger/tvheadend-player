@@ -5,7 +5,7 @@ Normative ownership rule for the UI-free Android library `:client`
 
 ## Purpose
 
-`:client` holds the reusable TVHeadend client layer: runtime ownership, settings
+`:client` holds the reusable Tvheadend client layer: runtime ownership, settings
 persistence and pure domain policy. A future mobile app or another TV front end
 can reuse it without inheriting this app's UI or UX. `:app` depends on
 `project(":client")`; `:client` never depends on `:app`.
@@ -16,7 +16,7 @@ boundary are `public`; keep everything else `internal`.
 
 ## Dependency rules
 
-Allowed: released TVHeadend SDK artifacts with the same strict version pin as
+Allowed: released Tvheadend SDK artifacts with the same strict version pin as
 `:app`, AndroidX core, DataStore preferences, kotlinx coroutines and
 serialization, and Media3 APIs the SDK already exposes. Test code may use JUnit,
 coroutines-test, `sdk-testing`, and Robolectric with AndroidX Test for the
@@ -65,7 +65,7 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 ## Placement rule
 
 New UI-free runtime, persistence or domain code goes to `:client`.
-TVHeadend-generic protocol, catalog, EPG, DVR or playback knowledge goes to the
+Tvheadend-generic protocol, catalog, EPG, DVR or playback knowledge goes to the
 SDK. Anything that needs Compose, `R`, views, Koin or TV interaction stays in `:app`.
 
 ## Tooling

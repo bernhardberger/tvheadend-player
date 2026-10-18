@@ -93,7 +93,7 @@ The fullscreen viewer is the official portable scrcpy 4.1 release at
 When the viewer is stopped, start it against the running emulator:
 
 ```bash
-ssh "$TVHPLAYER_NOTEBOOK_SSH" 'systemd-run --user --unit=tvhplayer-fullscreen-preview --collect --setenv=ADB="$HOME/Android/Sdk/platform-tools/adb" "$HOME/.local/opt/scrcpy-linux-x86_64-v4.1/scrcpy" --serial=emulator-5558 --fullscreen --no-audio --window-title="TVHeadend Player — TV preview" --shortcut-mod=lalt'
+ssh "$TVHPLAYER_NOTEBOOK_SSH" 'systemd-run --user --unit=tvhplayer-fullscreen-preview --collect --setenv=ADB="$HOME/Android/Sdk/platform-tools/adb" "$HOME/.local/opt/scrcpy-linux-x86_64-v4.1/scrcpy" --serial=emulator-5558 --fullscreen --no-audio --window-title="Tvheadend Player — TV preview" --shortcut-mod=lalt'
 ```
 
 - **Arrows / Enter:** D-pad / select. Focus the viewer window first.

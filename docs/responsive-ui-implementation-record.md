@@ -1,10 +1,13 @@
 # Responsive UI implementation record — through 0.2.53
 
+Status: Dated reference, consolidated 2026-09-13; history through 0.2.53, not a work queue.
+
 **Dated reference, consolidated 2026-09-13.** This preserves the original planning
 context, experiments, rejected evidence and deployments through 0.2.53. Historical
 instructions and proposed next steps below are not current assignments. Use the
-[active plan](responsive-ui-foundations-plan.md) for current priorities and gates,
-and the TV specification and code-ownership map for accepted behavior.
+performance workstream (E) in [the roadmap](roadmap-1.0.md) and
+[`profiling.md`](profiling.md) for current priorities and gates, and the TV
+specification and code-ownership map for accepted behavior.
 
 The planning baseline below predates the delivered work. Later results supersede
 earlier hypotheses; a successful installation is not physical acceptance. The
@@ -266,7 +269,7 @@ duplicate old/new implementations and demonstrably unused code. Keep one current
 path with tests for its behavior; tests whose sole purpose is preserving an
 abandoned format do not justify retaining that format.
 
-Supported Android and TVHeadend versions, genuinely optional protocol fields,
+Supported Android and Tvheadend versions, genuinely optional protocol fields,
 fresh-install behavior, same-version process restoration, reconnect handling and
 current authority validation are separate concerns. A fallback is not obsolete
 just because it is called a fallback. Changes to those product/runtime contracts
@@ -337,7 +340,7 @@ Verify those exact boundaries before deleting them. For example, retiring old
 signed-ID decoding does not remove validation of current unsigned IDs; retiring
 an obsolete route does not remove restoration of current routes. Reconcile the
 existing pre-SDK migration disposition in
-[the architecture remediation plan](product-architecture-remediation-plan.md).
+[the architecture remediation plan](archive/product-architecture-remediation-plan.md).
 
 #### Phase 0 implementation record — 2026-09-12
 

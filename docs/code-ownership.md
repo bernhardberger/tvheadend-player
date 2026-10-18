@@ -20,7 +20,7 @@ entry points are exhausted; avoid asking them to rediscover this table.
 | Recordings browsing and DVR actions | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/RecordingsScreen.kt` |
 | Server profile persistence, credential edit lifetime, and stream-profile selection | `client/src/main/java/at/bernhardberger/tvhplayer/settings/AppProfileOwner.kt` |
 | Onboarding and connection editing | `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/OnboardingScreen.kt` and `app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/settings/SettingsConnection.kt` |
-| Appliance launch, HOME/GUIDE, wake, and Simple TV | Start from `docs/appliance-mode-spec.md`, then `app/src/main/java/at/bernhardberger/tvhplayer/ui/MainActivity.kt`, `app/src/main/java/at/bernhardberger/tvhplayer/accessibility/ApplianceEntryAccessibilityService.kt`, and `app/src/main/java/at/bernhardberger/tvhplayer/core/` |
+| Appliance launch, HOME/GUIDE and wake | Start from `docs/appliance-mode-spec.md`, then `app/src/main/java/at/bernhardberger/tvhplayer/ui/MainActivity.kt`, `app/src/main/java/at/bernhardberger/tvhplayer/accessibility/ApplianceEntryAccessibilityService.kt`, and `app/src/main/java/at/bernhardberger/tvhplayer/core/` |
 | SDK public playback behavior | Owned by `tvheadend-sdk`; the app calls `TvheadendPlaybackCoordinator` through `AppPlaybackRuntime` and must not reproduce SDK state machines |
 | HTSP wire behavior | Owned by `tvheadend-htsp`; do not add an application workaround for an attributed protocol defect |
 

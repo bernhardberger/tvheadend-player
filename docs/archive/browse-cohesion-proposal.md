@@ -1,5 +1,7 @@
 # Browse cohesion proposal
 
+**Status:** Archived 2026-10-18. The accepted baseline (x130 headings, shared grid, Archive depth model) is in `docs/DESIGN.md` §9; the rest is design history.
+
 ## Motion follow-up — October 5, 2026
 
 - Current accepted Notebook preview: **159**, `0.2.90-browse-cohesion.8`.

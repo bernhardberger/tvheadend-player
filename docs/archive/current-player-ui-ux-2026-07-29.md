@@ -1,6 +1,6 @@
 # Fullscreen player UI/UX inventory
 
-**Status:** Current player evidence and source inventory.  The original visual
+**Status:** Archived 2026-10-18 player evidence and source inventory.  The original visual
 session was performed on 2026-07-29 against `90f7178c0592-dirty`; the complete
 inventory was revalidated and a replacement screenshot set was captured on
 2026-07-30 against `51a4f3abb2d6-dirty`.  Current source, tests,

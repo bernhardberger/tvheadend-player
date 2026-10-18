@@ -1,6 +1,6 @@
 # Product architecture remediation plan
 
-**Status:** Active. B4-P6 completed the first bounded slice.
+**Status:** Archived 2026-10-18. Its packages are complete or deferred; the open dependency and quality items (§13–15) moved to `docs/roadmap-1.0.md` (R3, R4, R7, U12). Originally active, with B4-P6 the first bounded slice.
 
 **Scope:** Simplify the existing application around explicit Standard and
 Appliance behavior, remove unearned variants, and move cross-cutting policy out

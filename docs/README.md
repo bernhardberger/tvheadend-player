@@ -25,11 +25,11 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `ai-engineering-harness.md` | Current AI-harness architecture and operation; harness work only. |
 | `code-ownership.md` | Compact source and tooling ownership map; read before locating application code or delegating broad repository mapping. |
 | `client-module.md` | UI-free `:client` library ownership, dependency rules and placement rule; read before adding runtime, persistence or domain code. |
-| `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback and Simple TV retirement. |
+| `appliance-mode-spec.md` | Autoplay, HOME/Guide/wake integration, warm playback, TCL firmware behavior and Simple TV retirement. |
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
-| `android-tooling.md` | Build/install/capture conventions and lane selection: Notebook032 interactive preview, LXC119 automated capture, physical TV acceptance; qualified CLI and R8 limits. |
+| `android-tooling.md` | Build/install/capture conventions and lane selection: Notebook032 interactive preview, LXC119 automated capture, physical TV acceptance; Android CLI and R8 limits. |
 | `notebook-tv-preview.md` | Operational Notebook032 Android TV preview runbook: reuse/start, fullscreen keyboard control, verified APK updates, captures and ownership. Read for interactive UI iteration. |
-| `profiling.md` | Offline/configured-server profiling, optional R8 arm, guarded sustained traces, timestamped video and physical-TV limits. |
+| `profiling.md` | Baseline profile generation, offline/configured-server profiling, optional R8 arm, guarded sustained traces, timestamped video and physical-TV limits. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
 | `test-device-credential-provisioning.md` | Test-device credential workflow; provisioning work only. |
@@ -41,15 +41,8 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 |---|---|
 | `roadmap-1.0.md` | Milestone order from the current Player to a signed 1.0; links the plans that own each step. Archive at 1.0. |
 | `ux-inventory-1.0.md` | Per-screen UX inventory (current state, unfinished parts, nits, gaps, questions) feeding the roadmap's UX rework packages. Owner-corrected 2026-10-12; per-screen questions remain open. |
-| `browse-cohesion-proposal.md` | Native browse baseline and accepted shared-grid/Archive-depth follow-up; implementation, verification/review status and remaining physical-TV observations. Separately labeled feature proposals remain deferred. |
-| `responsive-ui-foundations-plan.md` | Current browse-performance contracts, delivered foundation and remaining navigation, Guide/cached-startup and physical acceptance gates. Optimized 0.2.53 deployed; assessment pending. |
 | `programme-window-prototype.md` | Programme-window Player prototype behavior, interaction checks and current experiment boundaries. |
 | `defect-ledger.md` | Open and closed defects from the post-SDK-refactor player stabilisation. Read when working on live-player performance or interaction defects; close rows only with the named evidence. |
-| `persistent-cache-plan.md` | Approved, unstarted plan for SDK-owned catalog/EPG/picon persistence with app-supplied policy (D16, D19, D23). Depends on SDK 0.8.0; read only when working on that package. |
-| `appliance-mode-plan.md` | Appliance architecture and task history. Read only the sections relevant to an appliance, channel/EPG/DVR, or playback decision. Split completed history from current work in a dedicated later cleanup. |
-| `player-ui-ux-overhaul-plan.md` | Completed implementation record for fullscreen Live TV, timeshift, and recording playback through Slice 8. Slice 9 remains optional and unstarted. |
-| `product-architecture-remediation-plan.md` | Active sequence for profile isolation, dead-path removal, orchestration decomposition, and shared product flows. Read only the current package and its invariants. |
-| `recording-progress-sync-plan.md` | Recording progress work; slices 0–5 are complete and the remaining slice is explicitly gated. |
 
 ## Dated references
 
@@ -64,17 +57,19 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `g10-field-feedback-2026-09-08.md` | Bounded G10-05/09/15 and configured-state corrections, G10-08/02 triage, and static evidence limits. Original operator observations are preserved separately. |
 | `ai-skills-audit-2026-07-28.md` | Audit record for the imported skill set. Current agents and local skills carry the durable routing and caveats; this audit is not mandatory startup reading. |
 | `codebase-audit-2026-07-23.md` | Point-in-time hardening audit with later updates. Use only for a specifically identified finding, then verify current source. |
-| `current-player-ui-ux-2026-07-29.md` | Revision-bound fullscreen-player baseline and exact replacement G10 screenshot manifest used by the completed overhaul. Revalidate every claim against current source. |
-| `media3-upgrade-assessment-2026-07-28.md` | Evidence and remaining gate for the named Media3 upgrade only. |
+| `media3-upgrade-assessment-2026-07-28.md` | Evidence and remaining gate for the named Media3 upgrade only; the coupled-path list is outdated (see its note). |
+| `residual-main-menu-performance-2026-09-11.md` | P48 checkpoint: mechanisms retained for the main-menu sidebar and their limits; not an acceptance result. |
+| `appliance-tcl-findings-2026-07-27.md` | July 2026 TCL bring-up observations: accessibility service and wake, HOME priority, initial channel list, and the G08 intermittent render mode (roadmap P6). |
+| `android-cli-qualification-2026-09-09.md` | Bounded 2026-09-09 qualification of the official Android CLI and the executed emulator evidence; the lasting limits are in `android-tooling.md`. |
+| `profiling-p38-static-rail-2026-09-09.md` | Earlier static-rail profiling fixture, its tool qualification and first measurements; not current journey acceptance. |
 | `tv-design-audit-2026-07-27.md` | Historical rationale for `DESIGN.md`; the specification is authoritative. |
 | `archive/tv-design-spec-2026-09.md` | Superseded long-form specification; historical only. |
 
 ## Historical and local material
 
-- `docs/archive/README.md` inventories archived handoffs, reports, and their
-  current successors. Do not browse the archive to discover instructions.
-- `screenshots/` contains legacy images of unknown revision. Its README defines
-  the evidence boundary.
+- `docs/archive/README.md` inventories archived handoffs, reports, completed
+  plans and their current successors. Do not browse the archive to discover
+  instructions.
 - `captures/` and `artifacts/` are ignored local evidence areas. Only exact paths
   explicitly supplied by an assignment may be treated as current evidence.
 - `artifacts/ai-session-notes/` is the ignored location for retained model

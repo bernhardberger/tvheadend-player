@@ -1,7 +1,10 @@
 # Implementation plan: server-synchronised recording progress and resume
 
-**Status:** Slices 0–5 implemented 2026-07-29; Slice 6 remains gated pending
-the disposable growing-recording spike and physical-TV evidence described below.
+**Status:** Completed and archived 2026-10-18. Slices 0–5 were implemented
+2026-07-29. Slice 6 shipped afterwards: growing recordings play with a moving
+timeline (`0e4e0fbf`, 2026-09-13) and in-progress recordings resume where the
+viewer stopped (`0c4d14c5`, 2026-09-26). The appliance plan it extends is now
+`archive/appliance-mode-plan.md`.
 **Classification:** Generic DVR/playback foundation. Any product presentation is
 separate from appliance behavior.
 **Scope boundary:** This plan does not add a Home **Continue watching** rail or

@@ -1,11 +1,11 @@
-# Spec: TVHeadend Player appliance mode
+# Spec: Tvheadend Player appliance mode
 
 ## Objective
 
-Provide optional autoplay and household integration for TVHeadend Player users
+Provide optional autoplay and household integration for Tvheadend Player users
 who prefer direct entry into live TV without navigating Google TV.
 
-The app must keep the configured household TVHeadend account local to the device,
+The app must keep the configured household Tvheadend account local to the device,
 play the last selected channel after an appliance launch, support physical
 channel and number buttons, reclaim TCL's globally intercepted TV/GUIDE button,
 and enter live TV after boot or display wake through a narrowly scoped
@@ -18,11 +18,12 @@ backs out to those screens.
 ## Tech stack
 
 - Android API 28 minimum / API 36 target
-- Kotlin 2.3.10, Jetpack Compose, and AndroidX TV Material 1.1.0 for focusable UI
-- AndroidX Media3 / ExoPlayer 1.11.0 through the released SDK boundary
-- TVHeadend HTSP through the existing custom extractor
+- Kotlin, Jetpack Compose, and AndroidX TV Material for focusable UI
+- AndroidX Media3 / ExoPlayer through the released SDK boundary
+- Library versions are pinned in `gradle/libs.versions.toml`
+- Tvheadend HTSP through the existing custom extractor
 - Preferences DataStore for non-secret last-channel state
-- Android Keystore/AES-GCM for the TVHeadend password, with backup and device
+- Android Keystore/AES-GCM for the Tvheadend password, with backup and device
   transfer disabled and password input excluded from saved-instance state
 - Android `AccessibilityService` for GUIDE filtering plus boot/wake appliance
   entry, without subscribing to accessibility events or window content
@@ -56,7 +57,7 @@ on the Android debug keystore.
   and credential-provisioning actions. An exact-identity production or test
   deployment target may receive a fully verified product-signed bundle only
   after explicit owner approval and command-line confirmation.
-- A designated test device may receive TVHeadend credentials through the
+- A designated test device may receive Tvheadend credentials through the
   debug-only app-private provisioning path after role and complete live identity
   validation. Secret values travel only over process stdin from an ignored,
   owner-only local file and are never entered through the TV UI.
@@ -90,7 +91,7 @@ fun adjacentChannelId(
 
 ## Testing strategy
 
-- Unit-test channel navigation, wrapping, TVHeadend number entry, playback
+- Unit-test channel navigation, wrapping, Tvheadend number entry, playback
   recovery backoff, UI defaults, language parsing, and launch-policy decisions.
 - Run JVM tests, lint, instrumentation-test compilation, and build the APK.
 - Verify audited native AAR hashes, ABI layout, ELF/APK 16 KB alignment, and
@@ -202,7 +203,7 @@ fun adjacentChannelId(
 - Stats for nerds is a non-focusable, one-second diagnostic overlay. It may show
   playback state/timing, selected formats, decoder names, rendered/dropped frame
   counters, audio underruns, measured HTSP stream/file read rate, display output,
-  thermal state, and app memory. Live TV conditionally adds TVHeadend tuner signal,
+  thermal state, and app memory. Live TV conditionally adds Tvheadend tuner signal,
   SNR, reception errors, queue depth/delay, and server-side frame drops only when
   the active adapter reports them; recordings never imply a tuner. Unavailable
   scan type and deinterlacing details are omitted rather than guessed. The
@@ -225,19 +226,19 @@ fun adjacentChannelId(
 
 - Disabling any TCL or Google package.
 - Removing either rollback client.
-- Adding server-side transcoding or changing TVHeadend stream profiles.
+- Adding server-side transcoding or changing Tvheadend stream profiles.
 - Publishing a signed release or upstream pull request.
 
 ### Never
 
-- Embed TVHeadend credentials, signing material, or Firebase secrets in Git.
+- Embed Tvheadend credentials, signing material, or Firebase secrets in Git.
 - Turn the accessibility service into general UI automation or key logging.
 - Autoplay again merely because the player was closed with Back.
 - Make server, tuner, OSCam, storage, or recording changes for this client work.
 
 ## Success criteria
 
-1. The TVHeadend Player package installs and runs on the TCL's 32-bit `armeabi-v7a`
+1. The Tvheadend Player package installs and runs on the TCL's 32-bit `armeabi-v7a`
    Android TV 12 environment.
 2. Interlaced-channel playback remains at least as good as the accepted
    TVHStream diagnostic result.
@@ -245,13 +246,13 @@ fun adjacentChannelId(
     visible channels and wrap at the ends of the list, including in the Player
     channel shelf. In ordinary browse lists they page without tuning until the
     user confirms a row.
-   The owner can independently limit each TV to All Channels, selected TVHeadend
+   The owner can independently limit each TV to All Channels, selected Tvheadend
    channel tags, or a mixture, with at least one browsing scope always enabled.
 4. Physical `0`-`9` keys show a channel-number overlay and select the matching
-   TVHeadend channel number using up to as many digits as the largest visible
+   Tvheadend channel number using up to as many digits as the largest visible
    channel number (or channel count under positional fallback), with a minimum
    entry limit of 1 digit. Positional numbering is used only when no channel
-   in the current ordered scope has a positive major channel number; TVHeadend
+   in the current ordered scope has a positive major channel number; Tvheadend
    reports unnumbered channels as `0`, which counts as unnumbered.
 5. The last successfully selected channel survives process death and reboot.
 6. When startup autoplay is enabled, a fresh app, HOME, boot, wake, or
@@ -259,7 +260,7 @@ fun adjacentChannelId(
    persisted channel or the first channel. When it is disabled, a fresh app
    opens the normal UI. If playback is already visible, the entry intent must
    not restart it.
-7. Back reveals the normal TVHeadend Player UI without an autoplay loop and keeps the
+7. Back reveals the normal Tvheadend Player UI without an autoplay loop and keeps the
    foreground live or recording session and video surface warm behind a readable
    navigation scrim. Root Back may return to that warm fullscreen session once
    (one-shot). The return opportunity is consumed before navigating to the player
@@ -307,21 +308,25 @@ fun adjacentChannelId(
     installed package/signature/version details are recorded without secrets.
     The strict native release-provenance gate must also pass.
 12. The operator UI can follow the system language or explicitly select German
-    or English, and can hide the main EPG menu without disabling playback.
+    or English, and can hide the Guide entry in the navigation rail (Settings,
+    "Show Guide menu", on by default) without disabling playback.
 13. The EPG uses one shared horizontal time axis with fixed channel rows. Cards
     never overlap, the focused programme remains fully visible, Up/Down changes
     channel, Left/Right changes time, and CH+/CH- pages channel rows without
     tuning. OK opens programme details before any playback or recording action.
 14. Recordings are separated into Archive, Schedule, and Problems. Archive shows
-    only playable completed recordings in the sanitized TVHeadend folder
+    only playable completed recordings in the sanitized Tvheadend folder
     hierarchy; Schedule isolates active and future entries; Problems isolates
-    failed and cancelled entries. Recording, stop, and delete operations require
-    confirmation with the safe action focused by default. Archive uses a
+    failed and cancelled entries. Stop and delete operations require
+    confirmation with the safe action focused by default; Record acts immediately
+    (`DESIGN.md` §10, Context menus and dialogs). Archive uses a
     newest-first folder list with an opaque persistent context pane; focused rows
     do not scale or clip, and folder changes transfer focus directly into the
     destination rather than falling back to the main navigation. Folder rows
-    summarize descendant recording count and storage, while the context pane
-    exposes five focusable recent descendants. Schedule is a full-width agenda
+    summarize descendant recording count and storage. The right column is an
+    inert preview of the focused folder's immediate children, or passive metadata
+    for a recording; it never takes focus and is not a recent-descendant shortcut
+    (`DESIGN.md` §9, Archive depth model). Schedule is a full-width agenda
     grouped by Recording now, Today, Tomorrow, and explicit later dates. Problems
     is a full-width triage list grouped into Failed and Cancelled. Recording rows
     reserve a trailing date/time column so subtitles cannot displace time, and
@@ -330,7 +335,7 @@ fun adjacentChannelId(
     Returning from playback restores the previous mode, folder, scroll position,
     and focused item rather than resetting the recordings browser.
     Recording playback uses an auto-hiding TV overlay with metadata, the shared
-    Info/Settings/Stop strip, and stable focus. A known real seekable duration
+    action row (Play/Pause, Stop, Settings), and stable focus. A known real seekable duration
     shows elapsed/total time and a focusable seekbar. A growing recording with no
     known duration shows elapsed time plus **Still recording**; another unknown
     duration shows elapsed time plus **Duration unavailable**. Neither unknown
@@ -347,23 +352,29 @@ fun adjacentChannelId(
 
 ## Open questions
 
-- How to make TVHeadend Player the TCL's HOME app without disabling Google Basic TV.
+- How to make Tvheadend Player the TCL's HOME app without disabling Google Basic TV.
   The firmware gives its system launcher priority `2`, caps third-party HOME
   candidates to priority `0`, and ignores both shell and user role selection.
-  Google must remain enabled until a safe reversible path is proven.
+  Google must remain enabled until a safe reversible path is proven. The owner
+  decision is roadmap item A1.
+- Whether the intermittent bad interlaced render mode seen on the G08 and, earlier,
+  the G10 needs investigation or only observation is roadmap item P6.
 
-## TCL deployment findings
+## TCL firmware behavior
 
 - TCL Safety Guard must allow the appliance package's hidden `APP_AUTO_START`
-  app-op before the user-approved accessibility service will bind. The enabled
-  service and app-op survived three standby/wake cycles and one Android reboot.
+  app-op before the user-approved accessibility service will bind.
 - The physical TV button emits Linux `KEY_EPG`, but this firmware delivers TCL
   private Android key code `4001` to accessibility services. The service also
   accepts standard Android `KEYCODE_GUIDE` for non-TCL input paths.
+- Dated deployment observations are in
+  [appliance-tcl-findings-2026-07-27.md](appliance-tcl-findings-2026-07-27.md).
+
+## Connection and metadata behavior
+
 - Initial channel metadata is delivered without lossy buffering and staged until
   `initialSyncCompleted`, so the UI receives one complete channel snapshot rather
-  than unstable partial lists (previously observed around 30, 84, and 50 channels).
-  Recheck the stable count on the TCL before final appliance deployment.
+  than unstable partial lists.
 - Activity recreation reuses a healthy process-scoped HTSP connection to the same
   endpoint. A full metadata snapshot is reserved for startup, changed settings,
   and real reconnects; live channel and EPG changes continue through HTSP deltas.

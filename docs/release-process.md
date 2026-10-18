@@ -1,106 +1,86 @@
 # Release and rollback process
 
-One authorized owner may prepare, verify, sign, publish and check the result in
-one task. Routine use of this release path needs no extra model review or separate
-administrative packages. Retain exact operation approval, native/source and
-signing checks, device identity checks and attended acceptance below.
+One authorized maintainer may prepare, verify, sign, publish and check a release
+in one task. Routine use of this path needs no extra model review or separate
+administrative packages. Retain exact operation approval, native and source
+checks, signing checks, device identity checks and attended acceptance below.
 
-This process separates reproducible release preparation on the engineering host
-from signing on the isolated owner-controlled signing host. The private key and
-passwords never enter LXC 106, Git, release metadata, or command arguments.
-Publication and production-device mutation still require explicit owner approval.
+Release preparation and signing run on separate hosts. A build host produces a
+reproducible unsigned bundle; an isolated signing host holds the private key and
+signs it. The private key and its passwords never reach the build host, Git,
+release metadata or command arguments. Publication and production-device
+mutation need explicit owner approval.
 
-## Builds
+Host names, container numbers, device inventory and rollback clients are specific
+to one installation. The maintainer keeps them in the ignored
+`.tvhplayer-release-operator.md` at the repository root; this document uses the
+roles "build host" and "signing host".
 
 - [ ] Reminder, not a gate: regenerate the [baseline profile](profiling.md#baseline-profile-generation) after a UI batch changes screens or navigation.
 
-Each release produces two builds from one commit (owner, 2026-10-11): the Play
-build `at.bernhardberger.tvhplayer` and the Appliance build
-`at.bernhardberger.tvhplayer.appliance`, which alone carries the HOME filter, the
-GUIDE accessibility service and the Appliance settings. Both APKs are attached to
-every GitHub release. Play App Signing must use this project's own release key
-("use your own key" at enrollment), so a GitHub APK and a Play install update
-each other.
+## Builds
 
-The bundle also includes a Play AAB for Google Play. Household Appliance TVs
-must be switched once to the Appliance build because Play owns the old
-application ID; installing Play over the old household build would drop HOME
-and GUIDE.
+Each release produces two builds from one commit: the Play build
+`at.bernhardberger.tvhplayer` and the Appliance build
+`at.bernhardberger.tvhplayer.appliance`. Only the Appliance build carries the HOME
+filter, the GUIDE accessibility service and the Appliance settings. Both APKs are
+attached to every GitHub release. The bundle also includes a Play AAB for Google
+Play. Play App Signing must use this project's own release key ("use your own
+key" at enrollment), so a GitHub APK and a Play install update each other.
 
 ## Version policy
 
-`at.bernhardberger.tvhplayer` is a clean application ID. Version `0.1.0`
-(`versionCode` 1) was its first candidate. Versions `0.1.1` and `0.1.2`
-(`versionCode` 2 and 3) are interlaced-playback diagnostic updates. Version
-`0.1.3` (`versionCode` 4) consolidates the live and recording player overlays.
-Version `0.1.4` (`versionCode` 5) adds the Shield HDMI-CEC channel-key
-compatibility fix. Version `0.2.0` (`versionCode` 6) consolidates the player
-polish and channel/Guide/recording fixes using SDK 0.9.1. Its unsigned bundle
-remains historical. Version `0.2.1` (`versionCode` 7) is the subsequent acceptance
-candidate with published SDK 0.10.0 / HTSP 0.9.0 and segment-safe previews.
-Version `0.2.2` (`versionCode` 8) packages the bounded G10 field corrections
-for debug acceptance, retaining SDK 0.10.0 / HTSP 0.9.0.
-Version `0.2.3` (`versionCode` 9) retains the channel-audio persistence fixes
-with public SDK 0.10.1 / HTSP 0.9.0. Version `0.2.4` (`versionCode` 10) unifies
-Player timeline presentation for debug acceptance with those same dependencies.
-Version `0.2.5` (`versionCode` 11) packages the numeric-overlay exit and bounded
-seek-state/command consistency corrections, retaining those dependencies.
-Version `0.2.6` (`versionCode` 12) retains those corrections and recompiles against
-public SDK 0.11.0 / HTSP 0.10.0, with unchanged Media3/native payloads.
-Version `0.2.7` (`versionCode` 13) adopts public SDK 0.12.0 for correlated
-content-seek settlement and bounded timeline recovery. HTSP 0.10.0 and
-Media3/native payloads remain unchanged. This is a debug acceptance candidate,
-not a claim of physical paused-frame acceptance.
-Version `0.2.13` (`versionCode` 19) releases the seek-selection and paused-playback
-work developed through debug candidates 0.2.8–0.2.12. It consumes public SDK
-0.13.0 / HTSP 0.10.0; Media3 1.11.0 and native binaries remain unchanged.
-None update the predecessor or temporary
-`at.leoville.tvhstream` diagnostic package. Every subsequently distributed or
-device-installed product build must increase `versionCode`.
-`versionName` follows semantic versioning; do not reuse an APK version for
-different source or native binaries.
+`versionName` follows semantic versioning and `versionCode` increases with every
+build that is distributed or installed on a device; both are set in
+`app/build.gradle.kts`. Never reuse a version for different source or native
+binaries. [`CHANGELOG.md`](../CHANGELOG.md) records what each release contains.
 
-Android will not normally accept a lower version as an update. A product
-rollback therefore uses the same stable key and a new, higher `versionCode`
-built from the last-known-good source commit. During initial household
-acceptance, keep Headent and `at.leoville.tvhstream` installed as independent
-immediate rollback clients.
+Android does not normally accept a lower version as an update. A rollback
+therefore uses the same stable key and a new, higher `versionCode`, built from the
+last-known-good source commit.
 
-## Host boundary
-
-- LXC 106 builds and verifies unsigned, zip-aligned Play and Appliance APKs and
-  a Play AAB from one clean commit.
-  It also packages application source, released SDK source classifiers, native
-  corresponding source, checksums, and a JSON manifest. It has no release key
-  and Gradle has no signing setup.
-- LXC 117 holds the stable product key. It verifies every incoming byte before
-  prompting for passwords, signs both already aligned APKs and the AAB, and rejects any
-  certificate other than the pinned product certificate.
+## Release key
 
 The canonical key alias is `tvhplayer-release`. Its public certificate SHA-256
 fingerprint is:
 
 `1E:18:48:62:F5:BB:A2:D1:C8:40:6D:6A:7A:79:65:7F:F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9`
 
-Keep the LXC 117 keystore and its backup in separate owner-controlled secure
-storage. Losing the key prevents future in-place updates; exposing it compromises
-every installation signed by it.
+Keep the keystore and its backup in separate, owner-controlled secure storage.
+Losing the key prevents future in-place updates; exposing it compromises every
+installation signed with it.
 
-## Unsigned preparation on LXC 106
+## SDK and library pins
+
+A release resolves byte-pinned SDK artifacts from the public repositories. The
+SDK version appears in these places, and a bump changes all of them together:
+
+1. `gradle/libs.versions.toml` (`tvheadend-sdk`).
+2. The SDK and HTSP version checks in the dependency-proof task in
+   `app/build.gradle.kts`.
+3. `SDK_VERSION`, the AAR hash and the source-classifier hashes in
+   `tools/check-native-libs`.
+4. `SDK_VERSION` and `SDK_SOURCE_COMMIT` in `tools/prepare-release`.
+5. The pinned values asserted in `tools/tests/test_release_metadata.py`.
+
+Run `./tools/verify` afterwards; it fails when one of them lags.
+
+## Unsigned preparation on the build host
 
 ### Guided workflow
 
-Create an owner-only local orchestrator configuration once:
+Create an owner-only local orchestrator configuration once, starting from the
+committed example, and replace the example values with your signing host's:
 
 ```bash
 cp .tvhplayer-release.example.json .tvhplayer-release.json
 chmod 600 .tvhplayer-release.json
 ```
 
-The homelab uses the `tvh-signing` SSH alias for LXC 117. The trusted signing
-checkout has the configured Git remote and branch, while the keystore and release
-staging paths remain outside that checkout. The configuration contains paths and
-host routing only, never passwords or private key data.
+The configuration names the SSH alias of the signing host, the trusted signing
+checkout with its Git remote and branch, the keystore path and the release
+staging root. The keystore and staging paths stay outside that checkout. The file
+holds paths and host routing only, never passwords or private key data.
 
 After pushing the intended clean commit to its configured upstream, the guided
 commands are:
@@ -108,18 +88,18 @@ commands are:
 ```bash
 ./tools/release prepare
 ./tools/release sign
-./tools/release verify-signed build/release/signed/0.2.1
+./tools/release verify-signed build/release/signed/<version>
 ```
 
-`prepare` resolves the byte-pinned SDK 0.34.0 artifacts and source classifiers
-from the public repositories, verifies them, and creates the unsigned bundle.
-`sign` checks that local `HEAD` is pushed, verifies the bundle, transfers it over
-SSH, fetches the configured trusted branch on LXC 117, checks out the exact source
-commit, and signs non-interactively using owner-only password files configured
-in the LXC 117 SSH environment. It retrieves the signed
-bundle and independently verifies checksums, source continuity, all three artifact
-identities, native alignment, and the pinned certificate. It never installs to a TV or publishes a
-release. It never reads or builds a sibling SDK checkout.
+`prepare` resolves the byte-pinned SDK artifacts and source classifiers from the
+public repositories, verifies them, and creates the unsigned bundle. `sign` checks
+that local `HEAD` is pushed, verifies the bundle, transfers it over SSH, fetches
+the configured trusted branch on the signing host, checks out the exact source
+commit, and signs non-interactively using owner-only password files configured in
+the signing host's SSH environment. It retrieves the signed bundle and
+independently verifies checksums, source continuity, all three artifact
+identities, native alignment, and the pinned certificate. It never installs to a
+TV or publishes a release. It never reads or builds a sibling SDK checkout.
 
 The lower-level commands below remain available for diagnosis and manual use.
 
@@ -147,10 +127,10 @@ creates `build/release/unsigned/<version>/` containing:
 - `release-manifest.json` with per-artifact application ID/flavor, version, source commit, and hashes;
 - `SHA256SUMS` covering the complete unsigned bundle.
 
-Transfer that directory to LXC 117 over an authenticated channel. Verify the
+Transfer that directory to the signing host over an authenticated channel. Verify the
 transferred directory and expected source commit before signing.
 
-LXC 106, LXC 117 and the install host require bundletool **1.18.3**, either
+The build host, the signing host and the install host require bundletool **1.18.3**, either
 `bundletool-all-1.18.3.jar` under `ANDROID_HOME` or version `1.18.3` in the
 Gradle Maven cache with all runtime dependencies. Local bundletool must confirm the AAB's
 Play identity and uncompressed, 16 KB aligned native-library configuration for
@@ -158,17 +138,18 @@ generated APKs. The native bytes must match the Play APK, with both ARM ABIs and
 16 KB ELF LOAD alignment on 64-bit libraries. The AAB itself is a compressed
 upload container, not an APK to zip-align. Missing bundletool fails closed.
 
-## Isolated signing on LXC 117
+## Isolated signing on the signing host
 
-Run the signing tool from a trusted, reviewed checkout on LXC 117, not from files
-inside the incoming bundle. Identify the incoming bundle and protected keystore:
+Run the signing tool from a trusted, reviewed checkout on the signing host, not
+from files inside the incoming bundle. Identify the incoming bundle and protected
+keystore:
 
 ```bash
-./tools/sign-release /path/to/incoming/0.2.1 /secure/path/release.jks
+./tools/sign-release /path/to/incoming/<version> /secure/path/release.jks
 ```
 
 The tool uses `umask 077` and verifies incoming checksums, manifest identity,
-version, unsigned state, and 16 KB alignment. On the isolated signing host,
+version, unsigned state, and 16 KB alignment. On the signing host,
 `TVHPLAYER_SIGNING_STORE_PASS_FILE` and `TVHPLAYER_SIGNING_KEY_PASS_FILE` may
 name non-empty owner-only files owned by the signing user; otherwise the tool
 falls back to interactive prompts. Both APKs use `apksigner`; the AAB uses
@@ -193,15 +174,47 @@ The signed output contains:
 Publish that set together; the mapping files are published with it (they reveal
 nothing beyond the corresponding source). Release builds are R8-minified, so before
 publishing smoke both a debug-key-signed `playRelease` and `applianceRelease` on the
-G10; for Appliance include HOME launch, the accessibility service and Settings →
+a test TV; for Appliance include HOME launch, the accessibility service and Settings →
 Appliance. Review it for private data before upload. The signing
 fingerprint is public verification material; the private key and passwords are
 never release artifacts.
 
+## Publish
+
+After the signed bundle passes `verify-signed` and device acceptance, publish it
+as a GitHub release. The release title is the bare version, for example `0.3.0`,
+and the tag is `v<version>`. Pass the repository explicitly, because the default
+repository can resolve to the upstream project on some machines.
+
+1. Copy the section for this version out of `CHANGELOG.md` into a notes file.
+2. Create the release from the exact source commit named in the signed manifest
+   and upload the signed set:
+
+   ```bash
+   gh release create "v<version>" \
+     -R bernhardberger/tvheadend-player \
+     --target <sourceCommit> \
+     --title "<version>" \
+     --notes-file <notes-file> \
+     <signed-bundle>/*-play.apk \
+     <signed-bundle>/*-appliance.apk \
+     <the remaining files of the signed bundle, except the AAB>
+   ```
+
+   Attach both APKs, the application source archives, the SDK source classifiers,
+   the Media3/FFmpeg corresponding-source archive, both R8 mapping files, the
+   manifest, `SHA256SUMS` and the verification logs. The AAB is the Google Play
+   upload artifact and is not attached.
+3. Download one APK from the release page and compare its SHA-256 with
+   `SHA256SUMS`.
+
+Do not publish before the owner approves; a published release and its assets can
+be cached or mirrored even if they are later deleted.
+
 ## Test deployment
 
 Read `docs/device-targets.md` and load the `android-tv-device-testing` workflow.
-Use `./tools/device --target g10 package-info` and `package-certificate` before
+Use `./tools/device --target <test-target> package-info` and `package-certificate` before
 staging to compare installed version and verified APK certificate. The latter
 temporarily retrieves only the installed base APK, never app-private data.
 Confirm the intended serial, role and all four live identity properties before
@@ -231,8 +244,8 @@ then run `doctor` with that same target. Install only the complete signed bundle
 through the bounded wrapper:
 
 ```bash
-./tools/device --target g08 --package at.bernhardberger.tvhplayer.appliance install-release \
-  --bundle build/release/signed/0.2.1 \
+./tools/device --target <production-target> --package at.bernhardberger.tvhplayer.appliance install-release \
+  --bundle build/release/signed/<version> \
   --confirm-release-install
 ```
 
@@ -243,38 +256,25 @@ Play installation refuses to replace an installed package with Appliance HOME
 or GUIDE entry points. It verifies bundle checksums, source continuity, artifact
 identity, alignment, and the pinned signing certificate before rechecking all
 four live identity properties and invoking the Android package installer. It
-does not launch the app, inject input, provision credentials, or remove rollback
-clients. Record only the bounded package metadata printed after installation.
+does not launch the app, inject input, provision credentials, or remove other
+installed clients. Record only the bounded package metadata printed after
+installation.
 
-Removing the legacy `at.leoville.tvhstream` rollback client is a separate,
-explicitly approved production mutation. After confirming the replacement is
-running, use `./tools/device uninstall-legacy --confirm-legacy-uninstall`. The
-wrapper rechecks exact production identity, requires the replacement package to
-be installed, removes only the fixed legacy package name, and verifies removal.
+Do not mutate a production TV until the exact signed candidate has passed
+acceptance on a test target and the owner approves production deployment. Keep
+the previous clients installed until post-deployment wake, reboot and Back/Stop
+checks pass.
 
 ## Rollback
 
-For a failed G10 candidate, with the test target identity re-confirmed and no
-credential screen visible, remove only the product package and return to the
-retained diagnostic client:
-
-```bash
-adb -s "$TVHPLAYER_ADB_SERIAL" shell am force-stop at.bernhardberger.tvhplayer
-adb -s "$TVHPLAYER_ADB_SERIAL" uninstall at.bernhardberger.tvhplayer
-adb -s "$TVHPLAYER_ADB_SERIAL" shell monkey -p at.leoville.tvhstream 1
-```
-
-Use those raw commands only for an explicitly approved rollback; routine device
-work follows the CLI-first `android-tooling.md` workflow. The signed-bundle
+For a failed test candidate, with the target identity re-confirmed and no
+credential screen visible, force-stop and uninstall only the product package.
+Use raw ADB commands only for an explicitly approved rollback; routine device work
+follows the CLI-first `android-tooling.md` workflow. The signed-bundle
 installation above remains a specialized provenance gate, not an ordinary
-install/capture mandate. Do not remove Headent, the diagnostic client,
-Google Basic TV, or their data during validation.
+install/capture mandate.
 
-For an already accepted product release, prepare a forward-versioned rollback
-APK from the last-known-good source commit, resolve and verify the byte-pinned
-public SDK artifacts and corresponding source, sign with the same stable product
-key, run the complete release and G10 matrix, then install it as a normal update.
-
-Do not mutate the bedroom G08 until the exact signed candidate has passed G10
-acceptance and the owner explicitly approves production deployment. Keep the
-previous clients installed until post-deployment wake/reboot checks pass.
+For an already accepted release, prepare a forward-versioned rollback APK from
+the last-known-good source commit, resolve and verify the byte-pinned public SDK
+artifacts and corresponding source, sign it with the same stable key, run the
+complete release and test-target matrix, then install it as a normal update.

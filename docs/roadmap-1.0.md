@@ -1,7 +1,7 @@
 # Roadmap and plan to 1.0
 
-**Status:** Draft for owner review, 2026-10-11. Base `main` 72530a9f (Player
-0.2.93, SDK 0.24.0 / HTSP 1.0 beta). U13 is done; nothing else is started.
+**Status:** Draft for owner review, 2026-10-11. The milestone table shows what
+is done; the SDK version is pinned in `gradle/libs.versions.toml`.
 **Scope:** Everything between the current Player and a signed 1.0 release of the
 remote-first Android TV client. Detailed designs stay in the plans each
 workstream links to; this document owns scope, order, decisions and exit
@@ -23,7 +23,7 @@ In 1.0:
 Not in 1.0:
 
 - Multiple servers (at least not simultaneously).
-- App-owned favourites beyond TVHeadend channel tags.
+- App-owned favourites beyond Tvheadend channel tags.
 - Picture-in-picture. Android TV allows PiP only from Android 14 and only for
   communication, smart-home, health or ticker content; media playback in PiP is
   explicitly disallowed
@@ -34,7 +34,7 @@ after an on-screen warning).
 
 Owner, 2026-10-11:
 
-- Series rules stay in the TVHeadend web UI: the app adds no series or rule
+- Series rules stay in the Tvheadend web UI: the app adds no series or rule
   logic, which gets complicated quickly with EIT-only or weak EPG. This
   replaces the earlier "series recording" scope item and drops D1–D3, D5 and
   D6 (later the same day; supersedes "D5 and D6 are in"). Rule-made
@@ -60,13 +60,16 @@ Present:
 - Native decoder provenance pinned: `decoder-ffmpeg/provenance.json` and
   `tools/check-native-libs`.
 
-Available in SDK 0.24.0 but unused:
+Available in the SDK but unused (checked 2026-10-18):
 
 - autorec (series) rules;
 - timerec rules;
 - editing scheduled entries (`updateEntry`);
-- DVR disk space;
 - server discovery.
+
+DVR disk space was unused on 2026-10-11 and is now shown in Settings and
+Recordings (D4; `ui/screens/SettingsScreen.kt:43`,
+`ui/screens/RecordingsScreen.kt:461`).
 
 Release builds are R8-minified since R2 (2026-10-15); the optimized
 `profileServer` build used for measurement needs `-Ptvhplayer.profileMinify=true`
@@ -88,19 +91,19 @@ Source: `defect-ledger.md`, `media3-upgrade-assessment-2026-07-28.md`.
 | P3 | **Deferred (owner 2026-10-12): the G10 has run fine all day; reopen only when a defect shows up in use.** G10 reliability session: zap stress (D12/D17), ORF1 matrix (D24), timeshift (D15), header fallback (D20), stutter (D14) **[TV]** | Each row attributed, fixed or closed with evidence |
 | P4 | Deferred with P3. Fixes arising from P3 | Focused regression test per fix |
 | P5 | Media3 1.11.1 device matrix and interlaced-motion comparison (assessment steps 5–6, doc still names 1.10.1) **[TV]** | Assessment updated to the current stack and gate passed |
-| P6 | G08 intermittent bad render mode (`appliance-mode-plan.md`): decide observe-only or investigate | Owner decision recorded |
+| P6 | G08 intermittent bad render mode (`appliance-tcl-findings-2026-07-27.md`): decide observe-only or investigate | Owner decision recorded |
 
 ### D — DVR completeness
 
-Source: SDK `DvrRepository`; `recording-progress-sync-plan.md`;
+Source: SDK `DvrRepository`; `archive/recording-progress-sync-plan.md`;
 `live-tv-dvr-conventions`.
 
 | ID | Item | Exit |
 |---|---|---|
-| D1–D3 | **Dropped 2026-10-11** (owner): series rules stay in the TVHeadend web UI | — |
+| D1–D3 | **Dropped 2026-10-11** (owner): series rules stay in the Tvheadend web UI | — |
 | D4 | Disk space in Recordings (`dvrDiskSpaceState`); owner requirement for 1.0 | Truthful unknown/unsupported state |
 | D5, D6 | **Dropped 2026-10-11** (owner): no entry editing, no timer rules | — |
-| D7 | **Already shipped** (corrected 2026-10-11; the plan's status line is stale): growing recordings play with a moving timeline (0e4e0fbf) and resume where the viewer stopped (0c4d14c5). Remaining: update the `recording-progress-sync-plan.md` status, then archive it under X2 | Plan status corrected |
+| D7 | **Shipped:** growing recordings play with a moving timeline (0e4e0fbf) and resume where the viewer stopped (0c4d14c5). The plan's status line was corrected and the plan archived on 2026-10-18 | Done |
 | D8 | Real-server DVR mutation pass on the test server **[TV]** | Schedule, cancel and delete (and D9 if in) observed end to end |
 | D9 | **In (owner 2026-10-12), after D4; droppable if time runs short.** Manual one-off recording: channel, day, start and end, sent as the SDK's `DvrSchedule.ExplicitTime`. No rule and no EPG dependency; the server records the window. The cost is a D-pad time-entry surface that follows U13 | Owner decision; then TV floor, tests, notices via `NoticeCenter` |
 
@@ -165,13 +168,13 @@ screenshot-first UX review.
 |---|---|---|
 | U1 | Open trials, decided inside the rework of the screen they belong to: channel-rows screen (kept on `trial/channel-rows`), the two-row rail vs the in-place rail trial and Up-recents experiment, programme window B (default on) | Each kept, made a setting or dropped; branches pruned (X3) |
 | U2 | UX inventory (`docs/ux-inventory-1.0.md`): per screen its current state, unfinished parts, nits and gaps; also re-checks `DESIGN.md` §12 against what is settled. First owner pass 2026-10-12 ("not far off"; owner direction recorded per screen) | Owner-corrected inventory; package order agreed |
-| U3 | Home screen: new top-level destination, missing today. Autostart keeps opening the player, but its default changes from on to off (owner 2026-10-12). First package, because it changes navigation for every other screen; uses the H1 results and the S5 requirements (for example Back from the top level) | Brief accepted, implemented, reviewed |
+| U3 | Home screen: new top-level destination, missing today. Autostart keeps opening the player, but its default is off (owner 2026-10-12; done in code, `settings/UiSettings.kt:15`). First package, because it changes navigation for every other screen; uses the H1 results and the S5 requirements (for example Back from the top level) | Brief accepted, implemented, reviewed |
 | U4 | Channels rework: one or two more view modes (wall/grid, maybe an immersive list; channel-rows is a candidate); group tabs vs a top-right filter vs a setting. Introduces layout-matched skeleton loading as one shared, non-focusable component (owner 2026-10-16): the shell and layout show at once, placeholders sit where rows and cards will be, content crossfades in; every later screen rework reuses it instead of holding the launch frame or showing a spinner | From U2 |
 | U5 | Guide rework, probably a complete rewrite for looks and performance (Guide performance numbers come from E7); OK opens details first with Watch focused on a live programme (owner, 2026-10-12; a direct-tune setting may follow); the Search entry is hidden for 1.0. Genre presentation in the grid (none today) and a genre filter (logic exists, no UI) are decided in this rework (owner, 2026-10-12). Both must work from category text as well as genre codes: Tvheadend's XMLTV importer only assigns a genre code when a category's text exactly matches one of its genre names, so Schedules Direct data mostly arrives without one, and category text only arrives when the grabber's "Scrape credits and extra information" option is on (off by default; checked in the Tvheadend source 2026-10-14). Past programmes after a cold start are wanted if the cost is proportionate; Tvheadend deletes ended programmes, so this needs the SDK to persist its guide history (SDK owner estimate, 2026-10-12: medium, about 2–4 days, no public API change with a fixed 6 h horizon, also fixes history lost on every reconnect; scheduled after SDK 0.27 once the Player commits to a guide-history UI; not needed for 1.0) | From U2 |
 | U6 | Recordings rework: folder browse kept; in-progress recordings, watch status, D4 free space, list and details content; one or two more views (genre, channel); Back restores the previous folder; tabs overhauled or removed; D9 entry if in; recording length shows what was actually recorded, not the scheduled length (G10: "51m" for a short recording, 46m for a 9:06 file stopped early; "61m · Completed" for a 7 MB / 5 s file Tvheadend calls Completed OK), from the SDK's `DvrRecordingFile` start/stop, with a hint when far shorter than planned (threshold decided in U6); running recordings show the real stop including padding (`stopExtraMinutes`, effective value from the DVR profile) in the list, Schedule and recording player ("Recording until 16:30" while it records until 18:30 with 2 h post-padding), as the details page already does; watched-progress bars orange per DESIGN.md §2 progress-colour rule (details page included) | From U2 |
 | U7 | Settings rework: sliding-depth browse kept, rows restructured; server connection editor. Idea to decide here (owner, 2026-10-14): a setting to opt out of warm playback while browsing, and/or a finer choice to prefer programme art or the warm video on details pages | From U2 |
 | U8 | Player polish and finishing: the gaps from U2, not a single extra feature | From U2 |
-| U9 | Splash and startup: never looks hung. Revised 2026-10-16 after SDK 0.32 (saved rows draw in about 0.5 s): with saved data no in-app splash and no extra launch-frame hold (Android TV shows no splash icon by design; screens get skeletons in their reworks, see U4); without saved data today's animated splash and stage messages until channels arrive, never flashing; unreachable server offers Try again and Edit connection; no counts, guide wait or Skip action. Done 2026-10-17 with D26; the autoplay startup screen dissolves into the first video frames over 800 ms, and any key ends that early | Done 2026-10-17 |
+| U9 | Splash and startup: never looks hung. Revised 2026-10-16 after SDK 0.32 (saved rows draw in about 0.5 s): with saved data no in-app splash and no extra launch-frame hold (Android TV shows no splash icon by design; screens get skeletons in their reworks, see U4); without saved data an autoplay launch shows the animated splash and stage messages until channels arrive, never flashing, and a launch without autoplay opens on the screens' own loading states (`core/MainStartupPresentation.kt`); unreachable server offers Try again and Edit connection; no counts, guide wait or Skip action. Done 2026-10-17 with D26; the autoplay startup screen dissolves into the first video frames over 800 ms, and any key ends that early | Done 2026-10-17 |
 | U10 | Search: hidden for 1.0 (owner, 2026-10-12). A global search, and what it covers, is a stretch feature after 1.0 | Guide search entry hidden |
 | U11 | Physical acceptance of the reworked screens **[TV]** | Observation only |
 | U12 | Screenshot goldens for production composables once screens settle | After U3–U10 |
@@ -183,18 +186,20 @@ screenshot-first UX review.
 
 ### E — Performance and benchmarks
 
-Sources: `profiling.md`, `responsive-ui-foundations-plan.md` (HEAD copy),
+Sources: `profiling.md`, `responsive-ui-implementation-record.md`,
 `navigation-startup-profiling-2026-09-10.md`,
 `residual-main-menu-performance-2026-09-11.md`.
 
 Current state:
 
 - Profiling is manual ADB/Perfetto (`tools/profiling/`).
-- The baseline profile (`app/src/main/baseline-prof.txt`) is hand-written and
-  covers the sidebar/Guide pair and the live player, not startup, Recordings or
-  Settings.
-- There is no Macrobenchmark module, no machine-readable budgets and no
-  regression detection.
+- The `:baselineprofile` module generates the baseline and startup profiles
+  (`baselineprofile/build.gradle.kts`, journeys in
+  `baselineprofile/src/main/java/at/bernhardberger/tvhplayer/baselineprofile/PlayerBaselineProfile.kt`)
+  into `app/src/main/generated/baselineProfiles/`. It uses the Macrobenchmark
+  library for generation only; E3 covers the minimal journeys.
+- There is no benchmark module that records timings, no machine-readable
+  budgets and no regression detection (E2).
 
 Measured on the G10, 2026-09:
 
@@ -220,7 +225,7 @@ E8 depends on R2 (minified release), so what is measured is what ships. Keep E2�
 
 ### A — Appliance profile
 
-Source: `appliance-mode-spec.md`, `appliance-mode-plan.md`.
+Source: `appliance-mode-spec.md`, `appliance-tcl-findings-2026-07-27.md`.
 
 | ID | Item | Exit |
 |---|---|---|
@@ -230,18 +235,20 @@ Source: `appliance-mode-spec.md`, `appliance-mode-plan.md`.
 
 ### R — Release hardening
 
-Source: `release-process.md`, `product-identity-plan.md`,
-`product-architecture-remediation-plan.md` §13–15.
+Source: `release-process.md`, `product-identity-plan.md`; the open dependency
+and quality items of the archived product-architecture remediation plan
+(§13–15) are R3, R4, R7 and U12; the Compose compiler metrics stay a
+diagnostic for an identified recomposition question, not a deliverable.
 
 | ID | Item | Exit |
 |---|---|---|
 | R1 | Native gate: run `./tools/check-native-libs --release` on the release candidate; correct stale "blocked" claims (appliance plan, codebase audit AUD-008) | Gate passes; docs current |
 | R2 | R8 for release: keep rules for Koin, serialization restoration, native decoders; licenses and corresponding source unaffected. Done 2026-10-15: no extra keep rules needed, mappings kept with each release; Play release smoked on the G10, Appliance release smoke is a release-time step | Minified release passes `./tools/verify` and a G10 smoke **[TV]** |
-| R3 | Dependency hygiene §13: Material Components re-parent, Coil OkHttp artifact, extended icons, inert dependencies — each its own package | APK size and visual smoke per package |
+| R3 | Dependency hygiene §13: Material Components re-parent (visual smoke for splash, system bars and the mobile-Material primitives still in use), Coil OkHttp artifact (only after proving no valid artwork request reaches the generic HTTP fetcher, then artwork check on the target TV), extended icons (committed vectors or the smallest supported source, with the APK change measured), inert dependencies (only with source and resolved-graph proof) — each its own package, never bundled into player or navigation work | APK size and visual smoke per package |
 | R4 | Accessibility: TalkBack pass across Channels, Guide, Recordings, Settings, player **[TV]** | Findings fixed or recorded |
 | R5 | Release notes, privacy policy and `NOTICE.md` checked against the artifact (identity plan item 5) | Checked |
 | R6 | Signed-release acceptance: prepare on LXC 106, sign on LXC 117, verify, G10 install and same-key update, playback/HOME/GUIDE/standby/reboot matrix **[TV]** | `release-process.md` end to end |
-| R7 | Dependency-update and wrapper-validation automation (separately authorized repository package) | Optional for 1.0 |
+| R7 | Dependency-update and wrapper-validation automation (separately authorized repository package); playback-critical pinned coordinates stay manually reviewed | Optional for 1.0 |
 
 ### S — Store readiness and TV quality gates
 
@@ -269,24 +276,26 @@ Already met:
 - Backup disabled.
 - `LICENSE`, `NOTICE.md` and `privacy-policy.md` present.
 
+Done since the audit: the `play` and `appliance` flavors
+(`app/build.gradle.kts:67-77`; the Appliance build adds `.appliance` to the
+application ID and `APPLIANCE_BUILD`) and the Play bundle in the release pipeline
+(`tools/prepare-release:46-50` builds `:app:bundlePlayRelease` and checks
+`app/build/outputs/bundle/playRelease/app-play-release.aab`).
+
 Gaps:
 
-- The HOME intent filter and the GUIDE `AccessibilityService` are declared
-  unconditionally in the main manifest (`app/src/main/AndroidManifest.xml`), and
-  no build flavor separates them.
-- The release pipeline builds APKs only, never an AAB.
 - There are no store assets and no current screenshots.
-- A reviewer cannot use the app without a TVHeadend server.
+- A reviewer cannot use the app without a Tvheadend server.
 
 | ID | Item | Exit |
 |---|---|---|
 | S1 | Distribution model. **Decided (owner, 2026-10-11):** two builds, a Play build and an Appliance build, and both APKs are attached to every GitHub release so users can install newer builds before Play review finishes. Keep it minimal: one build dimension and one release pipeline that produces both, with no second code path. For a GitHub APK to update a Play install (and the other way round), Play App Signing must use our existing release key ("use your own key" at enrollment), not a Google-generated key. Originally proposed: the Play build keeps the current application ID; the Appliance sideload build gets its own ID (for example an `.appliance` suffix) so a Play update can never replace an Appliance install with the build that lacks GUIDE/HOME. Both can be installed side by side. Existing Appliance TVs are set up once more (0.x needs no migration). Needs a `product-identity-plan.md` entry | Decision recorded in `release-process.md` and `product-identity-plan.md` |
 | S2 | Play account: personal accounts created after 2023-11-13 need a closed test with ≥12 testers opted in for 14 consecutive days before production; organization accounts are exempt (<https://support.google.com/googleplay/android-developer/answer/14151465>) | Decided (owner, 2026-10-11): personal account, created 2026-10-11, so the closed test applies. Exit: ≥12 testers recruited before the 0.9 RC |
-| S3 | Appliance boundary for Play: the GUIDE accessibility service is a high policy risk (launcher/automation is not an accessibility tool; it would need a prominent disclosure, consent and a video declaration: <https://support.google.com/googleplay/android-developer/answer/10964491>). The HOME filter is an unverified risk. Decided (owner): a `play` build without both, and an Appliance sideload build with them; product profile logic unchanged. In-app GUIDE/TV handling (U14) is in both builds; the Appliance build adds HOME, boot/wake entry and capturing GUIDE/TV while the app is closed. That is the minimum (owner, 2026-10-11): the Appliance build may later add more, including player behavior such as exit gating from the dropped Simple TV mode, decided case by case. The Appliance build is a hard accessibility requirement for the household (autostart, GUIDE/HOME never leave the player) and stays a fully supported, release-gated build, not a leftover | Flavor or manifest split; tests prove the Play manifest lacks both, the Appliance manifest keeps both, and Standard behavior is unchanged; each release checks the Appliance build on the G10 |
-| S4 | Reviewer access. **Owner (2026-10-11): no permanently hosted server.** Research (2026-10-11): Google requires that reviewers can reach all functionality "at all times" (<https://support.google.com/googleplay/android-developer/answer/15748846>), and lists demo accounts, QR codes and instructions as ways to give access. No verified precedent shows a server-dependent client passing on instructions or a video alone, and TVHClient and dream Player do not say how they pass review. Plan: submit the closed-test release (reviewed like production) with precise instructions and a demo video, and fall back only if Google rejects it. Fallbacks: a server run only during review windows (risk: a later re-review finds it offline), or the options below. Any hosted fallback is weak: it puts an unhardened TVHeadend and plaintext HTSP on the internet, and it is reached over an intercontinental link of unknown quality, so a slow or failing session can itself be judged broken functionality. Earlier proposal: a small hosted demo TVHeadend (own VM/container, no tuners or OSCam, 2–3 IPTV channels looping CC-licensed films, a scripted XMLTV guide, a few recordings, a review-only account) with the credentials in Play Console "App access". An in-app demo mode was rejected: it would need a fake server, guide, DVR and stream path that the real app does not use and would have to be kept in step with them. The demo server is internet-exposed infrastructure and needs separate owner approval | Closed-test release accepted with the chosen access route; if a fallback is needed, the owner approves it |
+| S3 | Appliance boundary for Play: the GUIDE accessibility service is a high policy risk (launcher/automation is not an accessibility tool; it would need a prominent disclosure, consent and a video declaration: <https://support.google.com/googleplay/android-developer/answer/10964491>). The HOME filter is an unverified risk. Decided (owner): a `play` build without both, and an Appliance sideload build with them; product profile logic unchanged. In-app GUIDE/TV handling (U14) is in both builds; the Appliance build adds HOME, boot/wake entry and capturing GUIDE/TV while the app is closed. That is the minimum (owner, 2026-10-11): the Appliance build may later add more, including player behavior such as exit gating from the dropped Simple TV mode, decided case by case. The Appliance build is a hard accessibility requirement for the household (autostart, GUIDE/HOME never leave the player) and stays a fully supported, release-gated build, not a leftover | Flavor or manifest split; tests prove the Play manifest lacks both, the Appliance manifest keeps both, and Play behavior is unchanged; each release checks the Appliance build on the G10 |
+| S4 | Reviewer access. **Owner (2026-10-11): no permanently hosted server.** Research (2026-10-11): Google requires that reviewers can reach all functionality "at all times" (<https://support.google.com/googleplay/android-developer/answer/15748846>), and lists demo accounts, QR codes and instructions as ways to give access. No verified precedent shows a server-dependent client passing on instructions or a video alone, and TVHClient and dream Player do not say how they pass review. Plan: submit the closed-test release (reviewed like production) with precise instructions and a demo video, and fall back only if Google rejects it. Fallbacks: a server run only during review windows (risk: a later re-review finds it offline), or the options below. Any hosted fallback is weak: it puts an unhardened Tvheadend and plaintext HTSP on the internet, and it is reached over an intercontinental link of unknown quality, so a slow or failing session can itself be judged broken functionality. Earlier proposal: a small hosted demo Tvheadend (own VM/container, no tuners or OSCam, 2–3 IPTV channels looping CC-licensed films, a scripted XMLTV guide, a few recordings, a review-only account) with the credentials in Play Console "App access". An in-app demo mode was rejected: it would need a fake server, guide, DVR and stream path that the real app does not use and would have to be kept in step with them. The demo server is internet-exposed infrastructure and needs separate owner approval | Closed-test release accepted with the chosen access route; if a fallback is needed, the owner approves it |
 | S5 | TV quality audit against every checklist ID. Since May 2026 the guidelines have three tiers: Tier 3 "TV Ready" (the required checklist), Tier 2 "TV Optimized" and Tier 1 "TV Differentiated". The owner wants as much of tiers 2 and 1 as possible (2026-10-12); in-app search is no longer required (TV-SB removed). Tier 2/1 items and where they land: TV-BP baseline profiles (E3), TV-4K high-resolution icon, banner and cards (store assets), TV-LC stored credentials (done), TV-LI mobile/Google login (no fit for server credentials; documented deviation), TV-VS voice input in search (not applicable while search is hidden, U10), TV-VC voice commands through `MediaSession`, TV-EC/TV-ER Engage (partner-only, H1), TV-FR frame-rate requests (frame-rate matching exists; confirm), TV-AO audio output switching, TV-PI picture profiles, TV-TO pointer and touch, TV-SA spatial audio, TV-AX enhanced accessibility (audio description preference exists), TV-AI (no plan); each item is covered, planned or a documented deviation. Likely review risks: TV-DB (Back from the top level returns to the TV home screen), TV-PC/TV-PP (D-pad center and media play/pause toggle playback; Center already toggles pause where live pause or a recording allows it, and otherwise shows the reason on the Banner, which needs only confirming), TV-OV overscan, TV-ME low-RAM devices, TV-BU/TV-BY ambient mode. Validate `MediaSession` with the Media Session Validator | Each ID passes, or is a documented deviation with rationale |
 | S6 | AAB in the release pipeline (`tools/prepare-release`, `release-process.md`): build, align and verify the bundle; keep the APK for sideload; prove 16 KB alignment with `bundletool` | Signed AAB and APK from the same commit |
-| S7 | Store listing: TV screenshots from real devices, banner, English and German descriptions naming Android TV, hosted privacy-policy URL (mention the accessibility service in the `full` build) | Listing complete in Play Console |
+| S7 | Store listing: TV screenshots from real devices, banner, English and German descriptions naming Android TV, hosted privacy-policy URL (mention the accessibility service in the Appliance build) | Listing complete in Play Console |
 | S8 | App content declarations: Data safety (credentials stored on device and sent only to the user's server; unencrypted HTSP disclosed), content rating, target audience, ads, any foreground-service types | Declarations submitted |
 | S9 | GPLv3 on Play: confirm corresponding-source offer and compatibility of Play distribution terms (licensing check, not a Play-docs question) | Owner-accepted conclusion recorded in `product-identity-plan.md` |
 | S10 | Developer verification for sideloaded installs (global rollout 2027): register the package and key | Registered before 1.0 |
@@ -297,10 +306,10 @@ Gaps:
 
 | ID | Item |
 |---|---|
-| X1 | `responsive-ui-foundations-plan.md` is emptied in the worktree (uncommitted): archive or delete it; E5/E7 no longer depend on it |
-| X2 | Close or archive completed plans (player overhaul, persistent cache once its physical gates pass, product-architecture remediation once §13–15 move here) |
+| X1 | ~~Empty `responsive-ui-foundations-plan.md`~~ Deleted 2026-10-18; E5/E7 use `profiling.md` and `responsive-ui-implementation-record.md` |
+| X2 | ~~Close or archive completed plans~~ Done 2026-10-18: the player overhaul, persistent cache, product-architecture remediation, recording-progress, appliance and browse-cohesion plans and the player UI inventory are in `archive/`; the open items of the remediation plan are R3 and R7 |
 | X3 | Prune merged and abandoned trial branches and worktrees after U1 |
-| X4 | Defect ledger: close D22 (superseded), archive the ledger once P3/P4 clear it |
+| X4 | Defect ledger: resolve D22 (reopened 2026-10-18: the Channels-down cue the ledger records as removed is still drawn, `ui/player/VideoPlayerScreen.kt:1775`), archive the ledger once P3/P4 clear it |
 
 ## Milestones
 

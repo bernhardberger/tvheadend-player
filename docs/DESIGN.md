@@ -1,4 +1,4 @@
-# TVHeadend Player · TV design contract
+# Tvheadend Player · TV design contract
 
 Authoritative visual and interaction contract for the Android TV app. It records
 **accepted product decisions** only. Implementation mechanics, library internals,
@@ -75,9 +75,15 @@ drawn artwork and do not follow font scale.
 
 **Scope (2026-10-02):** app launch, returning to the app and the handoff to
 usable content. Destination-level loading is separate, deferred design work.
-Channels is the current non-autoplay landing destination, not a permanent
-assumption of the startup experience; a future Home destination remains an
-option rather than an approved routing change.
+Channels is the landing destination for a launch without autoplay. A Home
+destination is planned (roadmap U3) but its routing is not decided here.
+
+The startup layer (title card, branding and stage message below) is shown while
+local state resolves and while an autoplay launch is pending or entering. With no
+pending launch the presentation is inactive (`core/MainStartupPresentation.kt:49-62`),
+so a launch without autoplay shows no startup layer after local resolution and
+Channels reports the connection state itself. Roadmap U9 records the owner's
+2026-10-16 direction: no in-app splash when saved data exists.
 
 Startup branding uses a silent, calmer 1850ms adaptation of the selected
 hybrid-synced choreography (accepted 2026-10-01). Keep the 80dp symbol, 14dp gap and
@@ -167,8 +173,9 @@ never reintroduces startup.
 
 Revisit Channels loading with its unfinished layout, and apply the same principles
 to whichever destination eventually receives the startup handoff. Evaluate
-layout-matched skeletons or equivalent placeholders once that layout is settled;
-the placeholder design is not decided here. Show usable cached content while
+layout-matched skeletons or equivalent placeholders once that layout is settled.
+One shared, non-focusable skeleton component is planned with the Channels rework
+(roadmap U4); its design is decided in that brief, not here. Show usable cached content while
 refreshing, keep available navigation and recovery accessible, and preserve stable
 layout and D-pad focus as content arrives. Distinguish browsable cached data from
 content that can currently be activated. This follow-up does not extend the
@@ -396,7 +403,9 @@ Accepted 2026-09-15; static design in Penpot page
 - **Connection** enters a normal overview (Status, Server, HTSP port, `Edit
   connection` with an edit icon). The edit action opens the existing secure
   editor as a dedicated flow; no inline text inputs, per-field rows or
-  credentials in lists or previews. Its presentation is pending design.
+  credentials in lists or previews. The overview and editor exist
+  (`ui/screens/settings/SettingsConnectionOverview.kt`,
+  `SettingsConnection.kt`); their visual presentation is still to be specified here.
 - Cache clearing is one row action (title, size line, trailing delete icon);
   outcomes surface through the global snackbar, not inline paragraphs.
 
@@ -531,9 +540,9 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   Material rows/cards and indication with reserved focus-growth space. Text scale
   changes the available rows/columns, never the native font sizes.
 - Guide keeps date/Now/Search together using existing working actions, with
-  trailing focus clearance. Its 172dp channel gutter and 8dp gap put the timeline
-  at x310, extending 650dp to the physical edge, with the ruler above
-  the programme rows. Timeline and channel content may continue to the physical
+  trailing focus clearance. A 124dp channel column and an 8dp gap lead into the
+  timeline, which extends to the physical edge, with the ruler above the
+  programme rows (`ui/screens/guide/GuideViewport.kt:17-18`). Timeline and channel content may continue to the physical
   trailing/bottom edges beneath local 48dp fades. Leading/top fades appear only
   when more content exists there. Headers, controls and scopes remain clear.
   Settled focused cells remain inside the unfaded area; real data/history bounds
@@ -547,12 +556,18 @@ activation, DVR eligibility, confirmations and current-session guards remain.
 - Guide's continuous 2dp current-time marker paints above cells and their focus
   treatment using the same time mapping as event widths and the ruler. Its ruler
   marker stays visible during vertical scrolling; the line follows the local
-  content fade. Gaps are explicitly labeled without implying available programmes.
-- Guide's normal native rows are 80dp high; larger text increases that height.
-  The channel number and contained 44×20dp picon share a compact upper line.
-  The name uses native `titleSmall` (14/20), up to two lines, across the 156dp
-  inner width below it. Measure both header and programme typography when growing
-  lanes (104dp at the reference 1.3× scale); do not shrink fonts or distort logos.
+  content fade (`ui/screens/guide/GuideViewport.kt:78-88`). A channel row with
+  nothing to draw says why in one line instead of leaving empty space: no guide
+  data for the channel, no programmes in the window, partial or stale data,
+  reconnecting, permission denied, server failure or an empty filter
+  (`ui/screens/guide/EpgGridContent.kt:538-552`).
+- Guide's normal native rows are 64dp high, scaled with the font scale and grown
+  to fit the channel header and one programme title and time line
+  (`ui/screens/guide/EpgGridContent.kt:105-120`). The header shows the channel
+  number (`labelMedium`) beside a picon of at most 60×36dp, or beside the
+  single-line `titleSmall` name when there is no picon or it failed to load
+  (`:380-420`); never all three. Measure both header and programme typography
+  when growing lanes; do not shrink fonts or distort logos.
   The visible time span adapts to measured labels (normally three hours, two
   with enlarged text). This does not change the three-hour acquisition window
   or the existing history/future availability policy.
@@ -584,9 +599,9 @@ activation, DVR eligibility, confirmations and current-session guards remain.
 ## 10. Player
 
 Player chrome owns its gradients. Play/Pause and seek semantics, programme
-window, timeshift and scene-marker behaviour are specified in
-`docs/player-ui-ux-overhaul-plan.md` and the playback safety skill; only the
-colour and indication rules above apply here. Remote keys follow §6.
+window, timeshift and scene-marker behaviour follow the playback safety skill;
+only the colour and indication rules above apply here. Remote keys follow §6 and
+"Key cycles, Back and auto-hide" below.
 
 ### Player chrome (revised 2026-09-30)
 
@@ -677,8 +692,9 @@ colour and indication rules above apply here. Remote keys follow §6.
   controls it sits 8dp above the thumb and the info bar fades; in the Banner step
   there is no thumb, it rests on the bar row and the info bar stays.
 - There is no Go live control: stepping or scrubbing forward reaches live.
-- The action row is Play/Pause and Stop, then Record and Settings at the right.
-  There is no Info button: the identity card opens Info. Controls focus starts on
+- The action row is Play/Pause and Stop, with Settings at the right end
+  (`ui/player/PlayerActionRow.kt:63-67`). There is no Record button and no Info
+  button: the identity card opens Info. Controls focus starts on
   Play/Pause. Seekbar: Left/Right scrub, Down to the last focused action, Up to
   the card. Actions: Left/Right along the row without wrapping, Up to the seekbar,
   or to the card where the timeline takes no focus. Center toggles pause on
@@ -724,6 +740,42 @@ colour and indication rules above apply here. Remote keys follow §6.
 - Channels rows and quick-zap cards share neutral content-colour play/pause
   markers; an indeterminate spinner occupies the same slot during an owned tune.
 
+### Key cycles, Back and auto-hide
+
+- The Compose key dispatcher owns every player key. The `PlayerView` runs with its
+  controller off and is neither focusable nor clickable
+  (`ui/player/PlayerVideoSurface.kt:84-89`).
+- A key that reveals the controls, peeks the Banner, opens the channel drawer,
+  Info or the playback options begins an opening cycle for its key code. The
+  first non-repeat KeyDown acts once; repeats and the matching KeyUp are
+  consumed, so they can neither act again nor move focus inside the layer that
+  just appeared (`core/PlaybackKeyPolicy.kt:103-125`,
+  `ui/player/LivePlayerLayerState.kt:293-299`). Stop with no active target
+  uses the same suppression (`ui/player/PlayerStop.kt:71-86`).
+- Hidden-chrome keys (`core/PlaybackKeyPolicy.kt:191-277`): Center, Enter and
+  Numpad Enter toggle Play/Pause and reveal the controls on recordings and on
+  live with Pause available; where live cannot pause they peek the Banner with
+  the reason. Up and Down reveal the controls without changing playback.
+  Left/Right step on recordings and on live with timeshift, and pass through on
+  live without it. Info opens Info; TV Contents Menu, TV Number Entry and
+  Bookmark open the live channel shelf and pass through on recordings.
+- Back acts on the topmost foreground layer, in this order
+  (`core/PlayerBackPolicy.kt:60-79`, actions `:99-122`): confirmation, Info,
+  the Audio/Subtitles quick list (restores the earlier selection and closes),
+  options detail (returns to the options root), options root, numeric entry
+  (clears it), channel drawer, recovery, terminal error, controls, pending seek
+  preview, dispatched seek preview, Stats. With no layer, Back hides the Banner
+  when it is visible and otherwise closes the player to warm browse. A pending
+  step cancels; a dispatched one only dismisses its feedback and claims no
+  undo. Recovery and terminal-error Back close the player at once. Back is not
+  Stop.
+- Controls auto-hide only when they are visible, playback is playing and ready,
+  and the player is stable (`core/PlayerAutoHidePolicy.kt:13-32`). A pending
+  seek, a modal layer, recovery and an actionable error each prevent it. The
+  delay is 5 s (`ui/player/LivePlayerLayerState.kt:31`,
+  `RecordingPlayerScreen.kt:94`), extended to at least 30 s while focus rests on
+  the identity card or its recent row (`core/PlayerAutoHidePolicy.kt:19-23`). Auto-hide never reveals anything.
+
 ### Retained programme history (revised 2026-09-22)
 
 - Guide opens near Now and permits navigation into the preceding six hours of
@@ -753,7 +805,9 @@ colour and indication rules above apply here. Remote keys follow §6.
   Left/Right steps crossfade the preview; while Left/Right is held it is hidden and
   returns 250 ms after release. Reopening previews the remembered card from the
   first frame.
-- Two rows: the first is titled with the active channel group (or All channels),
+- Two rows (the current implementation, `ui/player/PlayerChannelBrowser.kt:82-111`,
+  and still a trial against an in-place rail; roadmap U1 decides): the first is
+  titled with the active channel group (or All channels),
   the second is Recent channels and is absent while empty. The quiet row's title
   shrinks to title-small at the passive alpha and its cards dim to 40%; Down and
   Up change rows over 300 ms and each row keeps its card and viewport. Up from the
@@ -838,4 +892,3 @@ Not decided; do not treat existing code as the decision:
 - Card grid widths and aspect ratios.
 - Universal single-line headline rule.
 - Connection editor presentation.
-- Recordings folder navigation (candidate for the depth container).

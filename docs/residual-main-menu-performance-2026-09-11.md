@@ -1,5 +1,9 @@
 # Residual main-menu work: retained mechanisms and limits
 
+Status: Dated P48 engineering checkpoint, 2026-09-11. It records the mechanisms
+retained at that revision and their limits; it is not a current task or an
+acceptance result. Verify against current source before relying on it.
+
 Product-specific P48 engineering checkpoint. The existing multi-channel Guide,
 navigation-on-focus, spacing and playback path are preserved. This document does
 not declare that all responsiveness budgets or final delivery gates have passed.

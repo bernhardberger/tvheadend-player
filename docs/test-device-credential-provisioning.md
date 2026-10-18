@@ -1,8 +1,9 @@
 # Test-device credential provisioning
 
 This workflow exists only to make repeatable development setup possible on an
-explicitly designated Android TV test device. It is appliance-specific tooling,
-not a release feature or a general credential-import API.
+explicitly designated Android TV test device. It applies to any designated test
+device and to the debug build of either flavor, not only to Appliance devices. It
+is development tooling, not a release feature or a general credential-import API.
 
 ## Policy
 
@@ -36,10 +37,10 @@ Create the configured `.tvhplayer-credentials.json` locally with this shape:
 
 ```json
 {
-  "host": "<TVHeadend host>",
+  "host": "<Tvheadend host>",
   "htsp_port": 9982,
-  "username": "<TVHeadend username>",
-  "password": "<TVHeadend password>",
+  "username": "<Tvheadend username>",
+  "password": "<Tvheadend password>",
   "auto_connect": true
 }
 ```
@@ -66,15 +67,15 @@ path. It carries only the path; never put credential values in that variable.
    app, and streams canonical JSON through subprocess stdin.
 3. ADB `run-as` writes the payload with mode `0600` into the debug app's private
    files directory. The values are not present in host or device command lines.
-4. The debug `Application` startup importer validates the bounded payload, saves
-   the password through `SecurePasswordStore`, and saves server settings through
-   `ServerSettingsStore`.
+4. The debug `Application` (`DebugApp`) runs `TestCredentialProvisioner` at
+   startup. It validates the bounded payload and stores host, port, username and
+   password through the SDK's `TvheadendServerProfileStore`
+   (`app/src/debug/java/at/bernhardberger/tvhplayer/debug/TestCredentialProvisioner.kt:44-63`).
 5. The importer deletes the plaintext staging file on success or failure and
    writes only `ok` or `failed`. The wrapper suppresses sensitive subprocess
    output and removes that result marker.
 
-The stored password remains encrypted with AES-GCM using the existing
-non-exportable Android Keystore key. Existing app-wide backup and device-transfer
+The profile store owns how the password is encrypted at rest. Existing app-wide backup and device-transfer
 exclusions cover the encrypted password, settings, staging file, and result
 marker. Release builds do not contain the importer.
 
@@ -108,7 +109,7 @@ export app-private files to confirm cleanup.
   rewrite ignored local configuration or the tool can defeat it; repository
   agents must not do so to target a production TV.
 - An `ok` acknowledgment proves only that local storage calls completed. It does
-  not prove TVHeadend accepted the credentials or that playback works. Validate
+  not prove Tvheadend accepted the credentials or that playback works. Validate
   connection and playback separately without exposing settings or logs.
-- Direct HTSP remains unencrypted. Provisioning does not improve TVHeadend
+- Direct HTSP remains unencrypted. Provisioning does not improve Tvheadend
   transport security; use it only on a trusted LAN or protected tunnel.

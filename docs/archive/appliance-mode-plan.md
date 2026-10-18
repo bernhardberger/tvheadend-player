@@ -1,8 +1,9 @@
 # Implementation plan: TVHeadend Player appliance mode
 
-**Status:** Active architecture and implementation record. Read only the
-sections relevant to the current task; current specifications, source, and tests
-take precedence over completed-work narrative.
+**Status:** Archived 2026-10-18 implementation record. Current behavior is in
+`docs/appliance-mode-spec.md`; dated TCL and G08 findings are summarized in
+`docs/appliance-tcl-findings-2026-07-27.md`. Current specifications, source and
+tests take precedence over this completed-work narrative.
 
 ## Architecture decisions
 

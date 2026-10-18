@@ -43,7 +43,7 @@ These recur on several screens and are better decided once than per screen.
    - The Guide says "Retry the server connection" while showing a
      Connection settings button (`ui/screens/EpgGridScreen.kt:2383-2387`,
      `ui/screens/guide/EpgGridContent.kt:671-691`).
-   - Destination loading placeholders are still deferred (`docs/DESIGN.md:160-169`).
+   - Destination loading placeholders are still deferred (`docs/DESIGN.md` §2, Deferred destination-loading direction).
 
    Owner: the whole error delivery and recovery needs an overhaul, not
    per-string fixes.
@@ -102,7 +102,7 @@ These recur on several screens and are better decided once than per screen.
    The shell's synthetic `browse-cohesion/shell/expanded.png` is a colour-bar
    probe. Screen packages should add the captures they need for review.
 10. **`docs/DESIGN.md` lags the code** in several places (listed per screen).
-    `DESIGN.md:126-139` forbids startup sub-stages, counters and ETAs; the
+    `DESIGN.md` §2 (Startup) forbids startup sub-stages, counters and ETAs; the
     owner now wants more or more verbose stages, ideally with counts (see the
     splash section), so that rule changes with U9.
 
@@ -150,8 +150,9 @@ These recur on several screens and are better decided once than per screen.
 **Owner direction (2026-10-12)**
 - The home screen does not exist today and is new work (U3).
 - Home is probably the Back root. Autostart keeps opening the player.
-- The autostart default changes from on to off
-  (`settings/UiSettings.kt:12`, `autoStartPlayback = true` today).
+- The autostart default is off (done: `autoStartPlayback = false` in
+  `settings/UiSettings.kt:15`, and `resolvePlaybackAutoStart` falls back to false
+  at `:19`).
 
 **Questions**
 1. Back from an autostarted player lands on Home (follows from the above);
@@ -214,8 +215,9 @@ and the JetStream/JetFit samples.
   read "1 h 2 min", not "1:02".
 - "Mark as watched" is in 1.0. Recordings show three watch states: unwatched,
   partly watched, watched.
-- The notice is the snackbar-like one-off event and keeps "Connection lost"; the
-  offline strip shows the ongoing state ("Reconnecting…").
+- The notice is the snackbar-like one-off event and keeps "Connection lost". The
+  ongoing state is the warning badge on the rail's Settings item and Settings →
+  Connection ("Reconnecting…"); there is no offline strip (decided with U15).
 - A channel page would not be a programme-details variant. The owner pictures an
   immersive list or hero plus rows, which belongs with the Channels view modes
   in U4.
@@ -280,7 +282,7 @@ This supersedes the round-3 points above where they conflict. Reference frames:
 - **Offline** has three parts: a one-off notice "Connection lost · Showing
   saved channels"; a warning badge on the rail's Settings item while
   disconnected; errors at the point of use (blocking error frame). Settings →
-  Connection shows the status and a focused "Try again". The offline strip and
+  Connection shows the status and a focused "Try again". An offline strip and
   a lasting snackbar were rejected.
 - **Watch states** in lists as in frame 13 (trailing marker, "28 min left"),
   built with the Recordings rework (U6).
@@ -346,7 +348,7 @@ decides and screens only ask.
 **Unfinished**
 - Owner, 2026-10-11: the channel and guide sync on the splash lasts long and
   needs more granular information or stages so it never looks hung. This
-  conflicts with the `DESIGN.md:126-139` rule. It pairs with E5 (startup work).
+  conflicts with the `DESIGN.md` §2 (Startup) rule. It pairs with E5 (startup work).
 - No persistent connection status after the notice disappears (comparable apps).
 - No "last updated" or offline indication for cached Guide or Recordings data.
 
@@ -378,7 +380,7 @@ per-channel guide tables. So a count per channel matches what Kodi shows.
 to useless without a guide; Home, Channels, the Guide and the player would show
 placeholders for seconds. If anything, now/next must come first. Two facts
 bear on this:
-- The persistent cache (`docs/persistent-cache-plan.md`, SDK cold-start
+- The persistent cache (`docs/archive/persistent-cache-plan.md`, SDK cold-start
   publication) already shows the previous guide during a sync on warm starts.
   Placeholders would only appear on the first run, after "Clear cache" or
   after a long absence. Why the splash still waits so long on warm starts is an
@@ -431,18 +433,20 @@ bear on this:
 
 **Today**
 - Settings is a sliding-depth tree (`ui/screens/SettingsScreen.kt:26-44`) with
-  five root rows:
+  root rows:
   - **General:** language; clock format; "Show Guide menu"; clear cache with
     its size.
-  - **Channel groups:** a switch per TVHeadend tag; the last enabled group is
+  - **Channel groups:** a switch per Tvheadend tag; the last enabled group is
     locked on.
   - **Connection:** read-only Status, Server and HTSP port rows plus "Edit
     connection".
   - **Player:** timeshift, frame-rate matching, audio passthrough, audio
     preferences (three languages, format, audio description, subtitle
     language), keep channel, start-up buffer, stream profile.
-  - **Appliance:** the autostart switch, accessibility service state and the
-    disclosure text.
+  - **Recordings:** the recording profile choice and DVR disk space; shown when
+    the server offers recording profiles (`ui/screens/settings/SettingsRecordings.kt`).
+  - **Appliance** (Appliance build only): the autostart switch, accessibility
+    service state and the disclosure text.
 - Connection editor: host, HTSP port, username, password, Save and "Clear
   saved password". It is `FLAG_SECURE`, and a field opens the keyboard only on
   OK (`ui/screens/settings/SettingsConnection.kt:101-242`).
@@ -467,8 +471,8 @@ bear on this:
 - Advanced and diagnostic rows sit among everyday ones: start-up buffer,
   passthrough, frame rate, stream profile.
 - Decided: autostart moves to Player settings in both builds, and the
-  Appliance section exists only in the Appliance build (roadmap S3). Its
-  default changes to off (owner, 2026-10-12).
+  Appliance section exists only in the Appliance build (roadmap S3;
+  `ui/screens/SettingsScreen.kt:44`). Its default is off in code.
 
 **Nits**
 - `onboarding-captures/en-font1.0-introduction.png`: the welcome title is
@@ -501,7 +505,7 @@ bear on this:
 ## Channels
 
 **Today**
-- Heading plus TVHeadend tag tabs. The tab band is always reserved, even with
+- Heading plus Tvheadend tag tabs. The tab band is always reserved, even with
   one scope (`ui/screens/ChannelsScreen.kt:278`, `:605-644`). There are no
   header actions.
 - Fixed order from the SDK comparator. Rows show `number name`, a picon, and
@@ -572,7 +576,8 @@ bear on this:
   - Live programmes: Watch plus Record, Stop or Cancel.
   - Future programmes: Record or Cancel.
   - Past programmes: Watch only if recorded.
-- Record asks for a DVR config when there are several, then always confirms.
+- Record asks for a DVR config when there are several, then records at once; it
+  has no confirmation (`ui/screens/ProgrammeDetailsHost.kt:200`, `docs/DESIGN.md` §10).
 - Search is a dialog inside the Guide, scoped to the active tag. It runs a
   server full-text query on button press. Results open the same details. It
   maps distinct errors.
@@ -585,7 +590,7 @@ bear on this:
   recording do.
 - Gaps inside a row are blank; only fully empty rows are labelled.
 - History is accumulate-only, so a cold start has no past programmes
-  (`docs/DESIGN.md:695-697`).
+  (`docs/DESIGN.md` §10, Retained programme history).
 - Cold entry focuses the scope tabs, not a programme.
 
 **Nits**
@@ -621,7 +626,7 @@ bear on this:
   focused on a live programme; a direct-tune setting can come later.
 - Decided (second pass): hide the Guide search for 1.0. A global search, and
   what it should cover, is a later stretch feature. TV-VS then does not apply.
-- Record always asks for confirmation (see Player).
+- Record has no confirmation step (see Player).
 
 **Recommendation (agent, for the U5 brief)**
 - Keep details first as the default, with Watch focused first on a live
@@ -801,7 +806,7 @@ bear on this:
 
 **Gaps** (comparable apps unless noted)
 - Last-channel toggle; the Recent row covers it partly.
-- A Record entry point in the chrome (with confirmation).
+- A Record entry point in the chrome; the action row has none (`ui/player/PlayerActionRow.kt:63-67`).
 - Sleep timer (stretch goal).
 - Zoom and crop beyond Auto/16:9/4:3; audio delay.
 - Tag switching inside the player.
@@ -813,30 +818,30 @@ bear on this:
 
 **Owner direction (2026-10-12)**
 - Right direction, but needs polish and finishing touches.
-- Never record without confirmation. Recording profiles come later and need
-  the confirmation step anyway. A Record button or key may open that
-  confirmation; it never records directly.
+- Recorded 2026-10-12: never record without confirmation. Superseded when U15
+  settled the shared patterns: Record acts immediately and the recording
+  profile comes from Settings → Recordings (`docs/DESIGN.md` §10, Context menus
+  and dialogs; `ui/screens/ProgrammeDetailsHost.kt:200`).
 
 **Questions**
 1. Should recordings get the same full-screen info as live?
-2. Record: a Record button or key that opens the confirmation, or only inside
+2. Record: a Record button or key that records at once, or only inside
    info?
 3. Recent row only, or also a dedicated last-channel key?
 4. Tag switching in the player rail, or does the Channels scope apply?
 
 ## Stale documentation found
 
+Corrected in `docs/DESIGN.md` on 2026-10-18 (sections named instead of line numbers,
+which drift): the player action row (§10 Player chrome), the Guide row-state
+labels and channel header (§9), the connection editor and Settings (§7, §12), the
+Recordings folder depth model (§9, §12) and the startup scope (§2 Startup). Still
+open:
+
 | Document | Claim | Reality |
 |---|---|---|
-| `docs/DESIGN.md:643` | The action row includes Record | Play/Pause, Stop, Settings only |
-| `docs/DESIGN.md:578-579` | The player clock stands alone at the top | A channel identity is drawn top left |
-| `docs/DESIGN.md:510-513` | Guide gaps are labelled | Only fully empty rows are |
-| `docs/DESIGN.md:514-518` | Guide channel header has number, picon and a two-line name | Picon or a one-line name |
-| `docs/DESIGN.md:360-363` | Connection editor presentation pending | The editor exists; there is no design capture |
-| `docs/DESIGN.md:788` | Recordings folders are an undecided depth candidate | Already uses depth navigation |
-| `docs/DESIGN.md:331-366` | Settings tree | Missing Appliance, audio preferences, clock format |
-| `docs/DESIGN.md:126-139` | No startup sub-stages | Still matches code; contradicted by the owner's request |
-| `docs/defect-ledger.md:24` (D22) | Channels-down hint removed | `downHint = Channels` still passed (`ui/player/VideoPlayerScreen.kt:1748`) |
-| `docs/browse-cohesion-proposal.md:199-215`, `:260` | Header actions, 396/360 dp trial, typography trial | None in code |
-| `AGENTS.md:1` and other engineering docs | "TVHeadend Player" in prose | Public name is "Tvheadend Player" (`docs/product-identity-plan.md:10`) |
+| `docs/DESIGN.md` §2 Startup | No startup sub-stages | Still matches code; contradicted by the owner's request (roadmap U9 records the later direction: no counts) |
+| `docs/defect-ledger.md` D22 | Channels-down hint removed | `downHint = Channels` still passed (`ui/player/VideoPlayerScreen.kt:1775`); D22 reopened |
+| `docs/archive/browse-cohesion-proposal.md:199-215`, `:260` | Header actions, 396/360 dp trial, typography trial | None in code |
+| `AGENTS.md:1` and other engineering docs | "TVHeadend Player" in prose | Public name is "Tvheadend Player" (`docs/product-identity-plan.md`); `docs/` prose corrected 2026-10-18, `AGENTS.md` is outside the docs batch |
 | `app/src/main/res/values/strings.xml:358` | "Playback never starts directly from the guide" | Watch exists; the string is also unused |

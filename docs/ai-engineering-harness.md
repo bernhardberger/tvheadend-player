@@ -18,11 +18,13 @@ repository root, identified by this `AGENTS.md` and `.opencode/opencode.json`.
 | `.opencode/agents/app-analyze.md` | Concrete implementation diagnostician |
 | `.opencode/agents/app-research.md` | Authoritative external-source researcher |
 | `.opencode/agents/android-reviewer.md` | Risk-based Android runtime and TV interaction reviewer |
+| `.opencode/agents/app-implementer.md` | Writable implementer for one delegated, bounded code slice with tests and a build gate; never commits, releases or touches devices |
+| `.opencode/agents/app-device-operator.md` | Bounded operator for an explicitly authorized test TV (official CLI-first install and capture); no repository edits |
 | `.opencode/agents/tv-evidence-curator.md` | Optional validator for exact screenshot evidence sets |
 | `.opencode/agents/tv-ux-brief.md` | TV product design specialist when direction is unresolved |
 | `.opencode/agents/tv-ux-reviewer.md` | Final screenshot-first visual-quality reviewer |
 | `.agents/skills/` | Reviewed, pinned Kotlin and Compose implementation guidance and documentation writing guidance |
-| `.opencode/skills/` | TVHeadend product, playback, device, DVR, and upstream overlays |
+| `.opencode/skills/` | Tvheadend product, playback, device, DVR, and upstream overlays |
 | `.opencode/commands/` | Verification, device, reviewer, UX, and upstream shortcuts |
 | `skills-lock.json` / `NOTICE.md` | Imported skill source, hashes, license, and attribution |
 | `tools/check-doc-authority` | Documentation classification, archive containment, and stale-context prevention |
@@ -319,7 +321,7 @@ control.
 Prefer deterministic offline captures of production composables with fake
 channels, EPG, tracks, timelines, recovery states, local images, and a
 deterministic video backdrop. The writable primary, not the design reviewer,
-generates them without a live TVHeadend connection and records scenario, canvas,
+generates them without a live Tvheadend connection and records scenario, canvas,
 density, font scale, locale, and focus state. Generated PNGs remain under ignored
 evidence paths and are passed by exact path. They can prove only the captured
 static composition; integrated navigation, SurfaceView/video, focus and remote
@@ -333,7 +335,7 @@ The 17 retained Chris Banes Kotlin and Compose skills are pinned to
 documentation prose to tag `2026.10.8`; `skills-lock.json` records their paths
 and content hashes. They are
 default mechanics only when their concrete trigger matches. Repository-local
-skills provide the TV interaction, TVHeadend DVR, playback, device, and upstream
+skills provide the TV interaction, Tvheadend DVR, playback, device, and upstream
 constraints plus durable caveats for this product.
 
 `implement-issue`, `shepherd`, and `using-chrisbanes-skills` remain excluded

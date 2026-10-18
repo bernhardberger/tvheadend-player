@@ -377,7 +377,7 @@ separate surfaces at viewing distance.
 
 `docs/product-identity-plan.md` (status: approved and implemented) and
 `artwork/README.md` define the product palette as cyan `#00BCFA` and orange
-`#FA7F00`, chosen explicitly to recall TVHeadend compatibility. Neither appears
+`#FA7F00`, chosen explicitly to recall Tvheadend compatibility. Neither appears
 anywhere in the app. The launcher icon and the app interior are unrelated.
 
 Colour currently originates from five places: the TV scheme, the parallel mobile

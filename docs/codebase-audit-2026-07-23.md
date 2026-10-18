@@ -1,4 +1,4 @@
-# TVHeadend Player predecessor-fork technical audit
+# Tvheadend Player predecessor-fork technical audit
 
 Date: 2026-07-23
 Status: dated audit and implementation record. Use only a named finding and
@@ -33,6 +33,11 @@ this code-only pass. A dining-room TCL was subsequently assigned as the test TV,
 but the complete runtime matrix is still required. Signed release publication is
 additionally blocked until `./tools/check-native-libs --release` passes with real
 provenance rather than placeholders.
+
+Note (2026-10-18): the "blocked" statements about release publication and native
+provenance (this paragraph and AUD-008) describe the audit date. The gate is
+tracked as R1 in `roadmap-1.0.md`; run `./tools/check-native-libs --release` on
+the release candidate for the current result.
 
 The product identity was subsequently migrated from the temporary package and
 TVHStream-shaped source namespace to `at.bernhardberger.tvhplayer`. Historical
@@ -259,7 +264,7 @@ actions without immutable SHA pinning. Actions are enabled in the public fork,
 although no fork runs were present during this audit.
 
 `privacy-policy.md` is materially inaccurate: it says the app has no login
-credentials and uses Firebase, while the fork stores TVHeadend credentials and
+credentials and uses Firebase, while the fork stores Tvheadend credentials and
 removed Firebase. The README and all artwork remain upstream-branded.
 
 Disable deployment until the final app ID, signing, distribution channel, and
@@ -424,7 +429,7 @@ directly addresses.
 
 ### Stage 0 - Product decisions
 
-- Decide whether this is a household-only appliance, a public TVHeadend client,
+- Decide whether this is a household-only appliance, a public Tvheadend client,
   or a public client with an optional appliance profile.
 - Decide GitHub/sideload-only versus eventual Google Play distribution.
 - Decide whether the existing application ID and installed app data must remain
