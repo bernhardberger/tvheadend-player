@@ -2,10 +2,8 @@
 
 ## 0.3.0 (unreleased)
 
-<!-- TODO: add Tvheadend SDK 0.34.0 and the frame rate that streams declare once that work is merged. -->
-
 Each release now has two builds, Play and Appliance, and the app consumes Tvheadend
-SDK 0.33.0 and HTSP 1.0.0-beta.4.
+SDK 0.34.0 and HTSP 1.0.0-beta.4.
 
 ### Added
 
@@ -23,8 +21,11 @@ SDK 0.33.0 and HTSP 1.0.0-beta.4.
 - One programme details page, shared by the Guide, Recordings and the player.
 - A single notice when the connection is lost, a badge on Settings while the app
   is offline, and a Try again action.
-- Match content frame rate setting (Always, Only if seamless, Off). Playback
-  statistics show the output mode, the display modes and the measured frame rate.
+- Match content frame rate setting (Always, Only if seamless, Off). The player
+  asks the display for the frame rate the server declares for the stream, so a
+  50 Hz channel can switch a TV that offers 50 Hz. Playback statistics show the
+  output mode, the display modes, the declared and the measured frame rate.
+- Tunnelled playback as an experimental player setting, off by default.
 - Video decoder counters and a classification of playback failures in the
   diagnostics.
 - A two-row channel rail in the player, with a live preview and a programme
@@ -58,7 +59,7 @@ SDK 0.33.0 and HTSP 1.0.0-beta.4.
 - The German interface addresses users informally.
 - English text uses American spelling.
 - Release builds are minified with R8, and each release ships the mapping files.
-- Tvheadend SDK 0.33.0 and HTSP 1.0.0-beta.4, including SDK-owned retry of failed
+- Tvheadend SDK 0.34.0 and HTSP 1.0.0-beta.4, including SDK-owned retry of failed
   Player cleanup while preserving unrelated playback items.
 
 ### Fixed
