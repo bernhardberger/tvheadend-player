@@ -141,6 +141,22 @@
     <string name="language_german">Deutsch</string>
     <string name="language_english">Englisch</string>
     <string name="settings_clock_format">Uhrzeitformat</string>
+    <string name="channels_layout_list">Liste</string>
+    <string name="channels_layout_grid">Raster</string>
+    <string name="channels_layout_rows">Reihen</string>
+    <string name="channels_group">Sendergruppe</string>
+    <string name="channels_view_options">Ansichtsoptionen</string>
+    <string name="channels_view_layout">Darstellung</string>
+    <string name="channels_view_grid_columns">Spalten</string>
+    <plurals name="channels_view_grid_columns_value">
+        <item quantity="one">%d Spalte</item>
+        <item quantity="other">%d Spalten</item>
+    </plurals>
+    <string name="channels_view_card_picture">Kartenbild</string>
+    <string name="channels_card_picture_programme">Sendungsbild</string>
+    <string name="channels_card_picture_logo">Senderlogo</string>
+    <string name="channels_show_all">Alle Sender anzeigen</string>
+    <string name="channels_empty_group">Keine Sender in dieser Gruppe</string>
     <string name="clock_format_12_hour">12 Stunden (8:15\u00A0PM)</string>
     <string name="clock_format_24_hour">24 Stunden (20:15)</string>
     <string name="profile">Streamprofil</string>

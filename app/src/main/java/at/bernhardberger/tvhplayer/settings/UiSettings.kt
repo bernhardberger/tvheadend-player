@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -15,6 +16,7 @@ data class UiSettings(
     val autoStartPlayback: Boolean = false,
     val clockFormat: ClockFormat = ClockFormat.SYSTEM,
     val recordingProfileId: DvrConfigId? = null,
+    val channelsView: ChannelsView = ChannelsView(),
 )
 
 fun resolveEpgMenuVisibility(storedValue: Boolean?): Boolean = storedValue ?: true
@@ -27,6 +29,9 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val AUTO_START_PLAYBACK = booleanPreferencesKey("autoStartPlayback")
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
+        val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
+        val CHANNELS_GRID_COLUMNS = intPreferencesKey("channelsGridColumns")
+        val CHANNELS_CARD_PICTURE = stringPreferencesKey("channelsCardPicture")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
@@ -35,12 +40,25 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
+            channelsView = resolveChannelsView(
+                layout = preferences[Keys.CHANNELS_LAYOUT],
+                gridColumns = preferences[Keys.CHANNELS_GRID_COLUMNS],
+                cardPicture = preferences[Keys.CHANNELS_CARD_PICTURE],
+            ),
         )
     }
 
     suspend fun setClockFormat(format: ClockFormat) {
         dataStore.edit { preferences ->
             preferences[Keys.CLOCK_FORMAT] = format.name
+        }
+    }
+
+    suspend fun setChannelsView(view: ChannelsView) {
+        dataStore.edit { preferences ->
+            preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
+            preferences[Keys.CHANNELS_GRID_COLUMNS] = view.gridColumns
+            preferences[Keys.CHANNELS_CARD_PICTURE] = view.cardPicture.name
         }
     }
 

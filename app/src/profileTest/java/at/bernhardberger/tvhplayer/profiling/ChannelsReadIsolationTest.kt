@@ -12,7 +12,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -30,7 +29,7 @@ class ChannelsReadIsolationTest {
         if (compose.onAllNodes(hasText("Channels") and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
             key(Key.DirectionRight)
         }
-        compose.onNodeWithText("All channels").assertIsFocused()
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
         val roots = mutableListOf<String>()
         var bodies = 0
         var details = 0
@@ -53,9 +52,8 @@ class ChannelsReadIsolationTest {
             // ownership. Entry alone need not recompose the correctly isolated wrapper.
             key(Key.DirectionLeft)
             compose.onNode(hasText("Channels") and isFocused()).assertExists()
+            // The rail re-enters the channel focus was left on.
             key(Key.DirectionRight)
-            compose.onNodeWithText("All channels").assertIsFocused()
-            key(Key.DirectionDown)
             compose.onNodeWithTag("channel-row-1").assertIsFocused()
             compose.runOnIdle {
                 assertEquals("The observer must see BOTH roots before the isolation check",

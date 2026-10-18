@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -94,6 +95,15 @@ internal fun rememberTabListState(current: LazyListState): LazyListState {
     val owner = LocalTabOwner.current
     return if (owner?.isCurrent != false) current else remember {
         LazyListState(current.firstVisibleItemIndex, current.firstVisibleItemScrollOffset)
+    }
+}
+
+/** [rememberTabListState] for grids. */
+@Composable
+internal fun rememberTabGridState(current: LazyGridState): LazyGridState {
+    val owner = LocalTabOwner.current
+    return if (owner?.isCurrent != false) current else remember {
+        LazyGridState(current.firstVisibleItemIndex, current.firstVisibleItemScrollOffset)
     }
 }
 

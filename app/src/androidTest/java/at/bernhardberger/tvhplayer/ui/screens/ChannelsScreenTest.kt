@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.ui.test.onRoot
 import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
-import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.assertIsDisplayed
 
 import android.view.KeyEvent
@@ -22,6 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
@@ -55,6 +56,7 @@ import org.junit.Assert.assertTrue
 import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
+import kotlin.math.abs
 
 @OptIn(ExperimentalTestApi::class)
 class ChannelsScreenTest {
@@ -175,17 +177,17 @@ class ChannelsScreenTest {
     }
 
     @Test
-    fun tagSwitchResetsUnfocusedViewportToTop() = assertTagViewport(playingId = null)
+    fun groupEntryStartsAtTheFirstChannel() = assertGroupEntry(playingId = null)
 
     @Test
-    fun tagSwitchPrefersPlayingChannelOnlyWhenItBelongsToTheScope() =
-        assertTagViewport(playingId = ChannelId(40))
+    fun groupEntryPrefersPlayingChannelOnlyWhenItBelongsToTheGroup() =
+        assertGroupEntry(playingId = ChannelId(40))
 
     @Test
-    fun tagSwitchPositionsPlayingChannelInBothOverlappingScopes() =
-        assertTagViewport(playingId = ChannelId(70))
+    fun groupEntryPositionsPlayingChannelThatBelongsToTheGroup() =
+        assertGroupEntry(playingId = ChannelId(70))
 
-    private fun assertTagViewport(playingId: ChannelId?) {
+    private fun assertGroupEntry(playingId: ChannelId?) {
         val international = tag(1, "International")
         val selections = mutableListOf<ChannelId>()
         setChannelsContent(
@@ -195,188 +197,20 @@ class ChannelsScreenTest {
             playingChannelId = playingId,
             onSelection = selections::add,
         )
-        val all = composeRule.onNodeWithText("All channels")
-        val other = composeRule.onNodeWithText("International")
-        val internationalTarget = playingId?.value?.takeIf { it >= 61 } ?: 61L
-        val allTarget = playingId?.value ?: 1L
-        all.assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        other.assertIsFocused()
-        row(internationalTarget).assertIsDisplayed()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel $internationalTarget")
-        composeRule.runOnIdle { assertTrue(selections.isEmpty()) }
-        val internationalTop = row(internationalTarget).fetchSemanticsNode().boundsInRoot.top
-        other.pressDown()
-        waitForFocus(internationalTarget)
-        assertEquals("International entry must retain its preview", internationalTop,
-            row(internationalTarget).fetchSemanticsNode().boundsInRoot.top, 1f)
-        row(internationalTarget).performKeyInput { pressKey(Key.Back) }
-        other.assertIsFocused()
+        waitForFocus(1)
         composeRule.runOnIdle { selections.clear() }
-
-        other.performKeyInput { pressKey(Key.DirectionLeft) }
-        all.assertIsFocused()
-        row(allTarget).assertIsDisplayed()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel $allTarget")
-        composeRule.runOnIdle { assertTrue("Tag preview must not publish native channel focus", selections.isEmpty()) }
-        val topBeforeEntry = row(allTarget).fetchSemanticsNode().boundsInRoot.top
-        all.pressDown()
-        waitForFocus(allTarget)
-        assertEquals("Down must enter the preview without a second scroll", topBeforeEntry,
-            row(allTarget).fetchSemanticsNode().boundsInRoot.top, 1f)
-
-        // Back to the same tag is a focus-layer return, not a fresh tag selection.
-        row(allTarget).pressDown()
-        waitForFocus(allTarget + 1)
-        row(allTarget + 1).performKeyInput { pressKey(Key.Back) }
-        all.assertIsFocused().pressDown()
-        waitForFocus(allTarget + 1)
-    }
-
-    @Test
-    fun rapidTagReversalsPositionOnlyTheLatestScopeBeforeDown() {
-        val international = tag(1, "International")
-        val sports = tag(2, "Sports")
-        val selections = mutableListOf<ChannelId>()
-        setChannelsContent(
-            channels = (1..80).map { id -> channel(id, when (id) {
-                in 31..45 -> sports.id
-                in 61..80 -> international.id
-                else -> null
-            }) },
-            tags = listOf(international, sports),
-            initialSelectedId = ChannelId(1),
-            playingChannelId = ChannelId(40),
-            onSelection = selections::add,
-        )
-        composeRule.onNodeWithText("All channels").assertIsFocused()
-        composeRule.mainClock.autoAdvance = false
-        try {
-            val beforeKeys = composeRule.mainClock.currentTime
-            composeRule.onRoot().performKeyInput {
-                // No intervening rendered frames or waits for any list to settle.
-                listOf(Key.DirectionRight, Key.DirectionRight, Key.DirectionLeft,
-                    Key.DirectionLeft, Key.DirectionRight, Key.DirectionRight)
-                    .forEach { keyDown(it); keyUp(it) }
-            }
-            assertEquals("The key burst must not advance rendering", beforeKeys, composeRule.mainClock.currentTime)
-            repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
-            composeRule.onNodeWithText("Sports").assertIsFocused().assertIsSelected()
-            row(40).assertIsDisplayed()
-            composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 40")
-            composeRule.runOnIdle { assertTrue(selections.isEmpty()) }
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
-        composeRule.onNodeWithText("Sports").pressDown()
-        waitForFocus(40)
-    }
-
-    @Test
-    fun sameFrameTagRoundTripResetsPreviouslyBrowsedScopeBeforeDown() =
-        assertSameFrameTagRoundTrip(playingId = ChannelId(40), entryKey = Key.DirectionDown)
-
-    @Test
-    fun sameFrameTagRoundTripResetsPreviouslyBrowsedScopeBeforeOk() =
-        assertSameFrameTagRoundTrip(playingId = null, entryKey = Key.DirectionCenter)
-
-    private fun assertSameFrameTagRoundTrip(playingId: ChannelId?, entryKey: Key) {
-        val international = tag(1, "International")
-        val selections = mutableListOf<ChannelId>()
-        setChannelsContent(
-            channels = (1..80).map { id -> channel(id, international.id.takeIf { id >= 61 }) },
-            tags = listOf(international),
-            initialSelectedId = ChannelId(10),
-            playingChannelId = playingId,
-            onSelection = selections::add,
-        )
-        val all = composeRule.onNodeWithText("All channels")
-        all.pressDown()
-        waitForFocus(10)
-        row(10).pressDown()
-        waitForFocus(11)
-        row(11).performKeyInput { pressKey(Key.Back) }
-        all.assertIsFocused()
-        composeRule.runOnIdle { selections.clear() }
-
-        val target = playingId?.value ?: 1L
-        composeRule.mainClock.autoAdvance = false
-        try {
-            val beforeKeys = composeRule.mainClock.currentTime
-            composeRule.onRoot().performKeyInput {
-                keyDown(Key.DirectionRight)
-                keyUp(Key.DirectionRight)
-                keyDown(Key.DirectionLeft)
-                keyUp(Key.DirectionLeft)
-            }
-            assertEquals("The round trip must not advance rendering", beforeKeys, composeRule.mainClock.currentTime)
-            repeat(4) { composeRule.mainClock.advanceTimeByFrame() }
-            all.assertIsFocused().assertIsSelected()
-            row(target).assertIsDisplayed()
-            composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel $target")
-            composeRule.runOnIdle { assertTrue(selections.isEmpty()) }
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
-        val topBeforeEntry = row(target).fetchSemanticsNode().boundsInRoot.top
-        all.performKeyInput { pressKey(entryKey) }
+        val target = playingId?.value?.takeIf { it >= 61 } ?: 61L
+        pickGroup("channels-group-${international.id.value}", steps = 1)
         waitForFocus(target)
-        assertEquals("Entry must retain the reset preview", topBeforeEntry,
-            row(target).fetchSemanticsNode().boundsInRoot.top, 1f)
-    }
-
-    @Test
-    fun newlyPopulatedTagPositionsPlayingChannelWithoutStealingTabFocus() {
-        val international = tag(1, "International")
-        lateinit var updateChannels: (List<Channel>) -> Unit
-        setChannelsContent(
-            channels = channels(1..60),
-            tags = listOf(international),
-            initialSelectedId = ChannelId(1),
-            playingChannelId = ChannelId(70),
-            onUpdateChannelsReady = { updateChannels = it },
-        )
-        composeRule.onNodeWithText("All channels").performKeyInput { pressKey(Key.DirectionRight) }
-        val other = composeRule.onNodeWithText("International")
-        other.assertIsFocused()
+        row(target).assertIsDisplayed()
+        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel $target")
         composeRule.runOnIdle {
-            updateChannels((1..80).map { id -> channel(id, international.id.takeIf { id >= 61 }) })
+            assertTrue("Only the entered channel is published", selections.isNotEmpty() && selections.all { it == ChannelId(target) })
         }
-        other.assertIsFocused()
-        row(70).assertIsDisplayed()
-        val topBeforeEntry = row(70).fetchSemanticsNode().boundsInRoot.top
-        other.pressDown()
-        waitForFocus(70)
-        assertEquals("Loaded tag preview must already be aligned", topBeforeEntry,
-            row(70).fetchSemanticsNode().boundsInRoot.top, 1f)
     }
 
     @Test
-    fun firstPopulatedTagAlignsPreviewWithoutPreviouslyMeasuredRows() {
-        val international = tag(1, "International")
-        lateinit var updateChannels: (List<Channel>) -> Unit
-        setChannelsContent(
-            channels = emptyList(),
-            tags = listOf(international),
-            initialSelectedId = null,
-            playingChannelId = ChannelId(70),
-            onUpdateChannelsReady = { updateChannels = it },
-        )
-        composeRule.onNodeWithText("All channels").requestFocus()
-            .performKeyInput { pressKey(Key.DirectionRight) }
-        val other = composeRule.onNodeWithText("International")
-        other.assertIsFocused()
-        composeRule.runOnIdle { updateChannels((61..80).map { channel(it, international.id) }) }
-        other.assertIsFocused()
-        row(70).assertIsDisplayed()
-        val topBeforeEntry = row(70).fetchSemanticsNode().boundsInRoot.top
-        other.pressDown()
-        waitForFocus(70)
-        assertEquals("First measured preview must already be aligned", topBeforeEntry,
-            row(70).fetchSemanticsNode().boundsInRoot.top, 1f)
-    }
-
-    @Test
-    fun returningToADifferentTagStartsAtTopInsteadOfItsOldFocusedChannel() {
+    fun eachGroupReturnsToItsOwnChannel() {
         val news = tag(1, "News")
         val sports = tag(2, "Sports")
         setChannelsContent(
@@ -388,91 +222,18 @@ class ChannelsScreenTest {
             tags = listOf(news, sports),
             initialSelectedId = ChannelId(1),
         )
-        composeRule.onNodeWithText("All channels").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithText("News").assertIsFocused().pressDown()
+        waitForFocus(1)
+        pickGroup("channels-group-${news.id.value}", steps = 1)
         waitForFocus(1)
         row(1).pressDown()
-        row(2).assertIsFocused()
+        waitForFocus(2)
 
-        composeRule.onNodeWithText("News").requestFocus().performKeyInput { pressKey(Key.DirectionRight) }
-        composeRule.onNodeWithText("Sports").assertIsFocused().pressDown()
+        pickGroup("channels-group-${sports.id.value}", steps = 1)
         waitForFocus(3)
-        composeRule.onNodeWithText("Sports").requestFocus().performKeyInput { pressKey(Key.DirectionLeft) }
-        composeRule.onNodeWithText("News").assertIsFocused().pressDown()
-
-        waitForFocus(1)
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 1")
-    }
-
-    @Test
-    fun channelScopeReversalFramesKeepFocusSelectionAndVisibleScopeTogether() {
-        val news = tag(1, "News")
-        val sports = tag(2, "Sports")
-        setChannelsContent(channels = listOf(channel(1, news.id), channel(2, sports.id)),
-            tags = listOf(news, sports), initialSelectedId = ChannelId(1))
-        composeRule.onNodeWithText("All channels").assertIsFocused()
-        composeRule.mainClock.autoAdvance = false
-        try {
-            listOf(Key.DirectionRight to "News", Key.DirectionRight to "Sports", Key.DirectionLeft to "News")
-                .forEachIndexed { step, (direction, label) ->
-                    composeRule.onRoot().performKeyInput { keyDown(direction); keyUp(direction) }
-                    repeat(4) { frame ->
-                        composeRule.mainClock.advanceTimeByFrame()
-                        composeRule.onNodeWithText(label).assertIsFocused().assertIsSelected()
-                        row(if (label == "News") 1 else 2).assertIsDisplayed()
-                    }
-                }
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
-    }
-
-    @Test
-    fun rapidTagDownRequestsOnlyRestoreTheLatestScope() = assertLatestTagEntry(Key.DirectionDown)
-
-    @Test
-    fun rapidTagOkRequestsOnlyRestoreTheLatestScope() = assertLatestTagEntry(Key.DirectionCenter)
-
-    private fun assertLatestTagEntry(entryKey: Key) {
-        val news = tag(1, "News")
-        val sports = tag(2, "Sports")
-        val selections = mutableListOf<ChannelId>()
-        setChannelsContent(
-            channels = listOf(channel(1, news.id), channel(2, sports.id)),
-            tags = listOf(news, sports),
-            initialSelectedId = ChannelId(1),
-            onSelection = selections::add,
-        )
-        composeRule.onNodeWithText("All channels").assertIsFocused()
-        composeRule.mainClock.autoAdvance = false
-        try {
-            composeRule.onNodeWithText("All channels").performKeyInput {
-                keyDown(Key.DirectionRight)
-                keyUp(Key.DirectionRight)
-            }
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.onNodeWithText("News").assertIsFocused().performKeyInput {
-                keyDown(entryKey)
-                keyUp(entryKey)
-                keyDown(Key.DirectionRight)
-                keyUp(Key.DirectionRight)
-            }
-            composeRule.mainClock.advanceTimeByFrame()
-            composeRule.onNodeWithText("Sports").assertIsFocused().performKeyInput {
-                keyDown(entryKey)
-                keyUp(entryKey)
-            }
-        } finally {
-            composeRule.mainClock.autoAdvance = true
-        }
+        pickGroup("channels-group-${news.id.value}", steps = -1)
 
         waitForFocus(2)
         composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 2")
-        composeRule.runOnIdle {
-            assertEquals(ChannelId(2), selections.last())
-            val finalTargetIndex = selections.indexOf(ChannelId(2))
-            assertTrue(selections.drop(finalTargetIndex).all { it == ChannelId(2) })
-        }
     }
 
     @Test
@@ -494,7 +255,7 @@ class ChannelsScreenTest {
     }
 
     @Test
-    fun catalogueRemovalDoesNotStealFocusFromActiveTag() {
+    fun catalogueRemovalDoesNotStealFocusFromTheHeader() {
         lateinit var updateChannels: (List<Channel>) -> Unit
         val news = tag(1, "News")
         setChannelsContent(
@@ -503,15 +264,12 @@ class ChannelsScreenTest {
             initialSelectedId = ChannelId(2),
             onUpdateChannelsReady = { updateChannels = it },
         )
-        composeRule.onNodeWithText("All channels").assertIsFocused().pressDown()
         waitForFocus(2)
-        val allChannels = composeRule.onNodeWithText("All channels")
-        row(2).performKeyInput { pressKey(Key.Back) }
-        allChannels.assertIsFocused()
+        groupButton.requestFocus().assertIsFocused()
 
         composeRule.runOnIdle { updateChannels(listOf(channel(1), channel(3))) }
 
-        allChannels.assertIsFocused()
+        groupButton.assertIsFocused()
     }
 
     @Test
@@ -548,17 +306,17 @@ class ChannelsScreenTest {
             initialSelectedId = ChannelId(1),
             onSelection = selections::add,
         )
-        composeRule.onNodeWithText("All channels").assertIsFocused().pressDown()
         waitForFocus(1)
         composeRule.runOnIdle { selections.clear() }
         composeRule.mainClock.autoAdvance = false
         try {
+            // Up from the first row reaches the header before the page lands.
             composeRule.onRoot().performKeyInput {
                 pressKey(Key(KeyEvent.KEYCODE_CHANNEL_DOWN))
-                pressKey(Key.Back)
+                pressKey(Key.DirectionUp)
             }
             composeRule.mainClock.advanceTimeBy(1_000)
-            composeRule.onNodeWithText("All channels").assertIsFocused()
+            groupButton.assertIsFocused()
             composeRule.runOnIdle {
                 assertTrue("Cancelled paging must not publish a channel that never received focus", selections.isEmpty())
             }
@@ -677,7 +435,7 @@ class ChannelsScreenTest {
         waitForFocus(1)
     }
 
-    @Test fun externalSelectionUpdatesDetailsAndScopeEntryWithoutStealingFocus() {
+    @Test fun externalSelectionDoesNotStealFocusFromTheHeader() {
         lateinit var select: (ChannelId) -> Unit
         setChannelsContent(
             channels = channels(1..3),
@@ -685,13 +443,11 @@ class ChannelsScreenTest {
             initialSelectedId = ChannelId(1),
             onUpdateSelectionReady = { select = it },
         )
-        composeRule.onNodeWithText("All channels").assertIsFocused()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 1")
+        waitForFocus(1)
+        groupButton.requestFocus().assertIsFocused()
         composeRule.runOnIdle { select(ChannelId(3)) }
-        composeRule.onNodeWithText("All channels").assertIsFocused()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 3")
-        composeRule.onNodeWithText("All channels").pressDown()
-        waitForFocus(3)
+        groupButton.assertIsFocused()
+        row(3).assertIsNotFocused()
     }
 
     private fun channelRowTops(): Map<String, Float> {
@@ -793,6 +549,22 @@ class ChannelsScreenTest {
     }
 
     private fun row(id: Long) = composeRule.onNodeWithTag("channel-row-$id")
+
+    private val groupButton get() = composeRule.onNodeWithTag("channels-group-button")
+
+    /** Opens the group picker from the header and applies the group [steps] rows from the current one, Up when negative. */
+    private fun pickGroup(groupTag: String, steps: Int) {
+        groupButton.requestFocus().assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.waitUntilExactlyOneExists(
+            isFocused() and hasAnyAncestor(hasTestTag("channels-group-panel")),
+            timeoutMillis = 5_000,
+        )
+        repeat(abs(steps)) {
+            composeRule.onRoot().performKeyInput { pressKey(if (steps < 0) Key.DirectionUp else Key.DirectionDown) }
+        }
+        composeRule.waitUntilExactlyOneExists(hasTestTag(groupTag) and isFocused(), timeoutMillis = 5_000)
+        composeRule.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+    }
 
     private fun SemanticsNodeInteraction.pressDown() =
         performKeyInput { pressKey(Key.DirectionDown) }

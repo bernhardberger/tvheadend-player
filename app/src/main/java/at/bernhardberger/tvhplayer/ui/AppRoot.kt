@@ -840,6 +840,7 @@ fun AppRoot(
                             initialFocusEnabled = !drawerActive && currentDestination == ChannelsKey,
                             playingChannelId = activeChannelId,
                             playerReturn = playerReturnFor(ChannelsKey),
+                            view = uiSettings.channelsView,
                             connectionUiState = connectionUiState,
                             onRetryConnection = appVm::reconnectNow,
                             onOpenConnectionSettings = {

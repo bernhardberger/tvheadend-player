@@ -152,19 +152,23 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 }
             }
             composeRule.runOnIdle { inputMode.requestInputMode(InputMode.Keyboard) }
-            composeRule.waitUntilExactlyOneExists(hasText("All channels") and isFocused(), 5_000)
-            composeRule.onNodeWithText("All channels").performKeyInput { pressKey(Key.DirectionDown) }
             composeRule.waitUntilExactlyOneExists(hasTestTag("channel-row-2") and isFocused(), 5_000)
+            /** Opens the group picker and moves [steps] rows down from All channels. */
+            fun openGroupPicker(steps: Int) {
+                composeRule.onNodeWithTag("channels-group-button").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                composeRule.waitUntilExactlyOneExists(hasTestTag("channels-group-all") and isFocused(), 5_000)
+                repeat(steps) { composeRule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionDown) } }
+            }
             val focus = when (scenario) {
+                // Group picker over many groups, on International.
                 "tags-overflow" -> {
-                    composeRule.onNodeWithText("All channels").requestFocus()
-                    repeat(5) { composeRule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionRight) } }
-                    composeRule.onNodeWithText("International")
+                    openGroupPicker(steps = 5)
+                    composeRule.onNodeWithTag("channels-group-5")
                 }
                 "empty-filter" -> {
-                    composeRule.onNodeWithText("All channels").requestFocus()
-                    repeat(4) { composeRule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionRight) } }
-                    composeRule.onNodeWithText("Empty filter")
+                    openGroupPicker(steps = 4)
+                    composeRule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionCenter) }
+                    composeRule.onNodeWithTag("channels-show-all")
                 }
                 else -> composeRule.onNodeWithTag("channel-row-2")
             }
@@ -173,10 +177,9 @@ class ChannelsScreenshotTest(private val scenario: String) {
             focus.assertIsFocused().assertIsDisplayed()
             if (scenario == "empty-filter") {
                 composeRule.onNodeWithTag("channel-row-2").assertDoesNotExist()
-                composeRule.onNodeWithText(instrumentation.targetContext.getString(R.string.empty_channel_tag)).assertIsDisplayed()
-            } else {
-                val detailChannel = if (scenario == "tags-overflow") channels.first() else channels[1]
-                composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals(detailChannel.name!!)
+                composeRule.onNodeWithText(instrumentation.targetContext.getString(R.string.channels_empty_group)).assertIsDisplayed()
+            } else if (scenario != "tags-overflow") {
+                composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals(channels[1].name!!)
             }
             if (scenario == "playing-recording") {
                 focus.assertIsSelected().assertContentDescriptionEquals("Currently playing", "Recording now")

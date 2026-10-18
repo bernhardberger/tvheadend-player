@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,6 +55,7 @@ internal fun ChannelsRouteContent(
     initialFocusEnabled: Boolean,
     playingChannelId: ChannelId?,
     playerReturn: PlayerReturnFocus?,
+    view: ChannelsView,
     connectionUiState: ConnectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
@@ -71,6 +73,7 @@ internal fun ChannelsRouteContent(
                 initialFocusEnabled = initialFocusEnabled,
                 playingChannelId = playingChannelId,
                 playerReturn = playerReturn,
+                view = view,
                 connectionUiState = connectionUiState,
                 onRetryConnection = onRetryConnection,
                 onOpenConnectionSettings = onOpenConnectionSettings,

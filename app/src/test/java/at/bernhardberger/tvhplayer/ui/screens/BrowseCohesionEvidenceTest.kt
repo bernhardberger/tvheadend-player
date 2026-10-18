@@ -172,8 +172,8 @@ class BrowseCohesionEvidenceTest {
                 }
             }
         }
-        awaitFocus(hasText("All channels"))
-        key(Key.DirectionDown)
+        // Channels enters its first row; the group sits behind the header button.
+        awaitFocus(hasTestTag("channel-row-1"))
         awaitFocus(hasTestTag("channel-row-1"))
         val connectedBounds = compose.onNodeWithTag("channel-row-1").fetchSemanticsNode().boundsInRoot
         compose.runOnIdle { disconnected = true }
@@ -242,8 +242,8 @@ class BrowseCohesionEvidenceTest {
     @Test
     fun channelsPopulatedAndMissingEpgDoNotTune() {
         showChannels(1f)
-        awaitFocus(hasText("All channels"))
-        key(Key.DirectionDown)
+        // Channels enters its first row; the group sits behind the header button.
+        awaitFocus(hasTestTag("channel-row-1"))
         capture("channels-current", 1f, "Channels current programme; first row", hasTestTag("channel-row-1"))
         compose.onNodeWithTag("channels-detail-channel", useUnmergedTree = true)
             .assertTextEquals("Ridge Earth HD")
@@ -260,8 +260,8 @@ class BrowseCohesionEvidenceTest {
     @Test
     fun channelsLargeTextKeepsLongRowFocusedWithoutTuning() {
         showChannels(1.3f)
-        awaitFocus(hasText("All channels"))
-        key(Key.DirectionDown)
+        // Channels enters its first row; the group sits behind the header button.
+        awaitFocus(hasTestTag("channel-row-1"))
         key(Key.DirectionDown)
         capture("channels-long-font1.3", 1.3f, "Channels long channel and programme text", hasTestTag("channel-row-2"))
     }

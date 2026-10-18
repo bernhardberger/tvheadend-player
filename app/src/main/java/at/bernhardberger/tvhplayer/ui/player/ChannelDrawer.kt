@@ -1,24 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
-import at.bernhardberger.tvhplayer.ui.components.ChannelNowIndicators
 import at.bernhardberger.tvhplayer.ui.components.ChannelTitle
-import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExitTransition
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -40,7 +29,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -52,7 +40,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.layout.offset
@@ -61,11 +48,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.CompactCard
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -75,10 +58,12 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.profiling.profileTrace
-import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
-import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
+import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
+import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
+import at.bernhardberger.tvhplayer.ui.components.CompactZapCardWidth
+import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
+import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
+import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
 
@@ -119,20 +104,10 @@ fun ChannelDrawer(
     val focusManager = LocalFocusManager.current
     // 48dp screen-safe space plus native card enlargement/outline overflow.
     val edgeInset = 64.dp
-    // The viewport reaches this far past both screen edges so the next cards of a held
-    // D-pad are already composed and placed; otherwise each step past the edge runs a
-    // synchronous beyond-bounds search inside key dispatch and the rail stalls.
-    val offscreen = 440.dp
+    val offscreen = CompactZapRowOffscreen
     val offscreenPx = with(LocalDensity.current) { offscreen.roundToPx() }
     val edgeInsetPx = with(LocalDensity.current) { edgeInset.toPx() } + offscreenPx
-    // The rail keeps the focused card on the start keyline: the row scrolls, and at the list
-    // end scrolling stops and focus moves on.
-    val bringIntoView = remember(edgeInsetPx) {
-        object : BringIntoViewSpec {
-            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
-                offset - edgeInsetPx
-        }
-    }
+    val bringIntoView = remember(edgeInsetPx) { StartKeylineBringIntoViewSpec(edgeInsetPx) }
     val pageActive = LocalPlayerPageActive.current
     val tabOwner = LocalTabOwner.current
     // Capture before disposal can automatically focus a neighbouring lazy item.
@@ -238,20 +213,11 @@ fun ChannelDrawer(
         // Insets belong to list content, not its viewport: adjacent cards travel to the screen edge.
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyRow(
-            modifier = Modifier.layout { measurable, constraints ->
-                check(constraints.hasBoundedWidth) { "The rail needs a bounded width" }
-                val placeable = measurable.measure(
-                    constraints.copy(
-                        minWidth = constraints.minWidth + 2 * offscreenPx,
-                        maxWidth = constraints.maxWidth + 2 * offscreenPx,
-                    ),
-                )
-                layout((placeable.width - 2 * offscreenPx).coerceAtLeast(0), placeable.height) { placeable.place(-offscreenPx, 0) }
-            },
+            modifier = Modifier.overflowingRowViewport(offscreenPx),
             state = listState,
             // Room above and below the cards for the focus scale and border.
             contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = ChannelCardRoom),
-            horizontalArrangement = Arrangement.spacedBy(24.dp),
+            horizontalArrangement = Arrangement.spacedBy(CompactZapCardGap),
         ) {
             items(channels, key = { it.id.value }) { channel ->
                 // Details consume the opening release. Retire the native Card's held-click state
@@ -277,6 +243,7 @@ fun ChannelDrawer(
                         }?.let { open(channel, it) }
                     } },
                     modifier = Modifier
+                        .width(CompactZapCardWidth)
                         .focusProperties { canFocus = ownsInput() }
                         .testTag("player-channel-card-${channel.id.value}")
                         .focusRequester(requesters.getValue(channel.id))
@@ -297,93 +264,3 @@ fun ChannelDrawer(
     }
 }
 
-
-@Composable
-private fun CompactZapCard(
-    channel: Channel,
-    number: Long?,
-    event: EpgEvent?,
-    nowSec: Long,
-    playbackIndicator: ChannelPlaybackIndicator,
-    recording: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    onLongClick: (() -> Unit)? = null,
-) {
-    val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onLongClick, menuKey = false)
-    val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
-    // The programme leads; without one, the channel does.
-    val programme = currentEvent?.title?.takeIf { it.isNotBlank() }
-    val identity = channelTitleText(number, channel.name.orEmpty())
-    // Preserve the kit's 54dp picon region; let the two text baselines grow with font scale.
-    val cardHeight = with(LocalDensity.current) {
-        70.dp + MaterialTheme.typography.titleMedium.lineHeight.toDp() + MaterialTheme.typography.bodySmall.lineHeight.toDp()
-    }
-    CompactCard(
-        onClick = onClick,
-        onLongClick = contextMenu.onLongClick,
-        border = embeddedProgressCardBorder(),
-        // The kit scrim keeps text legible over artwork; this card's text sits on a flat surface.
-        scrimBrush = SolidColor(Color.Transparent),
-        modifier = modifier.then(contextMenu.modifier).width(196.dp),
-        image = {
-            Box(Modifier.fillMaxWidth().height(cardHeight).background(TvSurfaceColors.containerLowest)) {
-                PiconBox(
-                    piconPath = channel.icon,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(100.dp, 45.dp)
-                        .testTag("player-channel-${channel.id.value}-picon"),
-                )
-            }
-        },
-        title = {
-            Row(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = programme ?: identity,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f).testTag("player-channel-${channel.id.value}-${if (programme != null) "now" else "identity"}"),
-                )
-                // The new marker fades in; the old one leaves at once so two glyphs never
-                // overlap in the slot and its tag and announcement go with it.
-                AnimatedContent(
-                    targetState = playbackIndicator,
-                    transitionSpec = {
-                        (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
-                            ExitTransition.None).using(null)
-                    },
-                    label = "zap-card-marker",
-                ) { indicator ->
-                    if (!leaving) ChannelNowIndicators(playingNow = indicator == ChannelPlaybackIndicator.PLAYING,
-                        recordingNow = recording, playbackIndicator = indicator)
-                }
-            }
-        },
-        subtitle = {
-            // The picon already names the channel, so only its text may shorten; time left stays whole.
-            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = 6.dp)) {
-                Text(
-                    text = if (programme != null) identity else stringResource(R.string.no_epg),
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false)
-                        .testTag("player-channel-${channel.id.value}-${if (programme != null) "identity" else "now"}"),
-                )
-                if (programme != null && currentEvent != null) {
-                    Text(
-                        stringResource(R.string.quick_zap_minutes_left, ((currentEvent.stop.epochSeconds - nowSec + 59) / 60).toInt()),
-                        maxLines = 1, softWrap = false,
-                        modifier = Modifier.testTag("player-channel-${channel.id.value}-left"),
-                    )
-                }
-            }
-        },
-        description = {
-            if (currentEvent != null) {
-                ProgressStrip(
-                    progress = ((nowSec - currentEvent.start.epochSeconds).toDouble() /
-                        (currentEvent.stop.epochSeconds - currentEvent.start.epochSeconds)).toFloat(),
-                    height = 2.dp,
-                    modifier = Modifier.fillMaxWidth().testTag("player-channel-${channel.id.value}-progress"),
-                )
-            } else Box(Modifier.fillMaxWidth().height(2.dp))
-        },
-    )
-}

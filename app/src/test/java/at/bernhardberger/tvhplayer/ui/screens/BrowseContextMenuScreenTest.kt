@@ -1181,8 +1181,8 @@ class BrowseContextMenuScreenTest {
             channelRecording = action == "Keep" || action == "Stop", recordingState = DvrEntryState.RECORDING)
         val rowTag = if (recordings) "recording-list-entry-1" else "channel-row-1"
         // Enter as the remote does, so cold-entry bookkeeping matches the production screen.
+        // Channels enters its first row itself.
         if (recordings) compose.onNodeWithTag(rowTag).requestFocus()
-        else compose.onNodeWithText("All channels").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag(rowTag).assertIsFocused().performKeyInput { pressKey(Key.Menu) }
         when (action) {
             "Back" -> {

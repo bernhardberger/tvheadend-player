@@ -4,7 +4,6 @@ import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -30,7 +29,6 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -85,12 +83,9 @@ class ChannelsPlayerReturnFocusTest {
         assertRowFocused(24)
     }
 
-    @Test fun ordinaryEntryStillStartsOnScopeTabs() {
+    @Test fun ordinaryEntryStartsOnTheFirstChannelWithoutScopeTabs() {
         channels(activeTag = null, playerReturn = null)
-        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
-        val focusedTags = compose.onAllNodes(isFocused()).fetchSemanticsNodes()
-            .map { it.config.getOrNull(SemanticsProperties.TestTag) }
-        assertNull(focusedTags.firstOrNull { it?.startsWith("channel-row-") == true })
+        assertRowFocused(1)
     }
 
     private fun assertRowFocused(id: Int) {

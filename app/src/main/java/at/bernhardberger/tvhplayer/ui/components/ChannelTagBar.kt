@@ -26,6 +26,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -42,6 +43,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.ChannelScopeItemMaxWidth
 import at.bernhardberger.tvhplayer.ui.TvNavigationRailGradientRunout
+import kotlin.math.roundToInt
 
 @Composable
 fun ChannelTagSelector(
@@ -85,6 +87,19 @@ fun ChannelTagSelector(
                     onMoveToContent()
             }
             .onGloballyPositioned(edgeFadeState::updateViewportBounds)
+            // More scopes than fit: end the row inside a tab, never just past one.
+            .layout { measurable, constraints ->
+                val width = edgeFadeState.trailingHintWidthPx(
+                    fullWidthPx = constraints.maxWidth.toFloat(),
+                    protectedIndices = setOf(activeIndex, focusedIndex),
+                    minimumPeekPx = ScopeOverflowPeek.toPx(),
+                    layoutDirection = layoutDirection,
+                ).roundToInt()
+                val placeable = measurable.measure(constraints.copy(minWidth = minOf(constraints.minWidth, width), maxWidth = width))
+                layout(constraints.maxWidth, placeable.height) {
+                    placeable.placeRelative(0, 0)
+                }
+            }
             .navigationEdgeFadeMask(
                 width = TvNavigationRailGradientRunout,
                 maskEnabled = {
@@ -132,6 +147,9 @@ fun ChannelTagSelector(
     }
 }
 
+/** The least of a cut trailing tab that reads as more scopes rather than a stray edge. */
+private val ScopeOverflowPeek = 56.dp
+
 private class TabEdgeFadeState {
     private val viewportBounds = mutableStateOf(Rect.Zero)
     private val tabBounds = mutableStateMapOf<Int, Rect>()
@@ -142,6 +160,33 @@ private class TabEdgeFadeState {
 
     fun updateTabBounds(index: Int, coordinates: LayoutCoordinates) {
         tabBounds[index] = coordinates.unclippedBoundsInRoot()
+    }
+
+    /**
+     * Width that leaves the first overflowing tab visibly cut at the unscrolled position.
+     * If it would show less than [minimumPeekPx], the row ends halfway through the tab
+     * before it instead, unless that tab is active or focused. Spans are measured from the
+     * first tab, so scrolling the row never changes its width.
+     */
+    fun trailingHintWidthPx(
+        fullWidthPx: Float,
+        protectedIndices: Set<Int>,
+        minimumPeekPx: Float,
+        layoutDirection: LayoutDirection,
+    ): Float {
+        val viewport = viewportBounds.value
+        val first = tabBounds[0]
+        if (viewport.width <= 0f || first == null) return fullWidthPx
+        val origin = first.spaceFromLeadingEdge(viewport, layoutDirection)
+        val spans = tabBounds.toSortedMap().map { (index, bounds) ->
+            val start = bounds.spaceFromLeadingEdge(viewport, layoutDirection) - origin
+            Triple(index, start, start + bounds.width)
+        }
+        val cut = spans.indexOfFirst { (_, _, end) -> end > fullWidthPx }
+        if (cut < 0 || fullWidthPx - spans[cut].second >= minimumPeekPx) return fullWidthPx
+        val (index, start, end) = spans.getOrNull(cut - 1) ?: return fullWidthPx
+        if (index in protectedIndices || start <= 0f) return fullWidthPx
+        return (start + (end - start) / 2f).coerceAtMost(fullWidthPx)
     }
 
     fun availableFadeWidthPx(

@@ -32,7 +32,9 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
@@ -168,37 +170,35 @@ class ChannelsStandardLayoutEvidenceTest {
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun entryLandsOnTheActiveTagDownEntersTheAnchorAndBackReturns() {
+    fun entryLandsOnTheAnchorUpReachesTheHeaderAndAGroupEntersItsPlayingChannel() {
         channelsShell(1f)
 
-        tab("All channels").assertIsFocused()
-
-        key(Key.DirectionDown)
         // Nothing selected or remembered yet: the anchor is the first channel in scope.
         row(1).assertIsFocused()
         detail("channels-detail-channel").assertTextEquals(name(1))
 
-        key(Key.Back)
-        tab("All channels").assertIsFocused()
-
-        // An actual tag change previews the playing channel of the new scope; Down agrees.
-        key(Key.DirectionRight)
-        tab("Favourites").assertIsFocused()
+        key(Key.DirectionUp)
+        groupButton().assertIsFocused()
         key(Key.DirectionDown)
+        row(1).assertIsFocused()
+
+        // A group change enters the playing channel of the new scope.
+        pickGroup(steps = 1)
         row(PLAYING).assertIsFocused()
+        heading("Favourites").assertExists()
         detail("channels-detail-channel").assertTextEquals(name(PLAYING))
 
-        key(Key.Back)
-        tab("Favourites").assertIsFocused()
-        key(Key.DirectionDown)
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionRight)
         row(PLAYING).assertIsFocused()
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun tagConfirmEntersAnchorWithoutActivatingItOnTheSamePress() {
+    fun groupConfirmEntersAnchorWithoutActivatingItOnTheSamePress() {
         channelsShell(1f)
-        tab("All channels").assertIsFocused()
-        key(Key.DirectionCenter)
+        row(1).assertIsFocused()
+        pickGroup(steps = 0)
         row(1).assertIsFocused()
         assertEquals("relocation key does not tune", 0, playbackRequests)
         key(Key.DirectionCenter)
@@ -218,31 +218,35 @@ class ChannelsStandardLayoutEvidenceTest {
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun standardRowsFollowTheAcceptedGeometryOnTheShellInsets() {
         channelsShell(1f)
-        // Focus stays on the tag row so every asserted row is at its unscaled layout
+        // Focus rests on the header so every asserted row is at its unscaled layout
         // size; the library's focus scale is checked separately at the end.
-        tab("All channels").assertIsFocused()
+        key(Key.DirectionUp)
+        groupButton().assertIsFocused()
 
-        val heading = detail("channels-heading").bounds()
+        // The group's name heads the screen; Group and View options end on the trailing inset.
+        val heading = heading().bounds()
         assertEquals("heading x", 130f, heading.left, .5f)
-        assertEquals("heading y", 28f, heading.top, .5f)
-        detail("channels-heading").assertTextEquals("Channels")
-        // Tags follow the real headline height and share the row axis.
-        val tabs = tab("All channels").bounds()
-        assertEquals("tag row x", 130f, tabs.left, 1f)
-        assertEquals("tag row y", 76f, tabs.top, 1f)
-
+        assertEquals("heading y", 36f, heading.top, .5f)
+        val header = header().bounds()
+        assertEquals("header y", 28f, header.top, .5f)
+        val group = groupButton().bounds()
+        val view = compose.onNodeWithTag("channels-view-button").bounds()
+        assertEquals("buttons end on the trailing inset", 902f, view.right, .5f)
+        assertEquals("button size", 48f, view.width, .5f)
+        assertEquals("button gap", 12f, view.left - group.right, .5f)
+        assertEquals("buttons share the heading's axis", heading.center.y, view.center.y, 1f)
         // The list column spans the focus reserve and runs to the screen bottom.
         val list = compose.onNodeWithTag("channels-list").bounds()
         assertEquals("list column x", 118f, list.left, .5f)
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
 
-        // Rows: 340dp wide at x130, first at y124, 4dp gaps. Height is the library's
+        // Rows: 340dp wide at x130, first at y88 below the header, 4dp gaps. Height is the library's
         // standard two-line minimum and grows with text scale rather than clipping.
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
-        assertEquals("row y", 124f, first.top, .5f)
+        assertEquals("row y", 88f, first.top, .5f)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
@@ -281,6 +285,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // The focused row keeps the library's own focus scale, uncancelled, and the
         // list reserves it horizontally instead of clipping.
+        key(Key.DirectionDown)
         enterAndFocus(1)
         val focusedPicon = inRow(1, "channel-picon").bounds()
         assertTrue("focused content is scaled (${focusedPicon.width})", focusedPicon.width > 60f)
@@ -292,7 +297,7 @@ class ChannelsStandardLayoutEvidenceTest {
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
         assertEquals("details width", 340f, details.width, .5f)
-        assertEquals("details top", 124f, details.top, .5f)
+        assertEquals("details top", 88f, details.top, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
         assertEquals("details bottom inset", 512f, details.bottom, .5f)
     }
@@ -415,7 +420,6 @@ class ChannelsStandardLayoutEvidenceTest {
             return position
         }
 
-        move(Key.DirectionDown)
         assertSettled(1)
         move(Key.DirectionDown)
         assertSettled(2)
@@ -429,10 +433,10 @@ class ChannelsStandardLayoutEvidenceTest {
         val scrolledPosition = assertSettled(4)
         assertTrue("genuine forward focus scroll still moves the list", scrolledPosition.top < originalFirst.top + 3 * (rowHeight + 4f))
         assertFocusedShapePixels(4, rowHeight, scrolled = true)
-        move(Key.Back)
-        tab("All channels").assertIsFocused()
-        move(Key.DirectionDown)
-        assertEquals("Back/Down restores the settled pivot", scrolledPosition, assertSettled(4))
+        move(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        move(Key.DirectionRight)
+        assertEquals("Left/Right restores the settled pivot", scrolledPosition, assertSettled(4))
 
         for (channel in 3 downTo 1) {
             move(Key.DirectionUp)
@@ -441,10 +445,7 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("backward return restores the first-row boundary", originalFirst, row(1).bounds())
         assertFocusedShapePixels(1, rowHeight, scrolled = false)
 
-        move(Key.Back)
-        move(Key.DirectionRight)
-        tab("Favourites").assertIsFocused()
-        move(Key.DirectionDown)
+        pickGroup(steps = 1, move = ::move)
         assertSettled(PLAYING) // Explicit restoration can clamp this short scope at the start.
         assertFocusedShapePixels(PLAYING, rowHeight, scrolled = fontScale != 1f)
         assertEquals("artwork stays fixed", artwork, detail("channels-preview").bounds())
@@ -457,8 +458,7 @@ class ChannelsStandardLayoutEvidenceTest {
         channelsShell(fontScale)
         val rowHeight = row(1).bounds().height
         val noEpgRowHeight = row(NO_EPG).bounds().height
-        val heading = detail("channels-heading").bounds()
-        val tabs = tab("All channels").bounds()
+        val header = header().bounds()
         val details = detail("channels-details").bounds()
         enterAndFocus(1)
         val firstPosition = row(1).bounds()
@@ -467,7 +467,7 @@ class ChannelsStandardLayoutEvidenceTest {
         capture("en-font$fontScale-top-fade-initial-bright-video")
 
         // These anchors leave a real, generated 5:3 picon crossing the top edge.
-        val downTarget = if (fontScale == 1f) 8 else 11
+        val downTarget = if (fontScale == 1f) 9 else 11
         repeat(downTarget - 1) { key(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
@@ -494,8 +494,7 @@ class ChannelsStandardLayoutEvidenceTest {
         compose.waitForIdle()
         assertEquals("the boundary does not oscillate", firstPosition, row(1).bounds())
         assertSamePixels(returned, drawShell(), Rect(list.left, list.top, list.right, list.top + 48f))
-        assertEquals("heading never moves", heading, detail("channels-heading").bounds())
-        assertEquals("tabs never move", tabs, tab("All channels").bounds())
+        assertEquals("header never moves", header, header().bounds())
         assertEquals("details viewport never moves", details, detail("channels-details").bounds())
         capture("en-font$fontScale-top-fade-top-return-bright-video")
     }
@@ -521,17 +520,9 @@ class ChannelsStandardLayoutEvidenceTest {
         assertTopFadePixels(7)
         val position = row(8).bounds()
 
-        key(Key.Back)
-        tab("All channels").assertIsFocused()
-        key(Key.DirectionDown)
-        row(8).assertIsFocused()
-        assertEquals("Back/Down preserves the scrolled anchor", position, row(8).bounds())
-        assertFocusedShapePixels(8, rowHeight, scrolled = true)
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         key(Key.DirectionRight)
-        tab("All channels").assertIsFocused()
-        key(Key.DirectionDown)
         row(8).assertIsFocused()
         assertEquals("drawer re-entry preserves the scrolled anchor", position, row(8).bounds())
         assertFocusedShapePixels(8, rowHeight, scrolled = true)
@@ -545,29 +536,28 @@ class ChannelsStandardLayoutEvidenceTest {
         assertTrue("Channel Up still pages backward", pageUpChannel < pageDownChannel)
         assertFocusedShapePixels(pageUpChannel, rowHeight, scrolled = pageUpChannel != 1)
 
-        key(Key.Back)
-        key(Key.DirectionRight)
-        tab("Favourites").assertIsFocused()
-        key(Key.DirectionDown)
+        // The group picker publishes the same scope changes; content keeps focus across them.
+        compose.runOnIdle { activeTag = ChannelTagId(1) }
+        compose.waitForIdle()
         row(PLAYING).assertIsFocused()
         assertFocusedShapePixels(PLAYING, rowHeight, scrolled = true)
-        key(Key.Back)
-        key(Key.DirectionRight)
-        tab("Sport").assertIsFocused()
-        key(Key.DirectionDown)
+        compose.runOnIdle { activeTag = ChannelTagId(2) }
+        compose.waitForIdle()
         row(7).assertIsFocused()
         assertFocusedShapePixels(7, rowHeight, scrolled = false)
         assertEquals("new scope's first row keeps the original top reserve", detail("channels-list").bounds().top + 4f, row(7).bounds().top, .5f)
-        key(Key.Back)
+        // A change while the rail has focus only previews the group's anchor.
         key(Key.DirectionLeft)
-        tab("Favourites").assertIsFocused()
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        compose.runOnIdle { activeTag = ChannelTagId(1) }
+        compose.waitForIdle()
         val previewTop = row(PLAYING).bounds().top
         // A short scope may clamp at its bottom before the anchor reaches the inset.
         assertTrue(
             "scope preview clears the destination's fade even when leaving the top boundary",
             previewTop >= detail("channels-list").bounds().top + 56f,
         )
-        key(Key.DirectionDown)
+        key(Key.DirectionRight)
         row(PLAYING).assertIsFocused()
         assertEquals("native focus does not need to repair the preview anchor", previewTop, row(PLAYING).bounds().top, .5f)
         assertFocusedShapePixels(PLAYING, rowHeight, scrolled = true)
@@ -637,14 +627,12 @@ class ChannelsStandardLayoutEvidenceTest {
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun enlargedTextGrowsRowsWithoutOverlap() {
         channelsShell(1.3f)
-        val heading = detail("channels-heading").bounds()
-        val tabs = tab("All channels").bounds()
+        val heading = heading().bounds()
         val headingLayouts = mutableListOf<TextLayoutResult>()
-        detail("channels-heading").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(headingLayouts) }
+        heading().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(headingLayouts) }
         val headingLayout = headingLayouts.single()
         assertTrue("headline keeps its whole measured line", headingLayout.getLineBottom(headingLayout.lineCount - 1) <= heading.height)
-        assertEquals("scopes stay 12dp below the headline", heading.bottom + 12f, tabs.top, 1f)
-        assertTrue("rows stay below native enlarged tabs", row(1).bounds().top >= tabs.bottom + 12f - 1f)
+        assertTrue("rows stay below the enlarged header", row(1).bounds().top >= header().bounds().bottom + 8f - 1f)
         enterAndFocus(PLAYING)
 
         val first = row(1).bounds()
@@ -745,10 +733,12 @@ class ChannelsStandardLayoutEvidenceTest {
     private fun captureSet(locale: String, fontScale: Float) {
         channelsShell(fontScale)
         val prefix = "$locale-font$fontScale"
-        val tabLabel = if (locale == "de") "Alle Sender" else "All channels"
-
-        tab(tabLabel).assertIsFocused()
-        captureBackgrounds("$prefix-entry-tag-focused")
+        row(1).assertIsFocused()
+        captureBackgrounds("$prefix-entry-first-row-focused")
+        key(Key.DirectionUp)
+        groupButton().assertIsFocused()
+        captureBackgrounds("$prefix-header-group-button-focused")
+        key(Key.DirectionDown)
 
         enterAndFocus(PLAYING)
         captureBackgrounds("$prefix-row-focused-playing-recording")
@@ -993,9 +983,8 @@ class ChannelsStandardLayoutEvidenceTest {
 
     // ---- helpers ----
 
-    /** Down from the tags enters the first-channel anchor; further Downs reach row [n]. */
+    /** Entry focuses the first-channel anchor; further Downs reach row [n]. */
     private fun enterAndFocus(n: Int) {
-        key(Key.DirectionDown)
         row(1).assertIsFocused()
         repeat(n - 1) { key(Key.DirectionDown) }
         row(n).assertIsFocused()
@@ -1006,7 +995,19 @@ class ChannelsStandardLayoutEvidenceTest {
         compose.waitForIdle()
     }
 
-    private fun tab(label: String) = compose.onNodeWithText(label)
+    private fun header() = compose.onNodeWithTag("channels-header")
+    private fun groupButton() = compose.onNodeWithTag("channels-group-button")
+    private fun heading(label: String = "All channels") =
+        compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true)
+
+    /** Up from the first row, OK on the group button, [steps] Downs in the picker and OK. */
+    private fun pickGroup(steps: Int, move: (Key) -> Unit = ::key) {
+        move(Key.DirectionUp)
+        groupButton().assertIsFocused()
+        move(Key.DirectionCenter)
+        repeat(steps) { move(Key.DirectionDown) }
+        move(Key.DirectionCenter)
+    }
     private fun row(n: Int) = compose.onNodeWithTag("channel-row-$n")
     private fun detail(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true)
 

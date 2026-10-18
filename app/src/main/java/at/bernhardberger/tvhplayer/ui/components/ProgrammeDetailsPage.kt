@@ -674,8 +674,9 @@ private const val DetailsBlurredScrimAlpha = 0.6f
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f
 
+/** The kit's immersive background: top-right 16:9 art under [KitCinematicScrim], or a blurred full-screen copy. */
 @Composable
-private fun DetailsHero(image: ArtworkId?, modifier: Modifier, blurred: Boolean = false, background: State<Color>? = null) {
+internal fun DetailsHero(image: ArtworkId?, modifier: Modifier, blurred: Boolean = false, background: State<Color>? = null) {
     val session = LocalArtworkContext.current.currentSession
     if (image == null || session == null) return
     if (blurred) {

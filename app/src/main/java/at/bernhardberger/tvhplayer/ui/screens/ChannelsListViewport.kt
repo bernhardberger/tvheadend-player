@@ -21,9 +21,6 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 // The shell passes 24dp leading and 32dp top; nominal rows sit 26dp further in
 // (x130 on the 960x540 canvas), including the list's 12dp native focus reserve.
 
-/** Minimum scope band; larger native tabs grow it rather than clipping their text. */
-internal val ChannelsTagSectionHeight = 44.dp
-
 /** Top content reserve inside the list so the first focused row's scale is not clipped. */
 internal val ChannelsListTopReserve = 4.dp
 
