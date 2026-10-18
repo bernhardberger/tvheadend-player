@@ -31,6 +31,7 @@ data class SettingsPlayerUiState(
     val selectedProfileId: StreamProfileId? = null,
     val timeshiftEnabled: Boolean = true,
     val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
+    val tunnelingEnabled: Boolean = false,
     val audioPassthroughEnabled: Boolean = true,
     val audioPassthroughChangeFailed: Boolean = false,
     val keepChannelMinutes: Int = 20,
@@ -63,6 +64,7 @@ class SettingsPlayerViewModel(
             selectedProfileId = selectedProfileId,
             timeshiftEnabled = settings.timeshiftEnabled,
             frameRateSwitching = settings.frameRateSwitching,
+            tunnelingEnabled = settings.tunnelingEnabled,
             audioPassthroughEnabled = settings.audioPassthroughEnabled,
             audioPassthroughChangeFailed = audioPassthroughChangeFailed,
             keepChannelMinutes = settings.keepChannelMinutes,
@@ -115,6 +117,10 @@ class SettingsPlayerViewModel(
             settingsStore.setFrameRateSwitching(switching)
             playbackRuntime.setFrameRateSwitching(switching)
         }
+    }
+
+    fun onTunnelingEnabledChanged(enabled: Boolean) {
+        viewModelScope.launch { settingsStore.setTunnelingEnabled(enabled) }
     }
 
     fun onAudioPassthroughEnabledChanged(enabled: Boolean) {

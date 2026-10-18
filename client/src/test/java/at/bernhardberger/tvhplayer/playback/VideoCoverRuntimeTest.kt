@@ -547,6 +547,82 @@ class VideoCoverRuntimeTest {
             assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
         }
 
+    @Test fun tunneledReadyTargetWithoutFrameReportsUncoversAfterTheFallbackDelay() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            requestTunneling()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            // The codec reports no rendered frame: neither a first frame nor motion.
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS - 1)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            idleFor(1)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun tunneledFallbackDelayStartsAgainWhenTheTargetIsReadyAgain() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            requestTunneling()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS - 1)
+            buffering()
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS * 2)
+            assertFalse("a buffering target stays covered", runtime.videoPresentation.value.visible)
+            playerReady()
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS - 1)
+            assertFalse(runtime.videoPresentation.value.visible)
+            idleFor(1)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun tunnelingTurnedOffDuringTheFallbackDelayKeepsTheCoverUntilThePictureMoves() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            requestTunneling()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS - 1)
+            // No playback state event follows: only the track selection changes.
+            settings.setTunnelingEnabled(false)
+            await { !player.trackSelectionParameters.tunnelingRequested }
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS * 2)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFirstFrame()
+            renderFrames(counters, 0)
+            assertFalse(runtime.videoPresentation.value.visible)
+            renderFrames(counters)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun aPendingTunneledFallbackOfTheReplacedTargetDoesNotUncoverTheNextOne() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            requestTunneling()
+            live()
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS - 1)
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertNotEquals(oldEpoch, epoch)
+            // The replaced target's delay would end now; the next target's own delay just began.
+            idleFor(1)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS - 2)
+            assertFalse(runtime.videoPresentation.value.visible)
+            idleFor(1)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun withoutTunnelingAReadyTargetWithoutAFrameStaysCovered() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            idleFor(TUNNELED_COVER_FALLBACK_MILLIS * 4)
+            assertFalse(runtime.videoPresentation.value.visible)
+        }
+
     @Test fun pausedTargetShowsItsReadyFirstFrameWithoutMotion() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             countVideoFrames()
@@ -979,6 +1055,15 @@ class VideoCoverRuntimeTest {
     private fun renderFrames(counters: DecoderCounters, count: Int = 1) {
         counters.renderedOutputBufferCount += count
         shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(MOTION_POLL_MILLIS))
+    }
+
+    private suspend fun BackgroundPlaybackRuntimeTest.Fixture.requestTunneling() {
+        settings.setTunnelingEnabled(true)
+        await { player.trackSelectionParameters.tunnelingRequested }
+    }
+
+    private fun idleFor(millis: Long) {
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis))
     }
 
     private fun audioTracks() = Tracks(listOf(Tracks.Group(

@@ -121,7 +121,7 @@ class AudioPreferenceUiTest {
         val format = if (locale == "de") "Audioformat" else "Audio format"
         val description = if (locale == "de") "Audiodeskription" else "Audio description"
         key(Key.DirectionCenter)
-        repeat(4) { key(Key.DirectionDown) }
+        repeat(5) { key(Key.DirectionDown) }
         compose.onNodeWithText(first).assertIsFocused()
         capture(view, "$locale-player-font$scale")
         key(Key.DirectionCenter)

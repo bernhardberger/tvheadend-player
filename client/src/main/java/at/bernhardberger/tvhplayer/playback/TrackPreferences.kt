@@ -1,8 +1,11 @@
+@file:androidx.media3.common.util.UnstableApi
+
 package at.bernhardberger.tvhplayer.playback
 
 import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.MimeTypes
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
 import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.normalizeAudioLanguages
@@ -36,3 +39,20 @@ fun trackPreferences(
         }
     }
     .build()
+    .withTunneling(settings.tunnelingEnabled)
+
+/**
+ * The experimental tunnelling request. The default keeps the player's parameters untouched: they
+ * change only when the setting differs from them. Media3 then tunnels only while exactly one audio
+ * and one video renderer have a selection and both support tunnelling for it, so a disabled or
+ * absent audio track plays without tunnelling.
+ */
+internal fun TrackSelectionParameters.withTunneling(enabled: Boolean): TrackSelectionParameters {
+    val parameters = this as? DefaultTrackSelector.Parameters ?: return this
+    if (parameters.tunnelingEnabled == enabled) return this
+    return parameters.buildUpon().setTunnelingEnabled(enabled).build()
+}
+
+/** Whether the player's parameters ask for tunnelling; Media3 does not report whether it is active. */
+internal val TrackSelectionParameters.tunnelingRequested: Boolean
+    get() = (this as? DefaultTrackSelector.Parameters)?.tunnelingEnabled == true

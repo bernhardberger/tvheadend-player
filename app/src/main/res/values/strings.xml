@@ -568,6 +568,8 @@
     <string name="audio_passthrough_description">May briefly interrupt audio.</string>
     <string name="audio_passthrough_failed">Couldn’t apply this mode.</string>
     <string name="refresh_rate_matching_setting_description">Let Android match the display refresh rate to the video when supported.</string>
+    <string name="tunneling_setting">Tunnelled playback (experimental)</string>
+    <string name="tunneling_setting_description">Sends video straight to the TV when the decoder supports it. May briefly interrupt the picture.</string>
 
     <string name="play">Play</string>
     <string name="play_recording">Play recording</string>

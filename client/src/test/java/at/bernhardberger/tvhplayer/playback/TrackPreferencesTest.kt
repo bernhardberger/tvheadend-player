@@ -39,6 +39,19 @@ class TrackPreferencesTest {
         assertEquals(640, mapped.maxVideoWidth)
     }
 
+    @Test fun tunnelingIsUntouchedByDefaultAndFollowsTheExperimentalSetting() {
+        val today = trackPreferences(DefaultTrackSelector.Parameters.DEFAULT, PlayerSettings())
+        assertFalse(today.tunnelingRequested)
+        assertSame(today, today.withTunneling(false))
+        val tunneled = trackPreferences(today, PlayerSettings(listOf("de"), tunnelingEnabled = true))
+        assertTrue((tunneled as DefaultTrackSelector.Parameters).tunnelingEnabled)
+        assertEquals(listOf("de"), tunneled.preferredAudioLanguages)
+        assertSame(tunneled, tunneled.withTunneling(true))
+        val restored = trackPreferences(tunneled, PlayerSettings())
+        assertFalse(restored.tunnelingRequested)
+        assertEquals(today, restored)
+    }
+
     @Test fun automaticRestoresCaptionManagerDelegationAndClearsOwnedAudioPreferences() {
         val prior = defaults.buildUpon().setPreferredTextLanguage("de")
             .setPreferredTextRoleFlags(C.ROLE_FLAG_CAPTION).build()

@@ -6,6 +6,7 @@ import android.os.Handler
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -18,6 +19,13 @@ import kotlinx.coroutines.flow.asStateFlow
 
 /** How often a playing target's covered first frame is checked for a further rendered frame. */
 internal const val MOTION_POLL_MILLIS = 20L
+
+/**
+ * How long a ready target that asks for tunnelled video stays covered without frame evidence.
+ * Tunnelled, Media3 learns of a rendered frame only from the codec's frame-rendered callback,
+ * which a vendor codec may deliver late or never; the cover must not stay black.
+ */
+internal const val TUNNELED_COVER_FALLBACK_MILLIS = 1_500L
 
 /**
  * [AppPlaybackRuntime]'s publication of player state, diagnostics and video presentation, and its
@@ -91,6 +99,25 @@ internal class PlaybackPresentationPublisher(
             }
         }
     }
+
+    // Requested tunnelling only: a ready target of this epoch uncovers after the fallback delay
+    // even without the first-frame and motion evidence the codec may never report.
+    private var tunneledCoverEpoch: Long? = null
+    private val tunneledCoverFallback = Runnable {
+        targetCommands.runIfOpen {
+            val epoch = tunneledCoverEpoch ?: return@runIfOpen
+            tunneledCoverEpoch = null
+            if (targetInstallationInProgress() || presentationBeforeInstall != null || !targetReady) return@runIfOpen
+            if (!player.trackSelectionParameters.tunnelingRequested) return@runIfOpen
+            if (_videoPresentation.value.visible || _videoPresentation.value.epoch != epoch) return@runIfOpen
+            stopMotionWatch()
+            _videoPresentation.value = _videoPresentation.value.onFirstFrame(
+                frameEpoch = epoch,
+                activeTargetEpoch = activeTargetEpoch(),
+            )
+            if (policy.trace.enabled && _videoPresentation.value.visible) policy.trace.videoCoverLifted(epoch)
+        }
+    }
     val diagnostics = _diagnostics.asStateFlow()
     val videoPresentation = _videoPresentation.asStateFlow()
 
@@ -161,6 +188,7 @@ internal class PlaybackPresentationPublisher(
     fun coverVideoForTargetInstallLocked() {
         targetCommands.runIfOpen {
             stopMotionWatch()
+            stopTunneledCoverWatch()
             val current = _videoPresentation.value
             presentationBeforeInstall = current
             staleVideoFormat = player.videoFormat
@@ -198,7 +226,7 @@ internal class PlaybackPresentationPublisher(
                 previous.visible -> previous
                 frameStands() && targetReady ->
                     previous.onFirstFrame(frameEpoch = previous.epoch, activeTargetEpoch = activeTargetEpoch())
-                else -> return@runIfOpen
+                else -> return@runIfOpen watchTunneledCover(previous.epoch)
             }
             _videoPresentation.value = restored
             if (policy.trace.enabled && restored.visible) policy.trace.videoCoverLifted(restored.epoch)
@@ -211,6 +239,7 @@ internal class PlaybackPresentationPublisher(
             targetSoundListener?.let(player::removeAnalyticsListener)
             pendingSoundMillis = null
             stopMotionWatch()
+            stopTunneledCoverWatch()
             _videoPresentation.value = _videoPresentation.value.beginTarget(epoch)
             val staleFormat = staleVideoFormat
             presentationBeforeInstall = null
@@ -246,6 +275,12 @@ internal class PlaybackPresentationPublisher(
                     targetReady = playbackState == Player.STATE_READY
                     if (!targetReady) targetCommands.runIfOpen { pendingSoundMillis = null }
                     if (!targetInstallationInProgress()) liftCoverOnReadyPicture(epoch)
+                }
+
+                // Tunnelling turned off cancels its fallback delay; turned on, a covered ready target starts it.
+                override fun onTrackSelectionParametersChanged(parameters: TrackSelectionParameters) {
+                    if (!targetCommands.isOpen() || targetInstallationInProgress()) return
+                    targetCommands.runIfOpen { if (presentationBeforeInstall == null) watchTunneledCover(epoch) }
                 }
 
                 // A pause shows a ready picture; a play starts watching it for motion. A sound that
@@ -362,6 +397,7 @@ internal class PlaybackPresentationPublisher(
         playing: Boolean = startIntentPending || serverResumePending || player.playWhenReady,
     ) {
         if (presentationBeforeInstall != null) return
+        watchTunneledCover(epoch)
         if (!frameStands() || !targetReady || _videoPresentation.value.visible) return stopMotionWatch()
         if (playing && !pictureAdvanced(epoch)) return
         stopMotionWatch()
@@ -403,6 +439,22 @@ internal class PlaybackPresentationPublisher(
         motionHandler.removeCallbacks(motionPoll)
     }
 
+    /** With tunnelling requested, a covered ready target of [epoch] starts its fallback delay once. */
+    private fun watchTunneledCover(epoch: Long) {
+        if (!targetReady || _videoPresentation.value.visible || !player.trackSelectionParameters.tunnelingRequested) {
+            return stopTunneledCoverWatch()
+        }
+        if (tunneledCoverEpoch == epoch) return
+        stopTunneledCoverWatch()
+        tunneledCoverEpoch = epoch
+        motionHandler.postDelayed(tunneledCoverFallback, TUNNELED_COVER_FALLBACK_MILLIS)
+    }
+
+    private fun stopTunneledCoverWatch() {
+        tunneledCoverEpoch = null
+        motionHandler.removeCallbacks(tunneledCoverFallback)
+    }
+
     fun endTargetPresentationLocked(epoch: Long) {
         targetCommands.runIfOpen {
             targetFrameListener?.let(player::removeListener)
@@ -411,6 +463,7 @@ internal class PlaybackPresentationPublisher(
             targetSoundListener = null
             pendingSoundMillis = null
             stopMotionWatch()
+            stopTunneledCoverWatch()
             presentationBeforeInstall = null
             staleVideoFormat = null
             frameDuringInstall = false
@@ -431,6 +484,7 @@ internal class PlaybackPresentationPublisher(
         targetSoundListener = null
         pendingSoundMillis = null
         stopMotionWatch()
+        stopTunneledCoverWatch()
     }
 
     /*

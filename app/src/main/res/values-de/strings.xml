@@ -460,6 +460,8 @@
     <string name="audio_passthrough_description">Kann den Ton kurz unterbrechen.</string>
     <string name="audio_passthrough_failed">Modus konnte nicht übernommen werden.</string>
     <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
+    <string name="tunneling_setting">Tunnel-Wiedergabe (experimentell)</string>
+    <string name="tunneling_setting_description">Leitet das Video direkt an den Fernseher, wenn der Decoder das unterstützt. Kann das Bild kurz unterbrechen.</string>
     <string name="play">Abspielen</string>
     <string name="play_recording">Aufnahme abspielen</string>
 

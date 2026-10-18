@@ -104,7 +104,7 @@ internal fun settingsPlayerLevels(navigation: DepthNavigationState, vm: Settings
     val ui by vm.ui.collectAsStateWithLifecycle()
     return listOf(settingsPlayerLevel(ui, vm::onTimeshiftEnabledChanged,
         vm::onProfileSelected, vm::onAudioPassthroughEnabledChanged, vm::onAudioDescriptionChanged,
-        vm::onAutoStartPlaybackChanged)) +
+        vm::onAutoStartPlaybackChanged, vm::onTunnelingEnabledChanged)) +
         settingsAudioPreferenceLevels(ui,
             onAudioLanguageSelected = { slot, language -> vm.onAudioLanguageSelected(slot, language); navigation.pop() },
             onAudioFormatSelected = { vm.onAudioFormatSelected(it); navigation.pop() },
@@ -119,6 +119,7 @@ internal fun settingsPlayerLevel(
     onAudioPassthroughEnabledChanged: (Boolean) -> Unit,
     onAudioDescriptionChanged: (Boolean) -> Unit = {},
     onAutoStartPlaybackChanged: (Boolean) -> Unit = {},
+    onTunnelingEnabledChanged: (Boolean) -> Unit = {},
 ): DepthLevel {
     val direct = stringResource(R.string.profile_direct_streaming)
     val profileSection = stringResource(R.string.profile)
@@ -129,6 +130,9 @@ internal fun settingsPlayerLevel(
             onClick = { onTimeshiftEnabledChanged(!ui.timeshiftEnabled) }))
         add(settingsRow(FRAME_RATE_LEVEL, stringResource(R.string.refresh_rate_matching_setting),
             frameRateSwitchingLabel(ui.frameRateSwitching), child = FRAME_RATE_LEVEL))
+        add(settingsRow("tunneling", stringResource(R.string.tunneling_setting),
+            supporting = stringResource(R.string.tunneling_setting_description), checked = ui.tunnelingEnabled,
+            onClick = { onTunnelingEnabledChanged(!ui.tunnelingEnabled) }))
         add(settingsRow("audio-passthrough", stringResource(R.string.audio_passthrough_setting),
             supporting = if (ui.audioPassthroughChangeFailed) stringResource(R.string.audio_passthrough_failed)
                 else stringResource(R.string.audio_passthrough_description), checked = ui.audioPassthroughEnabled,

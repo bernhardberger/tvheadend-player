@@ -79,6 +79,8 @@ data class PlayerSettings(
     val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
     val timeshiftEnabled: Boolean = true,
     val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
+    /** Experimental: asks Media3 for tunnelled video when both selected renderers support it. */
+    val tunnelingEnabled: Boolean = false,
     val audioPassthroughEnabled: Boolean = true,
     val keepChannelMinutes: Int = 20,
     /** Live start-up buffer in milliseconds; [STARTUP_BUFFER_AUTOMATIC] learns it per server. */
@@ -129,6 +131,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
         val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
         val FRAME_RATE_SWITCHING = stringPreferencesKey("frameRateSwitching")
+        val TUNNELING_ENABLED = booleanPreferencesKey("tunnelingEnabled")
         val AUDIO_PASSTHROUGH_ENABLED = booleanPreferencesKey("audioPassthroughEnabled")
         val KEEP_CHANNEL_MINUTES = intPreferencesKey("keepChannelMinutes")
         val STARTUP_BUFFER_MILLIS = intPreferencesKey("startupBufferMillis")
@@ -205,6 +208,10 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
 
     suspend fun setFrameRateSwitching(switching: FrameRateSwitching) {
         dataStore.edit { it[Keys.FRAME_RATE_SWITCHING] = switching.name }
+    }
+
+    suspend fun setTunnelingEnabled(enabled: Boolean) {
+        dataStore.edit { it[Keys.TUNNELING_ENABLED] = enabled }
     }
 
     suspend fun setAudioPassthroughEnabled(enabled: Boolean) {
@@ -290,6 +297,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 aspectRatio = aspect,
                 timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
                 frameRateSwitching = resolveFrameRateSwitching(p[Keys.FRAME_RATE_SWITCHING]),
+                tunnelingEnabled = p[Keys.TUNNELING_ENABLED] ?: false,
                 audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
                 keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in listOf(0, 10, 20, 30) } ?: 20,
                 startupBufferMillis = p[Keys.STARTUP_BUFFER_MILLIS]

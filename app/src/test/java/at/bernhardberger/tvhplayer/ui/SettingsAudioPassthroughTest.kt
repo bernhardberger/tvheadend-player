@@ -73,9 +73,7 @@ class SettingsAudioPassthroughTest {
         }
         compose.onNodeWithText("Open player").assertIsFocused()
         key(Key.DirectionCenter)
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
+        repeat(4) { key(Key.DirectionDown) }
         compose.onNodeWithText(label).assertIsDisplayed().assertIsFocused().assertIsOn()
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
