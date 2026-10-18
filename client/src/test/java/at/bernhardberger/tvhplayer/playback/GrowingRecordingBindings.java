@@ -29,6 +29,7 @@ final class GrowingRecordingBindings {
             continuation -> new RecordingFileResult.Failed(TvheadendFailure.NOT_SUPPORTED),
             () -> new RecordingFileResult.Ok<>(lease),
             (growingLease, progress, continuation) -> DvrProgressResult.Accepted.INSTANCE,
-            continuation -> new DvrCutpointsResult.Failed(TvheadendFailure.NOT_READY)));
+            continuation -> new DvrCutpointsResult.Failed(TvheadendFailure.NOT_READY),
+            () -> null));
     }
 }

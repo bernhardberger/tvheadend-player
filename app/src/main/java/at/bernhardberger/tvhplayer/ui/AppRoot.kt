@@ -68,6 +68,7 @@ import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
 import at.bernhardberger.tvhplayer.ui.startup.rememberColdStart
@@ -1113,8 +1114,7 @@ fun AppRoot(
                         instant = applianceLaunchActive || !ValueAnimator.areAnimatorsEnabled(),
                     ),
                     // Browse screens over warm playback leave the TV in its own mode.
-                    frameRate = requestedFrameRate.rate.takeIf { isPlayer },
-                    frameRateMedia3Votes = requestedFrameRate.media3Votes,
+                    frameRate = if (isPlayer) requestedFrameRate else SurfaceFrameRateRequest(),
                 )
             }
         },

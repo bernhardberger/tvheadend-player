@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -37,6 +38,7 @@ import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.ui.common.formatHms
 import java.util.Locale
+import kotlin.time.DurationUnit
 
 /** Stats appear over 150 ms and leave over 100 ms, dropping semantics at once. */
 @Composable
@@ -65,7 +67,6 @@ internal fun PlaybackStatsOverlay(
     frameRate: PlaybackFrameRate? = null,
 ) {
     val locale = Locale.ROOT
-    val measuredFrameRate = rememberMeasuredFrameRate(frameRate)
     val video = diagnostics.video
     val audio = diagnostics.audio
     val live = diagnostics.live
@@ -157,20 +158,12 @@ internal fun PlaybackStatsOverlay(
                         video?.resolution,
                         video?.frameRate?.let {
                             stringResource(R.string.stats_frame_rate, it.oneDecimal(locale))
-                        } ?: measuredFrameRate?.let { measured ->
-                            listOfNotNull(
-                                measured.framesPerSecond?.let {
-                                    stringResource(R.string.stats_frame_rate_measured, formatRefreshRate(it))
-                                },
-                                measured.sameTimePercent?.let {
-                                    stringResource(R.string.stats_same_time_frames, it)
-                                },
-                            ).joinToString(" · ").ifEmpty { null }
                         },
                     ).joinToString(" · ").ifBlank {
                         stringResource(R.string.stats_unavailable)
                     },
                 )
+                frameRate?.let { FrameRateStatLine(it) }
                 StatLine(
                     stringResource(R.string.stats_audio),
                     listOfNotNull(
@@ -311,15 +304,45 @@ internal fun PlaybackStatsOverlay(
     }
 }
 
+/** The declared frame duration that drives the display request, and the measured rate for diagnosis. */
+@Composable
+private fun FrameRateStatLine(frameRate: PlaybackFrameRate) {
+    val declared by frameRate.declared.collectAsStateWithLifecycle()
+    val measured = rememberMeasuredFrameRate(frameRate)
+    StatLine(
+        stringResource(R.string.stats_frame_rate_label),
+        listOfNotNull(
+            declared?.let {
+                stringResource(
+                    R.string.stats_frame_rate_declared,
+                    formatFrameDurationMillis(it),
+                    formatRefreshRate((1.0 / it.toDouble(DurationUnit.SECONDS)).toFloat()),
+                )
+            } ?: stringResource(R.string.stats_frame_rate_declared_none),
+            measured?.framesPerSecond?.let {
+                stringResource(R.string.stats_frame_rate_measured, formatRefreshRate(it))
+            } ?: stringResource(R.string.stats_frame_rate_measured_none),
+            measured?.sameTimePercent?.let { stringResource(R.string.stats_same_time_frames, it) },
+        ).joinToString(" · "),
+    )
+}
+
 @Composable
 private fun DisplayOutputStatLines(frameRate: PlaybackFrameRate?) {
     val output = rememberDisplayOutput() ?: return
     val requested = frameRate?.requested?.collectAsStateWithLifecycle()?.value?.rate
+    // A rate requested while nothing is declared is kept from an earlier declaration.
+    val kept = frameRate?.declared?.collectAsStateWithLifecycle()?.value == null
     StatLine(
         stringResource(R.string.stats_output),
         listOfNotNull(
             stringResource(R.string.stats_output_value, output.width, output.height, output.refreshRate),
-            requested?.let { stringResource(R.string.stats_output_requested, formatRefreshRate(it)) },
+            requested?.let {
+                stringResource(
+                    if (kept) R.string.stats_output_requested_kept else R.string.stats_output_requested,
+                    formatRefreshRate(it),
+                )
+            },
         ).joinToString(" · "),
     )
     if (output.refreshRatesByResolution.isNotEmpty()) {

@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.profiling
 
 import at.bernhardberger.tvhplayer.client.BuildConfig
+import kotlin.time.Duration
 
 /**
  * One marker per frame about to be rendered, with the presentation and release time spacing to
@@ -27,3 +28,7 @@ internal class ProfileVideoFrameTrace {
 /** Parsed by trace tooling; both deltas in microseconds and may be zero or negative. */
 internal fun videoFrameMarker(presentationDeltaUs: Long, releaseDeltaUs: Long): String =
     "P44:frame:pts:$presentationDeltaUs:release:$releaseDeltaUs"
+
+/** Parsed by trace tooling: the declared frame duration in microseconds, or none. */
+internal fun declaredFrameDurationMarker(duration: Duration?): String =
+    "P44:frame:declared:${duration?.inWholeMicroseconds ?: "none"}"

@@ -4,12 +4,15 @@ import android.os.Build
 import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
+import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateChange
+import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateVote
 
 /**
- * Asks the display for the video's frame rate on the player's SurfaceView, switching modes even
- * when that is not seamless. Main thread only: [request] from composition, the holder callbacks
- * from the view. A recreated surface gets the request again; a destroyed one and [release] clear it.
+ * Asks the display for the video's frame rate on the player's SurfaceView, the only vote on it
+ * (Media3's change strategy is Off). Main thread only: [request] from composition, the holder
+ * callbacks from the view. A recreated surface gets the request again; a destroyed one and
+ * [release] clear it.
  */
 internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
     private val vote = SurfaceFrameRateVote()
@@ -22,9 +25,8 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
         if (surfaceHolder.surface?.isValid == true) apply(surfaceHolder, vote.surfaceCreated())
     }
 
-    /** [rate] in Hz, or null for no request; [media3Votes]: see [SurfaceFrameRateVote.request]. */
-    fun request(rate: Float?, media3Votes: Boolean) {
-        holder?.let { apply(it, vote.request(rate, media3Votes)) }
+    fun request(request: SurfaceFrameRateRequest) {
+        holder?.let { apply(it, vote.request(request)) }
     }
 
     fun release() {
@@ -40,15 +42,26 @@ internal class VideoSurfaceFrameRate : SurfaceHolder.Callback {
 
     override fun surfaceDestroyed(holder: SurfaceHolder) = apply(holder, vote.surfaceDestroyed())
 
-    private fun apply(holder: SurfaceHolder, rate: Float?) {
-        if (rate == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+    /** Sets [request] on the surface; one without a rate clears the vote. */
+    private fun apply(holder: SurfaceHolder, request: SurfaceFrameRateRequest?) {
+        if (request == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         val surface = holder.surface?.takeIf { it.isValid } ?: return
+        val rate = request.rate
         try {
-            surface.setFrameRate(
-                rate,
-                if (rate == 0f) Surface.FRAME_RATE_COMPATIBILITY_DEFAULT else Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
-                Surface.CHANGE_FRAME_RATE_ALWAYS,
-            )
+            when {
+                rate == null -> surface.setFrameRate(0f, Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && request.change != SurfaceFrameRateChange.SEAMLESS_DEFAULT ->
+                    surface.setFrameRate(
+                        rate,
+                        Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
+                        if (request.change == SurfaceFrameRateChange.ALWAYS) {
+                            Surface.CHANGE_FRAME_RATE_ALWAYS
+                        } else {
+                            Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS
+                        },
+                    )
+                else -> surface.setFrameRate(rate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE)
+            }
         } catch (_: IllegalStateException) {
             // The surface went away meanwhile; its vote went with it.
         } catch (_: IllegalArgumentException) {

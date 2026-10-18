@@ -2,7 +2,6 @@
 
 package at.bernhardberger.tvhplayer.playback
 
-import android.os.Build
 import androidx.media3.common.C
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.ExoPlayer
@@ -139,12 +138,7 @@ internal class PlaybackAudioTracks(
     }
 
     fun setFrameRateSwitching(switching: FrameRateSwitching) {
-        targetCommands.runIfOpen { applyFrameRateSwitching(switching) }
-    }
-
-    private fun applyFrameRateSwitching(switching: FrameRateSwitching) {
-        player.setVideoChangeFrameRateStrategy(media3FrameRateStrategy(switching, Build.VERSION.SDK_INT))
-        frameRate.setSwitching(switching)
+        targetCommands.runIfOpen { frameRate.setSwitching(switching) }
     }
 
     fun configureAudioOutputBeforeFirstTargetLocked(value: PlayerSettings) {
@@ -208,7 +202,7 @@ internal class PlaybackAudioTracks(
             player.trackSelectionParameters = trackPreferences(
                 player.trackSelectionParameters, value,
             )
-            applyFrameRateSwitching(value.frameRateSwitching)
+            frameRate.setSwitching(value.frameRateSwitching)
         }
     }
 }

@@ -33,6 +33,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import at.bernhardberger.tvhplayer.core.shouldKeepPlaybackScreenOn
+import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 
 @OptIn(UnstableApi::class)
@@ -45,10 +46,8 @@ fun PlayerVideoSurface(
     debugVideoBackdropVisible: Boolean = false,
     /** How long the black cover takes to clear a first picture; 0 removes it at once. */
     coverFadeMillis: Int = 0,
-    /** Display rate to ask for in Hz while the player is shown, or null for none. */
-    frameRate: Float? = null,
-    /** Media3 votes on the surface itself, so a withdrawn [frameRate] is not cleared over it. */
-    frameRateMedia3Votes: Boolean = false,
+    /** Display rate to ask for while the player is shown; one without a rate asks for none. */
+    frameRate: SurfaceFrameRateRequest = SurfaceFrameRateRequest(),
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     val surfaceFrameRate = remember { VideoSurfaceFrameRate() }
@@ -95,7 +94,7 @@ fun PlayerVideoSurface(
             update = { view ->
                 view.player = player
                 view.keepScreenOn = keepScreenOn
-                surfaceFrameRate.request(frameRate, frameRateMedia3Votes)
+                surfaceFrameRate.request(frameRate)
                 view.alpha = if (videoVisible) 1f else 0f
                 view.resizeMode = when (aspectRatio) {
                     AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT

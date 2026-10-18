@@ -312,6 +312,14 @@ class AppPlaybackRuntime(
         }
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
+    private val declaredVideoFrameDuration = coordinator.declaredVideoFrameDuration
+
+    /** The server's declared frame duration is the display rate request's only source. */
+    private val declaredFrameDurationJob = scope.launch {
+        declaredVideoFrameDuration.collect(frameRate::onDeclared)
+    }
+
     private val livePlaybackObservationJob = scope.launch {
         livePlaybackObservation.collect { observation ->
             val observedEpoch = activeTargetEpoch
@@ -375,6 +383,9 @@ class AppPlaybackRuntime(
             // Known tracks without video (radio): nothing to request. Empty tracks during a zap keep the rate.
             if (tracks.groups.isNotEmpty() && !tracks.containsType(androidx.media3.common.C.TRACK_TYPE_VIDEO)) {
                 frameRate.reset()
+            } else if (tracks.containsType(androidx.media3.common.C.TRACK_TYPE_VIDEO)) {
+                // Video again after a reset: the declaration may be unchanged, so the flow says nothing.
+                frameRate.onDeclared(declaredVideoFrameDuration.value)
             }
             if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTracksChanged()
         }
@@ -410,6 +421,8 @@ class AppPlaybackRuntime(
     init {
         targetCommands.runIfOpen {
             player.addListener(listener)
+            // The app votes on the video surface itself (PlayerVideoSurface); Media3 never does.
+            player.setVideoChangeFrameRateStrategy(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF)
             player.setVideoFrameMetadataListener(frameRate.listener)
             presentation.seekDiagnosticsListener?.let(player::addAnalyticsListener)
         }
@@ -1778,9 +1791,11 @@ class AppPlaybackRuntime(
         val pendingRecovery = liveRecovery.cancelOnDetach()
         livePlaybackObservationJob.cancel()
         settingsJob.cancel()
+        declaredFrameDurationJob.cancel()
         pendingRecovery?.join()
         livePlaybackObservationJob.join()
         settingsJob.join()
+        declaredFrameDurationJob.join()
         targetCommands.awaitIdle {
             recordingRecovery = null
             livePauseController.dropPendingLivePauseLocked()

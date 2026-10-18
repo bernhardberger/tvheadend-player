@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.playback.PlaybackFrameRate
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.time.Duration
 import kotlinx.coroutines.delay
 
 internal enum class MatchFrameRatePreference { NEVER, SEAMLESS_ONLY, ALWAYS }
@@ -42,6 +43,10 @@ internal fun formatRefreshRate(hz: Float): String {
     if (abs(hz - whole) < 0.02f) return whole.toString()
     return String.format(Locale.ROOT, "%.2f", hz).trimEnd('0')
 }
+
+/** A declared frame duration in milliseconds, to the microsecond: "40", "33.367". */
+internal fun formatFrameDurationMillis(duration: Duration): String =
+    String.format(Locale.ROOT, "%.3f", duration.inWholeMicroseconds / 1_000.0).trimEnd('0').trimEnd('.')
 
 /**
  * Every rate the display offers, grouped by resolution, largest first: "2160p: 30 · 60 / 1080p:

@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.ui.player
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.milliseconds
 
 class PlaybackStatsDisplayTest {
     @Test
@@ -13,6 +15,13 @@ class PlaybackStatsDisplayTest {
         assertEquals("23.98", formatRefreshRate(23.976f))
         assertEquals("29.97", formatRefreshRate(29.97f))
         assertEquals("90.5", formatRefreshRate(90.5f))
+    }
+
+    @Test
+    fun declaredFrameDurationsPrintInMillisecondsToTheMicrosecond() {
+        assertEquals("40", formatFrameDurationMillis(40.milliseconds))
+        assertEquals("33.367", formatFrameDurationMillis(33_367.microseconds))
+        assertEquals("41.7", formatFrameDurationMillis(41_700.microseconds))
     }
 
     @Test

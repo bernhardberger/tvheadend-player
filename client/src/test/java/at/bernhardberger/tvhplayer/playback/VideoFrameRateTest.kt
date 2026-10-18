@@ -1,11 +1,13 @@
 package at.bernhardberger.tvhplayer.playback
 
-import androidx.media3.common.C
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
 import at.bernhardberger.tvhplayer.settings.resolveFrameRateSwitching
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.microseconds
+import kotlin.time.Duration.Companion.milliseconds
 
 class VideoFrameRateTest {
     @Test
@@ -104,44 +106,44 @@ class VideoFrameRateTest {
     }
 
     @Test
-    fun aRateBecomesStableOnlyAfterHoldingAndAZapKeepsItUntilTheNewOneHolds() {
-        val stable = StableFrameRate(requiredFrames = 4)
-        repeat(3) { assertNull(stable.offer(50f)) }
-        assertNull(stable.stable)
-        assertEquals(50f, stable.offer(50f))
-        assertEquals(50f, stable.stable)
-
-        // A zap: unmeasurable frames and a short run of another rate keep 50.
-        assertNull(stable.offer(null))
-        repeat(3) { assertNull(stable.offer(25f)) }
-        assertNull(stable.offer(50f))
-        assertEquals(50f, stable.stable)
-
-        // The same rate after a zap changes nothing; a held new rate replaces it once.
-        repeat(10) { assertNull(stable.offer(50f)) }
-        repeat(3) { assertNull(stable.offer(25f)) }
-        assertEquals(25f, stable.offer(25f))
-        assertNull(stable.offer(25f))
-
-        stable.reset()
-        assertNull(stable.stable)
+    fun theDisplayCadenceNeverAsksFor25Or30Hz() {
+        assertEquals(50f, displayCadence(25f))
+        assertEquals(59.94f, displayCadence(29.97f))
+        assertEquals(60f, displayCadence(30f))
+        for (rate in listOf(23.976f, 24f, 50f, 59.94f, 60f)) assertEquals(rate, displayCadence(rate))
     }
 
     @Test
-    fun onlyAlwaysOnAndroid12RequestsARateItself() {
-        assertEquals(50f, frameRateRequest(FrameRateSwitching.ALWAYS, 31, 50f))
-        assertNull(frameRateRequest(FrameRateSwitching.ALWAYS, 31, null))
-        assertNull(frameRateRequest(FrameRateSwitching.ALWAYS, 30, 50f))
-        assertNull(frameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 34, 50f))
-        assertNull(frameRateRequest(FrameRateSwitching.OFF, 34, 50f))
+    fun aDeclaredFrameDurationAsksForItsStandardRateAtTheDisplayCadence() {
+        assertEquals(50f, declaredDisplayRate(40.milliseconds))
+        assertEquals(50f, declaredDisplayRate(20.milliseconds))
+        assertEquals(59.94f, declaredDisplayRate(33_367.microseconds))
+        assertEquals(23.976f, declaredDisplayRate(41_708.microseconds))
+        assertEquals(60f, declaredDisplayRate(33_333.microseconds))
+        assertEquals(24f, declaredDisplayRate(41_667.microseconds))
+        // Off-standard or nonsense declarations ask for nothing.
+        assertNull(declaredDisplayRate(45.milliseconds))
+        assertNull(declaredDisplayRate(80.milliseconds))
+        assertNull(declaredDisplayRate(Duration.ZERO))
     }
 
     @Test
-    fun media3HandlesSeamlessSwitchesAndAlwaysBelowAndroid12() {
-        assertEquals(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF, media3FrameRateStrategy(FrameRateSwitching.ALWAYS, 31))
-        assertEquals(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS, media3FrameRateStrategy(FrameRateSwitching.ALWAYS, 30))
-        assertEquals(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_ONLY_IF_SEAMLESS, media3FrameRateStrategy(FrameRateSwitching.SEAMLESS_ONLY, 34))
-        assertEquals(C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF, media3FrameRateStrategy(FrameRateSwitching.OFF, 34))
+    fun theSettingAndAndroidVersionDecideHowTheAppVotes() {
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 31, 50f))
+        assertEquals(
+            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS),
+            surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 34, 50f),
+        )
+        // Android 11 has only the seamless two-argument call, whatever the setting.
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 30, 50f))
+        assertEquals(
+            SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT),
+            surfaceFrameRateRequest(FrameRateSwitching.SEAMLESS_ONLY, 30, 50f),
+        )
+        // Off, Android 9 and no rate: no vote.
+        assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.OFF, 34, 50f))
+        assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 28, 50f))
+        assertEquals(SurfaceFrameRateRequest(), surfaceFrameRateRequest(FrameRateSwitching.ALWAYS, 34, null))
     }
 
     @Test
@@ -153,118 +155,106 @@ class VideoFrameRateTest {
     }
 
     @Test
-    fun playbackFrameRateRequestsTheStableRateWhileAlwaysAndForgetsItOnReset() {
-        val frameRate = PlaybackFrameRate(sdkInt = 31, requiredFrames = 4)
-        feed(frameRate::onFrame, frames = 11, spacingUs = 20_000L)
-        assertNull(frameRate.requested.value.rate)
-        frameRate.onFrame(11 * 20_000L)
-        assertEquals(50f, frameRate.requested.value.rate)
+    fun aDeclarationIsRequestedAtOnceKeptThroughAGapReplacedByTheNextAndClearedOnReset() {
+        val frameRate = PlaybackFrameRate(sdkInt = 31)
+        frameRate.onDeclared(40.milliseconds)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), frameRate.requested.value)
+        assertEquals(40.milliseconds, frameRate.declared.value)
 
-        frameRate.setSwitching(FrameRateSwitching.SEAMLESS_ONLY)
-        assertNull(frameRate.requested.value.rate)
-        frameRate.setSwitching(FrameRateSwitching.ALWAYS)
+        // A live restart gap keeps the display where it is.
+        frameRate.onDeclared(null)
         assertEquals(50f, frameRate.requested.value.rate)
+        assertNull(frameRate.declared.value)
 
+        frameRate.onDeclared(41_708.microseconds)
+        assertEquals(23.976f, frameRate.requested.value.rate)
+        // An off-standard declaration replaces it with no request.
+        frameRate.onDeclared(45.milliseconds)
+        assertNull(frameRate.requested.value.rate)
+
+        frameRate.onDeclared(20.milliseconds)
         frameRate.reset()
+        assertEquals(SurfaceFrameRateRequest(), frameRate.requested.value)
+        frameRate.onDeclared(null)
         assertNull(frameRate.requested.value.rate)
+    }
+
+    @Test
+    fun theSettingChangesHowTheDeclaredRateIsAskedFor() {
+        val frameRate = PlaybackFrameRate(sdkInt = 31)
+        frameRate.onDeclared(40.milliseconds)
+        frameRate.setSwitching(FrameRateSwitching.SEAMLESS_ONLY)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS), frameRate.requested.value)
+        frameRate.setSwitching(FrameRateSwitching.OFF)
+        assertEquals(SurfaceFrameRateRequest(), frameRate.requested.value)
+        frameRate.setSwitching(FrameRateSwitching.ALWAYS)
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), frameRate.requested.value)
+
+        val android11 = PlaybackFrameRate(sdkInt = 30).apply { onDeclared(40.milliseconds) }
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.SEAMLESS_DEFAULT), android11.requested.value)
+        val android9 = PlaybackFrameRate(sdkInt = 28).apply { onDeclared(40.milliseconds) }
+        assertEquals(SurfaceFrameRateRequest(), android9.requested.value)
+    }
+
+    @Test
+    fun releasedFramesAreMeasuredButRequestNothing() {
+        val frameRate = PlaybackFrameRate(sdkInt = 31)
+        feed(frameRate::onFrame, frames = 80, spacingUs = 20_000L)
+        assertEquals(50f, frameRate.measured()!!, 0.01f)
+        assertNull(frameRate.requested.value.rate)
+        frameRate.reset()
         assertNull(frameRate.measured())
     }
 
     @Test
-    fun aRequestWithdrawnForMedia3IsForgottenWithoutClearingItsVote() {
-        val vote = SurfaceFrameRateVote()
-        vote.surfaceCreated()
-        assertEquals(50f, vote.request(50f))
-        // Media3 replaced the vote when it took over: clearing now would erase Media3's.
-        assertNull(vote.request(null, media3Votes = true))
-        assertNull(vote.request(null, media3Votes = true))
-        // Back to the app: it asks again rather than assuming its old vote survived.
-        assertEquals(50f, vote.request(50f))
-        // Withdrawn without Media3 taking over: cleared.
-        assertEquals(0f, vote.request(null))
-    }
-
-    @Test
-    fun aSurfaceHandedBackFromMedia3WithoutARateIsCleared() {
-        // Always → seamless only → Off: Media3 leaves its last vote while Off.
-        val off = SurfaceFrameRateVote()
-        off.surfaceCreated()
-        assertEquals(50f, off.request(50f))
-        assertNull(off.request(null, media3Votes = true))
-        assertEquals(0f, off.request(null))
-        assertNull(off.request(null))
-
-        // Seamless only → Always before the app has a rate.
-        val always = SurfaceFrameRateVote()
-        always.surfaceCreated()
-        assertNull(always.request(null, media3Votes = true))
-        assertEquals(0f, always.request(null))
-
-        // A surface created while Media3 owns it carries Media3's vote too.
-        val recreated = SurfaceFrameRateVote()
-        assertNull(recreated.request(null, media3Votes = true))
-        assertNull(recreated.surfaceCreated())
-        assertEquals(0f, recreated.request(null))
-    }
-
-    @Test
-    fun aSurfaceHandedBackFromMedia3WithARateVotesIt() {
-        val vote = SurfaceFrameRateVote()
-        vote.surfaceCreated()
-        assertNull(vote.request(null, media3Votes = true))
-        assertEquals(25f, vote.request(25f))
-        assertNull(vote.request(25f))
-    }
-
-    @Test
-    fun releasingASurfaceMedia3VotesOnLeavesItsVote() {
-        val vote = SurfaceFrameRateVote()
-        vote.surfaceCreated()
-        assertNull(vote.request(null, media3Votes = true))
-        assertNull(vote.release())
-    }
-
-    @Test
-    fun theRequestCarriesWhetherMedia3VotesOnTheSurface() {
+    fun aClosedFrameRateIgnoresLaterDeclarationsAndFrames() {
         val frameRate = PlaybackFrameRate(sdkInt = 31)
-        frameRate.setSwitching(FrameRateSwitching.ALWAYS)
-        assertEquals(SurfaceFrameRateRequest(null, media3Votes = false), frameRate.requested.value)
-        frameRate.setSwitching(FrameRateSwitching.SEAMLESS_ONLY)
-        // The rate stays null, yet the owner change is a new value collectors see.
-        assertEquals(SurfaceFrameRateRequest(null, media3Votes = true), frameRate.requested.value)
-        frameRate.setSwitching(FrameRateSwitching.OFF)
-        assertEquals(SurfaceFrameRateRequest(null, media3Votes = false), frameRate.requested.value)
-    }
-
-    @Test
-    fun aClosedFrameRateIgnoresLaterFrames() {
-        val frameRate = PlaybackFrameRate(sdkInt = 31, requiredFrames = 4)
-        feed(frameRate::onFrame, frames = 12, spacingUs = 20_000L)
-        assertEquals(50f, frameRate.requested.value.rate)
+        frameRate.onDeclared(40.milliseconds)
         frameRate.close()
-        assertNull(frameRate.requested.value.rate)
-        feed(frameRate::onFrame, frames = 12, spacingUs = 20_000L, startUs = 1_000_000L)
-        assertNull(frameRate.requested.value.rate)
+        assertEquals(SurfaceFrameRateRequest(), frameRate.requested.value)
+        assertNull(frameRate.declared.value)
+        frameRate.onDeclared(20.milliseconds)
+        feed(frameRate::onFrame, frames = 12, spacingUs = 20_000L)
+        assertEquals(SurfaceFrameRateRequest(), frameRate.requested.value)
         assertNull(frameRate.measured())
     }
 
     @Test
     fun aSurfaceVoteIsSetOnceClearedOnDemandAndRenewedOnARecreatedSurface() {
         val vote = SurfaceFrameRateVote()
+        val fifty = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS)
+        val twentyFive = SurfaceFrameRateRequest(25f, SurfaceFrameRateChange.ALWAYS)
         // No surface yet: nothing to set until it exists.
-        assertNull(vote.request(50f))
-        assertEquals(50f, vote.surfaceCreated())
-        assertNull(vote.request(50f))
-        assertEquals(25f, vote.request(25f))
+        assertNull(vote.request(fifty))
+        assertEquals(fifty, vote.surfaceCreated())
+        assertNull(vote.request(fifty))
+        assertEquals(twentyFive, vote.request(twentyFive))
 
-        assertEquals(0f, vote.surfaceDestroyed())
-        assertNull(vote.request(50f))
-        assertEquals(50f, vote.surfaceCreated())
+        // A destroyed surface clears its vote; a recreated one gets the request again.
+        assertEquals(SurfaceFrameRateRequest(), vote.surfaceDestroyed())
+        assertNull(vote.request(fifty))
+        assertEquals(fifty, vote.surfaceCreated())
 
-        assertEquals(0f, vote.request(null))
-        assertNull(vote.request(null))
+        assertEquals(SurfaceFrameRateRequest(), vote.request(SurfaceFrameRateRequest()))
+        assertNull(vote.request(SurfaceFrameRateRequest()))
         assertNull(vote.surfaceDestroyed())
         assertNull(vote.surfaceCreated())
+    }
+
+    @Test
+    fun aChangedStrategyVotesAgainAndOffOrReleaseClearsTheVote() {
+        val vote = SurfaceFrameRateVote()
+        vote.surfaceCreated()
+        assertEquals(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS), vote.request(SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ALWAYS)))
+        // Same rate, seamless only now: the surface gets the new strategy.
+        val seamless = SurfaceFrameRateRequest(50f, SurfaceFrameRateChange.ONLY_IF_SEAMLESS)
+        assertEquals(seamless, vote.request(seamless))
+        // Off: the app's earlier vote is cleared; nothing else votes on the surface.
+        assertEquals(SurfaceFrameRateRequest(), vote.request(SurfaceFrameRateRequest()))
+
+        vote.request(seamless)
+        assertEquals(SurfaceFrameRateRequest(), vote.release())
+        assertNull(vote.release())
     }
 
     private fun feed(onFrame: (Long) -> Unit, frames: Int, spacingUs: Long, startUs: Long = 0L) {

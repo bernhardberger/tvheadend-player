@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
+import kotlin.time.Duration.Companion.milliseconds
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -820,37 +821,81 @@ class BackgroundPlaybackRuntimeTest {
         return release
     }
 
-    @Test fun frameRateIsRequestedForVideoAndForgottenForRadioAndStop() = exercise {
-        live()
+    @Test fun theDeclaredFrameDurationIsRequestedAndForgottenForRadioAndStop() = exercise {
+        // Media3 never votes on the surface: the app's request is the only one.
+        assertEquals(androidx.media3.common.C.VIDEO_CHANGE_FRAME_RATE_STRATEGY_OFF, player.videoChangeFrameRateStrategy)
+        live(frameDurationUs = 40_000L)
+        await { runtime.frameRate.requested.value.rate == 50f }
+        assertEquals(40.milliseconds, runtime.frameRate.declared.value)
+        // Frames are measured for the stats only.
         renderFrames(spacingUs = 20_000L)
         assertEquals(50f, runtime.frameRate.requested.value.rate)
 
         // The same target's known tracks turn out audio-only (radio): nothing to ask for.
         playerListeners.toList().forEach { it.onTracksChanged(audioOnlyTracks()) }
         assertNull(runtime.frameRate.requested.value.rate)
+        // Video again under the unchanged declaration: the request returns without a new value.
+        playerListeners.toList().forEach { it.onTracksChanged(videoTracks()) }
+        assertEquals(50f, runtime.frameRate.requested.value.rate)
 
-        renderFrames(spacingUs = 40_000L, startUs = 10_000_000L)
-        assertEquals(25f, runtime.frameRate.requested.value.rate)
         val stopped = scope.async { runtime.stop() }
         await { stopped.isCompleted }
         assertNull(runtime.frameRate.requested.value.rate)
     }
 
-    @Test fun detachRemovesTheFrameListenerAndForgetsTheRequest() = exercise {
-        live()
+    @Test fun detachStopsTheDeclarationsAndForgetsTheRequest() = exercise {
+        live(frameDurationUs = 33_367L)
+        await { runtime.frameRate.requested.value.rate == 59.94f }
         val installed = requireNotNull(frameListener)
-        renderFrames(spacingUs = 20_000L)
-        assertEquals(50f, runtime.frameRate.requested.value.rate)
 
         val detach = scope.async { runtime.detach() }
         await { detach.isCompleted }
         assertNull(frameListener)
-        assertNull(runtime.frameRate.requested.value.rate)
+        assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
+        assertNull(runtime.frameRate.declared.value)
 
         // A frame the player still delivers to the old listener changes nothing.
         renderFrames(spacingUs = 20_000L, startUs = 10_000_000L, listener = installed)
-        assertNull(runtime.frameRate.requested.value.rate)
         assertNull(runtime.frameRate.measured())
+        assertEquals(SurfaceFrameRateRequest(), runtime.frameRate.requested.value)
+    }
+
+    @Test fun aDeclarationGoneThroughALiveRestartGapKeepsTheRequest() = exercise {
+        live(frameDurationUs = 40_000L)
+        await { runtime.frameRate.requested.value.rate == 50f }
+        // The stream turns over and its new tracks declare nothing yet.
+        startSubscription(frameDurationUs = null)
+        await { runtime.frameRate.declared.value == null }
+        settle()
+        assertEquals(50f, runtime.frameRate.requested.value.rate)
+        startSubscription(frameDurationUs = 40_000L)
+        await { runtime.frameRate.declared.value == 40.milliseconds }
+        settle()
+        assertEquals(50f, runtime.frameRate.requested.value.rate)
+    }
+
+    @Test fun aReplacementThatDeclaresNothingKeepsTheRequestUntilAnotherDeclares() = exercise {
+        live(frameDurationUs = 40_000L)
+        await { runtime.frameRate.requested.value.rate == 50f }
+        // A zap between channels of one rate must not switch the display twice.
+        live(channel = 2)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertNull(runtime.frameRate.declared.value)
+        assertEquals(50f, runtime.frameRate.requested.value.rate)
+        live(channel = 1, frameDurationUs = 33_367L)
+        await { runtime.frameRate.requested.value.rate == 59.94f }
+    }
+
+    @Test fun aRecordingsDeclaredFrameDurationIsRequested() = exercise {
+        val install = scope.async {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, RECORDING)),
+                RecordingPlaybackStart.START_OVER)
+        }
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        await { runtime.frameRate.requested.value.rate == 50f }
+        assertEquals(20.milliseconds, runtime.frameRate.declared.value)
     }
 
     private fun audioOnlyTracks() = androidx.media3.common.Tracks(listOf(androidx.media3.common.Tracks.Group(
@@ -862,9 +907,20 @@ class BackgroundPlaybackRuntimeTest {
         booleanArrayOf(true),
     )))
 
+    private fun videoTracks() = androidx.media3.common.Tracks(listOf(androidx.media3.common.Tracks.Group(
+        androidx.media3.common.TrackGroup(
+            androidx.media3.common.Format.Builder().setSampleMimeType(androidx.media3.common.MimeTypes.VIDEO_H264).build(),
+        ),
+        false,
+        intArrayOf(androidx.media3.common.C.FORMAT_HANDLED),
+        booleanArrayOf(true),
+    )))
+
     private fun exercise(block: suspend Fixture.() -> Unit) = exercise(PlaybackRuntimePolicy.fromPlayerSettings(), block)
 
     companion object {
+        val RECORDING = DvrEntryId(1)
+
         /** Shared with [PlaybackRuntimePolicyTest] so host policies run against the same runtime fixture. */
         fun exercise(policy: PlaybackRuntimePolicy, block: suspend Fixture.() -> Unit) = runBlocking {
             val fixture = Fixture(policy)
@@ -937,8 +993,8 @@ class BackgroundPlaybackRuntimeTest {
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1)), Channel.create(ChannelId(2))))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).apply { scriptLivePlaybackSuccess(manager) }
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording()))),
+        )).apply { scriptLivePlaybackSuccess(manager); scriptRecordingPlaybackSuccess() }
         /** Runs before each settings read; the runtime reads settings after admitting a start. */
         var beforeSettingsRead: suspend () -> Unit = {}
         val settings = PlayerSettingsStore(InMemoryPreferencesDataStore().let { store ->
@@ -1040,7 +1096,12 @@ class BackgroundPlaybackRuntimeTest {
             it == ScriptedSubscriptionCall.SPEED || it == ScriptedSubscriptionCall.PRIORITY
         }
 
-        suspend fun live(channel: Int = 1, timeshift: Boolean = true, beforeStart: () -> Unit = {}) {
+        suspend fun live(
+            channel: Int = 1,
+            timeshift: Boolean = true,
+            frameDurationUs: Long? = null,
+            beforeStart: () -> Unit = {},
+        ) {
             settings.setTimeshiftEnabled(timeshift)
             connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (timeshift) 120 else 0)))
             val previous = connection.subscribeCount
@@ -1052,7 +1113,7 @@ class BackgroundPlaybackRuntimeTest {
             if (connection.subscribeCount > previous) {
                 connection.awaitCollectionRegistered()
                 beforeStart()
-                startSubscription()
+                startSubscription(frameDurationUs)
             }
             await { install.isCompleted }
             assertTrue(install.await()?.isStarted == true)
@@ -1077,14 +1138,21 @@ class BackgroundPlaybackRuntimeTest {
             await { runtime.activeTarget.value != null && player.playWhenReady == playWhenReady }
         }
 
-        suspend fun startSubscription() {
+        suspend fun startSubscription(frameDurationUs: Long? = null) {
             connection.emit(SubscriptionEvent.Started(listOf(
                 SubscriptionStream(index = StreamIndex(1), type = SubscriptionStreamType.H264,
                     language = null, compositionId = null, ancillaryId = null, width = 320, height = 240,
-                    frameDuration = null, aspectNumerator = null, aspectDenominator = null, audioType = null,
+                    frameDuration = frameDurationUs, aspectNumerator = null, aspectDenominator = null, audioType = null,
                     audioVersion = null, channelCount = null, rate = null, rdsUecp = null),
             ), null))
         }
+
+        /** A completed 720p50 recording: its file declares 20 ms frames. */
+        @OptIn(ExperimentalTvheadendApi::class)
+        private fun recording() = DvrEntry.create(id = RECORDING, state = DvrEntryState.COMPLETED,
+            files = listOf(DvrRecordingFile.create(fileId = 1, streams = listOf(
+                DvrRecordingStream(type = SubscriptionStreamType.H264, frameDuration = 20.milliseconds),
+            ))), folder = emptyList())
 
         suspend fun await(predicate: () -> Boolean) {
             withTimeout(5_000) {

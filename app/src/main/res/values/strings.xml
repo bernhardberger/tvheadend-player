@@ -269,7 +269,11 @@
     <string name="stats_video_decoder" translatable="false">Video decoder</string>
     <string name="stats_frames" translatable="false">Frames</string>
     <string name="stats_frame_rate" translatable="false">%1$s fps</string>
-    <string name="stats_frame_rate_measured" translatable="false">%1$s fps (measured)</string>
+    <string name="stats_frame_rate_label" translatable="false">Frame rate</string>
+    <string name="stats_frame_rate_declared" translatable="false">Declared %1$s ms (%2$s fps)</string>
+    <string name="stats_frame_rate_declared_none" translatable="false">Declared none</string>
+    <string name="stats_frame_rate_measured" translatable="false">Measured %1$s fps</string>
+    <string name="stats_frame_rate_measured_none" translatable="false">Measured none</string>
     <string name="stats_same_time_frames" translatable="false">%1$d%% same-time frames</string>
     <string name="stats_frames_value" translatable="false">%1$s rendered · %2$s dropped</string>
     <string name="stats_frames_value_with_percentage" translatable="false">%1$s rendered · %2$s dropped (%3$s%%)</string>
@@ -311,6 +315,7 @@
     <string name="stats_output" translatable="false">Output</string>
     <string name="stats_output_value" translatable="false">%1$d×%2$d · %3$s Hz</string>
     <string name="stats_output_requested" translatable="false">Requested %1$s Hz</string>
+    <string name="stats_output_requested_kept" translatable="false">Requested %1$s Hz (kept)</string>
     <string name="stats_refresh_rates" translatable="false">Refresh rates</string>
     <string name="stats_match_frame_rate" translatable="false">Match frame rate</string>
     <string name="stats_match_frame_rate_never" translatable="false">Never</string>
