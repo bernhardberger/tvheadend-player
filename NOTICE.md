@@ -6,10 +6,12 @@ retains that project's Git history, copyright, and GNU GPL v3 licensing. The
 predecessor project in turn acknowledges ideas and code from
 [TVHClient](https://github.com/rsiebert/TVHClient).
 
-The original application mark uses a cyan rounded diamond, a dark inner core,
-and an orange play triangle. Its palette recalls compatibility with
-[Tvheadend](https://github.com/tvheadend/tvheadend), but it does not reuse the
-Tvheadend logo or its geometry. Tvheadend Player is not affiliated with,
+The original application mark is a cyan diamond aperture on a dark field: an
+orange play triangle inside a transparent aperture, inside a rotated cyan
+square. The rotated square is a nod to the diamond at the center of the
+[Tvheadend](https://github.com/tvheadend/tvheadend) logo, but the four chevrons
+around that diamond are not reproduced, no upstream path geometry is reused, and
+the color roles are inverted. Tvheadend Player is not affiliated with,
 endorsed by, or sponsored by the Tvheadend project. Artwork generation is
 documented in `artwork/README.md`.
 
@@ -31,7 +33,15 @@ grade 0, optical size 24) and the project modifications
 are recorded in `artwork/material-symbols-LICENSE.txt`, which retains the
 upstream Apache License text.
 
-The application uses AndroidX, Jetpack Compose, Compose for TV, Material
+The application consumes the Tvheadend SDK (`at.bernhardberger.tvheadend:sdk-*`,
+[`bernhardberger/tvheadend-sdk`](https://github.com/bernhardberger/tvheadend-sdk))
+and the Tvheadend HTSP client for Kotlin (`at.bernhardberger.tvheadend:htsp`,
+[`bernhardberger/tvheadend-htsp-kotlin`](https://github.com/bernhardberger/tvheadend-htsp-kotlin)),
+both by the same author, independently maintained, unofficial, and published
+under GPL-3.0 on Maven Central. Released SDK source classifiers accompany every
+binary release.
+
+The application also uses AndroidX, Jetpack Compose, Compose for TV, Material
 Components, Media3, Kotlin coroutines, Coil, and Koin. Their own copyright and
 license terms continue to apply; dependency coordinates and exact versions are
 recorded in `gradle/libs.versions.toml`.

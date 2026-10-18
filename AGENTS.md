@@ -1,7 +1,7 @@
-# TVHeadend Player Engineering Guide
+# Tvheadend Player Engineering Guide
 
-TVHeadend Player for TV is an independently developed, public GPLv3 Android TV
-client for TVHeadend. It descends from
+Tvheadend Player is an independently developed, public GPLv3 Android TV
+client for Tvheadend. It descends from
 [`Preclikos/tvhstream`](https://github.com/Preclikos/tvhstream) and preserves
 upstream history, attribution, and a clean path for generic contributions.
 
@@ -55,7 +55,7 @@ entire skill family. Multiple rows apply only when their concerns are affected.
 | Transient user feedback | `docs/DESIGN.md` §8 and `docs/code-ownership.md`; add a typed `Notice` and formatter branch, post to `NoticeCenter`, never a screen-local feedback mechanism |
 | Compose UI, focus, remote keys, accessibility, TV surfaces | `docs/DESIGN.md`; `android-tv-compose-ux`, whose router selects focused mechanics |
 | Channels, EPG, recordings, DVR | `live-tv-dvr-conventions`; the relevant appliance specification/plan sections only when appliance behavior is involved |
-| Appliance launch, HOME, GUIDE, wake, Simple TV | `docs/appliance-mode-spec.md`, relevant sections of `docs/appliance-mode-plan.md` |
+| Appliance build: launch, HOME, GUIDE, wake | `docs/appliance-mode-spec.md` |
 | Media3, HTSP, PlayerView, codecs, native AARs | `media3-htsp-playback-safety`; native provenance references only for dependency/native work; dated assessments only for a named upgrade/finding |
 | SDK adoption or app/SDK contract diagnosis | `tvheadend-sdk-adoption` |
 | Physical TV or emulator operations, interactive previews, ADB, install, capture or key injection | `android-tv-device-testing`; `docs/android-tooling.md` for lane selection; `docs/device-targets.md` for physical targets |
@@ -82,7 +82,7 @@ repository-local domain overlays, then the focused skill, then local style.
   versions, SDK/HTSP library APIs, and stored formats is not required. Prefer one
   current path; retire obsolete adapters and migrations, update current consumers,
   and document any manual migration or fresh setup instead of adding compatibility
-  layers. Supported Android/TVHeadend targets, current protocol optionality,
+  layers. Supported Android/Tvheadend targets, current protocol optionality,
   recovery behavior and session/permission guards remain separate requirements.
   This policy does not authorize automatic data clearing or device resets;
   SDK and HTSP repository changes remain with their respective owners.
@@ -154,7 +154,7 @@ physical-TV acceptance. Reuse the configured AVD rather than rebuilding the setu
 
 ## Device, credential, and release safety
 
-- TVHeadend credentials and signing material belong only in ignored owner-only
+- Tvheadend credentials and signing material belong only in ignored owner-only
   files and Android app-private storage. Never place values in arguments,
   environment variables, Git, Gradle properties, logs, screenshots, reports, or
   generated output.
@@ -172,7 +172,7 @@ physical-TV acceptance. Reuse the configured AVD rather than rebuilding the setu
   credential-bearing UI automation. Credential provisioning is allowed only
   through `./tools/device provision-test-credentials` on an exact designated
   test target under `docs/test-device-credential-provisioning.md`.
-- Do not add debug exported components for secret injection or modify TVHeadend
+- Do not add debug exported components for secret injection or modify Tvheadend
   accounts, tuners, OSCam, storage, stream profiles, TV packages, or network
   infrastructure without separate explicit approval.
 - For a human-visible or time-window device check, ask one focused question and

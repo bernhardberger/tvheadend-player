@@ -4,43 +4,43 @@
 
 Tvheadend Player is an independent, remote-first live-TV client for
 Tvheadend servers, built specifically for Android TV and Google TV. It combines
-live television, a widescreen programme guide, recordings, timeshift, and an
-optional simplified TV experience in one ten-foot interface.
+live television, a widescreen programme guide, recordings, and timeshift in one
+ten-foot interface. A separate Appliance build adds household-TV entry points.
 
-The app connects directly to your Tvheadend server over HTSP and uses AndroidX Media3 for
-playback. Phone and tablet support is not currently planned.
+The app connects directly to your Tvheadend server over HTSP and uses AndroidX
+Media3 for playback. Phone and tablet support is not currently planned.
 
 > [!IMPORTANT]
 > This project is under active development and does not yet have a stable public
 > release. It is not an official Tvheadend application and is not affiliated
 > with or endorsed by the Tvheadend project.
 
-## Why Tvheadend Player?
+## Features
 
 - **Designed for the television:** Compose for TV, Material for TV, predictable
   D-pad navigation, visible focus, TV-safe layouts, and focus restoration
-- **Complete Tvheadend experience:** live TV, channel tags, programme guide,
-  recording management, recording playback, and server stream profiles over HTSP
+- **Tvheadend features:** live TV, channel tags, programme guide, recording
+  management, recording playback, and server stream profiles over HTSP
 - **Physical remote support:** channel up/down, direct channel-number entry,
   media controls, Info, and supported channel-list keys
-- **Modern playback:** server-backed timeshift, cinematic controls, track and
-  display options, automatic recovery, and detailed playback diagnostics
-- **Optional Simple TV mode:** start on the last channel and keep the current
-  session in a deliberately restricted, player-only interface
+- **Playback:** server-backed timeshift, shared live and recording controls,
+  track and display options, automatic recovery, and playback diagnostics
+- **Two builds:** a Play build for ordinary TVs and an Appliance build for
+  household TVs that open the app from HOME and the GUIDE key
 
 ## Live TV and remote control
 
 - Native Tvheadend channel synchronization, picons, channel numbers, and live
   playback over HTSP
 - First-run connection setup with explicit connection and synchronization status
-- Normal launches open channel browsing in a detailed list or large-card layout;
-  autoplay and Simple TV resume the last successfully played channel
+- Optional **Start playback when the app opens** setting (off by default) resumes
+  the last successfully played channel after a fresh launch
 - Per-device browsing scopes using Tvheadend channel tags
 - `CH+` and `CH-` switching with wraparound during fullscreen playback
 - Direct 1- to 3-digit Tvheadend channel-number entry
 - Hardware Info, media play/pause, TV contents, TV number-entry, and supported
   remote channel-list keys
-- Last-played-channel restoration after a fresh launch
+- Recent channels in the player and saved channel logos before the server is ready
 - Warm foreground playback while browsing, with a one-shot return to fullscreen
   without unnecessarily retuning the channel
 - Bounded automatic connection and playback recovery with visible,
@@ -90,33 +90,31 @@ Timeshift availability depends on the Tvheadend server and selected stream
 profile. Recording visibility and write operations follow the permissions of the
 configured Tvheadend account.
 
-## Simple TV and appliance integration
+## Builds
 
-Simple TV is an optional player-only session intended for straightforward family
-or single-purpose television use. It is not Android lock-task or device-owner
-kiosk mode and does not take control of the whole device.
+Each release provides two builds from one commit. They share the same screens
+and playback, and update independently because their application IDs differ.
 
-- Start a fresh app session directly on the last valid channel
-- Keep channels, Guide, Recordings, Settings, Stop, and normal app-exit navigation
-  out of the restricted session
-- Continue to use channel keys, direct number entry, the player channel drawer,
-  and optionally timeshift
-- Prevent Back from accidentally leaving fullscreen playback
-- Exit through an explicit owner flow with an optional PIN and a separate safe
-  confirmation
+| Build | Launcher name | Application ID | What it adds |
+|---|---|---|---|
+| **Play** | Tvheadend Player | `at.bernhardberger.tvhplayer` | The store build for ordinary TVs. It has no HOME entry point and no accessibility service. |
+| **Appliance** | Tvheadend Player Appliance | `at.bernhardberger.tvhplayer.appliance` | A HOME launcher entry, an optional accessibility service and an **Appliance** section in Settings, for a TV that should start straight into the app. |
 
-An optional, user-approved accessibility service can open the app after TV
-startup or display wake and handle only the Android GUIDE key plus a captured TCL
-TV key. It subscribes to no accessibility events, cannot inspect screen content,
-and passes every unrelated key through unchanged. Appliance entry and special
-remote-key behavior are device-dependent; direct HOME replacement is not claimed
-on TCL firmware that gives its system launcher priority.
+Only the Appliance build can open the app after TV startup or display wake and
+act on the Android GUIDE key and one captured TCL TV key. That is done by an
+accessibility service the user must enable in Android settings. The service
+subscribes to no accessibility events, cannot inspect screen content, and passes
+every other key through unchanged. Appliance entry and special remote-key
+behavior are device-dependent; direct HOME replacement is not claimed on TCL
+firmware that gives its system launcher priority. The Appliance build is not
+Android lock-task or device-owner kiosk mode.
 
 ## Privacy and network security
 
 - No Firebase, analytics, advertising, or external product account
 - Tvheadend credentials remain in app-private storage
-- Password protection uses Android Keystore and AES-GCM
+- The saved username and password are encrypted with an Android Keystore key
+  (AES-GCM)
 - Android backup and device transfer are disabled for application data
 - Password input is kept out of saved-instance state and protected from screen
   capture while present
@@ -131,7 +129,8 @@ it only on a trusted local network or through a protected tunnel such as a VPN.
 - Remote control with D-pad navigation
 - Appropriate Tvheadend permissions for EPG or recording operations
 
-Local builds require Java 21 and Android SDK 36.
+Local builds require Java 21 and Android SDK platform 37 (`compileSdk` in
+[`app/build.gradle.kts`](app/build.gradle.kts)).
 
 ## Build and verify
 
@@ -161,14 +160,14 @@ Git. The debug-only designated-test-device provisioning flow is documented in
 
 ## Release integrity
 
-The intended distribution path is signed GitHub releases first while retaining
-a path to later Google Play distribution. Release preparation and signing are
-deliberately separated: reproducible unsigned bundles are prepared on the
-engineering host, while the stable private signing key remains on an isolated
-owner-controlled host.
+Signed GitHub releases carry the Play and Appliance APKs together with the
+corresponding source; a path to Google Play distribution is retained. Release
+preparation and signing are deliberately separated: reproducible unsigned bundles
+are prepared on an engineering host, while the stable private signing key
+remains on an isolated, owner-controlled host.
 
-The app consumes the TVHeadend SDK and supplies its own Media3 1.11.1 FFmpeg
-audio extension in [`decoder-ffmpeg/`](decoder-ffmpeg/README.md). Playback is
+The app consumes the Tvheadend SDK and supplies its own Media3 FFmpeg audio
+extension in [`decoder-ffmpeg/`](decoder-ffmpeg/README.md). Playback is
 platform-first, with AC-3/E-AC-3/MP3 software fallback. Native provenance pins
 the upstream sources, build inputs and binary hashes; verification checks all
 four ABIs, applicable 16 KiB ELF alignment, and byte identity in the APK.
@@ -176,13 +175,21 @@ Every binary release must include application source, released SDK source
 classifiers, the app-owned Media3/FFmpeg corresponding-source archive, and
 their checksums.
 
-The app consumes public SDK `0.24.0` from Maven Central. `./tools/verify` checks
-the resolved dependency graph and byte-pinned SDK evidence. Opt-in local SDK
+The app consumes a public SDK release from Maven Central; the version is pinned
+in [`gradle/libs.versions.toml`](gradle/libs.versions.toml). `./tools/verify`
+checks the resolved dependency graph and byte-pinned SDK evidence. Opt-in local SDK
 substitution remains available for development; `./tools/verify --staged-sdk`
 cannot establish public SDK provenance or authorize a release.
 
 See [`docs/release-process.md`](docs/release-process.md) for the complete release,
 signature, source, and rollback gates.
+
+## Engineering harness
+
+The repository carries the AI engineering harness used to develop it:
+`.opencode/` (agents, commands, skills), `review-provider-route.sh` and
+`skills-lock.json`. [`docs/ai-engineering-harness.md`](docs/ai-engineering-harness.md)
+describes it; building or using the app does not depend on it.
 
 ## Relationship to TVHStream
 

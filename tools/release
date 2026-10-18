@@ -334,7 +334,7 @@ def _verify_signed(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Guide the isolated TVHeadend Player release workflow")
+    parser = argparse.ArgumentParser(description="Guide the isolated Tvheadend Player release workflow")
     parser.add_argument("--config", type=Path, default=LOCAL_CONFIG)
     subparsers = parser.add_subparsers(dest="action", required=True)
 

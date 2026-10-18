@@ -18,8 +18,7 @@ import androidx.tv.material3.Text
 
 /**
  * Actions layout template: guidance on the left, actions on the right.
- * Used for onboarding, Simple TV exit/start confirmation, and destructive
- * recording confirmations.
+ * Used for onboarding.
  */
 @Composable
 fun ActionsTemplate(

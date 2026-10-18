@@ -6,9 +6,8 @@ description: Use for TVHeadend channels, channel scopes, EPG timelines, programm
 # Live TV And DVR Conventions
 
 Use `docs/README.md` to select the current plan for the requested channel, EPG,
-or DVR work. Read the relevant behavior in `docs/appliance-mode-spec.md` and the
-matching sections of `docs/appliance-mode-plan.md` only when the change affects
-appliance behavior or a contract documented there. This skill supplies a safe
+or DVR work. Read the relevant behavior in `docs/appliance-mode-spec.md` only when the
+change affects appliance behavior or a contract documented there. This skill supplies a safe
 method, not a second copy of product requirements.
 
 ## Preserve domain boundaries

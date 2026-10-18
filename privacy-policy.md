@@ -1,26 +1,39 @@
 # Privacy Policy
 
-Last updated: 2026-07-24
+Last updated: 2026-10-18
 
-This policy describes TVHeadend Player for TV, an independent open-source Android
-TV client for TVHeadend servers.
+This policy describes Tvheadend Player, an independent open-source Android TV
+client for Tvheadend servers. It is not an official Tvheadend application.
 
 ## Data stored on the TV
 
 The app stores the following data in its Android app-private storage:
 
-- TVHeadend server host, HTSP port, and username
-- TVHeadend password, encrypted with AES-GCM using a non-exportable Android
-  Keystore key
-- Playback preferences, selected stream profile, and last-played channel
-- Cached channel icons and transient guide/playback data
+- Tvheadend server host and HTSP port
+- The Tvheadend username and password, each encrypted with AES-GCM using a
+  non-exportable Android Keystore key
+- App and playback settings: language, clock format, channel groups and the
+  selected group, audio and subtitle choices, the selected stream profile, and
+  whether to start playback when the app opens
+- The last-played channel and a short list of recently played channels
+- Accent colors taken from channel logos
+
+The app also keeps a cache in its app-private cache directory, so that saved
+channels and logos can appear before the server is ready or while it is
+unreachable:
+
+- A copy of the channel list and the programme guide, kept for up to 7 days
+- Channel logos and programme pictures, kept for up to 30 days and up to 64 MiB
+
+Android may remove cache contents at any time; the app fetches them again from
+the server. Decoded images are also held in memory while the app runs.
 
 The saved password is not displayed in connection settings. Android backup and
 device-transfer extraction are disabled for the app.
 
 ## Network communication
 
-The app connects only to the TVHeadend server configured by the user. It sends
+The app connects only to the Tvheadend server configured by the user. It sends
 the username and HTSP challenge-response authentication data needed to connect,
 and receives channel, guide, icon, and media data from that server.
 
@@ -36,12 +49,13 @@ project maintainers.
 
 The app uses open-source libraries bundled into the application. Those
 libraries process data locally except when participating in the configured
-TVHeadend connection.
+Tvheadend connection.
 
 ## Accessibility service
 
-Appliance mode can optionally use an Android accessibility service after the
-user enables it in system settings. The service:
+Only the Appliance build of the app contains an Android accessibility service;
+the Play build has none. The Appliance service is used only after the user
+enables it in system settings. The service:
 
 - handles only the standard GUIDE key and the known TCL TV key
 - opens the app after service connection or display wake
@@ -51,8 +65,8 @@ user enables it in system settings. The service:
 ## Retention and deletion
 
 Settings remain on the TV until they are replaced, explicitly cleared, Android
-app data is cleared, or the app is uninstalled. Cached data may be removed by
-Android at any time. Uninstalling or clearing app data also removes the Android
+app data is cleared, or the app is uninstalled. Cached channel, guide and image
+data expires as described above and may be removed by Android at any time. Uninstalling or clearing app data also removes the Android
 Keystore key, making any remaining encrypted password blob unusable.
 
 ## Source and questions

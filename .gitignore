@@ -57,6 +57,7 @@ google-services.json
 .tvhplayer-device.json
 .tvhplayer-credentials.json
 .tvhplayer-release.json
+.tvhplayer-release-operator.md
 *.jks
 *.keystore
 keystore.properties

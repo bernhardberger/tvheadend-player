@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bounded ADB operations for TVHeadend Player Android TV validation.
+"""Bounded ADB operations for Tvheadend Player Android TV validation.
 
 This wrapper deliberately omits UI hierarchy dumps, app-private data exports,
 and unrestricted logcat/dumpsys output because those paths can expose runtime

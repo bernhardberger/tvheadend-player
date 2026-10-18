@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="456" viewBox="0 0 1080 456">
   <!-- Original illustrative programme artwork for the local design study.
-       Synthetic scenery, not a TVHeadend-provided asset or production fallback. -->
+       Synthetic scenery, not a Tvheadend-provided asset or production fallback. -->
   <defs>
     <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#42666e"/><stop offset="1" stop-color="#b3c2bc"/></linearGradient>
     <linearGradient id="water" x2="0" y2="1"><stop stop-color="#426f77"/><stop offset="1" stop-color="#173a48"/></linearGradient>

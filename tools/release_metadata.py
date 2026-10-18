@@ -625,7 +625,7 @@ def _create_signed(args: argparse.Namespace) -> None:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Create and validate TVHeadend Player release metadata")
+    parser = argparse.ArgumentParser(description="Create and validate Tvheadend Player release metadata")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     def add_identity_arguments(command: argparse.ArgumentParser) -> None:
