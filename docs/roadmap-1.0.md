@@ -306,9 +306,10 @@ Gaps:
 
 | Version | Content | Exit |
 |---|---|---|
-| 0.3 | P1–P2, H1, U2 inventory, S5 checklist read as input to the UX work (P3–P4 deferred) | Inventory accepted; home-screen integration scope fixed |
-| 0.4 | U3 home screen and U15 shared patterns; U17 locale formats; UI-independent foundations: E3 (minimal journeys), E4, R2, S1/S3 split, S6 AAB, D4 data, U14 | Home screen on the G10; minified release; Play build has no Appliance entry points |
-| 0.5–0.7 | U4–U10 screen by screen in the U2 order (D9 inside U6), U1 trials decided in place; E5/E6 alongside | Each screen accepted as it lands |
+| 0.3 | Done so far: P1–P2, H1, U2 inventory, U15 shared patterns, U17 locale formats, E3 (minimal journeys), R2, S1/S3 split, S6 AAB, D4, U9 startup, player entry and picture cover, display frame-rate matching from the stream's declared frame rate (SDK 0.34.0), artwork context (SDK 0.33.0); repository, docs and release material checked for stale content and naming first | Signed Play and Appliance release on GitHub; release smoke on the G10 |
+| 0.4 | U4 Channels; error catalog wired in three slices (live player, recording player, browse screens) | Channels accepted on the G10; no raw codes outside the stats overlay |
+| 0.5 | U6 Recordings (D9 inside, real recorded length and padded stop) | Recordings accepted on the G10 |
+| 0.6–0.7 | Remaining screens in the U2 order, U3 Home where it fits, E4, U14; U1 trials decided in place; E5/E6 alongside | Each screen accepted as it lands |
 | 0.8 | U16 entry focus and Back; E2 full journeys, E7, E8 on the settled screens; S5 audit and fixes; U12 goldens | Numbers recorded; TV checklist passes or deviations documented |
 | 0.9 RC | U11, P5, A1–A2, R1, R3–R5, E9, S7–S10, X1–X4; S4 reviewer instructions and demo video, recorded on the RC before the closed-test submission; S11 closed test | All [TV] gates observed; closed test running |
 | 1.0 | R6, Play production release after S11 | Signed release on GitHub and Play |
