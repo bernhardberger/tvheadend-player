@@ -5,6 +5,7 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
@@ -58,7 +59,11 @@ class AppErrorTest {
 
     private val growing = TvheadendTestResultFactory.growingRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
 
-    private fun entry(state: DvrEntryState?) = DvrEntry.create(DvrEntryId(1), state = state)
+    private fun entry(state: DvrEntryState?, files: Int? = null) = DvrEntry.create(
+        DvrEntryId(1),
+        state = state,
+        files = files?.let { count -> List(count) { DvrRecordingFile.create(fileId = it.toLong() + 1) } },
+    )
 
     @Test fun numbersAreUniqueAndStayInTheirGroup() {
         val all = AppErrorCondition.entries
@@ -258,11 +263,18 @@ class AppErrorTest {
         assertEquals(305, number(entry(DvrEntryState.RECORDING), RecordingPlaybackAdmission.GrowingDeferred))
         // Not admitted: what the entry shows decides.
         assertEquals(302, number(entry(DvrEntryState.SCHEDULED), RecordingPlaybackAdmission.TargetUnavailable))
-        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.COMPLETED, DvrEntryState.FILE_MISSING)) {
-            assertEquals("$state", 303, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
-        }
+        // File evidence: the server marks the file missing, or a running entry has no file at all.
+        assertEquals(303, number(entry(DvrEntryState.FILE_MISSING), RecordingPlaybackAdmission.TargetUnavailable))
+        assertEquals(303, number(entry(DvrEntryState.RECORDING), RecordingPlaybackAdmission.TargetUnavailable))
+        assertEquals(303, number(entry(DvrEntryState.RECORDING, files = 0), RecordingPlaybackAdmission.TargetUnavailable))
+        // Several files of a running recording only play once it is finished.
+        assertEquals(305, number(entry(DvrEntryState.RECORDING, files = 2), RecordingPlaybackAdmission.TargetUnavailable))
+        // One existing file but not admitted (blank path or a replaced incarnation): it changed.
+        assertEquals(304, number(entry(DvrEntryState.RECORDING, files = 1), RecordingPlaybackAdmission.TargetUnavailable))
+        // A deferred recording whose entry is gone is gone, not deferred.
+        assertEquals(304, number(null, RecordingPlaybackAdmission.GrowingDeferred))
         for (state in sdkConstants<DvrEntryState>() - setOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
-            DvrEntryState.COMPLETED, DvrEntryState.FILE_MISSING)) {
+            DvrEntryState.FILE_MISSING)) {
             assertEquals("$state", 304, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
         }
         assertEquals(304, number(entry(null), RecordingPlaybackAdmission.TargetUnavailable))

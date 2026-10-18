@@ -57,14 +57,20 @@ fun recordingErrorCondition(
 ): AppErrorCondition? = when {
     initialConnectionFailure != null -> initialConnectionFailure.recordingConnectionError().condition
     // The SDK defers an active recording whose single file is not MPEG-TS until it is finished.
-    admission == RecordingPlaybackAdmission.GrowingDeferred -> AppErrorCondition.RECORDING_DEFERRED
+    admission == RecordingPlaybackAdmission.GrowingDeferred ->
+        if (entry == null) AppErrorCondition.RECORDING_UNAVAILABLE else AppErrorCondition.RECORDING_DEFERRED
     admission == RecordingPlaybackAdmission.ObservationExpired -> AppErrorCondition.RECORDING_UNAVAILABLE
     admission == RecordingPlaybackAdmission.TargetUnavailable -> when (entry?.state) {
         DvrEntryState.SCHEDULED -> AppErrorCondition.RECORDING_NOT_STARTED
-        // An entry that has (or had) a file the SDK cannot find or name.
-        DvrEntryState.RECORDING,
-        DvrEntryState.COMPLETED,
         DvrEntryState.FILE_MISSING -> AppErrorCondition.RECORDING_FILE_MISSING
+        // A running entry: no file yet is missing-file evidence; several files can only play once it is finished;
+        // anything else (blank path, replaced incarnation) means it changed. A completed entry is always admitted,
+        // so it only arrives here when it changed or was replaced.
+        DvrEntryState.RECORDING -> when {
+            entry.files.isNullOrEmpty() -> AppErrorCondition.RECORDING_FILE_MISSING
+            entry.files.orEmpty().size > 1 -> AppErrorCondition.RECORDING_DEFERRED
+            else -> AppErrorCondition.RECORDING_UNAVAILABLE
+        }
         else -> AppErrorCondition.RECORDING_UNAVAILABLE
     }
     // Failed(OTHER) included: any playback failure of a playable or unresolved recording is an interruption.
