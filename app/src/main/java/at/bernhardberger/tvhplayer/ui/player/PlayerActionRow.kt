@@ -98,7 +98,7 @@ internal fun PlayerActionRow(
                         val glyphModifier = if (tag == "player-pause" && pauseUnavailableReason != null) {
                             Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha }
                         } else Modifier
-                        Icon(painterResource(icon), contentDescription = label, modifier = glyphModifier)
+                        Icon(painterResource(icon), contentDescription = label, modifier = glyphModifier.size(IconButtonDefaults.MediumIconSize))
                     }
                 }
             }

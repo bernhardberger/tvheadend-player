@@ -31,6 +31,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -86,6 +87,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import at.bernhardberger.tvhplayer.ui.components.SettingsSwitchRow
 import androidx.tv.material3.Text
+import androidx.tv.material3.IconButtonDefaults
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackTrackContentState
@@ -1069,6 +1071,7 @@ internal fun OptionsHeader(
                 Icon(
                     painter = painterResource(R.drawable.ic_keyboard_arrow_left),
                     contentDescription = stringResource(R.string.back),
+                    modifier = Modifier.size(IconButtonDefaults.MediumIconSize),
                 )
             }
         }

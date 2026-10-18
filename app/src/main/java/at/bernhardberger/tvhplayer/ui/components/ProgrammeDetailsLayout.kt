@@ -24,7 +24,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import kotlinx.coroutines.launch
@@ -106,14 +105,8 @@ internal fun ProgrammeDetailsButton(
             it.key == Key.DirectionLeft || it.key == Key.DirectionRight
         },
         shape = ButtonDefaults.shape(shape = shape, focusedShape = shape, pressedShape = shape),
-        colors = ButtonDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha),
-            contentColor = MaterialTheme.colorScheme.onSurface,
-            focusedContainerColor = MaterialTheme.colorScheme.inverseSurface,
-            focusedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
-        ),
         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp)) {
-        Box(Modifier.size(20.dp), contentAlignment = Alignment.Center) { icon() }
+        Box(Modifier.size(ButtonDefaults.IconSize), contentAlignment = Alignment.Center) { icon() }
         Spacer(Modifier.width(ButtonDefaults.IconSpacing))
         // The button's surface pins content to its top, so the label holds a full 24dp line to fill the 48dp height.
         Text(title, Modifier.heightIn(min = 24.dp).wrapContentHeight(), style = MaterialTheme.typography.titleMedium,

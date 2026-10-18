@@ -79,6 +79,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
+import androidx.tv.material3.ButtonDefaults
+import androidx.tv.material3.OutlinedButtonDefaults
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -755,9 +757,10 @@ internal fun RecordingsScreenContent(
                         .onFocusChanged { if (it.isFocused) startOverFocused = false }
                         .semantics { contentDescription = spokenResume; if (resumeEnd.isNotBlank()) stateDescription = resumeEnd }
                         .focusProperties { left = FocusRequester.Cancel; right = startOverFocus }
-                        .testTag("recording-resume")) {
-                    Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                        .testTag("recording-resume"),
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding) {
+                    Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(R.string.recording_resume_from,
                         at.bernhardberger.tvhplayer.core.formatPlaybackDuration(opened.playPosition?.inWholeMilliseconds ?: 0L)),
                         maxLines = 1, softWrap = false)
@@ -767,9 +770,10 @@ internal fun RecordingsScreenContent(
                         .onFocusChanged { if (it.isFocused) startOverFocused = true }
                         .semantics { if (startOverEnd.isNotBlank()) stateDescription = startOverEnd }
                         .focusProperties { left = resumeFocus; right = FocusRequester.Cancel }
-                        .testTag("recording-start-over")) {
-                    Icon(painterResource(R.drawable.ic_replay), null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                        .testTag("recording-start-over"),
+                    contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding) {
+                    Icon(painterResource(R.drawable.ic_replay), null, Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(R.string.context_start_over), maxLines = 1, softWrap = false)
                 }
             }

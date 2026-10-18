@@ -960,15 +960,17 @@ private fun DetailsActions(
                         up = FocusRequester.Cancel; down = FocusRequester.Cancel
                     }.testTag("details-${action.name.lowercase()}")
                 val content: @Composable RowScope.() -> Unit = {
-                    Icon(painterResource(action.icon()), null, Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(painterResource(action.icon()), null, Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
                         (event == null && recording?.state == DvrEntryState.SCHEDULED ||
                             event != null && !event.isRunning(nowSec)))),
                         maxLines = 1, softWrap = false)
                 }
-                 if (index == 0 && action != BrowseContextAction.DELETE) Button(onClick = { onAction(action) }, modifier = modifier, content = content)
-                else OutlinedButton(onClick = { onAction(action) }, modifier = modifier, content = content)
+                 if (index == 0 && action != BrowseContextAction.DELETE) Button(onClick = { onAction(action) }, modifier = modifier,
+                    contentPadding = ButtonDefaults.ButtonWithIconContentPadding, content = content)
+                else OutlinedButton(onClick = { onAction(action) }, modifier = modifier,
+                    contentPadding = OutlinedButtonDefaults.ButtonWithIconContentPadding, content = content)
             }
         }
     }
