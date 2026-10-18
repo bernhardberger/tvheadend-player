@@ -32,7 +32,7 @@ class ChannelNumberOverlayTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
-                    ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, null,
+                    ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending,
                         Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
                 }
             }
@@ -56,7 +56,7 @@ class ChannelNumberOverlayTest {
     fun newDigitsDuringExitReplaceOldEntry() {
         val number = mutableStateOf("123")
         composeRule.setContent {
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending, null) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending) }
         }
         composeRule.mainClock.autoAdvance = false
         composeRule.runOnIdle { number.value = "" }

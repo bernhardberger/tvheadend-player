@@ -28,7 +28,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -56,7 +56,6 @@ private data class ChannelNumberEntry(val number: String, val target: ChannelNum
 internal fun ChannelNumberOverlay(
     number: String,
     target: ChannelNumberTarget,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     maxDigits: Int = 3,
 ) {
@@ -103,7 +102,7 @@ internal fun ChannelNumberOverlay(
                         )
                     }
                     if (displayed.target != ChannelNumberTarget.Pending) {
-                        ChannelNumberTargetView(displayed.target, currentSession,
+                        ChannelNumberTargetView(displayed.target,
                             Modifier.padding(start = 16.dp))
                     }
                 }
@@ -115,9 +114,9 @@ internal fun ChannelNumberOverlay(
 @Composable
 private fun ChannelNumberTargetView(
     target: ChannelNumberTarget,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
 ) {
+    val currentSession = LocalArtworkContext.current.currentSession
     Row(
         modifier = modifier.widthIn(max = 240.dp),
         verticalAlignment = Alignment.CenterVertically,

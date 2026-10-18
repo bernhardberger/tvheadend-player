@@ -30,7 +30,6 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ProvideTextStyle
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
@@ -75,7 +74,6 @@ fun ChannelRow(
     name: String,
     programTitle: String,
     progress: Float?,
-    currentSession: CurrentSessionObservation? = null,
     piconPath: ArtworkId?,
     programStartSec: Long? = null,
     recordingNow: Boolean = false,
@@ -167,7 +165,6 @@ fun ChannelRow(
         leadingContent = {
             // Bare picon: fitted inside 60x36 with its own aspect ratio, no logo box.
             PiconBox(
-                currentSession = currentSession,
                 piconPath = piconPath,
                 placeholderTint = LocalContentColor.current,
                 modifier = Modifier

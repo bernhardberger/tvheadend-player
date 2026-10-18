@@ -14,6 +14,7 @@ import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
 
@@ -68,7 +69,10 @@ internal fun ChannelContextMenu(
                 else -> Unit
             }
         },
-        artwork = { ProgrammeArtwork(null, channel.icon, null, capability,
-            Modifier.fillMaxSize().testTag("browse-context-picon")) },
+        artwork = {
+            ProvideArtworkSession(capability) {
+                ProgrammeArtwork(null, channel.icon, null, Modifier.fillMaxSize().testTag("browse-context-picon"))
+            }
+        },
     )
 }

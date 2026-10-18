@@ -93,7 +93,7 @@ class AppNoticeCaptureTest {
                             content = PlayerChromeContent("18:30", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Documentary HD", programme,
                                 null, false, now.epochSeconds, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), now.epochSeconds, programme),
-                            actions = PlayerChromeActions(active = false), currentSession = null,
+                            actions = PlayerChromeActions(active = false),
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )

@@ -100,7 +100,6 @@ class ProgrammeWindowInputTest(private val scenario: String) {
                                 feedback = owner.feedback,
                             ),
                             actions = PlayerChromeActions(active = true, paused = paused),
-                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},

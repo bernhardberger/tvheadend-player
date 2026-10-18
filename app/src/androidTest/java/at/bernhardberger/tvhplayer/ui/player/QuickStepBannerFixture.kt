@@ -24,7 +24,6 @@ internal fun QuickStepBanner(
             feedback = feedback, feedbackIsError = feedbackIsError,
         ),
         actions = PlayerChromeActions(active = false),
-        currentSession = null,
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
         modifier = modifier,
     )

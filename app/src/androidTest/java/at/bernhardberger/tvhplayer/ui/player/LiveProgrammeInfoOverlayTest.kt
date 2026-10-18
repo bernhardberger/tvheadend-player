@@ -99,7 +99,6 @@ class LiveProgrammeInfoOverlayTest {
                         programme = null,
                     ),
                     actions = PlayerChromeActions(active = true, restoreFocus = "player-identity-card".takeIf { restoreInfoFocus }),
-                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},

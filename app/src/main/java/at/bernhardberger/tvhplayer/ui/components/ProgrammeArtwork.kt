@@ -23,9 +23,10 @@ import coil3.compose.AsyncImage
 @Composable
 internal fun ProgrammeArtwork(
     image: ArtworkId?, channelIcon: ArtworkId?, progress: Float?,
-    session: CurrentSessionObservation?, modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier,
     plateModifier: Modifier = Modifier, progressModifier: Modifier = Modifier,
 ) {
+    val session = LocalArtworkContext.current.currentSession
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
         if (image != null && session != null) {
             AsyncImage(AppArtworkSource(session, image), null,
@@ -34,8 +35,8 @@ internal fun ProgrammeArtwork(
                 Modifier.align(Alignment.BottomStart).padding(8.dp).then(plateModifier)
                     .size(56.dp, 32.dp)
                     .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
-                    .padding(horizontal = 4.dp, vertical = 3.dp), session)
-        } else PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp), session)
+                    .padding(horizontal = 4.dp, vertical = 3.dp))
+        } else PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
             progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = 3.dp)

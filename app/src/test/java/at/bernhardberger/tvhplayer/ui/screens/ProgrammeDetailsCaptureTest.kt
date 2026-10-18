@@ -54,6 +54,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 /** Matched before/after production details hosts; fictional fixture programme, no services. */
 @RunWith(RobolectricTestRunner::class)
@@ -103,10 +104,10 @@ class ProgrammeDetailsCaptureTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 dispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
-                if (shown) ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
+                if (shown) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
                     programmeDetailsActions(event, start.epochSeconds - 60, null, true, true, true),
-                    session, {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
-                        channel.id, event.stop, event.stop + 3600.seconds, title = "Next")))
+                    {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
+                        channel.id, event.stop, event.stop + 3600.seconds, title = "Next"))) }
             }
         }
         compose.onNodeWithTag("details-watch").assertIsFocused().performKeyInput { pressKey(Key.DirectionUp) }
@@ -130,9 +131,9 @@ class ProgrammeDetailsCaptureTest {
         val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds, title = "Ridge Light")
         compose.setContent {
             TVHeadendPlayerTheme {
-                ProgrammeDetailsPage(event, null, channel, now,
+                ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, now,
                     programmeDetailsActions(event, now, null, canModify, now >= start.epochSeconds, true),
-                    session, {}, {})
+                    {}, {}) }
             }
         }
         compose.onNodeWithTag("programme-details-page").assertIsFocused()
@@ -156,12 +157,12 @@ class ProgrammeDetailsCaptureTest {
                 Box(Modifier.fillMaxSize()) {
                     Button(onClick = {}) { Text("Underlying action") }
                     if (shown) {
-                        if (guide) ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
+                        if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
                             programmeDetailsActions(event, start.epochSeconds - 60, null, canModify, false, true),
-                            session, {}, { shown = false })
-                        else ProgrammeDetailsPage(null, entry, channel, 0L,
+                            {}, { shown = false }) }
+                        else ProvideArtworkSession(session) { ProgrammeDetailsPage(null, entry, channel, 0L,
                             recordingDetailsActions(entry, false, canModify, false),
-                            session, {}, { shown = false })
+                            {}, { shown = false }) }
                     }
                 }
             }
@@ -202,15 +203,15 @@ class ProgrammeDetailsCaptureTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         if (player) ProgrammeInfoSheetFrame {
                             ProgramDetails(ProgramDetailsState(), event, emptyList(), start.epochSeconds + 600, channel.name.orEmpty(),
-                                { shown, modifier -> ProgrammeHero(shown.image, channel.id, "101", channel.icon, session, modifier) },
+                                { shown, modifier -> ProvideArtworkSession(session) { ProgrammeHero(shown.image, channel.id, "101", channel.icon, modifier) } },
                                 { null }, true, remember { FocusRequester() }, remember { FocusRequester() }, {})
                         }
-                        else if (guide) ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
+                        else if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
                             start.epochSeconds + if (scheduled) -60 else 600,
                             programmeDetailsActions(event, start.epochSeconds + if (scheduled) -60 else 600,
-                                entry.takeIf { scheduled }, true, true, true), session, {}, {})
-                        else ProgrammeDetailsPage(null, entry, channel, 0L,
-                            recordingDetailsActions(entry, true, true, true), session, {}, {})
+                                entry.takeIf { scheduled }, true, true, true), {}, {}) }
+                        else ProvideArtworkSession(session) { ProgrammeDetailsPage(null, entry, channel, 0L,
+                            recordingDetailsActions(entry, true, true, true), {}, {}) }
                     }
                 }
             }

@@ -168,17 +168,18 @@ class PiconBoxTest {
                     Column(Modifier.fillMaxSize().background(background).padding(40.dp)) {
                         val picon = if (state == ArtworkState.MISSING) null else ArtworkId(1)
                         if (inRow) {
-                            ChannelRow(
-                                modifier = Modifier.width(396.dp).testTag("row"),
-                                number = 1,
-                                name = "Documentary",
-                                programTitle = "Programme",
-                                progress = null,
-                                currentSession = session,
-                                piconPath = picon,
-                                onFocus = {},
-                                onConfirm = {},
-                            )
+                            ProvideArtworkSession(session) {
+                                ChannelRow(
+                                    modifier = Modifier.width(396.dp).testTag("row"),
+                                    number = 1,
+                                    name = "Documentary",
+                                    programTitle = "Programme",
+                                    progress = null,
+                                    piconPath = picon,
+                                    onFocus = {},
+                                    onConfirm = {},
+                                )
+                            }
                             ListItem(
                                 selected = false,
                                 onClick = {},
@@ -188,11 +189,12 @@ class PiconBoxTest {
                         } else {
                             // Passive/player callers must not start inheriting an arbitrary ambient tint.
                             CompositionLocalProvider(LocalContentColor provides Color.Magenta) {
-                                PiconBox(
-                                    currentSession = session,
-                                    piconPath = picon,
-                                    modifier = Modifier.size(60.dp, 36.dp).testTag("passive-picon"),
-                                )
+                                ProvideArtworkSession(session) {
+                                    PiconBox(
+                                        piconPath = picon,
+                                        modifier = Modifier.size(60.dp, 36.dp).testTag("passive-picon"),
+                                    )
+                                }
                             }
                         }
                     }

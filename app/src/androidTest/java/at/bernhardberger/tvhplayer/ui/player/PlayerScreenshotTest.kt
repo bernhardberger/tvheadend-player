@@ -68,6 +68,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.Parameterized
 import at.bernhardberger.tvhplayer.testing.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 /** Offline production chrome only; these captures do not establish live video or SDK timing. */
 @RunWith(Parameterized::class)
@@ -173,7 +174,6 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 programmeWindow = window,
                             ),
                             actions = PlayerChromeActions(active = false, paused = scenario == "shelf-paused"),
-                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},
@@ -183,15 +183,15 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             onInfo = {},
                             decorationCoversControls = true,
                             controlsDecoration = { _, controls -> QuickZapPresentation(expanded = true, preview = {}, controls = controls, channelContent = {
-                            ChannelDrawer(
+                            ProvideArtworkSession(currentSession) { ChannelDrawer(
                                 channels = if (scenario == "shelf-empty") emptyList() else List(15) {
                                     Channel.create(id = ChannelId(it + 1L), icon = ArtworkId(it + 1), name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
                                 },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
                              nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") },
                                  nowSec = 1_783_020_600L,
-                                 onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {}, currentSession = currentSession,
-                            )
+                                 onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                            ) }
                         }) },
                         )
                     } else if (scenario.startsWith("recording")) {
@@ -244,7 +244,6 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 feedbackIsError = false,
                             ),
                             actions = PlayerChromeActions(active = true, paused = scenario.startsWith("paused") || scenario == "timeline-clamped", restoreFocus = "player-identity-card".takeIf { restoreInfo }),
-                            currentSession = null,
                             onStop = {},
                             onInteraction = {},
                             onOptions = {},

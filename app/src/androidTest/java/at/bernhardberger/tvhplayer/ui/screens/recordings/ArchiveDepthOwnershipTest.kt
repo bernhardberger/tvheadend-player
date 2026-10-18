@@ -69,7 +69,7 @@ class ArchiveDepthOwnershipTest {
                             backEnabled = owner.isCurrent, contentFocus = requester,
                             onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
-                            currentSession = null, piconForEntry = { null },
+                            piconForEntry = { null },
                         )
                     }
                 }

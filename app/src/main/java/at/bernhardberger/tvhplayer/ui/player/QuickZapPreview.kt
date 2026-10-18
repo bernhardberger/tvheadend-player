@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
@@ -36,11 +36,11 @@ fun QuickZapPreview(
     summary: String?,
     next: String?,
     image: ArtworkId?,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
 ) {
     val artwork = image
+    val currentSession = LocalArtworkContext.current.currentSession
     var artworkFailed by remember(artwork, currentSession) { mutableStateOf(false) }
     val secondary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextSecondaryAlpha)
     val tertiary = MaterialTheme.colorScheme.onSurface.copy(alpha = TvTextTertiaryAlpha)

@@ -87,6 +87,7 @@ import kotlin.math.sin
 import kotlin.math.hypot
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -742,13 +743,12 @@ class QuickZapPresentationTest {
                             }
                         }) {
                         val chrome: @Composable () -> Unit = {
-                        PlayerChrome(
+                        ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, playing?.value,
                                 playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
                             actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),
-                            currentSession = session,
                             onDownFromActions = {
                                 layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
                                 layers.openChannelDrawer()
@@ -763,11 +763,11 @@ class QuickZapPresentationTest {
                               preview = {},
                               controls = controls,
                               channelContent = {
-                                ChannelDrawer(
+                                ProvideArtworkSession(session) { ChannelDrawer(
                                     channels = catalog, selectedId = playing, playingChannelId = playing,
                                     playbackIndicator = indicator,
                                     recordingChannelIds = setOf(ChannelId(4)), nowEvent = { if (it == ChannelId(5)) null else event(it) },
-                                    currentSession = session, active = layers.channelDrawerOpen, nowSec = 900,
+                                    active = layers.channelDrawerOpen, nowSec = 900,
                                     onFocusChannel = {}, onPickChannel = {
                                         if (it.id == playing) layers.dismissChannelDrawer() else {
                                             if (confirmPicks) playing = it.id
@@ -779,10 +779,10 @@ class QuickZapPresentationTest {
                                         if (it != null) layers.beginOpeningKeyCycle(it)
                                         layers.dismissChannelDrawer()
                                     },
-                                )
+                                ) }
                               },
                             ) },
-                        )
+                        ) }
                         }
                         chrome()
                     }

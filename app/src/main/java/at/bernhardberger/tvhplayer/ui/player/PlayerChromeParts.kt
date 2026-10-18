@@ -43,7 +43,6 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.core.GlanceBadge
@@ -212,7 +211,6 @@ internal fun QuickZapTrayPreview(
     event: EpgEventEntry?,
     next: EpgEventEntry?,
     nowSec: Long,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     /** Without artwork and summary. */
     compact: Boolean = false,
@@ -239,7 +237,6 @@ internal fun QuickZapTrayPreview(
                 summary = it.summary,
                 next = it.next,
                 image = it.image,
-                currentSession = currentSession,
                 subtitle = it.subtitle,
             )
         }

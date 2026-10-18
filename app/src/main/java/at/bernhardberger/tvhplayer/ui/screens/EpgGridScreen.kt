@@ -11,6 +11,7 @@ import kotlinx.coroutines.ensureActive
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvhplayer.ui.components.BrowsePreparationPending
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 
 import androidx.activity.compose.BackHandler
@@ -1948,7 +1949,8 @@ fun EpgGridScreen(
                     .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
                         MaterialTheme.colorScheme.primary)
                     .testTag("epg-timeline-content")) {
-                CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
+                // A frame shows its pictures with the session of the observation it was built from.
+                ProvideArtworkSession(currentSession) { CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
                 LazyColumn(
                     state = channelListState,
                     userScrollEnabled = owner.isCurrent,
@@ -2004,7 +2006,6 @@ fun EpgGridScreen(
                             windowStartSec = renderedWindowStartSec,
                             windowEndSec = windowEndSec,
                             nowSecProvider = nowSecProvider,
-                            currentSession = currentSession,
                             events = eventsByChannel[channel.id].orEmpty(),
                             hasCachedEvents = channel.id in timelineEventIndex.channelsWithEvents,
                             hasMatchingCachedEvents =
@@ -2079,7 +2080,7 @@ fun EpgGridScreen(
                         )
                     }
                 }
-                }
+                } }
                 }
             }
             }

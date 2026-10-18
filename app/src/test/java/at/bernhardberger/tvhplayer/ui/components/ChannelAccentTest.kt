@@ -71,8 +71,10 @@ class ChannelAccentTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
-                val colour = rememberChannelAccent(session, ArtworkId(1), ChannelId(1))
-                SideEffect { returned += colour }
+                ProvideArtworkSession(session) {
+                    val colour = rememberChannelAccent(ArtworkId(1), ChannelId(1))
+                    SideEffect { returned += colour }
+                }
             }
         }
         return returned

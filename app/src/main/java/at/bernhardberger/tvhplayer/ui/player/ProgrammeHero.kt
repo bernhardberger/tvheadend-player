@@ -18,7 +18,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -33,11 +33,11 @@ fun ProgrammeHero(
     channelId: ChannelId,
     channelNumber: String,
     picon: ArtworkId?,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     recordingBadge: Boolean = false,
 ) {
-    val accent = rememberChannelAccent(currentSession, picon, channelId)
+    val currentSession = LocalArtworkContext.current.currentSession
+    val accent = rememberChannelAccent(picon, channelId)
     val artwork = image
     BoxWithConstraints(modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight)
         .clearAndSetSemantics {}) {
@@ -56,7 +56,7 @@ fun ProgrammeHero(
             ))).padding(bottom = bottomRoom, end = endRoom), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(markWidth, markHeight).testTag("programme-fallback-mark"), contentAlignment = Alignment.Center) {
                     if (picon != null && currentSession != null) {
-                        PiconBox(picon, Modifier.fillMaxSize(), currentSession)
+                        PiconBox(picon, Modifier.fillMaxSize())
                     } else Text(channelNumber.ifBlank { stringResource(R.string.player_channel) },
                         style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.headlineSmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,

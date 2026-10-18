@@ -397,7 +397,7 @@ class PlayerMotionTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
         compose.setContent {
             val context = LocalContext.current
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, null, Modifier.testTag("number")) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         val width = compose.onNodeWithTag("number").fetchSemanticsNode().size.width
@@ -435,7 +435,7 @@ class PlayerMotionTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
         compose.setContent {
             val context = LocalContext.current
-            TVHeadendPlayerTheme { ChannelNumberOverlay("123", target, null, Modifier.testTag("number")) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay("123", target, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         fun bounds() = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
@@ -481,7 +481,7 @@ class PlayerMotionTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Channel("One", null))
         compose.setContent {
             val context = LocalContext.current
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, null, Modifier.testTag("number")) }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number")) }
         }
         compose.waitForIdle()
         val shown = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
@@ -690,7 +690,6 @@ class PlayerMotionTest {
                     else -> null
                 },
             ),
-            currentSession = null,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInteraction = {},
             onInfo = onOpenInfo,
             onOptions = onOpenOptions,

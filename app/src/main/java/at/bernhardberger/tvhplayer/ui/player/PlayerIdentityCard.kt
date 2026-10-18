@@ -18,7 +18,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 
@@ -36,7 +35,6 @@ internal fun BoxScope.ChannelCardFace(
     picon: ArtworkId?,
     channelId: ChannelId?,
     name: String,
-    currentSession: CurrentSessionObservation?,
     logoTag: String = "player-identity-logo",
     nameTag: String = "player-identity-name",
     backdrop: Boolean = true,
@@ -50,7 +48,7 @@ internal fun BoxScope.ChannelCardFace(
     val mark = Modifier.align(Alignment.Center).graphicsLayer { translationY = -lift.toPx() / 2 }
         .size(markWidth, markHeight)
     if (picon != null) {
-        PiconBox(picon, mark.testTag(logoTag), currentSession)
+        PiconBox(picon, mark.testTag(logoTag))
     } else {
         Box(mark, contentAlignment = Alignment.Center) {
             Text(name, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis,

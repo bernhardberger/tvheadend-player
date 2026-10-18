@@ -57,7 +57,6 @@ class PlayerTimelineNavigationTest(private val recording: Boolean) {
                             programme = null,
                         ),
                         actions = PlayerChromeActions(active = true),
-                        currentSession = null,
                         onDownFromActions = { if (channelsAvailable.value) ({ shelfOpens++ })() },
                         onStop = {},
                         onInteraction = {},

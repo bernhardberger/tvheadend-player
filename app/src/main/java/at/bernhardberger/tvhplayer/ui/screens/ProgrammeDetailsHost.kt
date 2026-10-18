@@ -269,10 +269,11 @@ internal fun ProgrammeDetailsHost(
                 stacked = page.id != openingEvent.id || stack.isNotEmpty())
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
-            PlayerMotionFrame(leaving = page.id != selected.id || covered) {
+            // The page shows its pictures with the session it was opened with.
+            PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
                 pageActions,
-                capability, { action -> act(pageEvent, action) },
+                { action -> act(pageEvent, action) },
                 onClose = {
                     val previous = stack.lastOrNull()
                     if (previous == null) closeAnimated() else {
@@ -297,7 +298,7 @@ internal fun ProgrammeDetailsHost(
                     menuAiring = airing
                 },
             )
-            }
+            } }
         }
     }
     }

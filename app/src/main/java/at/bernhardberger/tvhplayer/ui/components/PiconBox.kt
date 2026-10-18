@@ -20,7 +20,6 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import coil3.compose.AsyncImage
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -31,12 +30,12 @@ import at.bernhardberger.tvhplayer.profiling.profileTrace
 fun PiconBox(
     piconPath: ArtworkId?,
     modifier: Modifier = Modifier,
-    currentSession: CurrentSessionObservation? = null,
     contentScale: ContentScale = ContentScale.Fit,
     alignment: Alignment = Alignment.Center,
     placeholderTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onError: (() -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
+    val currentSession = LocalArtworkContext.current.currentSession
     // Before a current session the saved copy is tried, so logos show at startup and offline.
     val piconUrl = remember(currentSession, piconPath) {
         piconPath?.let { AppArtworkSource(currentSession, it) }

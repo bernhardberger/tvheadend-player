@@ -283,7 +283,6 @@ class PlayerTopIdentityTest {
                     timeline = PlayerChromeTimeline.Live(this.timeshift, nowSec = 1_800),
                     actions = PlayerChromeActions(active = shownMode == PlayerChromeMode.CONTROLS, paused = false,
                         livePause = livePause, restoreFocus = restoreFocus),
-                    currentSession = null,
                     onTogglePause = { toggles++ }, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {},
                     onInteraction = {},
                     onPauseUnavailable = { toggles++ },

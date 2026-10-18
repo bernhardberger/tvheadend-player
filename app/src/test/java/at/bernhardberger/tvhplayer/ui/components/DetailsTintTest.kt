@@ -136,8 +136,10 @@ class DetailsTintTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             TVHeadendPlayerTheme {
-                val tint = rememberDetailsTint(session, art, picon).value
-                SideEffect { returned += tint }
+                ProvideArtworkSession(session) {
+                    val tint = rememberDetailsTint(art, picon).value
+                    SideEffect { returned += tint }
+                }
             }
         }
         assertEquals(neutral, returned.first())
@@ -184,8 +186,10 @@ class DetailsTintTest {
         compose.mainClock.autoAdvance = false
         compose.setContent {
             TVHeadendPlayerTheme {
-                val tint = rememberDetailsTint(session, art, picon).value
-                SideEffect { returned += tint }
+                ProvideArtworkSession(session) {
+                    val tint = rememberDetailsTint(art, picon).value
+                    SideEffect { returned += tint }
+                }
             }
         }
         assertEquals(redTint, returned.first())
@@ -204,7 +208,7 @@ class DetailsTintTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        ProgrammeDetailsPage(event, null, channel, 100, emptyList(), session, {}, {})
+                        ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, 100, emptyList(), {}, {}) }
                     }
                 }
             }

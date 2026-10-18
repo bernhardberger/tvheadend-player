@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.annotation.OptIn
@@ -625,7 +626,8 @@ fun RecordingPlayerScreen(
         if (playbackAvailable) {
             val entry = requireNotNull(entry)
             val channel = entry.channelId?.let { targetObservation?.channel(it) }
-            PlayerChrome(
+            // The chrome shows its pictures with the session of the recording it plays.
+            ProvideArtworkSession(retainedSelection?.currentSession) { PlayerChrome(
                 mode = chromeMode(foregroundLayer),
                 content = PlayerChromeContent(
                     clock = formatClock(nowSec),
@@ -660,7 +662,6 @@ fun RecordingPlayerScreen(
                         else -> null
                     },
                 ),
-                currentSession = retainedSelection?.currentSession,
                 entry = chrome.controlsEntry,
                 panelOpen = optionsPage != null || infoOpen,
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -687,7 +688,7 @@ fun RecordingPlayerScreen(
                 },
                 markerNavigation = markerNavigation,
                 onSeekMarker = ::seekMarker,
-            )
+            ) }
 
             PlayerPanelVisibility(Unit.takeIf { foregroundLayer == PlayerForegroundLayer.INFO }) {
                 PlaybackOptionsOverlayFrame(

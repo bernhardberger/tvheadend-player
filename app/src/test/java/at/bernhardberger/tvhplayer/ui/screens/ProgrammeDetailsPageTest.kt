@@ -53,6 +53,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import org.junit.Rule
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -1104,16 +1105,16 @@ class ProgrammeDetailsPageTest {
                             androidx.tv.material3.Text("Rail")
                         }
                         val details: @androidx.compose.runtime.Composable () -> Unit = {
-                        ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
+                        ProvideArtworkSession(session) { ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
                             if (recording) recordingDetailsActions(entry, true, true, true)
                             else programmeDetailsActions(shown, now, entry.takeIf { future }, true, true, false),
-                              session, {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
+                              {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
                                   listOf(EpgEvent.create(EventId(2), otherChannel.id, start, event.stop, title = event.title)) else if (todayCard)
                                   listOf(EpgEvent.create(EventId(2), channel.id, start + 3600.seconds, event.stop, title = event.title)) else airings,
                             onRelated = onRelated, channelOf = { listOf(channel, otherChannel).firstOrNull { c -> c.id == it } },
                             returnToCard = returnToCard, recordingEvent = shown.takeIf { recordingFacts },
                             recordingConfigurations = listOf(DvrConfiguration(DvrConfigId("default"), "", ""),
-                                DvrConfiguration(DvrConfigId("archive"), "Archive", "")))
+                                DvrConfiguration(DvrConfigId("archive"), "Archive", ""))) }
                         }
                         if (realRail) at.bernhardberger.tvhplayer.ui.components.SideRail(
                             currentRoute = AppDestination.CHANNELS, showEpgMenu = true, onRootBack = {}, onNavigate = {},

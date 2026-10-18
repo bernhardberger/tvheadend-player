@@ -65,7 +65,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -85,6 +84,7 @@ import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
@@ -204,7 +204,6 @@ internal fun FolderListRow(
 internal fun RecordingMetadataPane(
     entry: DvrEntry?,
     piconPath: ArtworkId?,
-    currentSession: CurrentSessionObservation?,
 ) {
     if (entry == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -223,9 +222,8 @@ internal fun RecordingMetadataPane(
             .testTag("recording-metadata-pane"),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        val artworkPath = currentSession?.let { entry.image ?: entry.fanartImage }
+        val artworkPath = LocalArtworkContext.current.currentSession?.let { entry.image ?: entry.fanartImage }
         PiconBox(
-            currentSession = currentSession,
             piconPath = artworkPath ?: piconPath,
             contentScale = if (artworkPath != null) ContentScale.Crop else ContentScale.Fit,
             modifier = Modifier
@@ -339,7 +337,6 @@ internal fun RecordingSchedule(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
@@ -459,7 +456,6 @@ internal fun RecordingSchedule(
                 RecordingListRow(
                     entry = entry,
                     piconPath = piconForEntry(entry),
-                    currentSession = currentSession,
                     selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                     focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
                     selectedFocus = selectedFocus,
@@ -484,7 +480,6 @@ internal fun RecordingProblems(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
@@ -612,7 +607,6 @@ internal fun RecordingProblems(
                     RecordingListRow(
                         entry = entry,
                         piconPath = piconForEntry(entry),
-                        currentSession = currentSession,
                         selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                         focusTarget =
                             active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
@@ -640,7 +634,6 @@ internal enum class RecordingRowKind {
 internal fun RecordingListRow(
     entry: DvrEntry,
     piconPath: ArtworkId?,
-    currentSession: CurrentSessionObservation?,
     selected: Boolean,
     modifier: Modifier = Modifier,
     focusTarget: Boolean = selected,
@@ -696,7 +689,6 @@ internal fun RecordingListRow(
                     )
                 }
                 PiconBox(
-                    currentSession = currentSession,
                     piconPath = piconPath,
                     placeholderTint = androidx.tv.material3.LocalContentColor.current,
                     modifier = Modifier.size(32.dp),

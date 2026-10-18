@@ -635,7 +635,6 @@ class LivePlayerChromeScreenTest {
                         nowSec = 1_800,
                     ),
                     actions = PlayerChromeActions(active = true, paused = state == PlayerStateCell.PAUSED),
-                    currentSession = null,
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {},
                     onInteraction = {},
                 )

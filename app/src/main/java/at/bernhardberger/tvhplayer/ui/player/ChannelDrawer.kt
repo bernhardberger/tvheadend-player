@@ -70,7 +70,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -93,7 +92,6 @@ fun ChannelDrawer(
     playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     recordingChannelIds: Set<ChannelId>,
     nowEvent: (ChannelId) -> EpgEvent?,
-    currentSession: CurrentSessionObservation? = null,
     active: Boolean = true,
     nowSec: Long = System.currentTimeMillis() / 1000L,
     onFocusChannel: (ChannelId) -> Unit,
@@ -266,7 +264,6 @@ fun ChannelDrawer(
                     nowSec = nowSec,
                     playbackIndicator = playbackIndicator.takeIf { channel.id == playbackChannelId } ?: ChannelPlaybackIndicator.NONE,
                     recording = channel.id in recordingChannelIds,
-                    currentSession = currentSession,
                     onClick = {
                         if (ownsInput()) {
                             if (channel.id != playingChannelId) pendingPickId = channel.id
@@ -309,7 +306,6 @@ private fun CompactZapCard(
     nowSec: Long,
     playbackIndicator: ChannelPlaybackIndicator,
     recording: Boolean,
-    currentSession: CurrentSessionObservation?,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     onLongClick: (() -> Unit)? = null,
@@ -333,7 +329,7 @@ private fun CompactZapCard(
         image = {
             Box(Modifier.fillMaxWidth().height(cardHeight).background(TvSurfaceColors.containerLowest)) {
                 PiconBox(
-                    currentSession = currentSession, piconPath = channel.icon,
+                    piconPath = channel.icon,
                     modifier = Modifier.align(Alignment.TopCenter).padding(top = 6.dp).size(100.dp, 45.dp)
                         .testTag("player-channel-${channel.id.value}-picon"),
                 )

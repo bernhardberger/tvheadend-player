@@ -106,6 +106,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 /** Offline native production composition; never a replacement Guide or a playback test. */
 @RunWith(RobolectricTestRunner::class)
@@ -239,7 +240,7 @@ class GuideVisualLayoutTest {
                     view = LocalView.current
                     Column {
                         Box(Modifier.height(guideTimelineRowHeight())) {
-                            TimelineChannelHeader(logoChannel, 1001, currentSession)
+                            ProvideArtworkSession(currentSession) { TimelineChannelHeader(logoChannel, 1001) }
                         }
                         Box(Modifier.height(guideTimelineRowHeight())) {
                             TimelineChannelHeader(noLogoChannel, 4567)
@@ -323,7 +324,7 @@ class GuideVisualLayoutTest {
                 view = LocalView.current
                 Box(Modifier.width(732.dp)) {
                     TimelineChannelRow(channel, 0, 1, null, requesters, 0, 7200,
-                        { 0 }, null, events, true, true, ConnectionUiState.Ready, false,
+                        { 0 }, events, true, true, ConnectionUiState.Ready, false,
                         { null }, {}, {})
                 }
             }
@@ -374,10 +375,10 @@ class GuideVisualLayoutTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 Box(Modifier.height(guideTimelineRowHeight())) {
-                    TimelineChannelHeader(
+                    ProvideArtworkSession(currentSession.value) { TimelineChannelHeader(
                         Channel.create(ChannelId(1), name = name.value, number = 1001, icon = icon.value),
-                        1001, currentSession.value,
-                    )
+                        1001,
+                    ) }
                 }
             }
         }
@@ -425,7 +426,7 @@ class GuideVisualLayoutTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 TimelineChannelRow(channel, 0, 1, null, requesters, 0, 10800,
-                    { 0 }, null, emptyList(), false, false, state.value, false,
+                    { 0 }, emptyList(), false, false, state.value, false,
                     { null }, {}, {})
             }
         }
@@ -614,7 +615,7 @@ class GuideVisualLayoutTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.width(784.dp)) {
                         TimelineChannelRow(channel, 0, 1, selected.value, requesters, 0, 10800,
-                            { 0 }, null, events, true, true, ConnectionUiState.Ready, false,
+                            { 0 }, events, true, true, ConnectionUiState.Ready, false,
                             { null }, {}, {}, visibleRowWidthPx = visibleWidth.value)
                     }
                 }

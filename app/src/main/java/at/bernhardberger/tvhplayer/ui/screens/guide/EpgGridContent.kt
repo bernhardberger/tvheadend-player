@@ -67,7 +67,6 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
@@ -91,6 +90,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
@@ -226,7 +226,6 @@ internal fun TimelineChannelRow(
     windowStartSec: Long,
     windowEndSec: Long,
     nowSecProvider: () -> Long,
-    currentSession: CurrentSessionObservation?,
     events: List<EpgEventEntry>,
     hasCachedEvents: Boolean,
     hasMatchingCachedEvents: Boolean,
@@ -258,7 +257,6 @@ internal fun TimelineChannelRow(
         TimelineChannelHeader(
             channel = channel,
             number = number,
-            currentSession = currentSession,
             selected = selectedEventId != null,
         )
         Spacer(Modifier.width(GuideChannelGap))
@@ -362,9 +360,9 @@ internal fun TimelineChannelRow(
 internal fun TimelineChannelHeader(
     channel: Channel,
     number: Long?,
-    currentSession: CurrentSessionObservation? = null,
     selected: Boolean = false,
 ) {
+    val currentSession = LocalArtworkContext.current.currentSession
     var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
     Surface(
         modifier = Modifier
@@ -402,7 +400,6 @@ internal fun TimelineChannelHeader(
             }
             if (channel.icon != null && currentSession != null && !logoFailed) {
                 PiconBox(
-                    currentSession = currentSession,
                     piconPath = channel.icon,
                     modifier = Modifier
                         .weight(1f, fill = false)

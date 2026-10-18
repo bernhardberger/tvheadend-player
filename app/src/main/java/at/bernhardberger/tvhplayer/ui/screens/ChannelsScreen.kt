@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
 
@@ -713,6 +714,8 @@ internal fun ChannelsScreenContent(
             return@body
         }
 
+        // A frame shows its pictures with the session of the observation it was built from.
+        ProvideArtworkSession(currentSession) {
         Row(
                 Modifier
                     .padding(browseViewportPadding)
@@ -816,7 +819,6 @@ internal fun ChannelsScreenContent(
                                     name = ch.name.orEmpty(),
                                     programTitle = now?.title ?: stringResource(R.string.no_epg),
                                     progress = if (now != null) prog else null,
-                                    currentSession = currentSession,
                                     piconPath = ch.icon,
                                     programStartSec = now?.start?.epochSeconds,
                                     recordingNow = status.recordingNow,
@@ -881,6 +883,7 @@ internal fun ChannelsScreenContent(
                     )
                 }
             }
+        }
         }
     }
     contextChannelId?.let { channelId ->
@@ -1143,7 +1146,6 @@ private fun FocusedChannelDetails(
             now = now,
             next = next,
             nowSec = nowSec,
-            currentSession = observation.currentSession,
             modifier = Modifier.fillMaxSize(),
         )
     }

@@ -60,14 +60,14 @@ class ArchiveDepthOwnershipTest {
                             backEnabled = selected.intValue == 0,
                             contentFocus = remember { FocusRequester() }, onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
-                            currentSession = null, piconForEntry = { null },
+                            piconForEntry = { null },
                         )
                         if (selected.intValue == 2) ArchiveDepthContent(
                             root = newRoot, navigation = navigation, contentPadding = PaddingValues(24.dp),
                             isCurrent = true, initialFocusEnabled = focusAllowed.value, backEnabled = true,
                             contentFocus = remember { FocusRequester() }, onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
-                            currentSession = null, piconForEntry = { null },
+                            piconForEntry = { null },
                         )
                     }
                 }

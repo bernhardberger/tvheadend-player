@@ -43,12 +43,14 @@ internal fun ProgrammeContextMenu(
         watchChannel = !event.isRunning(nowSec), programDetailsLabel = !fromGuide,
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         artwork = {
-            ProgrammeArtwork(event.image, channel?.icon, event.progress(nowSec).takeIf { event.isRunning(nowSec) },
-                currentSession,
-                Modifier.fillMaxSize().testTag(if (event.image != null && currentSession != null)
-                    "browse-context-artwork" else "browse-context-picon"),
-                plateModifier = Modifier.testTag("browse-context-plate"),
-                progressModifier = Modifier.testTag("browse-context-progress"))
+            // The menu shows its pictures with the session it was opened with.
+            ProvideArtworkSession(currentSession) {
+                ProgrammeArtwork(event.image, channel?.icon, event.progress(nowSec).takeIf { event.isRunning(nowSec) },
+                    Modifier.fillMaxSize().testTag(if (event.image != null && currentSession != null)
+                        "browse-context-artwork" else "browse-context-picon"),
+                    plateModifier = Modifier.testTag("browse-context-plate"),
+                    progressModifier = Modifier.testTag("browse-context-progress"))
+            }
         },
     )
 }

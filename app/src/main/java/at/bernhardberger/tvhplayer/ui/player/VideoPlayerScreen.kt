@@ -1686,7 +1686,7 @@ fun VideoPlayerScreen(
             railExpanded = layerState.channelRailPresented,
             nowPlaying = {
                 NowPlayingStrip(currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
-                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec, currentSession,
+                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec,
                     playbackIndicator = channelIndicator)
             },
             details = (detailsChannel to detailsBaseEvent).takeIf {
@@ -1742,7 +1742,6 @@ fun VideoPlayerScreen(
                     else -> layerState.restoreChannelAction
                 },
             ),
-            currentSession = currentSession,
             entry = layerState.chrome.controlsEntry,
             panelOpen = layerState.optionsPage != null,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -1787,7 +1786,6 @@ fun VideoPlayerScreen(
                             recordingChannelIds = recordingChannelIds,
                             nowSec = nowSec,
                             nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            currentSession = currentSession,
                             onFocusChannel = { selectedId = it },
                             onPickChannel = { tuneChannel(it) },
                             onClose = { keyCode ->
@@ -1815,7 +1813,7 @@ fun VideoPlayerScreen(
                         QuickZapTrayPreview(previewChannel,
                             previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
                             previewChannel?.let { observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            nowSec, currentSession,
+                            nowSec,
                             Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
                             scrolling = channelBrowser.scrolling)
                     },
@@ -1886,7 +1884,6 @@ fun VideoPlayerScreen(
                                 channelId = shownChannelId,
                                 channelNumber = shownChannel?.visibleChannelNumber?.toString().orEmpty(),
                                 picon = shownChannel?.icon,
-                                currentSession = currentSession,
                                 modifier = tileModifier,
                                 recordingBadge = observation.dvrEntryForEvent(event)?.state == DvrEntryState.RECORDING,
                             )
@@ -1981,7 +1978,6 @@ fun VideoPlayerScreen(
             number = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty(),
             target = channelNumberTarget,
             maxDigits = channelNumberDigits,
-            currentSession = currentSession,
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(start = 56.dp, top = 48.dp),

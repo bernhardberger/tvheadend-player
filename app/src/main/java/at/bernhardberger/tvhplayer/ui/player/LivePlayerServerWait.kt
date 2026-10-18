@@ -49,6 +49,7 @@ import at.bernhardberger.tvhplayer.core.WaitingConnectionFailure
 import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.core.waitingConnectionFailurePresentation
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.startup.mainStartupActionResource
@@ -165,7 +166,8 @@ internal fun LivePlayerServerWait(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            PiconBox(picon, Modifier.size(136.dp, 60.dp))
+            // Only the saved logo, as before a session.
+            ProvideArtworkSession(null) { PiconBox(picon, Modifier.size(136.dp, 60.dp)) }
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineSmall,

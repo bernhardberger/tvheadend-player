@@ -172,7 +172,6 @@ class LivePauseControlTest {
                                 content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 7, "Documentary", null, null, false, 1_800, "")),
                                 timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800, feedback = feedback),
                                 actions = PlayerChromeActions(active = true, paused = paused, livePause = livePause),
-                                currentSession = null,
                                 onTogglePause = { toggles++ },
                                 onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                                 onPauseUnavailable = { feedback = it },

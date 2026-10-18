@@ -197,6 +197,15 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 New screens use these shared patterns; a private copy of a size, timing or alpha
 they own is a review finding.
 
+Logos and programme pictures get their image loader (Coil's app singleton) and
+artwork session (`components/ArtworkContext.kt`, `LocalArtworkContext`) from the
+app root, not from parameters; a surface built from older data than the latest
+observation (details, context menus, a departing tab frame, the recording
+player) provides its own session with `ProvideArtworkSession`.
+CompositionLocals are only for such app-wide context and the existing theme and
+layout locals, never for screen data: channels, programmes, recordings and time
+(`nowSec`/`nowSecProvider`) stay explicit parameters.
+
 Focus, pressed, selected and disabled indication come from the TV Material
 components and their `*Defaults` (scale, colour, border, glow, shape). The app
 uses **library defaults**. Call sites do not override `scale(...)`,

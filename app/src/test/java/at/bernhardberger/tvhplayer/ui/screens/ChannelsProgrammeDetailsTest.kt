@@ -67,6 +67,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -334,13 +335,14 @@ class ChannelsProgrammeDetailsTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.size(340.dp, height ?: if (scale >= 1.3f) 364.dp else 380.dp)) {
-                        ChannelsProgrammeDetails(
-                            channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", icon = picon),
-                            now = programme,
-                            next = nextProgramme,
-                            nowSec = 900,
-                            currentSession = currentSession,
-                        )
+                        ProvideArtworkSession(currentSession) {
+                            ChannelsProgrammeDetails(
+                                channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", icon = picon),
+                                now = programme,
+                                next = nextProgramme,
+                                nowSec = 900,
+                            )
+                        }
                     }
                 }
             }

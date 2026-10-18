@@ -88,6 +88,7 @@ import java.util.TimeZone
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 /**
  * Live footer compaction evidence. Captures are composition only: 960×540 px,
@@ -894,7 +895,7 @@ class PlayerFooterLayoutEvidenceTest {
                             growing = growing(), paused = paused(), info = fixtureRecordingInfo(title, growing(), durationMs = recordingDurationMs),
                             onCommitSeek = onCommitSeek, markers = markers,
                             markerNavigation = markerNavigation, markerRevision = markerRevision, onSeekMarker = onSeekMarker,
-                        ) else PlayerChrome(
+                        ) else ProvideArtworkSession(session) { PlayerChrome(
                             mode = PlayerChromeMode.CONTROLS,
                             content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programme, null, false, 1_800, "")),
                             timeline = PlayerChromeTimeline.Live(
@@ -919,7 +920,6 @@ class PlayerFooterLayoutEvidenceTest {
                                 feedbackIsError = error && feedback() != null,
                             ),
                             actions = PlayerChromeActions(active = true, paused = paused()),
-                            currentSession = session,
                             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                             onCommitSeek = onCommitSeek,
                             controlsDecoration = { _, controls -> QuickZapPresentation(
@@ -927,7 +927,7 @@ class PlayerFooterLayoutEvidenceTest {
                               preview = {},
                               controls = controls,
                               channelContent = {
-                                ChannelDrawer(
+                                ProvideArtworkSession(session) { ChannelDrawer(
                                     channels = channels,
                                     selectedId = ChannelId(1),
                                     playingChannelId = ChannelId(1),
@@ -941,16 +941,15 @@ class PlayerFooterLayoutEvidenceTest {
                                             stop = Instant.fromEpochSeconds(3_600),
                                         )
                                     },
-                                    currentSession = session,
                                     active = false,
                                     nowSec = 1_800,
                                     onFocusChannel = {},
                                     onPickChannel = {},
                                     onCloseDrawer = {},
-                                )
+                                ) }
                               },
                             ) },
-                        )
+                        ) }
                     }
                 }
             }
@@ -1086,7 +1085,6 @@ private fun QuickStepBanner(
         content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
         timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow),
         actions = PlayerChromeActions(active = false),
-        currentSession = null,
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
         modifier = modifier,
     )

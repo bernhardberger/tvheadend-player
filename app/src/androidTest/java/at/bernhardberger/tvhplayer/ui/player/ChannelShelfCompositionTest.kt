@@ -83,7 +83,6 @@ class ChannelShelfCompositionTest {
                             0.25f, 0f, 0.75f, 0.75f, true),
                         ),
                         actions = PlayerChromeActions(active = layers.chrome.controlsVisible, paused = pausedGuard, restoreFocus = layers.restoreChannelAction),
-                        currentSession = null,
                         onDownFromActions = {
                             layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
                             layers.openChannelDrawer()

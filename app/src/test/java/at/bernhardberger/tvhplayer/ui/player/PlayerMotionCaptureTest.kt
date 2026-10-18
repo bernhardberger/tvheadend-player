@@ -80,6 +80,7 @@ import java.util.TimeZone
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 
 /**
  * Design-review captures of the player header, the controls-to-panel handover and zap
@@ -129,8 +130,8 @@ class PlayerMotionCaptureTest {
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
         show { session ->
             Box(Modifier.fillMaxSize()) {
-                ChannelNumberOverlay(number, target, session,
-                    Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
+                ProvideArtworkSession(session) { ChannelNumberOverlay(number, target,
+                    Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp)) }
             }
         }
         compose.mainClock.autoAdvance = false
@@ -212,7 +213,7 @@ class PlayerMotionCaptureTest {
             LaunchedEffect(Unit) { layers.showControls() }
             PlayerPage(details = Unit.takeIf { layers.infoOpen },
                 railExpanded = layers.channelRailPresented,
-                nowPlaying = { NowPlayingStrip("1", "Documentary", ArtworkId(1), programme, 1_800, session) },
+                nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip("1", "Documentary", ArtworkId(1), programme, 1_800) } },
                 railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
                 player = {
                     live(session, behind = false,
@@ -233,7 +234,7 @@ class PlayerMotionCaptureTest {
                             } else listOf(programme, next),
                             nowSec = 1_800, channelIdentity = "1 · Documentary",
                             tile = { event, modifier ->
-                                ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), session, modifier)
+                                ProvideArtworkSession(session) { ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), modifier) }
                             },
                             recordingFor = { null }, canModifyRecordings = true,
                             recordFocus = recordFocus, firstFocus = firstFocus, onAction = {},
@@ -387,7 +388,7 @@ class PlayerMotionCaptureTest {
             programme, Instant.fromEpochSeconds(if (behind) 1_770 else 1_800),
             if (behind) 0.49f else 0.5f, 0.33f, 0.5f, 0.5f, true,
         )
-        PlayerChrome(
+        ProvideArtworkSession(session) { PlayerChrome(
             mode = mode,
             content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, if (zapped) 2 else 1,
                 if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ArtworkId(1)),
@@ -400,7 +401,6 @@ class PlayerMotionCaptureTest {
                 motionKey = ChannelId(if (zapped) 2 else 1),
             ),
             actions = PlayerChromeActions(active = true, paused = behind),
-            currentSession = session,
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             entry = entry,
             panelOpen = panelOpen,
@@ -412,26 +412,25 @@ class PlayerMotionCaptureTest {
                     QuickZapPresentation(
                         expanded = rail.channelRailPresented,
                         preview = {
-                            QuickZapTrayPreview(channels.first(), programme, null, 1_800, session,
-                                Modifier.padding(horizontal = TvGridHorizontalMargin))
+                            ProvideArtworkSession(session) { QuickZapTrayPreview(channels.first(), programme, null, 1_800,
+                                Modifier.padding(horizontal = TvGridHorizontalMargin)) }
                         },
                         trayBleeds = true,
                         header = { PlayerChannelBrowserHint(browser, true, stringResource(R.string.all_channels)) },
                         controls = controls,
                         channelContent = {
-                            PlayerChannelBrowser(
+                            ProvideArtworkSession(session) { PlayerChannelBrowser(
                                 state = browser, channels = channels, recentChannels = channels.drop(1),
                                 playingChannelId = ChannelId(1), recordingChannelIds = emptySet(),
                                 nowEvent = { programme }, nowSec = 1_800,
-                                currentSession = session,
                                 onFocusChannel = {}, onOpenDetails = { _, _, _ -> },
                                 onPickChannel = {}, onClose = {}, active = rail.channelDrawerOpen,
-                            )
+                            ) }
                         },
                     )
                 }
             },
-        )
+        ) }
     }
 
     private fun show(content: @Composable (CurrentSessionObservation) -> Unit) {

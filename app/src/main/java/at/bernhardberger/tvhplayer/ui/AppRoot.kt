@@ -82,6 +82,7 @@ import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
@@ -1053,6 +1054,9 @@ fun AppRoot(
     val returningToPlayback = mainStartupReturningToPlayback(
         priorLiveChannelId, enteringLaunchTarget ?: revealingTarget,
     )
+    // Logos and programme pictures load with the latest current session; the provider recomposes
+    // nothing for guide or recording updates.
+    ProvideAppArtwork(tvheadendSession.observation) {
     MainStartupComposition(
         state = MainStartupCompositionState(
             presentation = effectiveStartupPresentation,
@@ -1168,6 +1172,7 @@ fun AppRoot(
             )
         },
     )
+    }
 }
 
 private fun ApplianceLaunchTarget.matchesPlayerKey(destination: AppNavKey?): Boolean {

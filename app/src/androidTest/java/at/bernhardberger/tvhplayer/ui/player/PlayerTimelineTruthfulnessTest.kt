@@ -741,7 +741,6 @@ class PlayerTimelineTruthfulnessTest {
                     ),
                     ),
                     actions = PlayerChromeActions(active = true),
-                    currentSession = null,
                     onStop = {},
                     onInteraction = {},
                     onOptions = {},

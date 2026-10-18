@@ -1156,7 +1156,6 @@ class PlayerTimelineGeometryTest {
                     state = frame.cell),
                 timeline = frame.timeline,
                 actions = PlayerChromeActions(active = frame.mode == PlayerChromeMode.CONTROLS, paused = frame.cell == PlayerStateCell.PAUSED),
-                currentSession = null,
                 onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             )
             PlayerBusyIndicator(frame.busy, Modifier.align(Alignment.Center))

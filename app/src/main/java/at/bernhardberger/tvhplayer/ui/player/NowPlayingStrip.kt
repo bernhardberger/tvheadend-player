@@ -25,7 +25,6 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -42,7 +41,6 @@ internal fun NowPlayingStrip(
     picon: ArtworkId?,
     programme: EpgEvent?,
     nowSec: Long,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
 ) {
@@ -51,7 +49,7 @@ internal fun NowPlayingStrip(
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(48.dp, 27.dp).clip(RoundedCornerShape(6.dp))
             .background(TvSurfaceColors.containerLowest), contentAlignment = Alignment.Center) {
-            if (picon != null) PiconBox(picon, Modifier.padding(3.dp), currentSession)
+            if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
             if (current != null) ProgressStrip(

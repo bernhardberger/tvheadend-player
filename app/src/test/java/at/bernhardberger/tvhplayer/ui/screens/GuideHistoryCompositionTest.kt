@@ -65,13 +65,13 @@ class GuideHistoryCompositionTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
                 TVHeadendPlayerTheme {
                     if (details) ProgrammeDetailsPage(a, null, null, 4000, emptyList(),
-                        null, {}, { details = false })
+                        {}, { details = false })
                     else Column(Modifier.fillMaxSize()) {
                         listOf(1L, 2L).forEach { channel -> TimelineChannelRow(
                             channel = Channel.create(ChannelId(channel), name = "Documentary $channel"),
                             channelIndex = (channel - 1).toInt(), number = channel, selectedEventId = null,
                             eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 7200,
-                            nowSecProvider = { 4000 }, currentSession = null,
+                            nowSecProvider = { 4000 },
                             events = events.filter { it.channelId == ChannelId(channel) }, hasCachedEvents = true,
                             hasMatchingCachedEvents = true, connectionUiState = ConnectionUiState.Ready,
                             coveragePending = false, recordingForEvent = { null }, onFocused = {},
@@ -104,7 +104,7 @@ class GuideHistoryCompositionTest {
         compose.setContent { TVHeadendPlayerTheme {
             ProgrammeDetailsPage(selected, recording, null, 4000,
                 programmeDetailsActions(selected, 4000, recording, true, false, true, liveProgramme = live),
-                null, {}, {})
+                {}, {})
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
         compose.runOnIdle { live = true }

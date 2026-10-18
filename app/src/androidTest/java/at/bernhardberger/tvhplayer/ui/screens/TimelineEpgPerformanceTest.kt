@@ -82,7 +82,7 @@ class TimelineEpgPerformanceTest {
                     TimelineChannelRow(
                         channel = channel, channelIndex = 0, number = 1, selectedEventId = null,
                         eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 10800,
-                        nowSecProvider = { 0L }, currentSession = null,
+                        nowSecProvider = { 0L },
                         events = events, hasCachedEvents = true, hasMatchingCachedEvents = true,
                         connectionUiState = ConnectionUiState.Ready, coveragePending = false,
                         recordingForEvent = { null },
@@ -141,7 +141,7 @@ class TimelineEpgPerformanceTest {
                             selectedEventId = selected.value?.takeIf { it.channelIndex == 0 }?.eventId,
                             eventFocusRequesters = focusRequesters,
                             windowStartSec = 0, windowEndSec = 10800, nowSecProvider = { 0L },
-                            currentSession = null, events = events,
+                            events = events,
                             hasCachedEvents = true, hasMatchingCachedEvents = true,
                             connectionUiState = ConnectionUiState.Ready, coveragePending = false,
                             recordingForEvent = { null }, onFocused = {}, onOpenDetails = {},

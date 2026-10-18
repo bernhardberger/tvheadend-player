@@ -13,7 +13,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.images.ChannelAccents
@@ -30,12 +29,12 @@ val LocalChannelAccents = staticCompositionLocalOf { ChannelAccents() }
  */
 @Composable
 fun rememberChannelAccent(
-    currentSession: CurrentSessionObservation?,
     piconPath: ArtworkId?,
     channelId: ChannelId,
 ): Color {
     val context = LocalContext.current
     val accents = LocalChannelAccents.current
+    val currentSession = LocalArtworkContext.current.currentSession
     val model = remember(currentSession, piconPath) {
         currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
     }

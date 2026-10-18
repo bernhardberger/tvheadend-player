@@ -51,7 +51,6 @@ class PlayerChromeTest {
                         nowSec = 1_800,
                     ),
                     actions = PlayerChromeActions(active = mode == PlayerChromeMode.CONTROLS),
-                    currentSession = null,
                     onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
                 )
             }

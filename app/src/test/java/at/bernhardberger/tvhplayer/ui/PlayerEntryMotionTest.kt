@@ -130,7 +130,6 @@ class PlayerEntryMotionTest {
                     nowSec = 1_800,
                 ),
                 actions = PlayerChromeActions(active = false),
-                currentSession = null,
                 onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             )
         }

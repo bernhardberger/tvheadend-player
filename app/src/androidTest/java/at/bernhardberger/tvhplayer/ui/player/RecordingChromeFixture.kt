@@ -92,7 +92,6 @@ internal fun RecordingChromeFixture(
             markerRevision = markerRevision,
         ),
         actions = PlayerChromeActions(active = active, paused = paused, restoreFocus = restoreFocus),
-        currentSession = null,
         onTogglePause = onTogglePause,
         onSeek = onSeek,
         onStop = onStop,

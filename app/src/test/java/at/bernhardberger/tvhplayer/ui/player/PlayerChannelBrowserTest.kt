@@ -47,7 +47,7 @@ class PlayerChannelBrowserTest {
                         PlayerChannelBrowser(state, channels, recent, ChannelId(1), emptySet(),
                             { id -> if (events) EpgEvent.create(EventId(id.value), id, Instant.fromEpochSeconds(1),
                                 Instant.fromEpochSeconds(100), title = "Programme ${id.value}") else null },
-                            50, null, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
+                            50, active, {}, { picks += it.id }, { channel, _, _ -> details += channel.id },
                             { closes += it }, channelsTitle = "Sport")
                         PlayerChannelBrowserHint(state, recent.isNotEmpty(), "Sport", Modifier.testTag("hint"))
                     }

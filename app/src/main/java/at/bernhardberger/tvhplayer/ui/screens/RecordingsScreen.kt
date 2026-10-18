@@ -20,6 +20,7 @@ import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
 import androidx.compose.foundation.layout.width
@@ -544,7 +545,8 @@ internal fun RecordingsScreenContent(
                 upFocus = modeFocus,
                 modifier = Modifier.padding(start = startPadding, end = endPadding),
             )
-        } else {
+        } else ProvideArtworkSession(currentSession) {
+            // A frame shows its pictures with the session of the observation it was built from.
             when (mode) {
                 DvrLibraryMode.ARCHIVE -> ArchiveDepthContent(
                     root = frame.archive,
@@ -581,7 +583,6 @@ internal fun RecordingsScreenContent(
                             showContextMenu = true
                         }
                     },
-                    currentSession = currentSession,
                     piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
                     modifier = Modifier.fillMaxSize().onFocusChanged {
                         if (owner.isCurrent) {
@@ -621,7 +622,6 @@ internal fun RecordingsScreenContent(
                                     showContextMenu = true
                                 }
                             },
-                            currentSession = currentSession,
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
@@ -664,7 +664,6 @@ internal fun RecordingsScreenContent(
                                     showContextMenu = true
                                 }
                             },
-                            currentSession = currentSession,
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
@@ -744,7 +743,7 @@ internal fun RecordingsScreenContent(
                     (channel?.let { at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty()) }
                         ?: opened.channelName)?.takeIf(String::isNotBlank),
                     opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
-                    ).joinToString(" · "), observation.currentSession,
+                    ).joinToString(" · "),
                         Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
                 },
                 onDismiss = closeResume,
@@ -865,10 +864,12 @@ internal fun RecordingsScreenContent(
             },
             artwork = {
                 val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
-                ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null,
-                    selectedCapability, Modifier.fillMaxSize().testTag(if (artwork != null)
-                        "browse-context-artwork" else "browse-context-picon"),
-                    plateModifier = Modifier.testTag("browse-context-plate"))
+                ProvideArtworkSession(selectedCapability) {
+                    ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null,
+                        Modifier.fillMaxSize().testTag(if (artwork != null)
+                            "browse-context-artwork" else "browse-context-picon"),
+                        plateModifier = Modifier.testTag("browse-context-plate"))
+                }
             },
         )
         }
@@ -878,13 +879,13 @@ internal fun RecordingsScreenContent(
         val menuAlpha = animateShown(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "recording-details-from-menu")
         val alpha = remember(detailAlpha, menuAlpha) { derivedStateOf { detailAlpha.value * menuAlpha.value } }
-        ProgrammeDetailsPage(
+        // Details show their pictures with the session they were opened with.
+        ProvideArtworkSession(selectedCapability) { ProgrammeDetailsPage(
             event = null,
             recording = opened,
             nowSec = nowSec,
             recordingEvent = opened.eventId?.takeIf { selectedCapability != null }?.let(observation::event),
             recordingConfigurations = observation.currentDvrConfigurations().takeIf { selectedCapability != null }.orEmpty(),
-            currentSession = selectedCapability,
             channel = opened.channelId?.let(channelsById::get),
             actions = recordingDetailsActions(opened, selectedCapability != null,
                 canModifyRecordings = selectedCapability != null &&
@@ -949,7 +950,7 @@ internal fun RecordingsScreenContent(
                 }
             },
             onClose = { visibility.targetState = false },
-        )
+        ) }
         }
         }
         }

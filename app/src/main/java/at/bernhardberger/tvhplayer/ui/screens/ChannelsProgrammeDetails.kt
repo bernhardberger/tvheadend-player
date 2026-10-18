@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -40,6 +39,7 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
@@ -61,7 +61,6 @@ internal fun ChannelsProgrammeDetails(
     now: EpgEvent?,
     next: EpgEvent?,
     nowSec: Long,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier = Modifier,
 ) = profileTrace("P1:compose:channelDetails") {
     val title = now?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
@@ -121,7 +120,6 @@ internal fun ChannelsProgrammeDetails(
                 channel = channel,
                 now = now,
                 nowSec = nowSec,
-                currentSession = currentSession,
                 modifier = Modifier.size(
                     width = with(density) { (imageHeight * 16f / 9f).toDp() },
                     height = with(density) { imageHeight.toDp() },
@@ -179,10 +177,10 @@ private fun ChannelsProgrammePreview(
     channel: Channel,
     now: EpgEvent?,
     nowSec: Long,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier,
 ) {
-    val accent = rememberChannelAccent(currentSession, channel.icon, channel.id)
+    val currentSession = LocalArtworkContext.current.currentSession
+    val accent = rememberChannelAccent(channel.icon, channel.id)
     val artwork = now?.image
     val timedEvent = now?.takeIf { it.stop > it.start }
     val timing = timedEvent?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) }
@@ -212,7 +210,6 @@ private fun ChannelsProgrammePreview(
             ) {
                 PiconBox(
                     piconPath = channel.icon,
-                    currentSession = currentSession,
                     modifier = Modifier.fillMaxSize(0.6f).testTag("channels-preview-identity"),
                 )
             }

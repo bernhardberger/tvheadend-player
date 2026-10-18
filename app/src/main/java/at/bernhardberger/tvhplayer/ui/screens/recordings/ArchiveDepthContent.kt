@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
@@ -59,7 +58,6 @@ internal fun ArchiveDepthContent(
     onModeFocus: () -> Unit,
     onDrawerFocus: (() -> Unit)?,
     onOpenRecording: (DvrEntry) -> Unit,
-    currentSession: CurrentSessionObservation?,
     piconForEntry: (DvrEntry) -> ArtworkId?,
     modifier: Modifier = Modifier,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
@@ -67,7 +65,7 @@ internal fun ArchiveDepthContent(
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
     val latestOnOpenContextMenu = rememberUpdatedState(onOpenContextMenu)
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
-    val levels = remember(root, currentSession) {
+    val levels = remember(root) {
         val levels = linkedMapOf<String, DepthLevel>()
         fun addFolder(folder: DvrArchiveFolder) {
             val id = archiveLevelId(folder.path)
@@ -97,7 +95,7 @@ internal fun ArchiveDepthContent(
                                 rows = emptyList(),
                                 heading = { ArchiveLevelHeading("", it) },
                                 passiveContent = {
-                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry), currentSession)
+                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry))
                                 },
                             )
                             DepthRow(
@@ -107,7 +105,7 @@ internal fun ArchiveDepthContent(
                             ) { rowModifier, activate ->
                                 RecordingListRow(
                                     entry = item.entry, piconPath = latestPiconForEntry.value(item.entry),
-                                    currentSession = currentSession, selected = false, modifier = rowModifier,
+                                    selected = false, modifier = rowModifier,
                                     onClick = activate,
                                     onOpenContextMenu = { latestOnOpenContextMenu.value?.invoke(item.entry) },
                                 )

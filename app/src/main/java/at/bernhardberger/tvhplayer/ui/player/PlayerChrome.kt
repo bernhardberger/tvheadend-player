@@ -42,7 +42,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
@@ -72,7 +72,6 @@ internal fun PlayerChrome(
     content: PlayerChromeContent,
     timeline: PlayerChromeTimeline,
     actions: PlayerChromeActions,
-    currentSession: CurrentSessionObservation?,
     onTogglePause: () -> Unit,
     onSeek: (deltaMs: Long) -> Unit,
     onStop: () -> Unit,
@@ -160,10 +159,10 @@ internal fun PlayerChrome(
                              shape = CardDefaults.shape(ArtworkTileShape),
                              border = embeddedProgressCardBorder()) {
                             ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                                currentSession, Modifier)
+                                Modifier)
                         }
                     } else ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                        currentSession, faded)
+                        faded)
                 }
                 timelineRow()
             }
@@ -196,7 +195,7 @@ internal fun PlayerChrome(
                 onChannelZap = onChannelZap,
                 downHint = downHint,
                 topIdentity = { placed, _, _ ->
-                    PlayerTopIdentity(content, currentSession, placed)
+                    PlayerTopIdentity(content, placed)
                 },
             )
         } else {
@@ -205,7 +204,7 @@ internal fun PlayerChrome(
             PlayerOverlayChrome(
                 headerContent = { placed ->
                     header(placed)
-                    PlayerTopIdentity(content, currentSession, placed)
+                    PlayerTopIdentity(content, placed)
                 },
                 footerPadding = PaddingValues(start = TvGridHorizontalMargin, end = TvGridHorizontalMargin,
                     top = TvOverlayFooterGradientRunout, bottom = PlayerBannerBottomPadding),
@@ -325,10 +324,10 @@ private fun ProgrammeArtworkTile(
     artwork: ArtworkId?,
     picon: ArtworkId?,
     channelNumber: String,
-    currentSession: CurrentSessionObservation?,
     modifier: Modifier,
 ) {
     val id = artwork
+    val currentSession = LocalArtworkContext.current.currentSession
     var failed by remember(id, currentSession) { mutableStateOf(false) }
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
@@ -336,7 +335,7 @@ private fun ProgrammeArtworkTile(
             Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLow))
             AsyncImage(AppArtworkSource(currentSession, id), null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
-        } else ChannelArtworkFallback(picon, channelNumber, currentSession)
+        } else ChannelArtworkFallback(picon, channelNumber)
     }
 }
 
@@ -345,12 +344,12 @@ private fun ProgrammeArtworkTile(
 private fun ChannelArtworkFallback(
     picon: ArtworkId?,
     channelNumber: String,
-    currentSession: CurrentSessionObservation?,
 ) {
+    val currentSession = LocalArtworkContext.current.currentSession
     Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLowest).testTag("player-info-artwork-fallback"),
         contentAlignment = Alignment.Center) {
         if (picon != null && currentSession != null) {
-            PiconBox(picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), currentSession)
+            PiconBox(picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
         } else Text(channelNumber, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
             color = MaterialTheme.colorScheme.onSurface)
     }

@@ -1,0 +1,151 @@
+package at.bernhardberger.tvhplayer.ui.components
+
+import android.app.Application
+import android.graphics.Bitmap
+import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.dp
+import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import coil3.ImageLoader
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.intercept.Interceptor
+import coil3.request.SuccessResult
+import kotlin.time.Instant
+import kotlinx.coroutines.Dispatchers
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+
+/** The app's artwork context follows the session, not the observation: guide updates leave logos alone. */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34], application = Application::class)
+class ArtworkContextTest {
+    @get:Rule val images = ImageLoaderRule()
+    @get:Rule val compose = createComposeRule()
+    private val requests = mutableListOf<Any>()
+    private var logoCompositions = 0
+    private var observationCompositions = 0
+
+    @Test fun aGuideUpdateNeitherRecomposesALogoNorRequestsItAgain() {
+        val session = FakeTvheadendSession(observation(ready, guide = 1))
+        show(session)
+        val current = requireNotNull(session.observation.value.currentSession)
+        assertEquals(1, requests.size)
+        val logos = logoCompositions
+        val seen = observationCompositions
+
+        repeat(3) { session.publish(observation(ready, guide = 2 + it)) }
+        compose.waitForIdle()
+
+        assertSame(current, session.observation.value.currentSession)
+        assertTrue("the guide updates reached the composition", observationCompositions > seen)
+        assertEquals(logos, logoCompositions)
+        assertEquals(1, requests.size)
+    }
+
+    @Test fun beforeReadyUpdatesOfTheSameProfileNeitherRecomposeALogoNorRequestItAgain() {
+        val session = FakeTvheadendSession(observation(SessionState.Synchronizing, guide = 1))
+        show(session)
+        assertNull(session.observation.value.currentSession)
+        assertEquals(listOf<Any>(AppArtworkSource(null, LOGO)), requests)
+        val logos = logoCompositions
+        val seen = observationCompositions
+
+        repeat(3) { session.publish(observation(SessionState.Synchronizing, guide = 2 + it)) }
+        compose.waitForIdle()
+
+        assertTrue("the retained updates reached the composition", observationCompositions > seen)
+        assertEquals(logos, logoCompositions)
+        assertEquals(listOf<Any>(AppArtworkSource(null, LOGO)), requests)
+    }
+
+    @Test fun aNewSessionReachesTheLogo() {
+        val session = FakeTvheadendSession(observation(SessionState.Synchronizing, guide = 1))
+        show(session)
+        val logos = logoCompositions
+
+        session.publish(observation(ready, guide = 2))
+        compose.waitForIdle()
+
+        val current = requireNotNull(session.observation.value.currentSession)
+        assertTrue(logoCompositions > logos)
+        assertEquals(listOf<Any>(AppArtworkSource(null, LOGO), AppArtworkSource(current, LOGO)), requests)
+    }
+
+    private fun show(session: FakeTvheadendSession) {
+        images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+            .components {
+                add(Interceptor { chain ->
+                    requests += chain.request.data
+                    SuccessResult(Bitmap.createBitmap(8, 4, Bitmap.Config.ARGB_8888).asImage(), chain.request, DataSource.MEMORY)
+                })
+            }
+            .coroutineContext(Dispatchers.Main.immediate)
+            .diskCache(null)
+            .build())
+        compose.setContent {
+            ProvideAppArtwork(session.observation) {
+                ObservationReader(session)
+                Logo()
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    // Reads the artwork session like every logo and picture does.
+    @Composable
+    private fun Logo() {
+        LocalArtworkContext.current.currentSession
+        SideEffect { logoCompositions++ }
+        PiconBox(LOGO, Modifier.size(60.dp, 36.dp))
+    }
+
+    // A screen of the app, which follows every observation.
+    @Composable
+    private fun ObservationReader(session: FakeTvheadendSession) {
+        session.observation.collectAsState().value
+        SideEffect { observationCompositions++ }
+    }
+
+    private fun observation(state: SessionState, guide: Int) = SessionObservation.create(
+        sessionState = state,
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "One", icon = LOGO)))),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(EpgEvent.create(EventId(guide.toLong()), ChannelId(1),
+            Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600), title = "Programme $guide")))),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+    )
+
+    private companion object {
+        val LOGO = ArtworkId(1)
+        val ready = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED))
+    }
+}

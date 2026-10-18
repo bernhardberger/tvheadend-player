@@ -62,8 +62,8 @@ class PiconBoxTest {
             compose.setContent {
                 TVHeadendPlayerTheme {
                     Column {
-                        PiconBox(ArtworkId(1), bounds("subject"), current,
-                            contentScale = ContentScale.Crop)
+                        ProvideArtworkSession(current) { PiconBox(ArtworkId(1), bounds("subject"),
+                            contentScale = ContentScale.Crop) }
                         // The former subcomposition propagated its fixed minimum constraints
                         // to the icon. Preserve that full, centred square for load/error states.
                         Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
@@ -88,8 +88,8 @@ class PiconBoxTest {
             compose.setContent {
                 TVHeadendPlayerTheme {
                     Column {
-                        PiconBox(ArtworkId(1), bounds("pending"), currentSession = null)
-                        PiconBox(null, bounds("missing"), currentSession = null)
+                        PiconBox(ArtworkId(1), bounds("pending"))
+                        PiconBox(null, bounds("missing"))
                         Box(bounds("reference")) { PiconPlaceholder(Modifier.fillMaxSize()) }
                     }
                 }
@@ -142,7 +142,7 @@ class PiconBoxTest {
         try {
             compose.setContent {
                 TVHeadendPlayerTheme {
-                    PiconBox(ArtworkId(1), bounds("subject"), current.value)
+                    ProvideArtworkSession(current.value) { PiconBox(ArtworkId(1), bounds("subject")) }
                 }
             }
             compose.waitUntil(5_000) { started.isCompleted }

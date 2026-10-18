@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
-import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.detailsTintRgb
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
@@ -15,13 +14,13 @@ import at.bernhardberger.tvhplayer.images.DetailsArtColors
 /** Only the details backdrop changes colour; the content retains the normal theme. */
 @Composable
 internal fun rememberDetailsTint(
-    session: CurrentSessionObservation?,
     art: ArtworkId?,
     picon: ArtworkId?,
 ): State<Color> {
     val neutral = MaterialTheme.colorScheme.background
     val context = LocalContext.current
     val accents = LocalChannelAccents.current
+    val session = LocalArtworkContext.current.currentSession
     val source = remember(session, art, picon) {
         session?.let { current -> (art ?: picon)?.let { AppArtworkSource(current, it) } }
     }
