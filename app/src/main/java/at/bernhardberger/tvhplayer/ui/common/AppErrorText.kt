@@ -23,7 +23,7 @@ internal class AppErrorText(private val context: Context) {
         reconnectInSeconds: Int? = null,
         startsAt: String? = null,
     ): String = when {
-        condition == AppErrorCondition.RECONNECTING && reconnectInSeconds != null ->
+        condition == AppErrorCondition.RECONNECTING && reconnectInSeconds != null && reconnectInSeconds > 0 ->
             context.getString(R.string.error_110_reason, reconnectInSeconds)
         condition == AppErrorCondition.RECONNECTING -> context.getString(R.string.error_110_reason_pending)
         condition == AppErrorCondition.RECORDING_NOT_STARTED && startsAt != null ->
@@ -32,7 +32,7 @@ internal class AppErrorText(private val context: Context) {
         else -> context.getString(condition.reasonRes())
     }
 
-    /** What helps, or null where it would only repeat the reason (a countdown, a start time). */
+    /** What helps, or null where it would only repeat the reason (a countdown, a start time, a finish). */
     fun hint(condition: AppErrorCondition): String? = condition.hintRes()?.let(context::getString)
 
     fun number(condition: AppErrorCondition): String = context.getString(R.string.error_number, condition.number)
@@ -64,11 +64,15 @@ internal fun AppErrorCondition.titleRes(): Int = when (this) {
     AppErrorCondition.RECORDING_NOT_STARTED -> R.string.error_302_title
     AppErrorCondition.RECORDING_FILE_MISSING -> R.string.error_303_title
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_304_title
+    AppErrorCondition.RECORDING_DEFERRED -> R.string.error_305_title
 }
 
-/** The plain reason; [AppErrorText.reason] substitutes the countdown and start time. */
+/**
+ * The plain reason. Private because 110 and 302 are format strings: only [AppErrorText.reason]
+ * substitutes the countdown and start time or falls back to their plain sentences.
+ */
 @StringRes
-internal fun AppErrorCondition.reasonRes(): Int = when (this) {
+private fun AppErrorCondition.reasonRes(): Int = when (this) {
     AppErrorCondition.UNREACHABLE -> R.string.error_101_reason
     AppErrorCondition.TIMEOUT -> R.string.error_102_reason
     AppErrorCondition.AUTHENTICATION_REJECTED -> R.string.error_103_reason
@@ -91,6 +95,7 @@ internal fun AppErrorCondition.reasonRes(): Int = when (this) {
     AppErrorCondition.RECORDING_NOT_STARTED -> R.string.error_302_reason
     AppErrorCondition.RECORDING_FILE_MISSING -> R.string.error_303_reason
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_304_reason
+    AppErrorCondition.RECORDING_DEFERRED -> R.string.error_305_reason
 }
 
 /** Hints are shared: conditions with the same advice point at one string. */
@@ -118,6 +123,7 @@ internal fun AppErrorCondition.hintRes(): Int? = when (this) {
     AppErrorCondition.RECORDING_NOT_STARTED -> null
     AppErrorCondition.RECORDING_FILE_MISSING -> R.string.error_hint_check_recording
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_hint_other_recording
+    AppErrorCondition.RECORDING_DEFERRED -> null
 }
 
 @StringRes

@@ -2,10 +2,17 @@
 
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
@@ -18,6 +25,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
 class AppErrorTest {
     /** The SDK's open values are companion constants, not enum entries. */
     private inline fun <reified T : Any> sdkConstants(): List<T> = T::class.java.fields
@@ -27,6 +35,30 @@ class AppErrorTest {
 
     private fun unavailable(failure: SessionFailure) =
         SessionState.Unavailable(failure).toConnectionUiState()
+
+    private val retry = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
+    private val settings = listOf(AppErrorAction.CONNECTION_SETTINGS)
+
+    /** Buttons of each connection condition when the SDK gives no guidance, from the vocabulary table. */
+    private val defaultButtons = mapOf(
+        AppErrorCondition.UNREACHABLE to retry,
+        AppErrorCondition.TIMEOUT to retry,
+        AppErrorCondition.AUTHENTICATION_REJECTED to settings,
+        AppErrorCondition.PERMISSION_DENIED to settings,
+        AppErrorCondition.INCOMPATIBLE_SERVER to settings,
+        AppErrorCondition.CREDENTIAL_UNAVAILABLE to settings,
+        AppErrorCondition.NOT_CONFIGURED to settings,
+        AppErrorCondition.NO_CHANNELS to retry,
+        AppErrorCondition.LOAD_FAILED to retry,
+        AppErrorCondition.RECONNECTING to settings,
+    )
+
+    /** Real SDK admissions, built through its test factory. */
+    private val completed = TvheadendTestResultFactory.completedRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
+
+    private val growing = TvheadendTestResultFactory.growingRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
+
+    private fun entry(state: DvrEntryState?) = DvrEntry.create(DvrEntryId(1), state = state)
 
     @Test fun numbersAreUniqueAndStayInTheirGroup() {
         val all = AppErrorCondition.entries
@@ -95,8 +127,6 @@ class AppErrorTest {
     }
 
     @Test fun buttonsFollowTheRecoveryDisposition() {
-        val retry = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
-        val settings = listOf(AppErrorAction.CONNECTION_SETTINGS)
         fun actions(kind: ConnectionFailureKind, disposition: SessionRecoveryDisposition, closable: Boolean = false) =
             ConnectionUiState.Error(kind, disposition).toAppError(closable)!!.actions
 
@@ -121,13 +151,52 @@ class AppErrorTest {
         assertEquals(retry + AppErrorAction.CLOSE, noChannelsAppError(closable = true).actions)
     }
 
+    /** Rule 3 over every failure kind, every SDK disposition and both surfaces, read through [primaryRecoveryAction]. */
+    @Test fun everyKindAndDispositionTakesItsButtonsFromThePrimaryRecoveryAction() {
+        val dispositions = sdkConstants<SessionRecoveryDisposition>()
+        for (kind in ConnectionFailureKind.entries) for (closable in listOf(false, true)) {
+            val close = if (closable) listOf(AppErrorAction.CLOSE) else emptyList()
+            for (disposition in dispositions) {
+                val state = ConnectionUiState.Error(kind, disposition)
+                val error = state.toAppError(closable)!!
+                val expected = when (state.primaryRecoveryAction()) {
+                    // The owner keeps a connection that retries by itself to Connection settings only.
+                    ConnectionRecoveryAction.RETRY -> if (error.condition == AppErrorCondition.RECONNECTING) settings else retry
+                    ConnectionRecoveryAction.SETTINGS,
+                    ConnectionRecoveryAction.NONE -> settings
+                }
+                assertEquals("$kind $disposition closable=$closable", expected + close, error.actions)
+            }
+            // Without guidance every condition the kind can read as keeps its own default.
+            for (condition in dispositions.map { kind.toAppErrorCondition(it) }.toSet()) {
+                assertEquals("$kind $condition no guidance closable=$closable",
+                    defaultButtons.getValue(condition) + close, condition.actions(recovery = null, closable = closable))
+            }
+        }
+    }
+
+    @Test fun guidanceOverridesTheDefaultOfEveryConnectionCondition() {
+        for (condition in AppErrorCondition.entries.filter { it.kind == AppErrorKind.CONNECTION }) {
+            val retryOrOwn = if (condition == AppErrorCondition.RECONNECTING) settings else retry
+            assertEquals("$condition", retryOrOwn, condition.actions(ConnectionRecoveryAction.RETRY))
+            assertEquals("$condition", settings, condition.actions(ConnectionRecoveryAction.SETTINGS))
+            assertEquals("$condition", settings, condition.actions(ConnectionRecoveryAction.NONE))
+        }
+        // No channels under a no-retry or automatic-backoff session offers no Retry.
+        assertEquals(settings, AppErrorCondition.NO_CHANNELS.actions(
+            ConnectionUiState.Error(ConnectionFailureKind.OTHER, SessionRecoveryDisposition.NO_RETRY).primaryRecoveryAction()))
+        assertEquals(settings, AppErrorCondition.NO_CHANNELS.actions(
+            ConnectionUiState.Error(ConnectionFailureKind.OTHER, SessionRecoveryDisposition.AUTOMATIC_BACKOFF).primaryRecoveryAction()))
+    }
+
     @Test fun conditionsWithoutGuidanceUseTheirDefaultButtons() {
-        assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS),
-            AppErrorCondition.UNREACHABLE.actions())
-        assertEquals(listOf(AppErrorAction.CONNECTION_SETTINGS), AppErrorCondition.AUTHENTICATION_REJECTED.actions())
-        // A future disposition is neither explicit retry nor terminal: the default applies.
-        assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS),
-            AppErrorCondition.LOAD_FAILED.actions(disposition = null))
+        val connection = AppErrorCondition.entries.filter { it.kind == AppErrorKind.CONNECTION }
+        assertEquals(connection.toSet(), defaultButtons.keys)
+        for (condition in connection) {
+            assertEquals("$condition", defaultButtons.getValue(condition), condition.actions())
+            assertEquals("$condition", defaultButtons.getValue(condition) + AppErrorAction.CLOSE,
+                condition.actions(closable = true))
+        }
     }
 
     @Test fun channelMessagesHaveNoButtonsAndAlertsCarryClose() {
@@ -137,7 +206,7 @@ class AppErrorTest {
         assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE), AppErrorCondition.USER_LIMIT.actions())
         assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE), AppErrorCondition.RECORDING_INTERRUPTED.actions())
         for (condition in listOf(AppErrorCondition.RECORDING_NOT_STARTED, AppErrorCondition.RECORDING_FILE_MISSING,
-            AppErrorCondition.RECORDING_UNAVAILABLE)) {
+            AppErrorCondition.RECORDING_UNAVAILABLE, AppErrorCondition.RECORDING_DEFERRED)) {
             assertEquals("$condition", listOf(AppErrorAction.CLOSE), condition.actions())
         }
     }
@@ -169,31 +238,125 @@ class AppErrorTest {
 
     @Test fun recordingPlaybackMapsEveryReasonAndAdmission() {
         for (reason in AppPlaybackFailureReason.entries) {
-            val condition = recordingErrorCondition(null, AppPlaybackState.Failed(reason))
-            assertEquals("$reason", AppErrorKind.RECORDING, condition.kind)
+            val condition = recordingErrorCondition(null, null, AppPlaybackState.Failed(reason))
+            assertEquals("$reason", AppErrorKind.RECORDING, condition!!.kind)
         }
-        val readFailed = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
-        val other = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)
-        assertEquals(301, recordingErrorCondition(null, readFailed).number)
-        assertEquals(301, recordingErrorCondition(null, other).number)
-        assertEquals(302, recordingErrorCondition(RecordingPlaybackAdmission.GrowingDeferred, null).number)
-        assertEquals(304, recordingErrorCondition(RecordingPlaybackAdmission.TargetUnavailable, readFailed).number)
-        assertEquals(304, recordingErrorCondition(RecordingPlaybackAdmission.ObservationExpired, other).number)
-        assertEquals(304, recordingErrorCondition(null, null).number)
-        assertEquals(101, recordingErrorCondition(null, null, initialConnectionFailure = true).number)
-        // Completed and Growing are built inside the SDK; they report the playback failure.
+        // A new SDK admission needs a row here and in the vocabulary.
         assertEquals(
             setOf("Completed", "Growing", "GrowingDeferred", "TargetUnavailable", "ObservationExpired"),
             RecordingPlaybackAdmission::class.java.classes.map { it.simpleName }.toSet(),
         )
     }
 
-    @Test fun recordingAlertAlwaysOffersCloseAndRetriesAnInitialConnectionFailure() {
-        assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS, AppErrorAction.CLOSE),
-            recordingAppError(null, null, initialConnectionFailure = true).actions)
+    @Test fun recordingConditionsFollowTheSdkAdmission() {
+        val readFailed = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+        val other = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)
+        fun number(entry: DvrEntry?, admission: RecordingPlaybackAdmission?, failure: AppPlaybackState.Failed? = null) =
+            recordingErrorCondition(entry, admission, failure)?.number
+
+        // The SDK defers an active recording whose file is not MPEG-TS.
+        assertEquals(305, number(entry(DvrEntryState.RECORDING), RecordingPlaybackAdmission.GrowingDeferred))
+        // Not admitted: what the entry shows decides.
+        assertEquals(302, number(entry(DvrEntryState.SCHEDULED), RecordingPlaybackAdmission.TargetUnavailable))
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.COMPLETED, DvrEntryState.FILE_MISSING)) {
+            assertEquals("$state", 303, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
+        }
+        for (state in sdkConstants<DvrEntryState>() - setOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
+            DvrEntryState.COMPLETED, DvrEntryState.FILE_MISSING)) {
+            assertEquals("$state", 304, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
+        }
+        assertEquals(304, number(entry(null), RecordingPlaybackAdmission.TargetUnavailable))
+        assertEquals(304, number(null, RecordingPlaybackAdmission.TargetUnavailable, readFailed))
+        assertEquals(302, number(entry(DvrEntryState.SCHEDULED), RecordingPlaybackAdmission.TargetUnavailable, other))
+        assertEquals(304, number(entry(DvrEntryState.COMPLETED), RecordingPlaybackAdmission.ObservationExpired, other))
+        assertEquals(304, number(null, RecordingPlaybackAdmission.ObservationExpired))
+        // Playback failures of a playable or unresolved recording; Failed(OTHER) stays an interruption.
+        assertEquals(301, number(entry(DvrEntryState.COMPLETED), completed, readFailed))
+        assertEquals(301, number(entry(DvrEntryState.RECORDING), growing, other))
+        assertEquals(301, number(null, null, readFailed))
+        assertEquals(301, number(null, null, other))
+        // An admitted recording whose entry is gone, or an entry the SDK did not admit.
+        assertEquals(304, number(null, completed))
+        assertEquals(304, number(null, growing))
+        assertEquals(304, number(entry(DvrEntryState.COMPLETED), null))
+        // Playing and loading are not errors.
+        assertNull(number(entry(DvrEntryState.COMPLETED), completed))
+        assertNull(number(entry(DvrEntryState.RECORDING), growing))
+        assertNull(number(null, null))
+        assertNull(recordingAppError(entry(DvrEntryState.COMPLETED), completed, null))
+    }
+
+    /** Same predicates as `RecordingPlayerScreen`: an error exists exactly when its terminal error shows. */
+    @Test fun recordingErrorExistsExactlyWhenThePlayerShowsItsTerminalError() {
+        val entries = listOf(null, entry(null)) + sdkConstants<DvrEntryState>().map { entry(it) }
+        val admissions = listOf(null, completed, growing, RecordingPlaybackAdmission.GrowingDeferred,
+            RecordingPlaybackAdmission.TargetUnavailable, RecordingPlaybackAdmission.ObservationExpired)
+        val failures = listOf(null) + AppPlaybackFailureReason.entries.map { AppPlaybackState.Failed(it) }
+        val connection = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
+        for (entry in entries) for (admission in admissions) for (failure in failures) for (connectionAvailable in
+            listOf(true, false)) {
+            val playbackAvailable = entry != null && when (admission) {
+                is RecordingPlaybackAdmission.Completed,
+                is RecordingPlaybackAdmission.Growing -> true
+                RecordingPlaybackAdmission.GrowingDeferred,
+                RecordingPlaybackAdmission.ObservationExpired,
+                RecordingPlaybackAdmission.TargetUnavailable,
+                null -> false
+            }
+            val recordingResolved = entry != null || admission != null || failure != null
+            val initialConnectionFailure = !recordingResolved && !connectionAvailable
+            val terminalErrorVisible = initialConnectionFailure ||
+                (recordingResolved && (!playbackAvailable || failure != null))
+
+            val label = "entry=${entry?.state} $admission $failure connected=$connectionAvailable"
+            val passed = connection.takeIf { initialConnectionFailure }
+            val condition = recordingErrorCondition(entry, admission, failure, passed)
+            val error = recordingAppError(entry, admission, failure, passed)
+            assertEquals(label, terminalErrorVisible, condition != null)
+            assertEquals(label, condition, error?.condition)
+            if (error != null) assertEquals(label, AppErrorAction.CLOSE, error.actions.last())
+        }
+    }
+
+    @Test fun recordingConnectionFailureReusesTheConnectionMapping() {
+        val close = AppErrorAction.CLOSE
+        fun error(connection: ConnectionUiState) = recordingAppError(null, null, null, connection)!!
+
+        with(error(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY))) {
+            assertEquals(101, condition.number)
+            assertEquals(retry + close, actions)
+        }
+        with(error(ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED))) {
+            assertEquals(103, condition.number)
+            assertEquals(settings + close, actions)
+        }
+        with(error(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF))) {
+            assertEquals(110, condition.number)
+            assertEquals(settings + close, actions)
+        }
+        assertEquals(106, error(ConnectionUiState.CredentialUnavailable).condition.number)
+        assertEquals(settings + close, error(ConnectionUiState.CredentialUnavailable).actions)
+        assertEquals(107, error(ConnectionUiState.NeedsConfiguration).condition.number)
+        // Between automatic attempts the SDK is Connecting; the alert stays on reconnecting.
+        with(error(ConnectionUiState.Connecting)) {
+            assertEquals(110, condition.number)
+            assertEquals(settings + close, actions)
+        }
+        // Every connection state reads through the same mapping as the other screens.
+        for (kind in ConnectionFailureKind.entries) for (disposition in sdkConstants<SessionRecoveryDisposition>()) {
+            val state = ConnectionUiState.Error(kind, disposition)
+            assertEquals("$kind $disposition", state.toAppError(closable = true), error(state))
+            assertEquals("$kind $disposition", state.toAppError()!!.condition,
+                recordingErrorCondition(null, null, null, state))
+        }
+    }
+
+    @Test fun recordingAlertAlwaysOffersClose() {
         assertEquals(listOf(AppErrorAction.CLOSE),
-            recordingAppError(RecordingPlaybackAdmission.TargetUnavailable, null).actions)
+            recordingAppError(entry(DvrEntryState.SCHEDULED), RecordingPlaybackAdmission.TargetUnavailable, null)!!.actions)
+        assertEquals(listOf(AppErrorAction.CLOSE),
+            recordingAppError(entry(DvrEntryState.RECORDING), RecordingPlaybackAdmission.GrowingDeferred, null)!!.actions)
         assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE),
-            recordingAppError(null, AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)).actions)
+            recordingAppError(null, null, AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED))!!.actions)
     }
 }

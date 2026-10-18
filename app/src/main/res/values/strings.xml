@@ -790,4 +790,6 @@
     <string name="error_303_reason">Tvheadend has no playable file for this recording.</string>
     <string name="error_304_title">Recording no longer available</string>
     <string name="error_304_reason">It was changed or deleted on the server.</string>
+    <string name="error_305_title">Can’t play yet</string>
+    <string name="error_305_reason">This recording can be played once it’s finished.</string>
 </resources>

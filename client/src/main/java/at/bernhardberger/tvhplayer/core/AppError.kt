@@ -51,6 +51,9 @@ enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
     RECORDING_NOT_STARTED(302, AppErrorKind.RECORDING),
     RECORDING_FILE_MISSING(303, AppErrorKind.RECORDING),
     RECORDING_UNAVAILABLE(304, AppErrorKind.RECORDING),
+
+    /** A running recording whose file cannot be played while it grows. */
+    RECORDING_DEFERRED(305, AppErrorKind.RECORDING),
 }
 
 /** Buttons of a full-screen alert, in display order; the first is focused. */
@@ -59,32 +62,33 @@ enum class AppErrorAction { RETRY, CONNECTION_SETTINGS, CLOSE }
 data class AppError(val condition: AppErrorCondition, val actions: List<AppErrorAction>)
 
 fun AppErrorCondition.toAppError(
-    disposition: SessionRecoveryDisposition? = null,
+    recovery: ConnectionRecoveryAction? = null,
     closable: Boolean = false,
-): AppError = AppError(this, actions(disposition, closable))
+): AppError = AppError(this, actions(recovery, closable))
 
 /**
- * Buttons follow the SDK recovery disposition: explicit retry offers Retry; a profile change or no
- * retry offers Connection settings only; a connection that retries by itself offers Connection
- * settings only. Without guidance (or with a future disposition) the condition's default applies.
- * [closable] is a connection condition shown in a player, which adds Close. Live and recording
- * alerts always carry their own Close; channel messages have no buttons.
+ * Buttons follow the SDK's recovery guidance as [primaryRecoveryAction] reads it: Retry offers Retry
+ * and Connection settings; Settings or None offers Connection settings only. Without guidance
+ * ([recovery] null) the condition's own default applies. A connection that retries by itself (110)
+ * offers Connection settings only. [closable] is a connection condition shown in a player, which
+ * adds Close last. Live and recording alerts always carry their own Close; channel messages have no
+ * buttons.
  */
 fun AppErrorCondition.actions(
-    disposition: SessionRecoveryDisposition? = null,
+    recovery: ConnectionRecoveryAction? = null,
     closable: Boolean = false,
 ): List<AppErrorAction> {
     val own = when (this) {
-        AppErrorCondition.NOT_CONFIGURED,
-        AppErrorCondition.CREDENTIAL_UNAVAILABLE -> listOf(AppErrorAction.CONNECTION_SETTINGS)
-        AppErrorCondition.NO_CHANNELS -> RETRY_AND_SETTINGS
+        AppErrorCondition.RECONNECTING -> SETTINGS
         AppErrorCondition.UNREACHABLE,
         AppErrorCondition.TIMEOUT,
-        AppErrorCondition.LOAD_FAILED -> byDisposition(disposition, retryByDefault = true)
+        AppErrorCondition.NO_CHANNELS,
+        AppErrorCondition.LOAD_FAILED -> recovery.buttons(default = RETRY_AND_SETTINGS)
         AppErrorCondition.AUTHENTICATION_REJECTED,
         AppErrorCondition.PERMISSION_DENIED,
         AppErrorCondition.INCOMPATIBLE_SERVER,
-        AppErrorCondition.RECONNECTING -> byDisposition(disposition, retryByDefault = false)
+        AppErrorCondition.CREDENTIAL_UNAVAILABLE,
+        AppErrorCondition.NOT_CONFIGURED -> recovery.buttons(default = SETTINGS)
         AppErrorCondition.NO_FREE_ADAPTER,
         AppErrorCondition.NO_SIGNAL,
         AppErrorCondition.MUX_NOT_ENABLED,
@@ -96,41 +100,41 @@ fun AppErrorCondition.actions(
         AppErrorCondition.RECORDING_INTERRUPTED -> listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)
         AppErrorCondition.RECORDING_NOT_STARTED,
         AppErrorCondition.RECORDING_FILE_MISSING,
-        AppErrorCondition.RECORDING_UNAVAILABLE -> listOf(AppErrorAction.CLOSE)
+        AppErrorCondition.RECORDING_UNAVAILABLE,
+        AppErrorCondition.RECORDING_DEFERRED -> listOf(AppErrorAction.CLOSE)
     }
     return if (kind == AppErrorKind.CONNECTION && closable) own + AppErrorAction.CLOSE else own
 }
 
 private val RETRY_AND_SETTINGS = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
+private val SETTINGS = listOf(AppErrorAction.CONNECTION_SETTINGS)
 
-private fun byDisposition(
-    disposition: SessionRecoveryDisposition?,
-    retryByDefault: Boolean,
-): List<AppErrorAction> = when (disposition) {
-    SessionRecoveryDisposition.EXPLICIT_RETRY -> RETRY_AND_SETTINGS
-    SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED,
-    SessionRecoveryDisposition.NO_RETRY,
-    SessionRecoveryDisposition.AUTOMATIC_BACKOFF -> listOf(AppErrorAction.CONNECTION_SETTINGS)
-    else -> if (retryByDefault) RETRY_AND_SETTINGS else listOf(AppErrorAction.CONNECTION_SETTINGS)
+private fun ConnectionRecoveryAction?.buttons(default: List<AppErrorAction>): List<AppErrorAction> = when (this) {
+    ConnectionRecoveryAction.RETRY -> RETRY_AND_SETTINGS
+    ConnectionRecoveryAction.SETTINGS,
+    ConnectionRecoveryAction.NONE -> SETTINGS
+    null -> default
 }
 
 /**
  * A connection that is still working or Ready has no error. Unknown or future SDK values land on
- * [AppErrorCondition.LOAD_FAILED] through [ConnectionFailureKind.OTHER].
+ * [AppErrorCondition.LOAD_FAILED] through [ConnectionFailureKind.OTHER]; the buttons follow
+ * [primaryRecoveryAction].
  */
-fun ConnectionUiState.toAppError(closable: Boolean = false): AppError? = when (this) {
-    ConnectionUiState.NeedsConfiguration -> AppErrorCondition.NOT_CONFIGURED.toAppError(closable = closable)
-    ConnectionUiState.CredentialUnavailable ->
-        AppErrorCondition.CREDENTIAL_UNAVAILABLE.toAppError(closable = closable)
-    is ConnectionUiState.Error ->
-        kind.toAppErrorCondition(recoveryDisposition).toAppError(recoveryDisposition, closable)
-    ConnectionUiState.Connecting,
-    ConnectionUiState.SyncingChannels,
-    ConnectionUiState.Ready,
-    ConnectionUiState.Reconnecting -> null
+fun ConnectionUiState.toAppError(closable: Boolean = false): AppError? {
+    val condition = when (this) {
+        ConnectionUiState.NeedsConfiguration -> AppErrorCondition.NOT_CONFIGURED
+        ConnectionUiState.CredentialUnavailable -> AppErrorCondition.CREDENTIAL_UNAVAILABLE
+        is ConnectionUiState.Error -> kind.toAppErrorCondition(recoveryDisposition)
+        ConnectionUiState.Connecting,
+        ConnectionUiState.SyncingChannels,
+        ConnectionUiState.Ready,
+        ConnectionUiState.Reconnecting -> return null
+    }
+    return condition.toAppError(primaryRecoveryAction(), closable)
 }
 
-/** A Ready session whose authoritative channel catalog is empty. */
+/** A Ready session whose authoritative channel catalog is empty; Ready gives no guidance, so 108's default applies. */
 fun noChannelsAppError(closable: Boolean = false): AppError =
     AppErrorCondition.NO_CHANNELS.toAppError(closable = closable)
 

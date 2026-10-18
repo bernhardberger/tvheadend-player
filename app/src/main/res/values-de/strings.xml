@@ -364,8 +364,8 @@
     <string name="recording_action_conflict">Dein Tvheadend-Server meldet einen Aufnahme- oder Tuner-Konflikt.</string>
     <string name="recording_action_rejected">Dein Tvheadend-Server hat die Aufnahmeanfrage abgelehnt.</string>
     <string name="recording_action_not_supported">Dein Tvheadend-Server unterstützt diese Aufnahmeaktion nicht.</string>
-    <string name="recording_action_timeout">Dein Tvheadend-Server hat nicht rechtzeitig geantwortet. Die Änderung kann trotzdem wirksam werden; prüfe die Aufnahme, bevor du es erneut versuchen.</string>
-    <string name="recording_action_unknown_outcome">Die Serverantwort konnte nicht gelesen werden. Die Änderung kann bereits wirksam sein; prüfe die Aufnahme, bevor du es erneut versuchen.</string>
+    <string name="recording_action_timeout">Dein Tvheadend-Server hat nicht rechtzeitig geantwortet. Die Änderung kann trotzdem wirksam werden; prüfe die Aufnahme, bevor du es erneut versuchst.</string>
+    <string name="recording_action_unknown_outcome">Die Serverantwort konnte nicht gelesen werden. Die Änderung kann bereits wirksam sein; prüfe die Aufnahme, bevor du es erneut versuchst.</string>
     <string name="recording_action_connection">Dein Tvheadend-Server konnte für die Aufnahmeanfrage nicht erreicht werden.</string>
     <string name="recording_already_scheduled">Diese Sendung wird aufgenommen oder ist geplant.</string>
     <string name="recordings_title">Aufnahmen</string>
@@ -681,4 +681,6 @@
     <string name="error_303_reason">Tvheadend hat keine abspielbare Datei für diese Aufnahme.</string>
     <string name="error_304_title">Aufnahme nicht mehr verfügbar</string>
     <string name="error_304_reason">Sie wurde auf dem Server geändert oder gelöscht.</string>
+    <string name="error_305_title">Noch nicht abspielbar</string>
+    <string name="error_305_reason">Diese Aufnahme kann abgespielt werden, sobald sie fertig ist.</string>
 </resources>

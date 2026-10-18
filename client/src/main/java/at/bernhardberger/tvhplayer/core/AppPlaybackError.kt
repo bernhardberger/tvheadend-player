@@ -2,8 +2,9 @@
 
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
-import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssueCategory
@@ -41,36 +42,55 @@ fun liveErrorCondition(issue: SubscriptionIssue?): AppErrorCondition = when (iss
 fun AppPlaybackState.Failed.toLiveErrorCondition(): AppErrorCondition = liveErrorCondition(subscriptionIssue)
 
 /**
- * The recording player's terminal condition. [admission] decides first for a target that cannot
- * play; a playable or unresolved target reports the playback [failure]. An unresolved recording
- * with no connection is [initialConnectionFailure], which is retryable.
+ * The recording player's terminal condition, or null when there is nothing to report: the recording
+ * plays, or it is still loading. [entry] is the recording in the current observation, null when it
+ * is gone or not observed yet. The SDK's [admission] decides first for a target that cannot play; a
+ * playable or unresolved target reports the playback [failure]. [initialConnectionFailure] is the
+ * connection while an unresolved recording has none; it reads as that connection's condition.
  */
 @OptIn(ExperimentalTvheadendApi::class)
 fun recordingErrorCondition(
+    entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     failure: AppPlaybackState.Failed?,
-    initialConnectionFailure: Boolean = false,
-): AppErrorCondition = when {
-    initialConnectionFailure -> AppErrorCondition.UNREACHABLE
-    admission == RecordingPlaybackAdmission.GrowingDeferred -> AppErrorCondition.RECORDING_NOT_STARTED
-    admission == RecordingPlaybackAdmission.TargetUnavailable ||
-        admission == RecordingPlaybackAdmission.ObservationExpired -> AppErrorCondition.RECORDING_UNAVAILABLE
-    // Any playback failure of a playable recording is an interruption; 303 is only the missing file.
+    initialConnectionFailure: ConnectionUiState? = null,
+): AppErrorCondition? = when {
+    initialConnectionFailure != null -> initialConnectionFailure.recordingConnectionError().condition
+    // The SDK defers an active recording whose single file is not MPEG-TS until it is finished.
+    admission == RecordingPlaybackAdmission.GrowingDeferred -> AppErrorCondition.RECORDING_DEFERRED
+    admission == RecordingPlaybackAdmission.ObservationExpired -> AppErrorCondition.RECORDING_UNAVAILABLE
+    admission == RecordingPlaybackAdmission.TargetUnavailable -> when (entry?.state) {
+        DvrEntryState.SCHEDULED -> AppErrorCondition.RECORDING_NOT_STARTED
+        // An entry that has (or had) a file the SDK cannot find or name.
+        DvrEntryState.RECORDING,
+        DvrEntryState.COMPLETED,
+        DvrEntryState.FILE_MISSING -> AppErrorCondition.RECORDING_FILE_MISSING
+        else -> AppErrorCondition.RECORDING_UNAVAILABLE
+    }
+    // Failed(OTHER) included: any playback failure of a playable or unresolved recording is an interruption.
     failure != null -> AppErrorCondition.RECORDING_INTERRUPTED
-    // Playable admission without a failure is the file itself; no admission and no failure is an entry that is gone.
-    admission is RecordingPlaybackAdmission.Completed ||
-        admission is RecordingPlaybackAdmission.Growing -> AppErrorCondition.RECORDING_FILE_MISSING
-    else -> AppErrorCondition.RECORDING_UNAVAILABLE
+    // A playable admission for an entry that is no longer observed, or an entry the SDK did not admit.
+    (entry == null && admission != null) || (entry != null && admission == null) ->
+        AppErrorCondition.RECORDING_UNAVAILABLE
+    // Completed or Growing with its entry plays; neither entry nor admission is still loading.
+    else -> null
 }
 
-/** The recording player always offers Close; an initial connection failure is retryable. */
+/**
+ * The recording player's alert, or null when [recordingErrorCondition] has none. Recording
+ * conditions offer Close; a connection condition keeps its SDK-guided buttons and adds Close.
+ */
 fun recordingAppError(
+    entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     failure: AppPlaybackState.Failed?,
-    initialConnectionFailure: Boolean = false,
-): AppError {
-    val condition = recordingErrorCondition(admission, failure, initialConnectionFailure)
-    // Without a connection state the failure is the one the viewer can retry.
-    val disposition = SessionRecoveryDisposition.EXPLICIT_RETRY.takeIf { initialConnectionFailure }
-    return condition.toAppError(disposition, closable = true)
-}
+    initialConnectionFailure: ConnectionUiState? = null,
+): AppError? = initialConnectionFailure?.recordingConnectionError()
+    ?: recordingErrorCondition(entry, admission, failure)?.toAppError(closable = true)
+
+/**
+ * The SDK flips between attempts and Connecting while it reconnects; a connection that is not a
+ * failure itself reads as reconnecting so the alert does not blink.
+ */
+private fun ConnectionUiState.recordingConnectionError(): AppError = toAppError(closable = true)
+    ?: AppErrorCondition.RECONNECTING.toAppError(primaryRecoveryAction(), closable = true)
