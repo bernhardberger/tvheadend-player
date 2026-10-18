@@ -283,7 +283,6 @@ internal fun ChannelsScreenContent(
     val hasScopeTabs = channelScope.tags.size + (if (channelScope.allChannelsVisible) 1 else 0) > 1
     val scopeFocus = remember { FocusRequester() }
     var consumeBackRelease by remember { mutableStateOf(false) }
-    val currentSession = observation.currentSession
     val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val channels = channelScope.visibleChannels

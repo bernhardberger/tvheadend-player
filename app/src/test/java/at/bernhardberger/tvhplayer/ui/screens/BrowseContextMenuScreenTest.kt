@@ -29,6 +29,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertTrue
 import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -55,6 +56,7 @@ class BrowseContextMenuScreenTest {
     private lateinit var view: View
     private var layering: at.bernhardberger.tvhplayer.ui.components.BrowseContentLayering? = null
     private var plays = 0
+    private val artworkRequests = java.util.Collections.synchronizedList(mutableListOf<at.bernhardberger.tvhplayer.core.AppArtworkSource>())
     private var guideRequest: ChannelId? = null
     private var guideProgramme: EpgEvent? = null
     private var start: RecordingPlaybackStart? = null
@@ -431,6 +433,26 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         assertResumePiconGeometry(picon = false)
         capture("resume-no-picon", "u15-dialogs")
+    }
+
+    @Test fun recordingResumeLoadsItsLogoWithTheSessionOfItsRecordingWhateverTheRootProvides() {
+        val rootSession = FakeTvheadendSession(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(emptyList())),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+        ))
+        val session = show(recordings = true, rootArtwork = rootSession)
+        val own = requireNotNull(session.observation.value.currentSession)
+        val root = requireNotNull(rootSession.observation.value.currentSession)
+        assertNotSame(own, root)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-resume-picon").assertExists()
+        compose.waitForIdle()
+
+        val logos = synchronized(artworkRequests) { artworkRequests.filter { it.id == ArtworkId(1) } }
+        assertTrue("the resume dialog drew the channel logo", logos.any { it.currentSession === own })
+        assertEquals(emptyList<Any>(), logos.filter { it.currentSession === root })
     }
 
     private fun assertResumePiconGeometry(picon: Boolean) {
@@ -1185,7 +1207,8 @@ class BrowseContextMenuScreenTest {
         summary: String? = "A winter expedition beyond the Arctic Circle follows the changing light across the ridge.",
         description: String? = null, episodeSubtitle: String? = null, unknownDuration: Boolean = false,
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
-        offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false): FakeTvheadendSession {
+        offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
+        rootArtwork: FakeTvheadendSession? = null): FakeTvheadendSession {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
         check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
@@ -1239,7 +1262,8 @@ class BrowseContextMenuScreenTest {
         images.install(FixtureArt.imageLoader(context, if (imageProbe) mapOf(
             ArtworkId(1) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.CYAN) },
             ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.RED) },
-        ) else mapOf(ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light"))))
+        ) else mapOf(ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.art("ridge-light")),
+            onRequest = { artworkRequests += it }))
         val state = RecordingsScreenState().apply {
             if (recordingState == DvrEntryState.SCHEDULED || recordingState == DvrEntryState.RECORDING)
                 mode.value = at.bernhardberger.tvhplayer.core.DvrLibraryMode.SCHEDULE
@@ -1249,7 +1273,7 @@ class BrowseContextMenuScreenTest {
                 androidx.compose.runtime.DisposableEffect(application) {
                     onDispose { application.close() }
                 }
-                TVHeadendPlayerTheme {
+                TVHeadendPlayerTheme { at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork((rootArtwork ?: session).observation) {
                     back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     view = LocalView.current
                     val observation = session.observation.collectAsState().value
@@ -1290,7 +1314,7 @@ class BrowseContextMenuScreenTest {
                         ) { _, drawerActive -> content(drawerActive) } else content(false)
                     }
                     }
-                }
+                } }
             }
         }
         compose.waitForIdle()

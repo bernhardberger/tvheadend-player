@@ -28,9 +28,10 @@ object FixtureArt {
      * Answers every artwork request from [images] without server or network access;
      * an id without an image fails the way a missing server image does.
      */
-    fun imageLoader(context: Context, images: Map<ArtworkId, Bitmap>): ImageLoader =
+    fun imageLoader(context: Context, images: Map<ArtworkId, Bitmap>, onRequest: (AppArtworkSource) -> Unit = {}): ImageLoader =
         ImageLoader.Builder(context).components {
             add(Interceptor { chain ->
+                (chain.request.data as? AppArtworkSource)?.let(onRequest)
                 val id = (chain.request.data as? AppArtworkSource)?.id
                 val image = images[id]
                 if (image != null) SuccessResult(image.asImage(), chain.request, DataSource.MEMORY)

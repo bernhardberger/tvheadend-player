@@ -140,6 +140,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
@@ -1669,7 +1670,7 @@ fun VideoPlayerScreen(
             }
             .focusRequester(rootFocus)
             .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
-    ) {
+    ) { ProvideArtworkSession(currentSession) {
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {
             foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
@@ -2064,7 +2065,7 @@ fun VideoPlayerScreen(
                 playerClose::close
             },
         )
-    }
+    } }
 }
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> =
