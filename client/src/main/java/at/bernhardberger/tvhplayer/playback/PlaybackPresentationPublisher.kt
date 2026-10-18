@@ -244,12 +244,15 @@ internal class PlaybackPresentationPublisher(
                 override fun onPlaybackStateChanged(playbackState: Int) {
                     if (!targetCommands.isOpen()) return
                     targetReady = playbackState == Player.STATE_READY
+                    if (!targetReady) targetCommands.runIfOpen { pendingSoundMillis = null }
                     if (!targetInstallationInProgress()) liftCoverOnReadyPicture(epoch)
                 }
 
-                // A pause shows a ready picture; a play starts watching it for motion.
+                // A pause shows a ready picture; a play starts watching it for motion. A sound that
+                // was waiting for playing to start belongs to the play intent the pause ends.
                 override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
                     if (!targetCommands.isOpen()) return
+                    if (!playWhenReady) targetCommands.runIfOpen { pendingSoundMillis = null }
                     if (!targetInstallationInProgress()) liftCoverOnReadyPicture(epoch)
                 }
 

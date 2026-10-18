@@ -515,6 +515,20 @@ class VideoCoverRuntimeTest {
             assertNull(runtime.videoPresentation.value.soundSinceMillis)
         }
 
+    @Test fun soundReportedBeforeIsPlayingIsDroppedWhenThePlayerStallsBeforeItPlays() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            renderFirstFrame()
+            forcedPlaying = false
+            soundAdvancing()
+            // Media3 may mask isPlaying back without ever reporting true: the stall alone ends it.
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
+            forcedPlaying = true
+            playerListeners.toList().forEach { it.onIsPlayingChanged(true) }
+            assertNull(runtime.videoPresentation.value.soundSinceMillis)
+        }
+
     @Test fun replacedTargetsSoundNeverDescribesTheNextTargetsCover() =
         exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
             countVideoFrames()
