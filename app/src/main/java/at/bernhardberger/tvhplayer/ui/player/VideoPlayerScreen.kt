@@ -1778,7 +1778,8 @@ fun VideoPlayerScreen(
                 QuickZapPresentation(
                     // Keep the departing rail expanded throughout its vertical step.
                     expanded = layerState.channelRailPresented,
-                    channelContent = {
+                    // The rows' saved logos are those of the observation their scope was resolved from.
+                    channelContent = { ProvideArtworkSession(currentSession, channelScope.observation) {
                         PlayerChannelBrowser(
                             state = channelBrowser,
                             channels = channels,
@@ -1806,7 +1807,7 @@ fun VideoPlayerScreen(
                             active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
                             channelsTitle = channelsTitle,
                         )
-                    },
+                    } },
                     trayBleeds = recentChannels.isNotEmpty(),
                     header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle) },
                     preview = {

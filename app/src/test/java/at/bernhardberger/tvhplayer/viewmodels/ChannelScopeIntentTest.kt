@@ -143,6 +143,20 @@ class ChannelScopeIntentTest {
         assertFalse(model.unavailableTagNotice.value)
     }
 
+    @Test fun aScopeKeepsTheObservationItWasResolvedFrom() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val session = session(ChannelRepositoryState.Stale(catalog))
+        val model = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryPreferencesDataStore()))
+        models.put("scope", model)
+        runCurrent()
+        assertSame(session.observation.value, model.scope.value.observation)
+        session.publish(session.observation.value.let {
+            SessionObservation.create(it.sessionState, ChannelRepositoryState.Current(catalog), it.epgState, it.dvrState)
+        })
+        runCurrent()
+        assertSame(session.observation.value, model.scope.value.observation)
+    }
+
     @Test fun delayedObsoleteWriteCannotReplaceNewerVisibilityAndTag() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val gate = CompletableDeferred<Unit>()

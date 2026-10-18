@@ -42,6 +42,8 @@ data class ChannelScopeState(
     val channelCatalogCurrent: Boolean,
     val settingsLoaded: Boolean = true,
     val visibility: ChannelScopeVisibility = ChannelScopeVisibility(),
+    /** The observation the scope was resolved from; its rows' saved logos are that profile's. */
+    val observation: SessionObservation? = null,
 )
 
 class ChannelsViewModel(
@@ -133,7 +135,8 @@ class ChannelsViewModel(
 
     private fun publishScope() {
         val requested = preferences ?: return
-        val channelState = observation.value.channelState
+        val source = observation.value
+        val channelState = source.channelState
         val catalog = channelState.channelCatalogForDisplay ?: ChannelCatalog.create()
         if (catalog.channels != catalogChannels) {
             catalogChannels = catalog.channels
@@ -154,7 +157,7 @@ class ChannelsViewModel(
             mutableUnavailableTagNotice.value = resolved.fallback == TagScopeFallback.TAG_UNAVAILABLE
         }
         preferences = effective
-        mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility)
+        mutableScope.value = ChannelScopeState(resolved, current, visibility = effective.visibility, observation = source)
         if (effective != requested) enqueueSave()
     }
 

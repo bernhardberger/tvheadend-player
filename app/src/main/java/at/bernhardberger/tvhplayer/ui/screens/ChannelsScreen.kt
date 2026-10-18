@@ -713,8 +713,9 @@ internal fun ChannelsScreenContent(
             return@body
         }
 
-        // A frame shows its pictures with the session of the observation it was built from.
-        ProvideArtworkSession(currentSession, observation) {
+        // A frame shows its pictures with the session of the observation it was built from, and
+        // its rows' saved logos with the observation their scope was resolved from.
+        ProvideArtworkSession(currentSession, channelScopeState.observation) {
         Row(
                 Modifier
                     .padding(browseViewportPadding)

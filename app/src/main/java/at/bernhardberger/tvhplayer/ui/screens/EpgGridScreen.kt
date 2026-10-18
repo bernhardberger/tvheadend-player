@@ -1949,8 +1949,9 @@ fun EpgGridScreen(
                     .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
                         MaterialTheme.colorScheme.primary)
                     .testTag("epg-timeline-content")) {
-                // A frame shows its pictures with the session of the observation it was built from.
-                ProvideArtworkSession(currentSession, observation) { CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
+                // A frame shows its pictures with the session of the observation it was built from, and
+                // its rows' saved logos with the observation their scope was resolved from.
+                ProvideArtworkSession(currentSession, channelScopeState.observation) { CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
                 LazyColumn(
                     state = channelListState,
                     userScrollEnabled = owner.isCurrent,
