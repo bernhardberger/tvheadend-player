@@ -70,9 +70,6 @@ The app asks for your server's address, the HTSP port, and your Tvheadend
 username and password. After you save them, it connects and loads your channels and
 guide. You can change the connection later in Settings.
 
-The connection uses HTSP, which is not encrypted. Use it on your home network or
-through a VPN.
-
 ## Privacy
 
 The app has no analytics, advertising or external account. Your server address
