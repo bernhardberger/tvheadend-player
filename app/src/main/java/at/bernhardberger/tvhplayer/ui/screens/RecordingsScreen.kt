@@ -102,6 +102,7 @@ import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
+import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.TabContent
@@ -711,6 +712,7 @@ internal fun RecordingsScreenContent(
     if (opened != null) {
         val nowSec = at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds(nowSecProvider)
         if (showResumeChoice) {
+            val closeBehindPlayer = rememberCloseBehindPlayer()
             val resources = androidx.compose.ui.platform.LocalContext.current.resources
             val channel = opened.channelId?.let(channelsById::get)
             val closeResume = {
@@ -721,7 +723,7 @@ internal fun RecordingsScreenContent(
             }
             val play: (RecordingPlaybackStart) -> Unit = { intent ->
                 selectedCapability?.let { capability ->
-                    closeResume()
+                    closeBehindPlayer(closeResume)
                     onPlayRecording(RecordingPlaybackSelection(capability, opened.id), intent)
                 }
             }
@@ -780,6 +782,8 @@ internal fun RecordingsScreenContent(
                 }
             }
         } else {
+        val closeBehindPlayer = rememberCloseBehindPlayer()
+        val entryPending = at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending()
         val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
         val closing = !visibility.targetState
         BackHandler(enabled = backEnabled && closing) { }
@@ -797,7 +801,7 @@ internal fun RecordingsScreenContent(
         val detailAlpha = animateShown(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "recording-details-layer")
         at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame(leaving = closing,
-            modifier = Modifier.onPreviewKeyEvent { closing }) {
+            modifier = Modifier.onPreviewKeyEvent { closing || entryPending() }) {
         // Match ProgrammeDetailsHost: keep both pages drawn while details owns its alpha.
         AnimatedContent(targetState = showContextMenu, transitionSpec = {
             (if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)
@@ -827,15 +831,23 @@ internal fun RecordingsScreenContent(
                 playbackEligible = selectedCapability != null),
             onClose = { visibility.targetState = false },
             onAction = { action ->
-                menuConsumed = action != BrowseContextAction.DETAILS
-                showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
+                val playing = selectedCapability?.takeIf { action in listOf(BrowseContextAction.WATCH,
+                    BrowseContextAction.PLAY, BrowseContextAction.RESUME, BrowseContextAction.START_OVER) }
+                // Playback keeps the menu up until the player has replaced browse.
+                if (playing == null) {
+                    menuConsumed = action != BrowseContextAction.DETAILS
+                    showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
+                }
                 when (action) {
                     BrowseContextAction.WATCH, BrowseContextAction.PLAY,
-                    BrowseContextAction.RESUME, BrowseContextAction.START_OVER -> selectedCapability?.let {
-                        detailsEntry = null
-                        detailsObservation = null
-                        detailsInitialAction = null
-                        requestContentFocus = true
+                    BrowseContextAction.RESUME, BrowseContextAction.START_OVER -> playing?.let {
+                        closeBehindPlayer {
+                            showContextMenu = false
+                            detailsEntry = null
+                            detailsObservation = null
+                            detailsInitialAction = null
+                            requestContentFocus = true
+                        }
                         onPlayRecording(RecordingPlaybackSelection(it, opened.id),
                             if (action == BrowseContextAction.RESUME || action == BrowseContextAction.WATCH)
                                 RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
@@ -910,7 +922,7 @@ internal fun RecordingsScreenContent(
                 BrowseContextAction.START_OVER -> {
                     // A scheduled entry's channel is live playback: the player waits for the session.
                     val watchChannel = action == BrowseContextAction.WATCH && opened.state == DvrEntryState.SCHEDULED
-                    if (watchChannel || capability != null) {
+                    if (watchChannel || capability != null) closeBehindPlayer {
                         detailsEntry = null
                         detailsObservation = null
                         detailsInitialAction = null

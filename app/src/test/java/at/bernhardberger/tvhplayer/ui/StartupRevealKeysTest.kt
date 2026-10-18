@@ -1,7 +1,11 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.view.KeyEvent
+import android.view.View
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -12,14 +16,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyPress
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import org.junit.Assert.assertEquals
@@ -29,10 +36,15 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
-/** Keys during the autoplay reveal: the first ends it, and only the next reaches the player. */
+/**
+ * The autoplay reveal: its hold and fade, and keys during it: the first ends it, and only the
+ * next reaches the player.
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 class StartupRevealKeysTest {
     @get:Rule val compose = createComposeRule()
 
@@ -88,6 +100,47 @@ class StartupRevealKeysTest {
         key(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.ACTION_UP)
         assertEquals(listOf("KeyDown", "KeyUp"), playerKeys)
         assertEquals(1, revealed)
+    }
+
+    @Test fun theRevealHoldsForTheFirstPictureThenFadesOverTheLongDuration() {
+        var state by mutableStateOf(MainStartupCompositionState(
+            MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION), ChannelsKey,
+            navigationAllowed = true, contentAllowed = false))
+        var revealed = 0
+        lateinit var view: View
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                MainStartupComposition(
+                    state = state, onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
+                    motionEnabled = true,
+                    navigation = { _, _ -> Box(Modifier.fillMaxSize().background(Color.Red)) },
+                    onRevealed = { revealed++ },
+                )
+            }
+        }
+        frames()
+        val covered = pixel(view)
+        assertTrue("the startup screen covers the player", covered != android.graphics.Color.RED)
+
+        state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1)
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.PictureHoldMs - 20L)
+        assertEquals("opaque through the hold", covered, pixel(view))
+        compose.mainClock.advanceTimeBy(20L + StartupRevealMs / 2)
+        assertTrue("fading", pixel(view) != covered && pixel(view) != android.graphics.Color.RED)
+        assertEquals(0, revealed)
+        compose.mainClock.advanceTimeBy(StartupRevealMs / 2 + 40L)
+        compose.waitForIdle()
+        assertEquals("the player shows after hold + long2", android.graphics.Color.RED, pixel(view))
+        assertEquals(1, revealed)
+    }
+
+    private fun pixel(view: View): Int = compose.runOnIdle {
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(Canvas(bitmap))
+        bitmap.getPixel(2, 2).also { bitmap.recycle() }
     }
 
     /** The activity's dispatch: the startup contract first, then the composition. */

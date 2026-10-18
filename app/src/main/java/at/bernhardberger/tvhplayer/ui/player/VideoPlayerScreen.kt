@@ -17,7 +17,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -1400,9 +1399,12 @@ fun VideoPlayerScreen(
         }
     }
 
-    // Playback/recovery effects above stay mounted. No chrome, focus or key target exists under startup.
-    if (!contentAllowed) return
-    PlayerRootFocusEffect(foregroundLayer, rootFocus)
+    // Playback/recovery effects above stay mounted. No chrome exists under startup until its first
+    // picture is delivered; the passive Banner then shows while the startup screen fades, as on an
+    // ordinary entry. Focus and Back wait for the reveal to end; startup consumes its keys.
+    if (!contentAllowed &&
+        !(startupOutcomeDelivered && startupTarget != null && initialStartupTarget == startupTarget)) return
+    if (contentAllowed) PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = handle@{
         // Trial: Back first undoes a step inside the program details.
@@ -1442,7 +1444,7 @@ fun VideoPlayerScreen(
             PlayerBackAction.HIDE_STATS -> layerState.updateStatsVisibility(false)
         }
     }
-    PlayerBackHandler(handlePlaybackBack)
+    if (contentAllowed) PlayerBackHandler(handlePlaybackBack)
 
     // Until the displayed channel is confirmed playing, tracks and diagnostics may still
     // describe the previous channel, so no badge is shown.
@@ -1668,8 +1670,7 @@ fun VideoPlayerScreen(
                 false
             }
             .focusRequester(rootFocus)
-            .playerRootSemantics(stringResource(R.string.player_live_tv_surface))
-            .focusable()
+            .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
     ) {
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {

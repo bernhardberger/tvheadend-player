@@ -36,6 +36,8 @@ internal class AudioInterruptionController(
     private val cancelRecoveryForInterruptionLocked: (currentJob: Job) -> Unit,
     /** Playback may continue: a live recovery the interruption stopped may retune now. */
     private val resumeInterruptedRecoveryLocked: () -> Unit,
+    /** A play waits for the server's resume until the player plays; see [PlaybackPresentationPublisher.holdPlayingPictureLocked]. */
+    private val holdPlayingPicture: (Boolean) -> Unit,
 ) {
     private var focusGeneration = 0L
     var interruption: AudioInterruption? = null
@@ -158,13 +160,20 @@ internal class AudioInterruptionController(
         val releaseServer = if (restoreSoundOnly) interruption != null && interruptionHoldUnconfirmed
         else resumeTimeshift && !retiredPendingPause ||
             interruption != null && interruptionContent == AudioInterruptionContent.LIVE_TIMESHIFT
-        val result = if (releaseServer) coordinator.resumeTimeshift() else TimeshiftCommandResult.ACCEPTED
-        interruption = null
-        interruptionHoldUnconfirmed = false
-        interruptionPaused = false
-        resumeAfterInterruption = false
-        setInterruptionMuted(false)
-        player.play()
+        // Held until the player plays: the stopped player of a server resume is no pause.
+        holdPlayingPicture(true)
+        val result = try {
+            val resumed = if (releaseServer) coordinator.resumeTimeshift() else TimeshiftCommandResult.ACCEPTED
+            interruption = null
+            interruptionHoldUnconfirmed = false
+            interruptionPaused = false
+            resumeAfterInterruption = false
+            setInterruptionMuted(false)
+            player.play()
+            resumed
+        } finally {
+            holdPlayingPicture(false)
+        }
         resumeInterruptedRecoveryLocked()
         return result
     }
@@ -176,11 +185,16 @@ internal class AudioInterruptionController(
         if (event == AudioInterruption.GAIN) {
             when (action) {
                 AudioInterruptionAction.RESUME -> {
-                    if (content == AudioInterruptionContent.LIVE_TIMESHIFT &&
-                        coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED && interruptionPaused) return
-                    interruptionPaused = false
-                    setInterruptionMuted(false)
-                    player.play()
+                    holdPlayingPicture(true)
+                    try {
+                        if (content == AudioInterruptionContent.LIVE_TIMESHIFT &&
+                            coordinator.resumeTimeshift() != TimeshiftCommandResult.ACCEPTED && interruptionPaused) return
+                        interruptionPaused = false
+                        setInterruptionMuted(false)
+                        player.play()
+                    } finally {
+                        holdPlayingPicture(false)
+                    }
                 }
                 AudioInterruptionAction.UNMUTE -> setInterruptionMuted(false)
                 else -> return

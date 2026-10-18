@@ -24,6 +24,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
+import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
 import org.koin.compose.koinInject
 
 /** Shared programme navigation and guarded DVR actions for Guide and Channels. */
@@ -50,6 +52,8 @@ internal fun ProgrammeDetailsHost(
     returnFocusRequester: FocusRequester? = null,
     settingsStore: UiSettingsStore = koinInject(),
 ) {
+    val closeBehindPlayer = rememberCloseBehindPlayer()
+    val entryPending = rememberPlayerEntryPending()
     val close = {
         onClose()
         // Owners retain their deferred scroll/missing-item recovery. For a mounted origin,
@@ -157,8 +161,13 @@ internal fun ProgrammeDetailsHost(
             // neither needs more than the channel. Recording actions keep the session guard below.
             val event = current.event(programme.id) ?: programme
             event.channelId?.let(current::channel)?.let {
-                close()
-                if (action == BrowseContextAction.WATCH) onPlay(it.id, it.name.orEmpty()) else onShowGuide(it.id, event)
+                if (action == BrowseContextAction.WATCH) {
+                    closeBehindPlayer(close)
+                    onPlay(it.id, it.name.orEmpty())
+                } else {
+                    close()
+                    onShowGuide(it.id, event)
+                }
             }
             return@action
         }
@@ -175,6 +184,12 @@ internal fun ProgrammeDetailsHost(
         val actionRecording = current.dvrEntryForEvent(actionEvent)
         val actionCanModify = current.dvrState is DvrRepositoryState.Current &&
             (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        if (action == BrowseContextAction.PLAY && actionRecording != null) {
+            // Every page and menu stays up until the player has replaced browse.
+            closeBehindPlayer(close)
+            onPlayRecording?.invoke(RecordingPlaybackSelection(capability, actionRecording.id))
+            return@action
+        }
         val airingMenu = menuAiring != null
         if (!airingMenu && !showContextMenu) returnAction = action
         if (!airingMenu && showContextMenu && action in listOf(
@@ -182,10 +197,6 @@ internal fun ProgrammeDetailsHost(
         menuAiring = null
         mutationEvent = actionEvent
         when (action) {
-            BrowseContextAction.PLAY -> actionRecording?.let {
-                close()
-                onPlayRecording?.invoke(RecordingPlaybackSelection(capability, it.id))
-            }
             BrowseContextAction.RECORD -> if (current.event(programme.id) != null && actionCanModify &&
                 actionRecording?.state !in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING)) {
                 executeDirect(DvrMutationAction.CreateProgramme(actionEvent.programmeRecordingTarget(capability), null))
@@ -215,7 +226,7 @@ internal fun ProgrammeDetailsHost(
     val detailAlpha = animateShown(
         tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
         tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "browse-details-layer")
-    PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { closing }) {
+    PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { closing || entryPending() }) {
     AnimatedContent(targetState = showContextMenu, transitionSpec = {
         // Details owns its fade so the shell uses exactly the same progress.
         (if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)

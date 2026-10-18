@@ -286,6 +286,7 @@ class AppPlaybackRuntime(
         activeTargetEpoch = { activeTargetEpoch },
         cancelRecoveryForInterruptionLocked = liveRecovery::cancelOnInterruptionLocked,
         resumeInterruptedRecoveryLocked = ::resumeInterruptedLiveRecoveryLocked,
+        holdPlayingPicture = { presentation.holdPlayingPictureLocked(it) },
     )
     val isInterruptionMuted: Boolean get() = audioInterruptions.interruptionMuted
     val hasAudioInterruption: Boolean get() = audioInterruptions.interruption != null
@@ -664,8 +665,17 @@ class AppPlaybackRuntime(
         if (committed) {
             // STATE_READY reported while installation was in progress was not observed.
             if (player.playbackState == Player.STATE_READY) livePauseController.onTargetReady(activeTargetEpoch)
-            if (retainInterruptionMute && foreground) player.play()
-            else applyPlayIntentToStartedTarget(result, playWhenReady, heldPause = heldPause)
+            // A start cut short leaves the install's stopped player: only a start meant to play
+            // still owes its play.
+            val plays = foreground && (retainInterruptionMute || (playWhenReady && !heldPause))
+            var applied = false
+            try {
+                if (retainInterruptionMute && foreground) player.play()
+                else applyPlayIntentToStartedTarget(result, playWhenReady, heldPause = heldPause)
+                applied = true
+            } finally {
+                presentation.presentStartedTargetLocked(install.committedEpoch, playStillPending = plays && !applied)
+            }
             // Only a start the viewer is waiting for opens a start-up buffer window.
             startupBuffer?.liveStartApplied()
         }
@@ -977,7 +987,14 @@ class AppPlaybackRuntime(
         if (committed) {
             // Recovery continues where the lost target stood; the viewer's start applied once.
             recordingRecovery = recoverAt?.takeIf { it.recordingId == recordingId }
-            applyPlayIntentToStartedTarget(result)
+            val epoch = activeTargetEpoch
+            var applied = false
+            try {
+                applyPlayIntentToStartedTarget(result)
+                applied = true
+            } finally {
+                presentation.presentStartedTargetLocked(epoch, playStillPending = foreground && !applied)
+            }
         }
         return result
     }
@@ -1219,6 +1236,7 @@ class AppPlaybackRuntime(
         val wasPlaying = player.playWhenReady
         audioInterruptions.forgetInterruptionResumeLocked()
         player.pause()
+        presentation.settlePausedPictureLocked()
         // The interruption already holds the server; a second pause adds nothing.
         if (audioInterruptions.interruptionPaused) return null
         val epoch = activeTargetEpoch
@@ -1315,6 +1333,7 @@ class AppPlaybackRuntime(
         }
         audioInterruptions.forgetInterruptionResumeLocked()
         player.pause()
+        presentation.settlePausedPictureLocked()
         return true
     }
 
@@ -1815,7 +1834,9 @@ class AppPlaybackRuntime(
                 presentationEpoch.isCurrent(expectedPresentationEpoch) &&
                 previousTarget != null && healthyActiveTarget() == previousTarget &&
                 activeTargetEpoch == previousTargetEpoch && player.currentMediaItem == previousMediaItem
-            if (previousTargetStays) presentation.restoreVideoAfterFailedInstallLocked()
+            if (previousTargetStays) {
+                presentation.restoreVideoAfterFailedInstallLocked(resumesPlaying = foreground && previousPlayWhenReady)
+            }
             if (foreground && previousTargetStays) {
                 player.playWhenReady = previousPlayWhenReady
                 presentation.publishPlayerState()

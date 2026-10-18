@@ -11,6 +11,7 @@ import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -29,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -46,6 +48,20 @@ internal object PlayerMotion {
     const val PanelMs = 250
     /** Chrome emphasis while the timeline previews a seek. */
     const val EmphasisMs = 180
+    /** Into a player: the screens, and the rail with its page, cross-fade (emphasized decelerate). */
+    const val DestinationMs = 300
+    /** Out of a player: the player fades out (emphasized accelerate), browse in (emphasized decelerate). */
+    const val DestinationExitMs = MediumMs
+    /** The first picture on the way into the player clears its black cover. */
+    const val EntryPictureMs = 300
+    /** The first picture of a zap inside the player clears its black cover. */
+    const val ZapPictureMs = ShortMs
+    /**
+     * A first picture stays covered this long before its fade starts. The rendered-first-frame
+     * signal arrives before the panel shows the frame, and the surface still holds the previous
+     * picture until then.
+     */
+    const val PictureHoldMs = 100
 
     val Standard = CubicBezierEasing(0.2f, 0f, 0f, 1f)
     val StandardDecelerate = CubicBezierEasing(0f, 0f, 0f, 1f)
@@ -182,15 +198,20 @@ internal fun AnimatedVisibilityScope.animateEnterAfterFirstFrames(enter: Animati
  * semantics and focus cannot enter it; focus inside it drops to an inert sink on the
  * first exit frame, so the successor or the player root can take it without waiting
  * for the animation and no key reaches a disappearing control.
+ *
+ * With [restoreFocusOnReturn], content that stops leaving before it is removed takes back the
+ * focus it dropped, on the item that had it; for a shell whose own entry focus already ran.
  */
 @Composable
 internal fun PlayerMotionFrame(
     leaving: Boolean,
     modifier: Modifier = Modifier,
+    restoreFocusOnReturn: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val sink = remember { FocusRequester() }
     val focus = remember { FrameFocus() }
+    val contentFocus = remember { FocusRequester() }
     Box(
         modifier = modifier
             .then(if (leaving) Modifier.clearAndSetSemantics { } else Modifier)
@@ -202,7 +223,9 @@ internal fun PlayerMotionFrame(
             .focusTarget(),
         propagateMinConstraints = true,
     ) {
-        content()
+        if (restoreFocusOnReturn) {
+            Box(Modifier.focusRequester(contentFocus).focusRestorer().focusGroup(), propagateMinConstraints = true) { content() }
+        } else content()
         Box(
             Modifier
                 .matchParentSize()
@@ -219,10 +242,19 @@ internal fun PlayerMotionFrame(
         )
     }
     if (leaving) {
-        // Read in composition so focus that still arrives while leaving drops again.
+        // Read in composition so focus that still arrives while leaving drops again; checked again
+        // when applied, as content returning in the same frame may already have taken it back.
         val strayFocus = focus.within && !focus.sinkFocused
         SideEffect {
-            if (strayFocus) sink.requestFocus()
+            if (strayFocus && focus.within && !focus.sinkFocused) {
+                focus.dropped = restoreFocusOnReturn
+                sink.requestFocus()
+            }
+        }
+    } else if (focus.dropped) {
+        SideEffect {
+            focus.dropped = false
+            contentFocus.requestFocus()
         }
     }
 }
@@ -230,4 +262,7 @@ internal fun PlayerMotionFrame(
 private class FrameFocus {
     var within by mutableStateOf(false)
     var sinkFocused by mutableStateOf(false)
+
+    /** Focus was dropped while leaving and returns if the content stops leaving. */
+    var dropped = false
 }

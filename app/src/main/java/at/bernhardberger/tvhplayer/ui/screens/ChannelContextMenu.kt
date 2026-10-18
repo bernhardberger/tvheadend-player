@@ -9,6 +9,9 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
+import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import coil3.ImageLoader
@@ -40,6 +43,8 @@ internal fun ChannelContextMenu(
     val session: TvheadendSession = koinInject()
     val notices: NoticeCenter = koinInject()
     val mutations = remember(session) { DvrMutationActions(session.dvrRepository) }
+    val closeBehindPlayer = rememberCloseBehindPlayer()
+    val entryPending = rememberPlayerEntryPending()
     // Opened before Ready it stays: Watch needs only the channel. A session it opened with is gone.
     LaunchedEffect(capability) { if (opening.currentSession != null && capability == null) onClose() }
     if (event != null) {
@@ -54,10 +59,11 @@ internal fun ChannelContextMenu(
         channel = "", episode = "", time = "", watchChannel = true,
         actions = listOf(BrowseContextAction.WATCH, BrowseContextAction.SHOW_GUIDE),
         onClose = onClose,
+        modifier = Modifier.onPreviewKeyEvent { entryPending() },
         onAction = { action ->
             when (action) {
                 BrowseContextAction.WATCH -> {
-                    onClose()
+                    closeBehindPlayer(onClose)
                     onPlay(channelId, channel.name.orEmpty())
                 }
                 BrowseContextAction.SHOW_GUIDE -> { onClose(); onShowGuide(channelId, null) }

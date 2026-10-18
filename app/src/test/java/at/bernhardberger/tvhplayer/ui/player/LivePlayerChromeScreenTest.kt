@@ -30,6 +30,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
@@ -233,7 +234,7 @@ class LivePlayerChromeScreenTest {
         compose.waitUntil(5_000) { idleMainLooper(); scope.coroutineContext[Job]!!.isCompleted }
     }
 
-    @Test fun startupPlayerTunesBehindCoverWithoutChromeFocusOrKeysAndWaitsForItsFrame() {
+    @Test fun startupPlayerTunesBehindCoverWithoutFocusOrKeysAndShowsOnlyThePassiveBannerFromItsFrame() {
         val allowed = mutableStateOf(false)
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
         screen(contentAllowed = { allowed.value }, startup = true, onStartupOutcome = { outcomes += it })
@@ -254,12 +255,26 @@ class LivePlayerChromeScreenTest {
         compose.runOnIdle { playerListeners.toList().forEach { it.onRenderedFirstFrame() } }
         settle()
         compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.PRESENTED) }
-        assertFalse(exists("player-banner"))
+        settle()
+        // The startup screen now fades over the player: the Banner is already there, passive.
+        assertTrue("the Banner shows during the reveal", exists("player-banner"))
+        assertEquals("nothing takes focus before the reveal ends", emptyList<String>(), focused())
+        assertTrue("the player root is no focus target during the reveal", focusableNodes() == 0)
+        assertTrue("the player root is out of the semantics tree during the reveal",
+            compose.onAllNodes(hasContentDescription(liveTvSurface), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
+        key(Key.DirectionDown)
+        assertFalse("no key opens the controls during the reveal", exists("player-actions"))
+        assertEquals(emptyList<String>(), focused())
         compose.runOnIdle { allowed.value = true }
         settle()
+        assertTrue("the player root takes focus after the reveal", focusableNodes() > 0)
         key(Key.DirectionDown)
         assertTrue("controls become reachable after reveal", exists("player-actions"))
     }
+
+    private val liveTvSurface get() = context.getString(at.bernhardberger.tvhplayer.R.string.player_live_tv_surface)
+
+    private fun focusableNodes() = compose.onAllNodes(isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size
 
     @Test fun startupAudioOnlyPlayingHandsOffWithoutAVideoFrame() {
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()

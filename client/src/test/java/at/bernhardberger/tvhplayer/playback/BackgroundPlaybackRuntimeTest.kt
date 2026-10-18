@@ -923,6 +923,14 @@ class BackgroundPlaybackRuntimeTest {
         var forcedPlaying: Boolean? = null
         var forcedPlaybackState: Int? = null
         var forcedTracks: androidx.media3.common.Tracks? = null
+        /** Video decoder counters the runtime reads, for frames the fake stream never renders. */
+        var forcedVideoDecoderCounters: androidx.media3.exoplayer.DecoderCounters? = null
+        /** How often the runtime read the video decoder counters. */
+        var videoDecoderCounterReads = 0
+        /** Runs as the runtime asks the player to play, before it plays. */
+        var beforePlay: () -> Unit = {}
+        /** Runs after the runtime registers a player listener. */
+        var onListenerAdded: () -> Unit = {}
         /** Runs inside a live target install, before the session binds the channel. */
         var beforeLiveBinding: () -> Unit = {}
         private val runtimeSession = object : TvheadendSession by session {
@@ -937,6 +945,14 @@ class BackgroundPlaybackRuntimeTest {
             override fun isPlaying(): Boolean = forcedPlaying ?: player.isPlaying
             override fun getPlaybackState(): Int = forcedPlaybackState ?: player.playbackState
             override fun getCurrentTracks(): androidx.media3.common.Tracks = forcedTracks ?: player.currentTracks
+            override fun getVideoDecoderCounters(): androidx.media3.exoplayer.DecoderCounters? {
+                videoDecoderCounterReads++
+                return forcedVideoDecoderCounters ?: player.videoDecoderCounters
+            }
+            override fun play() {
+                beforePlay()
+                player.play()
+            }
             override fun pause() {
                 player.pause()
                 afterPause()
@@ -944,6 +960,7 @@ class BackgroundPlaybackRuntimeTest {
             override fun addListener(listener: Player.Listener) {
                 playerListeners += listener
                 player.addListener(listener)
+                onListenerAdded()
             }
             override fun removeListener(listener: Player.Listener) {
                 playerListeners -= listener

@@ -30,6 +30,10 @@ object ProfilePlaybackTrace : PlaybackTrace {
         profileTrace("P44:cover:shown") {}
     }
 
+    override fun videoPictureAdvancing(epoch: Long) {
+        profileTrace("P44:picture:advancing:$epoch") {}
+    }
+
     override fun videoCoverLifted(epoch: Long) {
         profileTrace("P44:cover:lifted:$epoch") {}
     }

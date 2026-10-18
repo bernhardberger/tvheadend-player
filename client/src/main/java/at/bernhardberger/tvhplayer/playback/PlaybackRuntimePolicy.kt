@@ -60,8 +60,11 @@ interface PlaybackTrace {
 
     fun firstVideoFrame(epoch: Long, format: Format?, adapterName: String?) {}
 
-    /** A target install began; the video is covered until a target's first frame. */
+    /** A target install began; the video is covered until a target's first frame is ready to move. */
     fun videoCoverShown() {}
+
+    /** The playing target of [epoch] rendered a frame after its ready first frame. */
+    fun videoPictureAdvancing(epoch: Long) {}
 
     /** The video of [epoch] is uncovered. */
     fun videoCoverLifted(epoch: Long) {}

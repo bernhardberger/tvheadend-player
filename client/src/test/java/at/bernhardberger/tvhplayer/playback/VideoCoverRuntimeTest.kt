@@ -15,18 +15,21 @@ import androidx.media3.common.C
 import androidx.media3.common.Player
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.DecoderCounters
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.*
 import at.bernhardberger.tvheadend.sdk.playback.*
 import at.bernhardberger.tvheadend.sdk.testing.*
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackRuntimeTest.Companion.exercise
+import java.time.Duration
 import kotlinx.coroutines.async
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collect
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -179,6 +182,76 @@ class VideoCoverRuntimeTest {
             forcedVideoFormat = videoFormat("new")
             renderFirstFrame()
             assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun firstFrameWhileBufferingKeepsTheCoverUntilTheTargetIsReady() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            // Media3 renders the first frame while it still buffers: that picture would stand still.
+            buffering()
+            renderFirstFrame()
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            playerReady()
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun readyBeforeTheFirstFrameUncoversAtTheFirstFrame() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            assertFalse("ready without a picture stays covered", runtime.videoPresentation.value.visible)
+            renderFirstFrame()
+            assertTrue(runtime.videoPresentation.value.visible)
+        }
+
+    @Test fun pausedTargetUncoversOnceReadyWithItsFirstFrame() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            player.playWhenReady = false
+            buffering()
+            renderFirstFrame()
+            assertFalse(runtime.videoPresentation.value.visible)
+            playerReady()
+            assertFalse(player.playWhenReady)
+            assertTrue("a paused target shows its picture once ready", runtime.videoPresentation.value.visible)
+        }
+
+    @Test fun anUnreadyFrameOfTheOldTargetDoesNotUncoverTheNextTarget() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            forcedVideoFormat = videoFormat("old")
+            buffering()
+            renderFirstFrame()
+            assertFalse(runtime.videoPresentation.value.visible)
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            // The next target is ready, but its own first frame has not been rendered.
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFirstFrame()
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            forcedVideoFormat = videoFormat("new")
+            renderFirstFrame()
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun failedReplacementKeepsAnUnreadyPictureCoveredUntilTheTargetThatStaysIsReady() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live(timeshift = false)
+            buffering()
+            renderFirstFrame()
+            val kept = runtime.videoPresentation.value
+            assertFalse(kept.visible)
+            session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            val install = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+            }
+            await { install.isCompleted }
+
+            assertFalse(install.await()?.isStarted == true)
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            assertEquals(kept, runtime.videoPresentation.value)
+            playerReady()
+            assertEquals(kept.copy(visible = true), runtime.videoPresentation.value)
         }
 
     @Test fun startupProjectionRequiresTheCurrentInstalledSessionAndServedIntent() =
@@ -359,6 +432,455 @@ class VideoCoverRuntimeTest {
             assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         }
 
+    @Test fun playingReadyFirstFrameStaysCoveredUntilTheDecoderRendersAnotherFrame() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            assertTrue(player.playWhenReady)
+            renderFirstFrame()
+            // Ready with its first frame, but the audio clock has not started: the picture stands.
+            renderFrames(counters, 0)
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(counters)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun pausedTargetShowsItsReadyFirstFrameWithoutMotion() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            countVideoFrames()
+            live()
+            player.playWhenReady = false
+            renderFirstFrame()
+            assertTrue("a deliberately paused picture is not a frozen one", runtime.videoPresentation.value.visible)
+        }
+
+    @Test fun rebufferAfterTheMovingPictureShowsDoesNotCoverItAgain() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            renderFirstFrame()
+            renderFrames(counters)
+            val shown = runtime.videoPresentation.value
+            assertTrue(shown.visible)
+            buffering()
+            renderFrames(counters, 0)
+            assertEquals(shown, runtime.videoPresentation.value)
+            playerReady()
+            renderFrames(counters, 0)
+            assertEquals(shown, runtime.videoPresentation.value)
+        }
+
+    @Test fun replacementStopsTheWatchOfThePictureItReplaces() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            forcedVideoFormat = videoFormat("old")
+            renderFirstFrame()
+            renderFrames(counters, 0)
+            assertFalse("the old picture is watched", runtime.videoPresentation.value.visible)
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            val reads = videoDecoderCounterReads
+            // The old watch would see this frame; the new target has not rendered its own first frame.
+            renderFrames(counters)
+            renderFrames(counters)
+            assertEquals("the replaced picture is no longer watched", reads, videoDecoderCounterReads)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+        }
+
+    @Test fun bufferingStopsTheWatchOfTheCoveredPictureUntilItIsReadyAgain() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            renderFirstFrame()
+            renderFrames(counters, 0)
+            buffering()
+            val reads = videoDecoderCounterReads
+            renderFrames(counters)
+            renderFrames(counters)
+            assertEquals("a buffering picture is not watched", reads, videoDecoderCounterReads)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            playerReady()
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(counters)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun viewerPauseShowsTheCoveredPictureThatWaitedForMotion() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            renderFirstFrame()
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            pauseAtTheServer()
+            assertFalse(player.playWhenReady)
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun playWaitingForTheServerResumeKeepsItsStillFirstFrameCovered() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            // Paused at the server before the first frame arrived.
+            pauseAtTheServer()
+            settle()
+            assertFalse(player.playWhenReady)
+            val resumeEntered = CompletableDeferred<Unit>()
+            val finishResume = CompletableDeferred<Unit>()
+            beforeSpeed = { speed ->
+                if (speed == 100) {
+                    resumeEntered.complete(Unit)
+                    finishResume.await()
+                }
+            }
+            val resume = scope.async { runtime.resumeTimeshift() }
+            await { resumeEntered.isCompleted }
+            assertFalse(player.playWhenReady)
+            // The first frame arrives while the player still stands for the server's resume.
+            renderFirstFrame()
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            finishResume.complete(Unit)
+            await { resume.isCompleted && player.playWhenReady }
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(counters)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun firstFrameOfTheNextSourceBeforeItsPresentationBeginsCounts() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            forcedVideoFormat = videoFormat("old")
+            renderFirstFrame()
+            renderFrames(counters)
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            var renderedBeforeItsPresentation = false
+            val next = DecoderCounters()
+            onNextSource {
+                // Only the replaced target's frame listener is registered yet.
+                renderedBeforeItsPresentation = runtime.videoPresentation.value.epoch == oldEpoch
+                // Media3 reports the next source's renderer enable before its first frame.
+                forcedVideoDecoderCounters = next
+                forcedVideoFormat = videoFormat("new")
+                playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+            }
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertNotEquals(oldEpoch, epoch)
+            assertTrue(renderedBeforeItsPresentation)
+            renderFrames(next, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(next)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun queuedFirstFrameOfTheReplacedSourceDoesNotCountForTheNextTarget() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            forcedVideoFormat = videoFormat("old")
+            renderFirstFrame()
+            renderFrames(counters)
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            var renderedBeforeItsPresentation = false
+            val next = DecoderCounters()
+            onNextSource {
+                // Delivered after the next source is set, still with the replaced source's format.
+                renderedBeforeItsPresentation = runtime.videoPresentation.value.epoch == oldEpoch
+                playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+                // The new source disables the old renderer before it can be ready.
+                forcedVideoDecoderCounters = next
+            }
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertTrue(renderedBeforeItsPresentation)
+            renderFrames(next)
+            renderFrames(next)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            forcedVideoFormat = videoFormat("new")
+            renderFirstFrame()
+            renderFrames(next)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun lateFormatAndFirstFrameOfAReplacedSourceWithoutFormatDoNotCountForTheNextTarget() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            // The covered target has neither a video format nor an enabled video decoder yet.
+            live()
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            val late = DecoderCounters()
+            val next = DecoderCounters()
+            onNextSource {
+                // Its decoder, format and first frame arrive only after the next source is set,
+                // then the new source disables its renderer and enables its own.
+                assertEquals(oldEpoch, runtime.videoPresentation.value.epoch)
+                forcedVideoDecoderCounters = late
+                forcedVideoFormat = videoFormat("late-old")
+                playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+                forcedVideoDecoderCounters = next
+            }
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertNotEquals(oldEpoch, epoch)
+            renderFrames(next)
+            renderFrames(next)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            forcedVideoFormat = videoFormat("new")
+            renderFirstFrame()
+            renderFrames(next, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(next)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun startCutShortAfterItsCommitKeepsItsInstallFrameCoveredUntilThePictureMoves() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            val epoch = startCutShort(paused = false)
+            playerReady()
+            renderFrames(counters, 0)
+            assertEquals("the install's stopped player is no pause", AppVideoPresentation(epoch = epoch, visible = false),
+                runtime.videoPresentation.value)
+            runtime.play()
+            await { player.playWhenReady }
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(counters)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun pausedStartCutShortAfterItsCommitShowsItsReadyInstallFrame() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            val epoch = startCutShort(paused = true)
+            assertFalse(player.playWhenReady)
+            renderFrames(counters, 0)
+            assertEquals("not ready yet", AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            playerReady()
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun viewerPauseShowsTheReadyPictureOfAPlayingStartCutShort() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            val epoch = startCutShort(paused = false)
+            playerReady()
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            runtime.pause()
+            await { runtime.videoPresentation.value.visible }
+            assertFalse(player.playWhenReady)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun failedReplacementKeepsThePlayingTargetThatStaysCoveredUntilItsPictureMovesAgain() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live(timeshift = false)
+            renderFirstFrame()
+            renderFrames(counters)
+            val kept = runtime.videoPresentation.value
+            assertTrue(kept.visible)
+            session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+            val install = scope.async {
+                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+            }
+            await { install.isCompleted }
+
+            assertFalse(install.await()?.isStarted == true)
+            assertTrue(player.playWhenReady)
+            // Paused for the attempt and resumed: its last frame stands until its audio runs again.
+            renderFrames(counters, 0)
+            assertEquals(kept.copy(visible = false), runtime.videoPresentation.value)
+            renderFrames(counters)
+            assertEquals(kept, runtime.videoPresentation.value)
+        }
+
+    @Test fun firstFrameOfTheNewTargetDuringItsInstallCountsOnceInstalled() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val counters = countVideoFrames()
+            live()
+            forcedVideoFormat = videoFormat("old")
+            renderFirstFrame()
+            renderFrames(counters)
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            // The new target's frame listener is registered inside the install; its own first frame follows.
+            onListenerAdded = {
+                if (runtime.videoPresentation.value.epoch != oldEpoch) {
+                    onListenerAdded = {}
+                    forcedVideoFormat = videoFormat("new")
+                    playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+                }
+            }
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertNotEquals(oldEpoch, epoch)
+            renderFrames(counters, 0)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            renderFrames(counters)
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    @Test fun firstFrameOfTheReplacedTargetDuringTheInstallDoesNotCountForTheNewTarget() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            live()
+            val oldEpoch = runtime.videoPresentation.value.epoch
+            // Rendered while the next install runs, before the next target's presentation begins.
+            beforeLiveBinding = {
+                beforeLiveBinding = {}
+                forcedVideoFormat = videoFormat("old")
+                playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+            }
+            live(channel = 2)
+            val epoch = runtime.videoPresentation.value.epoch
+            assertNotEquals(oldEpoch, epoch)
+            settle()
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = false), runtime.videoPresentation.value)
+            forcedVideoFormat = videoFormat("new")
+            renderFirstFrame()
+            assertEquals(AppVideoPresentation(epoch = epoch, visible = true), runtime.videoPresentation.value)
+        }
+
+    /**
+     * Starts channel 1 whose new source renders its first frame inside the install, and cuts the
+     * start short once it committed, as its play intent is applied: a [paused] start, which the
+     * viewer paused while it was pending, at its pause, else at its play. Returns its epoch.
+     */
+    private suspend fun BackgroundPlaybackRuntimeTest.Fixture.startCutShort(paused: Boolean): Long {
+        settings.setTimeshiftEnabled(false)
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0)))
+        val idleEpoch = runtime.videoPresentation.value.epoch
+        val cutShort = { throw kotlinx.coroutines.CancellationException("start cut short") }
+        onListenerAdded = {
+            if (runtime.videoPresentation.value.epoch != idleEpoch) {
+                onListenerAdded = {}
+                forcedVideoFormat = videoFormat("new")
+                playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+                // The install paused the player before; the next pause is the start's own.
+                if (paused) afterPause = { afterPause = {}; cutShort() }
+            }
+        }
+        if (!paused) beforePlay = { beforePlay = {}; cutShort() }
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        if (paused) assertNull(runtime.pauseTimeshiftPlayback())
+        val install = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1))), intent)
+        }
+        await { connection.subscribeCount > 0 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { install.isCompleted }
+        assertTrue(install.isCancelled)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        return runtime.videoPresentation.value.epoch
+    }
+
+    @Test fun ownFirstFrameDuringThePlayIntentOfAPausedStartOutlastsAStaleCarriedFrame() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val next = ownFrameDuringThePlayIntentAfterAStaleCarriedFrame(paused = true)
+            assertFalse(player.playWhenReady)
+            playerReady()
+            renderFrames(next, 0)
+            assertTrue(runtime.videoPresentation.value.visible)
+        }
+
+    @Test fun ownFirstFrameDuringThePlayIntentOfAPlayingStartOutlastsAStaleCarriedFrame() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            val next = ownFrameDuringThePlayIntentAfterAStaleCarriedFrame(paused = false)
+            assertTrue(player.playWhenReady)
+            playerReady()
+            renderFrames(next, 0)
+            assertFalse(runtime.videoPresentation.value.visible)
+            renderFrames(next)
+            assertTrue(runtime.videoPresentation.value.visible)
+        }
+
+    /**
+     * Replaces channel 1 by channel 2. The replaced source's late first frame is carried into the
+     * new presentation on its own counters, then the new source renders its first frame on new
+     * counters while the start applies its play intent. Returns the new source's counters.
+     */
+    private suspend fun BackgroundPlaybackRuntimeTest.Fixture.ownFrameDuringThePlayIntentAfterAStaleCarriedFrame(
+        paused: Boolean,
+    ): DecoderCounters {
+        // A held pause needs a channel the server can pause.
+        live(timeshift = paused)
+        val oldEpoch = runtime.videoPresentation.value.epoch
+        val stale = DecoderCounters()
+        val next = DecoderCounters()
+        onNextSource {
+            forcedVideoDecoderCounters = stale
+            forcedVideoFormat = videoFormat("late-old")
+            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+            forcedVideoDecoderCounters = next
+        }
+        val ownFrame = {
+            forcedVideoFormat = videoFormat("new")
+            playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        }
+        var ownFrameRendered = false
+        onListenerAdded = {
+            if (runtime.videoPresentation.value.epoch != oldEpoch) {
+                onListenerAdded = {}
+                // The install paused the player before; the next pause is the start's own.
+                if (paused) afterPause = { afterPause = {}; ownFrame(); ownFrameRendered = true }
+                else beforePlay = { beforePlay = {}; ownFrame(); ownFrameRendered = true }
+            }
+        }
+        val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+        if (paused) assertNull(runtime.pauseTimeshiftPlayback())
+        connection.scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, if (paused) 120 else 0)))
+        val previous = connection.subscribeCount
+        val install = scope.async {
+            runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))), intent)
+        }
+        await { connection.subscribeCount > previous }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { install.isCompleted }
+        assertTrue(install.await()?.isStarted == true)
+        assertTrue(ownFrameRendered)
+        assertNotEquals(oldEpoch, runtime.videoPresentation.value.epoch)
+        return next
+    }
+
+    private suspend fun BackgroundPlaybackRuntimeTest.Fixture.pauseAtTheServer() {
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        await { pause.isCompleted }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, pause.await())
+    }
+
+    /** Runs [action] once, as the next install sets its source on the player. */
+    private fun BackgroundPlaybackRuntimeTest.Fixture.onNextSource(action: () -> Unit) {
+        player.addListener(object : Player.Listener {
+            override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                if (reason != Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) return
+                player.removeListener(this)
+                action()
+            }
+        })
+    }
+
+    private fun BackgroundPlaybackRuntimeTest.Fixture.countVideoFrames() =
+        DecoderCounters().also { forcedVideoDecoderCounters = it }
+
+    /** The decoder renders [count] further frames, and the motion watch looks once. */
+    private fun renderFrames(counters: DecoderCounters, count: Int = 1) {
+        counters.renderedOutputBufferCount += count
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(MOTION_POLL_MILLIS))
+    }
+
     private fun audioTracks() = Tracks(listOf(Tracks.Group(
         TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()),
         false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
@@ -366,6 +888,12 @@ class VideoCoverRuntimeTest {
 
     private fun BackgroundPlaybackRuntimeTest.Fixture.renderFirstFrame() {
         playerListeners.toList().forEach { it.onRenderedFirstFrame() }
+        shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    /** The fake stream is reported ready by [BackgroundPlaybackRuntimeTest.Fixture.live]; a real one may still buffer. */
+    private fun BackgroundPlaybackRuntimeTest.Fixture.buffering() {
+        playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
         shadowOf(Looper.getMainLooper()).idle()
     }
 

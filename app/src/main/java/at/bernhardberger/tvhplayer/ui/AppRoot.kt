@@ -4,8 +4,11 @@ import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 
 import androidx.activity.compose.BackHandler
 import android.animation.ValueAnimator
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.EaseInOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -80,7 +83,13 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
+import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
+import at.bernhardberger.tvhplayer.ui.player.leaving
+import at.bernhardberger.tvhplayer.ui.player.rememberVideoCoverFadeMillis
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
@@ -141,13 +150,55 @@ internal fun shouldShowMainNavigationRail(
     },
 )
 
+/**
+ * Browse with the rail, or a full-screen player. With [motionEnabled] the two cross-fade like the
+ * player destination, so the rail and its page fade with the player instead of leaving in one
+ * frame; the leaving shell keeps its layout but gives up focus, semantics and Back at once.
+ * Otherwise the leaving shell is removed in the frame the other one appears.
+ */
 @Composable
 internal fun MainNavigationShell(
     showRail: Boolean,
     rail: @Composable () -> Unit,
     fullScreen: @Composable () -> Unit,
+    motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
 ) {
-    if (showRail) rail() else fullScreen()
+    AnimatedContent(
+        targetState = showRail,
+        transitionSpec = {
+            if (!motionEnabled) EnterTransition.None togetherWith ExitTransition.None using null
+            else if (targetState) playerExitContentTransform(motionEnabled = true) using null
+            else playerDestinationContentTransform(motionEnabled = true) using null
+        },
+        label = "navigation-shell",
+    ) { railShown ->
+        val exiting = leaving
+        if (exiting && !motionEnabled) return@AnimatedContent
+        val backOwner = rememberNavigationEventDispatcherOwner(enabled = !exiting)
+        // The owner applies `enabled` from an effect; a leaving shell stops answering Back as it commits.
+        SideEffect { backOwner.navigationEventDispatcher.isEnabled = !exiting }
+        CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides backOwner) {
+            // A move reversed mid-fade leaves this shell's entry focus spent: its frame restores it.
+            PlayerMotionFrame(leaving = exiting, restoreFocusOnReturn = true) { if (railShown) rail() else fullScreen() }
+        }
+    }
+}
+
+/**
+ * The back stack a shell shows: the live one while its top belongs to the shell, else the one it
+ * showed last, so a fading shell keeps its page instead of following the navigation.
+ */
+@Composable
+private fun rememberShellBackStack(backStack: List<AppNavKey>, playerShell: Boolean): List<AppNavKey> {
+    val shown = remember { ShellBackStack() }
+    val top = backStack.lastOrNull()
+    val own = top == null || (top is LivePlayerKey || top is RecordingPlayerKey) == playerShell
+    SideEffect { if (own) shown.keys = backStack.toList() }
+    return if (own || shown.keys.isEmpty()) backStack else shown.keys
+}
+
+private class ShellBackStack {
+    var keys: List<AppNavKey> = emptyList()
 }
 
 @Composable
@@ -182,7 +233,9 @@ internal fun MainStartupComposition(
     val latestOnRevealed by androidx.compose.runtime.rememberUpdatedState(onRevealed)
     LaunchedEffect(revealRequestId, motionEnabled) {
         if (revealRequestId == null) return@LaunchedEffect
-        if (motionEnabled) revealAlpha.animateTo(0f, tween(StartupRevealMs, easing = EaseInOut))
+        if (motionEnabled) {
+            revealAlpha.animateTo(0f, tween(StartupRevealMs, PlayerMotion.PictureHoldMs, PlayerMotion.Standard))
+        }
         latestOnRevealed()
     }
     val brandIntro = LocalStartupBrandIntro.current
@@ -273,8 +326,11 @@ internal fun MainStartupComposition(
     )
 }
 
-/** Autoplay handoff: the startup screen dissolves slowly into the first video frames. */
-internal const val StartupRevealMs = 800
+/**
+ * Autoplay handoff: the full-screen startup screen fades into the first video frames over the
+ * M3 long2 duration with M3 standard easing, after the first picture's [PlayerMotion.PictureHoldMs].
+ */
+internal const val StartupRevealMs = 500
 
 /** True while live playback continues behind the browse screens under [WarmPlaybackScrim]. */
 internal val LocalWarmPlayback = compositionLocalOf { false }
@@ -490,6 +546,7 @@ fun AppRoot(
     val playbackRuntime: AppPlaybackRuntime = koinInject()
     val tvheadendSession: TvheadendSession = koinInject()
     val playbackSelectionScope = rememberCoroutineScope()
+    val playerEntry = remember { PlayerEntryHandoff() }
     val playbackOrchestrator = remember { AppRootPlaybackOrchestrator() }
     val playerSettingsStore: PlayerSettingsStore = koinInject()
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
@@ -723,11 +780,13 @@ fun AppRoot(
     }
     // Every live start from browse: before the session is playable the player opens at once and
     // waits for it, then its entry start tunes this channel.
-    val requestLivePlayer: (ChannelId, String) -> Unit = { channelId, name ->
+    val requestLivePlayer: (ChannelId, String) -> Unit = start@{ channelId, name ->
+        // One request at a time: a repeated activation is consumed before it notes another intent.
+        if (playerEntry.pending) return@start
         @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
         val selection = currentLivePlaybackSelection(tvheadendSession.observation.value, channelId)
         val viewingIntent = playbackRuntime.notePlaybackIntent()
-        playbackSelectionScope.launch {
+        playerEntry.request(playbackSelectionScope) {
             val target = playbackOrchestrator.requestLivePlayer(
                 activeChannelId = activeChannelId,
                 activeRecordingId = activeRecordingId,
@@ -735,19 +794,21 @@ fun AppRoot(
                 requestedChannelName = name,
                 viewingIntent = viewingIntent,
                 startPlayback = { intent -> selection?.let { playbackRuntime.playLive(it, intent) } },
-            ) ?: return@launch
-            // A newer request replaces a player another request of this burst opened.
+            ) ?: return@request
+            // A player already open for another channel is replaced.
             if (backStack.lastOrNull() is LivePlayerKey) backStack.popNavigation()
             backStack.pushTransient(
                 LivePlayerKey(target.channelId.value, target.channelName),
             )
         }
     }
-    val content: @Composable (PaddingValues, Boolean, Boolean) -> Unit = {
-            contentPadding, drawerActive, contentAllowed ->
+    val content: @Composable (PaddingValues, Boolean, Boolean, List<AppNavKey>) -> Unit = {
+            contentPadding, drawerActive, contentAllowed, shellBackStack ->
             Box(Modifier.fillMaxSize().profileRouteDraw(currentDestination?.destination?.name ?: "NONE", drawerActive)) {
+                // The full-screen shell only ever shows players: its edges are player transitions.
+                val playerTransition = shellBackStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey }
                 NavDisplay(
-                    backStack = backStack,
+                    backStack = shellBackStack,
                     sceneStrategies = listOf(
                         rememberSidebarGuideSceneStrategy(drawerActive, currentDestination),
                     ),
@@ -758,9 +819,9 @@ fun AppRoot(
                         rememberSaveableStateHolderNavEntryDecorator(),
                         rememberViewModelStoreNavEntryDecorator(),
                     ),
-                    transitionSpec = { appDestinationContentTransform() },
-                    popTransitionSpec = { appDestinationContentTransform() },
-                    predictivePopTransitionSpec = { appDestinationContentTransform() },
+                    transitionSpec = { appRouteContentTransform(playerTransition) },
+                    popTransitionSpec = { appRouteContentTransform(playerTransition) },
+                    predictivePopTransitionSpec = { appRouteContentTransform(playerTransition) },
                     entryProvider = entryProvider {
                     entry<ChannelsKey>(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS),
@@ -784,13 +845,13 @@ fun AppRoot(
                             },
                             onPlay = requestLivePlayer,
                             onPlayRecording = { selection ->
-                                playbackSelectionScope.launch {
+                                playerEntry.request(playbackSelectionScope) {
                                     val target = playbackOrchestrator.requestRecordingPlayer(
                                         activeChannelId = activeChannelId,
                                         activeRecordingId = activeRecordingId,
                                         requestedRecordingId = selection.recordingId,
                                         startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
-                                    ) ?: return@launch
+                                    ) ?: return@request
                                     backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.START_OVER))
                                 }
                             },
@@ -813,7 +874,7 @@ fun AppRoot(
                             },
                             onPlayRecording = { playbackSelection ->
                                 val recordingId = playbackSelection.recordingId
-                                playbackSelectionScope.launch {
+                                playerEntry.request(playbackSelectionScope) {
                                     val target = playbackOrchestrator.requestRecordingPlayer(
                                         activeChannelId = activeChannelId,
                                         activeRecordingId = activeRecordingId,
@@ -824,7 +885,7 @@ fun AppRoot(
                                                 RecordingPlaybackStart.START_OVER,
                                             )
                                         },
-                                    ) ?: return@launch
+                                    ) ?: return@request
                                     backStack.pushTransient(
                                         recordingPlayerKey(
                                             recordingId = target.recordingId,
@@ -850,7 +911,7 @@ fun AppRoot(
                             onRetry = appVm::reconnectNow,
                             onPlayRecording = { playbackSelection, intent ->
                                 val recordingId = playbackSelection.recordingId
-                                playbackSelectionScope.launch {
+                                playerEntry.request(playbackSelectionScope) {
                                     val target = playbackOrchestrator.requestRecordingPlayer(
                                         activeChannelId = activeChannelId,
                                         activeRecordingId = activeRecordingId,
@@ -861,7 +922,7 @@ fun AppRoot(
                                                 intent,
                                             )
                                         },
-                                    ) ?: return@launch
+                                    ) ?: return@request
                                     backStack.pushTransient(
                                         recordingPlayerKey(target.recordingId, intent),
                                     )
@@ -1040,15 +1101,27 @@ fun AppRoot(
                     videoVisible = videoPresentation.visible,
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     modifier = Modifier.fillMaxSize(),
+                    // The startup screen and its reveal own an autoplay's first picture.
+                    coverFadeMillis = rememberVideoCoverFadeMillis(
+                        playerShown = isPlayer,
+                        videoVisible = videoPresentation.visible,
+                        instant = applianceLaunchActive || !ValueAnimator.areAnimatorsEnabled(),
+                    ),
                 )
             }
         },
         navigation = { _, contentAllowed ->
             MainNavigationShell(
                 showRail = showRail,
+                // The startup screen and its reveal own the way into an autoplay.
+                motionEnabled = !applianceLaunchActive && ValueAnimator.areAnimatorsEnabled(),
                 rail = {
+                    val railBackStack = rememberShellBackStack(backStack, playerShell = false)
+                    PlayerEntryOverlays(playerEntry,
+                        playerShown = { !shouldShowMainNavigationRail(backStack.lastOrNull(), navigationStartDestination) }) {
                     SideRail(
-                        currentRoute = currentDestination?.destination,
+                        // A fading rail keeps marking the page it fades with.
+                        currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,
                         rootRoute = AppDestination.CHANNELS,
                         showEpgMenu = uiSettings.showEpgMenu,
@@ -1080,12 +1153,13 @@ fun AppRoot(
                             }
                         },
                         content = { contentPadding, drawerActive ->
-                            content(contentPadding, drawerActive, contentAllowed)
+                            content(contentPadding, drawerActive, contentAllowed, railBackStack)
                         },
                     )
+                    }
                 },
                 fullScreen = {
-                    content(TvFullScreenPadding, false, contentAllowed)
+                    content(TvFullScreenPadding, false, contentAllowed, rememberShellBackStack(backStack, playerShell = true))
                 },
             )
         },

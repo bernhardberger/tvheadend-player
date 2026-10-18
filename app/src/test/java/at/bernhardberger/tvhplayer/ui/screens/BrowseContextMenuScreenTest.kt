@@ -57,6 +57,14 @@ class BrowseContextMenuScreenTest {
     private var guideProgramme: EpgEvent? = null
     private var start: RecordingPlaybackStart? = null
     private var watchedChannel: ChannelId? = null
+    private val playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
+
+    /** Starts a player request that stays pending, as while the player is still opening. */
+    private fun requestPlayer() {
+        playerEntry.request(kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Unconfined)) {
+            kotlinx.coroutines.awaitCancellation()
+        }
+    }
 
     @Test fun channelMenuShowsCurrentProgrammeArtwork() = menuArtwork(recordings = false, artwork = true)
     @Test fun channelMenuWithoutArtworkShowsPicon() = menuArtwork(recordings = false, artwork = false)
@@ -313,6 +321,35 @@ class BrowseContextMenuScreenTest {
     @Test fun channelsHoldMenuBackAndWatch() {
         show(recordings = false)
         exercise("channel-row-1", "Watch", "channels")
+        assertEquals(1, plays)
+    }
+
+    @Test fun recordingMenuTakesNoKeysWhileItsPlaybackIsOpening() {
+        show(recordings = true, entryHandoff = true)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Resume").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+        // The menu stays up until the player replaces browse; Delete is three steps down.
+        compose.onRoot().performKeyInput { repeat(3) { pressKey(Key.DirectionDown) }; pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
+        compose.onNodeWithText("Resume").assertIsFocused()
+        assertEquals(1, plays)
+    }
+
+    @Test fun programmeMenuTakesNoKeysWhileItsPlaybackIsOpening() = channelMenuWhileOpening(noProgramme = false)
+    @Test fun channelMenuTakesNoKeysWhileItsPlaybackIsOpening() = channelMenuWhileOpening(noProgramme = true)
+
+    private fun channelMenuWhileOpening(noProgramme: Boolean) {
+        val session = show(recordings = false, noProgramme = noProgramme, entryHandoff = true)
+        val watch = if (noProgramme) "Watch channel" else "Watch"
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText(watch).assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+        compose.onRoot().performKeyInput { repeat(3) { pressKey(Key.DirectionDown) }; pressKey(Key.DirectionCenter) }
+        assertEquals(null, guideRequest)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
+        compose.onNodeWithText(watch).assertIsFocused()
         assertEquals(1, plays)
     }
 
@@ -1149,7 +1186,7 @@ class BrowseContextMenuScreenTest {
         summary: String? = "A winter expedition beyond the Arctic Circle follows the changing light across the ridge.",
         description: String? = null, episodeSubtitle: String? = null, unknownDuration: Boolean = false,
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
-        offline: Boolean = false, guideDetails: Boolean = false): FakeTvheadendSession {
+        offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false): FakeTvheadendSession {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
         check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
@@ -1217,6 +1254,8 @@ class BrowseContextMenuScreenTest {
                     back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     view = LocalView.current
                     val observation = session.observation.collectAsState().value
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff provides playerEntry.takeIf { entryHandoff }) {
                     Box(Modifier.fillMaxSize().background(androidx.tv.material3.MaterialTheme.colorScheme.background)) {
                         val content: @androidx.compose.runtime.Composable (Boolean) -> Unit = { drawerActive ->
                         layering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
@@ -1227,13 +1266,13 @@ class BrowseContextMenuScreenTest {
                             mutations = DvrMutationActions(session.dvrRepository), notices = notices,
                             mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                             mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
-                            onPlay = { _, _ -> plays++ }, onPlayRecording = {}, onClose = {},
+                            onPlay = { _, _ -> plays++; requestPlayer() }, onPlayRecording = {}, onClose = {},
                          ) else if (recordings) RecordingsScreenContent(
                              initialFocusEnabled = !drawerActive,
                             observation = observation, state = state, imageLoader = loader,
                              dvrMutationActions = DvrMutationActions(session.dvrRepository), notices = notices,
                              nowSecProvider = { now.epochSeconds },
-                            onPlayRecording = { _, intent -> plays++; start = intent },
+                            onPlayRecording = { _, intent -> plays++; start = intent; requestPlayer() },
                             onWatchChannel = { channelId, _ -> watchedChannel = channelId },
                          ) else ChannelsScreenContent(
                              initialFocusEnabled = !drawerActive,
@@ -1241,15 +1280,16 @@ class BrowseContextMenuScreenTest {
                             observation = observation, tagNotice = false, selectedId = { channel.id },
                             imageLoader = loader, playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                             onSelectChannel = {}, onSelectTag = {}, onDismissTagNotice = {},
-                            onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> plays++ },
+                            onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> plays++; requestPlayer() },
                             onShowGuide = { channelId, programme -> guideRequest = channelId; guideProgramme = programme },
-                            onPlayRecording = { plays++; start = RecordingPlaybackStart.START_OVER },
+                            onPlayRecording = { plays++; start = RecordingPlaybackStart.START_OVER; requestPlayer() },
                         )
                         }
                         if (realRail) at.bernhardberger.tvhplayer.ui.components.SideRail(
                             currentRoute = at.bernhardberger.tvhplayer.ui.AppDestination.CHANNELS,
                             showEpgMenu = true, onRootBack = {}, onNavigate = {},
                         ) { _, drawerActive -> content(drawerActive) } else content(false)
+                    }
                     }
                 }
             }

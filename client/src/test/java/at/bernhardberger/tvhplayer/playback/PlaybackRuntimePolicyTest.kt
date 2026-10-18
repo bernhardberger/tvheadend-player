@@ -12,6 +12,7 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -96,6 +97,37 @@ class PlaybackRuntimePolicyTest {
         }
     }
 
+    @Test fun enabledTraceSeesTheFirstFrameWhenRenderedAndTheLiftOnlyOnceReady() {
+        val trace = RecordingTrace(enabled = true)
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_BUFFERING) }
+            renderFirstFrame()
+            assertFalse(runtime.videoPresentation.value.visible)
+            assertEquals(listOf("cover", "frame:$epoch"), trace.events)
+            playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) }
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(runtime.videoPresentation.value.visible)
+            assertEquals(listOf("cover", "frame:$epoch", "lifted:$epoch"), trace.events)
+        }
+    }
+
+    @Test fun enabledTraceSeesThePlayingPictureAdvanceBeforeTheLift() {
+        val trace = RecordingTrace(enabled = true)
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            val counters = androidx.media3.exoplayer.DecoderCounters().also { forcedVideoDecoderCounters = it }
+            live()
+            val epoch = runtime.videoPresentation.value.epoch
+            renderFirstFrame()
+            assertEquals(listOf("cover", "frame:$epoch"), trace.events)
+            counters.renderedOutputBufferCount++
+            shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(MOTION_POLL_MILLIS))
+            assertTrue(runtime.videoPresentation.value.visible)
+            assertEquals(listOf("cover", "frame:$epoch", "advancing:$epoch", "lifted:$epoch"), trace.events)
+        }
+    }
+
     @Test fun disabledTraceIsNeverCalled() {
         val trace = RecordingTrace(enabled = false)
         exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
@@ -130,6 +162,7 @@ class PlaybackRuntimePolicyTest {
             events += "frame:$epoch"
         }
         override fun videoCoverShown() { calls++; events += "cover" }
+        override fun videoPictureAdvancing(epoch: Long) { calls++; events += "advancing:$epoch" }
         override fun videoCoverLifted(epoch: Long) { calls++; events += "lifted:$epoch" }
     }
 }

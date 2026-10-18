@@ -2,12 +2,17 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.view.View
 import androidx.annotation.OptIn
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -15,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
@@ -36,6 +42,8 @@ fun PlayerVideoSurface(
     videoVisible: Boolean,
     modifier: Modifier = Modifier,
     debugVideoBackdropVisible: Boolean = false,
+    /** How long the black cover takes to clear a first picture; 0 removes it at once. */
+    coverFadeMillis: Int = 0,
 ) {
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var keepScreenOn by remember(player, lifecycle, videoVisible) { mutableStateOf(false) }
@@ -101,12 +109,61 @@ fun PlayerVideoSurface(
         )
         // View alpha does not hide a SurfaceView's content: cover the old picture until the
         // current target renders its first frame.
-        if (!videoVisible) {
-            Box(Modifier.matchParentSize().background(Color.Black).testTag("video-cover"))
-        }
+        VideoCover(videoVisible, coverFadeMillis, Modifier.matchParentSize())
         DebugVideoBackdrop(
             visible = debugVideoBackdropVisible,
             modifier = Modifier.matchParentSize(),
         )
     }
+}
+
+/**
+ * Covers the surface the moment [videoVisible] turns false. Once the first frame is visible the
+ * cover holds for [PlayerMotion.PictureHoldMs], then clears over [fadeMillis] (M3 standard easing)
+ * above the presented picture, or at once for 0.
+ */
+@Composable
+internal fun VideoCover(videoVisible: Boolean, fadeMillis: Int, modifier: Modifier) {
+    val alpha = remember { Animatable(if (videoVisible) 0f else 1f) }
+    LaunchedEffect(videoVisible) {
+        if (videoVisible && fadeMillis > 0) {
+            alpha.animateTo(0f, tween(fadeMillis, PlayerMotion.PictureHoldMs, PlayerMotion.Standard))
+        } else {
+            alpha.snapTo(if (videoVisible) 0f else 1f)
+        }
+    }
+    val fading by remember { derivedStateOf { alpha.value > 0f } }
+    if (!videoVisible || fadeMillis > 0 && fading) {
+        Box(
+            modifier
+                .graphicsLayer { this.alpha = if (videoVisible) alpha.value else 1f }
+                .background(Color.Black)
+                .testTag("video-cover"),
+        )
+    }
+}
+
+/**
+ * How long the cover takes to clear a first picture: [PlayerMotion.EntryPictureMs] for the first
+ * one while the player is shown, [PlayerMotion.ZapPictureMs] for a later zap, and 0 when [instant]
+ * (no animations, or the startup screen and its reveal own the first picture).
+ */
+@Composable
+internal fun rememberVideoCoverFadeMillis(playerShown: Boolean, videoVisible: Boolean, instant: Boolean): Int {
+    val visit = remember { PlayerPictureVisit() }
+    SideEffect {
+        if (!playerShown) visit.pictures = 0 else if (videoVisible && !visit.visible) visit.pictures++
+        visit.visible = videoVisible
+    }
+    return when {
+        instant -> 0
+        playerShown && visit.pictures == 0 -> PlayerMotion.EntryPictureMs
+        else -> PlayerMotion.ZapPictureMs
+    }
+}
+
+/** First pictures shown since the player was entered, read in the frame the next one appears. */
+private class PlayerPictureVisit {
+    var pictures = 0
+    var visible = false
 }
