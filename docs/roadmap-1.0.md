@@ -298,6 +298,7 @@ Gaps:
 | S7 | Store listing: TV screenshots from real devices, banner, English and German descriptions naming Android TV, hosted privacy-policy URL (mention the accessibility service in the Appliance build) | Listing complete in Play Console |
 | S8 | App content declarations: Data safety (credentials stored on device and sent only to the user's server; unencrypted HTSP disclosed), content rating, target audience, ads, any foreground-service types | Declarations submitted |
 | S9 | GPLv3 on Play: confirm corresponding-source offer and compatibility of Play distribution terms (licensing check, not a Play-docs question) | Owner-accepted conclusion recorded in `product-identity-plan.md` |
+| S10 | README screenshots. **Decided (owner, 2026-10-18):** three images (Channels, Guide, the player with its banner) from offline captures of the production screens with the fictional fixture pack, never device captures (video comes out black while playing, and real channels would show). Added with the 0.3.0 release, after U4 settles; refreshed when a pictured screen changes and at 1.0. The README holds a placeholder comment for them | Three current images in the README at each release |
 | S10 | Developer verification for sideloaded installs (global rollout 2027): register the package and key | Registered before 1.0 |
 | S11 | Closed test track: run the S2 window on the 0.9 RC | 14 days completed; feedback triaged |
 | S12 | Watch-ahead: targetSdk 37 makes local-network access a runtime permission. Not for 1.0 while targeting 36 | Noted in the release checklist |
@@ -315,7 +316,7 @@ Gaps:
 
 | Version | Content | Exit |
 |---|---|---|
-| 0.3 | Done so far: P1–P2, H1, U2 inventory, U15 shared patterns, U17 locale formats, E3 (minimal journeys), R2, S1/S3 split, S6 AAB, D4, U9 startup, player entry and picture cover, display frame-rate matching from the stream's declared frame rate (SDK 0.34.0), artwork context (SDK 0.33.0); repository, docs and release material checked for stale content and naming first | Signed Play and Appliance release on GitHub; release smoke on the G10 |
+| 0.3 | Done so far: P1–P2, H1, U2 inventory, U15 shared patterns, U17 locale formats, E3 (minimal journeys), R2, S1/S3 split, S6 AAB, D4, U9 startup, player entry and picture cover, display frame-rate matching from the stream's declared frame rate (SDK 0.34.0), artwork context (SDK 0.33.0); repository, docs and release material checked for stale content and naming first | Signed Play and Appliance release on GitHub; release smoke on the G10; README screenshots (S10) |
 | 0.4 | U4 Channels; error catalog wired in three slices (live player, recording player, browse screens) | Channels accepted on the G10; no raw codes outside the stats overlay |
 | 0.5 | U6 Recordings (D9 inside, real recorded length and padded stop) | Recordings accepted on the G10 |
 | 0.6–0.7 | Remaining screens in the U2 order, U3 Home where it fits, E4, U14; U1 trials decided in place; E5/E6 alongside | Each screen accepted as it lands |
