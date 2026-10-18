@@ -8,7 +8,7 @@ Status: approved and implemented beginning 2026-07-24
 |---|---|
 | Product boundary | Independent public Android TV live-TV client for Tvheadend, with appliance behavior as an optional profile/integration layer |
 | Public name | **Tvheadend Player** |
-| Launcher label | **Tvheadend Player** |
+| Launcher label | **Tvheadend Player** (Play build); **Tvheadend Player Appliance** (Appliance build, so both can be told apart when installed side by side) |
 | Descriptor | **Live TV client for Tvheadend servers** |
 | Repository | `bernhardberger/tvheadend-player` |
 | Distribution | GitHub-first, while keeping a later Google Play path possible |

@@ -77,6 +77,7 @@
     <string name="clear_cache">Clear cache</string>
     <string name="cache_clearing">Clearing cache…</string>
     <string name="app_name" translatable="false">Tvheadend Player</string>
+    <string name="launcher_label" translatable="false">@string/app_name</string>
 
     <string name="channel_list">Channel List</string>
     <string name="all_channels">All channels</string>
