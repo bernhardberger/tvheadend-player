@@ -578,6 +578,222 @@ class SessionPlaybackPlayerTest {
         assertTrue(connection.speeds.isEmpty())
     }
 
+    /*
+     * A target of the other kind is stopped before the replacement's source is set, so the
+     * replacement never plays through the old target's decoders. The same kind is replaced in place.
+     */
+
+    @Test fun recordingOpenedOverLiveStopsTheLiveTargetBeforeItsSource() = exercise {
+        live(false)
+        val stops = collectSessionStops()
+        val states = collectStates()
+        playerLog.clear()
+        recording()
+        assertEquals("stop", playerLog.first())
+        assertEquals("items=1", playerLog.last())
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
+        // Not the viewer's stop: the screen stays open and Idle never shows between the targets.
+        assertEquals(emptyList<Unit>(), stops)
+        assertFalse(states.toString(), AppPlaybackState.Idle in states)
+        assertEquals(1, connection.unsubscribeCount)
+    }
+
+    @Test fun channelStartedOverARecordingStopsTheRecordingBeforeItsSource() = exercise {
+        recording()
+        val stops = collectSessionStops()
+        val states = collectStates()
+        playerLog.clear()
+        live(false)
+        assertEquals("stop", playerLog.first())
+        assertEquals("items=1", playerLog.last())
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(null, runtime.recordingSelection.value)
+        assertEquals(emptyList<Unit>(), stops)
+        assertFalse(states.toString(), AppPlaybackState.Idle in states)
+    }
+
+    @Test fun targetsOfTheSameKindReplaceEachOtherWithoutAStop() = exercise {
+        live(false)
+        playerLog.clear()
+        answerNextSubscribe(2)
+        assertTrue(runtime.playLive(liveSelection())?.isStarted == true)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(playerLog.toString(), "stop" in playerLog)
+        recording()
+        playerLog.clear()
+        recording()
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(1)), runtime.activeTarget.value)
+        assertFalse(playerLog.toString(), "stop" in playerLog)
+    }
+
+    @Test fun aChannelThatFailsAfterTheRecordingStoppedLeavesNoTargetBehind() = exercise {
+        recording()
+        val stops = collectSessionStops()
+        playerLog.clear()
+        // The SDK binds the channel only after the recording stopped.
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val result = runtime.playLive(liveSelection())
+        settle()
+        assertFalse(result.toString(), result?.isStarted == true)
+        assertEquals("stop", playerLog.first())
+        assertEquals(null, runtime.activeTarget.value)
+        assertEquals(null, runtime.recordingSelection.value)
+        assertTrue(runtime.state.value.toString(), runtime.state.value is AppPlaybackState.Failed)
+        assertFalse(runtime.videoPresentation.value.visible)
+        assertEquals(emptyList<Unit>(), stops)
+    }
+
+    @Test fun aRecordingThatCannotBindLeavesTheChannelPlaying() = exercise {
+        live(false)
+        val picture = runtime.videoPresentation.value
+        playerLog.clear()
+        session.scriptRecordingPlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val result = runtime.playRecording(
+            requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+            RecordingPlaybackStart.START_OVER,
+        )
+        settle()
+        assertFalse(result.toString(), result?.isStarted == true)
+        assertFalse(playerLog.toString(), "stop" in playerLog)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(picture, runtime.videoPresentation.value)
+        assertEquals(0, connection.unsubscribeCount)
+    }
+
+    /*
+     * A start cancelled after it stopped the other kind settles as that stop would have: no
+     * target, Idle, no source left in the player, and not the viewer's stop.
+     */
+
+    @Test fun aRecordingCancelledWhileTheChannelStopsLeavesNothingBehind() = exercise {
+        live(false)
+        val stops = collectSessionStops()
+        val states = collectStates()
+        val start = recordingStart()
+        onPlayerLog = { if (it == "stop") start.cancel() }
+        start.start()
+        await { start.isCompleted }
+        onPlayerLog = {}
+        settle()
+        assertTrue(start.isCancelled)
+        assertCancelledStartSettled(states, stops)
+    }
+
+    @Test fun aRecordingCancelledWhileItsSourceIsSetLeavesNothingBehind() = exercise {
+        live(false)
+        val stops = collectSessionStops()
+        val states = collectStates()
+        val start = recordingStart()
+        onPlayerLog = { if (it == "items=1") start.cancel() }
+        start.start()
+        await { start.isCompleted }
+        onPlayerLog = {}
+        settle()
+        assertTrue(start.isCancelled)
+        assertCancelledStartSettled(states, stops)
+    }
+
+    @Test fun aRecordingCancelledWithNothingPlayingLeavesNothingBehind() = exercise {
+        val states = collectStates()
+        val start = recordingStart()
+        onPlayerLog = { if (it == "items=1") start.cancel() }
+        start.start()
+        await { start.isCompleted }
+        onPlayerLog = {}
+        settle()
+        assertTrue(start.isCancelled)
+        assertEquals(null, runtime.activeTarget.value)
+        assertEquals(AppPlaybackState.Idle, runtime.state.value)
+        assertFalse(states.toString(), states.any { it is AppPlaybackState.Failed })
+        assertEquals(playerLog.toString(), 0, player.mediaItemCount)
+    }
+
+    @Test fun aChannelCancelledWhileItsSourceIsSetOverARecordingLeavesNothingBehind() = exercise {
+        recording()
+        val stops = collectSessionStops()
+        val states = collectStates()
+        answerNextSubscribe(1)
+        val start = scope.async(start = CoroutineStart.LAZY) { runtime.playLive(liveSelection()) }
+        onPlayerLog = { if (it == "items=1") start.cancel() }
+        start.start()
+        await { start.isCompleted }
+        onPlayerLog = {}
+        settle()
+        assertTrue(start.isCancelled)
+        assertCancelledStartSettled(states, stops)
+    }
+
+    @Test fun aNewerStartCancelledBeforeItsTurnSettlesTheRecordingCancelledForIt() = exercise {
+        live(false)
+        val stops = collectSessionStops()
+        val states = collectStates()
+        val start = recordingStart()
+        var newer: Deferred<PlaybackTargetResult?>? = null
+        onPlayerLog = { entry ->
+            if (entry == "items=1" && newer == null) {
+                // A newer channel queues behind this start; both are cancelled before it runs.
+                val intent = runtime.notePlaybackIntent()
+                newer = scope.async(start = CoroutineStart.UNDISPATCHED) { runtime.playLive(liveSelection(), intent) }
+                newer?.cancel()
+                start.cancel()
+            }
+        }
+        start.start()
+        await { start.isCompleted && newer?.isCompleted == true }
+        onPlayerLog = {}
+        settle()
+        assertTrue(start.isCancelled)
+        assertTrue(requireNotNull(newer).isCancelled)
+        assertCancelledStartSettled(states, stops)
+    }
+
+    @Test fun aRecordingStartCancelledForANewerChannelShowsNoFailure() = exercise {
+        live(false)
+        playerLog.clear()
+        val states = collectStates()
+        val start = recordingStart()
+        val newer = java.util.concurrent.atomic.AtomicReference<Deferred<PlaybackTargetResult?>>()
+        onPlayerLog = { entry ->
+            if (entry == "items=1" && newer.get() == null) {
+                // The viewer chose a channel meanwhile; its start queues behind this one.
+                val intent = runtime.notePlaybackIntent()
+                answerNextSubscribe(2)
+                newer.set(scope.async { runtime.playLive(liveSelection(), intent) })
+                start.cancel()
+            }
+        }
+        start.start()
+        await { start.isCompleted && newer.get()?.isCompleted == true }
+        onPlayerLog = {}
+        settle()
+        assertTrue(start.isCancelled)
+        assertTrue(newer.get().await()?.isStarted == true)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertFalse(states.toString(), states.any { it is AppPlaybackState.Failed || it == AppPlaybackState.Idle })
+        assertEquals(1, player.mediaItemCount)
+        // The recording's source is stopped before the channel's, so the channel gets fresh decoders.
+        val recordingSource = playerLog.indexOf("items=1")
+        val channelSource = playerLog.lastIndexOf("items=1")
+        assertTrue(playerLog.toString(), recordingSource < channelSource)
+        assertTrue(playerLog.toString(), "stop" in playerLog.subList(recordingSource, channelSource))
+        assertTrue(player.playWhenReady)
+    }
+
+    private suspend fun Fixture.assertCancelledStartSettled(states: List<AppPlaybackState>, stops: List<Unit>) {
+        assertEquals(null, runtime.activeTarget.value)
+        assertEquals(null, runtime.recordingSelection.value)
+        assertEquals(AppPlaybackState.Idle, runtime.state.value)
+        assertFalse(states.toString(), states.any { it is AppPlaybackState.Failed })
+        assertFalse(runtime.videoPresentation.value.visible)
+        assertEquals(playerLog.toString(), 0, player.mediaItemCount)
+        // No subscription stays open, neither the stopped channel's nor a cancelled channel's.
+        await { connection.unsubscribeCount == connection.subscribeCount }
+        // Not the viewer's stop: no session Stop, and the next player entry is admitted.
+        assertEquals(emptyList<Unit>(), stops)
+        assertNotNull(runtime.enterPlayerScreen())
+    }
+
     @Test fun sessionStopTearsDownLiveWithoutTimeshiftAndAnnouncesOnce() = exercise {
         live(false)
         val stops = collectSessionStops()
@@ -1113,7 +1329,27 @@ class SessionPlaybackPlayerTest {
         private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()
-        private val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
+        /** The SDK's Player stops and the playlists they leave, in order: a stop releases the decoders. */
+        val playerLog: MutableList<String> = java.util.Collections.synchronizedList(mutableListOf())
+        /** Runs as each [playerLog] entry is made, so a test can cancel a start at that point. */
+        var onPlayerLog: (String) -> Unit = {}
+        private fun logPlayer(entry: String) {
+            playerLog += entry
+            onPlayerLog(entry)
+        }
+        private val coordinator = createTvheadendPlaybackCoordinator(object : ExoPlayer by player {
+            override fun stop() {
+                logPlayer("stop")
+                player.stop()
+            }
+        }).also { it.launchIn(scope) }
+        init {
+            player.addListener(object : Player.Listener {
+                override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                    if (reason == Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED) logPlayer("items=${player.mediaItemCount}")
+                }
+            })
+        }
         /** Runtime listeners, so tests can drive STATE_READY, which the fake stream never reaches. */
         private val playerListeners = mutableListOf<Player.Listener>()
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
@@ -1195,11 +1431,23 @@ class SessionPlaybackPlayerTest {
             await { wrapper.isCommandAvailable(Player.COMMAND_STOP) }
         }
 
+        /** A recording start that runs once started, so a test can arrange its cancellation first. */
+        fun recordingStart(): Deferred<PlaybackTargetResult?> = scope.async(start = CoroutineStart.LAZY) {
+            runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
+                RecordingPlaybackStart.START_OVER)
+        }
+
         /** Subscribes before returning, as a showing player screen would be. */
         suspend fun restoreRecording(): PlaybackTargetResult? = runtime.restoreRecordingRoute(
             requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(1))),
             RecordingPlaybackStart.START_OVER,
         )
+
+        fun collectStates(): List<AppPlaybackState> = java.util.Collections.synchronizedList(
+            mutableListOf<AppPlaybackState>(),
+        ).also { states ->
+            scope.launch(start = CoroutineStart.UNDISPATCHED) { runtime.state.collect { states += it } }
+        }
 
         fun collectSessionStops(): List<Unit> = mutableListOf<Unit>().also { stops ->
             scope.launch(start = CoroutineStart.UNDISPATCHED) { runtime.sessionStops.collect { stops += it } }

@@ -38,8 +38,10 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -49,8 +51,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.job
+import kotlinx.coroutines.withContext
 
 /** App presentation adapter over the released coordinator and app-owned player. */
 class AppPlaybackRuntime(
@@ -485,20 +489,26 @@ class AppPlaybackRuntime(
         intent: Long?,
         generation: Long,
     ): PlaybackTargetResult? =
-        targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+        serializeViewerStart(generation, onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
             if (intent != null && isPlaybackIntentStopped(intent)) {
                 endLiveSelection(generation)
-                return@serialize null
+                return@serializeViewerStart null
             }
             if (policy.trace.enabled) policy.trace.tuneAdmitted()
             lastLiveChannelId = selection.channelId
             forgetRecordingRecoveryLocked()
             liveRecovery.resetBackoffLocked()
-            val result = playLive(
-                channelId = selection.channelId,
-                recovering = false,
-                servedGeneration = generation,
-            )
+            val startEpoch = presentationEpoch.snapshot()
+            val result = try {
+                playLive(
+                    channelId = selection.channelId,
+                    recovering = false,
+                    expectedPresentationEpoch = startEpoch,
+                    servedGeneration = generation,
+                )
+            } finally {
+                settleCancelledStartLocked(startEpoch, generation)
+            }
             // A commit ended the selection. Otherwise the start failed while the previous live
             // target stayed: a Pause the viewer gave meanwhile is still the latest transport
             // intent, so it applies to that retained target.
@@ -621,6 +631,7 @@ class AppPlaybackRuntime(
                 ) {
                     PlaybackTargetResult.NOT_READY
                 } else {
+                    stopOtherKindBeforeInstall(live = true, expectedPresentationEpoch)
                     when (
                         val target = coordinator.setLiveTarget(
                             session = session,
@@ -708,11 +719,66 @@ class AppPlaybackRuntime(
         selection: RecordingPlaybackSelection,
         start: RecordingPlaybackStart,
     ): PlaybackTargetResult? {
-        playbackRequests.incrementAndGet()
-        return targetCommands.serialize(onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
+        val request = playbackRequests.incrementAndGet()
+        return serializeViewerStart(request, onClosed = { PlaybackTargetResult.SHUT_DOWN }) {
             // The viewer's start choice applies to a new play; no earlier position carries over.
             forgetRecordingRecoveryLocked()
-            playRecordingLocked(selection.recordingId, start)
+            val startEpoch = presentationEpoch.snapshot()
+            try {
+                playRecordingLocked(selection.recordingId, start)
+            } finally {
+                settleCancelledStartLocked(startEpoch, request)
+            }
+        }
+    }
+
+    /**
+     * Settles a viewer start cancelled before it committed, so neither its Starting and cover
+     * nor a source it or the stopped other kind left stays behind: it ends as [stopPlayback]
+     * does, Idle without a target, which is no user stop. A start superseded by a newer request
+     * or presentation leaves the presentation to that one and shows no failure, but the SDK
+     * still retires the source no app target owns, so the newer install gets fresh decoders.
+     */
+    private suspend fun settleCancelledStartLocked(startEpoch: Long, request: Long) {
+        if (currentCoroutineContext().isActive || !targetCommands.isOpen() || _activeTarget.value != null) return
+        withContext(NonCancellable) {
+            if (presentationEpoch.isCurrent(startEpoch) && request == playbackRequests.get()) {
+                stopPlayback()
+            } else {
+                // As during an install, the retired source's IDLE is no state of the newer request.
+                targetInstallationInProgress = true
+                try {
+                    coordinator.stop()
+                } finally {
+                    targetInstallationInProgress = false
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs viewer start [request]'s [command] under the serializer. A start cancelled while it
+     * still waited there is owed nothing itself, but as the latest request it inherits the
+     * Starting an earlier superseded start left without a target, and settles that as
+     * [settleCancelledStartLocked] would have. That runs later in the runtime's scope, so the
+     * cancelled caller never waits for the serializer.
+     */
+    private suspend fun <T> serializeViewerStart(request: Long, onClosed: () -> T, command: suspend () -> T): T {
+        var admitted = false
+        try {
+            return targetCommands.serialize(onClosed) {
+                admitted = true
+                command()
+            }
+        } catch (cancelled: CancellationException) {
+            if (!admitted) scope.launch {
+                targetCommands.serialize(onClosed = {}) {
+                    if (_activeTarget.value == null && state.value == AppPlaybackState.Starting &&
+                        request == playbackRequests.get()
+                    ) stopPlayback()
+                }
+            }
+            throw cancelled
         }
     }
 
@@ -955,6 +1021,7 @@ class AppPlaybackRuntime(
                         admission = binding.binding.admission
                         installedBinding = binding.binding
                         val recovery = recoverAt?.takeIf { it.recordingId == recordingId }
+                        if (targetCommands.isOpen()) stopOtherKindBeforeInstall(live = false, expectedPresentationEpoch)
                         if (!targetCommands.isOpen()) {
                             PlaybackTargetResult.SHUT_DOWN
                         } else if (recovery != null) {
@@ -1175,6 +1242,41 @@ class AppPlaybackRuntime(
             presentation.publishDiagnostics()
         }
         return result
+    }
+
+    /**
+     * Stops a target of the other kind before the SDK installs [live]'s replacement, which it
+     * would otherwise set over the old source and play through the old target's decoders. Not a
+     * user stop: no stop intent, no recording interruption, and the install keeps its cover and
+     * presentation epoch, so the old target's IDLE never shows. A failed install then publishes
+     * its failure with no target left behind.
+     */
+    private suspend fun stopOtherKindBeforeInstall(live: Boolean, expectedPresentationEpoch: Long) {
+        val previous = _activeTarget.value ?: return
+        if ((previous is AppPlaybackTarget.Live) == live) return
+        bufferRecovery = null
+        livePauseController.dropPendingLivePauseLocked()
+        if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
+            audioInterruptions.withdrawAudioInterruptionLocked()
+        } else audioInterruptions.clearAudioInterruptionLocked()
+        recordingMarkers.clearRecordingMarkers()
+        liveRecovery.cancelOnStopLocked(currentCoroutineContext().job)
+        // Cancellation must not split the SDK's stop from the app's release of the target.
+        withContext(NonCancellable) {
+            // PLAYER_UNAVAILABLE is let go as in stopPlayback: the SDK keeps that cleanup, and the
+            // replacement's installation is the retry it documents.
+            coordinator.stop()
+            if (!targetCommands.isOpen()) return@withContext
+            _activeTarget.value = null
+            _recordingSelection.value = null
+            _recordingAdmission.value = null
+            activeTargetEpoch = null
+            livePauseController.publishLivePause()
+            presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
+                presentation.publishStarting()
+                presentation.publishDiagnostics()
+            }
+        }
     }
 
     /**
