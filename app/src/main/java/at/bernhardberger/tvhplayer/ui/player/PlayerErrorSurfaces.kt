@@ -40,15 +40,17 @@ import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import kotlinx.coroutines.delay
 
 /**
- * The channel message: the alert's icon, the number, the title, then why and what helps as one
- * paragraph. It has no action and nothing focusable, so every key keeps its usual meaning. Its
- * exit keeps the condition it showed while the failure clears.
+ * The channel message: the alert's icon, the title, then why and what helps as one paragraph. A
+ * failure of this device's player adds the player's own error ([deviceFaultDetail]) as a faint
+ * line. It has no action and nothing focusable, so every key keeps its usual meaning. Its exit
+ * keeps what it showed while the failure clears.
  */
 @Composable
 internal fun PlayerChannelMessage(
     visible: Boolean,
     condition: AppErrorCondition?,
     modifier: Modifier = Modifier,
+    deviceFaultDetail: String? = null,
 ) {
     AnimatedVisibility(
         visible = visible,
@@ -57,7 +59,9 @@ internal fun PlayerChannelMessage(
         modifier = modifier.semanticsWhileShown(visible),
         label = PlayerChannelMessageTag,
     ) {
-        val shown = rememberLastShown(condition.takeIf { visible }) ?: return@AnimatedVisibility
+        val current = condition?.takeIf { visible }
+        val currentDetail = deviceFaultDetail.takeIf { current == AppErrorCondition.CHANNEL_PLAYBACK_FAILED }
+        val (shown, detail) = rememberLastShown(current?.let { it to currentDetail }) ?: return@AnimatedVisibility
         val text = rememberAppErrorText()
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -86,11 +90,21 @@ internal fun PlayerChannelMessage(
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp),
             )
+            if (detail != null) {
+                Text(
+                    text = detail,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 16.dp).testTag(PlayerChannelMessageDetailTag),
+                )
+            }
         }
     }
 }
 
 internal const val PlayerChannelMessageTag = "player-channel-unavailable"
+internal const val PlayerChannelMessageDetailTag = "player-channel-unavailable-detail"
 
 /**
  * The live player's full-screen alert for [alert]. Its buttons are the catalog's, in order, the

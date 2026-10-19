@@ -76,6 +76,7 @@ class PlayerErrorSurfacesCaptureTest {
                             visible = scene.value.channel != null,
                             condition = scene.value.channel,
                             modifier = Modifier.align(Alignment.Center),
+                            deviceFaultDetail = "DECODER_INIT_FAILED",
                         )
                         LivePlayerAlertOverlay(
                             visible = scene.value.alert != null,

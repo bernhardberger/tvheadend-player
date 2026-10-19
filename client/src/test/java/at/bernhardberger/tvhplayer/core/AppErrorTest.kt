@@ -376,4 +376,12 @@ class AppErrorTest {
         assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE),
             recordingAppError(null, null, AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED))!!.actions)
     }
+
+    @Test fun onlyAFailureOfThisDevicesPlayerShowsThePlayersOwnError() {
+        val failed = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, playerErrorCode = "ERROR_CODE_DECODER_INIT_FAILED")
+        assertEquals("DECODER_INIT_FAILED", failed.copy(deviceFault = true).deviceFaultDetail())
+        assertNull(failed.deviceFaultDetail())
+        assertNull(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, deviceFault = true).deviceFaultDetail())
+        assertNull(AppPlaybackState.Playing.deviceFaultDetail())
+    }
 }

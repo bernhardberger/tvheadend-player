@@ -663,7 +663,7 @@
     <string name="error_208_title">Kontolimit erreicht</string>
     <string name="error_208_reason">Dieses Konto nutzt bereits alle erlaubten Streams.</string>
     <string name="error_210_title">Sender kann nicht abgespielt werden</string>
-    <string name="error_210_reason">Dieser Fernseher konnte den Stream nicht abspielen.</string>
+    <string name="error_210_reason">Dieses Gerät konnte den Stream nicht abspielen.</string>
     <string name="error_301_title">Aufnahme unterbrochen</string>
     <string name="error_301_reason">Der Server liefert diese Aufnahme nicht mehr.</string>
     <string name="error_302_title">Aufnahme hat nicht begonnen</string>
@@ -676,5 +676,5 @@
     <string name="error_305_title">Noch nicht abspielbar</string>
     <string name="error_305_reason">Diese Aufnahme kann abgespielt werden, sobald sie fertig ist.</string>
     <string name="error_306_title">Aufnahme kann nicht abgespielt werden</string>
-    <string name="error_306_reason">Dieser Fernseher konnte die Aufnahme nicht abspielen.</string>
+    <string name="error_306_reason">Dieses Gerät konnte die Aufnahme nicht abspielen.</string>
 </resources>

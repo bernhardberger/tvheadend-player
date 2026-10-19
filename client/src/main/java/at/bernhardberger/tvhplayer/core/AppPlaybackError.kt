@@ -42,6 +42,13 @@ fun liveErrorCondition(issue: SubscriptionIssue?): AppErrorCondition = when (iss
 fun AppPlaybackState.Failed.toLiveErrorCondition(): AppErrorCondition = liveErrorCondition(subscriptionIssue)
 
 /**
+ * The player's own error for a failure on this device, such as `DECODER_INIT_FAILED`, shown small
+ * under the message because it is what a bug report needs; null for any other state.
+ */
+fun AppPlaybackState.deviceFaultDetail(): String? =
+    (this as? AppPlaybackState.Failed)?.takeIf { it.deviceFault }?.playerErrorCode?.removePrefix("ERROR_CODE_")
+
+/**
  * The recording player's terminal condition, or null when there is nothing to report: the recording
  * plays, or it is still loading. [entry] is the recording in the current observation, null when it
  * is gone or not observed yet. The SDK's [admission] decides first for a target that cannot play; a

@@ -776,7 +776,7 @@
     <string name="error_208_title">Account limit reached</string>
     <string name="error_208_reason">This account is already using all the streams it’s allowed.</string>
     <string name="error_210_title">Can’t play this channel</string>
-    <string name="error_210_reason">This TV couldn’t play the stream.</string>
+    <string name="error_210_reason">This device couldn’t play the stream.</string>
     <string name="error_301_title">Recording interrupted</string>
     <string name="error_301_reason">The server stopped sending this recording.</string>
     <string name="error_302_title">Recording hasn’t started</string>
@@ -789,5 +789,5 @@
     <string name="error_305_title">Can’t play yet</string>
     <string name="error_305_reason">This recording can be played once it’s finished.</string>
     <string name="error_306_title">Can’t play this recording</string>
-    <string name="error_306_reason">This TV couldn’t play the recording.</string>
+    <string name="error_306_reason">This device couldn’t play the recording.</string>
 </resources>

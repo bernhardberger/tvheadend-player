@@ -6,7 +6,9 @@ import android.view.View
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -68,6 +70,19 @@ class PlayerErrorSurfacesTest {
         // Only those two lines: no error number, no raw detail line.
         assertEquals(2, compose.onAllNodes(hasAnyAncestor(hasTestTag(PlayerChannelMessageTag))).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused)).fetchSemanticsNodes().size)
+    }
+
+    @Test
+    fun channelMessageShowsThePlayersOwnErrorOnlyWhenThisDevicesPlayerFailed() {
+        var condition by mutableStateOf(AppErrorCondition.CHANNEL_PLAYBACK_FAILED)
+        show { PlayerChannelMessage(visible = true, condition = condition, deviceFaultDetail = "DECODER_INIT_FAILED") }
+
+        assertInMessage(string(R.string.error_210_title))
+        compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("DECODER_INIT_FAILED"))
+
+        compose.runOnIdle { condition = AppErrorCondition.STREAM_STOPPED }
+        compose.waitForIdle()
+        assertEquals(0, compose.onAllNodes(hasTestTag(PlayerChannelMessageDetailTag)).fetchSemanticsNodes().size)
     }
 
     @Test

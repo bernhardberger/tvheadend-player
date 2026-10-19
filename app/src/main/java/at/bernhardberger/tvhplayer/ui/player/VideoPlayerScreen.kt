@@ -25,6 +25,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.livePauseUnavailable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
@@ -1966,6 +1967,7 @@ fun VideoPlayerScreen(
             visible = unavailableShown,
             condition = channelCondition,
             modifier = Modifier.align(Alignment.Center),
+            deviceFaultDetail = playbackState.deviceFaultDetail(),
         )
         LivePlayerServerWait(serverWait, currentChannel, currentChannelName, rootFocus)
         LivePlayerAlertOverlay(
