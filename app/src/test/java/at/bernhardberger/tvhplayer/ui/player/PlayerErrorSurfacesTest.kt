@@ -75,10 +75,10 @@ class PlayerErrorSurfacesTest {
     @Test
     fun channelMessageShowsThePlayersOwnErrorOnlyWhenThisDevicesPlayerFailed() {
         var condition by mutableStateOf(AppErrorCondition.CHANNEL_PLAYBACK_FAILED)
-        show { PlayerChannelMessage(visible = true, condition = condition, deviceFaultDetail = "DECODER_INIT_FAILED") }
+        show { PlayerChannelMessage(visible = true, condition = condition, deviceFaultDetail = "DECODER_INIT_FAILED (4001)") }
 
         assertInMessage(string(R.string.error_210_title))
-        compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("DECODER_INIT_FAILED"))
+        compose.onNodeWithTag(PlayerChannelMessageDetailTag).assert(hasText("DECODER_INIT_FAILED (4001)"))
 
         compose.runOnIdle { condition = AppErrorCondition.STREAM_STOPPED }
         compose.waitForIdle()

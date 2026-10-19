@@ -35,6 +35,8 @@ sealed interface AppPlaybackState {
         val targetResult: PlaybackTargetResult? = null,
         /** Media3 error code name for a player-reported failure; diagnostics only, never a message. */
         val playerErrorCode: String? = null,
+        /** Media3 error code number for [playerErrorCode]; diagnostics only, never a message. */
+        val playerErrorNumber: Int? = null,
         /** Bounded exception class and top frame only; never an exception message or file name. */
         val playerErrorClassification: String? = null,
         /** Last TVHeadend subscription issue seen before the target was retired, so the user sees why. */

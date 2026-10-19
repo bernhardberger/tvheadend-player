@@ -380,6 +380,10 @@ class AppErrorTest {
     @Test fun onlyAFailureOfThisDevicesPlayerShowsThePlayersOwnError() {
         val failed = AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, playerErrorCode = "ERROR_CODE_DECODER_INIT_FAILED")
         assertEquals("DECODER_INIT_FAILED", failed.copy(deviceFault = true).deviceFaultDetail())
+        assertEquals(
+            "DECODER_INIT_FAILED (4001)",
+            failed.copy(deviceFault = true, playerErrorNumber = 4001).deviceFaultDetail(),
+        )
         assertNull(failed.deviceFaultDetail())
         assertNull(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, deviceFault = true).deviceFaultDetail())
         assertNull(AppPlaybackState.Playing.deviceFaultDetail())

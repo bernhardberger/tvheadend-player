@@ -2149,6 +2149,7 @@ class AppPlaybackRuntime(
                     AppPlaybackFailureReason.OTHER
                 },
                 playerErrorCode = player.playerError?.errorCodeName,
+                playerErrorNumber = player.playerError?.errorCode,
                 playerErrorClassification = classifyPlaybackError(player.playerError),
                 subscriptionIssue = lastSubscriptionIssue(),
                 deviceFault = isDevicePlaybackFault(player.playerError),

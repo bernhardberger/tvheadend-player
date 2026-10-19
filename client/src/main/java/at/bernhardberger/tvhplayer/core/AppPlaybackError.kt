@@ -42,11 +42,14 @@ fun liveErrorCondition(issue: SubscriptionIssue?): AppErrorCondition = when (iss
 fun AppPlaybackState.Failed.toLiveErrorCondition(): AppErrorCondition = liveErrorCondition(subscriptionIssue)
 
 /**
- * The player's own error for a failure on this device, such as `DECODER_INIT_FAILED`, shown small
- * under the message because it is what a bug report needs; null for any other state.
+ * The player's own error for a failure on this device, such as `DECODER_INIT_FAILED (4001)`, shown
+ * small under the message because it is what a bug report needs; null for any other state.
  */
-fun AppPlaybackState.deviceFaultDetail(): String? =
-    (this as? AppPlaybackState.Failed)?.takeIf { it.deviceFault }?.playerErrorCode?.removePrefix("ERROR_CODE_")
+fun AppPlaybackState.deviceFaultDetail(): String? {
+    val failed = (this as? AppPlaybackState.Failed)?.takeIf { it.deviceFault } ?: return null
+    val name = failed.playerErrorCode?.removePrefix("ERROR_CODE_") ?: return null
+    return failed.playerErrorNumber?.let { "$name ($it)" } ?: name
+}
 
 /**
  * The recording player's terminal condition, or null when there is nothing to report: the recording
