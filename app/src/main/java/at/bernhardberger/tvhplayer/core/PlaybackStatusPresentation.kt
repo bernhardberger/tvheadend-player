@@ -9,6 +9,7 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import kotlin.time.Instant
 
 enum class PlaybackStatusPresentation {
     NONE,
@@ -62,8 +63,15 @@ fun liveChannelCondition(
  * [playbackStatusPresentation] is FULL_RECOVERY; the recording player uses [recordingPlayerAlert].
  */
 sealed interface LivePlayerAlert {
-    /** A numbered condition with the catalog's buttons; its Retry runs [retry]. */
-    data class Error(val error: AppError, val retry: PlaybackRetryCommand) : LivePlayerAlert
+    /**
+     * A numbered condition with the catalog's buttons; its Retry runs [retry]. [startsAt] is the
+     * start of a scheduled recording that has not begun (302).
+     */
+    data class Error(
+        val error: AppError,
+        val retry: PlaybackRetryCommand,
+        val startsAt: Instant? = null,
+    ) : LivePlayerAlert
 
     /**
      * Live playback retries by itself: passive text and Close only. [retryDelayMillis] is the wait
@@ -115,7 +123,8 @@ fun recordingPlayerAlert(
         recordingAppError(entry, admission, playbackState as? AppPlaybackState.Failed)
     } ?: return null
     val actions = if (retry == PlaybackRetryCommand.NONE) error.actions - AppErrorAction.RETRY else error.actions
-    return LivePlayerAlert.Error(error.copy(actions = actions), retry)
+    val startsAt = entry?.start.takeIf { error.condition == AppErrorCondition.RECORDING_NOT_STARTED }
+    return LivePlayerAlert.Error(error.copy(actions = actions), retry, startsAt)
 }
 
 private fun ConnectionState.playerConnectionError(): AppError {

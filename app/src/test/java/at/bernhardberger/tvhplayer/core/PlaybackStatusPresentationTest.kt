@@ -4,6 +4,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import kotlin.time.Instant
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
@@ -357,6 +358,11 @@ class PlaybackStatusPresentationTest {
         ) as LivePlayerAlert.Error
         assertEquals(AppError(AppErrorCondition.UNREACHABLE, listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)), unreachable.error)
         assertEquals(PlaybackRetryCommand.RECONNECT, unreachable.retry)
+        val rejected = recordingPlayerAlert(
+            ConnectionState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED),
+            true, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE,
+        ) as LivePlayerAlert.Error
+        assertEquals(AppError(AppErrorCondition.AUTHENTICATION_REJECTED, listOf(AppErrorAction.CONNECTION_SETTINGS, AppErrorAction.CLOSE)), rejected.error)
 
         assertEquals(
             LivePlayerAlert.Recovering(4_000L),
@@ -368,6 +374,20 @@ class PlaybackStatusPresentationTest {
         )
         // Still loading: nothing resolved and nothing failed.
         assertNull(recordingPlayerAlert(ConnectionState.Connected, false, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE))
+    }
+
+    @Test
+    fun recordingAlert_carriesTheStartOnlyForARecordingThatHasNotStarted() {
+        val start = Instant.fromEpochSeconds(1_792_000_000L)
+        fun alert(state: DvrEntryState) = recordingPlayerAlert(
+            ConnectionState.Connected, false, AppPlaybackState.Idle,
+            DvrEntry.create(DvrEntryId(1), state = state, start = start),
+            RecordingPlaybackAdmission.TargetUnavailable, PlaybackRetryCommand.NONE,
+        ) as LivePlayerAlert.Error
+
+        assertEquals(AppErrorCondition.RECORDING_NOT_STARTED, alert(DvrEntryState.SCHEDULED).error.condition)
+        assertEquals(start, alert(DvrEntryState.SCHEDULED).startsAt)
+        assertNull(alert(DvrEntryState.FILE_MISSING).startsAt)
     }
 
     private fun failed(issue: SubscriptionIssue? = null, recoveryReason: PlaybackRecoveryReason? = null) =

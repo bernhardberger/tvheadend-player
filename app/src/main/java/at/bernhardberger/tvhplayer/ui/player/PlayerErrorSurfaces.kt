@@ -35,9 +35,11 @@ import at.bernhardberger.tvhplayer.core.LivePlayerAlert
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryAction
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import kotlinx.coroutines.delay
+import kotlin.time.Instant
 
 /**
  * The channel message: the alert's icon, the title, then why and what helps as one paragraph. A
@@ -146,7 +148,7 @@ internal fun LivePlayerAlertOverlay(
             else -> ""
         },
         status = seconds?.takeIf { shown is LivePlayerAlert.Recovering }?.let(text::nextAttempt),
-        detail = condition?.let(text::paragraph),
+        detail = condition?.let { text.paragraph(it, (shown as? LivePlayerAlert.Error)?.startsAt?.let(::alertStart)) },
         icon = painterResource(R.drawable.ic_error_outlined).takeIf { condition != null },
         busy = shown is LivePlayerAlert.Recovering,
         footnote = last?.second,
@@ -198,3 +200,6 @@ private fun rememberAppErrorText(): AppErrorText {
     val context = LocalContext.current
     return remember(context) { AppErrorText(context) }
 }
+
+/** A scheduled recording's start as the Recordings screen writes it, with the day and the app's clock. */
+private fun alertStart(start: Instant): String = formatRecordingDate(start.epochSeconds)

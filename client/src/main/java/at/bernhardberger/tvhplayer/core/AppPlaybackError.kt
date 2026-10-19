@@ -55,17 +55,15 @@ fun AppPlaybackState.deviceFaultDetail(): String? {
  * The recording player's terminal condition, or null when there is nothing to report: the recording
  * plays, or it is still loading. [entry] is the recording in the current observation, null when it
  * is gone or not observed yet. The SDK's [admission] decides first for a target that cannot play; a
- * playable or unresolved target reports the playback [failure]. [initialConnectionFailure] is the
- * connection while an unresolved recording has none; it reads as that connection's condition.
+ * playable or unresolved target reports the playback [failure]. The connection while the recording
+ * is still unresolved is the player alert's own (`recordingPlayerAlert`).
  */
 @OptIn(ExperimentalTvheadendApi::class)
 fun recordingErrorCondition(
     entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     failure: AppPlaybackState.Failed?,
-    initialConnectionFailure: ConnectionUiState? = null,
 ): AppErrorCondition? = when {
-    initialConnectionFailure != null -> initialConnectionFailure.recordingConnectionError().condition
     // The SDK defers an active recording whose single file is not MPEG-TS until it is finished.
     admission == RecordingPlaybackAdmission.GrowingDeferred ->
         if (entry == null) AppErrorCondition.RECORDING_UNAVAILABLE else AppErrorCondition.RECORDING_DEFERRED
@@ -93,21 +91,9 @@ fun recordingErrorCondition(
     else -> null
 }
 
-/**
- * The recording player's alert, or null when [recordingErrorCondition] has none. Recording
- * conditions offer Close; a connection condition keeps its SDK-guided buttons and adds Close.
- */
+/** The recording player's alert, or null when [recordingErrorCondition] has none; it offers Close. */
 fun recordingAppError(
     entry: DvrEntry?,
     admission: RecordingPlaybackAdmission?,
     failure: AppPlaybackState.Failed?,
-    initialConnectionFailure: ConnectionUiState? = null,
-): AppError? = initialConnectionFailure?.recordingConnectionError()
-    ?: recordingErrorCondition(entry, admission, failure)?.toAppError(closable = true)
-
-/**
- * The SDK flips between attempts and Connecting while it reconnects; a connection that is not a
- * failure itself reads as reconnecting so the alert does not blink.
- */
-private fun ConnectionUiState.recordingConnectionError(): AppError = toAppError(closable = true)
-    ?: AppErrorCondition.RECONNECTING.toAppError(primaryRecoveryAction(), closable = true)
+): AppError? = recordingErrorCondition(entry, admission, failure)?.toAppError(closable = true)

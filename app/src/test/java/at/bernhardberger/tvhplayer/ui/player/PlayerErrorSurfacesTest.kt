@@ -53,6 +53,9 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import androidx.compose.ui.test.onNodeWithText
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
+import kotlin.time.Instant
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -372,6 +375,29 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-secondary").assertDoesNotExist()
         press(KeyEvent.KEYCODE_DPAD_CENTER)
         assertEquals(1, closed)
+    }
+
+    @Test
+    fun recordingThatHasNotStartedSaysWhenItStarts() {
+        val start = Instant.fromEpochSeconds(1_792_000_000L)
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = recordingAlert(
+                    AppPlaybackState.Idle,
+                    DvrEntry.create(DvrEntryId(1), state = DvrEntryState.SCHEDULED, start = start),
+                    RecordingPlaybackAdmission.TargetUnavailable,
+                ),
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = {},
+            )
+        }
+
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText(string(R.string.error_302_title)))
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        compose.onNodeWithText(context.getString(R.string.error_302_reason, formatRecordingDate(start.epochSeconds)), substring = true)
+            .assertExists()
     }
 
     @Test

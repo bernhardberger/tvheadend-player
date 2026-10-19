@@ -316,7 +316,6 @@ class AppErrorTest {
         val admissions = listOf(null, completed, growing, RecordingPlaybackAdmission.GrowingDeferred,
             RecordingPlaybackAdmission.TargetUnavailable, RecordingPlaybackAdmission.ObservationExpired)
         val failures = listOf(null) + AppPlaybackFailureReason.entries.map { AppPlaybackState.Failed(it) }
-        val connection = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
         for (entry in entries) for (admission in admissions) for (failure in failures) for (connectionAvailable in
             listOf(true, false)) {
             val playbackAvailable = entry != null && when (admission) {
@@ -329,49 +328,16 @@ class AppErrorTest {
             }
             val recordingResolved = entry != null || admission != null || failure != null
             val initialConnectionFailure = !recordingResolved && !connectionAvailable
-            val terminalErrorVisible = initialConnectionFailure ||
-                (recordingResolved && (!playbackAvailable || failure != null))
+            // The unresolved connection is the player alert's own (PlaybackStatusPresentationTest).
+            if (initialConnectionFailure) continue
+            val terminalErrorVisible = recordingResolved && (!playbackAvailable || failure != null)
 
             val label = "entry=${entry?.state} $admission $failure connected=$connectionAvailable"
-            val passed = connection.takeIf { initialConnectionFailure }
-            val condition = recordingErrorCondition(entry, admission, failure, passed)
-            val error = recordingAppError(entry, admission, failure, passed)
+            val condition = recordingErrorCondition(entry, admission, failure)
+            val error = recordingAppError(entry, admission, failure)
             assertEquals(label, terminalErrorVisible, condition != null)
             assertEquals(label, condition, error?.condition)
             if (error != null) assertEquals(label, AppErrorAction.CLOSE, error.actions.last())
-        }
-    }
-
-    @Test fun recordingConnectionFailureReusesTheConnectionMapping() {
-        val close = AppErrorAction.CLOSE
-        fun error(connection: ConnectionUiState) = recordingAppError(null, null, null, connection)!!
-
-        with(error(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY))) {
-            assertEquals(101, condition.number)
-            assertEquals(listOf(AppErrorAction.RETRY, close), actions)
-        }
-        with(error(ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED))) {
-            assertEquals(103, condition.number)
-            assertEquals(settings + close, actions)
-        }
-        with(error(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF))) {
-            assertEquals(110, condition.number)
-            assertEquals(listOf(close), actions)
-        }
-        assertEquals(106, error(ConnectionUiState.CredentialUnavailable).condition.number)
-        assertEquals(settings + close, error(ConnectionUiState.CredentialUnavailable).actions)
-        assertEquals(107, error(ConnectionUiState.NeedsConfiguration).condition.number)
-        // Between automatic attempts the SDK is Connecting; the alert stays on reconnecting.
-        with(error(ConnectionUiState.Connecting)) {
-            assertEquals(110, condition.number)
-            assertEquals(listOf(close), actions)
-        }
-        // Every connection state reads through the same mapping as the other screens.
-        for (kind in ConnectionFailureKind.entries) for (disposition in sdkConstants<SessionRecoveryDisposition>()) {
-            val state = ConnectionUiState.Error(kind, disposition)
-            assertEquals("$kind $disposition", state.toAppError(closable = true), error(state))
-            assertEquals("$kind $disposition", state.toAppError()!!.condition,
-                recordingErrorCondition(null, null, null, state))
         }
     }
 

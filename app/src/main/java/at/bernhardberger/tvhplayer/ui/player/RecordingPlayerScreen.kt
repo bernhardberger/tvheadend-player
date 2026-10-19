@@ -68,7 +68,7 @@ import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
-import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
+import at.bernhardberger.tvhplayer.core.recordingRetryCommand
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsKeyOutcome
@@ -447,13 +447,13 @@ fun RecordingPlayerScreen(
         initialConnectionFailure ||
             (playbackAvailable && retainedSelection != null &&
                 failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED)
-    val recoveryUiModel = playbackRecoveryUiModel(
+    val retryCommand = recordingRetryCommand(
         connectionState = connectionState,
         retryTargetAvailable = retryTargetAvailable,
     )
 
     fun dispatchRecoveryRetry() {
-        when (recoveryUiModel.retryCommand) {
+        when (retryCommand) {
             PlaybackRetryCommand.RECONNECT -> onReconnect()
             PlaybackRetryCommand.RESUME_RECORDING -> scope.launch { session.retryRecording() }
             PlaybackRetryCommand.RETRY_LIVE,
@@ -747,7 +747,7 @@ fun RecordingPlayerScreen(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY ||
                 foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
             alert = recordingPlayerAlert(
-                connectionState, initialConnectionFailure, playbackState, entry, admission, recoveryUiModel.retryCommand,
+                connectionState, initialConnectionFailure, playbackState, entry, admission, retryCommand,
             ),
             onRetry = { dispatchRecoveryRetry() },
             // Connection settings leaves through Close, so nothing of this screen starts meanwhile.

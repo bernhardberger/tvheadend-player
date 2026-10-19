@@ -107,24 +107,11 @@ class ConnectionUiStateTest {
         )
 
         retryCommandByState.forEach { (connectionState, expectedCommand) ->
-            val model = playbackRecoveryUiModel(
-                connectionState = connectionState,
-                retryTargetAvailable = true,
-            )
-
-            assertEquals(expectedCommand, model.retryCommand)
-            assertEquals(
-                if (expectedCommand == PlaybackRetryCommand.NONE) {
-                    PlaybackRecoveryInitialAction.CLOSE
-                } else {
-                    PlaybackRecoveryInitialAction.RETRY
-                },
-                model.initialAction,
-            )
+            assertEquals(expectedCommand, recordingRetryCommand(connectionState, retryTargetAvailable = true))
             // Without a recording to resume nothing retries, whatever the connection.
             assertEquals(
                 PlaybackRetryCommand.NONE,
-                playbackRecoveryUiModel(connectionState, retryTargetAvailable = false).retryCommand,
+                recordingRetryCommand(connectionState, retryTargetAvailable = false),
             )
         }
     }

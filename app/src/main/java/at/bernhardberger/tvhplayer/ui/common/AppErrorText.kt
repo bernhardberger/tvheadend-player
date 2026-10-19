@@ -48,8 +48,8 @@ internal class AppErrorText(private val context: Context) {
     fun hint(condition: AppErrorCondition): String? = condition.hintRes()?.let(context::getString)
 
     /** The reason and hint as one paragraph, as the alerts and the channel message show them. */
-    fun paragraph(condition: AppErrorCondition): String =
-        listOfNotNull(reason(condition), hint(condition)).joinToString(" ")
+    fun paragraph(condition: AppErrorCondition, startsAt: String? = null): String =
+        listOfNotNull(reason(condition, startsAt = startsAt), hint(condition)).joinToString(" ")
 
 
     fun label(action: AppErrorAction): String = context.getString(action.labelRes())
