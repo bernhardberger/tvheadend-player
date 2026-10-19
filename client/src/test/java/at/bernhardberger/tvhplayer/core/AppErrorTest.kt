@@ -40,6 +40,9 @@ class AppErrorTest {
     private val retry = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
     private val settings = listOf(AppErrorAction.CONNECTION_SETTINGS)
 
+    /** In a player alert a connection condition keeps its first fix and gains Close. */
+    private fun List<AppErrorAction>.inAlert(closable: Boolean) = if (closable) listOf(first(), AppErrorAction.CLOSE) else this
+
     /** Buttons of each connection condition when the SDK gives no guidance, from the vocabulary table. */
     private val defaultButtons = mapOf(
         AppErrorCondition.UNREACHABLE to retry,
@@ -144,8 +147,8 @@ class AppErrorTest {
         assertEquals(settings, actions(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED))
         assertEquals(settings, actions(ConnectionFailureKind.PERMISSION_DENIED, SessionRecoveryDisposition.NO_RETRY))
         assertEquals(settings, actions(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF))
-        // The player adds Close after the others.
-        assertEquals(retry + AppErrorAction.CLOSE,
+        // The player keeps the first fix and adds Close: an alert has at most two buttons.
+        assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE),
             actions(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY, closable = true))
         assertEquals(settings + AppErrorAction.CLOSE,
             actions(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED, closable = true))
@@ -153,14 +156,13 @@ class AppErrorTest {
         assertEquals(settings, ConnectionUiState.NeedsConfiguration.toAppError()!!.actions)
         assertEquals(settings, ConnectionUiState.CredentialUnavailable.toAppError()!!.actions)
         assertEquals(retry, noChannelsAppError().actions)
-        assertEquals(retry + AppErrorAction.CLOSE, noChannelsAppError(closable = true).actions)
+        assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE), noChannelsAppError(closable = true).actions)
     }
 
     /** Rule 3 over every failure kind, every SDK disposition and both surfaces, read through [primaryRecoveryAction]. */
     @Test fun everyKindAndDispositionTakesItsButtonsFromThePrimaryRecoveryAction() {
         val dispositions = sdkConstants<SessionRecoveryDisposition>()
         for (kind in ConnectionFailureKind.entries) for (closable in listOf(false, true)) {
-            val close = if (closable) listOf(AppErrorAction.CLOSE) else emptyList()
             for (disposition in dispositions) {
                 val state = ConnectionUiState.Error(kind, disposition)
                 val error = state.toAppError(closable)!!
@@ -170,12 +172,12 @@ class AppErrorTest {
                     ConnectionRecoveryAction.SETTINGS,
                     ConnectionRecoveryAction.NONE -> settings
                 }
-                assertEquals("$kind $disposition closable=$closable", expected + close, error.actions)
+                assertEquals("$kind $disposition closable=$closable", expected.inAlert(closable), error.actions)
             }
             // Without guidance every condition the kind can read as keeps its own default.
             for (condition in dispositions.map { kind.toAppErrorCondition(it) }.toSet()) {
                 assertEquals("$kind $condition no guidance closable=$closable",
-                    defaultButtons.getValue(condition) + close, condition.actions(recovery = null, closable = closable))
+                    defaultButtons.getValue(condition).inAlert(closable), condition.actions(recovery = null, closable = closable))
             }
         }
     }
@@ -199,8 +201,9 @@ class AppErrorTest {
         assertEquals(connection.toSet(), defaultButtons.keys)
         for (condition in connection) {
             assertEquals("$condition", defaultButtons.getValue(condition), condition.actions())
-            assertEquals("$condition", defaultButtons.getValue(condition) + AppErrorAction.CLOSE,
+            assertEquals("$condition", defaultButtons.getValue(condition).inAlert(closable = true),
                 condition.actions(closable = true))
+            assertTrue("$condition", condition.actions(closable = true).size <= 2)
         }
     }
 
@@ -341,7 +344,7 @@ class AppErrorTest {
 
         with(error(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY))) {
             assertEquals(101, condition.number)
-            assertEquals(retry + close, actions)
+            assertEquals(listOf(AppErrorAction.RETRY, close), actions)
         }
         with(error(ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED))) {
             assertEquals(103, condition.number)

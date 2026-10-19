@@ -88,7 +88,6 @@ class PlayerErrorSurfacesTest {
     @Test
     fun connectionAlertShowsTheCatalogButtonsInOrderWithTheFirstFocused() {
         var closed = 0
-        var settings = 0
         val retries = mutableListOf<PlaybackRetryCommand>()
         val alert = livePlayerAlert(
             ConnectionState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY),
@@ -100,7 +99,7 @@ class PlayerErrorSurfacesTest {
                 visible = true,
                 alert = alert,
                 onRetry = { retries += it },
-                onConnectionSettings = { settings++ },
+                onConnectionSettings = {},
                 onClose = { closed++ },
             )
         }
@@ -108,24 +107,46 @@ class PlayerErrorSurfacesTest {
         compose.onNode(hasText(string(R.string.error_101_title))).assertExists()
         compose.onNode(hasText(string(R.string.error_101_reason), substring = true)).assertExists()
         compose.onNode(hasText(string(R.string.error_hint_check_server), substring = true)).assertExists()
+        // An alert has at most two buttons: the first fix and Close.
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
-        compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
-        compose.onNodeWithTag("tv-recovery-tertiary").assert(hasText("Close"))
+        compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
+        compose.onNodeWithTag("tv-recovery-tertiary").assertDoesNotExist()
 
         press(KeyEvent.KEYCODE_DPAD_CENTER)
         assertEquals(listOf(PlaybackRetryCommand.RECONNECT), retries)
         press(KeyEvent.KEYCODE_DPAD_RIGHT)
         compose.onNodeWithTag("tv-recovery-secondary").assertIsFocused()
-        press(KeyEvent.KEYCODE_DPAD_CENTER)
-        assertEquals(1, settings)
         press(KeyEvent.KEYCODE_DPAD_RIGHT)
-        compose.onNodeWithTag("tv-recovery-tertiary").assertIsFocused()
-        press(KeyEvent.KEYCODE_DPAD_RIGHT)
-        compose.onNodeWithTag("tv-recovery-tertiary").assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assertIsFocused()
         press(KeyEvent.KEYCODE_DPAD_CENTER)
         assertEquals(1, closed)
         press(KeyEvent.KEYCODE_DPAD_LEFT)
-        compose.onNodeWithTag("tv-recovery-secondary").assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+    }
+
+    @Test
+    fun signInAlertOffersConnectionSettingsAndClose() {
+        var settings = 0
+        val alert = livePlayerAlert(
+            ConnectionState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED),
+            AppPlaybackState.Playing,
+            null,
+        )
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = alert,
+                onRetry = {},
+                onConnectionSettings = { settings++ },
+                onClose = {},
+            )
+        }
+
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Connection settings")).assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
+        compose.onNodeWithTag("tv-recovery-tertiary").assertDoesNotExist()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(1, settings)
     }
 
     @Test

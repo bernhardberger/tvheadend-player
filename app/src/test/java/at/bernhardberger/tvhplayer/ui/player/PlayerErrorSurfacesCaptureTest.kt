@@ -61,7 +61,8 @@ class PlayerErrorSurfacesCaptureTest {
             .map { condition -> Scene("channel-${condition.number}", channel = condition) }
         val alerts = listOf(
             Scene("alert-101-unreachable", alert = connectionAlert(ConnectionFailureKind.UNREACHABLE)),
-            Scene("alert-103-login", alert = connectionAlert(ConnectionFailureKind.AUTHENTICATION)),
+            Scene("alert-103-login", alert = connectionAlert(
+                ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)),
             Scene("alert-208-user-limit", alert = livePlayerAlert(ConnectionState.Connected, AppPlaybackState.Playing, AppErrorCondition.USER_LIMIT)),
             Scene("alert-110-reconnecting", alert = LivePlayerAlert.Recovering(retryDelayMillis = 7_500L)),
         )
@@ -105,8 +106,11 @@ class PlayerErrorSurfacesCaptureTest {
 
     private class Scene(val name: String, val channel: AppErrorCondition? = null, val alert: LivePlayerAlert? = null)
 
-    private fun connectionAlert(kind: ConnectionFailureKind) = livePlayerAlert(
-        ConnectionState.Error(kind, SessionRecoveryDisposition.EXPLICIT_RETRY),
+    private fun connectionAlert(
+        kind: ConnectionFailureKind,
+        disposition: SessionRecoveryDisposition = SessionRecoveryDisposition.EXPLICIT_RETRY,
+    ) = livePlayerAlert(
+        ConnectionState.Error(kind, disposition),
         AppPlaybackState.Playing,
         null,
     )

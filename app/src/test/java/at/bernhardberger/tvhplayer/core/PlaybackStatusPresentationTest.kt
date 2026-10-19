@@ -177,10 +177,7 @@ class PlaybackStatusPresentationTest {
             null,
         ) as LivePlayerAlert.Error
         assertEquals(AppErrorCondition.UNREACHABLE, explicit.error.condition)
-        assertEquals(
-            listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS, AppErrorAction.CLOSE),
-            explicit.error.actions,
-        )
+        assertEquals(listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE), explicit.error.actions)
         assertEquals(PlaybackRetryCommand.RECONNECT, explicit.retry)
 
         val rejected = livePlayerAlert(

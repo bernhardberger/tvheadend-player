@@ -76,9 +76,9 @@ fun AppErrorCondition.toAppError(
  * Buttons follow the SDK's recovery guidance as [primaryRecoveryAction] reads it: Retry offers Retry
  * and Connection settings; Settings or None offers Connection settings only. Without guidance
  * ([recovery] null) the condition's own default applies. A connection that retries by itself (110)
- * offers Connection settings only. [closable] is a connection condition shown in a player, which
- * adds Close last. Live and recording alerts always carry their own Close; channel messages have no
- * buttons.
+ * offers Connection settings only. [closable] is a connection condition shown in a player: an alert
+ * has at most two buttons, so it keeps only the first fix and adds Close. Live and recording alerts
+ * always carry their own Close; channel messages have no buttons.
  */
 fun AppErrorCondition.actions(
     recovery: ConnectionRecoveryAction? = null,
@@ -111,7 +111,7 @@ fun AppErrorCondition.actions(
         AppErrorCondition.RECORDING_UNAVAILABLE,
         AppErrorCondition.RECORDING_DEFERRED -> listOf(AppErrorAction.CLOSE)
     }
-    return if (kind == AppErrorKind.CONNECTION && closable) own + AppErrorAction.CLOSE else own
+    return if (kind == AppErrorKind.CONNECTION && closable) own.take(1) + AppErrorAction.CLOSE else own
 }
 
 private val RETRY_AND_SETTINGS = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)

@@ -611,7 +611,7 @@
     <string name="action_close">Schließen</string>
     <string name="error_hint_check_server">Prüfe, ob der Server läuft und im selben Netzwerk ist.</string>
     <string name="error_hint_try_in_a_moment">Versuche es gleich noch einmal.</string>
-    <string name="error_hint_check_sign_in">Prüfe Benutzername und Passwort.</string>
+    <string name="error_hint_check_sign_in">Prüfe sie in den Verbindungseinstellungen.</string>
     <string name="error_hint_check_account_permissions">Prüfe die Berechtigungen dieses Kontos in Tvheadend.</string>
     <string name="error_hint_update_tvheadend">Aktualisiere Tvheadend, um diese App zu nutzen.</string>
     <string name="error_hint_enter_sign_in_again">Gib Benutzername und Passwort erneut ein.</string>
