@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
@@ -43,8 +45,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvOverlayBoxAlpha
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -56,9 +58,10 @@ data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
 
 /**
  * [actions], when given, replace the primary and secondary action: up to [MaxRecoveryActions]
- * buttons in order, the first filled and focused when they appear or change. [errorNumber] is a
- * small line under the hint. [status] is a line under those that may change while shown, such as
- * a countdown; the live region holds [message], [detail], [hint] and [errorNumber], not [status].
+ * buttons in order, the first focused when they appear or change. [icon] heads the alert; [busy]
+ * puts a progress ring there instead, as does an alert without actions. [status] is a line under the
+ * text that may change while shown, such as a countdown; the live region holds [message], [detail]
+ * and [hint], not [status].
  */
 @Composable
 fun TvRecoveryOverlay(
@@ -74,9 +77,10 @@ fun TvRecoveryOverlay(
     secondaryActionLabel: String? = null,
     onSecondaryAction: (() -> Unit)? = null,
     liveRegionMode: LiveRegionMode = LiveRegionMode.Polite,
-    errorNumber: String? = null,
     actions: List<TvRecoveryAction> = emptyList(),
     status: String? = null,
+    icon: Painter? = null,
+    busy: Boolean = false,
 ) {
     require(actions.size <= MaxRecoveryActions) { "At most $MaxRecoveryActions recovery actions" }
     val buttons = actions.ifEmpty {
@@ -142,60 +146,58 @@ fun TvRecoveryOverlay(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
             ) {
-                if (!primaryVisible) {
-                    CircularProgressIndicator(color = MaterialTheme.colorScheme.onSurface)
+                // The kit's Full Screen dialog: icon, 32 dp, headline, 16 dp, body, 48 dp, actions.
+                val ring = busy || !primaryVisible
+                if (ring) {
+                    CircularProgressIndicator(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.padding(4.dp).size(RecoveryIconSize - 8.dp),
+                    )
+                } else if (icon != null) {
+                    Icon(
+                        painter = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(RecoveryIconSize),
+                    )
                 }
                 // One live region for the alert's text; a changing [status] stays outside it.
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
+                        .padding(top = if (ring || icon != null) 32.dp else 0.dp)
+                        .widthIn(max = RecoveryTextWidth)
                         .semantics { liveRegion = liveRegionMode }
                         .testTag("tv-recovery-announcement"),
                 ) {
                     Text(
                         text = message,
                         color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.headlineSmall,
+                        style = MaterialTheme.typography.headlineMedium,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
-                            .padding(top = if (primaryVisible) 0.dp else 24.dp)
-                            .widthIn(max = 680.dp)
                             .semantics { heading() }
                             .testTag("tv-recovery-title"),
                     )
+                    val body = MaterialTheme.colorScheme.onSurface.copy(alpha = RecoveryBodyAlpha)
                     if (detail != null) {
                         Text(
                             text = detail,
-                            color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.titleMedium,
+                            color = body,
+                            style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
-                            maxLines = 2,
+                            maxLines = 4,
                             overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .widthIn(max = 680.dp),
+                            modifier = Modifier.padding(top = 16.dp),
                         )
                     }
                     if (hint != null) {
                         Text(
                             text = hint,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = body,
                             style = MaterialTheme.typography.bodyLarge,
                             textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .widthIn(max = 680.dp),
-                        )
-                    }
-                    if (errorNumber != null) {
-                        Text(
-                            text = errorNumber,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier
-                                .padding(top = 12.dp)
-                                .testTag("tv-recovery-number"),
+                            modifier = Modifier.padding(top = if (detail != null) 0.dp else 16.dp),
                         )
                     }
                 }
@@ -203,18 +205,18 @@ fun TvRecoveryOverlay(
                     Text(
                         text = status,
                         color = MaterialTheme.colorScheme.onSurface,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.bodyLarge,
                         textAlign = TextAlign.Center,
                         modifier = Modifier
-                            .padding(top = 12.dp)
-                            .widthIn(max = 680.dp)
+                            .padding(top = 16.dp)
+                            .widthIn(max = RecoveryTextWidth)
                             .testTag("tv-recovery-status"),
                     )
                 }
                 if (primaryVisible) {
                     Row(
                         modifier = Modifier
-                            .padding(top = 32.dp)
+                            .padding(top = 48.dp)
                             .focusGroup(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -234,7 +236,8 @@ fun TvRecoveryOverlay(
                                     Text(action.label)
                                 }
                             } else {
-                                OutlinedButton(onClick = action.onClick, modifier = buttonModifier) {
+                                // The kit's default fill: only the focused action stands out.
+                                Button(onClick = action.onClick, modifier = buttonModifier) {
                                     Text(action.label)
                                 }
                             }
@@ -247,6 +250,10 @@ fun TvRecoveryOverlay(
 }
 
 const val MaxRecoveryActions = 3
+
+private val RecoveryIconSize = 48.dp
+private val RecoveryTextWidth = 480.dp
+private const val RecoveryBodyAlpha = 0.8f
 
 private val RecoveryActionTags = listOf("tv-recovery-primary", "tv-recovery-secondary", "tv-recovery-tertiary")
 

@@ -1121,7 +1121,8 @@ fun VideoPlayerScreen(
         shownChannelId = currentChannelId,
     )
     val currentPlaybackFailed = requestedChannelFailed || playbackState is AppPlaybackState.Failed
-    val channelCondition = liveChannelCondition(currentSubscriptionFailure, currentPlaybackFailed, currentLiveInterrupted)
+    val channelCondition = liveChannelCondition(currentSubscriptionFailure, currentPlaybackFailed, currentLiveInterrupted,
+        deviceFault = (playbackState as? AppPlaybackState.Failed)?.deviceFault == true)
     val statusPresentation = playbackStatusPresentation(
         connectionAvailable = connState is ConnectionState.Connected,
         playbackStarting = playbackState is AppPlaybackState.Starting,

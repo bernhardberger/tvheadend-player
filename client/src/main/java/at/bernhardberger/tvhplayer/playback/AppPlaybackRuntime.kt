@@ -2151,6 +2151,7 @@ class AppPlaybackRuntime(
                 playerErrorCode = player.playerError?.errorCodeName,
                 playerErrorClassification = classifyPlaybackError(player.playerError),
                 subscriptionIssue = lastSubscriptionIssue(),
+                deviceFault = isDevicePlaybackFault(player.playerError),
             ),
         )
         livePauseController.publishLivePause()

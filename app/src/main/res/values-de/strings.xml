@@ -606,7 +606,6 @@
     <string name="details_age_rating_description">Altersfreigabe %1$s</string>
 
     <!-- draft: German wording follows once the English catalog is settled -->
-    <string name="error_number">Fehler %1$d</string>
     <string name="action_retry">Erneut versuchen</string>
     <string name="action_connection_settings">Verbindungseinstellungen</string>
     <string name="action_close">Schließen</string>
@@ -625,10 +624,10 @@
     <string name="error_hint_stop_other_devices">Beende die Wiedergabe auf einem anderen Gerät oder versuche es später erneut.</string>
     <string name="error_hint_check_recording">Prüfe die Aufnahme in Tvheadend.</string>
     <string name="error_hint_other_recording">Wähle eine andere Aufnahme.</string>
-    <string name="error_101_title">Tvheadend nicht erreichbar</string>
-    <string name="error_101_reason">Der Server hat auf die Verbindung nicht geantwortet.</string>
-    <string name="error_102_title">Tvheadend antwortet nicht</string>
-    <string name="error_102_reason">Der Server hat zu lange für die Antwort gebraucht.</string>
+    <string name="error_101_title">Server nicht erreichbar</string>
+    <string name="error_101_reason">Er hat auf die Verbindung nicht geantwortet.</string>
+    <string name="error_102_title">Server antwortet nicht</string>
+    <string name="error_102_reason">Er hat zu lange für die Antwort gebraucht.</string>
     <string name="error_103_title">Anmeldung fehlgeschlagen</string>
     <string name="error_103_reason">Der Server hat Benutzername oder Passwort nicht akzeptiert.</string>
     <string name="error_104_title">Kein Zugriff auf Sender</string>
@@ -643,14 +642,14 @@
     <string name="error_108_reason">Dieses Konto hat keine Sender.</string>
     <string name="error_109_title">TV-Daten konnten nicht geladen werden</string>
     <string name="error_109_reason">Beim Laden ist etwas schiefgegangen.</string>
-    <string name="error_110_title">Tvheadend nicht erreichbar</string>
+    <string name="error_110_title">Server nicht erreichbar</string>
     <string name="error_110_reason">Neuverbindung in %1$d s…</string>
     <string name="error_110_reason_pending">Verbindung wird neu aufgebaut…</string>
     <string name="error_reconnect_next_attempt">Nächster Versuch in %1$d s</string>
     <string name="error_201_title">Kein freier Tuner</string>
     <string name="error_201_reason">Gerade ist jeder Tuner belegt.</string>
     <string name="error_202_title">Kein Signal</string>
-    <string name="error_202_reason">Tvheadend empfängt für diesen Sender kein brauchbares Signal.</string>
+    <string name="error_202_reason">Der Server empfängt für diesen Sender kein brauchbares Signal.</string>
     <string name="error_203_title">Sender nicht verfügbar</string>
     <string name="error_203_reason">Der Mux dieses Senders ist in Tvheadend deaktiviert.</string>
     <string name="error_204_title">Sender nicht entschlüsselbar</string>
@@ -660,18 +659,22 @@
     <string name="error_206_title">Sender übernommen</string>
     <string name="error_206_reason">Eine Aufnahme oder ein Zuschauer mit höherer Priorität hat den Tuner übernommen.</string>
     <string name="error_207_title">Wiedergabe beendet</string>
-    <string name="error_207_reason">Tvheadend sendet diesen Sender nicht mehr.</string>
+    <string name="error_207_reason">Der Server liefert diesen Sender nicht mehr.</string>
     <string name="error_208_title">Kontolimit erreicht</string>
     <string name="error_208_reason">Dieses Konto nutzt bereits alle erlaubten Streams.</string>
+    <string name="error_210_title">Sender kann nicht abgespielt werden</string>
+    <string name="error_210_reason">Dieser Fernseher konnte den Stream nicht abspielen.</string>
     <string name="error_301_title">Aufnahme unterbrochen</string>
-    <string name="error_301_reason">Tvheadend sendet diese Aufnahme nicht mehr.</string>
+    <string name="error_301_reason">Der Server liefert diese Aufnahme nicht mehr.</string>
     <string name="error_302_title">Aufnahme hat nicht begonnen</string>
     <string name="error_302_reason">Sie beginnt um %1$s.</string>
     <string name="error_302_reason_untimed">Sie hat noch nicht begonnen.</string>
     <string name="error_303_title">Aufnahmedatei fehlt</string>
-    <string name="error_303_reason">Tvheadend hat keine abspielbare Datei für diese Aufnahme.</string>
+    <string name="error_303_reason">Der Server hat keine abspielbare Datei für diese Aufnahme.</string>
     <string name="error_304_title">Aufnahme nicht mehr verfügbar</string>
     <string name="error_304_reason">Sie wurde auf dem Server geändert oder gelöscht.</string>
     <string name="error_305_title">Noch nicht abspielbar</string>
     <string name="error_305_reason">Diese Aufnahme kann abgespielt werden, sobald sie fertig ist.</string>
+    <string name="error_306_title">Aufnahme kann nicht abgespielt werden</string>
+    <string name="error_306_reason">Dieser Fernseher konnte die Aufnahme nicht abspielen.</string>
 </resources>

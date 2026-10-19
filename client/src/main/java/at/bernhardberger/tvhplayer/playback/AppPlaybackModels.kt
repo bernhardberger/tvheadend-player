@@ -41,6 +41,8 @@ sealed interface AppPlaybackState {
         val subscriptionIssue: SubscriptionIssue? = null,
         /** Last SDK recovery reason that led to retiring the target. */
         val recoveryReason: PlaybackRecoveryReason? = null,
+        /** The player on this device failed, not the stream's delivery; see [isDevicePlaybackFault]. */
+        val deviceFault: Boolean = false,
     ) : AppPlaybackState
 }
 

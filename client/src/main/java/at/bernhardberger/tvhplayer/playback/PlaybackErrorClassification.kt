@@ -1,5 +1,15 @@
 package at.bernhardberger.tvhplayer.playback
 
+import androidx.media3.common.PlaybackException
+
+/**
+ * Whether [error] happened in this device's player rather than in delivering the stream: anything
+ * but Media3's input/output codes (2xxx), so decoding, audio output, parsing and the player's own
+ * checks.
+ */
+internal fun isDevicePlaybackFault(error: PlaybackException?): Boolean =
+    error != null && error.errorCode !in 2000..2999
+
 /** Retains no throwable, message, file name, package name or full stack trace. */
 internal fun classifyPlaybackError(error: Throwable?): String? {
     var root = error ?: return null

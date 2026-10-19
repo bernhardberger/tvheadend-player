@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
@@ -747,11 +748,13 @@ fun RecordingPlayerScreen(
             message = stringResource(R.string.recording_recovering),
             detail = entry?.title,
             opaque = false,
+            busy = true,
             primaryActionLabel = stringResource(R.string.close),
             onPrimaryAction = playerClose::close,
         )
         TvRecoveryOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
+            icon = painterResource(R.drawable.ic_error_outlined),
             message = stringResource(
                 if (failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED) {
                     R.string.recording_playback_interrupted_title

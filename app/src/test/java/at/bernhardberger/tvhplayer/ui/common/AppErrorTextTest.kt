@@ -53,12 +53,7 @@ class AppErrorTextTest {
     @Test fun aDeferredRecordingSaysWhenItCanPlay() {
         assertEquals("Can’t play yet", text.title(AppErrorCondition.RECORDING_DEFERRED))
         assertEquals("This recording can be played once it’s finished.", text.reason(AppErrorCondition.RECORDING_DEFERRED))
-        assertEquals("Error 305", text.number(AppErrorCondition.RECORDING_DEFERRED))
         assertEquals("Try again in a moment.", text.hint(AppErrorCondition.RECORDING_INTERRUPTED))
-    }
-
-    @Test fun theNumberIsShownSmallAsErrorNumber() {
-        assertEquals("Error 203", text.number(AppErrorCondition.MUX_NOT_ENABLED))
     }
 
     @Test fun everyActionHasALabel() {

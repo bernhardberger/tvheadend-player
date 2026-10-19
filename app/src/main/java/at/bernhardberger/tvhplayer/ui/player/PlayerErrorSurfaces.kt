@@ -7,6 +7,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,10 +22,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.LivePlayerAlert
@@ -36,9 +40,9 @@ import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import kotlinx.coroutines.delay
 
 /**
- * The channel message: title, then why and what helps as one paragraph, then the number. It has
- * no action and nothing focusable, so every key keeps its usual meaning. Its exit keeps the
- * condition it showed while the failure clears.
+ * The channel message: the alert's icon, the number, the title, then why and what helps as one
+ * paragraph. It has no action and nothing focusable, so every key keeps its usual meaning. Its
+ * exit keeps the condition it showed while the failure clears.
  */
 @Composable
 internal fun PlayerChannelMessage(
@@ -63,6 +67,12 @@ internal fun PlayerChannelMessage(
                 .padding(24.dp)
                 .testTag(PlayerChannelMessageTag),
         ) {
+            Icon(
+                painter = painterResource(R.drawable.ic_error_outlined),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(bottom = 16.dp).size(40.dp),
+            )
             Text(
                 text = text.title(shown),
                 style = MaterialTheme.typography.titleLarge,
@@ -70,16 +80,9 @@ internal fun PlayerChannelMessage(
                 textAlign = TextAlign.Center,
             )
             Text(
-                text = listOfNotNull(text.reason(shown), text.hint(shown)).joinToString(" "),
+                text = text.paragraph(shown),
                 style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 8.dp),
-            )
-            Text(
-                text = text.number(shown),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp),
             )
@@ -121,9 +124,9 @@ internal fun LivePlayerAlertOverlay(
             else -> ""
         },
         status = seconds?.takeIf { shown is LivePlayerAlert.Recovering }?.let(text::nextAttempt),
-        detail = condition?.let(text::reason),
-        hint = condition?.let(text::hint),
-        errorNumber = condition?.let(text::number),
+        detail = condition?.let(text::paragraph),
+        icon = painterResource(R.drawable.ic_error_outlined).takeIf { condition != null },
+        busy = shown is LivePlayerAlert.Recovering,
         actions = actions.map { action ->
             TvRecoveryAction(text.label(action)) {
                 when (action) {

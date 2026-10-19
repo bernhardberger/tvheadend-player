@@ -9,7 +9,7 @@ import at.bernhardberger.tvhplayer.core.AppErrorCondition
 /**
  * The only wording boundary for numbered errors. A condition reads as its title, then why it
  * happened (the reason), then what helps (an optional hint shared by conditions with the same
- * advice), then its number.
+ * advice). Its catalog number stays internal and is never shown.
  */
 internal class AppErrorText(private val context: Context) {
     fun title(condition: AppErrorCondition): String = context.getString(condition.titleRes())
@@ -47,7 +47,10 @@ internal class AppErrorText(private val context: Context) {
     /** What helps, or null where it would only repeat the reason (a countdown, a start time, a finish). */
     fun hint(condition: AppErrorCondition): String? = condition.hintRes()?.let(context::getString)
 
-    fun number(condition: AppErrorCondition): String = context.getString(R.string.error_number, condition.number)
+    /** The reason and hint as one paragraph, as the alerts and the channel message show them. */
+    fun paragraph(condition: AppErrorCondition): String =
+        listOfNotNull(reason(condition), hint(condition)).joinToString(" ")
+
 
     fun label(action: AppErrorAction): String = context.getString(action.labelRes())
 }
@@ -72,11 +75,13 @@ internal fun AppErrorCondition.titleRes(): Int = when (this) {
     AppErrorCondition.CHANNEL_TAKEN_OVER -> R.string.error_206_title
     AppErrorCondition.STREAM_STOPPED -> R.string.error_207_title
     AppErrorCondition.USER_LIMIT -> R.string.error_208_title
+    AppErrorCondition.CHANNEL_PLAYBACK_FAILED -> R.string.error_210_title
     AppErrorCondition.RECORDING_INTERRUPTED -> R.string.error_301_title
     AppErrorCondition.RECORDING_NOT_STARTED -> R.string.error_302_title
     AppErrorCondition.RECORDING_FILE_MISSING -> R.string.error_303_title
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_304_title
     AppErrorCondition.RECORDING_DEFERRED -> R.string.error_305_title
+    AppErrorCondition.RECORDING_PLAYBACK_FAILED -> R.string.error_306_title
 }
 
 /**
@@ -103,11 +108,13 @@ private fun AppErrorCondition.reasonRes(): Int = when (this) {
     AppErrorCondition.CHANNEL_TAKEN_OVER -> R.string.error_206_reason
     AppErrorCondition.STREAM_STOPPED -> R.string.error_207_reason
     AppErrorCondition.USER_LIMIT -> R.string.error_208_reason
+    AppErrorCondition.CHANNEL_PLAYBACK_FAILED -> R.string.error_210_reason
     AppErrorCondition.RECORDING_INTERRUPTED -> R.string.error_301_reason
     AppErrorCondition.RECORDING_NOT_STARTED -> R.string.error_302_reason
     AppErrorCondition.RECORDING_FILE_MISSING -> R.string.error_303_reason
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_304_reason
     AppErrorCondition.RECORDING_DEFERRED -> R.string.error_305_reason
+    AppErrorCondition.RECORDING_PLAYBACK_FAILED -> R.string.error_306_reason
 }
 
 /** Hints are shared: conditions with the same advice point at one string. */
@@ -131,11 +138,13 @@ internal fun AppErrorCondition.hintRes(): Int? = when (this) {
     AppErrorCondition.CHANNEL_TAKEN_OVER -> R.string.error_hint_try_later_or_other_channel
     AppErrorCondition.STREAM_STOPPED -> R.string.error_hint_try_later_or_other_channel
     AppErrorCondition.USER_LIMIT -> R.string.error_hint_stop_other_devices
+    AppErrorCondition.CHANNEL_PLAYBACK_FAILED -> R.string.error_hint_try_later_or_other_channel
     AppErrorCondition.RECORDING_INTERRUPTED -> R.string.error_hint_try_in_a_moment
     AppErrorCondition.RECORDING_NOT_STARTED -> null
     AppErrorCondition.RECORDING_FILE_MISSING -> R.string.error_hint_check_recording
     AppErrorCondition.RECORDING_UNAVAILABLE -> R.string.error_hint_other_recording
     AppErrorCondition.RECORDING_DEFERRED -> null
+    AppErrorCondition.RECORDING_PLAYBACK_FAILED -> R.string.error_hint_try_in_a_moment
 }
 
 @StringRes

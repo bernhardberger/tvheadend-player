@@ -27,6 +27,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -208,9 +209,8 @@ internal fun LivePlayerServerWait(
     TvRecoveryOverlay(
         visible = current != null,
         message = failure?.let { text.title(it.condition) }.orEmpty(),
-        detail = failure?.let { text.reason(it.condition) },
-        hint = failure?.let { text.hint(it.condition) },
-        errorNumber = failure?.let { text.number(it.condition) },
+        detail = failure?.let { text.paragraph(it.condition) },
+        icon = painterResource(R.drawable.ic_error_outlined),
         actions = failure?.actions.orEmpty().mapNotNull { action ->
             when (action) {
                 AppErrorAction.RETRY -> state::retry

@@ -56,7 +56,8 @@ class PlayerErrorSurfacesCaptureTest {
     }
 
     @Test fun liveErrors() {
-        val channel = listOf(AppErrorCondition.NO_FREE_ADAPTER, AppErrorCondition.SCRAMBLED, AppErrorCondition.STREAM_STOPPED)
+        val channel = listOf(AppErrorCondition.NO_FREE_ADAPTER, AppErrorCondition.SCRAMBLED, AppErrorCondition.STREAM_STOPPED,
+            AppErrorCondition.CHANNEL_PLAYBACK_FAILED)
             .map { condition -> Scene("channel-${condition.number}", channel = condition) }
         val alerts = listOf(
             Scene("alert-101-unreachable", alert = connectionAlert(ConnectionFailureKind.UNREACHABLE)),

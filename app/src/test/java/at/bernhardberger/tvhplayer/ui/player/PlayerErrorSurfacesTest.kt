@@ -60,14 +60,13 @@ class PlayerErrorSurfacesTest {
     }
 
     @Test
-    fun channelMessageShowsTitleReasonHintAndNumberAndNothingFocusable() {
+    fun channelMessageShowsTitleReasonAndHintWithoutANumberAndNothingFocusable() {
         show { PlayerChannelMessage(visible = true, condition = AppErrorCondition.NO_FREE_ADAPTER) }
 
         assertInMessage(string(R.string.error_201_title))
         assertInMessage("${string(R.string.error_201_reason)} ${string(R.string.error_hint_try_later_or_other_channel)}")
-        assertInMessage("Error 201")
-        // Only those three lines: no raw detail line.
-        assertEquals(3, compose.onAllNodes(hasAnyAncestor(hasTestTag(PlayerChannelMessageTag))).fetchSemanticsNodes().size)
+        // Only those two lines: no error number, no raw detail line.
+        assertEquals(2, compose.onAllNodes(hasAnyAncestor(hasTestTag(PlayerChannelMessageTag))).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Focused)).fetchSemanticsNodes().size)
     }
 
@@ -92,9 +91,8 @@ class PlayerErrorSurfacesTest {
         }
 
         compose.onNode(hasText(string(R.string.error_101_title))).assertExists()
-        compose.onNode(hasText(string(R.string.error_101_reason))).assertExists()
-        compose.onNode(hasText(string(R.string.error_hint_check_server))).assertExists()
-        compose.onNodeWithTag("tv-recovery-number").assertExists().assert(hasText("Error 101"))
+        compose.onNode(hasText(string(R.string.error_101_reason), substring = true)).assertExists()
+        compose.onNode(hasText(string(R.string.error_hint_check_server), substring = true)).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
         compose.onNodeWithTag("tv-recovery-tertiary").assert(hasText("Close"))
@@ -129,7 +127,7 @@ class PlayerErrorSurfacesTest {
         }
 
         compose.onNode(hasText(string(R.string.error_208_title))).assertExists()
-        compose.onNodeWithTag("tv-recovery-number").assert(hasText("Error 208"))
+        assertEquals(0, compose.onAllNodes(hasText("208", substring = true), useUnmergedTree = true).fetchSemanticsNodes().size)
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-tertiary")).fetchSemanticsNodes().size)
@@ -233,9 +231,9 @@ class PlayerErrorSurfacesTest {
         val inLiveRegion = hasAnyAncestor(
             hasTestTag("tv-recovery-announcement") and SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion),
         )
-        for (text in listOf(string(R.string.error_208_title), string(R.string.error_208_reason), "Error 208") +
+        for (text in listOf(string(R.string.error_208_title), string(R.string.error_208_reason)) +
             listOfNotNull(AppErrorCondition.USER_LIMIT.hintRes()?.let(::string))) {
-            compose.onNode(hasText(text) and inLiveRegion).assertExists()
+            compose.onNode(hasText(text, substring = true) and inLiveRegion).assertExists()
         }
         // The buttons are not part of it.
         compose.onNodeWithTag("tv-recovery-primary").assert(!hasAnyAncestor(hasTestTag("tv-recovery-announcement")))

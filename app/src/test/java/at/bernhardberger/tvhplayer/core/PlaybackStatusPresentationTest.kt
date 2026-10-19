@@ -125,9 +125,22 @@ class PlaybackStatusPresentationTest {
     }
 
     @Test
+    fun channelCondition_is210WhenThisDevicesPlayerFailedWithoutAnIssue() {
+        assertEquals(
+            AppErrorCondition.CHANNEL_PLAYBACK_FAILED,
+            liveChannelCondition(null, playbackFailed = true, liveInterrupted = false, deviceFault = true),
+        )
+        // The server's own issue still names the cause.
+        assertEquals(
+            AppErrorCondition.NO_SIGNAL,
+            liveChannelCondition(SubscriptionIssue.NO_INPUT, playbackFailed = true, liveInterrupted = false, deviceFault = true),
+        )
+    }
+
+    @Test
     fun channelConditions_areTheBoxAndNeverTheAlert() {
         val channelConditions = AppErrorCondition.entries.filter { it.kind == AppErrorKind.CHANNEL }
-        assertEquals(7, channelConditions.size)
+        assertEquals(8, channelConditions.size)
         for (condition in channelConditions) {
             assertEquals(
                 "$condition",

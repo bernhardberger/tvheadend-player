@@ -18,9 +18,9 @@ enum class AppErrorKind {
 }
 
 /**
- * Every user-visible failure with its stable number: 1xx connection, 2xx live TV, 3xx recording
- * playback. One condition has one text and one number everywhere. Numbers never change when
- * wording or language does; add a condition with a new number instead of reusing one.
+ * Every user-visible failure with its stable internal number, never shown: 1xx connection, 2xx live
+ * TV, 3xx recording playback. One condition has one text and one number everywhere. Numbers never
+ * change when wording or language does; add a condition with a new number instead of reusing one.
  */
 enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
     UNREACHABLE(101, AppErrorKind.CONNECTION),
@@ -47,6 +47,9 @@ enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
     STREAM_STOPPED(207, AppErrorKind.CHANNEL),
     USER_LIMIT(208, AppErrorKind.LIVE_TV),
 
+    /** This device's player failed while the server reported no problem. */
+    CHANNEL_PLAYBACK_FAILED(210, AppErrorKind.CHANNEL),
+
     RECORDING_INTERRUPTED(301, AppErrorKind.RECORDING),
     RECORDING_NOT_STARTED(302, AppErrorKind.RECORDING),
     RECORDING_FILE_MISSING(303, AppErrorKind.RECORDING),
@@ -54,6 +57,9 @@ enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
 
     /** A running recording whose file cannot be played while it grows. */
     RECORDING_DEFERRED(305, AppErrorKind.RECORDING),
+
+    /** This device's player failed on a recording the server still offers. */
+    RECORDING_PLAYBACK_FAILED(306, AppErrorKind.RECORDING),
 }
 
 /** Buttons of a full-screen alert, in display order; the first is focused. */
@@ -95,9 +101,11 @@ fun AppErrorCondition.actions(
         AppErrorCondition.SCRAMBLED,
         AppErrorCondition.CHANNEL_ACCESS_DENIED,
         AppErrorCondition.CHANNEL_TAKEN_OVER,
-        AppErrorCondition.STREAM_STOPPED -> emptyList()
+        AppErrorCondition.STREAM_STOPPED,
+        AppErrorCondition.CHANNEL_PLAYBACK_FAILED -> emptyList()
         AppErrorCondition.USER_LIMIT,
-        AppErrorCondition.RECORDING_INTERRUPTED -> listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)
+        AppErrorCondition.RECORDING_INTERRUPTED,
+        AppErrorCondition.RECORDING_PLAYBACK_FAILED -> listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)
         AppErrorCondition.RECORDING_NOT_STARTED,
         AppErrorCondition.RECORDING_FILE_MISSING,
         AppErrorCondition.RECORDING_UNAVAILABLE,

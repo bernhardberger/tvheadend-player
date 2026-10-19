@@ -287,6 +287,11 @@ class AppErrorTest {
         assertEquals(301, number(entry(DvrEntryState.RECORDING), growing, other))
         assertEquals(301, number(null, null, readFailed))
         assertEquals(301, number(null, null, other))
+        // This device's player failed: the recording is still there, the TV couldn't play it.
+        val deviceFault = readFailed.copy(deviceFault = true)
+        assertEquals(306, number(entry(DvrEntryState.COMPLETED), completed, deviceFault))
+        assertEquals(306, number(null, null, deviceFault))
+        assertEquals(304, number(null, RecordingPlaybackAdmission.TargetUnavailable, deviceFault))
         // An admitted recording whose entry is gone, or an entry the SDK did not admit.
         assertEquals(304, number(null, completed))
         assertEquals(304, number(null, growing))

@@ -40,15 +40,20 @@ fun playbackStatusPresentation(
 
 /**
  * The condition of the live channel on screen, or null while nothing went wrong: the [issue] the
- * server reports, else 207 for a failed playback or a stream the server stopped ([liveInterrupted]).
+ * server reports, else 210 when this device's player failed ([deviceFault]), else 207 for a failed
+ * playback or a stream the server stopped ([liveInterrupted]).
  */
 @OptIn(UnstableApi::class)
 fun liveChannelCondition(
     issue: SubscriptionIssue?,
     playbackFailed: Boolean,
     liveInterrupted: Boolean,
-): AppErrorCondition? =
-    if (issue == null && !playbackFailed && !liveInterrupted) null else liveErrorCondition(issue)
+    deviceFault: Boolean = false,
+): AppErrorCondition? = when {
+    issue == null && deviceFault -> AppErrorCondition.CHANNEL_PLAYBACK_FAILED
+    issue == null && !playbackFailed && !liveInterrupted -> null
+    else -> liveErrorCondition(issue)
+}
 
 /** What the live player's full-screen alert shows; it exists exactly when [playbackStatusPresentation] is FULL_RECOVERY. */
 sealed interface LivePlayerAlert {

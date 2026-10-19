@@ -73,7 +73,8 @@ fun recordingErrorCondition(
         }
         else -> AppErrorCondition.RECORDING_UNAVAILABLE
     }
-    // Failed(OTHER) included: any playback failure of a playable or unresolved recording is an interruption.
+    failure?.deviceFault == true -> AppErrorCondition.RECORDING_PLAYBACK_FAILED
+    // Failed(OTHER) included: any other playback failure of a playable or unresolved recording is an interruption.
     failure != null -> AppErrorCondition.RECORDING_INTERRUPTED
     // A playable admission for an entry that is no longer observed, or an entry the SDK did not admit.
     (entry == null && admission != null) || (entry != null && admission == null) ->

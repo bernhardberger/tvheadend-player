@@ -32,6 +32,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -210,7 +211,7 @@ class LivePlayerServerWaitTest {
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
         }
         settle()
-        compose.onNodeWithTag("tv-recovery-number").assert(hasText("Error 110"))
+        compose.onNode(hasText(string(R.string.error_110_title))).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Connection settings")).assertIsFocused()
         assertEquals(0, compose.onAllNodes(hasText("Retry"), useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary"), useUnmergedTree = true).fetchSemanticsNodes().size)
@@ -225,7 +226,7 @@ class LivePlayerServerWaitTest {
             connection.value = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
         }
         settle()
-        compose.onNodeWithTag("tv-recovery-number").assert(hasText("Error 101"))
+        compose.onNode(hasText(string(R.string.error_101_title))).assertExists()
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
         compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Connection settings"))
     }
@@ -323,4 +324,6 @@ class LivePlayerServerWaitTest {
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
             transform(state.value).also { state.value = it }
     }
+
+    private fun string(id: Int): String = ApplicationProvider.getApplicationContext<Application>().getString(id)
 }
