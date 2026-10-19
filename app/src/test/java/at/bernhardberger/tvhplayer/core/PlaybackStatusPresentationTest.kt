@@ -135,6 +135,11 @@ class PlaybackStatusPresentationTest {
             AppErrorCondition.NO_SIGNAL,
             liveChannelCondition(SubscriptionIssue.NO_INPUT, playbackFailed = true, liveInterrupted = false, deviceFault = true),
         )
+        // A stream the server stopped stays the server's stop, even when this device's player failed too.
+        assertEquals(
+            AppErrorCondition.STREAM_STOPPED,
+            liveChannelCondition(null, playbackFailed = true, liveInterrupted = true, deviceFault = true),
+        )
     }
 
     @Test
@@ -207,8 +212,7 @@ class PlaybackStatusPresentationTest {
         )) {
             val alert = livePlayerAlert(connection, AppPlaybackState.Playing, null) as LivePlayerAlert.Error
             assertEquals("$connection", AppErrorCondition.RECONNECTING, alert.error.condition)
-            assertFalse("$connection", AppErrorAction.RETRY in alert.error.actions)
-            assertEquals("$connection", AppErrorAction.CLOSE, alert.error.actions.last())
+            assertEquals("$connection", listOf(AppErrorAction.CLOSE), alert.error.actions)
         }
         // The player retunes by itself: a countdown and Close, whatever the channel reported meanwhile.
         val recovering = AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED, retryDelayMillis = 3_000L)

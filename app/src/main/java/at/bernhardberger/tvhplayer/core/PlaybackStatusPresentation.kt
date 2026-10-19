@@ -40,8 +40,8 @@ fun playbackStatusPresentation(
 
 /**
  * The condition of the live channel on screen, or null while nothing went wrong: the [issue] the
- * server reports, else 210 when this device's player failed ([deviceFault]), else 207 for a failed
- * playback or a stream the server stopped ([liveInterrupted]).
+ * server reports, else 207 for a stream the server stopped ([liveInterrupted]), else 210 when this
+ * device's player failed ([deviceFault]), else 207 for any other failed playback.
  */
 @OptIn(UnstableApi::class)
 fun liveChannelCondition(
@@ -50,7 +50,7 @@ fun liveChannelCondition(
     liveInterrupted: Boolean,
     deviceFault: Boolean = false,
 ): AppErrorCondition? = when {
-    issue == null && deviceFault -> AppErrorCondition.CHANNEL_PLAYBACK_FAILED
+    issue == null && deviceFault && !liveInterrupted -> AppErrorCondition.CHANNEL_PLAYBACK_FAILED
     issue == null && !playbackFailed && !liveInterrupted -> null
     else -> liveErrorCondition(issue)
 }

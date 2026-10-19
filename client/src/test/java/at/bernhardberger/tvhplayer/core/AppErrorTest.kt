@@ -40,8 +40,12 @@ class AppErrorTest {
     private val retry = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
     private val settings = listOf(AppErrorAction.CONNECTION_SETTINGS)
 
-    /** In a player alert a connection condition keeps its first fix and gains Close. */
-    private fun List<AppErrorAction>.inAlert(closable: Boolean) = if (closable) listOf(first(), AppErrorAction.CLOSE) else this
+    /** In a player alert a connection condition keeps its first fix and gains Close; one retrying by itself has only Close. */
+    private fun List<AppErrorAction>.inAlert(closable: Boolean, condition: AppErrorCondition) = when {
+        !closable -> this
+        condition == AppErrorCondition.RECONNECTING -> listOf(AppErrorAction.CLOSE)
+        else -> listOf(first(), AppErrorAction.CLOSE)
+    }
 
     /** Buttons of each connection condition when the SDK gives no guidance, from the vocabulary table. */
     private val defaultButtons = mapOf(
@@ -172,12 +176,12 @@ class AppErrorTest {
                     ConnectionRecoveryAction.SETTINGS,
                     ConnectionRecoveryAction.NONE -> settings
                 }
-                assertEquals("$kind $disposition closable=$closable", expected.inAlert(closable), error.actions)
+                assertEquals("$kind $disposition closable=$closable", expected.inAlert(closable, error.condition), error.actions)
             }
             // Without guidance every condition the kind can read as keeps its own default.
             for (condition in dispositions.map { kind.toAppErrorCondition(it) }.toSet()) {
                 assertEquals("$kind $condition no guidance closable=$closable",
-                    defaultButtons.getValue(condition).inAlert(closable), condition.actions(recovery = null, closable = closable))
+                    defaultButtons.getValue(condition).inAlert(closable, condition), condition.actions(recovery = null, closable = closable))
             }
         }
     }
@@ -201,7 +205,7 @@ class AppErrorTest {
         assertEquals(connection.toSet(), defaultButtons.keys)
         for (condition in connection) {
             assertEquals("$condition", defaultButtons.getValue(condition), condition.actions())
-            assertEquals("$condition", defaultButtons.getValue(condition).inAlert(closable = true),
+            assertEquals("$condition", defaultButtons.getValue(condition).inAlert(closable = true, condition),
                 condition.actions(closable = true))
             assertTrue("$condition", condition.actions(closable = true).size <= 2)
         }
@@ -352,7 +356,7 @@ class AppErrorTest {
         }
         with(error(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF))) {
             assertEquals(110, condition.number)
-            assertEquals(settings + close, actions)
+            assertEquals(listOf(close), actions)
         }
         assertEquals(106, error(ConnectionUiState.CredentialUnavailable).condition.number)
         assertEquals(settings + close, error(ConnectionUiState.CredentialUnavailable).actions)
@@ -360,7 +364,7 @@ class AppErrorTest {
         // Between automatic attempts the SDK is Connecting; the alert stays on reconnecting.
         with(error(ConnectionUiState.Connecting)) {
             assertEquals(110, condition.number)
-            assertEquals(settings + close, actions)
+            assertEquals(listOf(close), actions)
         }
         // Every connection state reads through the same mapping as the other screens.
         for (kind in ConnectionFailureKind.entries) for (disposition in sdkConstants<SessionRecoveryDisposition>()) {

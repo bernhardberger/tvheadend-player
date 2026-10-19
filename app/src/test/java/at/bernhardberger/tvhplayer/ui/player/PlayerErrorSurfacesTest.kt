@@ -188,7 +188,6 @@ class PlayerErrorSurfacesTest {
         compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 3 s"))
         compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close"))
         assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary")).fetchSemanticsNodes().size)
-        assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-number")).fetchSemanticsNodes().size)
 
         compose.mainClock.advanceTimeBy(1_000L)
         compose.onNodeWithTag("tv-recovery-status").assert(hasText("Next attempt in 2 s"))

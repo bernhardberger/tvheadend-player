@@ -64,7 +64,9 @@ class PlayerErrorSurfacesCaptureTest {
             Scene("alert-103-login", alert = connectionAlert(
                 ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)),
             Scene("alert-208-user-limit", alert = livePlayerAlert(ConnectionState.Connected, AppPlaybackState.Playing, AppErrorCondition.USER_LIMIT)),
-            Scene("alert-110-reconnecting", alert = LivePlayerAlert.Recovering(retryDelayMillis = 7_500L)),
+            Scene("alert-110-reconnecting", alert = connectionAlert(
+                ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)),
+            Scene("alert-live-recovering", alert = LivePlayerAlert.Recovering(retryDelayMillis = 7_500L)),
         )
         val scene = mutableStateOf(channel.first())
         compose.setContent {
