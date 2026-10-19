@@ -150,7 +150,8 @@ internal fun LivePlayerAlertOverlay(
         status = seconds?.takeIf { shown is LivePlayerAlert.Recovering }?.let(text::nextAttempt),
         detail = condition?.let { text.paragraph(it, (shown as? LivePlayerAlert.Error)?.startsAt?.let(::alertStart)) },
         icon = painterResource(R.drawable.ic_error_outlined).takeIf { condition != null },
-        busy = shown is LivePlayerAlert.Recovering,
+        // Whatever retries by itself shows the ring; the error icon is for alerts that need the viewer.
+        busy = shown is LivePlayerAlert.Recovering || condition == AppErrorCondition.RECONNECTING,
         footnote = last?.second,
         actions = actions.map { action ->
             TvRecoveryAction(text.label(action)) {

@@ -377,6 +377,25 @@ class PlaybackStatusPresentationTest {
     }
 
     @Test
+    fun recordingAlert_isTheConnectionWhenPlaybackFailedWhileTheConnectionIsGone() {
+        val completed = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)
+        val readFailed = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+        val backoff = ConnectionState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        fun alert(connection: ConnectionState, state: AppPlaybackState = readFailed) = recordingPlayerAlert(
+            connection, false, state, completed, null, PlaybackRetryCommand.NONE,
+        ) as LivePlayerAlert.Error
+
+        assertEquals(AppError(AppErrorCondition.RECONNECTING, listOf(AppErrorAction.CLOSE)), alert(backoff).error)
+        assertEquals(AppErrorCondition.RECONNECTING, alert(ConnectionState.Disconnected).error.condition)
+        // The device's own fault is not the connection's; connected, the failure is the recording's.
+        assertEquals(
+            AppErrorCondition.RECORDING_PLAYBACK_FAILED,
+            alert(backoff, readFailed.copy(deviceFault = true)).error.condition,
+        )
+        assertEquals(AppErrorCondition.RECORDING_INTERRUPTED, alert(ConnectionState.Connected).error.condition)
+    }
+
+    @Test
     fun recordingAlert_carriesTheStartOnlyForARecordingThatHasNotStarted() {
         val start = Instant.fromEpochSeconds(1_792_000_000L)
         fun alert(state: DvrEntryState) = recordingPlayerAlert(

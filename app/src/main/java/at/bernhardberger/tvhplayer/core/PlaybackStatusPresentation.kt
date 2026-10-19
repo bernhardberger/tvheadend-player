@@ -103,9 +103,10 @@ fun livePlayerAlert(
 
 /**
  * The recording player's full-screen alert, in the same shape as the live one: the player's own
- * recovery first, then the connection while the recording is still unresolved ([connectionFailed]),
- * then [recordingAppError]. Retry runs [retry]; when there is nothing to retry
- * ([PlaybackRetryCommand.NONE]) the alert offers no Retry.
+ * recovery first, then the connection while the recording is still unresolved ([connectionFailed])
+ * or while playback failed without it, then [recordingAppError]. A device fault stays the device's.
+ * Retry runs [retry]; when there is nothing to retry ([PlaybackRetryCommand.NONE]) the alert
+ * offers no Retry.
  */
 @OptIn(UnstableApi::class)
 fun recordingPlayerAlert(
@@ -117,7 +118,10 @@ fun recordingPlayerAlert(
     retry: PlaybackRetryCommand,
 ): LivePlayerAlert? {
     if (playbackState is AppPlaybackState.Recovering) return LivePlayerAlert.Recovering(playbackState.retryDelayMillis)
-    val error = if (connectionFailed) {
+    // A read that failed because the connection went is the connection's, not the server stopping the recording.
+    val connectionLost = connection !is ConnectionState.Connected &&
+        playbackState is AppPlaybackState.Failed && !playbackState.deviceFault
+    val error = if (connectionFailed || connectionLost) {
         connection.playerConnectionError()
     } else {
         recordingAppError(entry, admission, playbackState as? AppPlaybackState.Failed)

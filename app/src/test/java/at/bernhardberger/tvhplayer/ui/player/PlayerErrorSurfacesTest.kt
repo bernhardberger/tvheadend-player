@@ -159,6 +159,34 @@ class PlayerErrorSurfacesTest {
     }
 
     @Test
+    fun aConnectionThatRetriesByItselfShowsTheRingAndAnAlertThatNeedsTheViewerTheIcon() {
+        compose.mainClock.autoAdvance = false
+        var connection by mutableStateOf<ConnectionState>(
+            ConnectionState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF),
+        )
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = livePlayerAlert(connection, AppPlaybackState.Playing, null),
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = {},
+            )
+        }
+        val ring = SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close"))
+        assertEquals(1, compose.onAllNodes(ring).fetchSemanticsNodes().size)
+
+        compose.runOnIdle {
+            connection = ConnectionState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry"))
+        assertEquals(0, compose.onAllNodes(ring).fetchSemanticsNodes().size)
+    }
+
+    @Test
     fun userLimitAlertRetriesTheChannel() {
         val retries = mutableListOf<PlaybackRetryCommand>()
         show {
