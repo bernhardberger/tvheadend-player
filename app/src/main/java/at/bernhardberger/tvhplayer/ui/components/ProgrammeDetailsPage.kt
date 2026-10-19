@@ -106,6 +106,8 @@ internal fun ProgrammeDetailsPage(
     visibilityAlpha: State<Float>? = null,
     recordingEvent: EpgEvent? = null,
     recordingConfigurations: List<DvrConfiguration> = emptyList(),
+    /** The SDK's admission of a [recording] shown without [event]; its time left follows the Resume it offers. */
+    recordingAdmission: RecordingPlaybackAdmission? = null,
 ) {
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
@@ -348,7 +350,7 @@ internal fun ProgrammeDetailsPage(
                         if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { emphasis(DetailsSection.ACTIONS) }) {
-                        DetailsInformation(event, recording, channel, nowSec) {
+                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
                                 Text(text, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
@@ -829,7 +831,8 @@ internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resource
 
 @Composable
 private fun DetailsInformation(
-    event: EpgEvent?, recording: DvrEntry?, channel: Channel?, nowSec: Long,
+    event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?,
+    channel: Channel?, nowSec: Long,
     synopsis: @Composable () -> Unit,
 ) {
     // Only the title spans the page; the remaining information keeps its narrow text column.
@@ -852,7 +855,7 @@ private fun DetailsInformation(
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Column(Modifier.widthIn(max = 470.dp)) { synopsis() }
-        val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let(::recordingDetailsFacts).orEmpty()
+        val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let { recordingDetailsFacts(it, recordingAdmission) }.orEmpty()
         val resources = LocalContext.current.resources
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,

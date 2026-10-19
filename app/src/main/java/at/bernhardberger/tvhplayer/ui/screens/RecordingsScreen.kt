@@ -202,6 +202,7 @@ fun RecordingsScreen(
     )
 }
 
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 internal fun RecordingsScreenContent(
     observation: SessionObservation,
@@ -262,7 +263,8 @@ internal fun RecordingsScreenContent(
 
     fun openRecording(entry: DvrEntry) {
         val capability = observation.currentSession
-        val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(entry, capability != null)
+        val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(entry,
+            capability?.let { observation.recordingPlaybackAdmission(entry) })
         showContextMenu = false
         if (capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
                 action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)) {
@@ -586,6 +588,9 @@ internal fun RecordingsScreenContent(
                         }
                     },
                     piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
+                    resumePositionForEntry = {
+                        at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
+                    },
                     modifier = Modifier.fillMaxSize().onFocusChanged {
                         if (owner.isCurrent) {
                             contentHasFocus = it.hasFocus
@@ -692,6 +697,13 @@ internal fun RecordingsScreenContent(
             observation.dvrEntry(entry.id)
         } else entry
     }
+    // The SDK admits the opened entry with the observation it was read from; without its session nothing plays.
+    val openedAdmission = opened?.let { entry ->
+        selectedCapability?.let {
+            (if (observation.dvrState is DvrRepositoryState.Current) observation else detailsObservation)
+                ?.recordingPlaybackAdmission(entry)
+        }
+    }
     LaunchedEffect(detailsEntry, opened) {
         if (detailsEntry != null && opened == null) {
             showResumeChoice = false
@@ -721,15 +733,17 @@ internal fun RecordingsScreenContent(
                     onPlayRecording(RecordingPlaybackSelection(capability, opened.id), intent)
                 }
             }
-            LaunchedEffect(selectedCapability, opened.state) {
-                if (selectedCapability == null || opened.state != DvrEntryState.COMPLETED) closeResume()
+            val choice = at.bernhardberger.tvhplayer.core.recordingOpenAction(opened, openedAdmission) ==
+                at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
+            LaunchedEffect(choice) {
+                if (!choice) closeResume()
             }
             val resumeFocus = remember { FocusRequester() }
             val startOverFocus = remember { FocusRequester() }
             var startOverFocused by remember(opened.id) { mutableStateOf(false) }
-            val durationMs = at.bernhardberger.tvhplayer.core.recordingDetailsFacts(opened)
+            val durationMs = at.bernhardberger.tvhplayer.core.recordingDetailsFacts(opened, openedAdmission)
                 .firstOrNull { it.kind == at.bernhardberger.tvhplayer.core.DetailsFactKind.LENGTH }?.seconds?.times(1000L)
-            val positionMs = opened.playPosition?.inWholeMilliseconds ?: 0L
+            val positionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds ?: 0L
             val resumeEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, positionMs, durationMs)
                 ?.let { stringResource(R.string.recording_ends_at, at.bernhardberger.tvhplayer.ui.common.formatClock(it)) }.orEmpty()
             val startOverEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, 0L, durationMs)
@@ -762,7 +776,7 @@ internal fun RecordingsScreenContent(
                     Icon(painterResource(R.drawable.ic_play_arrow), null, Modifier.size(ButtonDefaults.IconSize))
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(R.string.recording_resume_from,
-                        at.bernhardberger.tvhplayer.core.formatPlaybackDuration(opened.playPosition?.inWholeMilliseconds ?: 0L)),
+                        at.bernhardberger.tvhplayer.core.formatPlaybackDuration(positionMs)),
                         maxLines = 1, softWrap = false)
                 }
                 OutlinedButton(onClick = { play(RecordingPlaybackStart.START_OVER) },
@@ -824,7 +838,7 @@ internal fun RecordingsScreenContent(
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-                playbackEligible = selectedCapability != null),
+                admission = openedAdmission),
             onClose = { visibility.targetState = false },
             onAction = { action ->
                 val playing = selectedCapability?.takeIf { action in listOf(BrowseContextAction.WATCH,
@@ -891,7 +905,8 @@ internal fun RecordingsScreenContent(
             recordingEvent = opened.eventId?.takeIf { selectedCapability != null }?.let(observation::event),
             recordingConfigurations = observation.currentDvrConfigurations().takeIf { selectedCapability != null }.orEmpty(),
             channel = opened.channelId?.let(channelsById::get),
-            actions = recordingDetailsActions(opened, selectedCapability != null,
+            recordingAdmission = openedAdmission,
+            actions = recordingDetailsActions(opened, openedAdmission,
                 canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,

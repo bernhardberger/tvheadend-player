@@ -54,6 +54,7 @@ import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import org.junit.Rule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -1106,13 +1107,14 @@ class ProgrammeDetailsPageTest {
                         }
                         val details: @androidx.compose.runtime.Composable () -> Unit = {
                         ProvideArtworkSession(session) { ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
-                            if (recording) recordingDetailsActions(entry, true, true, true)
-                            else programmeDetailsActions(shown, now, entry.takeIf { future }, true, true, false),
+                            if (recording) recordingDetailsActions(entry, admitted(entry), true, true)
+                            else programmeDetailsActions(shown, now, entry.takeIf { future }, admitted(entry.takeIf { future }), true, true, false),
                               {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
                                   listOf(EpgEvent.create(EventId(2), otherChannel.id, start, event.stop, title = event.title)) else if (todayCard)
                                   listOf(EpgEvent.create(EventId(2), channel.id, start + 3600.seconds, event.stop, title = event.title)) else airings,
                             onRelated = onRelated, channelOf = { listOf(channel, otherChannel).firstOrNull { c -> c.id == it } },
                             returnToCard = returnToCard, recordingEvent = shown.takeIf { recordingFacts },
+                            recordingAdmission = admitted(entry.takeIf { recording || future }),
                             recordingConfigurations = listOf(DvrConfiguration(DvrConfigId("default"), "", ""),
                                 DvrConfiguration(DvrConfigId("archive"), "Archive", ""))) }
                         }
@@ -1140,4 +1142,9 @@ class ProgrammeDetailsPageTest {
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         return bitmap
     }
+}
+
+@OptIn(ExperimentalTvheadendApi::class)
+private fun admitted(entry: DvrEntry?) = entry?.let {
+    SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(it)
 }

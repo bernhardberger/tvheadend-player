@@ -451,7 +451,8 @@ class RecordingsVisualLayoutTest {
         compose.runOnIdle {
             session.replaceGeneration(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
-                    DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording(9, "Replacement recording", "replacement.ts")))))
+                    DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording(9, "Replacement recording", "replacement.ts")))),
+                    recordingProgressCapability = it.recordingProgressCapability)
             })
         }
         compose.waitForIdle()
@@ -486,7 +487,8 @@ class RecordingsVisualLayoutTest {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
-                    DvrRepositoryState.Current(DvrSnapshot.create(entries)))
+                    DvrRepositoryState.Current(DvrSnapshot.create(entries)),
+                    recordingProgressCapability = it.recordingProgressCapability)
             })
         }
         compose.waitForIdle()
@@ -511,7 +513,7 @@ class RecordingsVisualLayoutTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
             dvrDiskSpaceState = diskSpace,
-            recordingProgressCapability = RecordingProgressCapability.UNSUPPORTED,
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )
         session = FakeTvheadendSession(observation)
         val currentObservation = session.observation.value

@@ -8,15 +8,18 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+@OptIn(TvheadendTestingApi::class)
 class PlayerStatusTagsTest {
     @Test fun currentDvrUpdatesRetireTheGrowingRecording() {
         val id = DvrEntryId(4)
-        fun observation(state: DvrEntryState?) = SessionObservation.create(
+        fun observation(state: DvrEntryState?, files: List<DvrRecordingFile>? = listOf(
+            TvheadendTestResultFactory.recordingFile(serverPath = "/rec/a.ts"))) = SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(
-                entries = state?.let { listOf(DvrEntry.create(id = id, state = it)) } ?: emptyList(),
+                entries = state?.let { listOf(DvrEntry.create(id = id, state = it,
+                    files = files)) } ?: emptyList(),
             )),
         )
         val fake = FakeTvheadendSession(observation(DvrEntryState.RECORDING))
@@ -27,6 +30,10 @@ class PlayerStatusTagsTest {
             fake.publish(observation(state))
             assertFalse(currentRecordingIsGrowing(fake.observation.value, selection))
         }
+        fake.publish(observation(DvrEntryState.RECORDING_ERROR))
+        assertTrue(currentRecordingIsGrowing(fake.observation.value, selection))
+        fake.publish(observation(DvrEntryState.RECORDING_ERROR, files = null))
+        assertFalse(currentRecordingIsGrowing(fake.observation.value, selection))
         fake.publish(observation(DvrEntryState.RECORDING))
         assertTrue(currentRecordingIsGrowing(fake.observation.value, selection))
         fake.replaceGeneration(observation(DvrEntryState.RECORDING))

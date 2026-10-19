@@ -71,14 +71,19 @@ fun recordingErrorCondition(
     admission == RecordingPlaybackAdmission.TargetUnavailable -> when (entry?.state) {
         DvrEntryState.SCHEDULED -> AppErrorCondition.RECORDING_NOT_STARTED
         DvrEntryState.FILE_MISSING -> AppErrorCondition.RECORDING_FILE_MISSING
-        // A running entry: no file yet is missing-file evidence; several files can only play once it is finished;
-        // anything else (blank path, replaced incarnation) means it changed. A completed entry is always admitted,
-        // so it only arrives here when it changed or was replaced.
-        DvrEntryState.RECORDING -> when {
+        // A running entry, also one in an error state: no file yet is missing-file evidence; several files can
+        // only play once it is finished; anything else (blank path, replaced incarnation) means it changed.
+        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> when {
             entry.files.isNullOrEmpty() -> AppErrorCondition.RECORDING_FILE_MISSING
             entry.files.orEmpty().size > 1 -> AppErrorCondition.RECORDING_DEFERRED
             else -> AppErrorCondition.RECORDING_UNAVAILABLE
         }
+        // The SDK admits a failed or missed entry that left a file with data, so one without has none to play;
+        // one with a file only arrives here when it changed or was replaced.
+        DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED ->
+            if (entry.files.isNullOrEmpty() || entry.dataSizeBytes == 0L) AppErrorCondition.RECORDING_FILE_MISSING
+            else AppErrorCondition.RECORDING_UNAVAILABLE
+        // A completed entry is always admitted, so it only arrives here when it changed or was replaced.
         else -> AppErrorCondition.RECORDING_UNAVAILABLE
     }
     failure?.deviceFault == true -> AppErrorCondition.RECORDING_PLAYBACK_FAILED

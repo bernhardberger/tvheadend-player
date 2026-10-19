@@ -55,6 +55,7 @@ import org.robolectric.annotation.GraphicsMode
 import org.robolectric.shadows.ShadowDialog
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 /** Matched before/after production details hosts; fictional fixture programme, no services. */
 @RunWith(RobolectricTestRunner::class)
@@ -105,7 +106,7 @@ class ProgrammeDetailsCaptureTest {
             TVHeadendPlayerTheme {
                 dispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 if (shown) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
-                    programmeDetailsActions(event, start.epochSeconds - 60, null, true, true, true),
+                    programmeDetailsActions(event, start.epochSeconds - 60, null, null, true, true, true),
                     {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
                         channel.id, event.stop, event.stop + 3600.seconds, title = "Next"))) }
             }
@@ -132,7 +133,7 @@ class ProgrammeDetailsCaptureTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, now,
-                    programmeDetailsActions(event, now, null, canModify, now >= start.epochSeconds, true),
+                    programmeDetailsActions(event, now, null, null, canModify, now >= start.epochSeconds, true),
                     {}, {}) }
             }
         }
@@ -158,10 +159,10 @@ class ProgrammeDetailsCaptureTest {
                     Button(onClick = {}) { Text("Underlying action") }
                     if (shown) {
                         if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
-                            programmeDetailsActions(event, start.epochSeconds - 60, null, canModify, false, true),
+                            programmeDetailsActions(event, start.epochSeconds - 60, null, null, canModify, false, true),
                             {}, { shown = false }) }
                         else ProvideArtworkSession(session) { ProgrammeDetailsPage(null, entry, channel, 0L,
-                            recordingDetailsActions(entry, false, canModify, false),
+                            recordingDetailsActions(entry, null, canModify, false),
                             {}, { shown = false }) }
                     }
                 }
@@ -209,9 +210,10 @@ class ProgrammeDetailsCaptureTest {
                         else if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
                             start.epochSeconds + if (scheduled) -60 else 600,
                             programmeDetailsActions(event, start.epochSeconds + if (scheduled) -60 else 600,
-                                entry.takeIf { scheduled }, true, true, true), {}, {}) }
+                                entry.takeIf { scheduled }, admitted(entry.takeIf { scheduled }), true, true, true), {}, {}) }
                         else ProvideArtworkSession(session) { ProgrammeDetailsPage(null, entry, channel, 0L,
-                            recordingDetailsActions(entry, true, true, true), {}, {}) }
+                            recordingDetailsActions(entry, admitted(entry), true, true), {}, {},
+                            recordingAdmission = admitted(entry)) }
                     }
                 }
             }
@@ -255,4 +257,9 @@ class ProgrammeDetailsCaptureTest {
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
+}
+
+@OptIn(ExperimentalTvheadendApi::class)
+private fun admitted(entry: DvrEntry?) = entry?.let {
+    SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(it)
 }

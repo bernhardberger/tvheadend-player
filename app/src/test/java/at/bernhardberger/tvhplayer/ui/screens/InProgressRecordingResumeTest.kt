@@ -20,14 +20,16 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
-import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
+import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -44,6 +46,7 @@ import kotlin.time.Instant
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(TvheadendTestingApi::class)
 class InProgressRecordingResumeTest {
     @get:Rule val compose = createComposeRule()
 
@@ -158,9 +161,7 @@ class InProgressRecordingResumeTest {
             start = Instant.fromEpochMilliseconds(now - 1_800_000),
             stop = Instant.fromEpochMilliseconds(now + 1_800_000),
             folder = emptyList(),
-            files = listOf(
-                DvrRecordingFile.create(fileId = null, start = null, stop = null, sizeBytes = null)
-            ),
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "News/evening-news.ts")),
             playPosition = playPositionSeconds?.seconds,
         )
         return SessionObservation.create(
@@ -173,6 +174,7 @@ class InProgressRecordingResumeTest {
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )
     }
 }

@@ -47,10 +47,11 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
-import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
 import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
@@ -77,7 +78,7 @@ import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 
-@OptIn(ExperimentalTestApi::class)
+@OptIn(ExperimentalTestApi::class, TvheadendTestingApi::class)
 class RecordingsScreenTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule
@@ -91,7 +92,7 @@ class RecordingsScreenTest {
         backEnabled: Boolean = true,
         onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
         state: RecordingsScreenState? = null,
-        recordingProgressCapability: RecordingProgressCapability = RecordingProgressCapability.UNKNOWN,
+        recordingProgressCapability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         sessionObservation: SessionObservation? = null,
         connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
         onRetry: () -> Unit = {},
@@ -958,7 +959,6 @@ class RecordingsScreenTest {
             TVHeadendPlayerTheme {
                 TestRecordingsScreen(
                     entries = entries,
-                    recordingProgressCapability = RecordingProgressCapability.UNSUPPORTED,
                     onPlayRecording = { _, start -> playbackStart = start },
                 )
             }
@@ -1908,16 +1908,7 @@ class RecordingsScreenTest {
         title = title,
         state = state,
         folder = path?.split('/')?.filter(String::isNotEmpty)?.dropLast(1),
-        files = path?.let {
-            listOf(
-                DvrRecordingFile.create(
-                    fileId = null,
-                    start = null,
-                    stop = null,
-                    sizeBytes = fileSizeBytes,
-                )
-            )
-        },
+        files = path?.let { listOf(TvheadendTestResultFactory.recordingFile(serverPath = it, sizeBytes = fileSizeBytes)) },
         playPosition = playPositionSeconds?.seconds,
         channelName = channelName,
         subtitle = subtitle,

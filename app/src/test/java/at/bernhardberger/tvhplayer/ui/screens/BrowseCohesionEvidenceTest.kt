@@ -520,7 +520,7 @@ class BrowseCohesionEvidenceTest {
                 ),
             ),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (emptyRecordings) emptyList() else recordings(now))),
-            recordingProgressCapability = RecordingProgressCapability.UNSUPPORTED,
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )
     }
 

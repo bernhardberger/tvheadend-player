@@ -89,7 +89,8 @@ internal fun ProgrammeDetailsHost(
     val canModify = capability != null && observation.dvrState is DvrRepositoryState.Current &&
         (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
-    val actions = programmeDetailsActions(event, nowSec, recording, canModify,
+    val actions = programmeDetailsActions(event, nowSec, recording,
+        recording?.let(observation::recordingPlaybackAdmission), canModify,
         channel != null, fromGuide, liveProgramme = live != null, stacked = stack.isNotEmpty())
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -264,7 +265,8 @@ internal fun ProgrammeDetailsHost(
                 snapshot?.let { otherAirings(pageEvent, it.events, nowSec,
                     channelNumber = { id -> observation.channel(id)?.number }) }.orEmpty()
             }
-            val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording, canModify,
+            val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording,
+                pageRecording?.let(observation::recordingPlaybackAdmission), canModify,
                 pageChannel != null, fromGuide, liveProgramme = pageLive != null,
                 stacked = page.id != openingEvent.id || stack.isNotEmpty())
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }

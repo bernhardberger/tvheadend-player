@@ -31,6 +31,7 @@ import java.io.File
 import java.util.TimeZone
 import kotlin.time.Instant
 import org.junit.Rule
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -103,7 +104,7 @@ class GuideHistoryCompositionTest {
         var recording by mutableStateOf<DvrEntry?>(null)
         compose.setContent { TVHeadendPlayerTheme {
             ProgrammeDetailsPage(selected, recording, null, 4000,
-                programmeDetailsActions(selected, 4000, recording, true, false, true, liveProgramme = live),
+                programmeDetailsActions(selected, 4000, recording, admitted(recording), true, false, true, liveProgramme = live),
                 {}, {})
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()
@@ -130,4 +131,9 @@ class GuideHistoryCompositionTest {
             bitmap.recycle()
         }
     }
+}
+
+@OptIn(ExperimentalTvheadendApi::class)
+private fun admitted(entry: DvrEntry?) = entry?.let {
+    SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(it)
 }

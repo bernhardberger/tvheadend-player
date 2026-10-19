@@ -61,6 +61,7 @@ class ArchiveDepthOwnershipTest {
                             contentFocus = remember { FocusRequester() }, onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
                             piconForEntry = { null },
+                            resumePositionForEntry = { null },
                         )
                         if (selected.intValue == 2) ArchiveDepthContent(
                             root = newRoot, navigation = navigation, contentPadding = PaddingValues(24.dp),
@@ -68,6 +69,7 @@ class ArchiveDepthOwnershipTest {
                             contentFocus = remember { FocusRequester() }, onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
                             piconForEntry = { null },
+                            resumePositionForEntry = { null },
                         )
                     }
                 }

@@ -637,12 +637,32 @@ class BrowseContextMenuScreenTest {
                 epgState = previous.epgState,
                 dvrState = DvrRepositoryState.Current(DvrSnapshot.create(
                     previous.dvrSnapshotForDisplay!!.entries.filter { it.id != DvrEntryId(1) })),
+                recordingProgressCapability = previous.recordingProgressCapability,
             ))
         }
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         compose.onNodeWithTag("recording-list-entry-2").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithText("Play recording").assertIsFocused()
         compose.onNodeWithText("Details").assertExists()
+        assertEquals(0, plays)
+    }
+
+    @Test fun recordingWatchedToTheEndClosesResume() {
+        val session = show(recordings = true)
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-resume").assertIsFocused()
+        compose.runOnIdle {
+            val previous = session.observation.value
+            val watched = previous.dvrSnapshotForDisplay!!.entries.map { entry ->
+                if (entry.id != DvrEntryId(1)) entry else DvrEntry.create(entry.id, channelId = entry.channelId,
+                    eventId = entry.eventId, title = entry.title, folder = emptyList(), channelName = entry.channelName,
+                    state = entry.state, playPosition = 5300.seconds, start = entry.start, stop = entry.stop)
+            }
+            session.publish(SessionObservation.create(previous.sessionState, previous.channelState, previous.epgState,
+                DvrRepositoryState.Current(DvrSnapshot.create(watched)),
+                recordingProgressCapability = previous.recordingProgressCapability))
+        }
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         assertEquals(0, plays)
     }
 
@@ -988,7 +1008,8 @@ class BrowseContextMenuScreenTest {
             session.publish(SessionObservation.create(previous.sessionState, previous.channelState,
                 EpgRepositoryState.Current(EpgSnapshot.create(listOf(EpgEvent.create(event.id, event.channelId,
                     event.start, Instant.parse("2026-09-15T19:00:00Z") - 60.seconds,
-                    title = event.title)))), previous.dvrState))
+                    title = event.title)))), previous.dvrState,
+                recordingProgressCapability = previous.recordingProgressCapability))
         }
         compose.onNodeWithTag("details-play").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(1, plays)
@@ -1039,6 +1060,7 @@ class BrowseContextMenuScreenTest {
                 epgState = if (ready) EpgRepositoryState.Current(epg) else EpgRepositoryState.Stale(epg),
                 dvrState = if (ready) DvrRepositoryState.Current(dvr) else DvrRepositoryState.Stale(dvr),
                 dvrConfigurationsState = previous.dvrConfigurationsState,
+                recordingProgressCapability = previous.recordingProgressCapability,
             ))
         }
         publish(ready = false)
@@ -1252,6 +1274,7 @@ class BrowseContextMenuScreenTest {
             dvrState = if (offline) DvrRepositoryState.Stale(dvr) else DvrRepositoryState.Current(dvr),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(if (profiles) listOf(
                 DvrConfiguration(DvrConfigId("one"), "One", ""), DvrConfiguration(DvrConfigId("two"), "Two", "")) else emptyList()),
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         ))
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         val dependencies = module {

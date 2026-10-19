@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 enum class BrowseContextAction {
     WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
@@ -50,23 +52,22 @@ private fun programmeContextRecordingActions(
     }
 }
 
+/** [admission] is the SDK's admission of [entry] from the observation it was read from, null without a session. */
+@OptIn(ExperimentalTvheadendApi::class)
 fun recordingContextActions(
     entry: DvrEntry,
-    playbackEligible: Boolean,
+    admission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
 ): List<BrowseContextAction> = buildList {
-    if (playbackEligible) when (entry.state) {
-        DvrEntryState.RECORDING -> {
+    if (recordingPlaybackOffered(admission)) {
+        val resumable = offeredResumePosition(admission) != null
+        if (admission is RecordingPlaybackAdmission.Growing) {
             add(BrowseContextAction.WATCH)
-            if ((entry.playPosition?.inWholeSeconds ?: 0L) > 0L) add(BrowseContextAction.START_OVER)
-        }
-        DvrEntryState.COMPLETED -> {
-            if ((entry.playPosition?.inWholeSeconds ?: 0L) > 0L) {
-                add(BrowseContextAction.RESUME)
-                add(BrowseContextAction.START_OVER)
-            } else add(BrowseContextAction.PLAY)
-        }
-        else -> Unit
+            if (resumable) add(BrowseContextAction.START_OVER)
+        } else if (resumable) {
+            add(BrowseContextAction.RESUME)
+            add(BrowseContextAction.START_OVER)
+        } else add(BrowseContextAction.PLAY)
     }
     add(BrowseContextAction.DETAILS)
     if (canModifyRecordings) when (entry.state) {

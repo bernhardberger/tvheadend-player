@@ -26,6 +26,7 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.components.depth.*
+import kotlin.time.Duration
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
 
@@ -59,12 +60,14 @@ internal fun ArchiveDepthContent(
     onDrawerFocus: (() -> Unit)?,
     onOpenRecording: (DvrEntry) -> Unit,
     piconForEntry: (DvrEntry) -> ArtworkId?,
+    resumePositionForEntry: (DvrEntry) -> Duration?,
     modifier: Modifier = Modifier,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
 ) {
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
     val latestOnOpenContextMenu = rememberUpdatedState(onOpenContextMenu)
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
+    val latestResumePositionForEntry = rememberUpdatedState(resumePositionForEntry)
     val levels = remember(root) {
         val levels = linkedMapOf<String, DepthLevel>()
         fun addFolder(folder: DvrArchiveFolder) {
@@ -95,7 +98,8 @@ internal fun ArchiveDepthContent(
                                 rows = emptyList(),
                                 heading = { ArchiveLevelHeading("", it) },
                                 passiveContent = {
-                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry))
+                                    RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry),
+                                        latestResumePositionForEntry.value(item.entry))
                                 },
                             )
                             DepthRow(

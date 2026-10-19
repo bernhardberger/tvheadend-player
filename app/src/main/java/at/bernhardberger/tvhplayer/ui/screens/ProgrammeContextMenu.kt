@@ -31,7 +31,7 @@ internal fun ProgrammeContextMenu(
 ) {
     val actions = if (fromGuide) guideContextActions(event, nowSec, recording, canModify)
         else channelContextActions(event, nowSec, recording, canModify)
-    val showGuide = BrowseContextAction.SHOW_GUIDE in programmeDetailsActions(event, nowSec, recording,
+    val showGuide = BrowseContextAction.SHOW_GUIDE in programmeDetailsActions(event, nowSec, recording, null,
         canModify, channel != null && currentSession != null, fromGuide, stacked = stacked)
     BrowseContextMenu(
         title = event.title.orEmpty(),

@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import kotlin.math.abs
 
 enum class ProgrammeAction {
@@ -19,6 +20,8 @@ fun programmeActions(
     recording: DvrEntry?,
     serverTimeshiftCoversEvent: Boolean = false,
     canModifyRecordings: Boolean = true,
+    /** The SDK's admission of [recording] from the observation it was read from; null offers no playback. */
+    recordingAdmission: RecordingPlaybackAdmission? = null,
 ): List<ProgrammeAction> {
     val actions = when {
         event.start.epochSeconds <= nowSec && nowSec < event.stop.epochSeconds -> listOf(
@@ -37,8 +40,7 @@ fun programmeActions(
             else -> listOf(ProgrammeAction.RECORD)
         }
         serverTimeshiftCoversEvent ||
-            recording?.state == DvrEntryState.COMPLETED ||
-            recording?.state == DvrEntryState.RECORDING -> listOf(ProgrammeAction.WATCH_FROM_START)
+            recording != null && recordingPlaybackOffered(recordingAdmission) -> listOf(ProgrammeAction.WATCH_FROM_START)
         else -> emptyList()
     }
     if (canModifyRecordings) return actions

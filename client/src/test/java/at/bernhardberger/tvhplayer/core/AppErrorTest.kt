@@ -66,10 +66,11 @@ class AppErrorTest {
 
     private val growing = TvheadendTestResultFactory.growingRecordingAdmission(null, RecordingProgressCapability.SUPPORTED)
 
-    private fun entry(state: DvrEntryState?, files: Int? = null) = DvrEntry.create(
+    private fun entry(state: DvrEntryState?, files: Int? = null, dataSize: Long? = null) = DvrEntry.create(
         DvrEntryId(1),
         state = state,
         files = files?.let { count -> List(count) { DvrRecordingFile.create(fileId = it.toLong() + 1) } },
+        dataSizeBytes = dataSize,
     )
 
     @Test fun numbersAreUniqueAndStayInTheirGroup() {
@@ -280,7 +281,22 @@ class AppErrorTest {
         assertEquals(304, number(entry(DvrEntryState.RECORDING, files = 1), RecordingPlaybackAdmission.TargetUnavailable))
         // A deferred recording whose entry is gone is gone, not deferred.
         assertEquals(304, number(null, RecordingPlaybackAdmission.GrowingDeferred))
+        // A running entry in an error state follows a running one.
+        assertEquals(303, number(entry(DvrEntryState.RECORDING_ERROR), RecordingPlaybackAdmission.TargetUnavailable))
+        assertEquals(305, number(entry(DvrEntryState.RECORDING_ERROR, files = 2), RecordingPlaybackAdmission.TargetUnavailable))
+        assertEquals(304, number(entry(DvrEntryState.RECORDING_ERROR, files = 1), RecordingPlaybackAdmission.TargetUnavailable))
+        // A failed or missed entry without a playable file has none; one with a file that is not admitted changed.
+        for (state in listOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED)) {
+            assertEquals("$state", 303, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
+            assertEquals("$state", 303, number(entry(state, files = 0), RecordingPlaybackAdmission.TargetUnavailable))
+            assertEquals("$state", 303, number(entry(state, files = 1, dataSize = 0), RecordingPlaybackAdmission.TargetUnavailable))
+            assertEquals("$state", 304, number(entry(state, files = 1), RecordingPlaybackAdmission.TargetUnavailable))
+            // An admitted failed or missed recording plays without an alert.
+            assertNull("$state", number(entry(state, files = 1), completed))
+        }
+        assertNull(number(entry(DvrEntryState.RECORDING_ERROR, files = 1), growing))
         for (state in sdkConstants<DvrEntryState>() - setOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
+            DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.MISSED,
             DvrEntryState.FILE_MISSING)) {
             assertEquals("$state", 304, number(entry(state), RecordingPlaybackAdmission.TargetUnavailable))
         }

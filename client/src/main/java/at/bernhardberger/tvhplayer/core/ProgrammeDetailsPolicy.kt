@@ -4,6 +4,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 
 enum class DetailsStatus { ON_NOW, RECORDING, SCHEDULED, FAILED }
 
@@ -22,6 +23,7 @@ fun programmeDetailsActions(
     event: EpgEvent,
     nowSec: Long,
     recording: DvrEntry?,
+    recordingAdmission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
     canWatchChannel: Boolean,
     fromGuide: Boolean,
@@ -29,7 +31,8 @@ fun programmeDetailsActions(
     stacked: Boolean = false,
 ): List<BrowseContextAction> = buildList {
     if (canWatchChannel) add(BrowseContextAction.WATCH)
-    programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings).forEach {
+    programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings,
+        recordingAdmission = recordingAdmission).forEach {
         when (it) {
             ProgrammeAction.WATCH -> Unit
             ProgrammeAction.RECORD -> if (liveProgramme) add(BrowseContextAction.RECORD)
@@ -43,12 +46,12 @@ fun programmeDetailsActions(
 
 fun recordingDetailsActions(
     recording: DvrEntry,
-    playbackEligible: Boolean,
+    admission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
     canWatchChannel: Boolean,
 ): List<BrowseContextAction> = buildList {
     if (recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
-    addAll(recordingContextActions(recording, playbackEligible, canModifyRecordings).filter {
+    addAll(recordingContextActions(recording, admission, canModifyRecordings).filter {
         it != BrowseContextAction.DETAILS
     })
 }
@@ -84,12 +87,13 @@ fun programmeDetailsFacts(event: EpgEvent, nowSec: Long): List<DetailsFact> = bu
     }
 }
 
-fun recordingDetailsFacts(recording: DvrEntry): List<DetailsFact> = buildList {
+/** [admission] is the SDK's admission of [recording]; the time left follows the Resume it offers. */
+fun recordingDetailsFacts(recording: DvrEntry, admission: RecordingPlaybackAdmission?): List<DetailsFact> = buildList {
     recording.start?.let { add(DetailsFact(DetailsFactKind.RECORDED, it.epochSeconds)) }
     val length = recording.start?.let { start -> recording.stop?.let { (it - start).inWholeSeconds } }
         ?.takeIf { it > 0 } ?: return@buildList
     add(DetailsFact(DetailsFactKind.LENGTH, length))
-    recording.playPosition?.inWholeSeconds?.takeIf { it > 0 && it < length }?.let {
+    offeredResumePosition(admission)?.inWholeSeconds?.takeIf { it > 0 && it < length }?.let {
         add(DetailsFact(DetailsFactKind.LEFT, length - it))
     }
 }

@@ -52,7 +52,7 @@
 - Logos and programme pictures fade in as they load.
 - The start-up buffer for live TV is tuned per server.
 - The German interface now addresses you informally ("du").
-- Under the hood: built on Tvheadend SDK 0.34.0 and HTSP 1.0.0-beta.4. Release
+- Under the hood: built on Tvheadend SDK 0.35.0 and HTSP 1.0.0-beta.4. Release
   builds are smaller, and each release ships the mapping files that make crash
   reports readable.
 

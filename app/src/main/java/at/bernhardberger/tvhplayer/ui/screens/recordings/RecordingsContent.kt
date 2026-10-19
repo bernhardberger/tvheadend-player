@@ -8,6 +8,7 @@ import at.bernhardberger.tvhplayer.ui.components.AppTabRow
 import at.bernhardberger.tvhplayer.ui.components.AppTabStyle
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import kotlin.math.roundToInt
+import kotlin.time.Duration
 
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
@@ -204,6 +205,7 @@ internal fun FolderListRow(
 internal fun RecordingMetadataPane(
     entry: DvrEntry?,
     piconPath: ArtworkId?,
+    resumePosition: Duration?,
 ) {
     if (entry == null) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -267,7 +269,7 @@ internal fun RecordingMetadataPane(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        entry.playPosition?.inWholeSeconds?.takeIf { it > 0 }?.let { seconds ->
+        resumePosition?.inWholeSeconds?.takeIf { it > 0 }?.let { seconds ->
             Text(
                 stringResource(R.string.recording_resume_from,
                     at.bernhardberger.tvhplayer.core.formatPlaybackDuration(
@@ -319,7 +321,8 @@ internal fun RecordingMetadataPane(
         entry.subscriptionError?.label()?.let {
             Text(text = it, color = MaterialTheme.colorScheme.error, maxLines = 2)
         }
-        entry.playCount?.takeIf { it > 0 }?.let {
+        // Tvheadend ignores progress writes for a missed entry, so it never shows as watched.
+        entry.playCount?.takeIf { it > 0 && entry.state != DvrEntryState.MISSED }?.let {
             Text(
                 text = stringResource(R.string.recordings_play_count, it),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

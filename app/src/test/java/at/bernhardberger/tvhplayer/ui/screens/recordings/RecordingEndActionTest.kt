@@ -11,7 +11,7 @@ import org.junit.Test
 
 class RecordingEndActionTest {
     private fun endAction(state: DvrEntryState?) = recordingDetailsActions(
-        DvrEntry.create(DvrEntryId(1), state = state), true, true, false,
+        DvrEntry.create(DvrEntryId(1), state = state), null, true, false,
     ).singleOrNull { it == BrowseContextAction.STOP || it == BrowseContextAction.CANCEL }
     @Test
     fun runningRecordingIsStoppedAndScheduledRecordingIsCancelled() {
