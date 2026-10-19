@@ -228,6 +228,7 @@ internal fun RecordingPlayerRouteContent(
     connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    onOpenConnectionSettings: () -> Unit = {},
 ) {
     if (contentAllowed) {
         RecordingPlayerScreen(
@@ -236,6 +237,7 @@ internal fun RecordingPlayerRouteContent(
             connectionState = connectionState,
             onReconnect = onReconnect,
             onClose = onClose,
+            onOpenConnectionSettings = onOpenConnectionSettings,
         )
     }
 }

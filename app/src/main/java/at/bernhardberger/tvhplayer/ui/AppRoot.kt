@@ -1016,6 +1016,9 @@ fun AppRoot(
                             connectionState = connectionState,
                             onReconnect = appVm::reconnectNow,
                             onClose = { backStack.popNavigation() },
+                            onOpenConnectionSettings = {
+                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
                         )
                     }
                 },

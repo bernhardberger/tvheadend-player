@@ -505,14 +505,7 @@
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete this recording?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) will be deleted from the server.</string>
-    <string name="recording_unavailable_title">Recording unavailable</string>
     <string name="recording_loading">Loading recording…</string>
-    <string name="recording_recovering">Restoring recording playback…</string>
-    <string name="recording_playback_interrupted_title">Recording playback interrupted</string>
-    <string name="recording_connection_unavailable">The recording could not be loaded because the server connection was interrupted.</string>
-    <string name="recording_not_ready">This recording has not started yet.</string>
-    <string name="recording_file_unavailable">Your Tvheadend server did not expose a playable file for this recording.</string>
-    <string name="recording_read_failed">Your Tvheadend server could not continue reading this recording.</string>
     <string name="recording_resume_from">Resume from %1$s</string>
     <string name="recording_ends_at">Ends at %1$s</string>
     <string name="recording_play_from_beginning">Play from beginning</string>

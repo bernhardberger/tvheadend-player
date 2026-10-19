@@ -107,9 +107,11 @@ internal const val PlayerChannelMessageTag = "player-channel-unavailable"
 internal const val PlayerChannelMessageDetailTag = "player-channel-unavailable-detail"
 
 /**
- * The live player's full-screen alert for [alert]. Its buttons are the catalog's, in order, the
- * first focused; Retry runs the alert's [PlaybackRetryCommand]. While live playback retries by
- * itself it shows the countdown to the next attempt and only Close. The exit keeps what it showed.
+ * The live and recording player's full-screen alert for [alert]. Its buttons are the alert's, in
+ * order, the first focused; Retry runs the alert's [PlaybackRetryCommand]. While playback retries by
+ * itself it shows the countdown to the next attempt and only Close. A recording this device's player
+ * failed on (306) adds the player's own error ([deviceFaultDetail]) as a faint line. The exit keeps
+ * what it showed.
  */
 @Composable
 internal fun LivePlayerAlertOverlay(
@@ -118,8 +120,14 @@ internal fun LivePlayerAlertOverlay(
     onRetry: (PlaybackRetryCommand) -> Unit,
     onConnectionSettings: () -> Unit,
     onClose: () -> Unit,
+    deviceFaultDetail: String? = null,
 ) {
-    val shown = rememberLastShown(alert.takeIf { visible })
+    val current = alert.takeIf { visible }
+    val currentDetail = deviceFaultDetail.takeIf {
+        (current as? LivePlayerAlert.Error)?.error?.condition == AppErrorCondition.RECORDING_PLAYBACK_FAILED
+    }
+    val last = rememberLastShown(current?.let { it to currentDetail })
+    val shown = last?.first
     val text = rememberAppErrorText()
     // The current alert's attempt, hidden or not, so hiding the alert does not restart its countdown.
     val seconds = rememberReconnectSeconds(alert as? LivePlayerAlert.Recovering, visible)
@@ -141,6 +149,7 @@ internal fun LivePlayerAlertOverlay(
         detail = condition?.let(text::paragraph),
         icon = painterResource(R.drawable.ic_error_outlined).takeIf { condition != null },
         busy = shown is LivePlayerAlert.Recovering,
+        footnote = last?.second,
         actions = actions.map { action ->
             TvRecoveryAction(text.label(action)) {
                 when (action) {

@@ -61,7 +61,8 @@ data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
  * buttons in order, the first focused when they appear or change. [icon] heads the alert; [busy]
  * puts a progress ring there instead, as does an alert without actions. [status] is a line under the
  * text that may change while shown, such as a countdown; the live region holds [message], [detail]
- * and [hint], not [status].
+ * and [hint], not [status]. [footnote] is a faint line under them for a bug report, such as the
+ * player's own error, also outside the live region.
  */
 @Composable
 fun TvRecoveryOverlay(
@@ -81,6 +82,7 @@ fun TvRecoveryOverlay(
     status: String? = null,
     icon: Painter? = null,
     busy: Boolean = false,
+    footnote: String? = null,
 ) {
     require(actions.size <= MaxRecoveryActions) { "At most $MaxRecoveryActions recovery actions" }
     val buttons = actions.ifEmpty {
@@ -211,6 +213,18 @@ fun TvRecoveryOverlay(
                             .padding(top = 16.dp)
                             .widthIn(max = RecoveryTextWidth)
                             .testTag("tv-recovery-status"),
+                    )
+                }
+                if (footnote != null) {
+                    Text(
+                        text = footnote,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.labelMedium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier
+                            .padding(top = 16.dp)
+                            .widthIn(max = RecoveryTextWidth)
+                            .testTag("tv-recovery-footnote"),
                     )
                 }
                 if (primaryVisible) {

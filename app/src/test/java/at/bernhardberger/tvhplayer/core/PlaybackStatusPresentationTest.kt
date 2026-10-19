@@ -1,6 +1,10 @@
 package at.bernhardberger.tvhplayer.core
 
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
@@ -299,6 +303,71 @@ class PlaybackStatusPresentationTest {
                 livePlayerAlert(connection, state, condition) != null,
             )
         }
+    }
+
+    @Test
+    fun recordingAlert_isTheCatalogConditionWithAtMostTwoButtonsAndNoRetryWithNothingToRetry() {
+        val completed = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)
+        val readFailed = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+        val deviceFailed = readFailed.copy(deviceFault = true)
+        fun alert(
+            state: AppPlaybackState,
+            entry: DvrEntry? = completed,
+            admission: RecordingPlaybackAdmission? = null,
+            retry: PlaybackRetryCommand = PlaybackRetryCommand.RESUME_RECORDING,
+            connection: ConnectionState = ConnectionState.Connected,
+        ) = recordingPlayerAlert(connection, connection != ConnectionState.Connected, state, entry, admission, retry)
+
+        assertEquals(
+            LivePlayerAlert.Error(
+                AppError(AppErrorCondition.RECORDING_INTERRUPTED, listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)),
+                PlaybackRetryCommand.RESUME_RECORDING,
+            ),
+            alert(readFailed),
+        )
+        assertEquals(
+            listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE),
+            (alert(deviceFailed) as LivePlayerAlert.Error).error.actions,
+        )
+        assertEquals(AppErrorCondition.RECORDING_PLAYBACK_FAILED, (alert(deviceFailed) as LivePlayerAlert.Error).error.condition)
+        // Nothing to retry, such as a failure that is not a read failure: Retry would do nothing, so only Close.
+        assertEquals(
+            LivePlayerAlert.Error(
+                AppError(AppErrorCondition.RECORDING_INTERRUPTED, listOf(AppErrorAction.CLOSE)),
+                PlaybackRetryCommand.NONE,
+            ),
+            alert(readFailed, retry = PlaybackRetryCommand.NONE),
+        )
+        val missing = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING)
+        assertEquals(
+            AppError(AppErrorCondition.RECORDING_FILE_MISSING, listOf(AppErrorAction.CLOSE)),
+            (alert(AppPlaybackState.Idle, missing, RecordingPlaybackAdmission.TargetUnavailable) as LivePlayerAlert.Error).error,
+        )
+    }
+
+    @Test
+    fun recordingAlert_isTheConnectionWhileUnresolvedAndTheCountdownWhileRecovering() {
+        val waiting = recordingPlayerAlert(
+            ConnectionState.Disconnected, true, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE,
+        ) as LivePlayerAlert.Error
+        assertEquals(AppError(AppErrorCondition.RECONNECTING, listOf(AppErrorAction.CLOSE)), waiting.error)
+        val unreachable = recordingPlayerAlert(
+            ConnectionState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY),
+            true, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.RECONNECT,
+        ) as LivePlayerAlert.Error
+        assertEquals(AppError(AppErrorCondition.UNREACHABLE, listOf(AppErrorAction.RETRY, AppErrorAction.CLOSE)), unreachable.error)
+        assertEquals(PlaybackRetryCommand.RECONNECT, unreachable.retry)
+
+        assertEquals(
+            LivePlayerAlert.Recovering(4_000L),
+            recordingPlayerAlert(
+                ConnectionState.Connected, false,
+                AppPlaybackState.Recovering(PlaybackRecoveryReason.LIVE_ENDED, retryDelayMillis = 4_000L),
+                null, null, PlaybackRetryCommand.RESUME_RECORDING,
+            ),
+        )
+        // Still loading: nothing resolved and nothing failed.
+        assertNull(recordingPlayerAlert(ConnectionState.Connected, false, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE))
     }
 
     private fun failed(issue: SubscriptionIssue? = null, recoveryReason: PlaybackRecoveryReason? = null) =

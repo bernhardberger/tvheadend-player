@@ -264,7 +264,7 @@ class PlayerBackPolicyTest {
 
     @Test
     fun terminalRecordingErrorAndLayerlessRecordingClose() {
-        listOf(PlayerForegroundLayer.TERMINAL_ERROR, PlayerForegroundLayer.NONE).forEach { layer ->
+        listOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR, PlayerForegroundLayer.NONE).forEach { layer ->
             assertEquals(
                 PlayerBackAction.CLOSE_PLAYER,
                 playerBackAction(PlayerSurface.RECORDING, layer),

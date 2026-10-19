@@ -30,9 +30,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -53,7 +51,6 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
-import at.bernhardberger.tvhplayer.core.PlaybackRecoveryInitialAction
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
@@ -72,6 +69,8 @@ import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.playbackRecoveryUiModel
+import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
+import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsKeyOutcome
 import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
 import at.bernhardberger.tvhplayer.core.playbackOptionsKeyRequest
@@ -105,6 +104,7 @@ fun RecordingPlayerScreen(
     connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    onOpenConnectionSettings: () -> Unit = {},
 ) {
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
@@ -743,68 +743,20 @@ fun RecordingPlayerScreen(
             message = stringResource(R.string.recording_loading),
             opaque = false,
         )
-        TvRecoveryOverlay(
-            visible = foregroundLayer == PlayerForegroundLayer.RECOVERY,
-            message = stringResource(R.string.recording_recovering),
-            detail = entry?.title,
-            opaque = false,
-            busy = true,
-            primaryActionLabel = stringResource(R.string.close),
-            onPrimaryAction = playerClose::close,
-        )
-        TvRecoveryOverlay(
-            visible = foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
-            icon = painterResource(R.drawable.ic_error_outlined),
-            message = stringResource(
-                if (failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED) {
-                    R.string.recording_playback_interrupted_title
-                } else {
-                    R.string.recording_unavailable_title
-                }
+        LivePlayerAlertOverlay(
+            visible = foregroundLayer == PlayerForegroundLayer.RECOVERY ||
+                foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR,
+            alert = recordingPlayerAlert(
+                connectionState, initialConnectionFailure, playbackState, entry, admission, recoveryUiModel.retryCommand,
             ),
-            detail = entry?.title,
-            hint = stringResource(
-                when {
-                    failureReason == AppPlaybackFailureReason.RECORDING_READ_FAILED ->
-                        R.string.recording_read_failed
-                    initialConnectionFailure -> R.string.recording_connection_unavailable
-                    admission == RecordingPlaybackAdmission.GrowingDeferred ->
-                        R.string.recording_not_ready
-                    else -> R.string.recording_file_unavailable
-                }
-            ),
-            opaque = false,
-            primaryActionLabel = stringResource(
-                if (
-                    recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
-                ) {
-                    R.string.retry
-                } else {
-                    R.string.close
-                }
-            ),
-            onPrimaryAction = if (
-                recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
-            ) {
-                ::dispatchRecoveryRetry
-            } else {
-                playerClose::close
+            onRetry = { dispatchRecoveryRetry() },
+            // Connection settings leaves through Close, so nothing of this screen starts meanwhile.
+            onConnectionSettings = {
+                playerClose.close()
+                onOpenConnectionSettings()
             },
-            secondaryActionLabel = if (
-                recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
-            ) {
-                stringResource(R.string.close)
-            } else {
-                null
-            },
-            onSecondaryAction = if (
-                recoveryUiModel.initialAction == PlaybackRecoveryInitialAction.RETRY
-            ) {
-                playerClose::close
-            } else {
-                null
-            },
-            liveRegionMode = LiveRegionMode.Assertive,
+            onClose = playerClose::close,
+            deviceFaultDetail = playbackState.deviceFaultDetail(),
         )
         PlayerPanelVisibility(
             value = optionsPage?.let { it to optionsQuickList },

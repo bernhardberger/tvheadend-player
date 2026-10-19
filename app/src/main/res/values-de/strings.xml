@@ -393,14 +393,7 @@
     <string name="delete_recording">Aufnahme löschen</string>
     <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wird vom Server gelöscht.</string>
-    <string name="recording_unavailable_title">Aufnahme nicht verfügbar</string>
     <string name="recording_loading">Aufnahme wird geladen…</string>
-    <string name="recording_recovering">Aufnahmewiedergabe wird wiederhergestellt…</string>
-    <string name="recording_playback_interrupted_title">Aufnahmewiedergabe unterbrochen</string>
-    <string name="recording_connection_unavailable">Die Aufnahme konnte wegen einer unterbrochenen Serververbindung nicht geladen werden.</string>
-    <string name="recording_not_ready">Diese Aufnahme hat noch nicht begonnen.</string>
-    <string name="recording_file_unavailable">Dein Tvheadend-Server stellt für diese Aufnahme keine abspielbare Datei bereit.</string>
-    <string name="recording_read_failed">Dein Tvheadend-Server konnte diese Aufnahme nicht weiterlesen.</string>
     <string name="recording_resume_from">Fortsetzen ab %1$s</string>
     <string name="recording_ends_at">Endet um %1$s</string>
     <string name="recording_play_from_beginning">Von Anfang an abspielen</string>

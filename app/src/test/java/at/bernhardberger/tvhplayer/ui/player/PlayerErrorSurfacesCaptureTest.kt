@@ -17,12 +17,20 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.LivePlayerAlert
+import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
+import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.livePlayerAlert
+import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -38,7 +46,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 /**
- * Visual evidence for the live player's catalog error surfaces over the black player cover at the
+ * Visual evidence for the live and recording player's catalog error surfaces over the black player cover at the
  * 960×540 dp canvas, English, font scale 1.0, first button focused. Writes to
  * artifacts/player-chrome/errors (ignored).
  */
@@ -68,7 +76,33 @@ class PlayerErrorSurfacesCaptureTest {
                 ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)),
             Scene("alert-live-recovering", alert = LivePlayerAlert.Recovering(retryDelayMillis = 7_500L)),
         )
-        val scene = mutableStateOf(channel.first())
+        capture(channel + alerts)
+    }
+
+    @Test fun recordingErrors() {
+        val completed = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED)
+        val readFailed = AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)
+        val deviceFailed = readFailed.copy(
+            playerErrorCode = "ERROR_CODE_DECODER_INIT_FAILED", playerErrorNumber = 4001, deviceFault = true,
+        )
+        fun recording(state: AppPlaybackState, entry: DvrEntry?, admission: RecordingPlaybackAdmission?) =
+            recordingPlayerAlert(ConnectionState.Connected, false, state, entry, admission, PlaybackRetryCommand.RESUME_RECORDING)
+        capture(listOf(
+            Scene("recording-301-interrupted", alert = recording(readFailed, completed, null)),
+            Scene("recording-303-file-missing", alert = recording(AppPlaybackState.Idle,
+                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING), RecordingPlaybackAdmission.TargetUnavailable)),
+            Scene("recording-304-unavailable", alert = recording(AppPlaybackState.Idle, null, RecordingPlaybackAdmission.ObservationExpired)),
+            Scene("recording-305-deferred", alert = recording(AppPlaybackState.Idle,
+                DvrEntry.create(DvrEntryId(1), state = DvrEntryState.RECORDING), RecordingPlaybackAdmission.GrowingDeferred)),
+            Scene("recording-306-device", alert = recording(deviceFailed, completed, null),
+                alertDetail = deviceFailed.deviceFaultDetail()),
+            Scene("recording-110-reconnecting", alert = recordingPlayerAlert(
+                ConnectionState.Disconnected, true, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE)),
+        ))
+    }
+
+    private fun capture(scenes: List<Scene>) {
+        val scene = mutableStateOf(scenes.first())
         compose.setContent {
             TVHeadendPlayerTheme {
                 view = LocalView.current
@@ -87,12 +121,13 @@ class PlayerErrorSurfacesCaptureTest {
                             onRetry = {},
                             onConnectionSettings = {},
                             onClose = {},
+                            deviceFaultDetail = scene.value.alertDetail,
                         )
                     }
                 }
             }
         }
-        for (next in channel + alerts) {
+        for (next in scenes) {
             compose.runOnIdle { scene.value = next }
             compose.waitForIdle()
             compose.mainClock.advanceTimeBy(1_000L)
@@ -106,7 +141,12 @@ class PlayerErrorSurfacesCaptureTest {
         }
     }
 
-    private class Scene(val name: String, val channel: AppErrorCondition? = null, val alert: LivePlayerAlert? = null)
+    private class Scene(
+        val name: String,
+        val channel: AppErrorCondition? = null,
+        val alert: LivePlayerAlert? = null,
+        val alertDetail: String? = null,
+    )
 
     private fun connectionAlert(
         kind: ConnectionFailureKind,

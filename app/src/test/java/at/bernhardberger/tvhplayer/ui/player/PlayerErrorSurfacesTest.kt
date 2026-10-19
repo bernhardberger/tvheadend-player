@@ -21,6 +21,10 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
@@ -28,7 +32,9 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.LivePlayerAlert
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
+import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.livePlayerAlert
+import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
@@ -275,6 +281,100 @@ class PlayerErrorSurfacesTest {
     }
 
     @Test
+    fun recordingInterruptionRetriesTheRecordingThenCloses() {
+        var closed = 0
+        val retries = mutableListOf<PlaybackRetryCommand>()
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = recordingAlert(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED)),
+                onRetry = { retries += it },
+                onConnectionSettings = {},
+                onClose = { closed++ },
+                deviceFaultDetail = "DECODER_INIT_FAILED (4001)",
+            )
+        }
+
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText(string(R.string.error_301_title)))
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
+        compose.onNodeWithTag("tv-recovery-tertiary").assertDoesNotExist()
+        // Not this device's player: no raw error line.
+        compose.onNodeWithTag("tv-recovery-footnote").assertDoesNotExist()
+
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(listOf(PlaybackRetryCommand.RESUME_RECORDING), retries)
+        press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        compose.onNodeWithTag("tv-recovery-secondary").assertIsFocused()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(1, closed)
+        press(KeyEvent.KEYCODE_DPAD_LEFT)
+        compose.onNodeWithTag("tv-recovery-primary").assertIsFocused()
+    }
+
+    @Test
+    fun recordingPlayerFailureShowsThePlayersOwnErrorOutsideTheLiveRegion() {
+        val failed = AppPlaybackState.Failed(
+            AppPlaybackFailureReason.RECORDING_READ_FAILED,
+            playerErrorCode = "ERROR_CODE_DECODER_INIT_FAILED",
+            playerErrorNumber = 4001,
+            deviceFault = true,
+        )
+        var alert by mutableStateOf(recordingAlert(failed))
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = alert,
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = {},
+                deviceFaultDetail = failed.deviceFaultDetail(),
+            )
+        }
+
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText(string(R.string.error_306_title)))
+        compose.onNodeWithTag("tv-recovery-footnote")
+            .assert(hasText("DECODER_INIT_FAILED (4001)"))
+            .assert(!hasAnyAncestor(SemanticsMatcher.keyIsDefined(SemanticsProperties.LiveRegion)))
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Retry")).assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assert(hasText("Close"))
+
+        // A lost connection replaces the alert: the player's error goes with it.
+        compose.runOnIdle {
+            alert = recordingPlayerAlert(
+                ConnectionState.Disconnected, true, AppPlaybackState.Idle, null, null, PlaybackRetryCommand.NONE,
+            )
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText(string(R.string.error_110_title)))
+        compose.onNodeWithTag("tv-recovery-footnote").assertDoesNotExist()
+    }
+
+    @Test
+    fun recordingWithoutAFileOffersCloseOnly() {
+        var closed = 0
+        show {
+            LivePlayerAlertOverlay(
+                visible = true,
+                alert = recordingAlert(
+                    AppPlaybackState.Idle,
+                    DvrEntry.create(DvrEntryId(1), state = DvrEntryState.FILE_MISSING),
+                    RecordingPlaybackAdmission.TargetUnavailable,
+                ),
+                onRetry = {},
+                onConnectionSettings = {},
+                onClose = { closed++ },
+            )
+        }
+
+        compose.onNodeWithTag("tv-recovery-title").assert(hasText(string(R.string.error_303_title)))
+        compose.onNodeWithTag("tv-recovery-primary").assert(hasText("Close")).assertIsFocused()
+        compose.onNodeWithTag("tv-recovery-secondary").assertDoesNotExist()
+        press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(1, closed)
+    }
+
+    @Test
     fun countdownRoundsUpAndEndsWhenTheAttemptIsDue() {
         assertNull(reconnectCountdownSeconds(0L))
         assertNull(reconnectCountdownSeconds(-5L))
@@ -318,6 +418,12 @@ class PlayerErrorSurfacesTest {
         }
         compose.waitForIdle()
     }
+
+    private fun recordingAlert(
+        state: AppPlaybackState,
+        entry: DvrEntry? = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED),
+        admission: RecordingPlaybackAdmission? = null,
+    ) = recordingPlayerAlert(ConnectionState.Connected, false, state, entry, admission, PlaybackRetryCommand.RESUME_RECORDING)
 
     private fun assertInMessage(text: String) {
         compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag(PlayerChannelMessageTag))).assertExists()

@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.core
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionIssue
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -55,7 +57,10 @@ fun liveChannelCondition(
     else -> liveErrorCondition(issue)
 }
 
-/** What the live player's full-screen alert shows; it exists exactly when [playbackStatusPresentation] is FULL_RECOVERY. */
+/**
+ * What the player's full-screen alert shows. For live it exists exactly when
+ * [playbackStatusPresentation] is FULL_RECOVERY; the recording player uses [recordingPlayerAlert].
+ */
 sealed interface LivePlayerAlert {
     /** A numbered condition with the catalog's buttons; its Retry runs [retry]. */
     data class Error(val error: AppError, val retry: PlaybackRetryCommand) : LivePlayerAlert
@@ -86,6 +91,31 @@ fun livePlayerAlert(
         retry = PlaybackRetryCommand.RETRY_LIVE,
     )
     else -> null
+}
+
+/**
+ * The recording player's full-screen alert, in the same shape as the live one: the player's own
+ * recovery first, then the connection while the recording is still unresolved ([connectionFailed]),
+ * then [recordingAppError]. Retry runs [retry]; when there is nothing to retry
+ * ([PlaybackRetryCommand.NONE]) the alert offers no Retry.
+ */
+@OptIn(UnstableApi::class)
+fun recordingPlayerAlert(
+    connection: ConnectionState,
+    connectionFailed: Boolean,
+    playbackState: AppPlaybackState,
+    entry: DvrEntry?,
+    admission: RecordingPlaybackAdmission?,
+    retry: PlaybackRetryCommand,
+): LivePlayerAlert? {
+    if (playbackState is AppPlaybackState.Recovering) return LivePlayerAlert.Recovering(playbackState.retryDelayMillis)
+    val error = if (connectionFailed) {
+        connection.playerConnectionError()
+    } else {
+        recordingAppError(entry, admission, playbackState as? AppPlaybackState.Failed)
+    } ?: return null
+    val actions = if (retry == PlaybackRetryCommand.NONE) error.actions - AppErrorAction.RETRY else error.actions
+    return LivePlayerAlert.Error(error.copy(actions = actions), retry)
 }
 
 private fun ConnectionState.playerConnectionError(): AppError {
