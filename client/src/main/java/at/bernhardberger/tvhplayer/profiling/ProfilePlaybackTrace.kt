@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.profiling
 
 import androidx.media3.common.Format
 import at.bernhardberger.tvhplayer.client.BuildConfig
+import at.bernhardberger.tvhplayer.playback.PlaybackStall
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
 
 /** Emits the playback markers the profiling tooling parses; the strings must not change. */
@@ -36,5 +37,13 @@ object ProfilePlaybackTrace : PlaybackTrace {
 
     override fun videoCoverLifted(epoch: Long) {
         profileTrace("P44:cover:lifted:$epoch") {}
+    }
+
+    override fun stall(stall: PlaybackStall, epoch: Long) {
+        profileTrace("P44:stall:${stall.name.lowercase()}:$epoch") {}
+    }
+
+    override fun freshDecoderPerZap() {
+        profileTrace("P44:zap:fresh-decoder:on") {}
     }
 }

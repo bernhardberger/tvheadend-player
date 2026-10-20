@@ -191,6 +191,10 @@ data class AppPlaybackDiagnostics(
     val live: LiveSubscriptionDiagnostics? = null,
     /** Start-up buffer the next live start waits for; null outside live playback. */
     val startupBuffer: StartupBufferInEffect? = null,
+    /** Stalled targets the runtime restarted with fresh decoders since it began. */
+    val stallRecoveries: Int = 0,
+    /** A live stall recovery showed this device needs fresh decoders: every live zap stops the old target first. */
+    val freshDecoderPerZap: Boolean = false,
 )
 
 /**

@@ -208,6 +208,11 @@ internal fun PlaybackStatsOverlay(
                         ),
                     )
                 }
+                StatLine(stringResource(R.string.stats_stall_recoveries), diagnostics.stallRecoveries.toString())
+                StatLine(
+                    stringResource(R.string.stats_fresh_decoder_per_zap),
+                    stringResource(if (diagnostics.freshDecoderPerZap) R.string.stats_on else R.string.stats_off),
+                )
                 val tunerSource = live?.source
                 val frontend = live?.frontend
                 if (tunerSource != null || frontend != null) {

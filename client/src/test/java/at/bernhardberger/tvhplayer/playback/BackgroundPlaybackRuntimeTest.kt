@@ -1009,7 +1009,7 @@ class BackgroundPlaybackRuntimeTest {
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val player = ExoPlayer.Builder(context).build()
         var afterPause: () -> Unit = {}
-        private val coordinator = createTvheadendPlaybackCoordinator(player,
+        val coordinator = createTvheadendPlaybackCoordinator(player,
             onRecoveryRequired = { recover(it) }).also { it.launchIn(scope) }
         /** Currently registered runtime listeners, so tests can drive states the fake stream never reaches. */
         val playerListeners = mutableListOf<Player.Listener>()
@@ -1023,6 +1023,9 @@ class BackgroundPlaybackRuntimeTest {
         var forcedTracks: androidx.media3.common.Tracks? = null
         /** Video decoder counters the runtime reads, for frames the fake stream never renders. */
         var forcedVideoDecoderCounters: androidx.media3.exoplayer.DecoderCounters? = null
+        /** Position and queued media the runtime reads, for progress the fake stream never makes. */
+        var forcedPosition: (() -> Long)? = null
+        var forcedBufferedAhead: Long? = null
         /** How often the runtime read the video decoder counters. */
         var videoDecoderCounterReads = 0
         /** Runs as the runtime asks the player to play, before it plays. */
@@ -1047,11 +1050,15 @@ class BackgroundPlaybackRuntimeTest {
         }
         /** Runs inside a live target install, before the session binds the channel. */
         var beforeLiveBinding: () -> Unit = {}
+        /** Replaces the session's recording binding, for example with one whose file never answers. */
+        var recordingBinding: (PlaybackBindingResult<PlaybackBinding.Recording>) -> PlaybackBindingResult<PlaybackBinding.Recording> = { it }
         private val runtimeSession = object : TvheadendSession by session {
             override fun bindLivePlayback(currentSession: CurrentSessionObservation, channelId: ChannelId): PlaybackBindingResult<PlaybackBinding.Live> {
                 beforeLiveBinding()
                 return session.bindLivePlayback(currentSession, channelId)
             }
+            override fun bindRecordingPlayback(currentSession: CurrentSessionObservation, recordingId: DvrEntryId): PlaybackBindingResult<PlaybackBinding.Recording> =
+                recordingBinding(session.bindRecordingPlayback(currentSession, recordingId))
         }
         val runtime = AppPlaybackRuntime(object : ExoPlayer by player {
             override fun getPlayerError(): ExoPlaybackException? = forcedPlayerError ?: player.playerError
@@ -1059,6 +1066,8 @@ class BackgroundPlaybackRuntimeTest {
             override fun isPlaying(): Boolean = forcedPlaying ?: player.isPlaying
             override fun getPlaybackState(): Int = forcedPlaybackState ?: player.playbackState
             override fun getCurrentTracks(): androidx.media3.common.Tracks = forcedTracks ?: player.currentTracks
+            override fun getCurrentPosition(): Long = forcedPosition?.invoke() ?: player.currentPosition
+            override fun getTotalBufferedDuration(): Long = forcedBufferedAhead ?: player.totalBufferedDuration
             override fun getVideoDecoderCounters(): androidx.media3.exoplayer.DecoderCounters? {
                 videoDecoderCounterReads++
                 return forcedVideoDecoderCounters ?: player.videoDecoderCounters

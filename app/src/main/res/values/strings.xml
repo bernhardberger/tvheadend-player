@@ -284,6 +284,8 @@
     <string name="stats_startup_buffer" translatable="false">Start-up buffer</string>
     <string name="stats_startup_buffer_automatic" translatable="false">%1$s ms · automatic</string>
     <string name="stats_startup_buffer_fixed" translatable="false">%1$s ms · fixed</string>
+    <string name="stats_stall_recoveries" translatable="false">Stall recoveries</string>
+    <string name="stats_fresh_decoder_per_zap" translatable="false">Fresh decoder per zap</string>
     <string name="stats_underruns" translatable="false">Audio underruns</string>
     <string name="stats_stream_read_rate" translatable="false">Stream read rate</string>
     <string name="stats_file_read_rate" translatable="false">File read rate</string>

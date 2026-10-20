@@ -2,6 +2,8 @@
 
 package at.bernhardberger.tvhplayer.playback
 
+import android.os.Handler
+import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
@@ -181,6 +183,8 @@ class AppPlaybackRuntime(
         targetInstallationInProgress = { targetInstallationInProgress },
         publishPlayerErrorFromPlayer = ::publishPlayerErrorFromPlayer,
         elapsedRealtime = elapsedRealtime,
+        stallRecoveries = { stallRecoveries },
+        freshDecoderPerZap = { freshDecoderPerZap },
     )
     private val livePauseController = LivePauseController(
         player = player,
@@ -280,6 +284,29 @@ class AppPlaybackRuntime(
     /** Written under the command serializer, read at arrival by the transport commands. */
     @Volatile
     private var foreground = true
+    // The stall watchdog samples on the player's thread; its recovery runs as a serialized command.
+    private val stallHandler = Handler(player.applicationLooper)
+    private val stallWatch = PlaybackStallWatch()
+    private var stallPolling = false
+    @Volatile
+    private var stallRecoveryQueued = false
+    /** The last automatic stall recovery, its budget. Read and written under the serializer. */
+    private var lastStallRecovery: StallRecovery? = null
+    /** The stall recovery whose install retires the stuck target first, so its decoders are fresh. */
+    private var freshDecoderRecovery: Any? = null
+    /** The target epoch whose source [stopForFreshDecoder] retired during the install in progress. */
+    private var retiredTargetEpoch: Long? = null
+    /** Whether a recovery, not a viewer's zap or retry, retired [retiredTargetEpoch]. */
+    private var retiredForRecovery = false
+    @Volatile
+    private var stallRecoveries = 0
+    /**
+     * A live stall recovered once: this device's decoders do not survive a live source switch,
+     * so for the rest of the process every live zap stops the old target first. Memory only and
+     * off by default, so devices that never stall keep the fast zap.
+     */
+    @Volatile
+    private var freshDecoderPerZap = false
     private val audioInterruptions: AudioInterruptionController = AudioInterruptionController(
         player = player,
         coordinator = coordinator,
@@ -368,7 +395,17 @@ class AppPlaybackRuntime(
 
     private val listener = object : Player.Listener {
         override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            stallWatch.reset()
+            watchForStall()
             resumeRecoveryOnPlayerChange()
+        }
+
+        override fun onPositionDiscontinuity(
+            oldPosition: Player.PositionInfo,
+            newPosition: Player.PositionInfo,
+            reason: Int,
+        ) {
+            stallWatch.reset()
         }
 
         override fun onPlaybackSuppressionReasonChanged(playbackSuppressionReason: Int) {
@@ -392,9 +429,11 @@ class AppPlaybackRuntime(
                 frameRate.onDeclared(declaredVideoFrameDuration.value)
             }
             if (livePlaybackObservation.value != LivePlaybackObservation.Departed) audioTracks.onTracksChanged()
+            stallWatch.reset()
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
+            watchForStall()
             if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 if (policy.trace.enabled && playbackState == Player.STATE_READY) {
                     policy.trace.ready(activeTargetEpoch)
@@ -412,6 +451,7 @@ class AppPlaybackRuntime(
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
+            watchForStall()
             if (!targetInstallationInProgress && !coordinator.playerCleanupPending.value && targetCommands.isOpen()) {
                 presentation.publishPlayerState()
             }
@@ -419,6 +459,17 @@ class AppPlaybackRuntime(
 
         override fun onPlayerError(error: PlaybackException) {
             if (!targetInstallationInProgress && targetCommands.isOpen()) publishPlayerError()
+        }
+    }
+
+    /** Samples while Media3 has a target to play; player events start it again after a pause. */
+    private val stallPoll = object : Runnable {
+        override fun run() {
+            stallPolling = false
+            val sample = targetCommands.readIfOpen { stallSampleLocked() }
+            if (sample == null) stallWatch.reset()
+            else stallWatch.onSample(sample, SystemClock.uptimeMillis())?.let { recoverStall(it, sample.epoch) }
+            watchForStall()
         }
     }
 
@@ -632,6 +683,7 @@ class AppPlaybackRuntime(
                     PlaybackTargetResult.NOT_READY
                 } else {
                     stopOtherKindBeforeInstall(live = true, expectedPresentationEpoch)
+                    stopForFreshDecoder(recoveryFence, liveZap = true)
                     when (
                         val target = coordinator.setLiveTarget(
                             session = session,
@@ -976,6 +1028,8 @@ class AppPlaybackRuntime(
         recordingId: DvrEntryId,
         start: RecordingPlaybackStart,
         recoverAt: RecordingRecoveryPosition? = null,
+        // A stall recovery replaces the very target it validated: Pause and Play still address it.
+        continuesTarget: Boolean = false,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val playerSettings = settings.playerSettings.first()
@@ -1022,6 +1076,7 @@ class AppPlaybackRuntime(
                         installedBinding = binding.binding
                         val recovery = recoverAt?.takeIf { it.recordingId == recordingId }
                         if (targetCommands.isOpen()) stopOtherKindBeforeInstall(live = false, expectedPresentationEpoch)
+                        if (targetCommands.isOpen()) stopForFreshDecoder(recovery)
                         if (!targetCommands.isOpen()) {
                             PlaybackTargetResult.SHUT_DOWN
                         } else if (recovery != null) {
@@ -1051,8 +1106,10 @@ class AppPlaybackRuntime(
                 presentationEpoch.publishIfCurrent(epoch) {
                     committed = true
                     audioInterruptions.clearAudioInterruptionLocked()
+                    val continues = continuesTarget && activeTargetEpoch == expectedPresentationEpoch &&
+                        _activeTarget.value == AppPlaybackTarget.Recording(selection.recordingId)
                     activeTargetEpoch = epoch
-                    targetContinuity = epoch
+                    if (!continues) targetContinuity = epoch
                     livePauseController.dropPendingLivePauseLocked()
                     _activeTarget.value = AppPlaybackTarget.Recording(selection.recordingId)
                     _recordingSelection.value = selection
@@ -1299,12 +1356,18 @@ class AppPlaybackRuntime(
         // An explicit retry is a user decision, so it refills the budget an exhausted target used.
         liveRecovery.resetBackoffLocked()
         lastLiveChannelId?.let { channelId ->
-            playLive(
-                channelId = channelId,
-                recovering = true,
-                servedGeneration = generation,
-                viewerRetry = viewerRetry,
-            )
+            val startEpoch = presentationEpoch.snapshot()
+            try {
+                playLive(
+                    channelId = channelId,
+                    recovering = true,
+                    expectedPresentationEpoch = startEpoch,
+                    servedGeneration = generation,
+                    viewerRetry = viewerRetry,
+                )
+            } finally {
+                settleCancelledStartLocked(startEpoch, generation)
+            }
         }
     }
     suspend fun retryRecording(): PlaybackTargetResult? {
@@ -1440,11 +1503,16 @@ class AppPlaybackRuntime(
         return (livePlaybackObservation.value as? LivePlaybackObservation.Active)
             ?.timeshiftState?.toAppPresentation(sample) ?: AppTimeshiftState()
     }
+    /** Pauses the target it arrived for, or the recovery replacement that continues it. */
     fun pause() {
+        // Continuity first: a commit writes it after the epoch (see targetContinuity).
+        val continuity = targetContinuity
         val epoch = activeTargetEpoch
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
-                if (epoch == null || epoch != activeTargetEpoch) return@serialize
+                if (epoch == null || activeTargetEpoch == null ||
+                    epoch != activeTargetEpoch && continuity != targetContinuity
+                ) return@serialize
                 pauseLocallyOrRestoreSound()
             }
         }
@@ -1883,6 +1951,185 @@ class AppPlaybackRuntime(
         presentation.publishDiagnostics()
     }
 
+    private fun watchForStall() {
+        val state = player.playbackState
+        if (stallPolling || !targetCommands.isOpen() || !player.playWhenReady ||
+            state != Player.STATE_BUFFERING && state != Player.STATE_READY
+        ) return
+        stallPolling = true
+        stallHandler.postDelayed(stallPoll, STALL_POLL_MILLIS)
+    }
+
+    /**
+     * The installed target the viewer wants playing, or null while nothing may count as a stall:
+     * an install, cleanup or recovery in progress, the viewer's Pause or Stop, the background, an
+     * audio interruption that pauses it. An interruption mutes only live TV, which plays on and is
+     * watched; its recovery keeps the mute. The picture is watched with the counters of this
+     * target's decoder, also while its cover still waits for a moving picture, and not when
+     * tunnelling or without a selected video track (radio).
+     */
+    private fun stallSampleLocked(): StallSample? {
+        val epoch = activeTargetEpoch ?: return null
+        if (_activeTarget.value == null) return null
+        val state = player.playbackState
+        if (targetInstallationInProgress || coordinator.playerCleanupPending.value ||
+            state != Player.STATE_BUFFERING && state != Player.STATE_READY ||
+            recoveryPlaybackBlocked(epoch) || player.currentMediaItem.let { it == null || it !== ownedMediaItem } ||
+            bufferRecovery != null || liveRecovery.deferredRecovery != null || liveRecovery.interruptedRecovery != null ||
+            presentation.state.value.let { it is AppPlaybackState.Recovering || it is AppPlaybackState.Failed }
+        ) return null
+        val video = presentation.videoPresentation.value
+        val counters = player.videoDecoderCounters?.takeIf {
+            video.epoch == epoch && !player.trackSelectionParameters.tunnelingRequested &&
+                player.currentTracks.isTypeSelected(C.TRACK_TYPE_VIDEO)
+        }
+        counters?.ensureUpdated()
+        return StallSample(
+            epoch = epoch,
+            buffering = state == Player.STATE_BUFFERING,
+            bufferedAheadMillis = player.totalBufferedDuration,
+            playing = player.isPlaying,
+            positionMillis = player.currentPosition,
+            videoCounters = counters,
+            renderedFrames = counters?.renderedOutputBufferCount ?: 0,
+            pictureShown = video.epoch == epoch && video.visible,
+        )
+    }
+
+    /** Queues one recovery at a time; the watch keeps sampling, so progress meanwhile supersedes it. */
+    private fun recoverStall(stall: PlaybackStall, epoch: Long) {
+        if (stallRecoveryQueued) return
+        if (policy.trace.enabled) policy.trace.stall(stall, epoch)
+        val intent = playbackRequests.get()
+        val evidence = stallWatch.evidence
+        stallRecoveryQueued = true
+        scope.launch {
+            targetCommands.serialize(onClosed = {}) { recoverStallLocked(epoch, intent, evidence) }
+        }.invokeOnCompletion { stallRecoveryQueued = false }
+    }
+
+    /**
+     * Restarts the stalled target of [epoch] once with fresh decoders: live retunes the channel
+     * (the live edge, as any recovery retune), a recording resumes where it stood. A second stall
+     * of the same target and [intent] within [STALL_RECOVERY_WINDOW_MILLIS] fails it instead.
+     * Dropped, with its budget untouched, when the target progressed or was reset since the watch
+     * reported it ([evidence]), when a newer command replaced the target, or when it may no longer
+     * count as a stall at all: the viewer paused or stopped it, the app went to the background,
+     * an audio interruption holds it.
+     */
+    private suspend fun recoverStallLocked(epoch: Long, intent: Long, evidence: Long) {
+        val target = _activeTarget.value ?: return
+        val sample = stallSampleLocked()?.takeIf { it.epoch == epoch } ?: return
+        if (playbackRequests.get() != intent || isPlaybackIntentStopped(intent)) return
+        // Progress since the last poll supersedes the report just as progress at a poll does.
+        stallWatch.onSample(sample, SystemClock.uptimeMillis())
+        if (stallWatch.evidence != evidence) return
+        val now = elapsedRealtime()
+        if (!lastStallRecovery.allowsRecovery(target, intent, now)) {
+            failStalledTargetLocked(target)
+            return
+        }
+        when (target) {
+            is AppPlaybackTarget.Live -> {
+                val fence = activeLiveSelection?.let {
+                    LiveRecoveryFence(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED, it, epoch, servedIntent.get())
+                }?.takeIf(::liveRecoveryFenceMatches) ?: return
+                lastStallRecovery = StallRecovery(target, intent, now)
+                stallRecoveries++
+                if (!freshDecoderPerZap) {
+                    freshDecoderPerZap = true
+                    if (policy.trace.enabled) policy.trace.freshDecoderPerZap()
+                }
+                // Kept for a recovery its fence owes until the viewer plays again (see stopForFreshDecoder).
+                freshDecoderRecovery = fence
+                retryLiveRecoveryLocked(fence)
+            }
+            is AppPlaybackTarget.Recording -> {
+                val (recordingId, start) = lastRecordingRequest?.takeIf { it.first == target.recordingId } ?: return
+                lastStallRecovery = StallRecovery(target, intent, now)
+                stallRecoveries++
+                noteRecordingInterruptionLocked()
+                val recoverAt = recordingRecovery
+                freshDecoderRecovery = recoverAt
+                try {
+                    playRecordingLocked(recordingId, start, recoverAt = recoverAt, continuesTarget = true)
+                } finally {
+                    freshDecoderRecovery = null
+                }
+            }
+        }
+        presentation.publishDiagnostics()
+    }
+
+    /** The second stall in the window: live gives up as exhausted recovery, a recording fails to read. */
+    private suspend fun failStalledTargetLocked(target: AppPlaybackTarget) {
+        if (target is AppPlaybackTarget.Live) {
+            publishRecoveryExhausted(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED)
+            return
+        }
+        // Retry continues where the recording stood.
+        noteRecordingInterruptionLocked()
+        stopPlayback()
+        if (!targetCommands.isOpen()) return
+        presentation.publishFailed(AppPlaybackState.Failed(AppPlaybackFailureReason.RECORDING_READ_FAILED))
+        presentation.publishDiagnostics()
+    }
+
+    /**
+     * Retires the stalled target before [recovery]'s replacement installs: set over the old source,
+     * the replacement would play through the stuck decoders. Unlike [stopOtherKindBeforeInstall] the
+     * app keeps its target and interruption state, as any recovery does; the retired source is IDLE,
+     * so a failed install still publishes its failure, and a viewer's cancelled one lets the target
+     * go ([settleRetiredTargetLocked]). A [liveZap] over a live target stops it the same way once
+     * [freshDecoderPerZap] is on.
+     */
+    private suspend fun stopForFreshDecoder(recovery: Any?, liveZap: Boolean = false) {
+        val recovers = recovery != null && recovery == freshDecoderRecovery
+        if (!recovers && !(liveZap && freshDecoderPerZap && _activeTarget.value is AppPlaybackTarget.Live)) return
+        if (recovers) freshDecoderRecovery = null
+        // Cancellation must not split the SDK's stop from the note that the target is gone.
+        withContext(NonCancellable) {
+            retiredTargetEpoch = activeTargetEpoch
+            retiredForRecovery = recovery != null
+            coordinator.stop()
+        }
+    }
+
+    /**
+     * An install cancelled after [stopForFreshDecoder] retired its predecessor leaves no source
+     * behind that target. A viewer's zap or retry lets it go as [stopOtherKindBeforeInstall] does,
+     * the install's presentation keeping its cover, and then settles as any cancelled start
+     * ([settleCancelledStartLocked]). A recovery leaves it to the newer recovery or command that
+     * cancelled it, with the viewer's [previousPlayWhenReady] back as a cancelled recovery over the
+     * old source has it, so the install's pause does not hold the next one as the viewer's Pause.
+     * A source the SDK installed for the cancelled install is not the app's: it stays paused and the
+     * target departs, as [canContinueRecoveryLocked] would withdraw it for the newer recovery.
+     * An install that ran to its end published its own outcome.
+     */
+    private fun settleRetiredTargetLocked(
+        expectedPresentationEpoch: Long,
+        cancelled: Boolean,
+        previousPlayWhenReady: Boolean,
+    ) {
+        val retired = retiredTargetEpoch ?: return
+        retiredTargetEpoch = null
+        if (!cancelled || !targetCommands.isOpen() || activeTargetEpoch != retired) return
+        if (retiredForRecovery) {
+            if (player.currentMediaItem.let { it != null && it !== ownedMediaItem }) withdrawDepartedTargetLocked()
+            else if (foreground) player.playWhenReady = previousPlayWhenReady
+            return
+        }
+        _activeTarget.value = null
+        _recordingSelection.value = null
+        _recordingAdmission.value = null
+        activeTargetEpoch = null
+        livePauseController.publishLivePause()
+        presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
+            presentation.publishStarting()
+            presentation.publishDiagnostics()
+        }
+    }
+
     private fun lastSubscriptionIssue(): SubscriptionIssue? =
         (livePlaybackObservation.value as? LivePlaybackObservation.Active)?.subscriptionIssue
 
@@ -1905,6 +2152,7 @@ class AppPlaybackRuntime(
             audioInterruptions.clearAudioInterruptionLocked()
             presentation.removeTargetFrameListenerLocked()
             player.removeListener(listener)
+            stallHandler.removeCallbacks(stallPoll)
             player.clearVideoFrameMetadataListener(frameRate.listener)
             frameRate.close()
             presentation.seekDiagnosticsListener?.let(player::removeAnalyticsListener)
@@ -1960,6 +2208,7 @@ class AppPlaybackRuntime(
                 committed = activeTargetEpoch != previousTargetEpoch,
                 activeIsLive = _activeTarget.value is AppPlaybackTarget.Live,
             )
+            settleRetiredTargetLocked(expectedPresentationEpoch, !currentCoroutineContext().isActive, previousPlayWhenReady)
             val previousTargetStays = targetCommands.isOpen() &&
                 presentationEpoch.isCurrent(expectedPresentationEpoch) &&
                 previousTarget != null && healthyActiveTarget() == previousTarget &&

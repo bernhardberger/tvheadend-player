@@ -69,5 +69,11 @@ interface PlaybackTrace {
     /** The video of [epoch] is uncovered. */
     fun videoCoverLifted(epoch: Long) {}
 
+    /** The target of [epoch] has data but makes no progress ([stall]). */
+    fun stall(stall: PlaybackStall, epoch: Long) {}
+
+    /** From now on every live zap stops the old target first, for fresh decoders. */
+    fun freshDecoderPerZap() {}
+
     object None : PlaybackTrace
 }
