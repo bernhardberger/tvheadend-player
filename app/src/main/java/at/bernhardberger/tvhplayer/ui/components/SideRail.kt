@@ -83,8 +83,10 @@ import kotlin.math.roundToInt
 // Material for TV drawer padding: 12dp on both edges of the item column.
 private val DrawerStartPadding = 12.dp
 private val DrawerEndPadding = 12.dp
-private val ClosedDrawerWidth =
+internal val ClosedDrawerWidth =
     DrawerStartPadding + NavigationDrawerItemDefaults.CollapsedDrawerItemWidth + DrawerEndPadding
+internal val OpenDrawerWidth =
+    DrawerStartPadding + NavigationDrawerItemDefaults.ExpandedDrawerItemWidth + DrawerEndPadding
 
 /** Drawer top section: the kit's 56dp mark box above the first destination. */
 private val BrandHeaderHeight = 56.dp
@@ -175,6 +177,18 @@ internal fun Modifier.browseDetailsViewport(): Modifier {
             page.placeRelative(constraints.maxWidth - width, 0)
         }
     }
+}
+
+/** How far [browseDetailsViewport] reaches past the content's start, under the closed rail. */
+@Composable
+internal fun browseRailUnderlap(): Dp = if (LocalBrowseFullWidth.current != null) ClosedDrawerWidth else 0.dp
+
+/** A screen backdrop covers the whole screen and stays put while the opening drawer moves the browse content. */
+@Composable
+internal fun Modifier.browseScreenBackdrop(): Modifier {
+    val fullWidth = LocalBrowseFullWidth.current ?: return this
+    val layering = LocalBrowseContentLayering.current ?: return browseDetailsViewport()
+    return then(BrowseScreenBackdropElement(layering, fullWidth, LocalBrowseVisibleWidthPx.current))
 }
 
 @Composable

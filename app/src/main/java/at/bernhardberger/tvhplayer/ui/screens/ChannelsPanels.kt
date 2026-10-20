@@ -33,7 +33,6 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -43,11 +42,9 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.ChannelsCardPicture
+import at.bernhardberger.tvhplayer.settings.ChannelsArtwork
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
-import at.bernhardberger.tvhplayer.settings.ChannelsViewChoice
-import at.bernhardberger.tvhplayer.settings.ChannelsViewOption
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
@@ -68,18 +65,25 @@ import kotlinx.coroutines.flow.first
 /** Which Channels side panel is open. */
 internal enum class ChannelsPanel { GROUP, VIEW_OPTIONS }
 
-/** A line of a Channels side panel: a quiet section heading or a radio choice. */
+/** A line of a Channels side panel: a quiet section heading, a choice or a switch. */
 internal sealed interface ChannelsPanelEntry {
     data class Section(val title: String) : ChannelsPanelEntry
+    /** A row; [checked] makes it a switch, [enabled] false shows it greyed and out of D-pad reach. */
     class Choice(
         val key: String,
         val label: String,
         val selected: Boolean,
         val onClick: () -> Unit,
+        val icon: Int? = null,
+        val checked: Boolean? = null,
+        val enabled: Boolean = true,
     ) : ChannelsPanelEntry
 }
 
-/** The group picker: the visible groups, the current one checked and focused. OK applies and closes. */
+/**
+ * The group picker: the visible groups as the kit's single-choice list, the current one checked
+ * and focused. OK applies and closes.
+ */
 @Composable
 internal fun ChannelsGroupPanel(
     groups: List<ChannelsGroup>,
@@ -97,13 +101,14 @@ internal fun ChannelsGroupPanel(
         )
     }
     ChannelsSidePanel(stringResource(R.string.channels_group), "channels-group-panel", onClose) {
-        ChannelsPanelList(entries)
+        ChannelsPanelList(entries, radio = false)
     }
 }
 
 /**
- * View options: the layout, then only the current layout's own options, all rendered from their
- * declarations. Each choice applies at once behind the panel; Back closes it.
+ * View options: the layouts, then the artwork switches. A switch the current layout does not use
+ * stays in place, greyed, so the panel does not reflow while layouts change behind it. Each change
+ * applies at once; Back closes the panel.
  */
 @Composable
 internal fun ChannelsViewOptionsPanel(
@@ -112,54 +117,48 @@ internal fun ChannelsViewOptionsPanel(
     onClose: () -> Unit,
 ) {
     val entries = buildList {
-        view.sections.forEach { option ->
-            add(ChannelsPanelEntry.Section(option.title()))
-            option.choices.forEach { choice ->
-                add(ChannelsPanelEntry.Choice(
-                    key = "channels-view-${choice.key()}",
-                    label = choice.label(),
-                    selected = view.isSelected(choice),
-                    onClick = { onViewChange(view.with(choice)) },
-                ))
-            }
+        add(ChannelsPanelEntry.Section(stringResource(R.string.channels_view_layout)))
+        ChannelsLayout.entries.forEach { layout ->
+            add(ChannelsPanelEntry.Choice(
+                key = "channels-view-layout-${layout.name.lowercase()}",
+                label = stringResource(layout.label()),
+                selected = layout == view.layout,
+                onClick = { onViewChange(view.copy(layout = layout)) },
+                icon = layout.icon(),
+            ))
+        }
+        add(ChannelsPanelEntry.Section(stringResource(R.string.channels_view_artwork)))
+        ChannelsArtwork.entries.forEach { artwork ->
+            add(ChannelsPanelEntry.Choice(
+                key = "channels-view-art-${artwork.name.lowercase()}",
+                label = stringResource(artwork.label()),
+                selected = false,
+                onClick = { onViewChange(view.toggled(artwork)) },
+                checked = view.shows(artwork),
+                enabled = view.layout in artwork.layouts,
+            ))
         }
     }
     ChannelsSidePanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose) {
-        ChannelsPanelList(entries)
+        ChannelsPanelList(entries, radio = true)
     }
 }
 
-@Composable
-private fun ChannelsViewOption.title(): String = stringResource(
-    when (this) {
-        ChannelsViewOption.LAYOUT -> R.string.channels_view_layout
-        ChannelsViewOption.GRID_COLUMNS -> R.string.channels_view_grid_columns
-        ChannelsViewOption.CARD_PICTURE -> R.string.channels_view_card_picture
-    },
-)
-
-@Composable
-private fun ChannelsViewChoice.label(): String = when (this) {
-    is ChannelsViewChoice.Layout -> stringResource(
-        when (layout) {
-            ChannelsLayout.LIST -> R.string.channels_layout_list
-            ChannelsLayout.GRID -> R.string.channels_layout_grid
-            ChannelsLayout.IMMERSIVE -> R.string.channels_layout_immersive
-        },
-    )
-    is ChannelsViewChoice.GridColumns -> pluralStringResource(R.plurals.channels_view_grid_columns_value, count, count)
-    is ChannelsViewChoice.CardPicture -> stringResource(
-        when (picture) {
-            ChannelsCardPicture.PROGRAMME -> R.string.channels_card_picture_programme
-            ChannelsCardPicture.LOGO -> R.string.channels_card_picture_logo
-        },
-    )
+private fun ChannelsLayout.label(): Int = when (this) {
+    ChannelsLayout.LIST -> R.string.channels_layout_list
+    ChannelsLayout.GRID -> R.string.channels_layout_grid
+    ChannelsLayout.IMMERSIVE -> R.string.channels_layout_immersive
 }
 
-private fun ChannelsViewChoice.key(): String = when (this) {
-    is ChannelsViewChoice.Layout -> "layout-${layout.name.lowercase()}"
-    is ChannelsViewChoice.GridColumns -> "columns-$count"
-    is ChannelsViewChoice.CardPicture -> "picture-${picture.name.lowercase()}"
+private fun ChannelsLayout.icon(): Int = when (this) {
+    ChannelsLayout.LIST -> R.drawable.ic_view_list
+    ChannelsLayout.GRID -> R.drawable.ic_grid_view
+    ChannelsLayout.IMMERSIVE -> R.drawable.ic_view_carousel
+}
+
+private fun ChannelsArtwork.label(): Int = when (this) {
+    ChannelsArtwork.CARDS -> R.string.channels_art_cards
+    ChannelsArtwork.BACKDROP -> R.string.channels_art_backdrop
 }
 
 /**
@@ -210,10 +209,13 @@ private fun ChannelsSidePanel(
     }
 }
 
-/** One renderer for every panel list; the checked choice takes focus as the panel opens. */
+/**
+ * One renderer for every panel list; the checked choice takes focus as the panel opens. [radio]
+ * marks choices with radio buttons, otherwise the checked one carries a trailing check.
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>) {
+private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>, radio: Boolean) {
     val choices = entries.filterIsInstance<ChannelsPanelEntry.Choice>()
     val requesterStore = remember { mutableMapOf<String, FocusRequester>() }
     val choiceKeys = choices.map { it.key }
@@ -249,7 +251,8 @@ private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>) {
             contentPadding = PaddingValues(
                 start = PlaybackPanelPadding,
                 end = PlaybackPanelPadding,
-                top = 4.dp,
+                // A section heading brings its own room below the title.
+                top = 4.dp + if (entries.firstOrNull() is ChannelsPanelEntry.Choice) ChannelsPanelTitleGap else 0.dp,
                 bottom = PlaybackPanelPadding,
             ),
             modifier = Modifier
@@ -276,8 +279,11 @@ private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>) {
                         PlaybackOptionRow(
                             label = entry.label,
                             selected = entry.selected,
-                            radio = true,
+                            radio = radio,
                             onClick = entry.onClick,
+                            enabled = entry.enabled,
+                            leadingIcon = entry.icon,
+                            checked = entry.checked,
                             modifier = Modifier
                                 .containedFocus(requesters[index], requesters, index, lazy = true)
                                 .testTag(entry.key),
@@ -288,3 +294,6 @@ private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>) {
         }
     }
 }
+
+/** The kit drawer's room between its title and the first item. */
+private val ChannelsPanelTitleGap = 16.dp

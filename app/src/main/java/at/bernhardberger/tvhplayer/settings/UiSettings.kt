@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.Preferences
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -30,8 +29,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
-        val CHANNELS_GRID_COLUMNS = intPreferencesKey("channelsGridColumns")
-        val CHANNELS_CARD_PICTURE = stringPreferencesKey("channelsCardPicture")
+        val CHANNELS_CARD_ART = booleanPreferencesKey("channelsCardArt")
+        val CHANNELS_BACKDROP_ART = booleanPreferencesKey("channelsBackdropArt")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
@@ -42,8 +41,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
             channelsView = resolveChannelsView(
                 layout = preferences[Keys.CHANNELS_LAYOUT],
-                gridColumns = preferences[Keys.CHANNELS_GRID_COLUMNS],
-                cardPicture = preferences[Keys.CHANNELS_CARD_PICTURE],
+                cardArt = preferences[Keys.CHANNELS_CARD_ART],
+                backdropArt = preferences[Keys.CHANNELS_BACKDROP_ART],
             ),
         )
     }
@@ -57,8 +56,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setChannelsView(view: ChannelsView) {
         dataStore.edit { preferences ->
             preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
-            preferences[Keys.CHANNELS_GRID_COLUMNS] = view.gridColumns
-            preferences[Keys.CHANNELS_CARD_PICTURE] = view.cardPicture.name
+            preferences[Keys.CHANNELS_CARD_ART] = view.cardArt
+            preferences[Keys.CHANNELS_BACKDROP_ART] = view.backdropArt
         }
     }
 

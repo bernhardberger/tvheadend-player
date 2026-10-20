@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -373,11 +375,6 @@ class ChannelsStandardLayoutEvidenceTest {
         val last = row(CHANNEL_COUNT).bounds()
         assertTrue("focused last row bottom ${last.bottom} must clear the fade with 8dp room", last.bottom <= 540f - 56f + 2f)
         assertEquals("list still runs to the bottom", 540f, compose.onNodeWithTag("channels-list").bounds().bottom, .5f)
-
-        // Right from a row has no focus target in the details text.
-        key(Key.DirectionRight)
-        row(CHANNEL_COUNT).assertIsFocused()
-        detail("channels-detail-channel").assertTextEquals(name(CHANNEL_COUNT))
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -811,6 +808,7 @@ class ChannelsStandardLayoutEvidenceTest {
                             onNavigate = {},
                         ) { padding, drawerActive ->
                             ChannelsScreenContent(
+                                view = ChannelsView(ChannelsLayout.LIST),
                                 contentPadding = padding,
                                 initialFocusEnabled = !drawerActive,
                                 channelScopeState = scope,

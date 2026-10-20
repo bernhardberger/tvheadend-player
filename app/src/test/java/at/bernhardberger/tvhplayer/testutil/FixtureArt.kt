@@ -11,6 +11,7 @@ import coil3.decode.DataSource
 import coil3.intercept.Interceptor
 import coil3.request.ErrorResult
 import coil3.request.SuccessResult
+import coil3.request.transformations
 
 /**
  * Fictional broadcast art for captures: channel picons and programme key art from the
@@ -34,7 +35,10 @@ object FixtureArt {
                 (chain.request.data as? AppArtworkSource)?.let(onRequest)
                 val id = (chain.request.data as? AppArtworkSource)?.id
                 val image = images[id]
-                if (image != null) SuccessResult(image.asImage(), chain.request, DataSource.MEMORY)
+                // Apply the request's transformations as a real decode would: cards and backdrops bake their scrims in.
+                if (image != null) SuccessResult(
+                    chain.request.transformations.fold(image) { bitmap, it -> it.transform(bitmap, chain.size) }.asImage(),
+                    chain.request, DataSource.MEMORY)
                 else ErrorResult(null, chain.request, IllegalStateException("no fixture art for $id"))
             })
         }.build()

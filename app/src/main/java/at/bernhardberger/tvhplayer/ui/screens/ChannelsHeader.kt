@@ -33,7 +33,8 @@ internal class ChannelsHeaderFocus {
 
 /**
  * The Channels title with the Group and View options buttons at its end. Down returns to the
- * content's remembered item, the start edge leads to the navigation rail and Up stays.
+ * content's remembered item, the start edge leads to the navigation rail (or back to content
+ * that reached it with its end edge, see [startReturnsToContent]) and Up stays.
  * A single visible group has nothing to choose, so its button is not shown.
  */
 @Composable
@@ -46,9 +47,15 @@ internal fun ChannelsHeader(
     onOpen: (ChannelsPanel) -> Unit,
     onMoveToContent: () -> Boolean,
     modifier: Modifier = Modifier,
+    startReturnsToContent: Boolean = false,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val rail = navigationFocus ?: FocusRequester.Default
+    val towardStart = if (ltr) Key.DirectionLeft else Key.DirectionRight
+    // Content whose end edge leads here takes the start edge back; otherwise the rail does.
+    val startToContent = Modifier.onPreviewKeyEvent { event ->
+        startReturnsToContent && event.type == KeyEventType.KeyDown && event.key == towardStart && onMoveToContent()
+    }
     TopLevelBrowseHeader(
         title = title,
         modifier = modifier
@@ -62,7 +69,7 @@ internal fun ChannelsHeader(
                 onClick = { onOpen(ChannelsPanel.GROUP) },
                 focusRequester = focus.group,
                 onFocused = onFocused,
-                modifier = Modifier
+                modifier = startToContent
                     .focusProperties {
                         up = FocusRequester.Cancel
                         if (ltr) left = rail else right = rail
@@ -74,7 +81,7 @@ internal fun ChannelsHeader(
                 onClick = { onOpen(ChannelsPanel.VIEW_OPTIONS) },
                 focusRequester = focus.view,
                 onFocused = onFocused,
-                modifier = Modifier
+                modifier = (if (showGroup) Modifier else startToContent)
                     .focusProperties {
                         up = FocusRequester.Cancel
                         if (ltr) right = FocusRequester.Cancel else left = FocusRequester.Cancel

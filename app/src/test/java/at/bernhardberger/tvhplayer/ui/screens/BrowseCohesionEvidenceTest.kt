@@ -2,6 +2,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import org.koin.compose.KoinApplication
 import org.koin.dsl.module
 
@@ -155,7 +157,7 @@ class BrowseCohesionEvidenceTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.CHANNELS, showEpgMenu = true,
                             connectionDegraded = disconnected, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                            ChannelsScreenContent(contentPadding = padding, initialFocusEnabled = !drawerActive,
+                            ChannelsScreenContent(view = ChannelsView(ChannelsLayout.LIST), contentPadding = padding, initialFocusEnabled = !drawerActive,
                                 channelScopeState = resolveChannelScopeState(displayed.channelState, null),
                                 observation = displayed, tagNotice = false, selectedId = { null },
                                 playingChannelId = null, connectionUiState = if (disconnected) ConnectionUiState.Connecting else ConnectionUiState.Ready,
@@ -354,6 +356,7 @@ class BrowseCohesionEvidenceTest {
             var selected by remember { mutableStateOf<ChannelId?>(null) }
             var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
             ChannelsScreenContent(
+                view = ChannelsView(ChannelsLayout.LIST),
                 contentPadding = padding,
                 initialFocusEnabled = !drawerActive,
                 channelScopeState = resolveChannelScopeState(observation.channelState, activeTag),

@@ -5,9 +5,10 @@ import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
 
-/** Space between compact zap cards in a row or grid. */
-internal val CompactZapCardGap = 24.dp
+/** Space between compact zap cards in a row or grid: the kit's column gutter. */
+internal val CompactZapCardGap = TvGridGutter
 
 /**
  * A card row's viewport reaches this far past both screen edges so the next cards of a held

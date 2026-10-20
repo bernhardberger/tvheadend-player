@@ -20,6 +20,8 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProvideAppArtwork
@@ -91,6 +93,7 @@ class ChannelScopeArtworkTest {
             TVHeadendPlayerTheme {
                 ProvideAppArtwork(session) {
                     ChannelsScreenContent(
+                        view = ChannelsView(ChannelsLayout.LIST),
                         channelScopeState = resolveChannelScopeState(scopeFrom.channelState, null).copy(observation = scopeFrom),
                         observation = latest,
                         tagNotice = false,

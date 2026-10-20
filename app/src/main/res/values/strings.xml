@@ -149,14 +149,9 @@
     <string name="channels_group">Channel group</string>
     <string name="channels_view_options">View options</string>
     <string name="channels_view_layout">Layout</string>
-    <string name="channels_view_grid_columns">Columns</string>
-    <plurals name="channels_view_grid_columns_value">
-        <item quantity="one">%d column</item>
-        <item quantity="other">%d columns</item>
-    </plurals>
-    <string name="channels_view_card_picture">Card picture</string>
-    <string name="channels_card_picture_programme">Program picture</string>
-    <string name="channels_card_picture_logo">Channel logo</string>
+    <string name="channels_view_artwork">Program art</string>
+    <string name="channels_art_cards">On cards</string>
+    <string name="channels_art_backdrop">As backdrop</string>
     <string name="channels_show_all">Show all channels</string>
     <string name="channels_empty_group">No channels in this group</string>
     <string name="clock_format_12_hour">12-hour (8:15\u00A0PM)</string>

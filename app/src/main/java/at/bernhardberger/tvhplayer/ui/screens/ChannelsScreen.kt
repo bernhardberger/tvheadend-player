@@ -46,7 +46,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import at.bernhardberger.tvhplayer.settings.ChannelsCardPicture
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -75,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusEnterExitScope
@@ -384,10 +384,10 @@ internal fun ChannelsScreenContent(
         ).roundToInt()
     }
 
-    val viewport = remember(layout, view.gridColumns, listState, gridState, rowState, bringIntoViewSpec, rowOffscreenPx) {
+    val viewport = remember(layout, listState, gridState, rowState, bringIntoViewSpec, rowOffscreenPx) {
         when (layout) {
             ChannelsLayout.LIST -> ChannelsListViewport(listState, ::channelFocusScrollOffset)
-            ChannelsLayout.GRID -> ChannelsGridViewport(gridState, view.gridColumns)
+            ChannelsLayout.GRID -> ChannelsGridViewport(gridState, ChannelsGridColumns)
             ChannelsLayout.IMMERSIVE -> ChannelsRowViewport(rowState) { rowOffscreenPx }
         }
     }
@@ -663,9 +663,15 @@ internal fun ChannelsScreenContent(
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (showProgrammeDetails) 1f else 0f) },
     ) {
         // Behind the header from the screen's top: it follows focus across groups, while the
-        // group's content fades on its own.
-        if (layout == ChannelsLayout.IMMERSIVE && channels.isNotEmpty()) ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
+        // group's content fades on its own. The grid and list sit on the details page's blurred
+        // backdrop, or with backdrop art off on the logo's colour.
+        if (channels.isNotEmpty()) ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
             ChannelsImmersiveBackground(
+                backdrop = when {
+                    layout == ChannelsLayout.IMMERSIVE -> ChannelsBackdrop.CORNER
+                    view.backdropArt -> ChannelsBackdrop.BLURRED
+                    else -> ChannelsBackdrop.LOGO_COLOUR
+                },
                 // The shown channel follows focus after a delay; it may still be the previous group's.
                 channels = channelScope.allChannels,
                 channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
@@ -683,6 +689,10 @@ internal fun ChannelsScreenContent(
                 // The list column runs to the screen bottom beneath its fade; the details
                 // column re-applies the bottom inset itself.
                 .padding(top = contentPadding.calculateTopPadding())
+                // The immersive row sits farther from the rail than the header buttons, so the
+                // rail's Right is redirected here too, before it lands on the header.
+                .focusProperties { onEnter = { enterFromNavigation() } }
+                .focusGroup()
         ) {
             ChannelsHeader(
                 title = groups.firstOrNull { it.tagId == channelScope.activeTagId }?.name
@@ -693,15 +703,25 @@ internal fun ChannelsScreenContent(
                 onFocused = {
                     didInitialRestore = true
                     relinquishContentFocus()
+                    // The grid brings its header back with its first row.
+                    if (layout == ChannelsLayout.GRID) coroutineScope.launch { gridState.animateScrollToItem(0) }
                 },
                 onOpen = ::showPanel,
                 onMoveToContent = ::focusBrowseContent,
-                modifier = Modifier.padding(
+                // The list's rows lead to the header with the end edge, so the start edge leads back.
+                startReturnsToContent = layout == ChannelsLayout.LIST,
+                // The grid's header scrolls away with its first row, over the rows reaching up behind it.
+                modifier = Modifier.zIndex(1f).then(
+                    if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {
+                        val scrolled = if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset else Int.MAX_VALUE
+                        translationY = -minOf(scrolled.toFloat(), size.height + ChannelsHeaderGap.toPx() + contentPadding.calculateTopPadding().toPx())
+                    } else Modifier,
+                ).padding(
                     start = startPadding + TvBrowseLeadingInset,
                     end = maxOf(endPadding, TvBrowseTrailingInset),
                 ),
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(ChannelsHeaderGap))
             Box(Modifier.weight(1f).fillMaxWidth()) {
             TabContent(
                 motion = scopeMotion,
@@ -791,7 +811,7 @@ internal fun ChannelsScreenContent(
                             frame = frame,
                             nowSec = nowSecProvider,
                             keyline = startPadding + TvBrowseLeadingInset,
-                            programmePicture = view.cardPicture == ChannelsCardPicture.PROGRAMME,
+                            programmePicture = view.cardArt,
                             focusRequesters = rowFocusRequesters,
                             navigationFocus = navigationFocus,
                             headerFocus = headerEntryFocus,
@@ -821,7 +841,7 @@ internal fun ChannelsScreenContent(
                     UnavailableTagNotice(
                         visible = tagNotice,
                         onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
-                        modifier = Modifier.padding(horizontal = ChannelsGridEdgeInset),
+                        modifier = Modifier.zIndex(1f).padding(horizontal = ChannelsGridEdgeInset),
                     )
                     if (tagNotice) Spacer(Modifier.height(8.dp))
                     ChannelsGrid(
@@ -829,8 +849,7 @@ internal fun ChannelsScreenContent(
                         frame = frame,
                         nowSec = nowSecProvider,
                         state = rememberTabGridState(gridState),
-                        columns = view.gridColumns,
-                        programmePicture = view.cardPicture == ChannelsCardPicture.PROGRAMME,
+                        programmePicture = view.cardArt,
                         isCurrent = owner.isCurrent,
                         focusRequesters = rowFocusRequesters,
                         navigationFocus = navigationFocus,
@@ -841,6 +860,7 @@ internal fun ChannelsScreenContent(
                         onExitTowardNavigation = { relinquishContentFocus() },
                         onPage = ::pageChannels,
                         modifier = Modifier.weight(1f).fillMaxWidth().then(contentEntry),
+                        topOverflow = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight + ChannelsHeaderGap,
                     )
                 }
             } else Row(
@@ -923,13 +943,13 @@ internal fun ChannelsScreenContent(
                                             .then(if (owner.isCurrent) Modifier.focusRequester(rowFocusRequesters.getValue(channelId)) else Modifier)
                                             .tabFocus()
                                             .focusProperties {
-                                                // The passive details hold no target; the header buttons are Up's.
+                                                // The passive details hold no target, so the end edge leads to the header buttons.
                                                 if (layoutDirection == LayoutDirection.Ltr) {
                                                     left = navigationFocus ?: FocusRequester.Default
-                                                    right = FocusRequester.Cancel
+                                                    right = headerEntryFocus
                                                 } else {
                                                     right = navigationFocus ?: FocusRequester.Default
-                                                    left = FocusRequester.Cancel
+                                                    left = headerEntryFocus
                                                 }
                                                 if (channelId == orderedChannelIds.firstOrNull()) up = headerEntryFocus
                                             }
@@ -1292,6 +1312,9 @@ private fun FocusedChannelDetails(
         )
     }
 }
+
+/** Between the header and the content below it. */
+private val ChannelsHeaderGap = 8.dp
 
 /** Focused-programme dissolve. Short enough to keep row-to-row browsing responsive. */
 internal const val ChannelsDetailCrossfadeMillis = 160

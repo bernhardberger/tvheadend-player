@@ -31,7 +31,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.*
@@ -56,7 +55,6 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.*
@@ -71,7 +69,11 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
+import at.bernhardberger.tvhplayer.images.BackdropTransformation
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.transformations
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
@@ -310,10 +312,14 @@ internal fun ProgrammeDetailsPage(
             // With warm playback the live video is the background, so the page draws no art.
             // Scrolled away (or reading), the still corner art crossfades into the full-screen
             // blurred backdrop, like Google TV; no zoom.
-            DetailsHero(art,
+            val picon = channel?.icon.takeUnless { warmPlayback }
+            if (art == null && picon != null) DetailsHeroLogo(picon,
+                Modifier.align(Alignment.TopEnd).padding(top = DetailsSafeEdge, end = DetailsKeyline)
+                    .graphicsLayer { this.alpha = 1f - backdrop() }.testTag("details-hero-logo"))
+            else DetailsHero(art,
                 Modifier.align(Alignment.TopEnd).graphicsLayer { this.alpha = 1f - backdrop() }, background = background)
             DetailsHero(art,
-                Modifier.graphicsLayer { this.alpha = backdrop() }, blurred = true)
+                Modifier.graphicsLayer { this.alpha = backdrop() }, blurred = true, picon = picon)
             readingTransition.AnimatedContent(transitionSpec = {
                 (fadeIn(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard)) togetherWith
                     fadeOut(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard))).using(null)
@@ -670,37 +676,64 @@ private fun AiringCard(
 
 // Native 1.1 focus scale on a 220dp card adds ~6dp below it, plus the outline.
 private val AiringTextGap = 16.dp
-private const val DetailsBlurredScrimAlpha = 0.6f
+private const val DetailsBlurredScrimAlpha = 0.7f
+// The backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three passes of
+// radius 3 there match the former 32dp live blur on a 1080p screen.
+private val DetailsBackdropDecodeSize = 320 to 180
+private const val DetailsBackdropWidth = 160
+private const val DetailsBackdropBlurRadius = 3
+// A logo standing in for the art fills this share of the backdrop, like the list preview's logo.
+private const val DetailsBackdropLogoFit = 0.6f
+private val DetailsHeroLogoSize = 240.dp to 135.dp
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f
 
-/** The kit's immersive background: top-right 16:9 art under [KitCinematicScrim], or a blurred full-screen copy. */
+/**
+ * The kit's immersive background: top-right 16:9 art under [KitCinematicScrim], or a blurred
+ * full-screen copy. Without art the blurred copy is of the channel's [picon], centred on the
+ * backdrop's colour beneath; the corner takes [DetailsHeroLogo] instead.
+ */
 @Composable
-internal fun DetailsHero(image: ArtworkId?, modifier: Modifier, blurred: Boolean = false, background: State<Color>? = null) {
-    val session = LocalArtworkContext.current.currentSession
-    if (image == null || session == null) return
+internal fun DetailsHero(
+    image: ArtworkId?,
+    modifier: Modifier,
+    blurred: Boolean = false,
+    background: State<Color>? = null,
+    picon: ArtworkId? = null,
+    onLoaded: (() -> Unit)? = null,
+) {
+    val session = LocalArtworkContext.current.currentSession ?: return
     if (blurred) {
-        // Full screen: the blur only reads as a backdrop when it covers the page.
-        AsyncImage(AppArtworkSource(session, image), null, contentScale = ContentScale.Crop,
-            modifier = modifier.fillMaxSize().testTag("details-hero-blurred")
-                .then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(32.dp) else Modifier)
-                .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                .drawWithContent {
-                    drawContent()
-                    drawRect(Color.Black.copy(alpha = DetailsBlurredScrimAlpha), blendMode = BlendMode.SrcAtop)
-                })
+        val source = image ?: picon ?: return
+        // Full screen: the blur only reads as a backdrop when it covers the page. It is baked into
+        // a small decode, which stretches smoothly, instead of blurred by the GPU on every frame.
+        val context = LocalPlatformContext.current
+        val request = remember(session, source, image == null, context) {
+            ImageRequest.Builder(context).data(AppArtworkSource(session, source))
+                .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
+                .transformations(BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius,
+                    DetailsBlurredScrimAlpha, fit = DetailsBackdropLogoFit.takeIf { image == null }))
+                .build()
+        }
+        // A logo leaves the colour beneath showing, so only art counts as covering the page.
+        AsyncImage(request, null, contentScale = ContentScale.Crop,
+            modifier = modifier.fillMaxSize().testTag(if (image != null) "details-hero-blurred" else "details-hero-blurred-logo"),
+            onSuccess = { if (image != null) onLoaded?.invoke() })
         return
     }
+    if (image == null) return
     val neutral = MaterialTheme.colorScheme.background
-    val scrim = remember(background, neutral) { derivedStateOf { KitCinematicScrim(background?.value ?: neutral) } }
     AsyncImage(AppArtworkSource(session, image), null,
         contentScale = ContentScale.Crop,
         modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
             .testTag("details-hero")
-            .drawWithContent {
-                drawContent()
-                drawRect(scrim.value)
-            })
+            .unditheredGradient(over = true) { size -> kitCinematicScrim(background?.value ?: neutral, size) })
+}
+
+/** The channel's logo where [DetailsHero]'s corner art would be, for a programme without art. */
+@Composable
+internal fun DetailsHeroLogo(picon: ArtworkId?, modifier: Modifier) {
+    PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second))
 }
 
 /**
@@ -708,18 +741,16 @@ internal fun DetailsHero(image: ArtworkId?, modifier: Modifier, blurred: Boolean
  * top-right, page background at 10% there and fully opaque from 70.74% of the way to the
  * bottom-left corner. The matrix is the kit's SVG gradientTransform on its 960×540 viewBox.
  */
-private class KitCinematicScrim(private val color: Color) : ShaderBrush() {
-    override fun createShader(size: androidx.compose.ui.geometry.Size): Shader {
-        val shader = android.graphics.RadialGradient(0f, 0f, 10f,
-            intArrayOf(color.copy(alpha = .1f).toArgb(), color.toArgb()), floatArrayOf(0f, .7074f),
-            android.graphics.Shader.TileMode.CLAMP)
-        val sx = size.width / 960f
-        val sy = size.height / 540f
-        shader.setLocalMatrix(android.graphics.Matrix().apply {
-            setValues(floatArrayOf(-91.24f * sx, -91.24f * sx, 912.4f * sx, 54f * sy, -50.1f * sy, 0f, 0f, 0f, 1f))
-        })
-        return shader
-    }
+private fun kitCinematicScrim(color: Color, size: androidx.compose.ui.geometry.Size): Shader {
+    val shader = android.graphics.RadialGradient(0f, 0f, 10f,
+        intArrayOf(color.copy(alpha = .1f).toArgb(), color.toArgb()), floatArrayOf(0f, .7074f),
+        android.graphics.Shader.TileMode.CLAMP)
+    val sx = size.width / 960f
+    val sy = size.height / 540f
+    shader.setLocalMatrix(android.graphics.Matrix().apply {
+        setValues(floatArrayOf(-91.24f * sx, -91.24f * sx, 912.4f * sx, 54f * sy, -50.1f * sy, 0f, 0f, 0f, 1f))
+    })
+    return shader
 }
 
 /**
@@ -869,9 +900,9 @@ private fun DetailsInformation(
         val ratingText = programmeAgeRating(rating?.label, rating?.age)
         if (segments.isNotEmpty() || ratingText != null) {
             // Groups: identity, then facts with timeline, then the description panel, then the actions.
-            // A subtitle can now occupy two lines; keep the facts close enough to retain the
-            // first screen's action anchor and airings peek without shrinking either text style.
-            Spacer(Modifier.height(if (subtitle != null) 8.dp else 20.dp))
+            // The facts stay with the title whether or not a subtitle sits between them; a wider
+            // gap under the title alone reads as a missing line.
+            Spacer(Modifier.height(8.dp))
             Row(Modifier.widthIn(max = 470.dp).testTag("details-metadata-row"), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Screen readers hear the episode as "Season 5, Episode 10", as on the airing cards.
@@ -883,13 +914,7 @@ private fun DetailsInformation(
                 .semantics { contentDescription = spokenMetadata }.testTag("details-metadata"),
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                  maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (ratingText != null) {
-                val description = stringResource(R.string.details_age_rating_description, ratingText)
-                Text(ratingText, Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.shapes.extraSmall)
-                    .padding(horizontal = 6.dp, vertical = 2.dp).clearAndSetSemantics {
-                        contentDescription = description; testTag = "details-rating"
-                    }, style = MaterialTheme.typography.labelMedium)
-            }
+            if (ratingText != null) ProgrammeAgeRatingBox(ratingText, "details-rating")
             }
         }
         if (event != null && timelineVisible) {
@@ -930,6 +955,16 @@ internal fun ProgrammeEyebrow(
             color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing()
     }
+}
+
+/** The outlined age rating that ends a programme's metadata line. */
+@Composable
+internal fun ProgrammeAgeRatingBox(rating: String, tag: String) {
+    val description = stringResource(R.string.details_age_rating_description, rating)
+    Text(rating, Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.shapes.extraSmall)
+        .padding(horizontal = 6.dp, vertical = 2.dp).clearAndSetSemantics {
+            contentDescription = description; testTag = tag
+        }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
 }
 
 @Composable
@@ -980,16 +1015,21 @@ private fun DetailsActions(
     }
 }
 
+/** The clock fits the chip's small label as the dot does. */
+private val DetailsStatusIconSize = 12.dp
+
 @Composable
 private fun DetailsStatusChip(status: DetailsStatus?, label: String? = null) {
+    // Scheduled is the clock, as in the Guide and the player; the red dot means recording now.
     val color = when (status) {
         DetailsStatus.ON_NOW -> MaterialTheme.colorScheme.primary
-        DetailsStatus.RECORDING, DetailsStatus.SCHEDULED -> TvRecordingColor
+        DetailsStatus.RECORDING -> TvRecordingColor
         DetailsStatus.FAILED -> MaterialTheme.colorScheme.error
-        null -> null
+        DetailsStatus.SCHEDULED, null -> null
     }
     Row(Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (status == DetailsStatus.SCHEDULED) ScheduledIndicator(Modifier.size(DetailsStatusIconSize))
         if (color != null) Box(Modifier.size(6.dp).background(color, CircleShape))
         Text(label ?: stringResource(when (status) {
             DetailsStatus.ON_NOW -> R.string.details_status_on_now

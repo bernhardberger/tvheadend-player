@@ -415,7 +415,9 @@ class NavigationShellEvidenceTest {
         val bitmap = drawShell()
         val end = drawerWidth().toInt() + 128
         val red = (0..end).map { Color(bitmap.getPixel(it, 400)).red }
-        assertTrue("$state backing should be translucent", red.first() in 0.03f..0.07f)
+        // 60% black at the screen edge while the rail is closed, 95% with the drawer open.
+        val edge = if (state == "open") 0.03f..0.07f else 0.38f..0.42f
+        assertTrue("$state backing should be translucent", red.first() in edge)
         assertTrue("$state backing must have no hard edge", red.zipWithNext().all { (a, b) -> kotlin.math.abs(b - a) < 0.02f })
         assertEquals("$state content beyond the fade", Color.Red.toArgb(), bitmap.getPixel(end + 8, 400))
     }

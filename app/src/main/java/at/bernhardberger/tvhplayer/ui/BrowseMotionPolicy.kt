@@ -53,4 +53,14 @@ internal object BrowseMotionPolicy {
     }
     const val fadeThroughOutMs = 90
     const val fadeThroughInMs = 210
+
+    /**
+     * Leanback's background timing, for any backdrop that follows focus: it follows once focus
+     * has rested [backdropSettleMs], but changes at most once per [backdropIntervalMs], so
+     * stepping at a steady pace does not repaint the screen on every step. The fade shows the
+     * change at once and then settles.
+     */
+    const val backdropSettleMs = 300L
+    const val backdropIntervalMs = 500L
+    fun <T> backdropFade() = tween<T>(400, easing = pageStandardDecelerate)
 }

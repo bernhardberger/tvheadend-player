@@ -58,6 +58,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.profiling.profileTrace
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardWidth
@@ -102,8 +103,8 @@ fun ChannelDrawer(
     var reanchorId by remember { mutableStateOf<ChannelId?>(null) }
     val emptyFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
-    // 48dp screen-safe space plus native card enlargement/outline overflow.
-    val edgeInset = 64.dp
+    // The kit's side margin, so four cards span its twelve columns like the browse template.
+    val edgeInset = TvGridHorizontalMargin
     val offscreen = CompactZapRowOffscreen
     val offscreenPx = with(LocalDensity.current) { offscreen.roundToPx() }
     val edgeInsetPx = with(LocalDensity.current) { edgeInset.toPx() } + offscreenPx

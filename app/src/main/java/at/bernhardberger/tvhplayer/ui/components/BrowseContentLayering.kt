@@ -8,23 +8,32 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.node.DrawModifierNode
 import androidx.compose.ui.node.GlobalPositionAwareModifierNode
+import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.invalidateDraw
+import androidx.compose.ui.node.invalidateMeasurement
 import androidx.compose.ui.node.requireDensity
 import androidx.compose.ui.node.requireLayoutCoordinates
 import androidx.compose.ui.node.requireLayoutDirection
 import androidx.compose.ui.platform.InspectorInfo
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import kotlin.math.roundToInt
 
 /** The one shell gradient and the outgoing ink that must appear underneath it. */
 internal class BrowseContentLayering {
@@ -58,6 +67,15 @@ internal fun BrowseContentLayer(
         )
     }
 }
+
+/**
+ * A screen's backdrop sits under the shell's gradient like the shell's own background, not over it.
+ * An [opaque] backdrop takes the gradient directly, without the offscreen layer that keeps it off
+ * transparent pixels.
+ */
+@Composable
+internal fun Modifier.underBrowseShellScrim(opaque: Boolean = false): Modifier =
+    LocalBrowseContentLayering.current?.let { then(BrowseDepartureElement(it, layered = !opaque)) } ?: this
 
 internal fun Modifier.browseShellLayer(layering: BrowseContentLayering, fullWidth: Dp): Modifier =
     then(BrowseShellElement(layering, fullWidth))
@@ -94,12 +112,19 @@ internal class BrowseShellNode(
         val rtl = requireLayoutDirection() == LayoutDirection.Rtl
         val left = if (rtl) 0f else -rail
         val right = if (rtl) viewport.width + rail else viewport.width.toFloat()
+        val (closed, open) = with(requireDensity()) { ClosedDrawerWidth.toPx() to OpenDrawerWidth.toPx() }
+        val opening = ((rail - closed) / (open - closed)).coerceIn(0f, 1f)
         return BrowseScrimFrame(
             Rect(left, 0f, right, viewport.height.toFloat()),
             Offset(if (rtl) right else left, 0f),
             Offset(if (rtl) viewport.width - runout else runout, 0f),
+            lerp(ClosedRailEdgeAlpha, OpenDrawerEdgeAlpha, opening),
         )
     }
+
+    /** The screen's top-left corner in [target]'s coordinates, whatever the drawer's width. */
+    internal fun screenOrigin(target: LayoutCoordinates): Offset? =
+        if (isAttached) target.localPositionOf(requireLayoutCoordinates(), frame().bounds.topLeft) else null
 
     override fun ContentDrawScope.draw() {
         drawScrim(frame(), BlendMode.SrcOver, 1f - layering.detailsAlpha())
@@ -107,14 +132,48 @@ internal class BrowseShellNode(
     }
 }
 
-private data class BrowseDepartureElement(val layering: BrowseContentLayering) :
+internal data class BrowseScreenBackdropElement(
+    val layering: BrowseContentLayering,
+    val fullWidth: Dp,
+    val visibleWidthPx: Int?,
+) : ModifierNodeElement<BrowseScreenBackdropNode>() {
+    override fun create() = BrowseScreenBackdropNode(layering, fullWidth)
+    override fun update(node: BrowseScreenBackdropNode) {
+        node.fullWidth = fullWidth
+        node.invalidateMeasurement()
+    }
+    override fun InspectorInfo.inspectableProperties() { name = "browseScreenBackdrop" }
+}
+
+/**
+ * The drawer moves the browse content by moving an ancestor, which re-runs no placement down here.
+ * The visible width it leaves the content arrives in the same measure pass, so a change re-places
+ * the backdrop at the screen edge before that frame draws.
+ */
+internal class BrowseScreenBackdropNode(private val layering: BrowseContentLayering, var fullWidth: Dp) :
+    Modifier.Node(), LayoutModifierNode {
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        val width = fullWidth.roundToPx()
+        val page = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+        return layout(constraints.maxWidth, page.height) {
+            val origin = coordinates?.let { layering.shell?.screenOrigin(it) }
+            if (origin == null) page.placeRelative(constraints.maxWidth - width, 0)
+            else page.place(origin.x.roundToInt(), 0)
+        }
+    }
+}
+
+private data class BrowseDepartureElement(val layering: BrowseContentLayering, val layered: Boolean = true) :
     ModifierNodeElement<BrowseDepartureNode>() {
-    override fun create() = BrowseDepartureNode(layering)
-    override fun update(node: BrowseDepartureNode) = Unit
+    override fun create() = BrowseDepartureNode(layering, layered)
+    override fun update(node: BrowseDepartureNode) {
+        node.layered = layered
+        node.invalidateDraw()
+    }
     override fun InspectorInfo.inspectableProperties() { name = "browseDepartureInk" }
 }
 
-internal class BrowseDepartureNode(private val layering: BrowseContentLayering) :
+internal class BrowseDepartureNode(private val layering: BrowseContentLayering, internal var layered: Boolean = true) :
     Modifier.Node(), DrawModifierNode, GlobalPositionAwareModifierNode {
     private val paint = Paint()
 
@@ -140,7 +199,13 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering) 
                 local.localPositionOf(source, frame.bounds.bottomRight)),
             local.localPositionOf(source, frame.start),
             local.localPositionOf(source, frame.end),
+            frame.edgeAlpha,
         )
+        if (!layered) {
+            drawContent()
+            drawScrim(mapped, BlendMode.SrcOver, 1f - layering.detailsAlpha())
+            return
+        }
         val canvas = drawContext.canvas
         // Full shell bounds, not node bounds: outgoing ink/focus may overflow
         // this pane. SrcAtop changes premultiplied colour, never opacity or holes.
@@ -154,18 +219,30 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering) 
     }
 }
 
-internal class BrowseScrimFrame(val bounds: Rect, val start: Offset, val end: Offset)
+internal class BrowseScrimFrame(val bounds: Rect, val start: Offset, val end: Offset, val edgeAlpha: Float)
+
+/**
+ * The gradient's darkness at the screen edge. The closed rail's icons only need to read over the
+ * backdrop; the open drawer's labels lie over the content, so it darkens like the kit's modal drawer.
+ */
+private const val ClosedRailEdgeAlpha = 0.6f
+private const val OpenDrawerEdgeAlpha = 0.95f
 
 private fun ContentDrawScope.drawScrim(frame: BrowseScrimFrame, blendMode: BlendMode, alpha: Float) {
     if (alpha <= 0f) return
+    // Past its end the gradient is transparent, but painting it there still cost the G10's GPU
+    // a full-screen gradient pass per frame. Only the strip between its ends is drawn.
+    val left = maxOf(frame.bounds.left, minOf(frame.start.x, frame.end.x))
+    val right = minOf(frame.bounds.right, maxOf(frame.start.x, frame.end.x))
+    if (right <= left) return
     drawRect(
         brush = Brush.linearGradient(
-            colors = listOf(Color.Black.copy(alpha = 0.95f), Color.Transparent),
+            colors = listOf(Color.Black.copy(alpha = frame.edgeAlpha), Color.Transparent),
             start = frame.start,
             end = frame.end,
         ),
-        topLeft = frame.bounds.topLeft,
-        size = frame.bounds.size,
+        topLeft = Offset(left, frame.bounds.top),
+        size = Size(right - left, frame.bounds.height),
         blendMode = blendMode,
         alpha = alpha,
     )

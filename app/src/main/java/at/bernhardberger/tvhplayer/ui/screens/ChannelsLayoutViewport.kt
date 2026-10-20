@@ -39,7 +39,10 @@ internal class ChannelsListViewport(
     override fun requestScrollToChannel(index: Int) = state.requestScrollToItem(index, offsetFor(index))
 }
 
-/** A grid scrolls by whole rows, the target's row first; paging keeps the column. */
+/**
+ * A grid puts the target's row just below the peeking half of the row above it, where focus
+ * scrolling holds it; paging keeps the column.
+ */
 internal class ChannelsGridViewport(
     private val state: LazyGridState,
     private val columns: Int,
@@ -47,17 +50,32 @@ internal class ChannelsGridViewport(
     override fun isVisible(channelId: ChannelId): Boolean =
         state.layoutInfo.visibleItemsInfo.any { channelLazyItemMatches(it.key, channelId) }
 
+    /** The whole rows the grid fits, the same scrolled or not, so paging down and back up match. */
     override fun pageSize(): Int {
-        val visibleRows = (state.layoutInfo.visibleItemsInfo.size + columns - 1) / columns
-        return (visibleRows - 1).coerceAtLeast(1) * columns
+        val layout = state.layoutInfo
+        val row = layout.visibleItemsInfo.firstOrNull()?.size?.height ?: return columns
+        val height = layout.viewportSize.height - layout.beforeContentPadding
+        val wholeRows = (height + layout.mainAxisItemSpacing) / (row + layout.mainAxisItemSpacing)
+        return wholeRows.coerceAtLeast(1) * columns
     }
 
     override suspend fun scrollToChannel(index: Int, animate: Boolean) {
-        val rowStart = index - index % columns
-        if (animate) state.animateScrollToItem(rowStart) else state.scrollToItem(rowStart)
+        val (row, offset) = peekingRowFor(index)
+        if (animate) state.animateScrollToItem(row, offset) else state.scrollToItem(row, offset)
     }
 
-    override fun requestScrollToChannel(index: Int) = state.requestScrollToItem(index - index % columns)
+    override fun requestScrollToChannel(index: Int) {
+        val (row, offset) = peekingRowFor(index)
+        state.requestScrollToItem(row, offset)
+    }
+
+    /** The row above the target, scrolled so only its peeking part shows; the first row stays put. */
+    private fun peekingRowFor(index: Int): Pair<Int, Int> {
+        val rowStart = index - index % columns
+        if (rowStart == 0) return 0 to 0
+        val rowHeight = state.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.height ?: 0
+        return rowStart - columns to (rowHeight * (1f - ChannelsGridPeekFraction)).toInt()
+    }
 }
 
 /**

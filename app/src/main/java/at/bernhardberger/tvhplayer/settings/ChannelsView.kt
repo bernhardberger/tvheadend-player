@@ -1,82 +1,48 @@
 package at.bernhardberger.tvhplayer.settings
 
-/** How the Channels screen presents its channels. */
+/** How the Channels screen presents its channels, in View options order. */
 enum class ChannelsLayout {
+    IMMERSIVE,
     LIST,
     GRID,
-    IMMERSIVE,
 }
-
-/** Which picture a channel card leads with; without a programme picture it shows the logo. */
-enum class ChannelsCardPicture {
-    PROGRAMME,
-    LOGO,
-}
-
-/** Column counts the grid offers. */
-val ChannelsGridColumnCounts = listOf(3, 4)
-
-/** One value of a View options setting. */
-sealed interface ChannelsViewChoice {
-    data class Layout(val layout: ChannelsLayout) : ChannelsViewChoice
-    data class GridColumns(val count: Int) : ChannelsViewChoice
-    data class CardPicture(val picture: ChannelsCardPicture) : ChannelsViewChoice
-}
-
-/** A View options setting and the values it offers. */
-enum class ChannelsViewOption {
-    LAYOUT,
-    GRID_COLUMNS,
-    CARD_PICTURE,
-    ;
-
-    val choices: List<ChannelsViewChoice>
-        get() = when (this) {
-            LAYOUT -> ChannelsLayout.entries.map(ChannelsViewChoice::Layout)
-            GRID_COLUMNS -> ChannelsGridColumnCounts.map(ChannelsViewChoice::GridColumns)
-            CARD_PICTURE -> ChannelsCardPicture.entries.map(ChannelsViewChoice::CardPicture)
-        }
-}
-
-/** The options a layout offers of its own, in View options order. */
-val ChannelsLayout.options: List<ChannelsViewOption>
-    get() = when (this) {
-        ChannelsLayout.LIST -> emptyList()
-        ChannelsLayout.GRID -> listOf(ChannelsViewOption.GRID_COLUMNS, ChannelsViewOption.CARD_PICTURE)
-        ChannelsLayout.IMMERSIVE -> listOf(ChannelsViewOption.CARD_PICTURE)
-    }
 
 /**
- * The Channels screen's view, remembered for the whole app. Values the current layout does not
- * use are kept, so switching back restores them.
+ * Where View options may show programme art, each with the layouts that use it. Off, cards show
+ * the channel logo and the backdrop takes the logo's colour.
+ */
+enum class ChannelsArtwork(val layouts: Set<ChannelsLayout>) {
+    CARDS(setOf(ChannelsLayout.GRID, ChannelsLayout.IMMERSIVE)),
+    // Immersive's corner art is its backdrop already.
+    BACKDROP(setOf(ChannelsLayout.LIST, ChannelsLayout.GRID)),
+}
+
+/**
+ * The Channels screen's view, remembered for the whole app. Art settings the current layout does
+ * not use are kept, so switching back restores them.
  */
 data class ChannelsView(
-    val layout: ChannelsLayout = ChannelsLayout.LIST,
-    val gridColumns: Int = 4,
-    val cardPicture: ChannelsCardPicture = ChannelsCardPicture.PROGRAMME,
+    val layout: ChannelsLayout = ChannelsLayout.IMMERSIVE,
+    val cardArt: Boolean = false,
+    val backdropArt: Boolean = true,
 ) {
-    /** View options: the layout first, then only the current layout's options. */
-    val sections: List<ChannelsViewOption> get() = listOf(ChannelsViewOption.LAYOUT) + layout.options
-
-    fun isSelected(choice: ChannelsViewChoice): Boolean = when (choice) {
-        is ChannelsViewChoice.Layout -> choice.layout == layout
-        is ChannelsViewChoice.GridColumns -> choice.count == gridColumns
-        is ChannelsViewChoice.CardPicture -> choice.picture == cardPicture
+    fun shows(artwork: ChannelsArtwork): Boolean = when (artwork) {
+        ChannelsArtwork.CARDS -> cardArt
+        ChannelsArtwork.BACKDROP -> backdropArt
     }
 
-    fun with(choice: ChannelsViewChoice): ChannelsView = when (choice) {
-        is ChannelsViewChoice.Layout -> copy(layout = choice.layout)
-        is ChannelsViewChoice.GridColumns -> copy(gridColumns = choice.count)
-        is ChannelsViewChoice.CardPicture -> copy(cardPicture = choice.picture)
+    fun toggled(artwork: ChannelsArtwork): ChannelsView = when (artwork) {
+        ChannelsArtwork.CARDS -> copy(cardArt = !cardArt)
+        ChannelsArtwork.BACKDROP -> copy(backdropArt = !backdropArt)
     }
 }
 
 /** Stored values to a view; anything missing or unknown keeps its default. */
-fun resolveChannelsView(layout: String?, gridColumns: Int?, cardPicture: String?): ChannelsView {
+fun resolveChannelsView(layout: String?, cardArt: Boolean?, backdropArt: Boolean?): ChannelsView {
     val default = ChannelsView()
     return ChannelsView(
         layout = ChannelsLayout.entries.firstOrNull { it.name == layout } ?: default.layout,
-        gridColumns = gridColumns?.takeIf { it in ChannelsGridColumnCounts } ?: default.gridColumns,
-        cardPicture = ChannelsCardPicture.entries.firstOrNull { it.name == cardPicture } ?: default.cardPicture,
+        cardArt = cardArt ?: default.cardArt,
+        backdropArt = backdropArt ?: default.backdropArt,
     )
 }

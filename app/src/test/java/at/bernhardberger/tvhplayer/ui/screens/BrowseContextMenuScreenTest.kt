@@ -24,6 +24,8 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -583,7 +585,7 @@ class BrowseContextMenuScreenTest {
         // Above the card: details eyebrow, browse heading (picker), or rail glyph (menu).
         // Probe the heading for the picker: opaque-layer registration alone can hide the rail.
         val xs = if (details) 96 until 900 else 24 until 112
-        val ys = if (details) 125 until 220 else 100 until 980
+        val ys = if (details) 125 until 260 else 100 until 980
         var x = 0; var y = 0; var brightest = 0
         for (px in xs) for (py in ys) {
             val light = android.graphics.Color.red(original.getPixel(px, py))
@@ -1321,6 +1323,7 @@ class BrowseContextMenuScreenTest {
                             onPlayRecording = { _, intent -> plays++; start = intent; requestPlayer() },
                             onWatchChannel = { channelId, _ -> watchedChannel = channelId },
                          ) else ChannelsScreenContent(
+                             view = ChannelsView(ChannelsLayout.LIST),
                              initialFocusEnabled = !drawerActive,
                             channelScopeState = resolveChannelScopeState(observation.channelState, null),
                             observation = observation, tagNotice = false, selectedId = { channel.id },

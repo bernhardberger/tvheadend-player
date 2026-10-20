@@ -7,8 +7,6 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
-import at.bernhardberger.tvhplayer.settings.ChannelsCardPicture
-import at.bernhardberger.tvhplayer.settings.ChannelsGridColumnCounts
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -38,7 +36,7 @@ class ChannelsLayoutCaptureTest {
     private val groupButton = hasTestTag("channels-group-button")
     private val viewButton = hasTestTag("channels-view-button")
 
-    private fun ChannelsCardPicture.slug() = name.lowercase()
+    private fun Boolean.slug() = if (this) "programme" else "logo"
 
     @Test fun list() {
         fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt())
@@ -58,19 +56,18 @@ class ChannelsLayoutCaptureTest {
     }
 
     // One composition per test: every layout x option combination is its own test.
-    @Test fun grid3Programme() = grid(3, ChannelsCardPicture.PROGRAMME)
-    @Test fun grid3Logo() = grid(3, ChannelsCardPicture.LOGO)
-    @Test fun grid4Programme() = grid(4, ChannelsCardPicture.PROGRAMME)
-    @Test fun grid4Logo() = grid(4, ChannelsCardPicture.LOGO)
-    @Test fun immersiveProgramme() = immersive(ChannelsCardPicture.PROGRAMME)
-    @Test fun immersiveLogo() = immersive(ChannelsCardPicture.LOGO)
+    @Test fun gridProgramme() = grid(cardArt = true)
+    @Test fun gridLogo() = grid(cardArt = false)
+    @Test fun immersiveProgramme() = immersive(cardArt = true)
+    @Test fun immersiveLogo() = immersive(cardArt = false)
     @Test fun viewOptionsList() = viewOptions(ChannelsLayout.LIST)
     @Test fun viewOptionsGrid() = viewOptions(ChannelsLayout.GRID)
     @Test fun viewOptionsImmersive() = viewOptions(ChannelsLayout.IMMERSIVE)
 
-    private fun grid(columns: Int, picture: ChannelsCardPicture) {
-        check(columns in ChannelsGridColumnCounts)
-        fixture.show(ChannelsView(ChannelsLayout.GRID, columns, picture), fixture.fixtureArt())
+    private fun grid(cardArt: Boolean) {
+        val columns = ChannelsGridColumns
+        val picture = cardArt
+        fixture.show(ChannelsView(ChannelsLayout.GRID, cardArt), fixture.fixtureArt())
         capture("grid-$columns-${picture.slug()}-1-first-card", card(1))
         fixture.key(Key.DirectionRight)
         capture("grid-$columns-${picture.slug()}-2-long-names", card(2))
@@ -78,8 +75,9 @@ class ChannelsLayoutCaptureTest {
         capture("grid-$columns-${picture.slug()}-3-no-epg", card(2 + 2 * columns))
     }
 
-    private fun immersive(picture: ChannelsCardPicture) {
-        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, cardPicture = picture), fixture.fixtureArt())
+    private fun immersive(cardArt: Boolean) {
+        val picture = cardArt
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, cardArt), fixture.fixtureArt())
         capture("immersive-${picture.slug()}-1-first-card", card(1))
         fixture.key(Key.DirectionRight)
         capture("immersive-${picture.slug()}-2-long-names", card(2))
@@ -140,6 +138,9 @@ class ChannelsLayoutCaptureTest {
 
     private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f) {
         fixture.awaitFocus(focus)
+        // The background follows focus after a pause and a fade.
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
         val bitmap = draw()
         compose.waitForIdle()
         val settled = draw()

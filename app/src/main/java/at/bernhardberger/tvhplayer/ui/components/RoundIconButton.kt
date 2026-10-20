@@ -1,6 +1,5 @@
 package at.bernhardberger.tvhplayer.ui.components
 
-import androidx.tv.material3.MaterialTheme
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -20,8 +19,6 @@ fun RoundIconButton(
 ) {
     IconButton(
         onClick = onClick,
-        // The kit's resting fill made opaque, so a picture behind the header never shows through the glyph.
-        colors = IconButtonDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         modifier = modifier
             .size(IconButtonDefaults.MediumButtonSize)
             .focusRequester(focusRequester)

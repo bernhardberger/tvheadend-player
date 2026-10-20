@@ -82,6 +82,13 @@ import androidx.media3.common.util.UnstableApi
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButton
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
+import androidx.compose.foundation.layout.size
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -1111,6 +1118,8 @@ internal fun PlaybackOptionRow(
     showChevron: Boolean = false,
     enabled: Boolean = true,
     radio: Boolean = false,
+    leadingIcon: Int? = null,
+    checked: Boolean? = null,
 ) {
     ListItem(
         enabled = enabled,
@@ -1118,6 +1127,9 @@ internal fun PlaybackOptionRow(
         onClick = onClick,
         headlineContent = {
             Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = leadingIcon?.let { icon ->
+            { Icon(painterResource(icon), contentDescription = null, Modifier.size(ListItemDefaults.IconSize)) }
         },
         overlineContent = overlineLabel?.let { text ->
             { Text(text = text, maxLines = 1, overflow = TextOverflow.Ellipsis) }
@@ -1134,6 +1146,9 @@ internal fun PlaybackOptionRow(
         },
         trailingContent = {
             when {
+                checked != null -> androidx.tv.material3.Switch(checked = checked, onCheckedChange = null, enabled = enabled,
+                    // The row owns the toggle action and its state.
+                    modifier = Modifier.clearAndSetSemantics { })
                 radio -> androidx.tv.material3.RadioButton(selected = selected, onClick = null,
                     colors = androidx.tv.material3.RadioButtonDefaults.colors(
                         selectedColor = androidx.tv.material3.LocalContentColor.current,
@@ -1147,6 +1162,10 @@ internal fun PlaybackOptionRow(
         },
         modifier = modifier
             .fillMaxWidth()
+            .then(if (checked == null) Modifier else Modifier.semantics {
+                role = Role.Switch
+                toggleableState = ToggleableState(checked)
+            })
             .onPreviewKeyEvent { event ->
                 if (event.key != Key.DirectionRight || !showChevron) {
                     false

@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.ui.test.onRoot
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
 import androidx.compose.ui.test.assertIsDisplayed
 
@@ -494,6 +496,7 @@ class ChannelsScreenTest {
         }
 
         ChannelsScreenContent(
+            view = ChannelsView(ChannelsLayout.LIST),
             initialFocusEnabled = initialFocusEnabled,
             channelScopeState = scopeState,
             observation = testSessionObservation(channels = currentChannels, tags = tags),

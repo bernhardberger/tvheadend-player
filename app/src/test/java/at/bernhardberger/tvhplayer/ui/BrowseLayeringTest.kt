@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -51,6 +52,7 @@ import at.bernhardberger.tvhplayer.ui.components.TabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.TabOwner
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthFrame
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
@@ -168,6 +170,29 @@ class BrowseLayeringTest {
     @Test
     @Config(qualifiers = "en-ldrtl-w960dp-h540dp-land-mdpi")
     fun cachedDepthInkTracksAncestorMotionAndOpeningRtlDrawer() = movingDepthInk(true)
+
+    @Test fun screenBackdropStaysPutAndFillsTheOpeningDrawer() {
+        var backdrop: LayoutCoordinates? = null
+        shell(pageContent = {
+            Box(Modifier.browseScreenBackdrop().fillMaxSize().background(Color.Blue).onGloballyPositioned { backdrop = it })
+        })
+        compose.mainClock.autoAdvance = false
+        val closed = drawerWidth()
+        repeat(30) { frame ->
+            if (frame == 1) {
+                compose.onNodeWithTag("nav-channels").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+                focusTag = "nav-channels"
+            }
+            advance(16)
+            val coordinates = requireNotNull(backdrop)
+            assertEquals("the backdrop starts at the screen edge at frame $frame", 0f, coordinates.positionInRoot().x, .5f)
+            assertEquals("the backdrop spans the screen at frame $frame", view.width, coordinates.size.width)
+            // Red is the shell's own background: any of it under the drawer is the backdrop's missing edge.
+            val underDrawer = Color(capture("screen-backdrop-$frame").getPixel((drawerWidth() - 8f).roundToInt(), 520))
+            assertTrue("the backdrop shows under the drawer at frame $frame", underDrawer.red < .02f)
+        }
+        assertTrue("the drawer must open during the check", drawerWidth() > closed + 100f)
+    }
 
     @Test fun returningCategoryKeepsTranslucentInkHolesAndActiveOrdering() {
         destination = SettingsKey(SettingsSection.GENERAL)
@@ -345,8 +370,10 @@ class BrowseLayeringTest {
             previousWidth = drawerWidth()
         }
         assertTrue("drawer must expand during the still-moving strip", expandingFrames >= 3)
+        // The edge darkens as the drawer opens while the runout recedes, so the gradient at the
+        // content-relative sample changes little: one 8-bit step is enough to prove it moved.
         assertTrue("the oracle must exercise moving ancestors with cached leaf drawing", frames.zipWithNext().any { (a, b) ->
-            kotlin.math.abs(a.first - b.first) > 2f && a.second == b.second && kotlin.math.abs(a.third - b.third) > .005f
+            kotlin.math.abs(a.first - b.first) > 2f && a.second == b.second && kotlin.math.abs(a.third - b.third) > .003f
         })
     }
 
@@ -398,7 +425,7 @@ class BrowseLayeringTest {
         assertEquals("native drawer width", if (expanded) 280f else 80f, drawerWidth(), .5f)
         val bitmap = capture(name)
         val factor = backgroundFactor(bitmap)
-        val expectedFactor = 1f - .95f * (1f - (drawerWidth() + 48f) / (drawerWidth() + 128f))
+        val expectedFactor = 1f - edgeAlpha() * (1f - (drawerWidth() + 48f) / (drawerWidth() + 128f))
         assertEquals("the original background gradient remains", expectedFactor, factor, .01f)
         assertActiveInk(bitmap, header, "stationary header")
         assertActiveInk(bitmap, tabs, "stationary tabs")
@@ -517,6 +544,9 @@ class BrowseLayeringTest {
 
     private fun nearX(bitmap: Bitmap): Int =
         (if (rtl) bitmap.width - drawerWidth() - 48f else drawerWidth() + 48f).roundToInt()
+
+    /** The gradient's darkness at the screen edge: 60% for the closed rail, 95% for the open drawer. */
+    private fun edgeAlpha() = .6f + .35f * ((drawerWidth() - 80f) / 200f).coerceIn(0f, 1f)
 
     private fun backgroundFactor(bitmap: Bitmap) = Color(bitmap.getPixel(nearX(bitmap), 520)).red
 

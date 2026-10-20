@@ -30,6 +30,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
@@ -47,20 +48,25 @@ import at.bernhardberger.tvhplayer.ui.components.compactZapCardMinHeight
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import kotlin.math.floor
 
+/** Three columns keep the cards near 16:9 with whole rows on screen. */
+internal const val ChannelsGridColumns = 3
+
 /** Tighter than the columns, so more rows fit below the header. */
 private val ChannelsGridRowGap = 16.dp
 
 /** Room on every side for a focused card's native scale and its outer outline. */
 internal val ChannelsGridEdgeInset = 16.dp
 
-/** Fades over the peeking row and, once scrolled, the row leaving at the top. Settled
- * focus stays clear of both: row-aligned scrolling keeps the first row at the edge inset. */
-private val ChannelsGridFadeHeight = 16.dp
+/** How much of the row above the focus stays in view once scrolled: its lower half, with the
+ * programme and channel, cut off at the top like the kit's partially shown offscreen rows. */
+internal const val ChannelsGridPeekFraction = 0.5f
 
 /**
- * Wall of compact zap cards in [columns] columns. D-pad moves within the grid; Right at the last
+ * Wall of compact zap cards in [ChannelsGridColumns] columns. D-pad moves within the grid; Right at the last
  * column and Down at the last row stay, Left at the first column leaves for the navigation rail
- * and Up from the first row reaches the header buttons.
+ * and Up from the first row reaches the header buttons. Scrolled rows run on up to the screen's top,
+ * [topOverflow] above the grid, where the header scrolls away with them; at the bottom they run off
+ * the screen.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -69,7 +75,6 @@ internal fun ChannelsGrid(
     frame: ChannelsTabBody,
     nowSec: () -> Long,
     state: LazyGridState,
-    columns: Int,
     programmePicture: Boolean,
     isCurrent: Boolean,
     focusRequesters: Map<ChannelId, FocusRequester>,
@@ -81,14 +86,16 @@ internal fun ChannelsGrid(
     onExitTowardNavigation: () -> Unit,
     onPage: (Int) -> Boolean,
     modifier: Modifier = Modifier,
+    topOverflow: Dp = 0.dp,
 ) {
+    val columns = ChannelsGridColumns
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val density = LocalDensity.current
+    // The focus line counts from the screen's top, where the rows run once the header scrolls away.
     val bringIntoView = remember(density) {
         with(density) {
             ChannelsGridBringIntoViewSpec(
                 topInsetPx = ChannelsGridEdgeInset.toPx(),
-                bottomInsetPx = (ChannelsGridFadeHeight + 8.dp).toPx(),
                 rowGapPx = ChannelsGridRowGap.toPx(),
             )
         }
@@ -112,12 +119,12 @@ internal fun ChannelsGrid(
             contentPadding = PaddingValues(
                 start = ChannelsGridEdgeInset,
                 end = ChannelsGridEdgeInset,
-                top = ChannelsGridEdgeInset,
-                bottom = ChannelsGridFadeHeight + ChannelsGridEdgeInset,
+                top = topOverflow + ChannelsGridEdgeInset,
+                bottom = TvGridVerticalMargin,
             ),
             modifier = Modifier
+                .overflowTop(topOverflow)
                 .fillMaxSize()
-                .listEdgeFadeMask(ChannelsGridFadeHeight) { state.canScrollBackward }
                 .testTag("channels-grid")
                 .focusGroup()
                 .focusRestorer()
@@ -161,6 +168,7 @@ internal fun ChannelsGrid(
                     menuKey = true,
                     programmePicture = programmePicture,
                     preferredHeight = cardHeight,
+                    channelLed = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
@@ -186,6 +194,18 @@ internal fun ChannelsGrid(
     }
 }
 
+/** Lays the grid out [overflow] taller, reaching up by that much from its own top. */
+private fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable, constraints ->
+    val extra = overflow.roundToPx()
+    val placeable = measurable.measure(
+        constraints.copy(
+            minHeight = constraints.minHeight + extra,
+            maxHeight = if (constraints.hasBoundedHeight) constraints.maxHeight + extra else constraints.maxHeight,
+        ),
+    )
+    layout(placeable.width, placeable.height - extra) { placeable.place(0, -extra) }
+}
+
 /**
  * A grid card's height: 16:9 of its column, or the card's [minHeight] when its text needs more.
  * When that leaves the last row on screen mostly shown and cut off, the cards get just short
@@ -202,24 +222,16 @@ internal fun channelsGridCardHeight(columnWidth: Dp, rowsHeight: Dp, rowGap: Dp,
 }
 
 /**
- * Scrolls by whole rows: a row above the viewport becomes the first row, a row below it
- * the last row that fits above the bottom reserve. Visible rows do not move. The scroll
- * re-asks during its animation, so the answer depends only on the row-aligned targets.
+ * Holds the focused row below the peeking half of the row above it, so the rows move under it
+ * and the rows cut off at the edges are never the focused one. Near either end the scroll stops at its bound,
+ * which leaves the first or last rows in place. The scroll re-asks during its animation, so the
+ * answer depends only on the row-aligned target.
  */
 @OptIn(ExperimentalFoundationApi::class)
 internal class ChannelsGridBringIntoViewSpec(
     private val topInsetPx: Float,
-    private val bottomInsetPx: Float,
     private val rowGapPx: Float,
 ) : BringIntoViewSpec {
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-        val pitch = size + rowGapPx
-        val rows = floor((containerSize - bottomInsetPx - topInsetPx + rowGapPx) / pitch).coerceAtLeast(1f)
-        val lastRowOffset = topInsetPx + (rows - 1) * pitch
-        return when {
-            offset < topInsetPx -> offset - topInsetPx
-            offset > lastRowOffset -> offset - lastRowOffset
-            else -> 0f
-        }
-    }
+    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
+        offset - (topInsetPx + size * ChannelsGridPeekFraction + rowGapPx)
 }

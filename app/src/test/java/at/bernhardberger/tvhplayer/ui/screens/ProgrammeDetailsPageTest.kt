@@ -550,7 +550,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-about").assertDoesNotExist()
         val title = compose.onNodeWithText("Ridge Light").getUnclippedBoundsInRoot()
         val facts = compose.onNodeWithTag("details-metadata").assertTextEquals("Today\u00a019:00 · 120m").getUnclippedBoundsInRoot()
-        Assert.assertEquals(20f, facts.top.value - title.bottom.value, 1f)
+        Assert.assertEquals(8f, facts.top.value - title.bottom.value, 1f)
         // Without an About section, Down goes straight to the row.
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-card-2").assertIsFocused()
@@ -736,7 +736,7 @@ class ProgrammeDetailsPageTest {
         val bitmap = snapshot()
         // Scrolled away, the darkened blurred art covers the whole screen.
         for ((x, y) in listOf(1000 to 60, 1800 to 100)) {
-            Assert.assertEquals("blurred art is darkened at $x,$y", 102f, android.graphics.Color.red(bitmap.getPixel(x, y)).toFloat(), 1f)
+            Assert.assertEquals("blurred art is darkened at $x,$y", 77f, android.graphics.Color.red(bitmap.getPixel(x, y)).toFloat(), 1f)
         }
         for ((x, y) in listOf(20 to 20, 1800 to 1070)) {
             Assert.assertTrue("blurred art covers the corner $x,$y", android.graphics.Color.red(bitmap.getPixel(x, y)) > 40)
@@ -770,10 +770,21 @@ class ProgrammeDetailsPageTest {
         show(warm = true)
         capture("warm-playback", "u15-details-layout")
         compose.onNodeWithTag("details-hero").assertDoesNotExist()
+        compose.onNodeWithTag("details-hero-logo").assertDoesNotExist()
         compose.onNodeWithTag("details-hero-blurred").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithTag("details-hero-blurred").assertDoesNotExist()
+        compose.onNodeWithTag("details-hero-blurred-logo").assertDoesNotExist()
+    }
+
+    @Test fun withoutArtTheLogoStandsInForTheCornerArtAndTheBlur() {
+        show(future = true)
+        compose.onNodeWithTag("details-hero-logo", useUnmergedTree = true).assertExists()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(1000)
+        compose.onNodeWithTag("details-hero-blurred-logo", useUnmergedTree = true).assertExists()
+        capture("blurred-logo", "u15-details-layout")
     }
 
     @Test fun longTitleUsesOneLineAcrossThePageWithinTheKeylines() {

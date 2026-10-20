@@ -176,6 +176,8 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                     start = Instant.fromEpochSeconds(now - (10 + index * 7) * 60),
                     stop = Instant.fromEpochSeconds(now + (25 + index * 5) * 60),
                     title = title,
+                    // Only the first programme has a subtitle, as EIT supplies one beside the title.
+                    subtitle = "Winter on the ridge".takeIf { index == 0 },
                     summary = SYNOPSES[index],
                     // The Kettle Hour deliberately has no art: the immersive picon fallback.
                     image = ArtworkId(101 + index).takeIf { index != 5 },

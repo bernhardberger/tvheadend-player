@@ -26,6 +26,8 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import org.junit.Assert.assertEquals
@@ -129,6 +131,7 @@ class ChannelsPlayerReturnFocusTest {
             val observation = observation(loaded)
             TVHeadendPlayerTheme {
                 ChannelsScreenContent(
+                    view = ChannelsView(ChannelsLayout.LIST),
                     initialFocusEnabled = focusEnabled,
                     channelScopeState = resolveChannelScopeState(observation.channelState, activeTag),
                     observation = observation,
