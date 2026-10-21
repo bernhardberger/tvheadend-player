@@ -706,8 +706,11 @@ internal fun ChannelsScreenContent(
                 },
                 onOpen = ::showPanel,
                 onMoveToContent = ::focusBrowseContent,
-                // The list's rows lead to the header with the end edge, so the start edge leads back.
-                startReturnsToContent = layout == ChannelsLayout.LIST,
+                // The list's rows lead to the header with the end edge, so the start edge leads back
+                // to a row; an empty group has none and leaves it to the rail.
+                onReturnToContent = if (layout == ChannelsLayout.LIST) {
+                    { scopeEntryChannelId() != null && focusBrowseContent() }
+                } else null,
                 // The grid's header scrolls away with its first row, over the rows reaching up behind it.
                 modifier = Modifier.zIndex(1f).then(
                     if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {

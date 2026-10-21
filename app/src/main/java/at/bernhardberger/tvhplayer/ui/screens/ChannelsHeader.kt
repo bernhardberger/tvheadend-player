@@ -34,7 +34,7 @@ internal class ChannelsHeaderFocus {
 /**
  * The Channels title with the Group and View options buttons at its end. Down returns to the
  * content's remembered item, the start edge leads to the navigation rail (or back to content
- * that reached it with its end edge, see [startReturnsToContent]) and Up stays.
+ * that reached it with its end edge, see [onReturnToContent]) and Up stays.
  * A single visible group has nothing to choose, so its button is not shown.
  */
 @Composable
@@ -47,14 +47,14 @@ internal fun ChannelsHeader(
     onOpen: (ChannelsPanel) -> Unit,
     onMoveToContent: () -> Boolean,
     modifier: Modifier = Modifier,
-    startReturnsToContent: Boolean = false,
+    onReturnToContent: (() -> Boolean)? = null,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val rail = navigationFocus ?: FocusRequester.Default
     val towardStart = if (ltr) Key.DirectionLeft else Key.DirectionRight
     // Content whose end edge leads here takes the start edge back; otherwise the rail does.
     val startToContent = Modifier.onPreviewKeyEvent { event ->
-        startReturnsToContent && event.type == KeyEventType.KeyDown && event.key == towardStart && onMoveToContent()
+        event.type == KeyEventType.KeyDown && event.key == towardStart && onReturnToContent?.invoke() == true
     }
     TopLevelBrowseHeader(
         title = title,

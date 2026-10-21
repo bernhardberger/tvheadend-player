@@ -285,6 +285,29 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-show-all").assertDoesNotExist()
     }
 
+    @Test fun listHeaderStartEdgeReachesTheRailInAnEmptyGroup() {
+        fixture.show(list, emptyGroup = true, allChannels = false)
+        fixture.awaitFocus(row(1))
+        fixture.key(Key.DirectionUp)
+        pickGroup(group(9), steps = 2)
+        fixture.awaitFocus(groupButton)
+        // No row to go back to, so the start edge leads to the rail as on the other layouts.
+        fixture.key(Key.DirectionLeft)
+        awaitRail()
+    }
+
+    @Test fun listHeaderStartEdgeSkipsAllChannelsInAnEmptyGroup() {
+        fixture.show(list, emptyGroup = true)
+        fixture.awaitFocus(row(1))
+        fixture.key(Key.DirectionUp)
+        pickGroup(group(9), steps = 3)
+        fixture.awaitFocus(hasTestTag("channels-show-all"))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(groupButton)
+        fixture.key(Key.DirectionLeft)
+        awaitRail()
+    }
+
     @Test fun gridReturnsFromThePlayerOnThePlayingCardAndStaysAtTheLastRow() {
         fixture.show(grid, playerReturn = PlayerReturnFocus(ChannelId(17), ChannelId(3)))
         fixture.awaitFocus(card(17))
