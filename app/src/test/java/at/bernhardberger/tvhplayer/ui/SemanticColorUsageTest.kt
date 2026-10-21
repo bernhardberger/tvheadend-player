@@ -20,7 +20,12 @@ class SemanticColorUsageTest {
         )
         assertContains(
             "ui/components/ProgrammeDetailsPage.kt",
-            "DetailsStatus.RECORDING, DetailsStatus.SCHEDULED -> TvRecordingColor",
+            "DetailsStatus.RECORDING -> TvRecordingColor",
+        )
+        // A scheduled recording carries the clock the player and rows use, not the recording red.
+        assertContains(
+            "ui/components/ProgrammeDetailsPage.kt",
+            "if (status == DetailsStatus.SCHEDULED) ScheduledIndicator(",
         )
         assertContains("ui/player/PlayerBarStatusView.kt", "color = TvRecordingColor")
 

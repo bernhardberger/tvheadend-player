@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -29,7 +31,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -47,27 +51,37 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
+import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -78,14 +92,18 @@ import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.DetailsHero
 import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
+import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeAgeRatingBox
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
+import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
+import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
-import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
-import at.bernhardberger.tvhplayer.ui.components.browseRailUnderlap
+import at.bernhardberger.tvhplayer.ui.components.browseDrawerUnderlap
 import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
+import at.bernhardberger.tvhplayer.ui.components.browseUnderlap
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.navigationEdgeFadeMask
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
@@ -108,32 +126,28 @@ private val ImmersiveHeroGap = 40.dp - ImmersiveFocusRoom
 /** The kit's gap between the title group and the description. */
 private val ImmersiveSynopsisGap = 20.dp
 
-/** The kit's content gap between the hero's text and its closing metadata line. */
-private val ImmersiveMetadataGap = 20.dp
+/** Between the facts and time lines of the headline beside the list. */
+private val ImmersiveListLineGap = 8.dp
+
+/** The facts line, as tall as its outlined age rating. */
+private val ImmersiveFactsLineHeight = 22.dp
+
+private const val ImmersiveSynopsisLines = 2
+private const val ImmersiveListSynopsisLines = 3
 
 /** The channel logo standing in for a missing programme picture, this far below the header. */
 private val ImmersiveFallbackLogoTop = 24.dp
 
 private val ImmersiveHeroWidth = 480.dp
 
-
-/** What the Channels screen draws behind its channels while no playback is warm. */
-internal enum class ChannelsBackdrop {
-    /** The immersive list's: the programme picture in the top end corner, or the logo. */
-    CORNER,
-    /** The details page's: the picture, or else the logo, blurred over the whole screen on its colour. */
-    BLURRED,
-    /** With backdrop art off: the logo blurred on its colour, whatever the programme's picture. */
-    LOGO_COLOUR,
-}
-
 /**
- * Background of the Channels screen for the focused channel, per [backdrop]: for the immersive list
- * its programme picture in the screen's top end corner under the kit's cinematic scrim, as the kit's
- * immersive list has it, on the picture's colour, or its logo below the header ([logoTop]) on the
- * theme background. It
- * reaches under the closed rail, beneath the shell's gradient. Warm playback keeps the video as
- * the background, so nothing is drawn.
+ * Background of the Channels screen for the focused channel. In the [corner], as the kit's immersive
+ * list has it: the programme picture at the screen's top end under the kit's cinematic scrim, on
+ * the picture's colour, or else the logo below the header ([logoTop]) on the logo's colour.
+ * Otherwise the details page's backdrop: the picture, or else the logo, blurred over the whole
+ * screen on its colour. Without [programArt] the logo stands in either way, matching cards that
+ * show logos. It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps
+ * the video as the background, so nothing is drawn.
  */
 @Composable
 internal fun ChannelsImmersiveBackground(
@@ -144,52 +158,87 @@ internal fun ChannelsImmersiveBackground(
     logoTop: Dp,
     endInset: Dp,
     modifier: Modifier = Modifier,
-    backdrop: ChannelsBackdrop = ChannelsBackdrop.CORNER,
+    corner: Boolean = true,
+    programArt: Boolean = true,
 ) {
     if (LocalWarmPlayback.current) return
+    val session = observation.currentSession != null
+    val artwork = LocalArtworkContext.current
+    var revealed by remember { mutableStateOf<ChannelBackdrop?>(null) }
     FocusBackdrop(
-        channelId,
+        // A new backdrop for whatever changes what it shows, so the session's and the guide's
+        // arrival fade in like a focus step rather than popping in piece by piece.
+        {
+            val id = channelId()
+            val art = id?.takeIf { programArt && session }?.let { observation.eventAt(it, Instant.fromEpochSeconds(nowSec())) }?.image
+            val icon = channels.firstOrNull { it.id == id }?.icon
+            ChannelBackdrop(id, art, logo = session || icon?.let { artwork.logo(it).saved } != null)
+        },
         // The art in the corner leaves the rest clear, so the gradient is kept off its holes;
         // full-screen backdrops are opaque and take it directly.
         modifier.browseScreenBackdrop()
-            .then(if (backdrop == ChannelsBackdrop.CORNER) Modifier.underBrowseShellScrim() else Modifier)
+            .then(if (corner) Modifier.underBrowseShellScrim() else Modifier)
             .testTag("channels-immersive-background"),
-    ) { id ->
-        val channel = channels.firstOrNull { it.id == id } ?: return@FocusBackdrop
-        val now = nowSec()
-        val art = remember(observation, id, now) {
-            id?.let { observation.eventAt(it, Instant.fromEpochSeconds(now)) }?.image
+        onReveal = { revealed = it },
+    ) { shown, onReady ->
+        val channel = channels.firstOrNull { it.id == shown.channel }
+        // Without a session or a saved logo neither colour nor blur can load; the plain background stays.
+        if (channel == null || !shown.logo) {
+            LaunchedEffect(Unit) { onReady() }
+            return@FocusBackdrop
         }
-        val session = observation.currentSession
-        if (backdrop != ChannelsBackdrop.CORNER) {
-            val logoColour = backdrop == ChannelsBackdrop.LOGO_COLOUR
-            val tint = rememberDetailsTint(art.takeUnless { logoColour }, channel.icon)
+        val art = shown.art
+        // Shown once both its colour and its picture are known, so no step of either is seen.
+        var tintSettled by remember { mutableStateOf(false) }
+        var pictureSettled by remember { mutableStateOf(false) }
+        if (tintSettled && pictureSettled) LaunchedEffect(Unit) { onReady() }
+        if (!corner) {
+            val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })
             // Once the opaque art shows, the tint beneath it would only cost another full-screen fill.
             var artShown by remember(art) { mutableStateOf(false) }
             Box(
                 Modifier.fillMaxSize().underBrowseShellScrim(opaque = true)
                     .drawBehind { if (!artShown) drawRect(tint.value) }.testTag("channels-backdrop"),
             ) {
-                DetailsHero(art.takeUnless { logoColour }, Modifier, blurred = true, picon = channel.icon, onLoaded = { artShown = true })
+                DetailsHero(art, Modifier, blurred = true, picon = channel.icon, onLoaded = { artShown = true },
+                    onSettled = { pictureSettled = true })
             }
             return@FocusBackdrop
         }
         Box(Modifier.fillMaxSize()) {
             // The picture's colour, or else the logo's, fills the screen, as on the details page.
-            val shownArt = art.takeIf { session != null }
-            val tint = rememberDetailsTint(shownArt, channel.icon)
+            val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
-            if (shownArt != null) {
-                DetailsHero(shownArt, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"), background = tint)
+            if (art != null) {
+                DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"), background = tint,
+                    onSettled = { pictureSettled = true })
             } else {
-                DetailsHeroLogo(channel.icon,
-                    Modifier.align(Alignment.TopEnd).padding(top = logoTop + ImmersiveFallbackLogoTop, end = endInset)
-                        .testTag("channels-immersive-picon"),
-                )
+                // The logo blurred over the screen, as the grid's backdrop has it, under the sharp one.
+                DetailsHero(null, Modifier, blurred = true, picon = channel.icon, onSettled = { pictureSettled = true })
             }
         }
     }
+    if (!corner) return
+    // The sharp logo belongs to the content: it moves with it as the drawer opens, while the
+    // backdrop beneath stays put. It comes and changes as the backdrop fades in, which also
+    // waits for the logo to be there.
+    val logoChannel = revealed?.takeIf { it.art == null && it.logo }?.channel
+    Crossfade(logoChannel, modifier, BrowseMotionPolicy.backdropFade(), label = "immersiveLogo") { id ->
+        val channel = channels.firstOrNull { it.id == id } ?: return@Crossfade
+        Box(Modifier.fillMaxSize()) {
+            DetailsHeroLogo(channel.icon,
+                Modifier.align(Alignment.TopEnd).padding(top = logoTop + ImmersiveFallbackLogoTop, end = endInset)
+                    .testTag("channels-immersive-picon"),
+            )
+        }
+    }
 }
+
+/**
+ * What a backdrop shows: the channel's programme picture, which needs the session, or else its
+ * [logo], there with the session or before it as a saved copy.
+ */
+private data class ChannelBackdrop(val channel: ChannelId?, val art: ArtworkId?, val logo: Boolean)
 
 /** What the immersive list's cards need from the screen. */
 internal class ChannelsImmersiveCards(
@@ -224,7 +273,7 @@ internal fun ChannelsImmersiveBody(
 ) {
     Column(modifier.padding(bottom = (bottomInset - ImmersiveFocusRoom).coerceAtLeast(0.dp))) {
         Spacer(Modifier.weight(1f))
-        ChannelsImmersiveHero(channels, cards, Modifier.padding(start = cards.keyline))
+        ChannelsImmersiveHero(channels, cards.frame, cards.nowSec, Modifier.padding(start = cards.keyline))
         Spacer(Modifier.height(ImmersiveHeroGap))
         ChannelsCardRow(
             channels = channels,
@@ -252,8 +301,11 @@ private fun ChannelsCardRow(
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val density = LocalDensity.current
     val offscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
-    // The row reaches under the closed rail to the screen edge, so its keyline lies that much further in.
-    val keyline = cards.keyline + browseRailUnderlap()
+    // The row reaches under the drawer to the screen edge, open or closed, so its keyline lies that much further in.
+    val underlap = browseDrawerUnderlap()
+    val keyline = cards.keyline + underlap
+    // Where the screen's edge lies in the row, as the drawer moves it, for the fade.
+    var screenEdge by remember { mutableFloatStateOf(0f) }
     val bringIntoView = remember(density, keyline) {
         StartKeylineBringIntoViewSpec(with(density) { keyline.toPx() } + offscreenPx)
     }
@@ -271,10 +323,17 @@ private fun ChannelsCardRow(
                 bottom = ImmersiveFocusRoom,
             ),
             modifier = modifier
-                .browseDetailsViewport()
+                .browseUnderlap(underlap)
                 .fillMaxWidth()
-                // The card before the keyline runs on under the navigation rail and fades out at the screen edge.
-                .navigationEdgeFadeMask(keyline - CompactZapCardGap)
+                .onGloballyPositioned { coordinates ->
+                    val left = coordinates.positionInRoot().x
+                    val rootWidth = coordinates.findRootCoordinates().size.width
+                    screenEdge = (if (ltr) -left else left + coordinates.size.width - rootWidth).coerceAtLeast(0f)
+                }
+                // The card before the keyline runs on under the navigation drawer and fades out at the screen edge.
+                .navigationEdgeFadeMask(keyline - CompactZapCardGap, leadingInsetPx = { screenEdge })
+                // Under the opening drawer the cards darken like the backdrop, inside the fade's layer.
+                .underBrowseShellScrim(inOffscreenLayer = true)
                 .overflowingRowViewport(offscreenPx)
                 .testTag("channels-immersive-cards")
                 .focusGroup()
@@ -317,6 +376,7 @@ private fun ChannelsCardRow(
                     onLongClick = { if (current) cards.onOpenContextMenu(channelId) },
                     tagPrefix = "channels-immersive",
                     channelLed = true,
+                    programmeLoading = frame.guideLoading,
                     menuKey = true,
                     programmePicture = cards.programmePicture,
                     modifier = Modifier
@@ -346,12 +406,13 @@ private fun ChannelsCardRow(
 
 /** The focused channel's identity and programme, passive; it dissolves like the list preview. */
 @Composable
-private fun ChannelsImmersiveHero(
+internal fun ChannelsImmersiveHero(
     channels: List<Channel>,
-    cards: ChannelsImmersiveCards,
+    frame: ChannelsTabBody,
+    nowSec: () -> Long,
     modifier: Modifier,
+    besideList: Boolean = false,
 ) {
-    val frame = cards.frame
     // A leaving group keeps showing its own channel while it fades.
     val focusedId = rememberTabReader(frame.focusedId)
     val entryId = rememberTabReader(frame.entryId)
@@ -359,14 +420,13 @@ private fun ChannelsImmersiveHero(
         ?: browsingFocusChannelId(channels, entryId())
     val typography = MaterialTheme.typography
     // A fixed height keeps the row in place while the hero's text changes length; shorter text
-    // sits on the row, so a two-line title grows upward.
+    // sits on the row, so a two-line title grows upward. Beside the list nothing moves with it.
     val height = with(LocalDensity.current) {
         typography.bodyMedium.lineHeight.toDp() + 8.dp + typography.headlineSmall.lineHeight.toDp() * 2 +
-            4.dp + typography.titleMedium.lineHeight.toDp() + ImmersiveSynopsisGap +
-            typography.bodyMedium.lineHeight.toDp() * 2 + ImmersiveMetadataGap + typography.bodyMedium.lineHeight.toDp()
+            4.dp + typography.titleMedium.lineHeight.toDp() +
+            ImmersiveListLineGap + ImmersiveFactsLineHeight + ImmersiveListLineGap + typography.bodyMedium.lineHeight.toDp() +
+            ImmersiveSynopsisGap + typography.bodyMedium.lineHeight.toDp() * ImmersiveSynopsisLines
     }
-    val resources = LocalContext.current.resources
-    val locale = LocalConfiguration.current.locales[0]
     AnimatedContent(
         targetState = channelId,
         transitionSpec = {
@@ -375,58 +435,163 @@ private fun ChannelsImmersiveHero(
                 SizeTransform(clip = false) { _, _ -> snap() }
         },
         contentAlignment = Alignment.BottomStart,
-        modifier = modifier.height(height).widthIn(max = ImmersiveHeroWidth).testTag("channels-immersive-hero"),
+        modifier = modifier.then(if (besideList) Modifier else Modifier.height(height))
+            .widthIn(max = ImmersiveHeroWidth).testTag("channels-immersive-hero"),
         label = "immersiveHero",
     ) { id ->
         val channel = channels.firstOrNull { it.id == id } ?: return@AnimatedContent
-        val now = cards.nowSec()
+        val now = nowSec()
         val observation = frame.observation
         val current = remember(observation, id, now) { observation.eventAt(channel.id, Instant.fromEpochSeconds(now)) }
+        // Immersive answers what is on now; what follows is left to the list, details and player.
+        val next = if (besideList) remember(observation, id, now) {
+            observation.nextEvent(channel.id, Instant.fromEpochSeconds(now))
+        } else null
+        val nextScheduled = remember(observation, next) {
+            next?.let { observation.dvrEntryForEvent(it.id) }?.state == DvrEntryState.SCHEDULED
+        }
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
-        Column(Modifier.wrapContentHeight(Alignment.Bottom)) {
-            // Everything here is on now, so only a recording earns a mark: the player's REC badge.
-            ProgrammeEyebrow(channel, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty())) {
-                if (channel.id in frame.recordingIds) PlayerRecBadge()
+        ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
+            synopsisLines = if (besideList) ImmersiveListSynopsisLines else ImmersiveSynopsisLines,
+            loading = frame.guideLoading, modifier = Modifier.wrapContentHeight(Alignment.Bottom))
+    }
+}
+
+/** The facts and age rating of a programme, on one line. */
+@Composable
+private fun ProgrammeFacts(metadata: List<String>, rating: String?, modifier: Modifier) {
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        if (metadata.isNotEmpty()) {
+            Text(programmeFactsSegments(metadata), Modifier.weight(1f, fill = false),
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (rating != null) ProgrammeAgeRatingBox(rating, "channels-immersive-rating")
+    }
+}
+
+/** Avoid repeating a supplied subtitle as the synopsis when a fuller description exists. */
+internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
+    sequenceOf(event.summary, event.description)
+        .mapNotNull { it?.replace("\\r\\n", "\n")?.replace("\\n", "\n")?.trim() }
+        .firstOrNull { it.isNotBlank() && it != event.title?.trim() && it != event.subtitle?.trim() }
+
+/**
+ * The headline of the immersive row and beside the list, in the details page's order: who and
+ * what is on, its facts, its time and the synopsis; beside the list, what follows comes last.
+ */
+@Composable
+private fun ChannelsHeadline(
+    channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, recording: Boolean, now: Long,
+    synopsisLines: Int, loading: Boolean, modifier: Modifier,
+) {
+    val typography = MaterialTheme.typography
+    val colors = MaterialTheme.colorScheme
+    val resources = LocalContext.current.resources
+    val locale = LocalConfiguration.current.locales[0]
+    Column(modifier) {
+        // Everything here is on now, so only a recording earns a mark: the player's REC badge.
+        ProgrammeEyebrow(channel, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
+            Modifier.semantics(mergeDescendants = true) {}.testTag("channels-headline-channel")) {
+            if (recording) PlayerRecBadge()
+        }
+        if (current == null && loading) {
+            // The title and its time hold their lines until the guide arrives.
+            CompositionLocalProvider(LocalContentColor provides colors.onSurface) {
+                SkeletonLine(Modifier.padding(top = 8.dp).testTag("channels-immersive-loading"), typography.headlineSmall,
+                    widthFraction = 0.7f)
+                SkeletonLine(Modifier.padding(top = ImmersiveListLineGap), typography.bodyMedium, widthFraction = 0.35f)
             }
-            Text(
-                current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
-                style = typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 8.dp).testTag("channels-immersive-title"),
-            )
-            if (current != null) {
-                // As in the list preview; with EIT it is often the only text besides the title.
-                current.subtitle?.takeIf(String::isNotBlank)?.let {
-                    Text(it, style = typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 4.dp).testTag("channels-immersive-subtitle"))
-                }
-                channelsProgrammeSynopsis(current)?.let {
-                    Text(it, style = typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = ImmersiveSynopsisGap))
-                }
-                // As in Google TV's immersive row, the metadata closes the block next to the cards.
-                val metadata = remember(current, resources, locale) {
-                    programmeHeaderMetadata(programmeAboutFacts(current, null, resources, locale), resources,
-                        current.episode, current.firstAired, locale)
-                }
-                val rating = current.rating?.let { programmeAgeRating(it.label, it.age) }
-                Row(Modifier.padding(top = ImmersiveMetadataGap).testTag("channels-immersive-metadata"),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        formatTimeInterval(current.start.epochSeconds, current.stop.epochSeconds),
-                        style = typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                    )
-                    ProgressStrip(current.progress(now), Modifier.width(160.dp))
-                    if (metadata.isNotEmpty()) {
-                        Text(programmeFactsSegments(metadata), Modifier.weight(1f, fill = false),
-                            style = typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    if (rating != null) ProgrammeAgeRatingBox(rating, "channels-immersive-rating")
-                }
+            return@Column
+        }
+        Text(
+            current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
+            style = typography.headlineSmall, color = colors.onSurface,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp).testTag("channels-immersive-title"),
+        )
+        if (current != null) {
+            // With EIT it is often the only text besides the title.
+            current.subtitle?.takeIf(String::isNotBlank)?.let {
+                Text(it, style = typography.titleMedium, color = colors.onSurfaceVariant,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp).testTag("channels-immersive-subtitle"))
             }
+            val metadata = remember(current, resources, locale) {
+                programmeHeaderMetadata(programmeAboutFacts(current, null, resources, locale), resources,
+                    current.episode, current.firstAired, locale)
+            }
+            val rating = current.rating?.let { programmeAgeRating(it.label, it.age) }
+            if (metadata.isNotEmpty() || rating != null) {
+                ProgrammeFacts(metadata, rating, Modifier.padding(top = ImmersiveListLineGap).testTag("channels-list-facts"))
+            }
+            Row(Modifier.padding(top = ImmersiveListLineGap).testTag("channels-immersive-metadata"),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(formatTimeInterval(current.start.epochSeconds, current.stop.epochSeconds),
+                    style = typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1)
+                ProgressStrip(current.progress(now), Modifier.width(160.dp))
+            }
+        }
+        current?.let(::channelsProgrammeSynopsis)?.let {
+            Text(it, style = typography.bodyMedium, color = colors.onSurfaceVariant,
+                maxLines = synopsisLines, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = ImmersiveSynopsisGap).testTag("channels-headline-synopsis"))
+        }
+        // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
+        next?.let {
+            NextProgramme(it, nextScheduled, modifier = Modifier.padding(top = if (current != null) ImmersiveSynopsisGap else ImmersiveListLineGap))
+        }
+    }
+}
+
+/** What follows, with a scheduled recording marked on the programme as the rows mark theirs. */
+@Composable
+private fun NextProgramme(next: EpgEvent, scheduled: Boolean, modifier: Modifier) {
+    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(modifier.testTag("channels-immersive-next"), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
+        Text(stringResource(R.string.player_next, "${formatHm(next.start.epochSeconds)} $title"),
+            Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelLarge, color = color,
+            maxLines = 1, overflow = TextOverflow.Ellipsis)
+        if (scheduled) ScheduledIndicator(Modifier.testTag("channels-next-scheduled"), tint = color)
+    }
+}
+
+/**
+ * Over playback the screen draws no background, so the pane beside the list shows the focused
+ * channel's picture at its top, where the background's picture stands otherwise: with [programArt]
+ * the programme's artwork, else, and for a programme without artwork, the channel's logo.
+ */
+@Composable
+internal fun ChannelsListPlaybackArt(
+    channels: List<Channel>,
+    frame: ChannelsTabBody,
+    nowSec: () -> Long,
+    programArt: Boolean,
+    modifier: Modifier,
+) {
+    val focusedId = rememberTabReader(frame.focusedId)
+    val entryId = rememberTabReader(frame.entryId)
+    val channelId = focusedId()?.takeIf { id -> channels.any { it.id == id } }
+        ?: browsingFocusChannelId(channels, entryId())
+    AnimatedContent(
+        targetState = channelId,
+        transitionSpec = { fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith fadeOut(tween(ChannelsDetailCrossfadeMillis)) },
+        contentAlignment = Alignment.TopCenter,
+        modifier = modifier.testTag("channels-list-playback-art"),
+        label = "listPlaybackArt",
+    ) { id ->
+        val channel = channels.firstOrNull { it.id == id } ?: return@AnimatedContent
+        val now = nowSec()
+        val art = remember(frame.observation, id, now, programArt) {
+            if (programArt) frame.observation.eventAt(channel.id, Instant.fromEpochSeconds(now))?.image else null
+        }
+        // The eyebrow below already names the channel, so the artwork goes without its logo plate.
+        if (art != null && LocalArtworkContext.current.currentSession != null) {
+            ProgrammeArtwork(art, channelIcon = null, progress = null, Modifier.aspectRatio(16f / 9f))
+        } else {
+            DetailsHeroLogo(channel.icon, Modifier)
         }
     }
 }

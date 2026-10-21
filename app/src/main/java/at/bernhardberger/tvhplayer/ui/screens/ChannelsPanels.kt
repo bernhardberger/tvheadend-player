@@ -2,13 +2,16 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,7 +45,6 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.settings.ChannelsArtwork
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
@@ -65,10 +67,12 @@ import kotlinx.coroutines.flow.first
 /** Which Channels side panel is open. */
 internal enum class ChannelsPanel { GROUP, VIEW_OPTIONS }
 
-/** A line of a Channels side panel: a quiet section heading, a choice or a switch. */
+/** A line of a Channels side panel: a quiet section heading, a divider, a choice or a switch. */
 internal sealed interface ChannelsPanelEntry {
     data class Section(val title: String) : ChannelsPanelEntry
-    /** A row; [checked] makes it a switch, [enabled] false shows it greyed and out of D-pad reach. */
+    /** Sets a lone row apart from the section above it, where a heading would only repeat its label. */
+    data object Divider : ChannelsPanelEntry
+    /** A row; [checked] makes it a switch. */
     class Choice(
         val key: String,
         val label: String,
@@ -76,7 +80,6 @@ internal sealed interface ChannelsPanelEntry {
         val onClick: () -> Unit,
         val icon: Int? = null,
         val checked: Boolean? = null,
-        val enabled: Boolean = true,
     ) : ChannelsPanelEntry
 }
 
@@ -106,9 +109,8 @@ internal fun ChannelsGroupPanel(
 }
 
 /**
- * View options: the layouts, then the artwork switches. A switch the current layout does not use
- * stays in place, greyed, so the panel does not reflow while layouts change behind it. Each change
- * applies at once; Back closes the panel.
+ * View options: the layouts, then the current layout's program art switch where it has one. Each
+ * change applies at once; Back closes the panel.
  */
 @Composable
 internal fun ChannelsViewOptionsPanel(
@@ -127,17 +129,14 @@ internal fun ChannelsViewOptionsPanel(
                 icon = layout.icon(),
             ))
         }
-        add(ChannelsPanelEntry.Section(stringResource(R.string.channels_view_artwork)))
-        ChannelsArtwork.entries.forEach { artwork ->
-            add(ChannelsPanelEntry.Choice(
-                key = "channels-view-art-${artwork.name.lowercase()}",
-                label = stringResource(artwork.label()),
-                selected = false,
-                onClick = { onViewChange(view.toggled(artwork)) },
-                checked = view.shows(artwork),
-                enabled = view.layout in artwork.layouts,
-            ))
-        }
+        add(ChannelsPanelEntry.Divider)
+        add(ChannelsPanelEntry.Choice(
+            key = "channels-view-program-art",
+            label = stringResource(R.string.channels_view_program_art),
+            selected = false,
+            onClick = { onViewChange(view.toggledProgramArt()) },
+            checked = view.showsProgramArt,
+        ))
     }
     ChannelsSidePanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose) {
         ChannelsPanelList(entries, radio = true)
@@ -154,11 +153,6 @@ private fun ChannelsLayout.icon(): Int = when (this) {
     ChannelsLayout.LIST -> R.drawable.ic_view_list
     ChannelsLayout.GRID -> R.drawable.ic_grid_view
     ChannelsLayout.IMMERSIVE -> R.drawable.ic_view_carousel
-}
-
-private fun ChannelsArtwork.label(): Int = when (this) {
-    ChannelsArtwork.CARDS -> R.string.channels_art_cards
-    ChannelsArtwork.BACKDROP -> R.string.channels_art_backdrop
 }
 
 /**
@@ -263,6 +257,7 @@ private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>, radio: Boolean)
             items(entries, key = { entry ->
                 when (entry) {
                     is ChannelsPanelEntry.Section -> "section-${entry.title}"
+                    ChannelsPanelEntry.Divider -> "divider"
                     is ChannelsPanelEntry.Choice -> entry.key
                 }
             }) { entry ->
@@ -274,6 +269,10 @@ private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>, radio: Boolean)
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp).semantics { heading() },
                     )
+                    ChannelsPanelEntry.Divider -> Box(
+                        Modifier.padding(horizontal = 16.dp, vertical = 4.dp).fillMaxWidth().height(1.dp)
+                            .background(MaterialTheme.colorScheme.borderVariant),
+                    )
                     is ChannelsPanelEntry.Choice -> {
                         val index = choices.indexOf(entry)
                         PlaybackOptionRow(
@@ -281,7 +280,6 @@ private fun ChannelsPanelList(entries: List<ChannelsPanelEntry>, radio: Boolean)
                             selected = entry.selected,
                             radio = radio,
                             onClick = entry.onClick,
-                            enabled = entry.enabled,
                             leadingIcon = entry.icon,
                             checked = entry.checked,
                             modifier = Modifier

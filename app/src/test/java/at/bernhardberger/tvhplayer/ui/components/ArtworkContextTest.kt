@@ -88,6 +88,7 @@ class ArtworkContextTest {
         assertNull(session.observation.value.currentSession)
         val saved = requests.single() as AppArtworkSource
         assertNotNull("the logo is the saved copy of the observation's profile", saved.saved)
+        assertNotNull("whose key names the logo's stored colour", saved.savedKey)
         val logos = logoCompositions
         val seen = observationCompositions
 

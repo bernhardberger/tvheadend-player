@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -13,7 +14,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 
@@ -34,10 +34,9 @@ fun rememberChannelAccent(
 ): Color {
     val context = LocalContext.current
     val accents = LocalChannelAccents.current
-    val currentSession = LocalArtworkContext.current.currentSession
-    val model = remember(currentSession, piconPath) {
-        currentSession?.let { session -> piconPath?.let { AppArtworkSource(session, it) } }
-    }
+    val artwork = LocalArtworkContext.current
+    // As the logo's: before a session its saved copy names the stored colour.
+    val model by remember(artwork, piconPath) { derivedStateOf { piconPath?.let(artwork::logo) } }
     var rgb by remember(channelId) {
         mutableIntStateOf(model?.let(accents::stored) ?: NEUTRAL_ACCENT_RGB)
     }

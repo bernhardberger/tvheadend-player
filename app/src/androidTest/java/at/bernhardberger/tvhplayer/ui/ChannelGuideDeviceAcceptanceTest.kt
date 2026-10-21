@@ -216,8 +216,10 @@ class ChannelGuideDeviceAcceptanceTest {
             } else {
                 null
             }
-            tag?.startsWith("channel-row-") == true || tag?.startsWith("channel-card-") == true
+            tag != null && channelItemTag.matches(tag)
         }
+
+        private val channelItemTag = Regex("(channel-row|channels-grid|channels-immersive)-\\d+")
 
         fun compareChannels(left: Channel, right: Channel): Int =
             compareValues(left.number == null, right.number == null)

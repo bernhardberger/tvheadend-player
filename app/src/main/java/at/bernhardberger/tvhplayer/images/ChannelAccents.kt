@@ -30,7 +30,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * Channel colours taken from the channels' picons and kept in [store] under the SDK's artwork cache
- * key ([cacheKey]), so a colour is known in the first frame once it was sampled, also after a restart.
+ * key ([cacheKey]), so a colour is known in the first frame once it was sampled, also after a restart
+ * and, through the saved copy's equal key, before the session is there.
  * [sample] is the one sampler for callers and for the fill-in pass ([fillIn]); a key is never sampled
  * twice at the same time. The defaults keep nothing beyond the process and have no keys.
  */
@@ -43,16 +44,20 @@ class ChannelAccents(
     private val failed = ConcurrentHashMap.newKeySet<String>()
 
     /** The stored colour of [picon], from memory. Null before the store was read and for an unknown key. */
-    fun stored(picon: AppArtworkSource): Int? = picon.currentSession?.let { cacheKey(it, picon.id) }?.let { store[it] }
+    fun stored(picon: AppArtworkSource): Int? = key(picon)?.let { store[it] }
 
     /**
      * The colour of [picon]: the stored one, else sampled now and stored. A picon without a usable
      * colour, one the server does not have and one that does not decode give and store the neutral
      * colour. Null when the picon did not load for now, which is not stored, or when its session was
-     * replaced meanwhile. Without a key the colour is sampled for this call only.
+     * replaced meanwhile. Without a key the colour is sampled for this call only. Before a session
+     * only the stored colour of a saved copy is known; it is sampled once the session is there.
      */
     suspend fun sample(context: Context, picon: AppArtworkSource): Int? {
-        val session = picon.currentSession ?: return null
+        val session = picon.currentSession ?: return key(picon)?.let {
+            store.load()
+            store[it]
+        }
         val key = cacheKey(session, picon.id) ?: return samplePicon(context, picon)
         store.load()
         sampling.computeIfAbsent(key) { Mutex() }.withLock {
@@ -103,6 +108,10 @@ class ChannelAccents(
                 profileTrace("P50:accentPass:end:$sampled") { }
             }
     }
+
+    /** The session's key of [picon], or before one its saved copy's, which is the same for the same profile. */
+    private fun key(picon: AppArtworkSource): String? =
+        picon.currentSession?.let { cacheKey(it, picon.id) } ?: picon.savedKey
 }
 
 private data class FillInTarget(val session: SessionGenerationIdentity, val picons: Set<ArtworkId>)

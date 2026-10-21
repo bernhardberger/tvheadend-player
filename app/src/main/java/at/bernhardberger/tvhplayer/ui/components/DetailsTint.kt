@@ -11,22 +11,28 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.detailsTintRgb
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
 
-/** Only the details backdrop changes colour; the content retains the normal theme. */
+/**
+ * Only the details backdrop changes colour; the content retains the normal theme. The colour
+ * animates in once sampled; a caller that waits for [onSettled] instead gets it without animation.
+ * Before a session only a logo's stored colour is known.
+ */
 @Composable
 internal fun rememberDetailsTint(
     art: ArtworkId?,
     picon: ArtworkId?,
+    onSettled: (() -> Unit)? = null,
 ): State<Color> {
+    val currentOnSettled by rememberUpdatedState(onSettled)
     val neutral = MaterialTheme.colorScheme.background
     val context = LocalContext.current
     val accents = LocalChannelAccents.current
-    val session = LocalArtworkContext.current.currentSession
-    val source = remember(session, art, picon) {
-        session?.let { current -> (art ?: picon)?.let { AppArtworkSource(current, it) } }
-    }
-    val piconSource = remember(session, picon) {
-        session?.let { current -> picon?.let { AppArtworkSource(current, it) } }
-    }
+    val artwork = LocalArtworkContext.current
+    val session = artwork.currentSession
+    // As the logo's: before a session its saved copy names the stored colour. Art needs the session.
+    val logo by remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }
+    val piconSource = logo
+    val artSource = remember(session, art) { session?.let { current -> art?.let { AppArtworkSource(current, it) } } }
+    val source = if (art != null) artSource else piconSource
     // Replacing a page/source must not inherit the previous page's seed or animation.
     return key(source, piconSource, art != null, accents) {
         var seed by remember { mutableStateOf(source?.let {
@@ -40,8 +46,10 @@ internal fun rememberDetailsTint(
                     seed = accents.stored(piconSource) ?: accents.sample(context, piconSource)
                 }
             }
+            currentOnSettled?.invoke()
         }
-        animateColorAsState(seed?.let { Color(0xFF000000.toInt() or detailsTintRgb(it)) } ?: neutral,
-            tween(320), label = "detailsTint")
+        val color = seed?.let { Color(0xFF000000.toInt() or detailsTintRgb(it)) } ?: neutral
+        if (onSettled != null) rememberUpdatedState(color)
+        else animateColorAsState(color, tween(320), label = "detailsTint")
     }
 }

@@ -32,7 +32,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -82,7 +82,9 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.images.DetailsArtColors
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
@@ -101,11 +103,13 @@ import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
@@ -247,8 +251,8 @@ class BrowseCohesionEvidenceTest {
         // Channels enters its first row; the group sits behind the header button.
         awaitFocus(hasTestTag("channel-row-1"))
         capture("channels-current", 1f, "Channels current programme; first row", hasTestTag("channel-row-1"))
-        compose.onNodeWithTag("channels-detail-channel", useUnmergedTree = true)
-            .assertTextEquals("Ridge Earth HD")
+        compose.onNodeWithTag("channels-headline-channel")
+            .assertTextContains("Ridge Earth HD", substring = true)
         key(Key.DirectionDown)
         key(Key.DirectionDown)
         awaitFocus(hasTestTag("channel-row-3"))
@@ -352,6 +356,7 @@ class BrowseCohesionEvidenceTest {
     private fun showChannels(scale: Float) {
         val observation = observation()
         session = FakeTvheadendSession(observation)
+        sampleArtColours(observation)
         shell(AppDestination.CHANNELS, scale) { padding, drawerActive ->
             var selected by remember { mutableStateOf<ChannelId?>(null) }
             var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
@@ -373,6 +378,18 @@ class BrowseCohesionEvidenceTest {
                 onPlay = { _, _ -> playbackRequests++ },
             )
         }
+    }
+
+    /**
+     * The Channels backdrop takes the programme art's colour, sampled off the main thread where
+     * waiting for idle does not see it; sampled first, the colour is stored when the backdrop asks.
+     */
+    private fun sampleArtColours(observation: SessionObservation) {
+        val current = checkNotNull(observation.currentSession)
+        val arts = listOf(ArtworkId(101), ArtworkId(102)).map { AppArtworkSource(current, it) }
+        val samples = arts.map { runtimeScope.async(Dispatchers.Default) { DetailsArtColors.sample(context(), it) } }
+        compose.waitUntil(10_000) { samples.all { it.isCompleted } }
+        arts.forEach { assertNotNull("fixture art has a colour", DetailsArtColors.stored(it)) }
     }
 
     private fun showGuide(scale: Float) {
@@ -595,6 +612,9 @@ class BrowseCohesionEvidenceTest {
             val rail = compose.onNodeWithTag("global-drawer-surface").fetchSemanticsNode().boundsInRoot
             assertEquals("Production closed push rail", 80f, rail.width, 0.01f)
         }
+        // The Channels backdrop follows focus after a pause and a fade.
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
         val bitmap = draw(dialog)
         assertEquals(960, bitmap.width)
         assertEquals(540, bitmap.height)

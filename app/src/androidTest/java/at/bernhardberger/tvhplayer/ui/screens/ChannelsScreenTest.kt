@@ -4,6 +4,7 @@ import androidx.compose.ui.test.onRoot
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.ui.captureBrowseFrame
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import androidx.compose.ui.test.assertIsDisplayed
 
 import android.view.KeyEvent
@@ -26,7 +27,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.isDisplayed
@@ -157,7 +158,7 @@ class ChannelsScreenTest {
         )
 
         waitForFocus(10)
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 10")
+        assertHeadlineChannel(10)
     }
 
     @Test
@@ -174,7 +175,7 @@ class ChannelsScreenTest {
         row(1).performKeyInput { pressKey(Key.DirectionDown) }
 
         row(2).assertIsFocused()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 2")
+        assertHeadlineChannel(2)
         composeRule.runOnIdle { assertEquals(ChannelId(2), selections.last()) }
     }
 
@@ -205,7 +206,7 @@ class ChannelsScreenTest {
         pickGroup("channels-group-${international.id.value}", steps = 1)
         waitForFocus(target)
         row(target).assertIsDisplayed()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel $target")
+        assertHeadlineChannel(target)
         composeRule.runOnIdle {
             assertTrue("Only the entered channel is published", selections.isNotEmpty() && selections.all { it == ChannelId(target) })
         }
@@ -235,7 +236,7 @@ class ChannelsScreenTest {
         pickGroup("channels-group-${news.id.value}", steps = -1)
 
         waitForFocus(2)
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 2")
+        assertHeadlineChannel(2)
     }
 
     @Test
@@ -253,7 +254,7 @@ class ChannelsScreenTest {
         row(1).pressDown()
 
         row(3).assertIsFocused()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 3")
+        assertHeadlineChannel(3)
     }
 
     @Test
@@ -291,7 +292,7 @@ class ChannelsScreenTest {
         }
 
         row(2).assertIsFocused()
-        composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals("Channel 2")
+        assertHeadlineChannel(2)
         row(2).pressDown()
 
         row(1).assertIsFocused()
@@ -377,8 +378,7 @@ class ChannelsScreenTest {
             assertTrue("Two page presses must advance from the pending destination", finalId > onePageId)
             assertTrue(selections.all { it == ChannelId(finalId) })
         }
-        composeRule.onNodeWithTag("channels-detail-channel")
-            .assertTextEquals("Channel $finalId")
+        assertHeadlineChannel(finalId)
     }
 
     @Test
@@ -573,6 +573,11 @@ class ChannelsScreenTest {
         performKeyInput { pressKey(Key.DirectionDown) }
 
     private fun channels(ids: IntRange) = ids.map(::channel)
+
+    private fun assertHeadlineChannel(id: Long) {
+        composeRule.onNodeWithTag("channels-headline-channel")
+            .assertTextContains(channelTitleText(id, "Channel $id"))
+    }
 
     private fun channel(id: Int, tagId: ChannelTagId? = null, number: Long = id.toLong()) = Channel.create(
         id = ChannelId(id.toLong()),

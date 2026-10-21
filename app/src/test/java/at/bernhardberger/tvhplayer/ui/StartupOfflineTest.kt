@@ -57,6 +57,8 @@ import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -77,6 +79,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -420,7 +423,8 @@ class StartupOfflineTest {
             single { profiles }
             single { settings }
             single { ChannelTagSettingsStore(InMemoryData()) }
-            single { UiSettingsStore(InMemoryData()) }
+            // These journeys walk the list's rows.
+            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
             single { LastPlayedChannelStore(context) }
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }

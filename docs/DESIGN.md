@@ -460,25 +460,27 @@ tuner loss and interruption are failures, limit expiry is informational.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
 
-### Channels · immersive browse and programme preview
+### Channels · layouts, headline and backdrop
 
 Visual baseline accepted for implementation 2026-10-04 after the coordinated
-browse concept review. This replaces the former headline-free, no-artwork C3c
-composition while retaining its native rows, focus and playback contracts.
+browse concept review, revised in the U4 polish rounds through 2026-10-21. View
+options offer three layouts, in this order: **Immersive** (the default), **List**
+and **Grid**. Each layout keeps its own **Program art** switch; only List starts
+with it on. Off, cards and backdrops use channel logos instead of programme art.
 
-- The **Channels** headline shares the browse heading axis at x130, y32 on the
-  960×540 reference canvas. Scope tabs sit at x130, y80; rows begin below them.
-  At larger text, header/scope bands grow from their actual text measurements.
-  Header actions appear only when backed by working, authorized behavior; the
-  concept's Search/View placeholders are not inert production controls.
+- The header shows the current group's name (or All channels) on the browse
+  heading axis at x130, y32 on the 960×540 reference canvas, with the 40dp Group
+  and View options buttons at its end. Content begins at y80. At larger text the
+  header grows from its actual text measurements. Header actions appear only when
+  backed by working, authorized behavior.
 - Live video remains behind the content under the shell-owned warm-playback
   scrim in §4. There is no duplicate screen-local video scrim or rail/list seam.
 - The list's leading axis includes the shell's 24dp inset and a further 26dp,
   with its 12dp focus reserve inside that additional inset. Standard rows are
-  340dp wide, with a 92dp visual gap to the passive 340dp preview at x562.
+  340dp wide, with a 92dp visual gap to the passive headline pane at x562.
   The list runs to the screen bottom behind a
   48dp fade. A matching local top fade appears only while earlier rows exist;
-  returning to the first-row boundary removes it. Headings, tabs and the preview
+  returning to the first-row boundary removes it. The header and the headline pane
   are outside these masks. Rows scroll out under the fades; **settled focus never
   enters them** — native scrolling and explicit restoration share the readable
   viewport, including focus-scale breathing room. The TV pivot policy must settle
@@ -497,38 +499,61 @@ composition while retaining its native rows, focus and playback contracts.
 - Playing and recording markers sit beside the title and appear only when they
   apply; no slot is reserved for an absent state. They are decorative and
   non-focusable, and they shorten only the title.
-- The preview starts beside the list and stays within the trailing/bottom safe
-  insets. Use available programme artwork in a **16:9** slot, otherwise a contained
-  picon over restrained ambient color, otherwise the ordinary channel glyph over
-  a neutral surface. Loading/error retain the same slot and fallback. Artwork may
-  be deliberately cover-cropped; logos stay uncropped. Use existing session-bound
-  artwork loading, never an external artwork-discovery service.
-- Short channel identity, start–end time and truthful programme progress occupy
-  the image's bottom content area over a local black gradient. Unknown timing and
-  progress are omitted. This image-local gradient is separate from the shell's
-  video and navigation scrims. Keep fallback imagery clear of the embedded text.
-- Programme title and a separately supplied subtitle remain outside the image.
-  Absent subtitles leave no gap; never derive them from title punctuation.
-  Use native `titleLarge` (22/28) for the title, at most two lines;
-  `titleMedium` (16/24) for the subtitle; and `bodyMedium` (14/20) in
-  `onSurfaceVariant` for the synopsis. These passive roles replace the earlier
-  oversized headline/body treatment; user text scaling remains intact.
-  Image/title and title/subtitle use 4dp gaps. Following G10 feedback, artwork is
-  **constant across programmes**: 340×191.25dp at the reference viewport, including
-  1.3× text. Only viewport/type configuration may reduce that 16:9 slot to reserve
-  at least one title line, one subtitle line and the footer; metadata never resizes it.
-- **Next stays at the bottom** of the detail column (y508 at the reference viewport).
-  Reserve its one-line footer and 8dp separation even when no Next metadata exists;
-  leave it empty rather than inventing a programme. Fit measured whole text lines
-  above it: synopsis yields first (up to three lines, two at 1.3×, including complete
-  omission), then title/subtitle ellipsize while retaining at least one line each.
-  Preserve native type sizes and the stable artwork/title anchors.
-- The preview is passive and never an additional D-pad target. It **crossfades** rather than hard-cutting as
-  the browsed row changes: a 160ms dissolve, short enough that fast row-to-row
-  browsing still feels immediate. Each state resolves its own EPG, so the
-  outgoing copy keeps the channel it was written for. Layout adapts without
-  animating text baselines. Missing programme metadata does not itself make a
-  channel unwatchable. Do not add a persistent OK reminder.
+- **List headline pane.** Beside the list sits the headline that Immersive also
+  uses, bottom-anchored on the bottom safe inset (y512 at the reference viewport)
+  and at most 480dp wide. In the details page's order: an eyebrow with the 36×20
+  picon and `[number] [name]` (plus the player's REC badge while recording), the
+  title in `headlineSmall` (two lines), a supplied subtitle in `titleMedium`
+  (one line; absent subtitles leave no gap), the facts line with the age-rating
+  box, the start–end time with a 160dp on-air strip, then up to three synopsis
+  lines in `bodyMedium`. The list alone ends on a quiet `Next · HH:MM title` line
+  in `labelLarge`, with the scheduled clock when that programme is to be recorded.
+  Gaps are 8dp between eyebrow, title, facts and time (4dp before the subtitle)
+  and 20dp before the synopsis and before Next. Without EPG the title reads the
+  no-EPG label and the other programme lines are omitted.
+- **List backdrop.** Without warm playback, List uses the Immersive backdrop
+  below, with its logo centred over the pane. Over warm playback there is no
+  backdrop; the pane's top instead shows the focused programme's 16:9 artwork
+  without its logo plate, or with Program art off or no artwork the channel's
+  240×135 logo. That picture shrinks rather than overlap the headline.
+- The headline pane is passive and never an additional D-pad target. It
+  **crossfades** rather than hard-cutting as the browsed row changes: a 160ms
+  dissolve, short enough that fast row-to-row browsing still feels immediate. Each
+  state resolves its own EPG, so the outgoing copy keeps the channel it was written
+  for. Missing programme metadata does not itself make a channel unwatchable. Do
+  not add a persistent OK reminder. While the guide is still on its way, the title
+  and time hold skeleton lines rather than claiming no EPG.
+- **Immersive.** One row of 196dp compact cards, 20dp apart (the kit gutter),
+  rests at the bottom of the screen with its first card on the x130 keyline. The
+  row runs under the rail and the opened drawer to the screen edge; cards under
+  the opened drawer dim to at most the kit's 50% modal scrim. The same headline
+  sits 40dp above the cards, with two synopsis lines and no Next line: Immersive
+  answers what is on now. Down stays on the row, Up reaches the header and Left at
+  the row's start reaches the rail.
+- **Immersive and List backdrop.** With programme art, the focused programme's
+  picture fills the top-end corner from the screen's top edge, as the kit's
+  immersive list does, under its cinematic scrim over the programme's ambient
+  tint. Without art, the channel's logo colour fills the screen behind a blurred
+  copy of the logo, and the 240×135 logo stands at the top end. The backdrop stays
+  in place when the drawer opens; only the sharp logo moves with the content.
+- **Grid.** Three columns of channel-first cards (`[number] [name]`, then
+  `HH:MM · programme`). Cards are 16:9 unless the last visible row would be mostly
+  cut off; then they shrink so a further whole row fits, never flatter than 2:1 or
+  below the card's text height. The header scrolls away with the rows and returns
+  with the first row; the focused row is held below the visible half of the row
+  above. The backdrop is the focused programme's blurred art, or with Program art
+  off the logo colour behind a blurred logo.
+- **Cards.** In Channels, programme-art cards darken towards their text with a
+  linear scrim in the kit's colour (80% at the text, 95% at the bottom), and the
+  channel logo stands over the art inside a soft dark halo. That scrim is baked
+  into the card's bitmap, since live gradients over a dozen pictures were too slow
+  on the G10. Logo cards use the logo's ambient colour. The player rail keeps the
+  kit's card scrim.
+- **Backdrop timing.** Every focus-following backdrop changes as Leanback's does:
+  it settles for 300ms, changes at most every 500ms, waits up to 2s for its
+  picture and then fades in over the old one in 400ms, so there is no dip to grey.
+  Before a session, saved logos give their stored colour and blur from the first
+  frame.
 
 ### Guide and Recordings · browse cohesion
 

@@ -71,11 +71,17 @@ internal fun BrowseContentLayer(
 /**
  * A screen's backdrop sits under the shell's gradient like the shell's own background, not over it.
  * An [opaque] backdrop takes the gradient directly, without the offscreen layer that keeps it off
- * transparent pixels.
+ * transparent pixels. Content already drawn [inOffscreenLayer] lets that layer keep it off them, and
+ * darkens only as the drawer opens.
  */
 @Composable
-internal fun Modifier.underBrowseShellScrim(opaque: Boolean = false): Modifier =
-    LocalBrowseContentLayering.current?.let { then(BrowseDepartureElement(it, layered = !opaque)) } ?: this
+internal fun Modifier.underBrowseShellScrim(opaque: Boolean = false, inOffscreenLayer: Boolean = false): Modifier =
+    LocalBrowseContentLayering.current?.let {
+        then(BrowseDepartureElement(it, if (opaque) BrowseScrimMode.OVER else if (inOffscreenLayer) BrowseScrimMode.ATOP else BrowseScrimMode.LAYERED))
+    } ?: this
+
+/** How a node takes the shell's gradient: in its own layer, straight over opaque content, or atop a caller's layer as the drawer opens. */
+internal enum class BrowseScrimMode { LAYERED, OVER, ATOP }
 
 internal fun Modifier.browseShellLayer(layering: BrowseContentLayering, fullWidth: Dp): Modifier =
     then(BrowseShellElement(layering, fullWidth))
@@ -119,6 +125,7 @@ internal class BrowseShellNode(
             Offset(if (rtl) right else left, 0f),
             Offset(if (rtl) viewport.width - runout else runout, 0f),
             lerp(ClosedRailEdgeAlpha, OpenDrawerEdgeAlpha, opening),
+            opening,
         )
     }
 
@@ -163,17 +170,17 @@ internal class BrowseScreenBackdropNode(private val layering: BrowseContentLayer
     }
 }
 
-private data class BrowseDepartureElement(val layering: BrowseContentLayering, val layered: Boolean = true) :
+private data class BrowseDepartureElement(val layering: BrowseContentLayering, val mode: BrowseScrimMode = BrowseScrimMode.LAYERED) :
     ModifierNodeElement<BrowseDepartureNode>() {
-    override fun create() = BrowseDepartureNode(layering, layered)
+    override fun create() = BrowseDepartureNode(layering, mode)
     override fun update(node: BrowseDepartureNode) {
-        node.layered = layered
+        node.mode = mode
         node.invalidateDraw()
     }
     override fun InspectorInfo.inspectableProperties() { name = "browseDepartureInk" }
 }
 
-internal class BrowseDepartureNode(private val layering: BrowseContentLayering, internal var layered: Boolean = true) :
+internal class BrowseDepartureNode(private val layering: BrowseContentLayering, internal var mode: BrowseScrimMode = BrowseScrimMode.LAYERED) :
     Modifier.Node(), DrawModifierNode, GlobalPositionAwareModifierNode {
     private val paint = Paint()
 
@@ -200,10 +207,19 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering, 
             local.localPositionOf(source, frame.start),
             local.localPositionOf(source, frame.end),
             frame.edgeAlpha,
+            frame.opening,
         )
-        if (!layered) {
+        if (mode == BrowseScrimMode.OVER) {
             drawContent()
             drawScrim(mapped, BlendMode.SrcOver, 1f - layering.detailsAlpha())
+            return
+        }
+        if (mode == BrowseScrimMode.ATOP) {
+            // Foreground content reaches the closed rail's gradient at its keyline, so it darkens
+            // only as the drawer opens over it, and at the edge no more than the kit's modal scrim.
+            drawContent()
+            drawScrim(mapped, BlendMode.SrcAtop,
+                (1f - layering.detailsAlpha()) * mapped.opening * ForegroundUnderDrawerAlpha / mapped.edgeAlpha)
             return
         }
         val canvas = drawContext.canvas
@@ -219,7 +235,8 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering, 
     }
 }
 
-internal class BrowseScrimFrame(val bounds: Rect, val start: Offset, val end: Offset, val edgeAlpha: Float)
+/** [opening] runs from 0 with the rail closed to 1 with the drawer open. */
+internal class BrowseScrimFrame(val bounds: Rect, val start: Offset, val end: Offset, val edgeAlpha: Float, val opening: Float)
 
 /**
  * The gradient's darkness at the screen edge. The closed rail's icons only need to read over the
@@ -227,6 +244,9 @@ internal class BrowseScrimFrame(val bounds: Rect, val start: Offset, val end: Of
  */
 private const val ClosedRailEdgeAlpha = 0.6f
 private const val OpenDrawerEdgeAlpha = 0.95f
+
+/** The kit's modal drawer scrim, `colorScheme.scrim` at 50%: content under the drawer stays legible. */
+private const val ForegroundUnderDrawerAlpha = 0.5f
 
 private fun ContentDrawScope.drawScrim(frame: BrowseScrimFrame, blendMode: BlendMode, alpha: Float) {
     if (alpha <= 0f) return

@@ -43,12 +43,13 @@ class ArtworkContext(
     @OptIn(ExperimentalTvheadendApi::class)
     internal fun logo(id: ArtworkId): AppArtworkSource {
         val current = session.value
-        val saved = if (current != null) null else tvheadend?.let { tvheadend ->
-            // Read only to resolve again on each emission; the copy stays the [observation]'s profile's.
-            latest.value
-            observation.value?.let { TvheadendArtwork.cached(tvheadend, it, id) }
-        }
-        return AppArtworkSource(current, id, saved)
+        if (current != null) return AppArtworkSource(current, id)
+        // Read only to resolve again on each emission; the copy stays the [observation]'s profile's.
+        latest.value
+        val tvheadend = tvheadend ?: return AppArtworkSource(null, id)
+        val observed = observation.value ?: return AppArtworkSource(null, id)
+        return AppArtworkSource(null, id, TvheadendArtwork.cached(tvheadend, observed, id),
+            tvheadend.artwork.cachedArtwork(observed, id)?.cacheKey)
     }
 }
 

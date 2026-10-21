@@ -186,12 +186,14 @@ class ProgrammeDetailsPageTest {
             val heading = compose.onNodeWithText("Other airings of Ridge Light").fetchSemanticsNode().boundsInRoot
             val card = compose.onNodeWithTag("details-card-2").fetchSemanticsNode().boundsInRoot
             val bitmap = snapshot()
+            fun red(x: Int, y: Int) = android.graphics.Color.red(bitmap.getPixel(x, y))
+            // The logo's glow behind the page brightens the background gradually; the glyphs
+            // and the card's edge stand out from it.
             val glyphBottom = (heading.top.toInt() until heading.bottom.toInt()).last { y ->
-                (heading.left.toInt() until heading.right.toInt()).any { x -> android.graphics.Color.red(bitmap.getPixel(x, y)) > 50 }
+                (heading.left.toInt() until heading.right.toInt()).any { x -> red(x, y) > 100 }
             }
-            val cardTop = (glyphBottom + 1..card.top.toInt() + 20).first { y ->
-                android.graphics.Color.red(bitmap.getPixel(card.center.x.toInt(), y)) > 50
-            }
+            val x = card.center.x.toInt()
+            val cardTop = (glyphBottom + 2..card.top.toInt() + 20).first { y -> kotlin.math.abs(red(x, y) - red(x, y - 1)) > 10 }
             bitmap.recycle()
             return (cardTop - glyphBottom - 1) / 2f
         }

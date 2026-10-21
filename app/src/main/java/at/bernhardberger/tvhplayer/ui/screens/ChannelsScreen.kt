@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogoSize
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
@@ -18,13 +19,6 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.snap
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -103,11 +97,11 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
-import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.channelNowStatus
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
+import at.bernhardberger.tvhplayer.core.awaitsGuide
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
 import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
@@ -127,6 +121,8 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
+import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
+import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
@@ -156,6 +152,9 @@ internal fun channelsDetailPanePadding(
     end = maxOf(contentPadding.calculateEndPadding(layoutDirection), TvBrowseTrailingInset),
     bottom = contentPadding.calculateBottomPadding(),
 )
+
+/** Where the background's logo stands below the header, for the logo kept over playback. */
+private val ChannelsListPlaybackArtTop = 24.dp
 
 private const val CHANNEL_EMPTY_GROUP_FOCUS_FRAMES = 4
 
@@ -664,21 +663,20 @@ internal fun ChannelsScreenContent(
     ) {
         // Behind the header from the screen's top: it follows focus across groups, while the
         // group's content fades on its own. The grid and list sit on the details page's blurred
-        // backdrop, or with backdrop art off on the logo's colour.
+        // backdrop, matching what the cards show.
         if (channels.isNotEmpty()) ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
             ChannelsImmersiveBackground(
-                backdrop = when {
-                    layout == ChannelsLayout.IMMERSIVE -> ChannelsBackdrop.CORNER
-                    view.backdropArt -> ChannelsBackdrop.BLURRED
-                    else -> ChannelsBackdrop.LOGO_COLOUR
-                },
+                corner = layout != ChannelsLayout.GRID,
+                programArt = view.showsProgramArt,
                 // The shown channel follows focus after a delay; it may still be the previous group's.
                 channels = channelScope.allChannels,
                 channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
                 observation = observation,
                 nowSec = { nowSec },
                 logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
-                endInset = detailPanePadding.calculateEndPadding(layoutDirection),
+                // Beside the list, the logo is centred over the details pane, a browse column wide.
+                endInset = detailPanePadding.calculateEndPadding(layoutDirection) +
+                    if (layout == ChannelsLayout.LIST) (TvBrowseColumnWidth - DetailsHeroLogoSize.first) / 2 else 0.dp,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -811,7 +809,7 @@ internal fun ChannelsScreenContent(
                             frame = frame,
                             nowSec = nowSecProvider,
                             keyline = startPadding + TvBrowseLeadingInset,
-                            programmePicture = view.cardArt,
+                            programmePicture = view.showsProgramArt,
                             focusRequesters = rowFocusRequesters,
                             navigationFocus = navigationFocus,
                             headerFocus = headerEntryFocus,
@@ -849,7 +847,7 @@ internal fun ChannelsScreenContent(
                         frame = frame,
                         nowSec = nowSecProvider,
                         state = rememberTabGridState(gridState),
-                        programmePicture = view.cardArt,
+                        programmePicture = view.showsProgramArt,
                         isCurrent = owner.isCurrent,
                         focusRequesters = rowFocusRequesters,
                         navigationFocus = navigationFocus,
@@ -961,6 +959,7 @@ internal fun ChannelsScreenContent(
                                         ),
                                         name = ch.name.orEmpty(),
                                         programTitle = now?.title ?: stringResource(R.string.no_epg),
+                                        programmeLoading = now == null && frame.guideLoading,
                                         progress = if (now != null) prog else null,
                                         piconPath = ch.icon,
                                         programStartSec = now?.start?.epochSeconds,
@@ -988,25 +987,25 @@ internal fun ChannelsScreenContent(
 
                     Spacer(Modifier.width(ChannelsListToDetailsGap))
 
-                    // Passive preview starts beside the first row and retains the safe
-                    // bottom inset. Right from a row still stays on that row.
-                    Box(
+                    // Passive preview: the immersive headline, resting on the bottom safe inset
+                    // like the immersive row's hero. Right from a row leads to the header.
+                    // Over playback the picture stays at the top and gives way to a tall headline.
+                    val playbackArt = LocalWarmPlayback.current
+                    Column(
                         modifier = Modifier
                             .weight(1f)
                             .profileLayout("channels:details")
                             .padding(detailPanePadding)
-                            .padding(top = ChannelsListTopReserve)
                             .fillMaxHeight()
                             .testTag("channels-details"),
-                        contentAlignment = Alignment.TopStart,
+                        verticalArrangement = if (playbackArt) Arrangement.SpaceBetween else Arrangement.Bottom,
                     ) {
-                        FocusedChannelDetails(
-                            channels = channels,
-                            focusedChannelId = frame.focusedId,
-                            selectedId = frame.entryId,
-                            observation = observation,
-                            nowSecProvider = nowSecProvider,
-                        )
+                        if (playbackArt) ChannelsListPlaybackArt(channels, frame, nowSecProvider, view.showsProgramArt,
+                            Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(vertical = ChannelsListPlaybackArtTop)
+                                .weight(1f, fill = false))
+                        ChannelsImmersiveHero(channels, frame, nowSecProvider, Modifier, besideList = true)
                     }
                 }
             }
@@ -1071,7 +1070,10 @@ internal data class ChannelsTabBody(
     val initialFocusEnabled: Boolean,
     val playbackChannelId: ChannelId?,
     val playbackIndicator: ChannelPlaybackIndicator,
-)
+) {
+    /** A missing programme is still on its way rather than absent. */
+    val guideLoading: Boolean get() = connection.awaitsGuide(observation.epgState)
+}
 
 /** An empty group says so; with All channels visible it offers to show them instead. */
 @Composable
@@ -1256,62 +1258,6 @@ private fun connectionMessage(state: ConnectionUiState): String = stringResource
         }
     }
 )
-
-@Composable
-private fun FocusedChannelDetails(
-    channels: List<Channel>,
-    focusedChannelId: () -> ChannelId?,
-    selectedId: () -> ChannelId?,
-    observation: SessionObservation,
-    nowSecProvider: () -> Long,
-) {
-    // These reads belong to the details composition, not the screen or list.
-    // Keep local native focus ahead of shared selection during restoration.
-    val detailChannelId = rememberTabReader {
-        focusedChannelId()?.takeIf { id -> channels.any { it.id == id } }
-            ?: browsingFocusChannelId(channels, selectedId())
-    }()
-    // The details are informational and never focusable, so the column can dissolve
-    // between programmes instead of hard-cutting as the browsed row changes. Each
-    // state resolves its own EPG inside the transition, so the outgoing copy keeps
-    // showing the channel it was written for. Size changes snap rather than moving
-    // text baselines during the dissolve.
-    AnimatedContent(
-        targetState = detailChannelId,
-        transitionSpec = {
-            fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith
-                fadeOut(tween(ChannelsDetailCrossfadeMillis)) using
-                SizeTransform(clip = false) { _, _ -> snap() }
-        },
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopStart,
-        label = "channelsDetails",
-    ) { id ->
-        val channel = channels.firstOrNull { it.id == id }
-        val nowSec = nowSecProvider()
-        val now = remember(observation, channel?.id, nowSec) {
-            channel?.id?.let {
-                profileTrace("P48:channelsNowLookup") {
-                    observation.eventAt(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
-                }
-            }
-        }
-        val next = remember(observation, channel?.id, nowSec) {
-            channel?.id?.let {
-                profileTrace("P48:channelsNextLookup") {
-                    observation.nextEvent(it, kotlin.time.Instant.fromEpochSeconds(nowSec))
-                }
-            }
-        }
-        if (channel != null) ChannelsProgrammeDetails(
-            channel = channel,
-            now = now,
-            next = next,
-            nowSec = nowSec,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
-}
 
 /** Between the header and the content below it. */
 private val ChannelsHeaderGap = 8.dp

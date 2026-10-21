@@ -32,6 +32,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import coil3.ImageLoader
 import coil3.map.Mapper
@@ -182,7 +183,8 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 composeRule.onNodeWithTag("channel-row-2").assertDoesNotExist()
                 composeRule.onNodeWithText(instrumentation.targetContext.getString(R.string.channels_empty_group)).assertIsDisplayed()
             } else if (scenario != "tags-overflow") {
-                composeRule.onNodeWithTag("channels-detail-channel").assertTextEquals(channels[1].name!!)
+                composeRule.onNodeWithTag("channels-headline-channel")
+                    .assertTextContains(channelTitleText(channels[1].number, channels[1].name!!))
             }
             if (scenario == "playing-recording") {
                 focus.assertIsSelected().assertContentDescriptionEquals("Currently playing", "Recording now")

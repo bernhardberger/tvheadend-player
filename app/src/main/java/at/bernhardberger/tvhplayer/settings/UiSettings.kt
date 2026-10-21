@@ -29,8 +29,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
-        val CHANNELS_CARD_ART = booleanPreferencesKey("channelsCardArt")
-        val CHANNELS_BACKDROP_ART = booleanPreferencesKey("channelsBackdropArt")
+        fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
@@ -39,11 +38,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
-            channelsView = resolveChannelsView(
-                layout = preferences[Keys.CHANNELS_LAYOUT],
-                cardArt = preferences[Keys.CHANNELS_CARD_ART],
-                backdropArt = preferences[Keys.CHANNELS_BACKDROP_ART],
-            ),
+            channelsView = resolveChannelsView(preferences[Keys.CHANNELS_LAYOUT]) { preferences[Keys.channelsProgramArt(it)] },
         )
     }
 
@@ -56,8 +51,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setChannelsView(view: ChannelsView) {
         dataStore.edit { preferences ->
             preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
-            preferences[Keys.CHANNELS_CARD_ART] = view.cardArt
-            preferences[Keys.CHANNELS_BACKDROP_ART] = view.backdropArt
+            ChannelsLayout.entries.forEach { preferences[Keys.channelsProgramArt(it)] = it in view.programArt }
         }
     }
 

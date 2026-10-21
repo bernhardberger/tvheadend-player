@@ -64,7 +64,7 @@ private fun premultiply(pixels: IntArray, unpremultiply: Boolean) {
 }
 
 /** One box-blur pass along rows or columns of premultiplied pixels, clamping at the edges. */
-private fun boxBlur(pixels: IntArray, width: Int, height: Int, radius: Int, horizontal: Boolean) {
+internal fun boxBlur(pixels: IntArray, width: Int, height: Int, radius: Int, horizontal: Boolean) {
     val length = if (horizontal) width else height
     val lines = if (horizontal) height else width
     val span = 2 * radius + 1

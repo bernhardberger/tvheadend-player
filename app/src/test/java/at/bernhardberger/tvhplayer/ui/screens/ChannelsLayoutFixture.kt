@@ -10,6 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
@@ -33,10 +34,15 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EpgEpisode
+import at.bernhardberger.tvheadend.sdk.core.EpgRating
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -79,8 +85,12 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         warmPlayback: Boolean = false,
         allChannels: Boolean = true,
         emptyGroup: Boolean = false,
+        recordingNow: Int? = null,
+        scheduledNext: Int? = null,
+        video: android.graphics.Bitmap? = null,
+        guidePending: Boolean = false,
     ) {
-        val observation = observation(tags, manyTags, emptyGroup)
+        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending)
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
             configured = true, allChannelsVisible = false,
@@ -94,6 +104,12 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                 TVHeadendPlayerTheme {
                     this@ChannelsLayoutFixture.view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                        // A still standing in for the live video behind the screen.
+                        video?.let {
+                            androidx.compose.foundation.Image(it.asImageBitmap(), null, Modifier.fillMaxSize(),
+                                contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                            at.bernhardberger.tvhplayer.ui.WarmPlaybackScrim()
+                        }
                         SideRail(
                             currentRoute = AppDestination.CHANNELS,
                             showEpgMenu = true,
@@ -146,7 +162,10 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         compose.onNode(target and isFocused()).assertIsFocused().assertIsDisplayed()
     }
 
-    private fun observation(tags: Boolean, manyTags: Boolean, emptyGroup: Boolean): SessionObservation {
+    private fun observation(
+        tags: Boolean, manyTags: Boolean, emptyGroup: Boolean, recordingNow: Int?, scheduledNext: Int?,
+        guidePending: Boolean,
+    ): SessionObservation {
         val channels = LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
                 id = ChannelId(index + 1L), name = name, number = index + 1L,
@@ -178,6 +197,11 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                     title = title,
                     // Only the first programme has a subtitle, as EIT supplies one beside the title.
                     subtitle = "Winter on the ridge".takeIf { index == 0 },
+                    // A rich XMLTV programme: genre, episode, year and age rating.
+                    genre = "Documentary".takeIf { index == 0 },
+                    episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3").takeIf { index == 0 },
+                    copyrightYear = 2024L.takeIf { index == 0 },
+                    rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
                     summary = SYNOPSES[index],
                     // The Kettle Hour deliberately has no art: the immersive picon fallback.
                     image = ArtworkId(101 + index).takeIf { index != 5 },
@@ -196,7 +220,8 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                 ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
             ),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, channelTags)),
-            epgState = EpgRepositoryState.Current(
+            // A first connection whose guide is still on its way has no snapshot yet.
+            epgState = if (guidePending) EpgRepositoryState.Synchronizing(null) else EpgRepositoryState.Current(
                 EpgSnapshot.create(
                     events = events,
                     coverages = channels.map {
@@ -208,7 +233,17 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                     },
                 ),
             ),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+            // Channel n's current programme is event n00, its next n01.
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOfNotNull(
+                recordingNow?.let {
+                    DvrEntry.create(DvrEntryId(1), channelId = ChannelId(it.toLong()), eventId = EventId(it * 100L),
+                        state = DvrEntryState.RECORDING)
+                },
+                scheduledNext?.let {
+                    DvrEntry.create(DvrEntryId(2), channelId = ChannelId(it.toLong()), eventId = EventId(it * 100L + 1),
+                        state = DvrEntryState.SCHEDULED)
+                },
+            ))),
         )
     }
 

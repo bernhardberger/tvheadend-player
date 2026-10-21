@@ -517,8 +517,8 @@ bear on this:
   `HH:MM · title` with a progress strip; there are playing, paused, tuning and
   recording markers (`ui/components/ChannelRow.kt`).
 - A passive preview column shows artwork or picon, time range, title,
-  subtitle, a 2–3 line synopsis and the Next line
-  (`ui/screens/ChannelsProgrammeDetails.kt`).
+  subtitle, a 2–3 line synopsis and the Next line. U4 replaced it with the
+  Immersive headline (`ui/screens/ChannelsImmersiveList.kt`).
 - Keys:
   - OK plays.
   - CH+/− page the list.
@@ -527,12 +527,6 @@ bear on this:
   - Long-press and Menu do nothing.
 - States: empty tag (no action), no channels (Retry and Settings), refresh and
   error banners, a missing-tag banner.
-
-**Unfinished**
-- A failed tag-preference load or save is invisible here
-  (`ChannelsViewModel.settingsFailure` is unused by this screen).
-- The empty-tag panel has no "Show all channels" action.
-- The synopsis can never be read in full from Channels.
 
 **Nits**
 - `browse-cohesion/implemented/channels-current.png`: long channel and
@@ -546,7 +540,6 @@ bear on this:
 - Search or filter.
 - Number entry.
 - Recent channels.
-- Per-channel actions: record now, details.
 - Sort options.
 - More than one Next programme.
 
@@ -559,10 +552,14 @@ bear on this:
 - Open: keep the channel-group tabs, move them to a filter at the top right,
   or make that configurable.
 
+**U4 outcome (2026-10-21)**
+- View modes Immersive (default), List and Grid, chosen from a View options
+  button in the header; group tabs became a Group button there. The current
+  contract is in `docs/DESIGN.md` §9, "Channels · layouts, headline and
+  backdrop".
+
 **Questions**
 1. Do search and number entry belong on Channels or on Home?
-2. Which view modes, and where is the switch (header, Menu, Settings)?
-3. Group tabs, a top-right filter, or a setting?
 
 ## Guide and search
 

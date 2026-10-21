@@ -169,6 +169,7 @@ internal fun ChannelsGrid(
                     programmePicture = programmePicture,
                     preferredHeight = cardHeight,
                     channelLed = true,
+                    programmeLoading = frame.guideLoading,
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)

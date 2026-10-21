@@ -179,9 +179,19 @@ internal fun Modifier.browseDetailsViewport(): Modifier {
     }
 }
 
-/** How far [browseDetailsViewport] reaches past the content's start, under the closed rail. */
+/**
+ * How far a row reaches past the content's start: under the drawer at its widest, so passed cards
+ * run on to the screen edge however far the drawer has moved the content. See [browseUnderlap].
+ */
 @Composable
-internal fun browseRailUnderlap(): Dp = if (LocalBrowseFullWidth.current != null) ClosedDrawerWidth else 0.dp
+internal fun browseDrawerUnderlap(): Dp = if (LocalBrowseFullWidth.current != null) OpenDrawerWidth else 0.dp
+
+/** Widens the content by [underlap] toward the leading edge, beyond its parent's start. */
+internal fun Modifier.browseUnderlap(underlap: Dp): Modifier = layout { measurable, constraints ->
+    val extra = underlap.roundToPx()
+    val page = measurable.measure(constraints.copy(minWidth = constraints.maxWidth + extra, maxWidth = constraints.maxWidth + extra))
+    layout(constraints.maxWidth, page.height) { page.placeRelative(-extra, 0) }
+}
 
 /** A screen backdrop covers the whole screen and stays put while the opening drawer moves the browse content. */
 @Composable

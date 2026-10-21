@@ -683,15 +683,21 @@ private val DetailsBackdropDecodeSize = 320 to 180
 private const val DetailsBackdropWidth = 160
 private const val DetailsBackdropBlurRadius = 3
 // A logo standing in for the art fills this share of the backdrop, like the list preview's logo.
-private const val DetailsBackdropLogoFit = 0.6f
-private val DetailsHeroLogoSize = 240.dp to 135.dp
+// Its hard shapes would stretch into visible steps from the art's small blur, so it is baked at
+// the full decode width and spread far wider into a glow.
+private const val DetailsBackdropLogoFit = 0.8f
+private const val DetailsBackdropLogoScrimAlpha = 0.35f
+private const val DetailsBackdropLogoWidth = 320
+private const val DetailsBackdropLogoBlurRadius = 20
+internal val DetailsHeroLogoSize = 240.dp to 135.dp
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f
 
 /**
  * The kit's immersive background: top-right 16:9 art under [KitCinematicScrim], or a blurred
  * full-screen copy. Without art the blurred copy is of the channel's [picon], centred on the
- * backdrop's colour beneath; the corner takes [DetailsHeroLogo] instead.
+ * backdrop's colour beneath; the corner takes [DetailsHeroLogo] instead. [onSettled] reports
+ * once the picture has loaded or failed, or at once when there is none.
  */
 @Composable
 internal fun DetailsHero(
@@ -701,39 +707,63 @@ internal fun DetailsHero(
     background: State<Color>? = null,
     picon: ArtworkId? = null,
     onLoaded: (() -> Unit)? = null,
+    onSettled: (() -> Unit)? = null,
 ) {
-    val session = LocalArtworkContext.current.currentSession ?: return
+    val artwork = LocalArtworkContext.current
+    val session = artwork.currentSession
+    val logo by remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }
+    // Art needs the session; the blurred logo shows its saved copy before one, as the logos do.
+    val source = when {
+        image != null -> session?.let { AppArtworkSource(it, image) }
+        blurred -> logo?.takeIf { it.currentSession != null || it.saved != null }
+        else -> null
+    }
+    if (source == null) {
+        if (onSettled != null) LaunchedEffect(Unit) { onSettled() }
+        return
+    }
     if (blurred) {
-        val source = image ?: picon ?: return
         // Full screen: the blur only reads as a backdrop when it covers the page. It is baked into
         // a small decode, which stretches smoothly, instead of blurred by the GPU on every frame.
         val context = LocalPlatformContext.current
-        val request = remember(session, source, image == null, context) {
-            ImageRequest.Builder(context).data(AppArtworkSource(session, source))
+        val request = remember(source, image == null, context) {
+            ImageRequest.Builder(context).data(source)
                 .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
-                .transformations(BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius,
-                    DetailsBlurredScrimAlpha, fit = DetailsBackdropLogoFit.takeIf { image == null }))
+                .transformations(if (image != null) {
+                    BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius, DetailsBlurredScrimAlpha)
+                } else {
+                    BackdropTransformation(DetailsBackdropLogoWidth, DetailsBackdropLogoBlurRadius,
+                        DetailsBackdropLogoScrimAlpha, fit = DetailsBackdropLogoFit)
+                })
                 .build()
         }
         // A logo leaves the colour beneath showing, so only art counts as covering the page.
         AsyncImage(request, null, contentScale = ContentScale.Crop,
             modifier = modifier.fillMaxSize().testTag(if (image != null) "details-hero-blurred" else "details-hero-blurred-logo"),
-            onSuccess = { if (image != null) onLoaded?.invoke() })
+            onSuccess = {
+                if (image != null) onLoaded?.invoke()
+                onSettled?.invoke()
+            },
+            onError = { onSettled?.invoke() })
         return
     }
-    if (image == null) return
     val neutral = MaterialTheme.colorScheme.background
-    AsyncImage(AppArtworkSource(session, image), null,
+    AsyncImage(source, null,
         contentScale = ContentScale.Crop,
         modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
             .testTag("details-hero")
-            .unditheredGradient(over = true) { size -> kitCinematicScrim(background?.value ?: neutral, size) })
+            .unditheredGradient(over = true) { size -> kitCinematicScrim(background?.value ?: neutral, size) },
+        onSuccess = { onSettled?.invoke() },
+        onError = { onSettled?.invoke() })
 }
 
-/** The channel's logo where [DetailsHero]'s corner art would be, for a programme without art. */
+/**
+ * The channel's logo where [DetailsHero]'s corner art would be, for a programme without art. At
+ * this size a placeholder would be the loudest thing on the page, so only the logo itself shows.
+ */
 @Composable
 internal fun DetailsHeroLogo(picon: ArtworkId?, modifier: Modifier) {
-    PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second))
+    PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second), placeholders = false)
 }
 
 /**

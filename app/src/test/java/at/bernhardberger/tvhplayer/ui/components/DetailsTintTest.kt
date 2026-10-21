@@ -17,7 +17,9 @@ import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
@@ -105,6 +107,32 @@ class DetailsTintTest {
         runBlocking { store.put("tint-test-2", 0x336699) }
         showPage(hasArt = false)
         assertPixel(20, 20, 0xFF000000.toInt() or detailsTintRgb(0x336699))
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
+    @Test fun beforeASessionASavedLogosStoredColourShowsInTheFirstFrame() {
+        val profile = ServerProfile("first.tvheadend.test")
+        val tvheadend = FakeTvheadendSession()
+        tvheadend.artwork.scriptCached(profile)
+        tvheadend.publish(SessionObservation.create(
+            sessionState = SessionState.Synchronizing,
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Test", icon = picon)))),
+        ), profile)
+        runBlocking { store.put(TvheadendTestResultFactory.cachedArtwork(profile, picon).cacheKey, 0x336699) }
+        val returned = mutableListOf<Color>()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalChannelAccents provides accents) {
+                TVHeadendPlayerTheme {
+                    ProvideAppArtwork(tvheadend) {
+                        val tint = rememberDetailsTint(null, picon).value
+                        SideEffect { returned += tint }
+                    }
+                }
+            }
+        }
+        assertNull(tvheadend.observation.value.currentSession)
+        assertEquals(Color(0xFF000000.toInt() or detailsTintRgb(0x336699)), returned.first())
     }
 
     @Test fun absentArtAndPiconKeepsTheTheme() {

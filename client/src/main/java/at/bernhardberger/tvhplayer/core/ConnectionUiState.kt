@@ -1,9 +1,11 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionFailureKind
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.epgSnapshotForDisplay
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -76,6 +78,16 @@ fun shouldPresentEmptyTag(
     connectionState == ConnectionUiState.Ready &&
     hasChannelsOutsideActiveTag &&
     activeTagSelected
+
+/**
+ * Whether the programme guide is still on its way: none is there to show while the connection is
+ * being made or the guide synchronizes. Otherwise a missing programme is final.
+ */
+fun ConnectionUiState.awaitsGuide(epg: EpgRepositoryState): Boolean = epg.epgSnapshotForDisplay == null && when (this) {
+    ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels, ConnectionUiState.Reconnecting -> true
+    ConnectionUiState.Ready -> epg is EpgRepositoryState.Synchronizing
+    else -> false
+}
 
 fun SessionState.toConnectionUiState(): ConnectionUiState = when (this) {
     // The caller has an available profile; transport state cannot establish missing settings.

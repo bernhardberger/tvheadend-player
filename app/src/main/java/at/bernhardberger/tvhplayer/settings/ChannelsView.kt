@@ -8,41 +8,26 @@ enum class ChannelsLayout {
 }
 
 /**
- * Where View options may show programme art, each with the layouts that use it. Off, cards show
- * the channel logo and the backdrop takes the logo's colour.
- */
-enum class ChannelsArtwork(val layouts: Set<ChannelsLayout>) {
-    CARDS(setOf(ChannelsLayout.GRID, ChannelsLayout.IMMERSIVE)),
-    // Immersive's corner art is its backdrop already.
-    BACKDROP(setOf(ChannelsLayout.LIST, ChannelsLayout.GRID)),
-}
-
-/**
- * The Channels screen's view, remembered for the whole app. Art settings the current layout does
- * not use are kept, so switching back restores them.
+ * The Channels screen's view, remembered for the whole app. Each layout keeps its own art switch,
+ * so switching layouts never changes another layout's look.
  */
 data class ChannelsView(
     val layout: ChannelsLayout = ChannelsLayout.IMMERSIVE,
-    val cardArt: Boolean = false,
-    val backdropArt: Boolean = true,
+    /**
+     * The layouts whose art switch is on. Cards show channel logos by default; the list starts
+     * with the focused programme's picture behind it.
+     */
+    val programArt: Set<ChannelsLayout> = setOf(ChannelsLayout.LIST),
 ) {
-    fun shows(artwork: ChannelsArtwork): Boolean = when (artwork) {
-        ChannelsArtwork.CARDS -> cardArt
-        ChannelsArtwork.BACKDROP -> backdropArt
-    }
+    /** Whether cards and the backdrop behind them show programme pictures rather than logos. */
+    val showsProgramArt: Boolean get() = layout in programArt
 
-    fun toggled(artwork: ChannelsArtwork): ChannelsView = when (artwork) {
-        ChannelsArtwork.CARDS -> copy(cardArt = !cardArt)
-        ChannelsArtwork.BACKDROP -> copy(backdropArt = !backdropArt)
-    }
+    fun toggledProgramArt(): ChannelsView =
+        copy(programArt = if (layout in programArt) programArt - layout else programArt + layout)
 }
 
 /** Stored values to a view; anything missing or unknown keeps its default. */
-fun resolveChannelsView(layout: String?, cardArt: Boolean?, backdropArt: Boolean?): ChannelsView {
-    val default = ChannelsView()
-    return ChannelsView(
-        layout = ChannelsLayout.entries.firstOrNull { it.name == layout } ?: default.layout,
-        cardArt = cardArt ?: default.cardArt,
-        backdropArt = backdropArt ?: default.backdropArt,
-    )
-}
+fun resolveChannelsView(layout: String?, programArt: (ChannelsLayout) -> Boolean?): ChannelsView = ChannelsView(
+    layout = ChannelsLayout.entries.firstOrNull { it.name == layout } ?: ChannelsView().layout,
+    programArt = ChannelsLayout.entries.filterTo(mutableSetOf()) { programArt(it) ?: (it in ChannelsView().programArt) },
+)

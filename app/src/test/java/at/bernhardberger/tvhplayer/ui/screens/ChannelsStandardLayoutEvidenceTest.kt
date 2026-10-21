@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -29,6 +30,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsNodeInteraction
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performSemanticsAction
@@ -39,7 +41,6 @@ import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
@@ -76,6 +77,7 @@ import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import coil3.ImageLoader
@@ -177,7 +179,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // Nothing selected or remembered yet: the anchor is the first channel in scope.
         row(1).assertIsFocused()
-        detail("channels-detail-channel").assertTextEquals(name(1))
+        headlineChannel().assertTextContains(title(1))
 
         key(Key.DirectionUp)
         groupButton().assertIsFocused()
@@ -188,7 +190,7 @@ class ChannelsStandardLayoutEvidenceTest {
         pickGroup(steps = 1)
         row(PLAYING).assertIsFocused()
         heading("Favourites").assertExists()
-        detail("channels-detail-channel").assertTextEquals(name(PLAYING))
+        headlineChannel().assertTextContains(title(PLAYING))
 
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -295,13 +297,13 @@ class ChannelsStandardLayoutEvidenceTest {
         val scaleOverflow = (focusedPicon.width / 60f - 1f) * first.width / 2f
         assertTrue("focus scale fits the list column", first.left - scaleOverflow >= listColumn.left)
 
-        // Preview is 40dp after the unscaled row, beside its top, within safe bounds.
+        // The preview pane runs beside the rows, 92dp after them, and its headline rests on the safe inset.
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
         assertEquals("details width", 340f, details.width, .5f)
-        assertEquals("details top", 80f, details.top, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
         assertEquals("details bottom inset", 512f, details.bottom, .5f)
+        assertEquals("headline on the safe inset", 512f, detail("channels-immersive-hero").bounds().bottom, .5f)
     }
 
     @Test
@@ -309,20 +311,20 @@ class ChannelsStandardLayoutEvidenceTest {
     fun theDetailsColumnCrossfadesBetweenChannelsAndSettlesOnOne() {
         channelsShell(1f)
         enterAndFocus(1)
-        detail("channels-detail-channel").assertTextEquals(name(1))
+        headlineChannel().assertTextContains(title(1))
 
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(ChannelsDetailCrossfadeMillis / 2L)
-        // Both programmes are on screen during the dissolve, and the outgoing copy
+        // Both headlines are on screen during the dissolve, and the outgoing copy
         // keeps the channel it was written for instead of adopting the new row's EPG.
-        compose.onAllNodesWithText(name(1)).assertCountEquals(1)
-        compose.onAllNodesWithText(name(2)).assertCountEquals(1)
+        compose.onAllNodes(hasTestTag("channels-headline-channel") and hasText(title(1))).assertCountEquals(1)
+        compose.onAllNodes(hasTestTag("channels-headline-channel") and hasText(title(2))).assertCountEquals(1)
 
         compose.mainClock.autoAdvance = true
         compose.waitForIdle()
-        compose.onAllNodesWithTag("channels-detail-channel", useUnmergedTree = true).assertCountEquals(1)
-        detail("channels-detail-channel").assertTextEquals(name(2))
+        compose.onAllNodesWithTag("channels-headline-channel").assertCountEquals(1)
+        headlineChannel().assertTextContains(title(2))
         row(2).assertIsFocused()
     }
 
@@ -399,8 +401,7 @@ class ChannelsStandardLayoutEvidenceTest {
         compose.mainClock.advanceTimeBy(1_000)
         val originalFirst = row(1).bounds()
         val rowHeight = originalFirst.height
-        val artwork = detail("channels-preview").bounds()
-        val footer = detail("channels-detail-next").bounds().bottom
+        val footer = headlineBottom()
 
         fun move(key: Key) {
             compose.onRoot().performKeyInput { pressKey(key) }
@@ -445,8 +446,7 @@ class ChannelsStandardLayoutEvidenceTest {
         pickGroup(steps = 1, move = ::move)
         assertSettled(PLAYING) // Explicit restoration can clamp this short scope at the start.
         assertFocusedShapePixels(PLAYING, rowHeight, scrolled = fontScale != 1f)
-        assertEquals("artwork stays fixed", artwork, detail("channels-preview").bounds())
-        assertEquals("footer stays fixed", footer, detail("channels-detail-next").bounds().bottom, .5f)
+        assertEquals("headline stays on the safe inset", footer, headlineBottom(), .5f)
         assertEquals("focus and restoration do not tune", 0, playbackRequests)
         capture("en-font$fontScale-native-tv-pivot-restored-bright-video")
     }
@@ -652,68 +652,62 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun enlargedLongProgrammeKeepsTwoWholeSynopsisLinesBelowTitleAndSubtitle() {
+    fun enlargedLongProgrammeKeepsThreeWholeSynopsisLinesBelowTitleAndSubtitle() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
-        assertDescriptionFits(2)
+        assertDescriptionFits(3)
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun artworkAndTitleAnchorsStayFixedAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1f)
+    fun headlineRestsOnTheSafeInsetAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1f)
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun enlargedGermanArtworkAndTitleAnchorsStayFixedAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1.3f)
+    fun enlargedGermanHeadlineRestsOnTheSafeInsetAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1.3f)
 
     private fun checkDetailAnchors(fontScale: Float) {
         channelsShell(fontScale)
         enterAndFocus(1)
-        val image = detail("channels-preview").bounds()
-        val titleTop = detail("channels-detail-title").bounds().top
-        assertEquals("full-width artwork", 340f, image.width, .5f)
-        assertEquals("16:9 artwork height", 191.25f, image.height, .5f)
-        assertEquals("Next reaches the real safe bottom", 512f, detail("channels-detail-next").bounds().bottom, .5f)
-        for (channel in 2..NO_EPG) {
-            key(Key.DirectionDown)
+        for (channel in 1..NO_EPG) {
+            if (channel > 1) key(Key.DirectionDown)
             row(channel).assertIsFocused()
-            assertEquals("channel changes never resize or move artwork", image, detail("channels-preview").bounds())
-            assertEquals("title anchor", titleTop, detail("channels-detail-title").bounds().top, .5f)
+            assertEquals("the headline rests on the real safe bottom", 512f, headlineBottom(), .5f)
+            assertPictureClearsTheHeadline()
             if (channel == NO_EPG) {
-                detail("channels-detail-next").assertDoesNotExist()
-                detail("channels-detail-subtitle").assertDoesNotExist()
-                detail("channels-detail-description").assertDoesNotExist()
+                detail("channels-immersive-title").assertTextEquals(noEpg)
+                detail("channels-immersive-next").assertDoesNotExist()
+                detail("channels-immersive-subtitle").assertDoesNotExist()
+                detail("channels-headline-synopsis").assertDoesNotExist()
             } else {
-                assertEquals("Next stays pinned to the real safe bottom", 512f, detail("channels-detail-next").bounds().bottom, .5f)
+                assertEquals("Next closes the headline", 512f, detail("channels-immersive-next").bounds().bottom, .5f)
             }
         }
     }
 
     private fun assertDescriptionFits(expectedLines: Int) {
-        val description = detail("channels-detail-description")
-        val subtitle = detail("channels-detail-subtitle").bounds()
-        val next = detail("channels-detail-next").bounds()
-        if (expectedLines == 0) {
-            description.assertDoesNotExist()
-            assertTrue("Next clears the supplied subtitle", next.top >= subtitle.bottom + 7f)
-        } else {
-            val layout = description.textLayout()
-            assertEquals("actual rendered synopsis lines", expectedLines, layout.lineCount)
-            assertTrue("last line remains inside the measured text", layout.getLineBottom(expectedLines - 1) <= description.bounds().height + .5f)
-            assertTrue("next programme is below the description", next.top >= description.bounds().bottom + 7f)
-            assertTrue("description below supplied subtitle", description.bounds().top >= subtitle.bottom + 7f)
+        val description = detail("channels-headline-synopsis")
+        val subtitle = detail("channels-immersive-subtitle").bounds()
+        val time = detail("channels-immersive-metadata").bounds()
+        val next = detail("channels-immersive-next").bounds()
+        val layout = description.textLayout()
+        assertEquals("actual rendered synopsis lines", expectedLines, layout.lineCount)
+        assertTrue("last line remains inside the measured text", layout.getLineBottom(expectedLines - 1) <= description.bounds().height + .5f)
+        assertTrue("next programme is below the description", next.top >= description.bounds().bottom + 19f)
+        assertTrue("description below the programme's time", description.bounds().top >= time.bottom + 19f)
+        assertTrue("time below the supplied subtitle", time.top >= subtitle.bottom + 7f)
+        listOf("channels-immersive-title", "channels-immersive-subtitle").forEach { tag ->
+            val text = detail(tag).textLayout()
+            assertTrue("$tag retains its whole final line", text.getLineBottom(text.lineCount - 1) <= detail(tag).bounds().height + .5f)
         }
-        listOf("channels-detail-title", "channels-detail-subtitle", "channels-detail-next").forEach { tag ->
-            val layout = detail(tag).textLayout()
-            assertTrue("$tag retains its whole final line", layout.getLineBottom(layout.lineCount - 1) <= detail(tag).bounds().height + .5f)
-        }
-        val preview = detail("channels-preview").bounds()
-        assertEquals("preview stays full width", 340f, preview.width, .5f)
-        assertEquals("preview keeps its fixed 16:9 height", 191.25f, preview.height, .5f)
-        assertEquals("preview top stays on the list axis", compose.onNodeWithTag("channels-details").bounds().top, preview.top, .5f)
-        assertEquals("title outside image with 4dp gap", preview.bottom + 4f, detail("channels-detail-title").bounds().top, 1f)
-        assertEquals("subtitle 4dp below title", detail("channels-detail-title").bounds().bottom + 4f, detail("channels-detail-subtitle").bounds().top, 1f)
-        assertTrue("channel identity inside image", detail("channels-detail-channel").bounds().top >= preview.top)
-        assertTrue("progress inside image", detail("channels-detail-progress").bounds().bottom <= preview.bottom)
+        assertTrue("the headline stays below the header", headlineChannel().bounds().top >= header().bounds().bottom)
+        assertPictureClearsTheHeadline()
         assertEquals("Next is anchored to the real column bottom, not wrap content", 512f, next.bottom, .5f)
+    }
+
+    /** Over playback the picture keeps the pane's top and gives way to the headline below it. */
+    private fun assertPictureClearsTheHeadline() {
+        val picture = compose.onAllNodesWithTag("channels-list-playback-art", useUnmergedTree = true)
+            .fetchSemanticsNodes().singleOrNull()?.boundsInRoot ?: return
+        assertTrue("picture $picture above the headline", picture.bottom <= headlineChannel().bounds().top + .5f)
     }
 
     // ---- captures ----
@@ -742,11 +736,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
         key(Key.DirectionDown)
         row(LONG_TEXT).assertIsFocused()
-        assertDescriptionFits(when {
-            fontScale < 1.3f -> 3
-            locale == "de" -> 1
-            else -> 2
-        })
+        assertDescriptionFits(3)
         captureBackgrounds("$prefix-long-programme")
 
         key(Key.DirectionDown)
@@ -927,6 +917,9 @@ class ChannelsStandardLayoutEvidenceTest {
         else -> "Channel $n"
     }
 
+    private val noEpg: String
+        get() = ApplicationProvider.getApplicationContext<Application>().getString(R.string.no_epg)
+
     private val isGerman: Boolean
         get() = ApplicationProvider.getApplicationContext<Application>().resources.configuration.locales[0].language == "de"
 
@@ -1008,6 +1001,10 @@ class ChannelsStandardLayoutEvidenceTest {
     }
     private fun row(n: Int) = compose.onNodeWithTag("channel-row-$n")
     private fun detail(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true)
+    /** The headline's channel line, merged with its marks. */
+    private fun headlineChannel() = compose.onNodeWithTag("channels-headline-channel")
+    private fun headlineBottom() = detail("channels-immersive-hero").bounds().bottom
+    private fun title(n: Int) = channelTitleText(n.toLong(), name(n))
 
     /** Unmerged descendant [tag] of channel row [n]; rows merge their semantics. */
     private fun inRow(n: Int, tag: String): SemanticsNodeInteraction {
@@ -1045,16 +1042,16 @@ class ChannelsStandardLayoutEvidenceTest {
         File(directory, "$name.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
-        val preview = detail("channels-preview").bounds()
-        val next = compose.onAllNodesWithTag("channels-detail-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
-        val synopsisLines = if (compose.onAllNodesWithTag("channels-detail-description", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
-            detail("channels-detail-description").textLayout().lineCount
+        val picture = compose.onAllNodesWithTag("channels-list-playback-art", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
+        val next = compose.onAllNodesWithTag("channels-immersive-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
+        val synopsisLines = if (compose.onAllNodesWithTag("channels-headline-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
+            detail("channels-headline-synopsis").textLayout().lineCount
         File(directory, "$name.txt").writeText(
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +
                 "focus/scenario=${name.substringAfter("-font").substringAfter("-").removeSuffix("-bright-video").removeSuffix("-dark-video")}; " +
                 "background=${if (name.endsWith("bright-video")) "white #FFFFFF" else "dark #182330"}; " +
-                "artwork=$preview; titleTop=${detail("channels-detail-title").bounds().top}; " +
+                "picture=${picture?.boundsInRoot ?: "absent"}; headlineTop=${headlineChannel().bounds().top}; " +
                 "nextBottom=${next?.boundsInRoot?.bottom ?: "absent"}; synopsisLines=$synopsisLines; " +
                 "production=MainStartupComposition+SideRail+ChannelsScreenContent; " +
                 "synthetic video; static offline composition only\n",

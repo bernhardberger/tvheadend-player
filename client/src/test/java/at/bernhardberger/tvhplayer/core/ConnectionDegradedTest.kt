@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.core
 
+import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import org.junit.Assert.*
@@ -18,6 +20,21 @@ class ConnectionDegradedTest {
             assertTrue(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE,
                 SessionRecoveryDisposition.AUTOMATIC_BACKOFF).isDegraded(lost))
         }
+    }
+
+    @Test fun theGuideIsAwaitedOnlyWhileItCanStillArrive() {
+        val retained = EpgRepositoryState.Stale(EpgSnapshot.create())
+        for (state in listOf(ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels, ConnectionUiState.Reconnecting)) {
+            assertTrue(state.awaitsGuide(EpgRepositoryState.Empty))
+            assertFalse(state.awaitsGuide(retained))
+        }
+        assertTrue(ConnectionUiState.Ready.awaitsGuide(EpgRepositoryState.Synchronizing(null)))
+        assertFalse(ConnectionUiState.Ready.awaitsGuide(EpgRepositoryState.Synchronizing(EpgSnapshot.create())))
+        assertFalse(ConnectionUiState.Ready.awaitsGuide(EpgRepositoryState.Current(EpgSnapshot.create())))
+        assertFalse(ConnectionUiState.Ready.awaitsGuide(EpgRepositoryState.Empty))
+        assertFalse(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE,
+            SessionRecoveryDisposition.AUTOMATIC_BACKOFF).awaitsGuide(EpgRepositoryState.Empty))
+        assertFalse(ConnectionUiState.NeedsConfiguration.awaitsGuide(EpgRepositoryState.Empty))
     }
 
     @Test fun failureStaysDegradedThroughRetryAttemptsUntilAConnectionSucceeds() {

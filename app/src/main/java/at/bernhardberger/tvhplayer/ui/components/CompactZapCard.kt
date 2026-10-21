@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -40,6 +41,7 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
 import at.bernhardberger.tvhplayer.images.ScrimTransformation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
@@ -59,7 +61,8 @@ internal val CompactZapCardWidth = 196.dp
  * without one the card shows the channel logo as the rail does. A grid asks for its rows'
  * [preferredHeight]; the card never gets shorter than its text needs. A [channelLed] card names
  * the channel first and starts its programme line with the start time; otherwise the programme
- * leads and time left follows the channel.
+ * leads and time left follows the channel. While the guide is [programmeLoading], a missing
+ * programme line is a [SkeletonLine] rather than "No EPG".
  */
 @Composable
 internal fun CompactZapCard(
@@ -77,6 +80,7 @@ internal fun CompactZapCard(
     programmePicture: Boolean = false,
     preferredHeight: Dp? = null,
     channelLed: Boolean = false,
+    programmeLoading: Boolean = false,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = menuKey)
     val currentEvent = event?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
@@ -98,6 +102,12 @@ internal fun CompactZapCard(
         if (source == null || !channelLed) source
         else ImageRequest.Builder(context).data(source).transformations(compactZapTextScrim(textTop)).build()
     }
+    // A channel-led card keeps its logo over the picture, with a halo of its own so it reads
+    // without the whole picture darkening.
+    val logoOverArt = channelLed && showArtwork
+    val halo = if (logoOverArt) CompactZapLogoHalo else 0.dp
+    val haloPx = with(LocalDensity.current) { halo.roundToPx() }
+    val haloTransformation = remember(haloPx) { if (haloPx > 0) LogoHaloTransformation(haloPx, CompactZapLogoHaloAlpha) else null }
     CompactCard(
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
@@ -120,7 +130,7 @@ internal fun CompactZapCard(
                         LinearGradient(0f, 0f, 0f, size.height, top, 0, Shader.TileMode.CLAMP)
                     })
                 }
-                if (!showArtwork) Box(
+                if (!showArtwork || logoOverArt) Box(
                     // The room reaches into the title's leading, so the logo centres between the card's
                     // top and the title's letters rather than above its line box. The inset keeps a
                     // tall logo clear of both; a wide one is bound by its width instead.
@@ -130,10 +140,13 @@ internal fun CompactZapCard(
                     ),
                     contentAlignment = Alignment.Center,
                 ) {
-                    // The logo fills the room above the text, so a taller card shows a larger logo.
+                    // The logo fills the room above the text, so a taller card shows a larger logo; its
+                    // halo spreads past the room into the picture.
                     PiconBox(
                         piconPath = channel.icon,
-                        modifier = Modifier.fillMaxWidth(CompactZapLogoWidthFraction).fillMaxHeight().testTag("$tag-picon"),
+                        modifier = Modifier.fillMaxWidth(CompactZapLogoWidthFraction).fillMaxHeight().outset(halo)
+                            .testTag("$tag-picon"),
+                        transformation = haloTransformation,
                     )
                 }
             }
@@ -165,6 +178,8 @@ internal fun CompactZapCard(
             val subtitleModifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp).padding(bottom = CompactZapStripRoom - 2.dp)
             if (channelLed && programme != null && currentEvent != null) {
                 ChannelProgrammeSubtitle(programme, currentEvent.start.epochSeconds, subtitleModifier.testTag("$tag-now"))
+            } else if (programme == null && programmeLoading) {
+                SkeletonLine(subtitleModifier.testTag("$tag-loading"))
             } else Row(subtitleModifier) {
                 Text(
                     text = if (programme != null && !channelLed) identity else stringResource(R.string.no_epg),
@@ -222,12 +237,28 @@ private fun compactZapTextScrim(textTop: Float) = ScrimTransformation(
     ),
 )
 
+/** The halo's strength right next to a logo over a picture. */
+private const val CompactZapLogoHaloAlpha = 0.6f
+
+/** How far a logo's halo reaches past the logo over a picture. */
+private val CompactZapLogoHalo = 16.dp
+
+/** Grows a node by [extra] on every side beyond its constraints, centred over its own slot. */
+private fun Modifier.outset(extra: Dp): Modifier = if (extra == 0.dp) this else layout { measurable, constraints ->
+    val px = extra.roundToPx()
+    val placeable = measurable.measure(constraints.copy(
+        minWidth = constraints.minWidth + 2 * px, maxWidth = constraints.maxWidth + 2 * px,
+        minHeight = constraints.minHeight + 2 * px, maxHeight = constraints.maxHeight + 2 * px,
+    ))
+    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(-px, -px) }
+}
+
 /** The kit's card scrim colour. */
 private val CompactZapScrimColor = Color(28, 27, 31)
 
 /** The kit reaches about 0.5 at the text's top and 0.8 at the bottom. */
-private const val CompactZapScrimTextAlpha = 0.75f
-private const val CompactZapScrimBottomAlpha = 0.9f
+private const val CompactZapScrimTextAlpha = 0.8f
+private const val CompactZapScrimBottomAlpha = 0.95f
 
 /** The picture's room above the text block, so the card is 196x110 at font scale 1.0. */
 private val CompactZapPictureRoom = 62.dp

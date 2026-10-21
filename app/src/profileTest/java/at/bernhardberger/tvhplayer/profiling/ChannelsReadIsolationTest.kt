@@ -6,7 +6,7 @@ import androidx.compose.runtime.InternalComposeTracingApi
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertTextEquals
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
@@ -40,7 +40,7 @@ class ChannelsReadIsolationTest {
                     when (info.substringBefore(" (")) {
                         "at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen",
                         "at.bernhardberger.tvhplayer.ui.screens.ChannelsScreenContent" -> roots += info
-                        "at.bernhardberger.tvhplayer.ui.screens.EpgDetailPane" -> details++
+                        "at.bernhardberger.tvhplayer.ui.screens.ChannelsHeadline" -> details++
                         "at.bernhardberger.tvhplayer.ui.components.TabContent" -> bodies++
                     }
                 }
@@ -69,7 +69,7 @@ class ChannelsReadIsolationTest {
                 Key.DirectionUp to 2, Key.DirectionUp to 1)) {
                 key(direction)
                 compose.onNodeWithTag("channel-row-$id").assertIsFocused()
-                compose.onNodeWithTag("channels-detail-channel").assertTextEquals("Offline channel $id")
+                compose.onNodeWithTag("channels-headline-channel").assertTextContains("Offline channel $id", substring = true)
             }
             compose.runOnIdle {
                 assertTrue("Details must actually update", details >= 4)

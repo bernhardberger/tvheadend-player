@@ -30,6 +30,8 @@ import at.bernhardberger.tvhplayer.di.SdkRuntimeOwner
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
@@ -187,6 +189,7 @@ class JourneyProfileActivity : AppCompatActivity() {
                                         channelViewModel = catalog, selection = selection,
                                         playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                                         onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> },
+                                        view = ChannelsView(ChannelsLayout.LIST),
                                     ) }
                                 }
                             },

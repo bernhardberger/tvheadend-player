@@ -7,8 +7,10 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.Assert.assertTrue
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
@@ -43,7 +45,9 @@ class ChannelsLayoutCaptureTest {
         capture("list-1-first-row", row(1))
         fixture.key(Key.DirectionDown)
         capture("list-2-long-names", row(2))
-        repeat(6) { fixture.key(Key.DirectionDown) }
+        repeat(4) { fixture.key(Key.DirectionDown) }
+        capture("list-6-no-art", row(6))
+        repeat(2) { fixture.key(Key.DirectionDown) }
         capture("list-3-no-epg", row(8))
         repeat(7) { fixture.key(Key.DirectionUp) }
         fixture.key(Key.DirectionUp)
@@ -55,6 +59,37 @@ class ChannelsLayoutCaptureTest {
         capture("list-5-single-group", row(1))
     }
 
+    @Test fun listPlaying() = playing(ChannelsLayout.LIST, ::row)
+    @Test fun immersivePlaying() = playing(ChannelsLayout.IMMERSIVE, ::card)
+    @Test fun listPlayingWithoutArt() =
+        playing(ChannelsLayout.LIST, ::row, "list-logo", ChannelsView(ChannelsLayout.LIST, programArt = emptySet()))
+    @Test fun listRecording() = recording(ChannelsLayout.LIST, ::row)
+    @Test fun immersiveRecording() = recording(ChannelsLayout.IMMERSIVE, ::card)
+
+    /** Channel 1 plays behind the screen: focus on it, on another channel, then on a header button. */
+    private fun playing(
+        layout: ChannelsLayout,
+        item: (Int) -> SemanticsMatcher,
+        slug: String = layout.name.lowercase(),
+        view: ChannelsView = ChannelsView(layout),
+    ) {
+        fixture.show(view, fixture.fixtureArt(), warmPlayback = true,
+            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), video = FixtureArt.art("harbor-lights-live"))
+        capture("$slug-playing-1-same-channel", item(1))
+        fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)
+        capture("$slug-playing-2-other-channel", item(2))
+        fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionRight else Key.DirectionUp)
+        capture("$slug-playing-3-button", groupButton)
+    }
+
+    /** Channel 1's next programme is scheduled; channel 2 records now. */
+    private fun recording(layout: ChannelsLayout, item: (Int) -> SemanticsMatcher, slug: String = layout.name.lowercase()) {
+        fixture.show(ChannelsView(layout), fixture.fixtureArt(), recordingNow = 2, scheduledNext = 1)
+        capture("$slug-dvr-1-next-scheduled", item(1))
+        fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)
+        capture("$slug-dvr-2-recording", item(2))
+    }
+
     // One composition per test: every layout x option combination is its own test.
     @Test fun gridProgramme() = grid(cardArt = true)
     @Test fun gridLogo() = grid(cardArt = false)
@@ -64,33 +99,33 @@ class ChannelsLayoutCaptureTest {
     @Test fun viewOptionsGrid() = viewOptions(ChannelsLayout.GRID)
     @Test fun viewOptionsImmersive() = viewOptions(ChannelsLayout.IMMERSIVE)
 
-    private fun grid(cardArt: Boolean) {
+    private fun grid(cardArt: Boolean, slug: String = "grid") {
         val columns = ChannelsGridColumns
         val picture = cardArt
-        fixture.show(ChannelsView(ChannelsLayout.GRID, cardArt), fixture.fixtureArt())
-        capture("grid-$columns-${picture.slug()}-1-first-card", card(1))
+        fixture.show(ChannelsView(ChannelsLayout.GRID, setOfNotNull(ChannelsLayout.GRID.takeIf { cardArt })), fixture.fixtureArt())
+        capture("$slug-$columns-${picture.slug()}-1-first-card", card(1))
         fixture.key(Key.DirectionRight)
-        capture("grid-$columns-${picture.slug()}-2-long-names", card(2))
+        capture("$slug-$columns-${picture.slug()}-2-long-names", card(2))
         repeat(2) { fixture.key(Key.DirectionDown) }
-        capture("grid-$columns-${picture.slug()}-3-no-epg", card(2 + 2 * columns))
+        capture("$slug-$columns-${picture.slug()}-3-no-epg", card(2 + 2 * columns))
     }
 
-    private fun immersive(cardArt: Boolean) {
+    private fun immersive(cardArt: Boolean, slug: String = "immersive") {
         val picture = cardArt
-        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, cardArt), fixture.fixtureArt())
-        capture("immersive-${picture.slug()}-1-first-card", card(1))
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, setOfNotNull(ChannelsLayout.IMMERSIVE.takeIf { cardArt })), fixture.fixtureArt())
+        capture("$slug-${picture.slug()}-1-first-card", card(1))
         fixture.key(Key.DirectionRight)
-        capture("immersive-${picture.slug()}-2-long-names", card(2))
+        capture("$slug-${picture.slug()}-2-long-names", card(2))
         repeat(4) { fixture.key(Key.DirectionRight) }
-        capture("immersive-${picture.slug()}-3-no-art", card(6))
+        capture("$slug-${picture.slug()}-3-no-art", card(6))
         repeat(2) { fixture.key(Key.DirectionRight) }
-        capture("immersive-${picture.slug()}-4-no-epg-logo-fallback", card(8))
+        capture("$slug-${picture.slug()}-4-no-epg-logo-fallback", card(8))
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionCenter)
         repeat(2) { fixture.key(Key.DirectionDown) }
         fixture.awaitFocus(hasTestTag("channels-group-2"))
         fixture.key(Key.DirectionCenter)
-        capture("immersive-${picture.slug()}-5-other-group", card(7))
+        capture("$slug-${picture.slug()}-5-other-group", card(7))
     }
 
     @Test fun groupPickerAndEmptyGroup() {

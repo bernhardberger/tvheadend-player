@@ -18,8 +18,12 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
@@ -204,6 +208,23 @@ class ChannelAccentsTest {
         assertEquals(colours[0], colours[1])
         assertEquals(colours[0], accents.stored(source(red)))
         assertEquals(colours[0], runBlocking { sampleNow(red).awaitIdling() })
+        assertEquals(listOf(red).ids(), loaded())
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
+    @Test fun beforeASessionASavedLogoHasTheColourSampledUnderTheSessionAndIsNotSampled() {
+        val profile = ServerProfile("first.tvheadend.test")
+        // As the SDK's: the session's key and the saved copy's are the same for one profile.
+        val keyed = ChannelAccents(store) { current, id ->
+            TvheadendTestResultFactory.cachedArtwork(profile, id).cacheKey.takeIf { session.isCurrent(current) }
+        }
+        fun saved(id: ArtworkId) = AppArtworkSource(null, id, savedKey = TvheadendTestResultFactory.cachedArtwork(profile, id).cacheKey)
+        val colour = scope.async { keyed.sample(app, source(red)) }.awaitIdling()
+
+        assertEquals(colour, keyed.stored(saved(red)))
+        assertEquals(colour, scope.async { keyed.sample(app, saved(red)) }.awaitIdling())
+        assertNull("a logo not sampled yet waits for the session", scope.async { keyed.sample(app, saved(blue)) }.awaitIdling())
+        assertNull("without a saved copy there is no key", keyed.stored(AppArtworkSource(null, red)))
         assertEquals(listOf(red).ids(), loaded())
     }
 

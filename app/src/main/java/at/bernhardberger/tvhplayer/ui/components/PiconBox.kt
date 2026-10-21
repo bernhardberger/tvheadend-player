@@ -23,6 +23,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.transformations
+import coil3.transform.Transformation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
@@ -35,6 +39,10 @@ fun PiconBox(
     alignment: Alignment = Alignment.Center,
     placeholderTint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
     onError: (() -> Unit)? = null,
+    /** Baked into the logo once per decode, at the view's size. */
+    transformation: Transformation? = null,
+    /** Without, only the logo itself shows: nothing while it loads or when there is none. */
+    placeholders: Boolean = true,
 ) = profileTrace("P1:compose:picon") {
     val artwork = LocalArtworkContext.current
     val currentSession = artwork.currentSession
@@ -53,21 +61,26 @@ fun PiconBox(
         contentAlignment = alignment
     ) {
         if (piconUrl == null) {
-            Image(failed, null, Modifier.fillMaxSize())
+            if (placeholders) Image(failed, null, Modifier.fillMaxSize())
         } else {
             // One icon, one size: a logo without a saved copy keeps looking like it is loading
             // until the session can fetch it, so it only ever changes once, when the logo fades
             // in. Only a failure with a current session is final; no logo keeps the full icon.
             val waitingForSession = currentSession == null
+            val context = LocalPlatformContext.current
+            val model = remember(piconUrl, transformation) {
+                if (transformation == null) piconUrl
+                else ImageRequest.Builder(context).data(piconUrl).transformations(transformation).build()
+            }
             AsyncImage(
-                model = piconUrl,
+                model = model,
                 contentDescription = null,
                 contentScale = contentScale,
                 alignment = alignment,
                 modifier = Modifier.fillMaxSize(),
                 // Painter slots preserve loading/error appearance without image subcomposition.
-                placeholder = loading,
-                error = if (waitingForSession) loading else failed,
+                placeholder = loading.takeIf { placeholders },
+                error = (if (waitingForSession) loading else failed).takeIf { placeholders },
                 onError = { if (!waitingForSession) onError?.invoke() },
             )
         }

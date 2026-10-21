@@ -82,6 +82,8 @@ fun ChannelRow(
     onFocus: () -> Unit,
     onConfirm: () -> Unit,
     onOpenContextMenu: (() -> Unit)? = null,
+    /** The programme is still on its way: a [SkeletonLine] holds its line instead of [programTitle]. */
+    programmeLoading: Boolean = false,
 ) = profileTrace("P1:compose:channelRow") {
     var focused by remember { mutableStateOf(false) }
     val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
@@ -137,11 +139,15 @@ fun ChannelRow(
                 // This TV Material release defaults supporting text to bodySmall even
                 // on ListItem. Use its 14sp bodyMedium for the accepted ten-foot line.
                 ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
-                    ChannelProgrammeSubtitle(
-                        title = programTitle,
-                        startSec = programStartSec,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
+                    if (programmeLoading) {
+                        SkeletonLine(Modifier.testTag("channel-programme-loading"))
+                    } else {
+                        ChannelProgrammeSubtitle(
+                            title = programTitle,
+                            startSec = programStartSec,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
+                    }
                 }
                 if (progress != null) {
                     Spacer(Modifier.height(ChannelProgressGap))
