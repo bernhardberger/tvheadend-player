@@ -213,7 +213,7 @@ class ChannelShelfCompositionTest {
         val secondBounds = second.fetchSemanticsNode().boundsInRoot
         assertEquals(firstBounds.height, secondBounds.height, 1f)
         assertEquals(firstBounds.width, secondBounds.width, 1f)
-        rule.onNodeWithTag("player-channel-2-now", useUnmergedTree = true).assertTextEquals("No EPG")
+        rule.onNodeWithTag("player-channel-2-now", useUnmergedTree = true).assertTextEquals("No program information")
         assertEquals(0, picks)
         second.performKeyInput { pressKey(Key.DirectionLeft) }
         first.assertIsFocused().performKeyInput { pressKey(Key.Enter) }

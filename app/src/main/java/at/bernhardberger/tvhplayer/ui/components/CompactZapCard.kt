@@ -62,7 +62,7 @@ internal val CompactZapCardWidth = 196.dp
  * [preferredHeight]; the card never gets shorter than its text needs. A [channelLed] card names
  * the channel first and starts its programme line with the start time; otherwise the programme
  * leads and time left follows the channel. While the guide is [programmeLoading], a missing
- * programme line is a [SkeletonLine] rather than "No EPG".
+ * programme line is a [SkeletonLine] rather than "No program information".
  */
 @Composable
 internal fun CompactZapCard(

@@ -97,7 +97,7 @@
     <string name="player_next_event_at">Up next at %1$s: %2$s</string>
 
     <string name="options">Options</string>
-    <string name="no_epg">No EPG</string>
+    <string name="no_epg">No program information</string>
     <string name="epg_next">Next %1$s</string>
     <string name="select_channel_hint">Select a channel on the left to see details.</string>
 
@@ -388,7 +388,7 @@
     <string name="programme_category_lifestyle_leisure">Lifestyle &amp; Leisure</string>
     <string name="epg_channels_heading">Channels</string>
     <string name="epg_schedule">Schedule</string>
-    <string name="epg_loading">Loading EPG…</string>
+    <string name="epg_loading">Loading guide…</string>
     <string name="epg_jump">Jump to time</string>
     <string name="epg_jump_title">Jump to date and time</string>
     <string name="epg_jump_action">Jump</string>

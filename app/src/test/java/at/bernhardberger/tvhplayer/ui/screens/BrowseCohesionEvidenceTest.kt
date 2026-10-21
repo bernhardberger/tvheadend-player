@@ -257,7 +257,7 @@ class BrowseCohesionEvidenceTest {
         key(Key.DirectionDown)
         awaitFocus(hasTestTag("channel-row-3"))
         compose.onNode(
-            hasText("No EPG") and hasAnyAncestor(hasTestTag("channel-row-3")),
+            hasText("No program information") and hasAnyAncestor(hasTestTag("channel-row-3")),
             useUnmergedTree = true,
         ).assertIsDisplayed()
         capture("channels-missing-epg", 1f, "Channels third row with no EPG", hasTestTag("channel-row-3"))

@@ -480,7 +480,7 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         compose.onNodeWithTag("channels-backdrop").assertExists()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
-        compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No EPG")
+        compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No program information")
         // Without programme lines the title still sits on the row instead of leaving a gap.
         val hero = compose.onNodeWithTag("channels-immersive-hero").getUnclippedBoundsInRoot()
         val title = compose.onNodeWithTag("channels-immersive-title").getUnclippedBoundsInRoot()
@@ -492,12 +492,12 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(card(1))
         compose.onNodeWithTag("channels-immersive-loading").assertExists()
         compose.onNodeWithTag("channels-immersive-1-loading", useUnmergedTree = true).assertExists()
-        compose.onAllNodesWithText("No EPG", useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodesWithText("No program information", useUnmergedTree = true).assertCountEquals(0)
         fixture.channelsView = ChannelsView(ChannelsLayout.LIST)
         compose.waitForIdle()
         assertTrue(compose.onAllNodesWithTag("channel-programme-loading", useUnmergedTree = true)
             .fetchSemanticsNodes().isNotEmpty())
-        compose.onAllNodesWithText("No EPG", useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodesWithText("No program information", useUnmergedTree = true).assertCountEquals(0)
     }
 
     @Test fun immersiveBackgroundFollowsFocusAfterAnOrdinaryEntry() {

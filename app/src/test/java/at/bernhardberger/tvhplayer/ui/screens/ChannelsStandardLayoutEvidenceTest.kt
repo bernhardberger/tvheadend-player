@@ -345,7 +345,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // No EPG: the title line alone, no time segments and no progress, same anchors.
         val missing = row(NO_EPG).bounds()
-        inRow(NO_EPG, "channel-programme-title").assertTextEquals("No EPG")
+        inRow(NO_EPG, "channel-programme-title").assertTextEquals("No program information")
         compose.onAllNodesWithTag("channel-programme-start", useUnmergedTree = true)
             .fetchSemanticsNodes().none { it.boundsInRoot.top in missing.top..missing.bottom }
             .let { assertTrue("no start time on a channel without EPG", it) }
