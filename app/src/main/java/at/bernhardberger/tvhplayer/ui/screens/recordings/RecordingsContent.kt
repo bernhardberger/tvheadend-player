@@ -85,6 +85,7 @@ import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
@@ -264,7 +265,7 @@ internal fun RecordingMetadataPane(
             Text(
                 text = it,
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TvTextColors.primary,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
             )
@@ -275,7 +276,7 @@ internal fun RecordingMetadataPane(
                     at.bernhardberger.tvhplayer.core.formatPlaybackDuration(
                         seconds.coerceAtMost(Long.MAX_VALUE / 1000L) * 1000L)),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TvTextColors.tertiary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
@@ -292,20 +293,20 @@ internal fun RecordingMetadataPane(
                         durationMinutes.toLong(), androidx.compose.ui.platform.LocalResources.current))
                 }
             },
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = TvTextColors.tertiary,
             style = MaterialTheme.typography.bodyMedium,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
         val resources = androidx.compose.ui.platform.LocalContext.current.resources
         at.bernhardberger.tvhplayer.ui.common.episodeLabel(entry.episode, resources, onscreenFallback = false)?.let {
-            Text(text = it, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(text = it, color = TvTextColors.tertiary,
                 style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.semantics {
                     contentDescription = at.bernhardberger.tvhplayer.ui.common.episodeLabel(entry.episode, resources, spoken = true).orEmpty()
                 })
         }
         entry.summary?.takeIf(String::isNotBlank)?.let {
-            Text(text = it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            Text(text = it, style = MaterialTheme.typography.bodyMedium, color = TvTextColors.secondary,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         entry.description?.takeIf { it.isNotBlank() && it != entry.summary }?.let {
@@ -314,7 +315,7 @@ internal fun RecordingMetadataPane(
                 style = MaterialTheme.typography.bodyMedium,
                 maxLines = 7,
                 overflow = TextOverflow.Ellipsis,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TvTextColors.secondary,
                 modifier = Modifier.weight(1f, fill = false),
             )
         }
@@ -325,7 +326,7 @@ internal fun RecordingMetadataPane(
         entry.playCount?.takeIf { it > 0 && entry.state != DvrEntryState.MISSED }?.let {
             Text(
                 text = stringResource(R.string.recordings_play_count, it),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = TvTextColors.tertiary,
             )
         }
     }

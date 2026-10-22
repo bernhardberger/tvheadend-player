@@ -4,7 +4,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
-import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogoSize
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
@@ -121,8 +120,6 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
-import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
-import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
@@ -153,8 +150,8 @@ internal fun channelsDetailPanePadding(
     bottom = contentPadding.calculateBottomPadding(),
 )
 
-/** Where the background's logo stands below the header, for the logo kept over playback. */
-private val ChannelsListPlaybackArtTop = 24.dp
+/** Between the picture beside the list and the headline hanging from it: the kit's content gap. */
+private val ChannelsListArtGap = 20.dp
 
 private const val CHANNEL_EMPTY_GROUP_FOCUS_FRAMES = 4
 
@@ -666,7 +663,7 @@ internal fun ChannelsScreenContent(
         // backdrop, matching what the cards show.
         if (channels.isNotEmpty()) ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
             ChannelsImmersiveBackground(
-                corner = layout != ChannelsLayout.GRID,
+                corner = layout == ChannelsLayout.IMMERSIVE,
                 programArt = view.showsProgramArt,
                 // The shown channel follows focus after a delay; it may still be the previous group's.
                 channels = channelScope.allChannels,
@@ -674,9 +671,7 @@ internal fun ChannelsScreenContent(
                 observation = observation,
                 nowSec = { nowSec },
                 logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
-                // Beside the list, the logo is centred over the details pane, a browse column wide.
-                endInset = detailPanePadding.calculateEndPadding(layoutDirection) +
-                    if (layout == ChannelsLayout.LIST) (TvBrowseColumnWidth - DetailsHeroLogoSize.first) / 2 else 0.dp,
+                endInset = detailPanePadding.calculateEndPadding(layoutDirection),
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -990,10 +985,8 @@ internal fun ChannelsScreenContent(
 
                     Spacer(Modifier.width(ChannelsListToDetailsGap))
 
-                    // Passive preview: the immersive headline, resting on the bottom safe inset
-                    // like the immersive row's hero. Right from a row leads to the header.
-                    // Over playback the picture stays at the top and gives way to a tall headline.
-                    val playbackArt = LocalWarmPlayback.current
+                    // Passive preview: the focused channel's picture, the same in every state, and the
+                    // immersive headline hanging from it. Right from a row leads to the header.
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -1001,14 +994,12 @@ internal fun ChannelsScreenContent(
                             .padding(detailPanePadding)
                             .fillMaxHeight()
                             .testTag("channels-details"),
-                        verticalArrangement = if (playbackArt) Arrangement.SpaceBetween else Arrangement.Bottom,
                     ) {
-                        if (playbackArt) ChannelsListPlaybackArt(channels, frame, nowSecProvider, view.showsProgramArt,
-                            Modifier
-                                .align(Alignment.CenterHorizontally)
-                                .padding(vertical = ChannelsListPlaybackArtTop)
-                                .weight(1f, fill = false))
-                        ChannelsImmersiveHero(channels, frame, nowSecProvider, Modifier, besideList = true)
+                        // Level with the first row.
+                        ChannelsListArt(channels, frame, nowSecProvider, view.showsProgramArt,
+                            Modifier.padding(top = ChannelsListTopReserve))
+                        ChannelsImmersiveHero(channels, frame, nowSecProvider,
+                            Modifier.padding(top = ChannelsListArtGap).weight(1f).widthIn(max = ListArtWidth), besideList = true)
                     }
                 }
             }

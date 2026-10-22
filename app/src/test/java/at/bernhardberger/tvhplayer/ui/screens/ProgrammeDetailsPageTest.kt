@@ -738,7 +738,7 @@ class ProgrammeDetailsPageTest {
         val bitmap = snapshot()
         // Scrolled away, the darkened blurred art covers the whole screen.
         for ((x, y) in listOf(1000 to 60, 1800 to 100)) {
-            Assert.assertEquals("blurred art is darkened at $x,$y", 77f, android.graphics.Color.red(bitmap.getPixel(x, y)).toFloat(), 1f)
+            Assert.assertEquals("blurred art is darkened at $x,$y", 102f, android.graphics.Color.red(bitmap.getPixel(x, y)).toFloat(), 1f)
         }
         for ((x, y) in listOf(20 to 20, 1800 to 1070)) {
             Assert.assertTrue("blurred art covers the corner $x,$y", android.graphics.Color.red(bitmap.getPixel(x, y)) > 40)
@@ -1011,7 +1011,8 @@ class ProgrammeDetailsPageTest {
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeTextLongProgrammeNamesTheAiringsInAHintInsteadOfAPeek() {
-        show(longMeta = true, fontScale = 1.3f)
+        // A two-line subtitle too, since the 12sp metadata alone now leaves the peek its room.
+        show(longMeta = true, longSubtitle = true, fontScale = 1.3f)
         val information = compose.onNodeWithTag("details-information").getUnclippedBoundsInRoot()
         val actions = compose.onNodeWithTag("details-actions").getUnclippedBoundsInRoot()
         val hint = compose.onNodeWithTag("details-next-hint", useUnmergedTree = true).assertIsDisplayed().getUnclippedBoundsInRoot()
@@ -1054,10 +1055,10 @@ class ProgrammeDetailsPageTest {
                 credits = listOf(EpgCredit("Mara Vale, Ellis North, Robin Stone, Jules Brook, Taylor Ridge", EpgCreditRole.ACTOR),
                     EpgCredit("Rowan Frost", EpgCreditRole.GUEST), EpgCredit("Avery Lake", EpgCreditRole.PRESENTER),
                     EpgCredit("Morgan Pine", EpgCreditRole.DIRECTOR), EpgCredit("Alex Winter", EpgCreditRole.WRITER)))
-            longSubtitle -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
+            longSubtitle && !longMeta -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title,
                 subtitle = subtitle, genre = event.genre, image = event.image, summary = event.summary, description = event.description)
             longMeta -> EpgEvent.create(event.id, channel.id, start, event.stop,
-                title = "Ridge Light: Across the Frozen North and the Polar Sea", subtitle = event.subtitle,
+                title = "Ridge Light: Across the Frozen North and the Polar Sea", subtitle = if (longSubtitle) subtitle else event.subtitle,
                 genre = "Documentary and natural history about northern landscapes", episode = event.episode,
                 copyrightYear = 2024, rating = EpgRating(12, null, null, null, null, null), image = event.image,
                 summary = event.summary!!.repeat(3), description = event.description)

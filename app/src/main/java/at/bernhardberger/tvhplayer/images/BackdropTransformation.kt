@@ -14,15 +14,17 @@ import kotlin.math.roundToInt
  * shape, [width] pixels wide, three box-blur passes of [radius] and black at [dimAlpha] on top.
  * Drawn stretched to the screen it reads like a live blur without the GPU repeating one on every
  * frame. With [fit], a logo is fitted into that share of the frame instead and keeps its
- * transparency, so the backdrop's colour shows around it.
+ * transparency, so the backdrop's colour shows around it. A picture darker than usual is dimmed
+ * less, down to [minDimAlpha], so it ends about as bright as an ordinary one rather than black.
  */
 internal class BackdropTransformation(
     private val width: Int,
     private val radius: Int,
     private val dimAlpha: Float,
     private val fit: Float? = null,
+    private val minDimAlpha: Float = dimAlpha,
 ) : Transformation() {
-    override val cacheKey: String = "backdrop($width;$radius;$dimAlpha;$fit)"
+    override val cacheKey: String = "backdrop($width;$radius;$dimAlpha;$fit;$minDimAlpha)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val aspect = size.height.pxOrElse { input.height }.toFloat() / size.width.pxOrElse { input.width }
@@ -45,10 +47,22 @@ internal class BackdropTransformation(
         }
         premultiply(pixels, unpremultiply = true)
         output.setPixels(pixels, 0, width, 0, 0, width, height)
+        val dim = if (minDimAlpha >= dimAlpha) dimAlpha
+            else (1f - OrdinaryPictureLuma * (1f - dimAlpha) / meanLuma(pixels)).coerceIn(minDimAlpha, dimAlpha)
         // Only over what was drawn: a logo's transparent surroundings stay clear.
-        canvas.drawColor(android.graphics.Color.argb((dimAlpha * 255).roundToInt(), 0, 0, 0), PorterDuff.Mode.SRC_ATOP)
+        canvas.drawColor(android.graphics.Color.argb((dim * 255).roundToInt(), 0, 0, 0), PorterDuff.Mode.SRC_ATOP)
         return output
     }
+}
+
+/** An ordinary picture's mean brightness: [dimAlpha] darkens it to the brightness a darker one is lifted towards. */
+private const val OrdinaryPictureLuma = 0.4f
+
+/** The mean of the pixels' encoded luma, 0 to 1. */
+private fun meanLuma(pixels: IntArray): Float {
+    var sum = 0L
+    for (p in pixels) sum += 299L * (p shr 16 and 0xff) + 587L * (p shr 8 and 0xff) + 114L * (p and 0xff)
+    return sum / (pixels.size * 255_000f)
 }
 
 /** Blurs colour weighted by coverage, so transparent pixels don't bleed black into a logo's edges. */

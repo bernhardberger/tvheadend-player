@@ -35,6 +35,7 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.Button
 import androidx.tv.material3.OutlinedButton
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
 
@@ -167,11 +168,11 @@ internal fun CentredDialog(
                             Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.headlineMedium,
                                 color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                             if (!secondaryText.isNullOrBlank()) Text(secondaryText, style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                color = TvTextColors.primary,
                                 maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                         if (text.isNotBlank()) Text(text, style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f))
+                            color = TvTextColors.secondary)
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp), content = actions)

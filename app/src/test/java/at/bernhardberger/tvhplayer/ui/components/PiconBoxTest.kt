@@ -27,7 +27,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -66,6 +65,7 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 /** Real native ListItem drawing; all Coil requests are intercepted before any I/O. */
 @RunWith(RobolectricTestRunner::class)
@@ -77,17 +77,14 @@ class PiconBoxTest {
     private lateinit var view: View
     private var requests = 0
     private val loadingGate = CompletableDeferred<Unit>()
-    private var focusedTint = Color.Unspecified
-    private var restingTint = Color.Unspecified
-    private var focusedBackground = Color.Unspecified
     private var background = Color.Unspecified
     private var passiveTint = Color.Unspecified
 
-    @Test fun missingPiconFollowsNativeRowFocusColor() = assertRowFallback(ArtworkState.MISSING)
+    @Test fun missingPiconKeepsItsTintOnTheRowsPlate() = assertRowFallback(ArtworkState.MISSING)
 
-    @Test fun loadingPiconFollowsNativeRowFocusColor() = assertRowFallback(ArtworkState.LOADING)
+    @Test fun loadingPiconKeepsItsTintOnTheRowsPlate() = assertRowFallback(ArtworkState.LOADING)
 
-    @Test fun failedPiconFollowsNativeRowFocusColor() = assertRowFallback(ArtworkState.ERROR)
+    @Test fun failedPiconKeepsItsTintOnTheRowsPlate() = assertRowFallback(ArtworkState.ERROR)
 
     @Test fun successfulPiconKeepsItsOwnPixelsWhenRowFocusChanges() {
         show(ArtworkState.SUCCESS, inRow = true)
@@ -105,14 +102,15 @@ class PiconBoxTest {
 
     private fun assertRowFallback(state: ArtworkState) {
         show(state, inRow = true)
-        // TV Material 1.1.0 provides its leading slot content color at 80% opacity.
-        val alpha = (if (state == ArtworkState.LOADING) .35f else 1f) * .8f
+        // The charcoal plate is the icon's ground, so the light tint holds when the row's focus fill turns light.
+        val alpha = if (state == ArtworkState.LOADING) .35f else 1f
+        val expected = passiveTint.copy(alpha = alpha).compositeOver(TvSurfaceColors.containerLowest)
         focus("other-row")
-        assertPiconColor(restingTint.copy(alpha = alpha).compositeOver(background))
+        assertPiconColor(expected)
         focus("row")
-        assertPiconColor(focusedTint.copy(alpha = alpha).compositeOver(focusedBackground))
+        assertPiconColor(expected)
         focus("other-row")
-        assertPiconColor(restingTint.copy(alpha = alpha).compositeOver(background))
+        assertPiconColor(expected)
         assertEquals(if (state == ArtworkState.MISSING) 0 else 1, requests)
     }
 
@@ -159,11 +157,7 @@ class PiconBoxTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
-                    val colors = ListItemDefaults.colors()
-                    focusedTint = colors.focusedContentColor
-                    restingTint = colors.contentColor
                     background = MaterialTheme.colorScheme.background
-                    focusedBackground = colors.focusedContainerColor.compositeOver(background)
                     passiveTint = MaterialTheme.colorScheme.onSurfaceVariant
                     Column(Modifier.fillMaxSize().background(background).padding(40.dp)) {
                         val picon = if (state == ArtworkState.MISSING) null else ArtworkId(1)

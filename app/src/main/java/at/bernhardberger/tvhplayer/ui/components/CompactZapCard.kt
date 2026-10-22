@@ -37,7 +37,9 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.CompactCard
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -45,6 +47,7 @@ import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
 import at.bernhardberger.tvhplayer.images.ScrimTransformation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import at.bernhardberger.tvhplayer.ui.player.PlayerRecBadge
 import at.bernhardberger.tvhplayer.ui.player.leaving
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -122,14 +125,7 @@ internal fun CompactZapCard(
                     model = artworkModel, contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().testTag("$tag-art"), onError = { artworkFailed = true },
-                ) else if (channelLed) {
-                    // The channel's own colour from its logo, as the player's hero falls back to.
-                    val accent = rememberChannelAccent(channel.icon, channel.id)
-                    val top = accent.copy(alpha = CompactZapAccentAlpha).toArgb()
-                    Box(Modifier.fillMaxSize().unditheredGradient { size ->
-                        LinearGradient(0f, 0f, 0f, size.height, top, 0, Shader.TileMode.CLAMP)
-                    })
-                }
+                ) else if (channelLed) ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 if (!showArtwork || logoOverArt) Box(
                     // The room reaches into the title's leading, so the logo centres between the card's
                     // top and the title's letters rather than above its line box. The inset keeps a
@@ -149,6 +145,9 @@ internal fun CompactZapCard(
                         transformation = haloTransformation,
                     )
                 }
+                // On the Channels cards the kit's embed corner holds the recording badge, as on the
+                // player's schedule tiles; the rail keeps it beside the name.
+                if (channelLed && recording) PlayerRecBadge(Modifier.align(Alignment.TopEnd).padding(CompactZapEmbedInset))
             }
         },
         title = {
@@ -169,7 +168,7 @@ internal fun CompactZapCard(
                     label = "zap-card-marker",
                 ) { indicator ->
                     if (!leaving) ChannelNowIndicators(playingNow = indicator == ChannelPlaybackIndicator.PLAYING,
-                        recordingNow = recording, playbackIndicator = indicator)
+                        recordingNow = recording && !channelLed, playbackIndicator = indicator)
                 }
             }
         },
@@ -243,6 +242,9 @@ private const val CompactZapLogoHaloAlpha = 0.6f
 /** How far a logo's halo reaches past the logo over a picture. */
 private val CompactZapLogoHalo = 16.dp
 
+/** The kit's card embed puts its tags 8dp in from the picture's corners. */
+private val CompactZapEmbedInset = 8.dp
+
 /** Grows a node by [extra] on every side beyond its constraints, centred over its own slot. */
 private fun Modifier.outset(extra: Dp): Modifier = if (extra == 0.dp) this else layout { measurable, constraints ->
     val px = extra.roundToPx()
@@ -266,7 +268,20 @@ private val CompactZapPictureRoom = 62.dp
 /** The logo's clearance from the card's top, and roughly the title's leading above its letters. */
 private val CompactZapLogoTop = 6.dp
 
-/** The channel colour at the logo card's top, fading out toward its text; the player's hero uses the same. */
+/**
+ * The logo cards' ground: the channel's own colour from its logo, as the player's hero falls back
+ * to, fading down from the top to [bottomShare] of its strength, by default out toward the text.
+ */
+@Composable
+internal fun ChannelAccentFill(piconPath: ArtworkId?, channelId: ChannelId, modifier: Modifier = Modifier, bottomShare: Float = 0f) {
+    val accent = rememberChannelAccent(piconPath, channelId)
+    val top = accent.copy(alpha = CompactZapAccentAlpha).toArgb()
+    val bottom = accent.copy(alpha = CompactZapAccentAlpha * bottomShare).toArgb()
+    Box(modifier.unditheredGradient { size ->
+        LinearGradient(0f, 0f, 0f, size.height, top, bottom, Shader.TileMode.CLAMP)
+    })
+}
+
 private const val CompactZapAccentAlpha = 0.48f
 
 /** A tall logo's clearance above and below, beyond [CompactZapLogoTop]. */

@@ -43,6 +43,20 @@ class ThemeColorContractTest {
     }
 
     @Test
+    fun quietTextStepsRemainReadableOnTheDarkGrounds() {
+        listOf(
+            TvDarkColors.surface,
+            TvSurfaceColors.container,
+            // Browsing over warm playback: the scrim over a white frame.
+            Color.Black.copy(alpha = WarmPlaybackScrimAlpha).compositeOver(Color.White),
+        ).forEach { ground ->
+            listOf(TvTextColors.primary, TvTextColors.secondary, TvTextColors.tertiary).forEach { text ->
+                assertContrast(text.compositeOver(ground).argb(), ground.argb())
+            }
+        }
+    }
+
+    @Test
     fun neutralSurfaceHierarchyAndTvFocusKeepReadableForegrounds() {
         val surfaces = listOf(
             TvSurfaceColors.containerLowest, TvDarkColors.surface,

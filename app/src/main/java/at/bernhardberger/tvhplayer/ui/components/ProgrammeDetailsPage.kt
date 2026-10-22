@@ -66,6 +66,7 @@ import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
@@ -334,7 +335,7 @@ internal fun ProgrammeDetailsPage(
                         Text(title, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
                             overflow = TextOverflow.Ellipsis, modifier = Modifier.semantics { heading() })
                         (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)?.let {
-                            Text(it, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            Text(it, style = MaterialTheme.typography.titleLarge, color = TvTextColors.primary,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
@@ -500,8 +501,9 @@ private fun DetailsReadingPanel(onRead: () -> Unit, modifier: Modifier, interact
             Surface(onClick = onRead, modifier = modifier, interactionSource = interactionSource,
                 shape = ClickableSurfaceDefaults.shape(DetailsReadingShape),
                  scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                // The description in its quieter grey until focus makes it the thing to read.
                 colors = ClickableSurfaceDefaults.colors(
-                    containerColor = detailsReadingFill(false), contentColor = onSurface,
+                    containerColor = detailsReadingFill(false), contentColor = TvTextColors.secondary,
                     focusedContainerColor = detailsReadingFill(true), focusedContentColor = onSurface),
                 border = ClickableSurfaceDefaults.border(
                     border = detailsReadingBorder(false), focusedBorder = detailsReadingBorder(true))) {
@@ -676,7 +678,9 @@ private fun AiringCard(
 
 // Native 1.1 focus scale on a 220dp card adds ~6dp below it, plus the outline.
 private val AiringTextGap = 16.dp
-private const val DetailsBlurredScrimAlpha = 0.7f
+private const val DetailsBlurredScrimAlpha = 0.6f
+// A dark picture is dimmed less, so its backdrop doesn't turn black.
+private const val DetailsBlurredMinScrimAlpha = 0.4f
 // The backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three passes of
 // radius 3 there match the former 32dp live blur on a 1080p screen.
 private val DetailsBackdropDecodeSize = 320 to 180
@@ -689,7 +693,7 @@ private const val DetailsBackdropLogoFit = 0.8f
 private const val DetailsBackdropLogoScrimAlpha = 0.35f
 private const val DetailsBackdropLogoWidth = 320
 private const val DetailsBackdropLogoBlurRadius = 20
-internal val DetailsHeroLogoSize = 240.dp to 135.dp
+private val DetailsHeroLogoSize = 240.dp to 135.dp
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f
 
@@ -730,7 +734,8 @@ internal fun DetailsHero(
             ImageRequest.Builder(context).data(source)
                 .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
                 .transformations(if (image != null) {
-                    BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius, DetailsBlurredScrimAlpha)
+                    BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius, DetailsBlurredScrimAlpha,
+                        minDimAlpha = DetailsBlurredMinScrimAlpha)
                 } else {
                     BackdropTransformation(DetailsBackdropLogoWidth, DetailsBackdropLogoBlurRadius,
                         DetailsBackdropLogoScrimAlpha, fit = DetailsBackdropLogoFit)
@@ -913,7 +918,7 @@ private fun DetailsInformation(
         val subtitle = (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)
         subtitle?.let {
             Spacer(Modifier.height(4.dp))
-            Text(it, Modifier.widthIn(max = 470.dp).testTag("details-subtitle"), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onSurface,
+            Text(it, Modifier.widthIn(max = 470.dp).testTag("details-subtitle"), style = MaterialTheme.typography.titleLarge, color = TvTextColors.primary,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Column(Modifier.widthIn(max = 470.dp)) { synopsis() }
@@ -942,7 +947,7 @@ private fun DetailsInformation(
                 .joinToString(", ")
             if (segments.isNotEmpty()) Text(programmeFactsSegments(segments), Modifier.weight(1f, fill = false)
                 .semantics { contentDescription = spokenMetadata }.testTag("details-metadata"),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary,
                  maxLines = 2, overflow = TextOverflow.Ellipsis)
             if (ratingText != null) ProgrammeAgeRatingBox(ratingText, "details-rating")
             }
@@ -981,8 +986,8 @@ internal fun ProgrammeEyebrow(
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         channel?.icon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp)) }
-        Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
+            color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing()
     }
 }
@@ -991,10 +996,10 @@ internal fun ProgrammeEyebrow(
 @Composable
 internal fun ProgrammeAgeRatingBox(rating: String, tag: String) {
     val description = stringResource(R.string.details_age_rating_description, rating)
-    Text(rating, Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.shapes.extraSmall)
+    Text(rating, Modifier.border(1.dp, TvTextColors.tertiary, MaterialTheme.shapes.extraSmall)
         .padding(horizontal = 6.dp, vertical = 2.dp).clearAndSetSemantics {
             contentDescription = description; testTag = tag
-        }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface)
+        }, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
 }
 
 @Composable
@@ -1005,9 +1010,9 @@ private fun DetailsTimeline(
         contentDescription = spokenDescription
     },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(startLabel, style = MaterialTheme.typography.bodyMedium)
+        Text(startLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
         ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
-        Text(endLabel, style = MaterialTheme.typography.bodyMedium)
+        Text(endLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
     }
 }
 

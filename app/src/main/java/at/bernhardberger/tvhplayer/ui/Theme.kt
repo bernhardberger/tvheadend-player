@@ -58,6 +58,20 @@ internal val TvDarkColors = darkColorScheme(
     scrim = Color(0xFF000000),
 )
 
+/**
+ * Passive text on the dark browse screens, dialogs and details in the kit's three steps: the
+ * title and the subtitle naming its episode in onSurface, then descriptions, then metadata
+ * such as the channel, times and facts, in onSurfaceVariant at the kit's 80% and at our
+ * [TvTextTertiaryAlpha] (the kit's 60% falls below 4.5:1 over our backdrops). See-through
+ * panels over video keep onSurface at these alphas instead; onSurfaceVariant at 72% falls
+ * below 4.5:1 over a bright frame there.
+ */
+object TvTextColors {
+    val primary = TvDarkColors.onSurface
+    val secondary = TvDarkColors.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha)
+    val tertiary = TvDarkColors.onSurfaceVariant.copy(alpha = TvTextTertiaryAlpha)
+}
+
 // TV Material 1.1.0 does not provide text fields, progress indicators, dividers,
 // or dialogs. Keep the official mobile Material implementations color-aligned
 // rather than recreating their input, semantics, and accessibility behavior.

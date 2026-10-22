@@ -71,6 +71,17 @@ Meaning of colour:
 Typography is the TV Material scale with Roboto; no custom scale. Logos are
 drawn artwork and do not follow font scale.
 
+Passive text steps down in three tones (accepted 2026-10-21), as the kit's
+immersive list and dialog do: the title and its subtitle, which names the
+episode, in `onSurface`; descriptions in `onSurfaceVariant` at 80%; metadata (channel, times, facts,
+age rating, what follows) in `onSurfaceVariant` at 72%, where the kit uses 60%,
+which falls below 4.5:1 over our backdrops. Metadata uses the kit's 12sp
+`labelMedium`, whose Medium weight keeps it legible in that grey. `TvTextColors` in `ui/Theme.kt`
+holds them for the browse headlines, details page, dialogs and Recordings pane.
+Focusable rows and cards keep their focus colours, and see-through panels over
+video keep `onSurface` at these alphas, because `onSurfaceVariant` at 72% falls
+below 4.5:1 over a bright frame there.
+
 ### Startup
 
 **Scope (2026-10-02):** app launch, returning to the app and the handoff to
@@ -486,9 +497,10 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   viewport, including focus-scale breathing room. The TV pivot policy must settle
   at the top boundary without alternating scroll requests or flickering the fade.
 - Rows are the library's standard `ListItem`: native padding, height and growth
-  at 1.3× fonts, with a 60×36 bare picon in the leading slot (aspect preserved,
-  no logo box or background), native 16sp headline and Material 14sp `bodyMedium`
-  supporting text, indication and focus scale. Rows are 4dp apart. The
+  at 1.3× fonts, with the logo on a 72×40 charcoal plate in the leading slot
+  (4dp corners, aspect preserved, as the player's channel chip), native 16sp
+  headline and the library's 12sp `bodySmall` supporting text, as on the channel
+  cards, indication and focus scale. Rows are 4dp apart. The
   row is one D-pad target; the title is `[number]  [name]`.
 - The supporting line is `HH:MM · programme title` for the **current** programme;
   there is no minutes-left label. Start time keeps its natural width and only
@@ -499,23 +511,35 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
 - Playing and recording markers sit beside the title and appear only when they
   apply; no slot is reserved for an absent state. They are decorative and
   non-focusable, and they shorten only the title.
-- **List headline pane.** Beside the list sits the headline that Immersive also
-  uses, bottom-anchored on the bottom safe inset (y512 at the reference viewport)
-  and at most 480dp wide. In the details page's order: an eyebrow with the 36×20
-  picon and `[number] [name]` (plus the player's REC badge while recording), the
-  title in `headlineSmall` (two lines), a supplied subtitle in `titleMedium`
-  (one line; absent subtitles leave no gap), the facts line with the age-rating
-  box, the start–end time with a 160dp on-air strip, then up to three synopsis
-  lines in `bodyMedium`. The list alone ends on a quiet `Next · HH:MM title` line
-  in `labelLarge`, with the scheduled clock when that programme is to be recorded.
-  Gaps are 8dp between eyebrow, title, facts and time (4dp before the subtitle)
-  and 20dp before the synopsis and before Next. Without EPG the title reads the
-  no-EPG label and the other programme lines are omitted.
-- **List backdrop.** Without warm playback, List uses the Immersive backdrop
-  below, with its logo centred over the pane. Over warm playback there is no
-  backdrop; the pane's top instead shows the focused programme's 16:9 artwork
-  without its logo plate, or with Program art off or no artwork the channel's
-  240×135 logo. That picture shrinks rather than overlap the headline.
+- **List picture and headline.** The pane beside the list shows the same thing
+  in every state, so nothing moves or resizes when playback starts or stops. At
+  its top, level with the first row (y80), a 268×151 picture (the kit's
+  four-column card; the headline below keeps to its width, so picture and text
+  form one column) shows the focused programme's 16:9 artwork without its logo
+  plate. With Program art off or no artwork, it is a logo card's picture: the
+  logo on the logo cards' ambient colour from the logo, which here keeps its
+  strength to the bottom, since no text sits on it. The headline that Immersive also
+  uses hangs 20dp below it, start-aligned and at most 480dp wide. In the details
+  page's order: an eyebrow with the 36×20 picon and `[number] [name]` (plus the
+  player's REC badge while recording), the title in the kit's 32sp `headlineLarge`
+  (two lines; `titleLarge` beside the list, so it doesn't compete with the rows),
+  a supplied subtitle in `bodyLarge` (one line; absent subtitles leave no gap),
+  the facts line with the age-rating box, the start–end time with a 160dp on-air
+  strip, then the synopsis in the kit's 16sp `bodyLarge` (`bodyMedium` in the
+  narrow column beside the list). Eyebrow, facts, time and Next are metadata in the
+  kit's 12sp `labelMedium`. The list alone ends on a quiet
+  `Next · HH:MM title` line, with the scheduled clock when that
+  programme is to be recorded. Gaps are 8dp between eyebrow, title, facts and
+  time (4dp before the subtitle) and 20dp before the synopsis and before Next.
+  The synopsis takes up to three whole lines of the room left above the bottom
+  safe inset (y512), and is left out rather than cut when no whole line fits.
+  Without EPG the title reads the no-EPG label and the other programme lines are
+  omitted.
+- **List backdrop.** Without warm playback, List uses the Grid's blurred
+  backdrop below: the focused programme's art, or with Program art off or no art
+  the logo colour behind a blurred logo. A sharp picture in the corner would
+  repeat the pane's picture, so the corner backdrop stays with Immersive. Over
+  warm playback there is no backdrop.
 - The headline pane is passive and never an additional D-pad target. It
   **crossfades** rather than hard-cutting as the browsed row changes: a 160ms
   dissolve, short enough that fast row-to-row browsing still feels immediate. Each
@@ -530,7 +554,7 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   sits 40dp above the cards, with two synopsis lines and no Next line: Immersive
   answers what is on now. Down stays on the row, Up reaches the header and Left at
   the row's start reaches the rail.
-- **Immersive and List backdrop.** With programme art, the focused programme's
+- **Immersive backdrop.** With programme art, the focused programme's
   picture fills the top-end corner from the screen's top edge, as the kit's
   immersive list does, under its cinematic scrim over the programme's ambient
   tint. Without art, the channel's logo colour fills the screen behind a blurred
@@ -911,8 +935,7 @@ Directional icons mirror in RTL.
 
 Not decided; do not treat existing code as the decision:
 
-- Text/panel opacity tiers (`TvText*Alpha`, `TvPanel*Alpha`) versus Material
-  roles.
+- Panel opacity tiers (`TvPanel*Alpha`) versus Material roles.
 - Player action-row idle colours.
 - Card grid widths and aspect ratios.
 - Universal single-line headline rule.

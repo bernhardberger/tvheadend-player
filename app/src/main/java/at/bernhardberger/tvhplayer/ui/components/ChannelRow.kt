@@ -6,11 +6,15 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
@@ -20,6 +24,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
@@ -28,13 +33,13 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.ProvideTextStyle
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 
@@ -49,8 +54,10 @@ internal val ChannelRowWidth = TvBrowseColumnWidth
 internal val ChannelRowGap = 4.dp
 internal val ChannelRowEdgeInset = 12.dp
 
-internal val ChannelPiconWidth = 60.dp
-internal val ChannelPiconHeight = 36.dp
+/** The logo's plate: 16:9 and as tall as the two-line item's content. */
+internal val ChannelPiconWidth = 72.dp
+internal val ChannelPiconHeight = 40.dp
+private val ChannelPiconInset = 4.dp
 private val ChannelProgressGap = 3.dp
 internal val ChannelRowProgressHeight = 2.dp
 
@@ -136,18 +143,15 @@ fun ChannelRow(
         },
         supportingContent = {
             Column(Modifier.fillMaxWidth()) {
-                // This TV Material release defaults supporting text to bodySmall even
-                // on ListItem. Use its 14sp bodyMedium for the accepted ten-foot line.
-                ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
-                    if (programmeLoading) {
-                        SkeletonLine(Modifier.testTag("channel-programme-loading"))
-                    } else {
-                        ChannelProgrammeSubtitle(
-                            title = programTitle,
-                            startSec = programStartSec,
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                // The library's 12sp bodySmall, as on the channel cards.
+                if (programmeLoading) {
+                    SkeletonLine(Modifier.testTag("channel-programme-loading"))
+                } else {
+                    ChannelProgrammeSubtitle(
+                        title = programTitle,
+                        startSec = programStartSec,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
                 if (progress != null) {
                     Spacer(Modifier.height(ChannelProgressGap))
@@ -169,14 +173,23 @@ fun ChannelRow(
             }
         },
         leadingContent = {
-            // Bare picon: fitted inside 60x36 with its own aspect ratio, no logo box.
-            PiconBox(
-                piconPath = piconPath,
-                placeholderTint = LocalContentColor.current,
-                modifier = Modifier
-                    .testTag("channel-picon")
-                    .size(width = ChannelPiconWidth, height = ChannelPiconHeight),
-            )
+            // The logo on a charcoal plate, as the player's channel chip shows it: a steady column
+            // down the list, while the item itself keeps the library's bare rest state. The plate
+            // is the icon's ground, so a missing logo keeps its light tint when the row is focused.
+            Box(
+                Modifier
+                    .size(width = ChannelPiconWidth, height = ChannelPiconHeight)
+                    .clip(MaterialTheme.shapes.extraSmall)
+                    .background(TvSurfaceColors.containerLowest),
+            ) {
+                PiconBox(
+                    piconPath = piconPath,
+                    modifier = Modifier
+                        .testTag("channel-picon")
+                        .fillMaxSize()
+                        .padding(ChannelPiconInset),
+                )
+            }
         },
         modifier = modifier.then(contextMenu.modifier)
             .profileLayout("channels:row")

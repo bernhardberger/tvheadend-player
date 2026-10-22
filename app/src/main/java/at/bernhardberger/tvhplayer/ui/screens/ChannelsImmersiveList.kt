@@ -9,15 +9,18 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,6 +43,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -61,6 +65,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -81,9 +86,14 @@ import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
+import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvGridGutter
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
@@ -422,10 +432,10 @@ internal fun ChannelsImmersiveHero(
     // A fixed height keeps the row in place while the hero's text changes length; shorter text
     // sits on the row, so a two-line title grows upward. Beside the list nothing moves with it.
     val height = with(LocalDensity.current) {
-        typography.bodyMedium.lineHeight.toDp() + 8.dp + typography.headlineSmall.lineHeight.toDp() * 2 +
-            4.dp + typography.titleMedium.lineHeight.toDp() +
-            ImmersiveListLineGap + ImmersiveFactsLineHeight + ImmersiveListLineGap + typography.bodyMedium.lineHeight.toDp() +
-            ImmersiveSynopsisGap + typography.bodyMedium.lineHeight.toDp() * ImmersiveSynopsisLines
+        typography.labelMedium.lineHeight.toDp() + 8.dp + typography.headlineLarge.lineHeight.toDp() * 2 +
+            4.dp + typography.bodyLarge.lineHeight.toDp() +
+            ImmersiveListLineGap + ImmersiveFactsLineHeight + ImmersiveListLineGap + typography.labelMedium.lineHeight.toDp() +
+            ImmersiveSynopsisGap + typography.bodyLarge.lineHeight.toDp() * ImmersiveSynopsisLines
     }
     AnimatedContent(
         targetState = channelId,
@@ -434,7 +444,7 @@ internal fun ChannelsImmersiveHero(
                 fadeOut(tween(ChannelsDetailCrossfadeMillis)) using
                 SizeTransform(clip = false) { _, _ -> snap() }
         },
-        contentAlignment = Alignment.BottomStart,
+        contentAlignment = if (besideList) Alignment.TopStart else Alignment.BottomStart,
         modifier = modifier.then(if (besideList) Modifier else Modifier.height(height))
             .widthIn(max = ImmersiveHeroWidth).testTag("channels-immersive-hero"),
         label = "immersiveHero",
@@ -451,9 +461,15 @@ internal fun ChannelsImmersiveHero(
             next?.let { observation.dvrEntryForEvent(it.id) }?.state == DvrEntryState.SCHEDULED
         }
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
+        // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
             synopsisLines = if (besideList) ImmersiveListSynopsisLines else ImmersiveSynopsisLines,
-            loading = frame.guideLoading, modifier = Modifier.wrapContentHeight(Alignment.Bottom))
+            loading = frame.guideLoading, fitSynopsis = besideList,
+            // Beside the list the title steps down one size, so it doesn't compete with the rows.
+            titleStyle = if (besideList) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
+            // The kit's 16sp description; the narrow column beside the list keeps 14sp for its line length.
+            synopsisStyle = if (besideList) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.wrapContentHeight(if (besideList) Alignment.Top else Alignment.Bottom))
     }
 }
 
@@ -463,7 +479,7 @@ private fun ProgrammeFacts(metadata: List<String>, rating: String?, modifier: Mo
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (metadata.isNotEmpty()) {
             Text(programmeFactsSegments(metadata), Modifier.weight(1f, fill = false),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (rating != null) ProgrammeAgeRatingBox(rating, "channels-immersive-rating")
@@ -483,7 +499,9 @@ internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
 @Composable
 private fun ChannelsHeadline(
     channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, recording: Boolean, now: Long,
-    synopsisLines: Int, loading: Boolean, modifier: Modifier,
+    synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false,
+    titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
+    synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
 ) {
     val typography = MaterialTheme.typography
     val colors = MaterialTheme.colorScheme
@@ -498,22 +516,24 @@ private fun ChannelsHeadline(
         if (current == null && loading) {
             // The title and its time hold their lines until the guide arrives.
             CompositionLocalProvider(LocalContentColor provides colors.onSurface) {
-                SkeletonLine(Modifier.padding(top = 8.dp).testTag("channels-immersive-loading"), typography.headlineSmall,
+                SkeletonLine(Modifier.padding(top = 8.dp).testTag("channels-immersive-loading"), titleStyle,
                     widthFraction = 0.7f)
-                SkeletonLine(Modifier.padding(top = ImmersiveListLineGap), typography.bodyMedium, widthFraction = 0.35f)
+                SkeletonLine(Modifier.padding(top = ImmersiveListLineGap), typography.labelMedium, widthFraction = 0.35f)
             }
             return@Column
         }
         Text(
             current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
-            style = typography.headlineSmall, color = colors.onSurface,
+            style = titleStyle, color = colors.onSurface,
             maxLines = 2, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 8.dp).testTag("channels-immersive-title"),
         )
         if (current != null) {
             // With EIT it is often the only text besides the title.
             current.subtitle?.takeIf(String::isNotBlank)?.let {
-                Text(it, style = typography.titleMedium, color = colors.onSurfaceVariant,
+                // Regular weight, as the kit's dialog keeps everything under its title; white, as it
+                // names the episode with the title.
+                Text(it, style = typography.bodyLarge, color = TvTextColors.primary,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = 4.dp).testTag("channels-immersive-subtitle"))
             }
@@ -528,14 +548,22 @@ private fun ChannelsHeadline(
             Row(Modifier.padding(top = ImmersiveListLineGap).testTag("channels-immersive-metadata"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(formatTimeInterval(current.start.epochSeconds, current.stop.epochSeconds),
-                    style = typography.bodyMedium, color = colors.onSurfaceVariant, maxLines = 1)
+                    style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 1)
                 ProgressStrip(current.progress(now), Modifier.width(160.dp))
             }
         }
-        current?.let(::channelsProgrammeSynopsis)?.let {
-            Text(it, style = typography.bodyMedium, color = colors.onSurfaceVariant,
-                maxLines = synopsisLines, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = ImmersiveSynopsisGap).testTag("channels-headline-synopsis"))
+        current?.let(::channelsProgrammeSynopsis)?.let { synopsis ->
+            val text = @Composable { lines: Int ->
+                Text(synopsis, style = synopsisStyle, color = TvTextColors.secondary,
+                    maxLines = lines, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = ImmersiveSynopsisGap).testTag("channels-headline-synopsis"))
+            }
+            if (!fitSynopsis) text(synopsisLines) else BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+                // Only whole lines in what the rest leaves, and none rather than a cut one.
+                val lineHeight = with(LocalDensity.current) { synopsisStyle.lineHeight.toDp() }
+                val lines = minOf(synopsisLines, ((maxHeight - ImmersiveSynopsisGap) / lineHeight).toInt())
+                if (lines > 0) text(lines)
+            }
         }
         // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
         next?.let {
@@ -547,24 +575,25 @@ private fun ChannelsHeadline(
 /** What follows, with a scheduled recording marked on the programme as the rows mark theirs. */
 @Composable
 private fun NextProgramme(next: EpgEvent, scheduled: Boolean, modifier: Modifier) {
-    val color = MaterialTheme.colorScheme.onSurfaceVariant
+    val color = TvTextColors.tertiary
     Row(modifier.testTag("channels-immersive-next"), verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         val title = next.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg)
         Text(stringResource(R.string.player_next, "${formatHm(next.start.epochSeconds)} $title"),
-            Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelLarge, color = color,
+            Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium, color = color,
             maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (scheduled) ScheduledIndicator(Modifier.testTag("channels-next-scheduled"), tint = color)
     }
 }
 
 /**
- * Over playback the screen draws no background, so the pane beside the list shows the focused
- * channel's picture at its top, where the background's picture stands otherwise: with [programArt]
- * the programme's artwork, else, and for a programme without artwork, the channel's logo.
+ * The focused channel's picture at the top of the pane beside the list, one size and place
+ * whatever the headline below holds and whether playback runs behind: with [programArt] the
+ * programme's artwork, else, and for a programme without artwork, the logo on the logo's ambient
+ * backdrop.
  */
 @Composable
-internal fun ChannelsListPlaybackArt(
+internal fun ChannelsListArt(
     channels: List<Channel>,
     frame: ChannelsTabBody,
     nowSec: () -> Long,
@@ -578,9 +607,8 @@ internal fun ChannelsListPlaybackArt(
     AnimatedContent(
         targetState = channelId,
         transitionSpec = { fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith fadeOut(tween(ChannelsDetailCrossfadeMillis)) },
-        contentAlignment = Alignment.TopCenter,
-        modifier = modifier.testTag("channels-list-playback-art"),
-        label = "listPlaybackArt",
+        modifier = modifier.width(ListArtWidth).aspectRatio(16f / 9f).testTag("channels-list-art"),
+        label = "listArt",
     ) { id ->
         val channel = channels.firstOrNull { it.id == id } ?: return@AnimatedContent
         val now = nowSec()
@@ -589,9 +617,25 @@ internal fun ChannelsListPlaybackArt(
         }
         // The eyebrow below already names the channel, so the artwork goes without its logo plate.
         if (art != null && LocalArtworkContext.current.currentSession != null) {
-            ProgrammeArtwork(art, channelIcon = null, progress = null, Modifier.aspectRatio(16f / 9f))
+            ProgrammeArtwork(art, channelIcon = null, progress = null, Modifier.fillMaxSize())
         } else {
-            DetailsHeroLogo(channel.icon, Modifier)
+            // The logo cards' ambient colour; with no text on it, it keeps its strength to the bottom.
+            Box(Modifier.fillMaxSize().clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
+                ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize(), bottomShare = 1f)
+                PiconBox(channel.icon,
+                    Modifier.align(Alignment.Center).fillMaxWidth(ListArtLogoWidthFraction).fillMaxHeight(ListArtLogoHeightFraction)
+                        .testTag("channels-list-art-logo"))
+            }
         }
     }
 }
+
+/**
+ * The List's picture is the kit's four-column card, 268 by 151, and the headline below keeps to
+ * its width: one column, as JetFit's details card, rather than a picture over wider text.
+ */
+internal val ListArtWidth = TvGridColumnWidth * 4 + TvGridGutter * 3
+
+/** The logo's room in the List's picture: as wide as on the logo cards, half the picture tall. */
+private const val ListArtLogoWidthFraction = 0.6f
+private const val ListArtLogoHeightFraction = 0.5f

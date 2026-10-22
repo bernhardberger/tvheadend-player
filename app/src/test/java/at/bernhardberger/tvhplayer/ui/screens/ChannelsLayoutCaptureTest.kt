@@ -65,6 +65,7 @@ class ChannelsLayoutCaptureTest {
         playing(ChannelsLayout.LIST, ::row, "list-logo", ChannelsView(ChannelsLayout.LIST, programArt = emptySet()))
     @Test fun listRecording() = recording(ChannelsLayout.LIST, ::row)
     @Test fun immersiveRecording() = recording(ChannelsLayout.IMMERSIVE, ::card)
+    @Test fun gridRecording() = recording(ChannelsLayout.GRID, ::card)
 
     /** Channel 1 plays behind the screen: focus on it, on another channel, then on a header button. */
     private fun playing(

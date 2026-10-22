@@ -255,17 +255,17 @@ class ChannelsStandardLayoutEvidenceTest {
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
 
-        // Library standard anatomy: 16dp content inset, 60x36 bare picon, 8dp slot gap.
+        // Library standard anatomy: 16dp content inset, 72x40 logo tile, 8dp slot gap.
         val picon = inRow(1, "channel-picon").bounds()
         assertEquals("picon x", first.left + 16f, picon.left, .5f)
-        assertEquals("picon width", 60f, picon.width, .5f)
-        assertEquals("picon height", 36f, picon.height, .5f)
+        assertEquals("picon width", 72f, picon.width, .5f)
+        assertEquals("picon height", 40f, picon.height, .5f)
         val title = inRow(1, "channel-title").bounds()
         val subtitle = inRow(1, "channel-programme-start").bounds()
         val progress = inRow(1, "channel-progress").bounds()
-        assertEquals("title x", first.left + 84f, title.left, .5f)
+        assertEquals("title x", first.left + 96f, title.left, .5f)
         assertEquals("native headline type size", 16f, inRow(1, "channel-title").textLayout().layoutInput.style.fontSize.value, .01f)
-        assertEquals("accepted supporting type size", 14f, inRow(1, "channel-programme-title").textLayout().layoutInput.style.fontSize.value, .01f)
+        assertEquals("library supporting type size", 12f, inRow(1, "channel-programme-title").textLayout().layoutInput.style.fontSize.value, .01f)
         assertEquals("programme line shares the text column", title.left, subtitle.left, .5f)
         assertEquals("progress shares the text column", title.left, progress.left, .5f)
         assertEquals("text column runs to the trailing inset", first.right - 16f, progress.right, .5f)
@@ -292,9 +292,9 @@ class ChannelsStandardLayoutEvidenceTest {
         key(Key.DirectionDown)
         enterAndFocus(1)
         val focusedPicon = inRow(1, "channel-picon").bounds()
-        assertTrue("focused content is scaled (${focusedPicon.width})", focusedPicon.width > 60f)
+        assertTrue("focused content is scaled (${focusedPicon.width})", focusedPicon.width > 72f)
         val listColumn = compose.onNodeWithTag("channels-list").bounds()
-        val scaleOverflow = (focusedPicon.width / 60f - 1f) * first.width / 2f
+        val scaleOverflow = (focusedPicon.width / 72f - 1f) * first.width / 2f
         assertTrue("focus scale fits the list column", first.left - scaleOverflow >= listColumn.left)
 
         // The preview pane runs beside the rows, 92dp after them, and its headline rests on the safe inset.
@@ -337,7 +337,7 @@ class ChannelsStandardLayoutEvidenceTest {
         val long = row(LONG_TEXT).bounds()
         val start = inRow(LONG_TEXT, "channel-programme-start").bounds()
         val title = inRow(LONG_TEXT, "channel-programme-title").bounds()
-        assertEquals("start time keeps the text origin", long.left + 84f, start.left, .5f)
+        assertEquals("start time keeps the text origin", long.left + 96f, start.left, .5f)
         assertEquals("title gets all space after start", start.right, title.left, .5f)
         assertEquals("title can use the trailing edge", long.right - 16f, title.right, .5f)
         assertTrue("long programme naturally ellipsizes", inRow(LONG_TEXT, "channel-programme-title").textLayout().isLineEllipsized(0))
@@ -355,7 +355,7 @@ class ChannelsStandardLayoutEvidenceTest {
         assertTrue("row height without EPG (${missing.height})", missing.height >= 64f)
         assertEquals(
             "title anchor without EPG",
-            missing.left + 84f,
+            missing.left + 96f,
             inRow(NO_EPG, "channel-title").bounds().left,
             .5f,
         )
@@ -464,7 +464,7 @@ class ChannelsStandardLayoutEvidenceTest {
         capture("en-font$fontScale-top-fade-initial-bright-video")
 
         // These anchors leave a real, generated 5:3 picon crossing the top edge.
-        val downTarget = if (fontScale == 1f) 9 else 11
+        val downTarget = if (fontScale == 1f) 9 else 12
         repeat(downTarget - 1) { key(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
@@ -597,13 +597,16 @@ class ChannelsStandardLayoutEvidenceTest {
         }
     }
 
-    /** The fixture's 5:3 picon has a uniform bright right-hand stripe through the fade. */
+    /**
+     * The fixture's 5:3 picon has a uniform bright right-hand stripe through the fade; fitted 4dp
+     * inside its 72x40 tile, the logo spans 53x32 in the tile's middle.
+     */
     private fun assertTopFadePixels(channel: Int) {
         val list = detail("channels-list").bounds()
         val picon = inRow(channel, "channel-picon").bounds()
-        val x = (picon.right - 8f).toInt()
-        val firstY = ceil(maxOf(list.top + 2f, picon.top + 2f)).toInt()
-        val lastY = floor(minOf(list.top + 46f, picon.bottom - 3f)).toInt()
+        val x = (picon.right - 14f).toInt()
+        val firstY = ceil(maxOf(list.top + 2f, picon.top + 6f)).toInt()
+        val lastY = floor(minOf(list.top + 46f, picon.bottom - 7f)).toInt()
         assertTrue("picon $channel crosses the top fade: $picon / $list", lastY > firstY)
         val bitmap = drawShell()
         val first = android.graphics.Color.red(bitmap.getPixel(x, firstY))
@@ -645,24 +648,36 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun shortProgrammeKeepsThreeSynopsisLinesAboveTheBottomAlignedNext() {
+    fun shortProgrammeKeepsThreeSynopsisLinesUnderThePicture() {
         channelsShell(1f)
         enterAndFocus(1)
         assertDescriptionFits(3)
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun enlargedLongProgrammeKeepsThreeWholeSynopsisLinesBelowTitleAndSubtitle() {
+    fun enlargedLongProgrammeKeepsWholeLinesUnderThePicture() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
-        assertDescriptionFits(3)
+        // The picture keeps its size; the synopsis takes only whole lines, none when none fit.
+        val synopsis = compose.onAllNodesWithTag("channels-headline-synopsis", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        if (synopsis.isNotEmpty()) {
+            val node = detail("channels-headline-synopsis")
+            val layout = node.textLayout()
+            assertTrue("the last synopsis line is whole", layout.getLineBottom(layout.lineCount - 1) <= node.bounds().height + .5f)
+        }
+        assertTrue("Next stays above the real safe bottom", detail("channels-immersive-next").bounds().bottom <= 512.5f)
+        listOf("channels-immersive-title", "channels-immersive-subtitle").forEach { tag ->
+            val text = detail(tag).textLayout()
+            assertTrue("$tag retains its whole final line", text.getLineBottom(text.lineCount - 1) <= detail(tag).bounds().height + .5f)
+        }
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun headlineRestsOnTheSafeInsetAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1f)
+    fun headlineHangsFromThePictureAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1f)
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun enlargedGermanHeadlineRestsOnTheSafeInsetAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1.3f)
+    fun enlargedGermanHeadlineHangsFromThePictureAcrossChannelsWithAndWithoutMetadata() = checkDetailAnchors(1.3f)
 
     private fun checkDetailAnchors(fontScale: Float) {
         channelsShell(fontScale)
@@ -670,15 +685,19 @@ class ChannelsStandardLayoutEvidenceTest {
         for (channel in 1..NO_EPG) {
             if (channel > 1) key(Key.DirectionDown)
             row(channel).assertIsFocused()
-            assertEquals("the headline rests on the real safe bottom", 512f, headlineBottom(), .5f)
-            assertPictureClearsTheHeadline()
+            val picture = detail("channels-list-art").bounds()
+            assertEquals("the picture keeps the pane's top", 80f, picture.top, .5f)
+            assertEquals("the kit's four-column card", 268f, picture.width, .5f)
+            assertEquals("at 16:9", 150.75f, picture.height, .5f)
+            assertEquals("the headline hangs from the picture", picture.bottom + 20f, headlineChannel().bounds().top, .5f)
             if (channel == NO_EPG) {
                 detail("channels-immersive-title").assertTextEquals(noEpg)
                 detail("channels-immersive-next").assertDoesNotExist()
                 detail("channels-immersive-subtitle").assertDoesNotExist()
                 detail("channels-headline-synopsis").assertDoesNotExist()
             } else {
-                assertEquals("Next closes the headline", 512f, detail("channels-immersive-next").bounds().bottom, .5f)
+                assertTrue("Next closes the headline above the safe bottom",
+                    detail("channels-immersive-next").bounds().bottom <= 512.5f)
             }
         }
     }
@@ -699,15 +718,9 @@ class ChannelsStandardLayoutEvidenceTest {
             assertTrue("$tag retains its whole final line", text.getLineBottom(text.lineCount - 1) <= detail(tag).bounds().height + .5f)
         }
         assertTrue("the headline stays below the header", headlineChannel().bounds().top >= header().bounds().bottom)
-        assertPictureClearsTheHeadline()
-        assertEquals("Next is anchored to the real column bottom, not wrap content", 512f, next.bottom, .5f)
-    }
-
-    /** Over playback the picture keeps the pane's top and gives way to the headline below it. */
-    private fun assertPictureClearsTheHeadline() {
-        val picture = compose.onAllNodesWithTag("channels-list-playback-art", useUnmergedTree = true)
-            .fetchSemanticsNodes().singleOrNull()?.boundsInRoot ?: return
-        assertTrue("picture $picture above the headline", picture.bottom <= headlineChannel().bounds().top + .5f)
+        assertTrue("the picture stays above the headline",
+            detail("channels-list-art").bounds().bottom <= headlineChannel().bounds().top + .5f)
+        assertTrue("Next stays above the real safe bottom", next.bottom <= 512.5f)
     }
 
     // ---- captures ----
@@ -1042,7 +1055,7 @@ class ChannelsStandardLayoutEvidenceTest {
         File(directory, "$name.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
-        val picture = compose.onAllNodesWithTag("channels-list-playback-art", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
+        val picture = compose.onAllNodesWithTag("channels-list-art", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val next = compose.onAllNodesWithTag("channels-immersive-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val synopsisLines = if (compose.onAllNodesWithTag("channels-headline-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
             detail("channels-headline-synopsis").textLayout().lineCount
