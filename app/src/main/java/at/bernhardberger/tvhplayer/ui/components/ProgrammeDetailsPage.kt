@@ -466,7 +466,7 @@ private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifi
 @Composable
 private fun DetailsSynopsis(text: String) {
     val measurer = rememberTextMeasurer()
-    val style = MaterialTheme.typography.bodyLarge
+    val style = MaterialTheme.typography.bodyMedium
     val more = stringResource(R.string.details_more)
     BoxWithConstraints {
         val width = with(LocalDensity.current) { maxWidth.roundToPx() }
