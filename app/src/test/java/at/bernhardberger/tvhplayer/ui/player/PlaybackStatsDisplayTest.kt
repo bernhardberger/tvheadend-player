@@ -37,7 +37,7 @@ class PlaybackStatsDisplayTest {
         )
 
         assertEquals(
-            "2160p: 30 · 60 / 1080p: 23.98 · 50 · 60 / 720p: 50",
+            "2160p: 30 • 60 / 1080p: 23.98 • 50 • 60 / 720p: 50",
             refreshRatesByResolution(modes),
         )
         assertEquals("", refreshRatesByResolution(emptyList()))

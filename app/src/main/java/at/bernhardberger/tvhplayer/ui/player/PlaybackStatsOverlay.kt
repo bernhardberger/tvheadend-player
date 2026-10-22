@@ -158,7 +158,7 @@ internal fun PlaybackStatsOverlay(
                         video?.frameRate?.let {
                             stringResource(R.string.stats_frame_rate, it.oneDecimal(locale))
                         },
-                    ).joinToString(" · ").ifBlank {
+                    ).joinToString(" • ").ifBlank {
                         stringResource(R.string.stats_unavailable)
                     },
                 )
@@ -177,7 +177,7 @@ internal fun PlaybackStatsOverlay(
                                 formatCount(it.toLong(), locale),
                             )
                         },
-                    ).joinToString(" · ").ifBlank {
+                    ).joinToString(" • ").ifBlank {
                         stringResource(R.string.stats_unavailable)
                     },
                 )
@@ -226,7 +226,7 @@ internal fun PlaybackStatsOverlay(
                     ).takeIf { it.isNotEmpty() }?.let { values ->
                         StatLine(
                             stringResource(R.string.stats_source),
-                            values.joinToString(" · "),
+                            values.joinToString(" • "),
                         )
                     }
                     frontend?.state?.let { state ->
@@ -276,7 +276,7 @@ internal fun PlaybackStatsOverlay(
                                 formatCount(queue.packetCount, locale),
                             ),
                             formatBytes(queue.byteCount, locale),
-                        ).joinToString(" · "),
+                        ).joinToString(" • "),
                     )
                     queue.mediaSpanMicroseconds?.let { microseconds ->
                         StatLine(
@@ -327,7 +327,7 @@ private fun FrameRateStatLine(frameRate: PlaybackFrameRate) {
                 stringResource(R.string.stats_frame_rate_measured, formatRefreshRate(it))
             } ?: stringResource(R.string.stats_frame_rate_measured_none),
             measured?.sameTimePercent?.let { stringResource(R.string.stats_same_time_frames, it) },
-        ).joinToString(" · "),
+        ).joinToString(" • "),
     )
 }
 
@@ -347,7 +347,7 @@ private fun DisplayOutputStatLines(frameRate: PlaybackFrameRate?) {
                     formatRefreshRate(it),
                 )
             },
-        ).joinToString(" · "),
+        ).joinToString(" • "),
     )
     if (output.refreshRatesByResolution.isNotEmpty()) {
         StatLine(
@@ -439,7 +439,7 @@ private fun formattedMeasurement(
     absoluteValue?.let {
         stringResource(absoluteUnit, formatDecimal(it, 1, locale))
     },
-).takeIf { it.isNotEmpty() }?.joinToString(" · ")
+).takeIf { it.isNotEmpty() }?.joinToString(" • ")
 
 @Composable
 private fun formatBytes(value: Long, locale: Locale): String = when {

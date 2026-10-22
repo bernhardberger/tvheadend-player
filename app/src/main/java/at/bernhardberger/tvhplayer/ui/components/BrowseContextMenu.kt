@@ -81,7 +81,7 @@ internal fun BrowseContextMenu(
         onPreviewKeyEvent = { it.key == Key.Menu },
         itemCardLayout = true,
         leading = {
-            val subtitle = listOf(channel, time).filter(String::isNotBlank).joinToString(" · ")
+            val subtitle = listOf(channel, time).filter(String::isNotBlank).joinToString(" • ")
             val description = listOf(episode, summary).filter(String::isNotBlank).joinToString("\n")
             Column(Modifier.fillMaxWidth().testTag("browse-context-item")) {
                 Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f)) { artwork() }

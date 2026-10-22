@@ -26,14 +26,14 @@ class NoticeFormatterTest {
     @Test fun lostNoticeOnlyMentionsSavedChannelsWhenPresent() {
         assertEquals("Connection lost", formatter.format(Notice.Connection(
             at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST)).headline)
-        assertEquals("Connection lost · Showing saved channels", formatter.format(Notice.Connection(
+        assertEquals("Connection lost • Showing saved channels", formatter.format(Notice.Connection(
             at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST, true)).headline)
     }
 
     @Test @Config(qualifiers = "de") fun lostNoticeWithAndWithoutSavedChannelsInGerman() {
         assertEquals("Verbindung verloren", formatter.format(Notice.Connection(
             at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST)).headline)
-        assertEquals("Verbindung verloren · Gespeicherte Sender werden angezeigt", formatter.format(Notice.Connection(
+        assertEquals("Verbindung verloren • Gespeicherte Sender werden angezeigt", formatter.format(Notice.Connection(
             at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST, true)).headline)
     }
 
@@ -49,7 +49,7 @@ class NoticeFormatterTest {
         val result = formatter.format(Notice.Dvr(DvrChangeKind.RECORDING_STARTED, entry, DvrChangeOrigin.External))
 
         assertEquals("Recording started", result.headline)
-        assertEquals("MotoGP · Grand Prix of Austria · Sport HD", result.detail)
+        assertEquals("MotoGP • Grand Prix of Austria • Sport HD", result.detail)
     }
 
     @Test fun missingBlankOrDuplicateSubtitlesKeepTheExistingDetail() {
@@ -57,7 +57,7 @@ class NoticeFormatterTest {
             val entry = DvrEntry.create(DvrEntryId(1), title = "MotoGP", subtitle = subtitle, channelName = "Sport HD")
             val result = formatter.format(Notice.Dvr(DvrChangeKind.RECORDING_STARTED, entry, DvrChangeOrigin.External))
 
-            assertEquals("MotoGP · Sport HD", result.detail)
+            assertEquals("MotoGP • Sport HD", result.detail)
         }
     }
 

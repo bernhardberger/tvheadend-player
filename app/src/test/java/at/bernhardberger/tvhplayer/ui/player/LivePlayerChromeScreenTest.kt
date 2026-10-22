@@ -1791,7 +1791,6 @@ class LivePlayerChromeScreenTest {
         assertTrue(texts("details-title").contains("Now showing"))
         assertTrue(texts("details-facts").contains("Drama"))
         assertFalse("episode already used as subtitle is not duplicated", texts("details-facts").contains("S2"))
-        assertFalse(texts("details-facts").contains("•"))
         val text = texts("details-full-description")
         listOf(description.trim(), "Summary", "A separate summary", "Categories", "Documentary", "Keywords", "Mountains", "Copyright year", "2024")
             .forEach { assertTrue("reading includes $it", text.contains(it)) }

@@ -251,7 +251,7 @@ internal fun ProgramDetails(
             }
         } else {
             Text(if (state.opened == null && state.scheduleEntry)
-                "$channelIdentity · ${stringResource(R.string.details_tab_schedule)}"
+                "$channelIdentity • ${stringResource(R.string.details_tab_schedule)}"
                 else stringResource(R.string.details_tab_details),
                 style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(end = 20.dp).testTag("details-heading").semantics { heading() })
@@ -491,11 +491,11 @@ private fun Schedule(
             val meta = buildList {
                 if (minutes > 0) add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes, resources))
                 event.genre?.takeIf(String::isNotBlank)?.let(::add)
-            }.joinToString(" · ")
+            }.joinToString(" • ")
             val spokenMeta = buildList {
                 if (minutes > 0) add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes, resources, spoken = true))
                 event.genre?.takeIf(String::isNotBlank)?.let(::add)
-            }.joinToString(" · ")
+            }.joinToString(" • ")
             WideCardContainer(
                 modifier = Modifier.fillMaxWidth().height(rowHeight),
                 imageCard = { interaction ->
@@ -614,8 +614,8 @@ internal fun programmeReadingFields(event: EpgEventEntry, locale: Locale): List<
     text(R.string.details_description, event.description)
     if (event.summary?.trim() != event.description?.trim()) text(R.string.details_summary, event.summary)
     text(R.string.details_genre, event.genre)
-    text(R.string.details_categories, event.categories?.filter(String::isNotBlank)?.distinct()?.joinToString(" · "))
-    text(R.string.details_keywords, event.keywords?.filter(String::isNotBlank)?.distinct()?.joinToString(" · "))
+    text(R.string.details_categories, event.categories?.filter(String::isNotBlank)?.distinct()?.joinToString(" • "))
+    text(R.string.details_keywords, event.keywords?.filter(String::isNotBlank)?.distinct()?.joinToString(" • "))
     event.episode?.let {
         text(R.string.details_episode, it.onscreen)
         number(R.string.details_season, it.seasonNumber)
@@ -696,7 +696,7 @@ private fun factsLine(event: EpgEventEntry, channelIdentity: String): String = p
 
 /** [rangeIndex] marks the time range, whose separator is where it may break; other dashes are joined to their words. */
 internal fun programmeFactsSegments(segments: List<String>, rangeIndex: Int = -1): String =
-    segments.withIndex().joinToString(" · ") { (index, segment) ->
+    segments.withIndex().joinToString(" • ") { (index, segment) ->
         segment.replace(' ', '\u00a0').let { if (index == rangeIndex) it else it.replace("–", "\u2060–\u2060") }
     }
 

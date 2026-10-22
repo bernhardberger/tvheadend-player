@@ -34,7 +34,7 @@ internal fun classifyPlaybackError(error: Throwable?): String? {
         ?.let(::diagnosticIdentifier)
         ?: "?"
     val method = diagnosticIdentifier(frame.methodName)
-    return "$exception · $owner.$method:${frame.lineNumber}"
+    return "$exception • $owner.$method:${frame.lineNumber}"
 }
 
 private val preconditionHelpers = setOf(

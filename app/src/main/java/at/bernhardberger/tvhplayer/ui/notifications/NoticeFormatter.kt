@@ -99,7 +99,7 @@ internal class NoticeFormatter(private val context: Context) {
                 DvrChangeKind.RECORDING_FAILED -> entry.subscriptionError?.let { add(it.label(context)) }
                 else -> Unit
             }
-        }.joinToString(" · ")
+        }.joinToString(" • ")
         val title = if (notice.kind == DvrChangeKind.REMOVED && canceled && notice.count > 1) {
             context.resources.getQuantityString(R.plurals.recording_notice_canceled_count, notice.count, notice.count)
         } else context.getString(headline)

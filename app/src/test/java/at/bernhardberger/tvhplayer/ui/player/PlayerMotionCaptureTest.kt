@@ -214,13 +214,13 @@ class PlayerMotionCaptureTest {
             PlayerPage(details = Unit.takeIf { layers.infoOpen },
                 railExpanded = layers.channelRailPresented,
                 nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip("1", "Documentary", ArtworkId(1), programme, 1_800) } },
-                railHeader = if (rail) ({ ProgrammeScheduleHeader("1 · Documentary") }) else null,
+                railHeader = if (rail) ({ ProgrammeScheduleHeader("1 • Documentary") }) else null,
                 player = {
                     live(session, behind = false,
                         rail = layers.takeIf { rail }, downHint = "Channels".takeUnless { rail })
                 }) {
                 LiveProgrammeInfoOverlay(
-                    event = programme, channelIdentity = "1 · Documentary", channelName = "Documentary",
+                    event = programme, channelIdentity = "1 • Documentary", channelName = "Documentary",
                     recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
                     confirmationVisible = false, restoreRecordFocus = false,
                     onRecord = {}, onRecordingActivate = {}, onRecordingDismiss = {},
@@ -232,7 +232,7 @@ class PlayerMotionCaptureTest {
                                 EpgEvent.create(EventId(100L + it), ChannelId(1), Instant.fromEpochSeconds(3600L * it),
                                     Instant.fromEpochSeconds(3600L * (it + 1)), title = "Programme $it", summary = "Schedule programme")
                             } else listOf(programme, next),
-                            nowSec = 1_800, channelIdentity = "1 · Documentary",
+                            nowSec = 1_800, channelIdentity = "1 • Documentary",
                             tile = { event, modifier ->
                                 ProvideArtworkSession(session) { ProgrammeHero(event.image, ChannelId(1), "1", ArtworkId(1), modifier) }
                             },

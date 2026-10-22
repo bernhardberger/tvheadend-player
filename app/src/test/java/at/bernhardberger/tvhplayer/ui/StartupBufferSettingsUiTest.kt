@@ -63,7 +63,7 @@ class StartupBufferSettingsUiTest {
         val german = locale == "de"
         val title = if (german) "Startpuffer" else "Start-up buffer"
         // Automatic starts at 0.5 s, shown in locale decimals.
-        val automatic = if (german) "Automatisch · 0,5 s" else "Automatic · 0.5 s"
+        val automatic = if (german) "Automatisch • 0,5 s" else "Automatic • 0.5 s"
         val half = if (german) "0,5 s" else "0.5 s"
         val oneAndHalf = if (german) "1,5 s" else "1.5 s"
         val description = if (german) "Kürzer startet schneller, länger schützt vor Aussetzern."
@@ -144,7 +144,7 @@ class StartupBufferSettingsUiTest {
         capture(view, "$locale-level-fixed-font$scale")
         compose.runOnIdle { ui = ui.copy(startupBufferLearnedMillis = 1500) }
         key(Key.DirectionUp)
-        val learned = if (german) "Automatisch · 1,5 s" else "Automatic · 1.5 s"
+        val learned = if (german) "Automatisch • 1,5 s" else "Automatic • 1.5 s"
         compose.onNode(isFocused() and hasText(learned)).assertIsNotSelected()
         key(Key.DirectionCenter)
         assertEquals(STARTUP_BUFFER_AUTOMATIC, ui.startupBufferMillis)

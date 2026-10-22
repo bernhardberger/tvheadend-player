@@ -320,7 +320,7 @@ internal fun ProgrammeScheduleHeader(identity: String) {
             .padding(horizontal = TvGridHorizontalMargin)
             .padding(top = 92.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("$identity · ${stringResource(R.string.details_tab_schedule)}",
+            Text("$identity • ${stringResource(R.string.details_tab_schedule)}",
                 color = MaterialTheme.colorScheme.onSurface,
                 style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,

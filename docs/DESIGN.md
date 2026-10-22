@@ -1,4 +1,4 @@
-# Tvheadend Player · TV design contract
+# Tvheadend Player • TV design contract
 
 Authoritative visual and interaction contract for the Android TV app. It records
 **accepted product decisions** only. Implementation mechanics, library internals,
@@ -382,7 +382,7 @@ and does not replay its sideways reveal. The departing details retain their
 channel/event until return settles, then dispose; section 1 stays composed.
 Opening side panels, dialogs, auto-hide and zap reveals retain their own motion.
 
-## 7. Settings · sliding-depth navigation (Variant C)
+## 7. Settings • sliding-depth navigation (Variant C)
 
 Accepted 2026-09-15; static design in Penpot page
 `411cd6b7-a446-8042-8008-a3866b9562cf` (contract board
@@ -471,7 +471,7 @@ tuner loss and interruption are failures, limit expiry is informational.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
 
-### Channels · layouts, headline and backdrop
+### Channels • layouts, headline and backdrop
 
 Visual baseline accepted for implementation 2026-10-04 after the coordinated
 browse concept review, revised in the U4 polish rounds through 2026-10-21. View
@@ -502,7 +502,7 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   headline and the library's 12sp `bodySmall` supporting text, as on the channel
   cards, indication and focus scale. Rows are 4dp apart. The
   row is one D-pad target; the title is `[number]  [name]`.
-- The supporting line is `HH:MM · programme title` for the **current** programme;
+- The supporting line is `HH:MM • programme title` for the **current** programme;
   there is no minutes-left label. Start time keeps its natural width and only
   the title ellipsizes, from real text layout. Unknown EPG shows the no-EPG label
   with no timing and no progress.
@@ -528,7 +528,7 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   strip, then the synopsis in the kit's 16sp `bodyLarge` (`bodyMedium` in the
   narrow column beside the list). Eyebrow, facts, time and Next are metadata in the
   kit's 12sp `labelMedium`. The list alone ends on a quiet
-  `Next · HH:MM title` line, with the scheduled clock when that
+  `Next • HH:MM title` line, with the scheduled clock when that
   programme is to be recorded. Gaps are 8dp between eyebrow, title, facts and
   time (4dp before the subtitle) and 20dp before the synopsis and before Next.
   The synopsis takes up to three whole lines of the room left above the bottom
@@ -561,7 +561,7 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   copy of the logo, and the 240×135 logo stands at the top end. The backdrop stays
   in place when the drawer opens; only the sharp logo moves with the content.
 - **Grid.** Three columns of channel-first cards (`[number] [name]`, then
-  `HH:MM · programme`). Cards are 16:9 unless the last visible row would be mostly
+  `HH:MM • programme`). Cards are 16:9 unless the last visible row would be mostly
   cut off; then they shrink so a further whole row fits, never flatter than 2:1 or
   below the card's text height. The header scrolls away with the rows and returns
   with the first row; the focused row is held below the visible half of the row
@@ -579,7 +579,7 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   Before a session, saved logos give their stored colour and blur from the first
   frame.
 
-### Guide and Recordings · browse cohesion
+### Guide and Recordings • browse cohesion
 
 The shared-grid follow-up extends the 2026-10-04 visual baseline. Archive now
 uses the depth model below; destination entry, scope selection, details-first
@@ -687,7 +687,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   content or not, so nothing moves between programmes. It is bottom-aligned with
   the fixed-size card and may be slightly taller. The lines are a metadata row
   (live: programme times and genre; recordings:
-  `Recorded <date> · Ends HH:MM`, or `Recording until HH:MM` while growing) with a
+  `Recorded <date> • Ends HH:MM`, or `Recording until HH:MM` while growing) with a
   red `REC` badge while the channel or recording records and the stream badges,
   the title, the subtitle, and Next. A recording's episode stands under its title
   and its last line stays empty. Nothing in the info bar shows tuning or
@@ -846,7 +846,7 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - Use the compact channel-card anatomy: 196×110dp at default font scale, a
   centered picon on a flat surface without the kit's text scrim, the current
   programme title (with the playing and recording markers) as the main line,
-  `<number> <name> · Nm left` below it, and a 2dp cyan progress strip. Use TV
+  `<number> <name> • Nm left` below it, and a 2dp cyan progress strip. Use TV
   Material `CompactCard` indication; card height grows with localized text scale.
 - The rail follows the kit's immersive list: focus stays on the first slot and a
   preview of the focused card stands above the rows, its text on the start

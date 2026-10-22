@@ -27,7 +27,7 @@ import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 
 /**
  * Presentation strings follow the displayed programme/seek target. Callers pass no next for
- * recordings; a recording's [metadata] is its whole eyebrow (`Recorded 14 Nov · Ends 23:45`).
+ * recordings; a recording's [metadata] is its whole eyebrow (`Recorded 14 Nov • Ends 23:45`).
  */
 data class PlayerInfoBarData(
     val channelNumber: String,
@@ -67,7 +67,7 @@ fun PlayerInfoBar(
     val recorded = data.recordedDate != null
     // A recording's metadata is its whole line; live's is the time range followed by the metadata.
     val facts = if (data.recordedDate != null) data.metadata ?: stringResource(R.string.player_recorded_on, data.recordedDate)
-        else listOfNotNull(data.timeRange.takeIf(String::isNotBlank), data.metadata?.takeIf(String::isNotBlank)).joinToString(" · ")
+        else listOfNotNull(data.timeRange.takeIf(String::isNotBlank), data.metadata?.takeIf(String::isNotBlank)).joinToString(" • ")
     val next = data.next?.let { stringResource(R.string.player_next, it) }
     val remaining = data.remainingMinutes?.let { playerMinutesLeft(it, spoken = true) }
     val scheduled = if (data.nextScheduled && next != null) stringResource(R.string.player_scheduled) else null

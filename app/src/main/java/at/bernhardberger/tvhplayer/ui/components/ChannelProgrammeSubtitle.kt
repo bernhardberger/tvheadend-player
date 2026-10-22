@@ -10,10 +10,10 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 
 /** Separator between the start time and the programme title. */
-private const val SUBTITLE_SEPARATOR = " · "
+private const val SUBTITLE_SEPARATOR = " • "
 
 /**
- * Programme line: `HH:MM · title`. The start time keeps its natural width;
+ * Programme line: `HH:MM • title`. The start time keeps its natural width;
  * only the title yields to the remaining space and ellipsizes, so the
  * real text layout decides how much of it fits instead of a character budget.
  */

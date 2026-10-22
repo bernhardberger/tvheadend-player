@@ -240,7 +240,7 @@ class RecordingPlayerChromeScreenTest {
             growing = fixtureRecordingInfo(growing = true, positionMs = 1_800_000, durationMs = 2_000_000, nowSec = 1_700_010_000)
         }
         compose.waitForIdle()
-        assertEquals("Recorded ${finished.recordedDate} · Ends ${formatClock(1_700_010_000 + 1_800)}", finished.metadata)
+        assertEquals("Recorded ${finished.recordedDate} • Ends ${formatClock(1_700_010_000 + 1_800)}", finished.metadata)
         assertEquals("Recording until ${formatClock(1_700_003_600)}", growing.metadata)
     }
 

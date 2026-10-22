@@ -59,11 +59,11 @@ fun humanTrackLabel(
         listOf(language, channels, role)
     }
     return HumanTrackLabel(
-        summary = summaryParts.filterNotNull().joinToString(" · ").ifBlank { trackFallbackLabel },
+        summary = summaryParts.filterNotNull().joinToString(" • ").ifBlank { trackFallbackLabel },
         name = name,
         overline = knownLanguage?.takeIf { role != null },
         detail = listOfNotNull(channels?.takeIf { it != name }, humanCodecName(sampleMimeType))
-            .joinToString(" · ")
+            .joinToString(" • ")
             .ifBlank { null },
     )
 }

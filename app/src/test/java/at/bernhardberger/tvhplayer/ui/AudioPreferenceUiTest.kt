@@ -182,7 +182,7 @@ class AudioPreferenceUiTest {
         var automatic by mutableStateOf(true)
         var automaticCalls = 0
         var explicitCalls = 0
-        var tracks by mutableStateOf(listOf(PlaybackOptionTrack("de", "Deutsch · AC-3", "", true)))
+        var tracks by mutableStateOf(listOf(PlaybackOptionTrack("de", "Deutsch • AC-3", "", true)))
         lateinit var view: View
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {

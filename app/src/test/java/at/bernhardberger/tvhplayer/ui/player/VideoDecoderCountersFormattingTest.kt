@@ -16,13 +16,13 @@ class VideoDecoderCountersFormattingTest {
     @Test
     @Config(qualifiers = "en")
     fun englishCountersKeepRenderedDroppedSkippedOrder() {
-        assertEquals("Rendered 12345 · Dropped 6 · Skipped 2", formatted())
+        assertEquals("Rendered 12345 • Dropped 6 • Skipped 2", formatted())
     }
 
     @Test
     @Config(qualifiers = "de")
     fun germanCountersAreFullyTranslated() {
-        assertEquals("Angezeigt 12345 · Verworfen 6 · Übersprungen 2", formatted())
+        assertEquals("Angezeigt 12345 • Verworfen 6 • Übersprungen 2", formatted())
     }
 
     private fun formatted(): String = formatVideoDecoderCounters(

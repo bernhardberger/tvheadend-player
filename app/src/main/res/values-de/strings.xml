@@ -11,7 +11,7 @@
     <string name="recording_confirmation_profile">Aufnahmeprofil: %1$s</string>
     <string name="recording_confirmation_owner">Aufnahmebesitzer: %1$s</string>
     <string name="context_watch">Ansehen</string>
-    <string name="context_channel_now">%1$s · Jetzt: %2$s</string>
+    <string name="context_channel_now">%1$s • Jetzt: %2$s</string>
     <string name="context_watch_channel">Sender ansehen</string>
     <string name="context_details">Details</string>
     <string name="details_program">Sendungsdetails</string>
@@ -38,7 +38,7 @@
     <string name="context_start_over">Von vorne starten</string>
     <string name="context_delete">Löschen</string>
     <string name="stats_video_buffers">Videopuffer</string>
-    <string name="stats_video_buffers_value">Angezeigt %1$d · Verworfen %2$d · Übersprungen %3$d</string>
+    <string name="stats_video_buffers_value">Angezeigt %1$d • Verworfen %2$d • Übersprungen %3$d</string>
     <string name="audio_subtitles_section">Ton &amp; Untertitel</string>
     <string name="audio_language_first">Audiosprache</string>
     <string name="audio_language_second">Zweite Audiosprache</string>
@@ -242,7 +242,7 @@
     <string name="display_mode_4_3">4:3 ausfüllen</string>
 
     <string name="epg_title">Programmführer</string>
-    <string name="epg_filtered_title">Programmführer · %1$s</string>
+    <string name="epg_filtered_title">Programmführer • %1$s</string>
     <string name="epg_clear_filter">Filter löschen</string>
     <string name="epg_search">Suchen</string>
     <string name="epg_search_title">Programm durchsuchen</string>
@@ -259,7 +259,7 @@
     <string name="epg_search_unavailable">Die Programmsuche ist nicht verfügbar. Erneut versuchen.</string>
     <string name="epg_search_untitled">Sendung ohne Titel</string>
     <string name="epg_search_unknown_channel">Unbekannter Sender</string>
-    <string name="epg_search_result_schedule">%1$s · %2$s</string>
+    <string name="epg_search_result_schedule">%1$s • %2$s</string>
     <string name="epg_search_result_description">%1$s, %2$s. Sendungsdetails öffnen.</string>
     <string name="programme_category_all">Alle</string>
     <string name="programme_category_film_drama">Film &amp; Drama</string>
@@ -356,10 +356,10 @@
         <item quantity="other">%d Aufnahmen abgebrochen</item>
     </plurals>
     <string name="connection_notice_lost">Verbindung verloren</string>
-    <string name="connection_notice_lost_saved">Verbindung verloren · Gespeicherte Sender werden angezeigt</string>
+    <string name="connection_notice_lost_saved">Verbindung verloren • Gespeicherte Sender werden angezeigt</string>
     <string name="connection_problem_label">Einstellungen, Verbindungsproblem</string>
     <string name="connection_offline_badge">Offline</string>
-    <string name="connection_offline_saved">Tvheadend nicht erreichbar · Gespeicherte Sender werden angezeigt</string>
+    <string name="connection_offline_saved">Tvheadend nicht erreichbar • Gespeicherte Sender werden angezeigt</string>
     <string name="connection_try_again">Erneut versuchen</string>
     <string name="connection_retry_description">Tvheadend Player versucht es auch automatisch erneut</string>
     <string name="connection_notice_restored">Verbindung wiederhergestellt</string>
@@ -483,7 +483,7 @@
     <string name="status_connection_failed_incompatible">Verbindung fehlgeschlagen: Diese Tvheadend-Serverversion wird nicht unterstützt</string>
     <string name="status_connection_failed_permission">Verbindung fehlgeschlagen: Dieses Konto darf keine Senderdaten lesen</string>
     <string name="status_connection_failed_other">Verbindung fehlgeschlagen</string>
-    <string name="recording_marker_label">Marke %1$d · %2$s</string>
+    <string name="recording_marker_label">Marke %1$d • %2$s</string>
     <string name="recording_markers_open">Aufnahmemarken durchsuchen</string>
     <string name="recording_marker_previous">Vorherige Marke</string>
     <string name="recording_marker_start">Anfang der Aufnahme</string>
@@ -491,7 +491,7 @@
     <string name="keep_channel_setting">Sender nach Verlassen der App beibehalten</string>
     <string name="keep_channel_off">Aus</string>
     <string name="startup_buffer_setting">Startpuffer</string>
-    <string name="startup_buffer_automatic">Automatisch · %1$s</string>
+    <string name="startup_buffer_automatic">Automatisch • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Kürzer startet schneller, länger schützt vor Aussetzern.</string>
     <string name="background_live_stopped">Live-TV wurde im Hintergrund beendet</string>
@@ -510,10 +510,10 @@
     <string name="player_video_spoken">Video %1$s</string>
     <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_recorded_on">Aufgenommen am %1$s</string>
-    <string name="player_recorded_ends">Aufgenommen am %1$s · Endet %2$s</string>
+    <string name="player_recorded_ends">Aufgenommen am %1$s • Endet %2$s</string>
     <string name="player_recording_until">Aufnahme bis %1$s</string>
     <string name="player_playing">Wiedergabe</string>
-    <string name="player_next">Danach · %1$s</string>
+    <string name="player_next">Danach • %1$s</string>
     <string name="player_minutes_left">Noch %1$s</string>
     <string name="player_scheduled">Aufnahme geplant</string>
     <string name="player_channel_spoken">Sender %1$s</string>
@@ -603,7 +603,7 @@
     <string name="keep">Behalten</string>
     <string name="duration_unknown">unbekannter Dauer</string>
     <string name="details_today">Heute %1$s</string>
-    <string name="details_on_now_until">Läuft · bis %1$s</string>
+    <string name="details_on_now_until">Läuft • bis %1$s</string>
     <string name="details_more">Mehr</string>
     <string name="details_age_rating_description">Altersfreigabe %1$s</string>
 

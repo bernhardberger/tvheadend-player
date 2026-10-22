@@ -115,7 +115,7 @@ class BrowseContextMenuScreenTest {
             SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsProperties.IsDialog))
         val menuBounds = compose.onNodeWithTag("browse-context-menu").getUnclippedBoundsInRoot()
         assertEquals(960f, (menuBounds.right - menuBounds.left).value, 1f)
-        val subtitle = compose.onNode(hasText("101 Ridge Earth HD · On now · until ", substring = true) and inMenu)
+        val subtitle = compose.onNode(hasText("101 Ridge Earth HD • On now • until ", substring = true) and inMenu)
         val programme = compose.onNode(hasText("Ridge Light") and inMenu)
         subtitle.assertExists()
         assertTrue(programme.getUnclippedBoundsInRoot().bottom <= subtitle.getUnclippedBoundsInRoot().top)
@@ -149,7 +149,7 @@ class BrowseContextMenuScreenTest {
         card.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN, 1))
         compose.onNodeWithText("Details", substring = false).assertIsFocused()
         listOf("Record", "Watch channel", "Show in Guide").forEach { compose.onNodeWithText(it).assertExists() }
-        compose.onNode(hasText("100 Ridge Earth SD · ", substring = true) and hasAnyAncestor(hasTestTag("browse-context-menu"))).assertExists()
+        compose.onNode(hasText("100 Ridge Earth SD • ", substring = true) and hasAnyAncestor(hasTestTag("browse-context-menu"))).assertExists()
         compose.onNodeWithTag("browse-context-artwork").assertExists()
         compose.onNodeWithTag("nav-channels").assertDoesNotExist()
         compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
@@ -246,7 +246,7 @@ class BrowseContextMenuScreenTest {
     @Test fun guideMenuShowsChannelAndTimeBelowProgrammeTitle() {
         show(recordings = false, guideMenu = true)
         val title = compose.onNodeWithText("Ridge Light")
-        val channel = compose.onNodeWithText("101 Ridge Earth HD · On now · until ", substring = true)
+        val channel = compose.onNodeWithText("101 Ridge Earth HD • On now • until ", substring = true)
         assertTrue(title.getUnclippedBoundsInRoot().bottom <= channel.getUnclippedBoundsInRoot().top)
         compose.onNodeWithText("Details").assertIsFocused()
         assertMoreOptionsGeometry()
@@ -257,7 +257,7 @@ class BrowseContextMenuScreenTest {
         show(recordings = false, guideMenu = true)
         compose.onNodeWithText("Watch", substring = false).assertExists()
         compose.onNodeWithText("Watch channel").assertDoesNotExist()
-        compose.onNodeWithText("On now · until ", substring = true).assertExists()
+        compose.onNodeWithText("On now • until ", substring = true).assertExists()
         compose.onNodeWithTag("browse-context-progress").assertIsDisplayed().assertHeightIsEqualTo(3.dp)
         compose.onNodeWithTag("browse-context-artwork").assertWidthIsEqualTo(268.dp)
         compose.onNodeWithTag("browse-context-plate").assertIsDisplayed()
@@ -308,7 +308,7 @@ class BrowseContextMenuScreenTest {
         show(recordings = false, guideMenu = true, futureProgramme = true)
         compose.onNodeWithText("Watch channel").assertExists()
         compose.onNodeWithText("Watch", substring = false).assertDoesNotExist()
-        compose.onNodeWithText("On now · until ", substring = true).assertDoesNotExist()
+        compose.onNodeWithText("On now • until ", substring = true).assertDoesNotExist()
         compose.onNodeWithTag("browse-context-progress").assertDoesNotExist()
         compose.onNodeWithTag("browse-context-plate").assertIsDisplayed()
         capture("guide-future", "u15-context")
@@ -319,7 +319,7 @@ class BrowseContextMenuScreenTest {
         show(recordings = false, guideMenu = true)
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.context_watch)).assertExists()
-        compose.onNodeWithText("Läuft · bis ", substring = true).assertExists()
+        compose.onNodeWithText("Läuft • bis ", substring = true).assertExists()
         compose.onNodeWithTag("browse-context-progress").assertIsDisplayed()
         capture("guide-german", "u15-context")
     }
@@ -394,7 +394,7 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-resume").assertIsFocused()
         compose.onNodeWithText("Resume from 1:02:00").assertIsFocused()
         compose.onNode(hasText("The winter ridge") and hasAnyAncestor(hasTestTag("centred-dialog-content"))).assertExists()
-        compose.onNode(hasText("101 Ridge Earth HD · ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-content"))).assertExists()
+        compose.onNode(hasText("101 Ridge Earth HD • ", substring = true) and hasAnyAncestor(hasTestTag("centred-dialog-content"))).assertExists()
         compose.onNodeWithText("Watched", substring = true).assertDoesNotExist()
         assertResumePiconGeometry(picon = true)
         compose.onNodeWithText(resumeEnd).assertExists()
@@ -460,7 +460,7 @@ class BrowseContextMenuScreenTest {
     private fun assertResumePiconGeometry(picon: Boolean) {
         val content = compose.onNodeWithTag("centred-dialog-content").getUnclippedBoundsInRoot()
         val text = compose.onNodeWithTag("centred-dialog-text").getUnclippedBoundsInRoot()
-        val eyebrow = compose.onNode(hasText("101 Ridge Earth HD · ", substring = true) and
+        val eyebrow = compose.onNode(hasText("101 Ridge Earth HD • ", substring = true) and
             hasAnyAncestor(hasTestTag("centred-dialog-content"))).getUnclippedBoundsInRoot()
         val title = compose.onNode(hasText("Ridge Light: The remarkable journey along the mountain ridge in winter") and
             hasAnyAncestor(hasTestTag("centred-dialog-content"))).getUnclippedBoundsInRoot()

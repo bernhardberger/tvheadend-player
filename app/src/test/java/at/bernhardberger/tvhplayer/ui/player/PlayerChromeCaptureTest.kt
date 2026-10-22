@@ -583,7 +583,7 @@ class PlayerChromeCaptureTest {
                         title = event.title, subtitle = event.subtitle, summary = event.summary, genre = event.genre)
                 } else listOf(shown) + schedule.drop(1)
                 val channel = if (rail) channels[1] else channels[0]
-                val identity = "${channel.number} · ${channel.name}"
+                val identity = "${channel.number} • ${channel.name}"
                 val details = remember(scene) {
                     ProgramDetailsState().apply {
                         if (scene == Scene.PROGRAMME_SCHEDULE) tab = 1

@@ -21,7 +21,7 @@ class EpisodeLabelTest {
         assertEquals("S5 E10", episodeLabel(episode(5, 10), resources))
         assertEquals("S5", episodeLabel(episode(season = 5), resources))
         assertEquals("E10", episodeLabel(episode(number = 10), resources))
-        assertEquals("S5 E10 · Part 2", episodeLabel(episode(5, 10, 2), resources))
+        assertEquals("S5 E10 • Part 2", episodeLabel(episode(5, 10, 2), resources))
         assertEquals("Part 2", episodeLabel(episode(part = 2), resources))
         assertEquals("Season 5, Episode 10, Part 2", episodeLabel(episode(5, 10, 2), resources, spoken = true))
     }
@@ -36,12 +36,12 @@ class EpisodeLabelTest {
     }
 
     @Test @Config(qualifiers = "de") fun germanKeepsCompactSEAndLocalizesSpokenAndPart() {
-        assertEquals("S5 E10 · Teil 2", episodeLabel(episode(5, 10, 2), resources))
+        assertEquals("S5 E10 • Teil 2", episodeLabel(episode(5, 10, 2), resources))
         assertEquals("Staffel 5, Folge 10, Teil 2", episodeLabel(episode(5, 10, 2), resources, spoken = true))
     }
 
     @Test fun menuEpisodeLineCombinesHeaderMetadataWithoutRepeatingSubtitle() {
-        assertEquals("S5 E10 · The ridge", programmeEpisodeLine(episode(5, 10), "The ridge", resources))
+        assertEquals("S5 E10 • The ridge", programmeEpisodeLine(episode(5, 10), "The ridge", resources))
         assertEquals("S5 E10", programmeEpisodeLine(episode(5, 10), "S5 E10", resources))
         assertEquals("The ridge", programmeEpisodeLine(null, "The ridge", resources))
         assertEquals("", programmeEpisodeLine(null, " ", resources))

@@ -32,7 +32,7 @@ fun episodeLabel(episode: EpgEpisode?, resources: Resources, spoken: Boolean = f
     }.joinToString(if (spoken) ", " else " ")
     val part = episode.partNumber?.let { resources.getString(R.string.episode_part, it) }
     return listOfNotNull(numbers.takeIf(String::isNotEmpty), part).takeIf { it.isNotEmpty() }
-        ?.joinToString(if (spoken) ", " else " · ")
+        ?.joinToString(if (spoken) ", " else " • ")
         ?: episode.onscreen?.takeIf { onscreenFallback && it.isNotBlank() }
 }
 
@@ -43,7 +43,7 @@ fun programmeMetadata(event: EpgEventEntry, resources: Resources): String? = bui
 
 internal fun programmeEpisodeLine(episode: EpgEpisode?, subtitle: String?, resources: Resources): String =
     listOfNotNull(episodeLabel(episode, resources), subtitle?.takeIf(String::isNotBlank))
-        .distinct().joinToString(" · ")
+        .distinct().joinToString(" • ")
 
 /** Episodes identify their premiere; films and incomplete episode metadata keep the year. */
 fun programmeDateLabel(episode: EpgEpisode?, firstAired: kotlin.time.Instant?, copyrightYear: String?,

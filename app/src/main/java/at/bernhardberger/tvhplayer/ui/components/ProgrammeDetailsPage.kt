@@ -874,8 +874,8 @@ internal fun programmeAboutFacts(event: EpgEvent?, recording: DvrEntry?, resourc
         event?.isNew?.let {
             fact(R.string.details_broadcast, resources.getString(if (it) R.string.details_broadcast_new else R.string.details_broadcast_repeat))
         }
-        fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" · "))
-        fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" · "))
+        fact(R.string.details_categories, event?.categories?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))
+        fact(R.string.details_keywords, event?.keywords?.map(String::trim)?.filter(String::isNotEmpty)?.distinct()?.joinToString(" • "))
     }
 
 /**
@@ -888,7 +888,7 @@ internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resource
     locale: Locale = resources.configuration.locales[0]): List<String> {
     val genre = resources.getString(R.string.details_genre)
     val categories = facts.firstOrNull { it.first == resources.getString(R.string.details_categories) }
-        ?.second?.split(" · ")?.take(2).orEmpty()
+        ?.second?.split(" • ")?.take(2).orEmpty()
     val year = facts.firstOrNull { it.first == resources.getString(R.string.details_year) }?.second
     val date = programmeDateLabel(episode, firstAired, year, locale)
     val label = episodeLabel(episode, resources)
@@ -959,7 +959,7 @@ private fun DetailsInformation(
             val spokenRange = formatTimeIntervalSpoken(event.start.epochSeconds, event.stop.epochSeconds, resources)
             val minutesLeft = ((event.stop.epochSeconds - nowSec + 59) / 60).toInt()
             val progress = ((nowSec - event.start.epochSeconds).toFloat() / (event.stop - event.start).inWholeSeconds).coerceIn(0f, 1f)
-            DetailsTimeline(start, progress, "$end · ${playerMinutesLeft(minutesLeft)}",
+            DetailsTimeline(start, progress, "$end • ${playerMinutesLeft(minutesLeft)}",
                 "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}",
                 Modifier.widthIn(max = 470.dp).fillMaxWidth())
         } else if (facts.any { it.kind == DetailsFactKind.LEFT }) {
@@ -969,7 +969,7 @@ private fun DetailsInformation(
             val position = length - left
             val minutesLeft = ((left + 59) / 60).toInt()
             DetailsTimeline(formatPlaybackDuration(position * 1000L), position.toFloat() / length,
-                "${formatPlaybackDuration(length * 1000L)} · ${playerMinutesLeft(minutesLeft)}",
+                "${formatPlaybackDuration(length * 1000L)} • ${playerMinutesLeft(minutesLeft)}",
                 stringResource(R.string.details_recording_progress_spoken,
                     formatDurationMinutes(position / 60, resources, spoken = true),
                     formatDurationMinutes(length / 60, resources, spoken = true),

@@ -86,7 +86,7 @@ internal fun settingsStartupBufferLevel(millis: Int, learnedMillis: Int, onSelec
         }, initialItemId = "startup-buffer-$millis",
         description = stringResource(R.string.startup_buffer_description))
 
-/** "Automatic · 1 s" with the learned level, or a fixed level in locale decimals ("0,5 s"). */
+/** "Automatic • 1 s" with the learned level, or a fixed level in locale decimals ("0,5 s"). */
 @Composable
 internal fun startupBufferLabel(millis: Int, learnedMillis: Int): String =
     if (millis == STARTUP_BUFFER_AUTOMATIC) {

@@ -759,7 +759,7 @@ internal fun RecordingsScreenContent(
                     (channel?.let { at.bernhardberger.tvhplayer.ui.components.channelTitleText(it.number, it.name.orEmpty()) }
                         ?: opened.channelName)?.takeIf(String::isNotBlank),
                     opened.start?.epochSeconds?.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
-                    ).joinToString(" · "),
+                    ).joinToString(" • "),
                         Modifier.fillMaxWidth(), Modifier.testTag("recording-resume-picon"))
                 } },
                 onDismiss = closeResume,

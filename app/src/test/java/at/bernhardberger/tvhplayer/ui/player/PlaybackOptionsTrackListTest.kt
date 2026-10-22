@@ -109,10 +109,10 @@ class PlaybackOptionsTrackListTest {
             }
         }
         compose.onNodeWithTag("playback-options-track-automatic").assertIsFocused()
-        val stereo = "Stereo · MPEG-1 Layer II"
+        val stereo = "Stereo • MPEG-1 Layer II"
         val expectedLines = mapOf(
             "main" to listOf(texts.language, stereo),
-            "surround" to listOf(texts.language, "5.1 · Dolby Digital"),
+            "surround" to listOf(texts.language, "5.1 • Dolby Digital"),
             "second" to listOf(texts.multipleLanguages, stereo),
             "clear" to listOf(texts.clearDialogue, stereo),
             "described" to listOf(texts.language, texts.audioDescription, stereo),

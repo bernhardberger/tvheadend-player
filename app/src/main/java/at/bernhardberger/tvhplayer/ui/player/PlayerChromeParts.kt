@@ -166,7 +166,7 @@ internal fun trayPreviewMetadata(event: EpgEventEntry?, nowSec: Long): String = 
     event?.takeIf { nowSec >= it.start.epochSeconds && nowSec < it.stop.epochSeconds }
         ?.let { playerMinutesLeft(((it.stop.epochSeconds - nowSec + 59) / 60).toInt()) },
     event?.let { programmeMetadata(it, androidx.compose.ui.platform.LocalContext.current.resources) },
-).joinToString(" · ")
+).joinToString(" • ")
 
 /** Everything one tray preview renders, so a leaving preview keeps showing its own card. */
 internal data class QuickZapPreviewSnapshot(
@@ -274,7 +274,7 @@ internal fun QuickZapTrayPreviewFrame(
 }
 
 /**
- * The info bar for a recording: `Recorded 12 Sep · Ends 23:45` (now plus the remaining playback)
+ * The info bar for a recording: `Recorded 12 Sep • Ends 23:45` (now plus the remaining playback)
  * or, still recording, `Recording until 22:08`, above the title; the episode fills the last row.
  * A recording has no real next item, so there is no Next (UX-02).
  */

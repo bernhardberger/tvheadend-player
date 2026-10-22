@@ -98,7 +98,7 @@ class OfflinePatternTest {
                             connectionDegraded = degraded, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                                 settingsConnectionOverview(
-                                    if (degraded) "Can't reach Tvheadend · Showing saved channels" else "Connected",
+                                    if (degraded) "Can't reach Tvheadend • Showing saved channels" else "Connected",
                                     null, 9982, degraded, onRetry = { retries++ })),
                                 contentPadding = padding, initialFocusEnabled = !drawerActive)
                         }

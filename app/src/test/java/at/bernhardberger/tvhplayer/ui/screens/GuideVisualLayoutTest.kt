@@ -1235,7 +1235,7 @@ class GuideVisualLayoutTest {
         }
     }
     private fun title(channel: Int, offset: Int) = if (channel == 2 && offset == 0)
-        "Wunder der Natur: Eine außergewöhnliche Reise durch die nördlichen Landschaften" else "Channel $channel · Programme $offset"
+        "Wunder der Natur: Eine außergewöhnliche Reise durch die nördlichen Landschaften" else "Channel $channel • Programme $offset"
     private fun preferences() = object : DataStore<Preferences> {
         override val data = MutableStateFlow(emptyPreferences())
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) = transform(data.value).also { data.value = it }

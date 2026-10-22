@@ -108,9 +108,9 @@ class ProgrammeDetailsPageTest {
 
     @Test fun airingTopBlockShowsOwnProgressAndAiringsFollowActions() {
         show(); compose.onNodeWithTag("details-watch").assertIsFocused()
-        compose.onNodeWithText("21:00 · 112m left", substring = true).assertExists()
+        compose.onNodeWithText("21:00 • 112m left", substring = true).assertExists()
         compose.onNodeWithText("101 Ridge Earth HD").assertExists()
-        compose.onNodeWithTag("details-metadata").assertTextEquals("120m · Documentary · S2\u00a0E3")
+        compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary • S2\u00a0E3")
             .assertContentDescriptionEquals("120m, Documentary, Season 2, Episode 3")
         compose.onNodeWithTag("details-timeline").assertExists()
         compose.onNodeWithTag("details-progress", useUnmergedTree = true).assertExists()
@@ -138,7 +138,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-card-2").assertIsNotFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft); pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        compose.onNodeWithText("Mountain · Winter", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Mountain • Winter", useUnmergedTree = true).assertIsDisplayed()
         capture("details-panel-focused-dimmed-airings")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
@@ -156,7 +156,7 @@ class ProgrammeDetailsPageTest {
         val before = compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.onNodeWithTag("details-facts-panel").assertIsFocused()
-        compose.onNodeWithText("Mountain · Winter", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Mountain • Winter", useUnmergedTree = true).assertIsDisplayed()
         Assert.assertTrue(compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top < before)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         Assert.assertEquals(before, compose.onNodeWithTag("details-card-2").getUnclippedBoundsInRoot().top)
@@ -302,7 +302,7 @@ class ProgrammeDetailsPageTest {
     }
     @Test fun factsWithoutDescriptionAppearInHeaderWithoutAnEmptyReader() {
         show(factsOnly = true)
-        compose.onNodeWithTag("details-metadata").assertTextEquals("120m · Documentary")
+        compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary")
         compose.onNodeWithTag("details-about-description").assertDoesNotExist()
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionUp) }.assertIsFocused()
     }
@@ -353,7 +353,7 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(3723f / 7200f, progress.fetchSemanticsNode().config[
             androidx.compose.ui.semantics.SemanticsProperties.ProgressBarRangeInfo].current, .0001f)
         val left = compose.onNodeWithText("1:02:03", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        val right = compose.onNodeWithText("2:00:00 · 58m left", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val right = compose.onNodeWithText("2:00:00 • 58m left", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val strip = progress.getUnclippedBoundsInRoot()
         Assert.assertEquals(8f, (strip.left - left.right).value, .5f)
         Assert.assertEquals(8f, (right.left - strip.right).value, .5f)
@@ -551,7 +551,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-hero").assertDoesNotExist()
         compose.onNodeWithTag("details-about").assertDoesNotExist()
         val title = compose.onNodeWithText("Ridge Light").getUnclippedBoundsInRoot()
-        val facts = compose.onNodeWithTag("details-metadata").assertTextEquals("Today\u00a019:00 · 120m").getUnclippedBoundsInRoot()
+        val facts = compose.onNodeWithTag("details-metadata").assertTextEquals("Today\u00a019:00 • 120m").getUnclippedBoundsInRoot()
         Assert.assertEquals(8f, facts.top.value - title.bottom.value, 1f)
         // Without an About section, Down goes straight to the row.
         compose.onNodeWithTag("details-watch").performKeyInput { pressKey(Key.DirectionDown) }
@@ -609,9 +609,9 @@ class ProgrammeDetailsPageTest {
             categories = listOf("Nature", " ", "Nature"), keywords = listOf("Mountain", "Winter"))
         Assert.assertEquals(listOf("Genre" to "Documentary", "Season" to "2 of 5", "Episode" to "3 of 10", "Part" to "1 of 2",
             "Year" to "2024", "Age rating" to "FSK 12", "Star rating" to "4", "First aired" to "Jan 1, 2024",
-            "Broadcast" to "Repeat", "Categories" to "Nature", "Keywords" to "Mountain · Winter"),
+            "Broadcast" to "Repeat", "Categories" to "Nature", "Keywords" to "Mountain • Winter"),
              programmeAboutFacts(rich, null, resources, Locale.US))
-        Assert.assertEquals(listOf("Documentary", "2024", "S2 E3 · Part 1"),
+        Assert.assertEquals(listOf("Documentary", "2024", "S2 E3 • Part 1"),
             at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(programmeAboutFacts(rich, null, resources, Locale.US), resources, rich.episode))
         val sparse = EpgEvent.create(event.id, event.channelId, event.start, event.stop,
             episode = EpgEpisode(null, null, null, null, null, null, null, null, "Pilot"), isNew = true,
@@ -681,7 +681,7 @@ class ProgrammeDetailsPageTest {
         show(runningCard = true)
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         val stop = at.bernhardberger.tvhplayer.ui.common.formatHm(event.stop.epochSeconds)
-        compose.onNodeWithTag("details-card-2").assertContentDescriptionEquals("On now · until $stop, 102 Ridge Earth Plus")
+        compose.onNodeWithTag("details-card-2").assertContentDescriptionEquals("On now • until $stop, 102 Ridge Earth Plus")
         compose.onNodeWithTag("details-card-progress-2", useUnmergedTree = true).assertExists()
     }
 
@@ -839,7 +839,7 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(4f, (subtitle.top - title.bottom).value, .5f)
         Assert.assertEquals(8f, (metadata.top - subtitle.bottom).value, .5f)
         compose.onNodeWithTag("details-rating").assertContentDescriptionEquals("Age rating 12+")
-        compose.onNodeWithTag("details-metadata").assertTextEquals("120m · Documentary · S2\u00a0E3")
+        compose.onNodeWithTag("details-metadata").assertTextEquals("120m • Documentary • S2\u00a0E3")
         capture("top-subtitle-rating")
     }
 

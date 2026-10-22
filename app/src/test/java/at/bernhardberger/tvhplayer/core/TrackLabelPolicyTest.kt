@@ -44,29 +44,29 @@ class TrackLabelPolicyTest {
         // ORF1 HD, September 2026: German main tracks, a "mul" second-channel track and
         // "Klare Sprache" as qaa with the hearing-impaired audio type.
         assertEquals(
-            HumanTrackLabel("$german · Stereo", german, null, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("$german • Stereo", german, null, "Stereo • MPEG-1 Layer II"),
             label("de", 2, "audio/mpeg-L2", role = null),
         )
-        assertEquals("5.1 · Dolby Digital", label("de", 6, "audio/ac3", role = null).detail)
+        assertEquals("5.1 • Dolby Digital", label("de", 6, "audio/ac3", role = null).detail)
         assertEquals(
-            HumanTrackLabel("Multiple languages · Stereo", "Multiple languages", null, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("Multiple languages • Stereo", "Multiple languages", null, "Stereo • MPEG-1 Layer II"),
             label("mul", 2, "audio/mpeg-L2", role = null),
         )
         // "mul" is not a language to show above a role.
         assertEquals(
-            HumanTrackLabel("Clear dialogue · Stereo", "Clear dialogue", null, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("Clear dialogue • Stereo", "Clear dialogue", null, "Stereo • MPEG-1 Layer II"),
             label("mul", 2, "audio/mpeg-L2", role = "Clear dialogue"),
         )
         assertEquals(
-            HumanTrackLabel("Clear dialogue · Stereo", "Clear dialogue", null, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("Clear dialogue • Stereo", "Clear dialogue", null, "Stereo • MPEG-1 Layer II"),
             label("qaa", 2, "audio/mpeg-L2", role = "Clear dialogue"),
         )
         assertEquals(
-            HumanTrackLabel("$german · Stereo · Audio description", "Audio description", german, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("$german • Stereo • Audio description", "Audio description", german, "Stereo • MPEG-1 Layer II"),
             label("de", 2, "audio/mpeg-L2", role = "Audio description"),
         )
         assertEquals(
-            HumanTrackLabel("Audio description · Stereo", "Audio description", null, "Stereo · MPEG-1 Layer II"),
+            HumanTrackLabel("Audio description • Stereo", "Audio description", null, "Stereo • MPEG-1 Layer II"),
             label(null, 2, "audio/mpeg-L2", role = "Audio description"),
         )
         assertEquals(HumanTrackLabel("Stereo", "Stereo", null, "AAC"), label(null, 2, "audio/mp4a-latm", role = null))

@@ -196,7 +196,7 @@ class QuickZapPresentationTest {
             TVHeadendPlayerTheme {
                 PlayerPage<Unit>(details = null, railHeader = if (expanded) ({
                     androidx.compose.runtime.SideEffect { headerCompositions++ }
-                    ProgrammeScheduleHeader("1 · Ridge Earth HD")
+                    ProgrammeScheduleHeader("1 • Ridge Earth HD")
                 }) else null, player = {
                     peek = LocalPlayerRailPeek.current!!
                     QuickZapPresentation(expanded,

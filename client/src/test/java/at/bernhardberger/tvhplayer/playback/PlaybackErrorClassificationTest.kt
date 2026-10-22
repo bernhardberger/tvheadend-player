@@ -13,7 +13,7 @@ class PlaybackErrorClassificationTest {
             )
         }
         assertEquals(
-            "IllegalStateException · Decoder.render:42",
+            "IllegalStateException • Decoder.render:42",
             classifyPlaybackError(RuntimeException("outer message", RuntimeException(root))),
         )
     }
@@ -29,7 +29,7 @@ class PlaybackErrorClassificationTest {
         val error = IllegalStateException().apply {
             stackTrace = arrayOf(StackTraceElement("example.Player", "start", null, -1))
         }
-        assertEquals("IllegalStateException · Player.start:-1", classifyPlaybackError(error))
+        assertEquals("IllegalStateException • Player.start:-1", classifyPlaybackError(error))
     }
 
     @Test fun causeCycleStopsBeforeRevisitingAnException() {
@@ -50,7 +50,7 @@ class PlaybackErrorClassificationTest {
         val error = IllegalStateException().apply {
             stackTrace = arrayOf(StackTraceElement("invalid/owner", "private message", "PrivateSource.kt", 1))
         }
-        assertEquals("IllegalStateException · ?.?:1", classifyPlaybackError(error))
+        assertEquals("IllegalStateException • ?.?:1", classifyPlaybackError(error))
     }
 
     @Test fun urlShapedOwnerIsRejectedEvenWithASymbolSuffix() {
@@ -59,7 +59,7 @@ class PlaybackErrorClassificationTest {
                 StackTraceElement("https://example.invalid/private.secretToken", "run", null, 3),
             )
         }
-        assertEquals("IllegalStateException · ?.run:3", classifyPlaybackError(error))
+        assertEquals("IllegalStateException • ?.run:3", classifyPlaybackError(error))
     }
 
     @Test fun preconditionHelperFramesNameTheirCaller() {
@@ -69,7 +69,7 @@ class PlaybackErrorClassificationTest {
                 StackTraceElement("example.Renderer", "render", null, 77),
             )
         }
-        assertEquals("IllegalStateException · Renderer.render:77", classifyPlaybackError(error))
+        assertEquals("IllegalStateException • Renderer.render:77", classifyPlaybackError(error))
     }
 
     @Test fun onlyPreconditionFramesFallBackToTheTopFrame() {
@@ -78,6 +78,6 @@ class PlaybackErrorClassificationTest {
                 StackTraceElement("com.google.common.base.Preconditions", "checkArgument", null, 5),
             )
         }
-        assertEquals("IllegalArgumentException · Preconditions.checkArgument:5", classifyPlaybackError(error))
+        assertEquals("IllegalArgumentException • Preconditions.checkArgument:5", classifyPlaybackError(error))
     }
 }

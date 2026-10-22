@@ -443,7 +443,7 @@ class PlayerErrorSurfacesTest {
             reason = AppPlaybackFailureReason.OTHER,
             targetResult = PlaybackTargetResult.SHUT_DOWN,
             playerErrorCode = "ERROR_CODE_IO_UNSPECIFIED",
-            playerErrorClassification = "IllegalStateException · Example.run:12",
+            playerErrorClassification = "IllegalStateException • Example.run:12",
             recoveryReason = PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED,
         )
         show {
@@ -456,7 +456,7 @@ class PlayerErrorSurfacesTest {
         for (value in listOf(
             PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED.toString(),
             "ERROR_CODE_IO_UNSPECIFIED",
-            "IllegalStateException · Example.run:12",
+            "IllegalStateException • Example.run:12",
             PlaybackTargetResult.SHUT_DOWN.toString(),
         )) {
             compose.onNode(hasText(value)).assertExists()

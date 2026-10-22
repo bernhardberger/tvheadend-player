@@ -11,7 +11,7 @@
     <string name="recording_confirmation_profile">Recording profile: %1$s</string>
     <string name="recording_confirmation_owner">Recording owner: %1$s</string>
     <string name="context_watch">Watch</string>
-    <string name="context_channel_now">%1$s · Now: %2$s</string>
+    <string name="context_channel_now">%1$s • Now: %2$s</string>
     <string name="context_watch_channel">Watch channel</string>
     <string name="context_details">Details</string>
     <string name="details_program">Program details</string>
@@ -268,13 +268,13 @@
     <string name="stats_error_classification" translatable="false">Classification</string>
     <string name="stats_target_result" translatable="false">Target result</string>
     <string name="stats_timing" translatable="false">Position</string>
-    <string name="stats_timing_buffered" translatable="false">%1$s · buffer %2$d s</string>
-    <string name="stats_timing_buffered_with_duration" translatable="false">%1$s / %2$s · buffer %3$d s</string>
+    <string name="stats_timing_buffered" translatable="false">%1$s • buffer %2$d s</string>
+    <string name="stats_timing_buffered_with_duration" translatable="false">%1$s / %2$s • buffer %3$d s</string>
     <string name="stats_timeshift_live" translatable="false">Live</string>
     <string name="stats_timeshift_behind_live" translatable="false">%1$s behind live</string>
     <string name="stats_video" translatable="false">Video</string>
     <string name="stats_video_buffers">Video buffers</string>
-    <string name="stats_video_buffers_value">Rendered %1$d · Dropped %2$d · Skipped %3$d</string>
+    <string name="stats_video_buffers_value">Rendered %1$d • Dropped %2$d • Skipped %3$d</string>
     <string name="stats_video_decoder" translatable="false">Video decoder</string>
     <string name="stats_frames" translatable="false">Frames</string>
     <string name="stats_frame_rate" translatable="false">%1$s fps</string>
@@ -284,15 +284,15 @@
     <string name="stats_frame_rate_measured" translatable="false">Measured %1$s fps</string>
     <string name="stats_frame_rate_measured_none" translatable="false">Measured none</string>
     <string name="stats_same_time_frames" translatable="false">%1$d%% same-time frames</string>
-    <string name="stats_frames_value" translatable="false">%1$s rendered · %2$s dropped</string>
-    <string name="stats_frames_value_with_percentage" translatable="false">%1$s rendered · %2$s dropped (%3$s%%)</string>
+    <string name="stats_frames_value" translatable="false">%1$s rendered • %2$s dropped</string>
+    <string name="stats_frames_value_with_percentage" translatable="false">%1$s rendered • %2$s dropped (%3$s%%)</string>
     <string name="stats_audio" translatable="false">Audio</string>
     <string name="stats_audio_decoder" translatable="false">Audio decoder</string>
     <string name="stats_audio_channels" translatable="false">%1$d ch</string>
     <string name="stats_sample_rate" translatable="false">%1$s Hz</string>
     <string name="stats_startup_buffer" translatable="false">Start-up buffer</string>
-    <string name="stats_startup_buffer_automatic" translatable="false">%1$s ms · automatic</string>
-    <string name="stats_startup_buffer_fixed" translatable="false">%1$s ms · fixed</string>
+    <string name="stats_startup_buffer_automatic" translatable="false">%1$s ms • automatic</string>
+    <string name="stats_startup_buffer_fixed" translatable="false">%1$s ms • fixed</string>
     <string name="stats_stall_recoveries" translatable="false">Stall recoveries</string>
     <string name="stats_fresh_decoder_per_zap" translatable="false">Fresh decoder per zap</string>
     <string name="stats_underruns" translatable="false">Audio underruns</string>
@@ -320,11 +320,11 @@
     <string name="stats_queue_delay_value" translatable="false">%1$s ms</string>
     <string name="stats_packet_count" translatable="false">%1$s packets</string>
     <string name="stats_server_drops" translatable="false">Server frame drops</string>
-    <string name="stats_server_drops_value" translatable="false">I %1$s · P %2$s · B %3$s</string>
+    <string name="stats_server_drops_value" translatable="false">I %1$s • P %2$s • B %3$s</string>
     <string name="stats_client_drops" translatable="false">Client packet drops</string>
     <string name="stats_system" translatable="false">System</string>
     <string name="stats_output" translatable="false">Output</string>
-    <string name="stats_output_value" translatable="false">%1$d×%2$d · %3$s Hz</string>
+    <string name="stats_output_value" translatable="false">%1$d×%2$d • %3$s Hz</string>
     <string name="stats_output_requested" translatable="false">Requested %1$s Hz</string>
     <string name="stats_output_requested_kept" translatable="false">Requested %1$s Hz (kept)</string>
     <string name="stats_refresh_rates" translatable="false">Refresh rates</string>
@@ -356,7 +356,7 @@
 
     <!-- ===== EPG ===== -->
     <string name="epg_title">Guide</string>
-    <string name="epg_filtered_title">Guide · %1$s</string>
+    <string name="epg_filtered_title">Guide • %1$s</string>
     <string name="epg_clear_filter">Clear filter</string>
     <string name="epg_search">Search</string>
     <string name="epg_search_title">Search guide</string>
@@ -373,7 +373,7 @@
     <string name="epg_search_unavailable">Guide search is unavailable. Try again.</string>
     <string name="epg_search_untitled">Untitled program</string>
     <string name="epg_search_unknown_channel">Unknown channel</string>
-    <string name="epg_search_result_schedule">%1$s · %2$s</string>
+    <string name="epg_search_result_schedule">%1$s • %2$s</string>
     <string name="epg_search_result_description">%1$s, %2$s. Open program details.</string>
     <string name="programme_category_all">All</string>
     <string name="programme_category_film_drama">Film &amp; Drama</string>
@@ -470,10 +470,10 @@
         <item quantity="other">%d recordings canceled</item>
     </plurals>
     <string name="connection_notice_lost">Connection lost</string>
-    <string name="connection_notice_lost_saved">Connection lost · Showing saved channels</string>
+    <string name="connection_notice_lost_saved">Connection lost • Showing saved channels</string>
     <string name="connection_problem_label">Settings, connection problem</string>
     <string name="connection_offline_badge">Offline</string>
-    <string name="connection_offline_saved">Can\'t reach Tvheadend · Showing saved channels</string>
+    <string name="connection_offline_saved">Can\'t reach Tvheadend • Showing saved channels</string>
     <string name="connection_try_again">Try again</string>
     <string name="connection_retry_description">Tvheadend Player also retries on its own</string>
     <string name="connection_notice_restored">Connection restored</string>
@@ -528,7 +528,7 @@
     <string name="recording_timeline_status_description">Elapsed %1$s. %2$s.</string>
     <string name="recording_seek_preview_description">Seek target %1$s. Cumulative change %2$s. %3$s.</string>
     <string name="recording_known_duration">Total %1$s</string>
-    <string name="recording_marker_label">Marker %1$d · %2$s</string>
+    <string name="recording_marker_label">Marker %1$d • %2$s</string>
     <string name="recording_markers_open">Browse recording markers</string>
     <string name="recording_marker_previous">Previous marker</string>
     <string name="recording_marker_start">Beginning of recording</string>
@@ -606,7 +606,7 @@
     <string name="keep_channel_setting">Keep channel after leaving the app</string>
     <string name="keep_channel_off">Off</string>
     <string name="startup_buffer_setting">Start-up buffer</string>
-    <string name="startup_buffer_automatic">Automatic · %1$s</string>
+    <string name="startup_buffer_automatic">Automatic • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>
     <string name="startup_buffer_description">Shorter starts faster; longer protects against dropouts.</string>
     <string name="background_live_stopped">Live TV was stopped while the app was in the background</string>
@@ -625,10 +625,10 @@
     <string name="player_video_spoken">Video %1$s</string>
     <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_recorded_on">Recorded %1$s</string>
-    <string name="player_recorded_ends">Recorded %1$s · Ends %2$s</string>
+    <string name="player_recorded_ends">Recorded %1$s • Ends %2$s</string>
     <string name="player_recording_until">Recording until %1$s</string>
     <string name="player_playing">Playing</string>
-    <string name="player_next">Next · %1$s</string>
+    <string name="player_next">Next • %1$s</string>
     <string name="player_minutes_left">%1$s left</string>
     <string name="player_scheduled">Recording scheduled</string>
     <string name="player_channel_spoken">Channel %1$s</string>
@@ -718,7 +718,7 @@
     <string name="keep">Keep</string>
     <string name="duration_unknown">unknown duration</string>
     <string name="details_today">Today %1$s</string>
-    <string name="details_on_now_until">On now · until %1$s</string>
+    <string name="details_on_now_until">On now • until %1$s</string>
     <string name="details_more">More</string>
     <string name="details_age_rating_description">Age rating %1$s</string>
 

@@ -871,7 +871,7 @@ class PlaybackOptionsRemoteKeyTest {
         const val SUBTITLE_ROW = "playback-options-track-3:dvb:dvb"
         const val OFF_ROW = "playback-options-subtitles-off"
         const val OFF_SUPPORT = "playback-options-subtitles-off-support"
-        const val MAIN_SUMMARY = "German · Stereo"
+        const val MAIN_SUMMARY = "German • Stereo"
 
         fun group(id: String, mime: String, language: String, channels: Int?) = TrackGroup(
             id,

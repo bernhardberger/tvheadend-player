@@ -147,10 +147,10 @@ class ProgramDetailsStateTest {
 
     @Test fun factsOnlyBreakBetweenSegmentsAndAtTheRangeSeparator() {
         // The range arrives already non-breaking inside each endpoint from formatTimeInterval.
-        assertEquals("1\u00a0·\u00a0ORF1\u00a0HD · 20:15\u2009\u2013\u200921:45 · 90\u00a0min · S2\u00a0E4",
-            programmeFactsSegments(listOf("1 · ORF1 HD", "20:15\u2009\u2013\u200921:45", "90 min", "S2 E4"), rangeIndex = 1))
+        assertEquals("1\u00a0•\u00a0ORF1\u00a0HD • 20:15\u2009\u2013\u200921:45 • 90\u00a0min • S2\u00a0E4",
+            programmeFactsSegments(listOf("1 • ORF1 HD", "20:15\u2009\u2013\u200921:45", "90 min", "S2 E4"), rangeIndex = 1))
         // Only the range may break at its dash; an internal dash of any other segment stays with its words.
-        assertEquals("Arte\u00a0\u2060\u2013\u2060\u00a0Europe · 20:15\u2009\u2013\u200921:45 · Sci\u2060\u2013\u2060Fi",
+        assertEquals("Arte\u00a0\u2060\u2013\u2060\u00a0Europe • 20:15\u2009\u2013\u200921:45 • Sci\u2060\u2013\u2060Fi",
             programmeFactsSegments(listOf("Arte – Europe", "20:15\u2009\u2013\u200921:45", "Sci–Fi"), rangeIndex = 1))
     }
 
@@ -165,7 +165,7 @@ class ProgramDetailsStateTest {
         assertEquals("Full\ntext", fields[R.string.details_description])
         assertEquals("Short summary", fields[R.string.details_summary])
         assertEquals("Film", fields[R.string.details_categories])
-        assertEquals("Mountain · Rescue", fields[R.string.details_keywords])
+        assertEquals("Mountain • Rescue", fields[R.string.details_keywords])
         assertEquals("S2 E3", fields[R.string.details_episode])
         assertEquals("2", fields[R.string.details_season])
         assertEquals("5", fields[R.string.details_seasons])

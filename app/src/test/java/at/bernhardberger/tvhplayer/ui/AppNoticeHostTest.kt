@@ -60,7 +60,7 @@ class AppNoticeHostTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 AppNoticePresentation(message,
-                    detail = if (details) "A long programme title · Documentary, Tomorrow 18:30" else null,
+                    detail = if (details) "A long programme title • Documentary, Tomorrow 18:30" else null,
                     icon = if (details) AppNoticeIcon.SCHEDULE else null)
             }
         }

@@ -252,7 +252,7 @@ class PlayerChromeEvidenceTest {
         assertTrue(spoken.contains("20:15 to 21:45"))
         assertFalse(spoken.contains("Now:"))
         assertFalse(spoken.contains("Next"))
-        assertFalse(spoken.contains(" · Ridge"))
+        assertFalse(spoken.contains(" • Ridge"))
         compose.onNodeWithTag("player-scheduled-marker", useUnmergedTree = true).assertDoesNotExist()
     }
 
@@ -523,7 +523,7 @@ class PlayerChromeEvidenceTest {
                                 if (scene == Scene.HERO_NEUTRAL) null else ArtworkId.parse("imagecache/2"),
                             ) }
                             Scene.PREVIEW_ART, Scene.PREVIEW_TEXT -> ProvideArtworkSession(session) { QuickZapPreview(
-                                "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45 · ${playerMinutesLeft(38)} · Natur",
+                                "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45 • ${playerMinutesLeft(38)} • Natur",
                                 "Eine Reise durch die Bergwelt mit ihren Menschen und Geschichten. Entdecken Sie die Landschaft aus einer neuen Perspektive.",
                                 "21:45 Nachrichten", if (scene == Scene.PREVIEW_ART) ArtworkId(1) else null, Modifier.fillMaxWidth(),
                             ) }
@@ -564,7 +564,7 @@ class PlayerChromeEvidenceTest {
     }
 
     @Composable private fun info(recorded: Boolean) = PlayerInfoBarData("101", "Ridge Earth HD",
-        "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45", "Drama · S3 E4",
+        "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45", "Drama • S3 E4",
         "Eine neue Perspektive auf Menschen und ihre Geschichten", 38, if (recorded) null else "21:45 Nachrichten", !recorded,
         if (recorded) playerRecordedDate(LocalDate.of(2026, 9, 12)) else null, spokenTimeRange = "20:15 to 21:45")
 

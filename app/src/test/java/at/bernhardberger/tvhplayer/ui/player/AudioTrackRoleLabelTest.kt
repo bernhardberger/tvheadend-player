@@ -36,14 +36,14 @@ class AudioTrackRoleLabelTest {
         val labels = collected.map { it.label }
 
         assertEquals(3, labels.size)
-        assertFalse(labels[0].contains(" · Audiodeskription"))
-        assertFalse(labels[0].contains(" · Klare Sprache"))
-        assertTrue(labels[1].endsWith(" · Audiodeskription"))
-        assertTrue(labels[2].endsWith(" · Klare Sprache"))
+        assertFalse(labels[0].contains(" • Audiodeskription"))
+        assertFalse(labels[0].contains(" • Klare Sprache"))
+        assertTrue(labels[1].endsWith(" • Audiodeskription"))
+        assertTrue(labels[2].endsWith(" • Klare Sprache"))
         val german = collected[0].headline
         assertEquals(listOf(german, "Audiodeskription", "Klare Sprache"), collected.map { it.headline })
         assertEquals(listOf(null, german, german), collected.map { it.overline })
-        assertEquals(List(3) { "Stereo · MPEG-1 Layer II" }, collected.map { it.secondaryLabel })
+        assertEquals(List(3) { "Stereo • MPEG-1 Layer II" }, collected.map { it.secondaryLabel })
     }
 
     @Test
@@ -62,8 +62,8 @@ class AudioTrackRoleLabelTest {
             clearDialogueLabel = "Klare Sprache",
         ).map { it.label }
 
-        assertTrue(labels[0].endsWith(" · Audiodeskription"))
-        assertTrue(labels[1].endsWith(" · Klare Sprache"))
+        assertTrue(labels[0].endsWith(" • Audiodeskription"))
+        assertTrue(labels[1].endsWith(" • Klare Sprache"))
     }
 
     private fun audioGroup(id: String, roleFlags: Int, selected: Boolean = false): Tracks.Group =

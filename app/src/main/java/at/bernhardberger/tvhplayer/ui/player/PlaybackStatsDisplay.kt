@@ -49,8 +49,8 @@ internal fun formatFrameDurationMillis(duration: Duration): String =
     String.format(Locale.ROOT, "%.3f", duration.inWholeMicroseconds / 1_000.0).trimEnd('0').trimEnd('.')
 
 /**
- * Every rate the display offers, grouped by resolution, largest first: "2160p: 30 · 60 / 1080p:
- * 24 · 50 · 60". A height shared by two widths keeps the full size so the groups stay apart.
+ * Every rate the display offers, grouped by resolution, largest first: "2160p: 30 • 60 / 1080p:
+ * 24 • 50 • 60". A height shared by two widths keeps the full size so the groups stay apart.
  */
 internal fun refreshRatesByResolution(modes: List<DisplayModeSpec>): String {
     val groups = modes.groupBy { it.width to it.height }
@@ -59,7 +59,7 @@ internal fun refreshRatesByResolution(modes: List<DisplayModeSpec>): String {
         val (width, height) = size
         val label = if (groups.keys.count { it.second == height } > 1) "$width×$height" else "${height}p"
         val rates = group.map { it.refreshRate }.sorted().map(::formatRefreshRate).distinct()
-        "$label: ${rates.joinToString(" · ")}"
+        "$label: ${rates.joinToString(" • ")}"
     }
 }
 
