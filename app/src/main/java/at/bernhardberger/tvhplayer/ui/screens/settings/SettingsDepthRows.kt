@@ -97,8 +97,8 @@ internal fun settingsRow(
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
             headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
-            supportingContent = supporting?.let { { Text(it, style = MaterialTheme.typography.bodyMedium) } },
-            leadingContent = icon?.let { { Icon(painterResource(it), null, Modifier.size(24.dp)) } },
+            supportingContent = supporting?.let { { Text(it) } },
+            leadingContent = icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
             trailingContent = when {
                 busy -> ({ androidx.compose.material3.CircularProgressIndicator(
                     modifier = Modifier.size(24.dp), color = LocalContentColor.current, strokeWidth = 2.dp,
