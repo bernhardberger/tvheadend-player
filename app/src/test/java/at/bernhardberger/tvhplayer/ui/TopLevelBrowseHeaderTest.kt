@@ -35,6 +35,17 @@ class TopLevelBrowseHeaderTest {
     @Test fun normalTitleKeepsTheMinimumSlot() = checkTitle(fontScale = 1f)
     @Test fun largeTitleGrowsTheSlotWithoutClippingOrOverlappingTheNextRow() = checkTitle(fontScale = 2f)
 
+    @Test fun filterFollowsTheTitleInTheSecondaryToneEvenWhenItRepeatsTheTitle() {
+        compose.setContent {
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("News", filter = "News") }
+        }
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("News • News").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        val span = layouts.single().layoutInput.text.spanStyles.single()
+        assertEquals("Only the bullet and the filter step down", 4 until 11, span.start until span.end)
+        assertEquals(TvTextColors.secondary, span.item.color)
+    }
+
     private fun checkTitle(fontScale: Float) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {

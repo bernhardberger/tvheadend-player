@@ -658,19 +658,8 @@ class ChannelsStandardLayoutEvidenceTest {
     fun enlargedLongProgrammeKeepsWholeLinesUnderThePicture() {
         channelsShell(1.3f)
         enterAndFocus(LONG_TEXT)
-        // The picture keeps its size; the synopsis takes only whole lines, none when none fit.
-        val synopsis = compose.onAllNodesWithTag("channels-headline-synopsis", useUnmergedTree = true)
-            .fetchSemanticsNodes()
-        if (synopsis.isNotEmpty()) {
-            val node = detail("channels-headline-synopsis")
-            val layout = node.textLayout()
-            assertTrue("the last synopsis line is whole", layout.getLineBottom(layout.lineCount - 1) <= node.bounds().height + .5f)
-        }
-        assertTrue("Next stays above the real safe bottom", detail("channels-immersive-next").bounds().bottom <= 512.5f)
-        listOf("channels-immersive-title", "channels-immersive-subtitle").forEach { tag ->
-            val text = detail(tag).textLayout()
-            assertTrue("$tag retains its whole final line", text.getLineBottom(text.lineCount - 1) <= detail(tag).bounds().height + .5f)
-        }
+        // The picture keeps its size; the synopsis gives up lines rather than cutting one.
+        assertDescriptionFits(1)
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
