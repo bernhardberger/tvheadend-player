@@ -70,7 +70,7 @@ class ChannelsLayoutFocusTest {
     @Test fun gridEntersOnTheFirstCardAndStaysAtTheLastColumn() {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
-        assertTitle("All channels")
+        assertTitle("Channels")
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionRight)
@@ -120,13 +120,13 @@ class ChannelsLayoutFocusTest {
         pickGroup(group(1), steps = 1)
         compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
         fixture.awaitFocus(card(1))
-        assertTitle("Favorites")
+        assertTitle("Channels • Favorites")
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionUp)
         pickGroup(group(2), steps = 1)
         fixture.awaitFocus(card(7))
-        assertTitle("Entertainment")
+        assertTitle("Channels • Entertainment")
         fixture.key(Key.DirectionUp)
         pickGroup(group(1), steps = -1)
         fixture.awaitFocus(card(3))
@@ -145,7 +145,7 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.Back)
         compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
         fixture.awaitFocus(groupButton)
-        assertTitle("All channels")
+        assertTitle("Channels")
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(row(1))
     }
@@ -271,13 +271,13 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(hasTestTag("channels-show-all"))
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(card(1))
-        assertTitle("All channels")
+        assertTitle("Channels")
     }
 
     @Test fun emptyGroupWithoutAllChannelsLeavesFocusOnTheGroupButton() {
         fixture.show(grid, emptyGroup = true, allChannels = false)
         fixture.awaitFocus(card(1))
-        assertTitle("Favorites")
+        assertTitle("Channels • Favorites")
         fixture.key(Key.DirectionUp)
         pickGroup(group(9), steps = 2)
         fixture.awaitFocus(groupButton)
@@ -375,7 +375,7 @@ class ChannelsLayoutFocusTest {
     @Test fun immersiveDownStaysAndUpReachesTheHeader() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
-        assertTitle("All channels")
+        assertTitle("Channels")
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(2))
         fixture.key(Key.DirectionDown)
@@ -431,7 +431,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(groupButton)
         pickGroup(group(1), steps = 1)
         fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-immersive-cards")))
-        assertTitle("Favorites")
+        assertTitle("Channels • Favorites")
         fixture.key(Key.DirectionLeft)
         awaitRail()
         // The header is nearer the rail than the bottom row; Right still returns to the card.
@@ -448,7 +448,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(groupButton)
         pickGroup(group(2), steps = 2)
         fixture.awaitFocus(card(7))
-        assertTitle("Entertainment")
+        assertTitle("Channels • Entertainment")
         repeat(3) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(10))
         fixture.key(Key.DirectionUp)

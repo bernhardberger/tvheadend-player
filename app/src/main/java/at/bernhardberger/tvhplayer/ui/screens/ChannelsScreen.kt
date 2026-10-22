@@ -688,8 +688,9 @@ internal fun ChannelsScreenContent(
                 .focusGroup()
         ) {
             ChannelsHeader(
-                title = groups.firstOrNull { it.tagId == channelScope.activeTagId }?.name
-                    ?: stringResource(R.string.all_channels),
+                // The destination, as the Guide's title, with the group when one narrows it.
+                title = stringResource(R.string.nav_channels),
+                filter = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 focus = header,
                 showGroup = groups.size > 1,
                 navigationFocus = navigationFocus,

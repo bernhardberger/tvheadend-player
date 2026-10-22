@@ -40,6 +40,7 @@ internal class ChannelsHeaderFocus {
 @Composable
 internal fun ChannelsHeader(
     title: String,
+    filter: String?,
     focus: ChannelsHeaderFocus,
     showGroup: Boolean,
     navigationFocus: FocusRequester?,
@@ -58,6 +59,7 @@ internal fun ChannelsHeader(
     }
     TopLevelBrowseHeader(
         title = title,
+        filter = filter,
         modifier = modifier
             .onPreviewKeyEvent { event ->
                 event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onMoveToContent()

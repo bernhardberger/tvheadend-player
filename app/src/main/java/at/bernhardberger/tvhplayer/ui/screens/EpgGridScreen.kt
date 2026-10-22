@@ -1662,11 +1662,8 @@ fun EpgGridScreen(
                 },
         ) {
             TopLevelBrowseHeader(
-                title = if (category == ProgrammeCategory.ALL) {
-                    stringResource(R.string.epg_title)
-                } else {
-                    stringResource(R.string.epg_filtered_title, categoryLabel)
-                },
+                title = stringResource(R.string.epg_title),
+                filter = categoryLabel.takeIf { category != ProgrammeCategory.ALL },
                 modifier = Modifier
                     .padding(
                         start = startPadding + TvBrowseLeadingInset,

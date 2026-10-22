@@ -189,7 +189,7 @@ class ChannelsStandardLayoutEvidenceTest {
         // A group change enters the playing channel of the new scope.
         pickGroup(steps = 1)
         row(PLAYING).assertIsFocused()
-        heading("Favourites").assertExists()
+        heading("Channels • Favourites").assertExists()
         headlineChannel().assertTextContains(title(PLAYING))
 
         key(Key.DirectionLeft)
@@ -1001,7 +1001,7 @@ class ChannelsStandardLayoutEvidenceTest {
 
     private fun header() = compose.onNodeWithTag("channels-header")
     private fun groupButton() = compose.onNodeWithTag("channels-group-button")
-    private fun heading(label: String = "All channels") =
+    private fun heading(label: String = "Channels") =
         compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true)
 
     /** Up from the first row, OK on the group button, [steps] Downs in the picker and OK. */

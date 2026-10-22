@@ -479,7 +479,11 @@ options offer three layouts, in this order: **Immersive** (the default), **List*
 and **Grid**. Each layout keeps its own **Program art** switch; only List starts
 with it on. Off, cards and backdrops use channel logos instead of programme art.
 
-- The header shows the current group's name (or All channels) on the browse
+- The header names the destination as the Guide does: "Channels", or
+  "Channels • <group>" when a tag narrows it (accepted 2026-10-22; a long group
+  name is cut at the end). The group qualifies the destination, so " • <group>"
+  keeps the title's size and line but steps down to the secondary text tone, as
+  the Guide's category does. It sits on the browse
   heading axis at x130, y32 on the 960×540 reference canvas, with the 40dp Group
   and View options buttons at its end. Content begins at y80. At larger text the
   header grows from its actual text measurements. Header actions appear only when
@@ -551,8 +555,8 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   rests at the bottom of the screen with its first card on the x130 keyline. The
   row runs under the rail and the opened drawer to the screen edge; cards under
   the opened drawer dim to at most the kit's 50% modal scrim. The same headline
-  sits 40dp above the cards, with two synopsis lines and no Next line: Immersive
-  answers what is on now. Down stays on the row, Up reaches the header and Left at
+  sits 40dp above the cards, with two synopsis lines and, last, the List pane's
+  quiet Next line (trial 2026-10-22). Down stays on the row, Up reaches the header and Left at
   the row's start reaches the rail.
 - **Immersive backdrop.** With programme art, the focused programme's
   picture fills the top-end corner from the screen's top edge, as the kit's

@@ -435,7 +435,8 @@ internal fun ChannelsImmersiveHero(
         typography.labelMedium.lineHeight.toDp() + 8.dp + typography.headlineLarge.lineHeight.toDp() * 2 +
             4.dp + typography.bodyLarge.lineHeight.toDp() +
             ImmersiveListLineGap + ImmersiveFactsLineHeight + ImmersiveListLineGap + typography.labelMedium.lineHeight.toDp() +
-            ImmersiveSynopsisGap + typography.bodyLarge.lineHeight.toDp() * ImmersiveSynopsisLines
+            ImmersiveSynopsisGap + typography.bodyLarge.lineHeight.toDp() * ImmersiveSynopsisLines +
+            ImmersiveSynopsisGap + typography.labelMedium.lineHeight.toDp()
     }
     AnimatedContent(
         targetState = channelId,
@@ -453,10 +454,7 @@ internal fun ChannelsImmersiveHero(
         val now = nowSec()
         val observation = frame.observation
         val current = remember(observation, id, now) { observation.eventAt(channel.id, Instant.fromEpochSeconds(now)) }
-        // Immersive answers what is on now; what follows is left to the list, details and player.
-        val next = if (besideList) remember(observation, id, now) {
-            observation.nextEvent(channel.id, Instant.fromEpochSeconds(now))
-        } else null
+        val next = remember(observation, id, now) { observation.nextEvent(channel.id, Instant.fromEpochSeconds(now)) }
         val nextScheduled = remember(observation, next) {
             next?.let { observation.dvrEntryForEvent(it.id) }?.state == DvrEntryState.SCHEDULED
         }
@@ -494,7 +492,7 @@ internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
 
 /**
  * The headline of the immersive row and beside the list, in the details page's order: who and
- * what is on, its facts, its time and the synopsis; beside the list, what follows comes last.
+ * what is on, its facts, its time and the synopsis, then what follows in the quietest tone.
  */
 @Composable
 private fun ChannelsHeadline(
