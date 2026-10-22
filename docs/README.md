@@ -62,6 +62,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `appliance-tcl-findings-2026-07-27.md` | July 2026 TCL bring-up observations: accessibility service and wake, HOME priority, initial channel list, and the G08 intermittent render mode (roadmap P6). |
 | `android-cli-qualification-2026-09-09.md` | Bounded 2026-09-09 qualification of the official Android CLI and the executed emulator evidence; the lasting limits are in `android-tooling.md`. |
 | `profiling-p38-static-rail-2026-09-09.md` | Earlier static-rail profiling fixture, its tool qualification and first measurements; not current journey acceptance. |
+| `guide-performance-baseline-2026-10-22.md` | G10 frame timings of the Guide before the U5 rework (E7 baseline); measurements only, no budgets. |
 | `tv-design-audit-2026-07-27.md` | Historical rationale for `DESIGN.md`; the specification is authoritative. |
 | `archive/tv-design-spec-2026-09.md` | Superseded long-form specification; historical only. |
 
