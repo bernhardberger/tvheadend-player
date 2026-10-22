@@ -325,7 +325,8 @@ internal fun RecordingMetadataPane(
         // Tvheadend ignores progress writes for a missed entry, so it never shows as watched.
         entry.playCount?.takeIf { it > 0 && entry.state != DvrEntryState.MISSED }?.let {
             Text(
-                text = stringResource(R.string.recordings_play_count, it),
+                text = pluralStringResource(R.plurals.recordings_play_count,
+                    it.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), it),
                 color = TvTextColors.tertiary,
             )
         }
