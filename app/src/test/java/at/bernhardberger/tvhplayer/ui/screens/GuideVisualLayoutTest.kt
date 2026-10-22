@@ -586,6 +586,22 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
+    @Test fun leftCrossesAnEpgGapWiderThanTheEarlierWindowToTheRowsPreviousProgramme() {
+        // Five empty hours exceed the three-hour window Left would otherwise search.
+        show(historyOffset = -6)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        key(Key.DirectionLeft)
+        focused(title(1, -6))
+        val start = checkNotNull(position.position.value).windowStartSec
+        assertTrue("The window moves back across the gap: $start", start < hour - 5 * 3600)
+        assertEquals("Earlier navigation stays local", callsAtEntry, session.calls.size)
+        key(Key.DirectionRight)
+        focused(title(1, 0))
+        // Back over the gap, the window reaches now and acquires coverage like any later window.
+        assertNoPlayback(additionalCoverageCalls = 1)
+    }
+
     @Test fun focusGeometryKeepsNativeGrowthClearWithoutChangingChronologyOrBounds() {
         assertEquals(10800L, guideVisibleWindowSec(650f, 32, 1f))
         assertEquals(7200L, guideVisibleWindowSec(650f, 43, 1f))
@@ -949,7 +965,7 @@ class GuideVisualLayoutTest {
     }
 
     private fun show(scale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr, history: Boolean = true,
-        lastOffset: Int = 5, eventHour: Long = hour, longProgramme: Boolean = false,
+        lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null) {
         val channels = (1L..12L).map { id ->
@@ -973,7 +989,7 @@ class GuideVisualLayoutTest {
                         listOf(event(ch, 0)) + if (longProgrammeSuccessor) listOf(event(ch, longProgrammeHours)) else emptyList()
                     } else (0..lastOffset).map { event(ch, it) }
                 },
-                historicalEvents = if (history) channels.filterNot { it.id == ChannelId(3) }.map { event(it, -1) } else emptyList(),
+                historicalEvents = if (history) channels.filterNot { it.id == ChannelId(3) }.map { event(it, historyOffset) } else emptyList(),
                 coverages = if (initialCoverage) channels.map {
                     EpgCoverage.create(it.id, Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
                 } else emptyList(),

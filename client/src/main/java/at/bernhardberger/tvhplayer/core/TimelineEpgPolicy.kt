@@ -311,6 +311,30 @@ fun timelineFrontierFocus(
     return event?.let { EpgFocusTarget(channelIndex, it.id) }
 }
 
+/**
+ * The row's nearest programme past [boundarySec] in [direction] that still overlaps the
+ * Guide's range. An EPG gap can span the whole adjacent window; Left and Right then
+ * continue to this programme instead of stopping.
+ */
+fun timelineProgrammeAcrossGap(
+    events: List<EpgEventEntry>,
+    originEventId: EventId,
+    boundarySec: Long,
+    direction: Int,
+    rangeStartSec: Long,
+    rangeEndSec: Long,
+): EpgEventEntry? {
+    require(direction == -1 || direction == 1)
+    val inRange = events.filter {
+        it.id != originEventId && it.stop.epochSeconds > rangeStartSec && it.start.epochSeconds < rangeEndSec
+    }
+    return if (direction < 0) {
+        inRange.filter { it.start.epochSeconds < boundarySec }.maxByOrNull { it.start }
+    } else {
+        inRange.filter { it.start.epochSeconds >= boundarySec }.minByOrNull { it.start }
+    }
+}
+
 fun timelinePageFocusTarget(
     rows: List<EpgFocusColumn>,
     current: EpgFocusTarget,

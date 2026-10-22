@@ -129,6 +129,7 @@ import at.bernhardberger.tvhplayer.core.resolveGuideWindowFocus
 import at.bernhardberger.tvhplayer.core.shouldWaitForGuideCoverage
 import at.bernhardberger.tvhplayer.core.timelineFrontierFocus
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
+import at.bernhardberger.tvhplayer.core.timelineProgrammeAcrossGap
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
@@ -689,6 +690,20 @@ fun EpgGridScreen(
         deferFrontierOrigin(request)
     }
 
+    fun programmeAcrossGap(channelId: ChannelId, originEventId: EventId, boundarySec: Long, direction: Int) =
+        timelineProgrammeAcrossGap(
+            events = displayEvents.filter { it.channelId == channelId && it.matchesProgrammeCategory(category) },
+            originEventId = originEventId,
+            boundarySec = boundarySec,
+            direction = direction,
+            rangeStartSec = windowBounds.earliestStartSec,
+            rangeEndSec = windowBounds.latestStartSec + visibleWindowSec,
+        )
+
+    // Keeps Left's usual placement: the earlier programme ends at the window's right edge.
+    fun windowStartShowingEarlier(earlier: EpgEventEntry, targetWindowStartSec: Long): Long =
+        windowBounds.constrain(minOf(targetWindowStartSec, earlier.stop.epochSeconds - visibleWindowSec))
+
     fun clearAllCoverage(restoreFrontier: Boolean = false) {
         if (restoreFrontier) frontierRequest?.let(::deferFrontierOrigin)
         else pendingFrontierOrigin = null
@@ -1175,7 +1190,12 @@ fun EpgGridScreen(
                     it.matchesProgrammeCategory(category)
             }
         }
+        // Later EPG beyond the acquired window stays unknown, so only Left crosses a gap here.
+        val earlier = if (request.direction < 0) withContext(Dispatchers.Default) {
+            programmeAcrossGap(request.channelId, request.originEventId, request.boundarySec, -1)
+        } else null
         if (frontierRequest != request) return@LaunchedEffect
+        var targetWindowStartSec = request.throughSec - visibleWindowSec
         val target = snapshot?.let {
             timelineFrontierFocus(
                 rows = listOf(EpgFocusColumn(request.channelId, frontierEvents)),
@@ -1183,7 +1203,10 @@ fun EpgGridScreen(
                 originEventId = request.originEventId,
                 boundarySec = request.boundarySec,
                 direction = request.direction,
-            )?.copy(channelIndex = channelIndex)
+            )?.copy(channelIndex = channelIndex) ?: earlier?.let { event ->
+                targetWindowStartSec = windowStartShowingEarlier(event, targetWindowStartSec)
+                EpgFocusTarget(channelIndex, event.id)
+            }
         }
         val coverageSettled = snapshot?.let { current ->
             guideChannelPageCoverageSettled(
@@ -1196,7 +1219,7 @@ fun EpgGridScreen(
         if (coverageSettled && target != null) {
             if (mayFocusProgramme && !retainGridFocus()) return@LaunchedEffect
             pendingInitialChannelIndex = target.channelIndex
-            windowStartSec = request.throughSec - visibleWindowSec
+            windowStartSec = targetWindowStartSec
             selectedTarget = target
         } else if (
             shouldWaitForGuideCoverage(
@@ -1469,7 +1492,7 @@ fun EpgGridScreen(
                 }
                 // A display-sized step can still land wholly inside a long programme.
                 // Reach its edge so the adjacent programme is eligible in the next window.
-                val targetWindowStartSec = windowBounds.constrain(
+                var targetWindowStartSec = windowBounds.constrain(
                     if (move.timeFrontierDirection > 0) {
                         maxOf(windowStartSec + visibleWindowSec, boundarySec)
                     } else {
@@ -1488,10 +1511,27 @@ fun EpgGridScreen(
                         rows = listOf(EpgFocusColumn(channelId, pastEvents)), channelId = channelId,
                         originEventId = current.eventId, boundarySec = boundarySec,
                         direction = move.timeFrontierDirection,
-                    ) ?: return true
-                    windowStartSec = targetWindowStartSec
-                    selectedTarget = target.copy(channelIndex = current.channelIndex)
-                    return true
+                    )
+                    if (target != null) {
+                        windowStartSec = targetWindowStartSec
+                        selectedTarget = target.copy(channelIndex = current.channelIndex)
+                        return true
+                    }
+                    // An EPG gap can span the whole adjacent window. Continue to the row's
+                    // nearest programme beyond it instead of stopping on this one.
+                    val across = programmeAcrossGap(channelId, current.eventId, boundarySec, move.timeFrontierDirection)
+                        ?: return true
+                    targetWindowStartSec = if (move.timeFrontierDirection < 0) {
+                        windowStartShowingEarlier(across, targetWindowStartSec)
+                    } else {
+                        // Unacquired EPG after now may hold a nearer programme, so acquire from now at the latest.
+                        windowBounds.constrain(maxOf(targetWindowStartSec, minOf(across.start.epochSeconds, nowSecProvider())))
+                    }
+                    if (targetWindowStartSec + visibleWindowSec <= nowSecProvider()) {
+                        windowStartSec = targetWindowStartSec
+                        selectedTarget = EpgFocusTarget(current.channelIndex, across.id)
+                        return true
+                    }
                 }
                 val coverageRequest = requestVisibleWindow(
                     targetWindowStartSec,
