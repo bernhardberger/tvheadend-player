@@ -1,12 +1,5 @@
 package at.bernhardberger.tvhplayer.core
 
-import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
-
-enum class MainStartupActionId {
-    RETRY,
-    CONNECTION_SETTINGS,
-}
-
 enum class MainStartupMessageKind {
     PREPARING,
     CONNECTING,
@@ -15,15 +8,6 @@ enum class MainStartupMessageKind {
     RECONNECTING,
     STARTING_TELEVISION,
     RESUMING_PLAYBACK,
-    AUTHORITATIVE_NO_CHANNELS,
-    RETRYABLE_FAILURE,
-    AUTHENTICATION_FAILURE,
-    PERMISSION_DENIED,
-    INCOMPATIBLE_SERVER,
-    TIMEOUT_FAILURE,
-    SYNCHRONIZATION_FAILURE,
-    CONFIGURATION_REQUIRED,
-    CREDENTIAL_UNAVAILABLE,
 }
 
 sealed interface MainStartupPresentation {
@@ -33,10 +17,8 @@ sealed interface MainStartupPresentation {
         val messageKind: MainStartupMessageKind,
     ) : MainStartupPresentation
 
-    data class Actionable(
-        val messageKind: MainStartupMessageKind,
-        val actions: List<MainStartupActionId>,
-    ) : MainStartupPresentation
+    /** A connection condition from the catalog with its buttons; startup is never closable. */
+    data class Actionable(val error: AppError) : MainStartupPresentation
 
     data class Enter(val request: ApplianceLaunchRequest) : MainStartupPresentation
 }
@@ -73,31 +55,22 @@ fun mainStartupPresentation(
                     MainStartupMessageKind.WAITING_FOR_CURRENT_CHANNEL_METADATA,
                 )
             is CurrentChannelReadiness.Ready -> if (currentChannelReadiness.channels.isEmpty()) {
-                actionableFailure(
-                    normalMessageKind = MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
-                )
+                MainStartupPresentation.Actionable(noChannelsAppError())
             } else {
                 MainStartupPresentation.Enter(pendingLaunch.request)
             }
         }
-        ConnectionUiState.NeedsConfiguration -> actionableFailure(
-            normalMessageKind = MainStartupMessageKind.CONFIGURATION_REQUIRED,
-            normalActions = connectionSettingsAction,
-        )
-        ConnectionUiState.CredentialUnavailable -> actionableFailure(
-            normalMessageKind = MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
-            normalActions = connectionSettingsAction,
-        )
-        is ConnectionUiState.Error -> when (connectionState.primaryRecoveryAction()) {
-            ConnectionRecoveryAction.RETRY -> actionableFailure(
-                normalMessageKind = mainStartupFailureMessage(connectionState.kind),
-            )
-            ConnectionRecoveryAction.SETTINGS -> actionableFailure(
-                normalMessageKind = mainStartupFailureMessage(connectionState.kind),
-                normalActions = connectionSettingsAction,
-            )
-            ConnectionRecoveryAction.NONE ->
+        // While the SDK retries by itself this is 110, with Connection settings and no Retry;
+        // saved channels never block, so autoplay then waits as reconnecting.
+        ConnectionUiState.NeedsConfiguration,
+        ConnectionUiState.CredentialUnavailable,
+        is ConnectionUiState.Error -> {
+            val failure = waitingConnectionFailurePresentation(connectionState)
+            if (failure.error.condition == AppErrorCondition.RECONNECTING && currentChannelReadiness.channelsAvailable()) {
                 MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING)
+            } else {
+                failure
+            }
         }
     }
 }
@@ -174,29 +147,12 @@ data class WaitingConnectionFailure(
 }
 
 /**
- * Startup's recovery for a [waitingConnectionFailure]. Unlike a pending autoplay, an automatic
- * backoff is actionable too: the viewer is waiting on this screen, so Retry starts the next
- * attempt now.
+ * The recovery of a surface waiting for its first connection: the catalog's error for [failure]
+ * with the buttons the SDK's guidance offers. While the connection retries by itself (110) that is
+ * Connection settings only; the reconnecting text tells the viewer an attempt is on its way.
  */
 fun waitingConnectionFailurePresentation(failure: ConnectionUiState): MainStartupPresentation.Actionable =
-    when (failure) {
-        ConnectionUiState.CredentialUnavailable -> actionableFailure(
-            normalMessageKind = MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
-            normalActions = connectionSettingsAction,
-        )
-        is ConnectionUiState.Error -> actionableFailure(
-            normalMessageKind = mainStartupFailureMessage(failure.kind),
-            normalActions = if (failure.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS) {
-                connectionSettingsAction
-            } else {
-                retryAndConnectionSettingsActions
-            },
-        )
-        else -> actionableFailure(
-            normalMessageKind = MainStartupMessageKind.CONFIGURATION_REQUIRED,
-            normalActions = connectionSettingsAction,
-        )
-    }
+    MainStartupPresentation.Actionable(failure.toAppError() ?: AppErrorCondition.NOT_CONFIGURED.toAppError())
 
 /** Shown cold-start screens stay at least this long, so they can be read; one never shown waits for nothing. */
 internal const val ColdStartMinimumVisibleMillis = 500L
@@ -204,26 +160,3 @@ internal const val ColdStartMinimumVisibleMillis = 500L
 /** How much longer a cold-start screen first shown at [shownAtMillis] stays before it may leave. */
 fun coldStartRemainingVisibleMillis(shownAtMillis: Long?, nowMillis: Long): Long =
     shownAtMillis?.let { (it + ColdStartMinimumVisibleMillis - nowMillis).coerceAtLeast(0L) } ?: 0L
-
-private fun mainStartupFailureMessage(kind: ConnectionFailureKind): MainStartupMessageKind = when (kind) {
-    ConnectionFailureKind.AUTHENTICATION -> MainStartupMessageKind.AUTHENTICATION_FAILURE
-    ConnectionFailureKind.PERMISSION_DENIED -> MainStartupMessageKind.PERMISSION_DENIED
-    ConnectionFailureKind.INCOMPATIBLE_SERVER -> MainStartupMessageKind.INCOMPATIBLE_SERVER
-    ConnectionFailureKind.TIMEOUT -> MainStartupMessageKind.TIMEOUT_FAILURE
-    ConnectionFailureKind.UNREACHABLE -> MainStartupMessageKind.RETRYABLE_FAILURE
-    ConnectionFailureKind.OTHER -> MainStartupMessageKind.SYNCHRONIZATION_FAILURE
-}
-
-private fun actionableFailure(
-    normalMessageKind: MainStartupMessageKind,
-    normalActions: List<MainStartupActionId> = retryAndConnectionSettingsActions,
-): MainStartupPresentation.Actionable =
-    MainStartupPresentation.Actionable(
-        messageKind = normalMessageKind,
-        actions = normalActions,
-    )
-private val retryAndConnectionSettingsActions = listOf(
-    MainStartupActionId.RETRY,
-    MainStartupActionId.CONNECTION_SETTINGS,
-)
-private val connectionSettingsAction = listOf(MainStartupActionId.CONNECTION_SETTINGS)

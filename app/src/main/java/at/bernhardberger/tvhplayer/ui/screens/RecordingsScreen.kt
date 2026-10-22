@@ -91,9 +91,8 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
-import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrLibraryPartition
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
@@ -131,6 +130,7 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsAppError
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingItemKey
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
@@ -160,6 +160,7 @@ private data class RecordingsTabBody(
     val location: String,
     val empty: Boolean,
     val connection: ConnectionUiState,
+    val failure: ConnectionUiState?,
     val observation: SessionObservation,
     val channelsById: Map<ChannelId, Channel>,
     val archive: DvrArchiveFolder,
@@ -178,7 +179,9 @@ fun RecordingsScreen(
     backEnabled: Boolean = true,
     session: TvheadendSession = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
+    connectionFailure: ConnectionUiState? = connectionUiState,
     onRetry: () -> Unit = {},
+    onOpenConnectionSettings: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     onWatchChannel: ((ChannelId, String) -> Unit)? = null,
     state: RecordingsScreenState? = null,
@@ -193,7 +196,9 @@ fun RecordingsScreen(
         initialFocusEnabled = initialFocusEnabled,
         backEnabled = backEnabled,
         connectionUiState = connectionUiState,
+        connectionFailure = connectionFailure,
         onRetry = onRetry,
+        onOpenConnectionSettings = onOpenConnectionSettings,
         onPlayRecording = onPlayRecording,
         onWatchChannel = onWatchChannel,
         state = state,
@@ -210,7 +215,9 @@ internal fun RecordingsScreenContent(
     initialFocusEnabled: Boolean = true,
     backEnabled: Boolean = true,
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
+    connectionFailure: ConnectionUiState? = connectionUiState,
     onRetry: () -> Unit = {},
+    onOpenConnectionSettings: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     onWatchChannel: ((ChannelId, String) -> Unit)? = null,
     state: RecordingsScreenState? = null,
@@ -243,6 +250,7 @@ internal fun RecordingsScreenContent(
     var requestContentFocus by remember { mutableStateOf(true) }
     var contentHasFocus by remember { mutableStateOf(false) }
     var contentFocusOwned by remember { mutableStateOf(false) }
+    var loadingFocusParked by remember { mutableStateOf(false) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var focusRecoveryGeneration by remember { mutableIntStateOf(0) }
     var detailsEntry by remember { mutableStateOf<DvrEntry?>(null) }
@@ -347,8 +355,7 @@ internal fun RecordingsScreenContent(
             .flatMap { problemGroups[it].orEmpty() }
             .map { "recording:${recordingItemKey(it.id)}" }
     }
-    val retryAvailable = entries.isEmpty() &&
-        connectionUiState.primaryRecoveryAction() == ConnectionRecoveryAction.RETRY
+    val alertShown = recordingsAppError(entries.isEmpty(), connectionUiState, connectionFailure) != null
 
     val drawerState = at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState.current
     LaunchedEffect(observedEntries) {
@@ -372,17 +379,18 @@ internal fun RecordingsScreenContent(
         selectedKeys[location],
         requestContentFocus,
         initialFocusEnabled,
-        retryAvailable,
+        alertShown,
         detailsEntry,
         pendingAction,
     ) {
         if (detailsEntry != null || pendingAction != null) return@LaunchedEffect
-        if (itemKeys.isEmpty() && !retryAvailable) {
+        if (itemKeys.isEmpty() && !alertShown) {
             if (!initialFocusEnabled || (!requestContentFocus && !contentFocusOwned)) return@LaunchedEffect
             if (drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) return@LaunchedEffect
             if (modeFocus.requestFocus()) {
                 requestContentFocus = false
                 contentFocusOwned = false
+                loadingFocusParked = true
             }
             return@LaunchedEffect
         }
@@ -395,7 +403,7 @@ internal fun RecordingsScreenContent(
             return@LaunchedEffect
         }
         if (!initialFocusEnabled) return@LaunchedEffect
-        if (!requestContentFocus) return@LaunchedEffect
+        if (!requestContentFocus && !(alertShown && (loadingFocusParked || contentFocusOwned))) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             if (drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) return@LaunchedEffect
@@ -404,6 +412,7 @@ internal fun RecordingsScreenContent(
             val focused = contentHasFocus || runCatching { contentFocus.requestFocus() }.getOrDefault(false)
             if (focused) {
                 requestContentFocus = false
+                loadingFocusParked = false
                 return@LaunchedEffect
             }
         }
@@ -420,7 +429,7 @@ internal fun RecordingsScreenContent(
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
-                if (itemKeys.isEmpty() && !retryAvailable) modeFocus.requestFocus()
+                if (itemKeys.isEmpty() && !alertShown) modeFocus.requestFocus()
                 else contentFocus.requestFocus()
             }.getOrDefault(false)
             if (restored) {
@@ -516,6 +525,13 @@ internal fun RecordingsScreenContent(
                 },
                 modifier = Modifier
                     .wrapContentWidth(align = Alignment.Start)
+                    .onFocusChanged { if (!it.hasFocus) loadingFocusParked = false }
+                    .onPreviewKeyEvent {
+                        // A deliberate header move gives the viewer ownership, not the loading handoff.
+                        loadingFocusParked = false
+                        contentFocusOwned = false
+                        false
+                    }
                     .testTag("recordings-mode-tabs"),
             )
         }
@@ -524,7 +540,7 @@ internal fun RecordingsScreenContent(
             selectedKey = mode,
             state = {
                 RecordingsTabBody(
-                    mode, location, entries.isEmpty(), connectionUiState,
+                    mode, location, entries.isEmpty(), connectionUiState, connectionFailure,
                     observation, channelsById, archive,
                     scheduleGroups, problemGroups, selectedKeys[location],
                     archiveScrollPositions[location] ?: 0,
@@ -546,10 +562,25 @@ internal fun RecordingsScreenContent(
         if (frame.empty) {
             RecordingsEmptyState(
                 connectionUiState = frame.connection,
-                onRetry = { if (owner.isCurrent) onRetry() },
-                retryFocus = if (owner.isCurrent) contentFocus else remember { FocusRequester() },
+                connectionFailure = frame.failure,
+                onAction = { action ->
+                    if (owner.isCurrent) {
+                        when (action) {
+                            AppErrorAction.RETRY -> onRetry()
+                            AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
+                            AppErrorAction.CLOSE -> Unit
+                        }
+                    }
+                },
+                actionFocus = if (owner.isCurrent) contentFocus else remember { FocusRequester() },
                 upFocus = modeFocus,
-                modifier = Modifier.padding(start = startPadding, end = endPadding),
+                modifier = Modifier.padding(start = startPadding, end = endPadding)
+                    .onFocusChanged {
+                        if (owner.isCurrent) {
+                            contentHasFocus = it.hasFocus
+                            contentFocusOwned = it.hasFocus
+                        }
+                    },
             )
         } else ProvideArtworkSession(currentSession, observation) {
             // A frame shows its pictures with the session of the observation it was built from.

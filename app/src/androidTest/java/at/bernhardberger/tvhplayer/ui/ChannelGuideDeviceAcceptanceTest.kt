@@ -42,7 +42,7 @@ class ChannelGuideDeviceAcceptanceTest {
     @Test
     fun realCatalogRendersInNumericOrderAndGuideDoesNotClaimStaleEmptyState() {
         val session = GlobalContext.get().get<TvheadendSession>()
-        val noChannels = composeRule.activity.getString(R.string.no_channels_available)
+        val noChannels = composeRule.activity.getString(R.string.error_108_title)
 
         var currentCatalog: ChannelCatalog? = null
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {

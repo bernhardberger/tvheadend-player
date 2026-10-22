@@ -256,16 +256,19 @@ class StartupOfflineTest {
         assertEquals(0, startupScreens() + statusTexts())
     }
 
-    @Test fun aFailedColdStartKeepsRetryFocusedThroughAutomaticAttempts() {
+    @Test fun aFailedColdStartKeepsConnectionSettingsFocusedThroughAutomaticAttempts() {
         coldApp(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.TRANSPORT_UNAVAILABLE)))
         advance(1_000)
         compose.waitUntil(10_000) {
-            compose.onAllNodes(hasTestTag("main-startup-action-RETRY") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodes(hasTestTag("tv-recovery-primary") and isFocused()).fetchSemanticsNodes().isNotEmpty()
         }
-        compose.onNodeWithTag("main-startup-action-CONNECTION_SETTINGS").fetchSemanticsNode()
+        // 110: the session retries by itself, so the startup alert offers Connection settings and no Retry.
+        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true)).assertIsFocused()
+        assertEquals(0, compose.onAllNodes(hasTestTag("tv-recovery-secondary")).fetchSemanticsNodes().size)
+        assertEquals(1, startupScreens())
         session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
         advance(500)
-        compose.onNodeWithTag("main-startup-action-RETRY").assertIsFocused()
+        compose.onNode(hasTestTag("tv-recovery-primary") and hasText("Connection settings", substring = true)).assertIsFocused()
     }
 
     @Test fun unavailableProfileOffersConnectionSettingsInsteadOfConnecting() =

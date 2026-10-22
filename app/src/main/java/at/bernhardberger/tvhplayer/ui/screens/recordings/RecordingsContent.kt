@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -39,7 +38,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -60,7 +58,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.tv.material3.Button
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ListItem
@@ -71,9 +68,12 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
-import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
+import at.bernhardberger.tvhplayer.core.browseAppError
+import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrLibraryMode
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
@@ -767,43 +767,52 @@ private fun RecordingSupportingMetadata(entry: DvrEntry, metadata: String) {
     }
 }
 
+/** The Recordings 1xx alert, shown only while there are no recordings to list. */
+internal fun recordingsAppError(
+    empty: Boolean,
+    connectionUiState: ConnectionUiState,
+    connectionFailure: ConnectionUiState? = connectionUiState,
+): AppError? = if (empty) connectionFailure?.browseAppError() else null
+
+/** The passive text of an empty Recordings list without an alert. */
+internal fun recordingsEmptyMessageRes(connectionUiState: ConnectionUiState): Int = when (connectionUiState) {
+    ConnectionUiState.Connecting,
+    ConnectionUiState.SyncingChannels -> R.string.recordings_loading
+    ConnectionUiState.Reconnecting -> R.string.recordings_reconnecting
+    else -> R.string.recordings_empty
+}
+
 @Composable
 internal fun RecordingsEmptyState(
     connectionUiState: ConnectionUiState,
-    onRetry: () -> Unit,
-    retryFocus: FocusRequester,
+    connectionFailure: ConnectionUiState?,
+    onAction: (AppErrorAction) -> Unit,
+    actionFocus: FocusRequester,
     upFocus: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
-    val retryAvailable = connectionUiState.primaryRecoveryAction() == ConnectionRecoveryAction.RETRY
+    val alert = recordingsAppError(empty = true, connectionUiState = connectionUiState, connectionFailure = connectionFailure)
+    if (alert != null) {
+        AppErrorAlert(
+            error = alert,
+            onAction = onAction,
+            modifier = modifier.fillMaxSize(),
+            actionFocus = actionFocus,
+            leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
+            upExit = upFocus,
+        )
+        return
+    }
     Column(
         modifier = modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            stringResource(
-                when (connectionUiState) {
-                    ConnectionUiState.Connecting,
-                    ConnectionUiState.SyncingChannels -> R.string.recordings_loading
-                    ConnectionUiState.Reconnecting -> R.string.recordings_reconnecting
-                    is ConnectionUiState.Error -> R.string.recordings_server_failure
-                    else -> R.string.recordings_empty
-                }
-            ),
+            stringResource(recordingsEmptyMessageRes(connectionUiState)),
             style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.onBackground,
         )
-        if (retryAvailable) {
-            Spacer(Modifier.height(12.dp))
-            Button(
-                onClick = onRetry,
-                modifier = Modifier
-                    .tabFocus()
-                    .focusRequester(retryFocus)
-                    .focusProperties { up = upFocus },
-            ) { Text(stringResource(R.string.retry)) }
-        }
     }
 }
 

@@ -14,10 +14,16 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.core.chooseDvrConfig
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Test
 
 class EpgGridObservationPolicyTest {
@@ -34,15 +40,56 @@ class EpgGridObservationPolicyTest {
     }
 
     @Test
-    fun currentEmptyChannelCatalogIsAuthoritative() {
+    fun currentEmptyChannelCatalogIsTheNoChannelsAlert() {
         assertEquals(
-            R.string.no_channels_available,
-            guideEmptyMessageRes(
-                isEmptyTag = false,
-                connectionUiState = ConnectionUiState.Ready,
-                channelCatalogCurrent = true,
-            ),
+            AppError(AppErrorCondition.NO_CHANNELS, listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)),
+            guideAppError(hasChannels = false, isEmptyTag = false, ConnectionUiState.Ready, channelCatalogCurrent = true),
         )
+        // Before the catalog is current, and for an empty tag, the Guide stays passive.
+        assertNull(guideAppError(hasChannels = false, isEmptyTag = false, ConnectionUiState.Ready, channelCatalogCurrent = false))
+        assertNull(guideAppError(hasChannels = false, isEmptyTag = true, ConnectionUiState.Ready, channelCatalogCurrent = true))
+    }
+
+    @Test
+    fun connectionFailuresWithoutChannelsAreTheCatalogAlertAndNeverBlockSavedChannels() {
+        val unreachable = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)
+        val backoff = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        val denied = ConnectionUiState.Error(ConnectionFailureKind.PERMISSION_DENIED, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)
+        val expected = mapOf(
+            unreachable to AppError(AppErrorCondition.UNREACHABLE, listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)),
+            backoff to AppError(AppErrorCondition.RECONNECTING, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+            denied to AppError(AppErrorCondition.PERMISSION_DENIED, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+            ConnectionUiState.NeedsConfiguration to
+                AppError(AppErrorCondition.NOT_CONFIGURED, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+            ConnectionUiState.CredentialUnavailable to
+                AppError(AppErrorCondition.CREDENTIAL_UNAVAILABLE, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+        )
+        for ((connection, error) in expected) {
+            for (isEmptyTag in listOf(false, true)) {
+                assertEquals(error, guideAppError(hasChannels = false, isEmptyTag, connection, channelCatalogCurrent = true))
+            }
+            assertNull(guideAppError(hasChannels = true, isEmptyTag = false, connection, channelCatalogCurrent = true))
+        }
+    }
+
+    @Test
+    fun aHeldFailureStaysThroughAnAutomaticAttempt() {
+        val backoff = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
+        assertEquals(AppError(AppErrorCondition.RECONNECTING, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+            guideAppError(hasChannels = false, isEmptyTag = false, ConnectionUiState.Connecting,
+                channelCatalogCurrent = true, connectionFailure = backoff))
+        assertNull(guideAppError(hasChannels = true, isEmptyTag = false, ConnectionUiState.Connecting,
+            channelCatalogCurrent = true, connectionFailure = backoff))
+    }
+
+    @Test
+    fun loadingAndReconnectingStayPassive() {
+        for (connection in listOf(ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels, ConnectionUiState.Reconnecting)) {
+            assertNull(guideAppError(hasChannels = false, isEmptyTag = false, connection, channelCatalogCurrent = true))
+        }
+        assertEquals(R.string.epg_loading, guideEmptyMessageRes(false, ConnectionUiState.Connecting, false))
+        assertEquals(R.string.epg_loading, guideEmptyMessageRes(false, ConnectionUiState.SyncingChannels, false))
+        assertEquals(R.string.epg_reconnecting, guideEmptyMessageRes(false, ConnectionUiState.Reconnecting, true))
     }
 
     @Test

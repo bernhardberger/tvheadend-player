@@ -51,7 +51,7 @@ import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
 import at.bernhardberger.tvhplayer.core.BackAction
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvhplayer.core.MainStartupActionId
+import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupLoadingTiming
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
@@ -207,7 +207,7 @@ private class ShellBackStack {
 internal fun MainStartupComposition(
     state: MainStartupCompositionState,
     onBack: () -> Unit,
-    onAction: (MainStartupActionId) -> Unit,
+    onAction: (AppErrorAction) -> Unit,
     registerActivityKeyContract: (MainStartupActivityKeyContract) -> (() -> Unit),
     modifier: Modifier = Modifier,
     loadingTiming: MainStartupLoadingTiming = remember { MainStartupLoadingTiming() },
@@ -410,13 +410,15 @@ internal fun applyDeferredResolvingBack(
 }
 
 internal fun performMainStartupAction(
-    action: MainStartupActionId,
+    action: AppErrorAction,
     onRetry: () -> Unit,
     onConnectionSettings: () -> Unit,
 ) {
     when (action) {
-        MainStartupActionId.RETRY -> onRetry()
-        MainStartupActionId.CONNECTION_SETTINGS -> onConnectionSettings()
+        AppErrorAction.RETRY -> onRetry()
+        AppErrorAction.CONNECTION_SETTINGS -> onConnectionSettings()
+        // Startup errors are not closable; Back leaves startup.
+        AppErrorAction.CLOSE -> Unit
     }
 }
 
@@ -564,6 +566,10 @@ fun AppRoot(
     LaunchedEffect(uiSettings.clockFormat) { AppClock.format = uiSettings.clockFormat }
     val profileOwner: AppProfileOwner = koinInject()
     val profileGeneration by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
+    val browseFailure = at.bernhardberger.tvhplayer.ui.components.rememberBrowseConnectionFailure(
+        connectionUiState, profileGeneration, appVm::reconnectNow)
+    val browseConnectionFailure = browseFailure.failure
+    val retryBrowseConnection = browseFailure.retry
     val currentChannelReadiness = connectionPresentation.currentChannelReadiness
     var startupReveal by remember { mutableStateOf<MainStartupReveal?>(null) }
     val revealingTarget = startupReveal?.targetFor(profileGeneration)
@@ -842,7 +848,8 @@ fun AppRoot(
                             playerReturn = playerReturnFor(ChannelsKey),
                             view = uiSettings.channelsView,
                             connectionUiState = connectionUiState,
-                            onRetryConnection = appVm::reconnectNow,
+                            connectionFailure = browseConnectionFailure,
+                            onRetryConnection = retryBrowseConnection,
                             onOpenConnectionSettings = {
                                 navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                             },
@@ -871,7 +878,8 @@ fun AppRoot(
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
                             playerReturn = guideChannelRequest ?: playerReturnFor(GuideKey),
                             connectionUiState = connectionUiState,
-                            onRetry = appVm::reconnectNow,
+                            connectionFailure = browseConnectionFailure,
+                            onRetry = retryBrowseConnection,
                             onOpenConnectionSettings = {
                                 navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                             },
@@ -911,7 +919,11 @@ fun AppRoot(
                             initialFocusEnabled = !drawerActive && currentDestination == RecordingsKey,
                             backEnabled = !applianceLaunchActive,
                             connectionUiState = connectionUiState,
-                            onRetry = appVm::reconnectNow,
+                            connectionFailure = browseConnectionFailure,
+                            onRetry = retryBrowseConnection,
+                            onOpenConnectionSettings = {
+                                navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
+                            },
                             onPlayRecording = { playbackSelection, intent ->
                                 val recordingId = playbackSelection.recordingId
                                 playerEntry.request(playbackSelectionScope) {
@@ -1030,7 +1042,7 @@ fun AppRoot(
 
     val startupAction = remember(applianceLaunchState, selectRoot, appVm) {
         val expectedState = applianceLaunchState
-        { action: MainStartupActionId ->
+        { action: AppErrorAction ->
             performMainStartupAction(
                 action = action,
                 onRetry = appVm::reconnectNow,

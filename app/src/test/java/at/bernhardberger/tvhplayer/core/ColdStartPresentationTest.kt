@@ -10,7 +10,8 @@ import org.junit.Test
 class ColdStartPresentationTest {
     private val channels = listOf(Channel.create(ChannelId(1)))
     private val unreachable = ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)
-    private val retryAndSettings = listOf(MainStartupActionId.RETRY, MainStartupActionId.CONNECTION_SETTINGS)
+    private fun actionable(condition: AppErrorCondition, vararg actions: AppErrorAction) =
+        MainStartupPresentation.Actionable(AppError(condition, actions.toList()))
 
     @Test fun savedOrCurrentChannelsAndAnEmptyServerShowNoStartupScreen() {
         for (connection in listOf(ConnectionUiState.Connecting, unreachable, ConnectionUiState.SyncingChannels)) {
@@ -34,17 +35,21 @@ class ColdStartPresentationTest {
             coldStartPresentation(ConnectionUiState.Ready, waiting, null))
     }
 
-    @Test fun failuresAreActionableWithStartupMessagesEvenDuringAutomaticBackoff() {
+    @Test fun failuresAreActionableWithCatalogConditionsEvenDuringAutomaticBackoff() {
         val waiting = CurrentChannelReadiness.Waiting
         fun shown(connection: ConnectionUiState) = coldStartPresentation(connection, waiting, waitingConnectionFailure(connection, null))
-        assertEquals(MainStartupPresentation.Actionable(MainStartupMessageKind.RETRYABLE_FAILURE, retryAndSettings), shown(unreachable))
-        assertEquals(MainStartupPresentation.Actionable(MainStartupMessageKind.TIMEOUT_FAILURE, retryAndSettings),
+        // 110: the connection retries by itself, so only Connection settings.
+        assertEquals(actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS), shown(unreachable))
+        assertEquals(actionable(AppErrorCondition.UNREACHABLE, AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS),
+            shown(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)))
+        assertEquals(actionable(AppErrorCondition.TIMEOUT, AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS),
             shown(ConnectionUiState.Error(ConnectionFailureKind.TIMEOUT, SessionRecoveryDisposition.EXPLICIT_RETRY)))
-        assertEquals(MainStartupPresentation.Actionable(MainStartupMessageKind.AUTHENTICATION_FAILURE,
-            listOf(MainStartupActionId.CONNECTION_SETTINGS)),
+        assertEquals(actionable(AppErrorCondition.AUTHENTICATION_REJECTED, AppErrorAction.CONNECTION_SETTINGS),
             shown(ConnectionUiState.Error(ConnectionFailureKind.AUTHENTICATION, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)))
-        assertEquals(MainStartupPresentation.Actionable(MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
-            listOf(MainStartupActionId.CONNECTION_SETTINGS)), shown(ConnectionUiState.CredentialUnavailable))
+        assertEquals(actionable(AppErrorCondition.CREDENTIAL_UNAVAILABLE, AppErrorAction.CONNECTION_SETTINGS),
+            shown(ConnectionUiState.CredentialUnavailable))
+        assertEquals(actionable(AppErrorCondition.NOT_CONFIGURED, AppErrorAction.CONNECTION_SETTINGS),
+            shown(ConnectionUiState.NeedsConfiguration))
     }
 
     @Test fun failureStaysThroughAutomaticAttemptsAndRetryShowsConnectingUntilTheNextFailure() {
@@ -54,7 +59,7 @@ class ColdStartPresentationTest {
             failures = failures.observe(connection)
             return shown
         }
-        val failed = MainStartupPresentation.Actionable(MainStartupMessageKind.RETRYABLE_FAILURE, retryAndSettings)
+        val failed = actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS)
         val connecting = MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING)
         assertEquals(connecting, observe(ConnectionUiState.Connecting))
         assertEquals(failed, observe(unreachable))
@@ -70,12 +75,31 @@ class ColdStartPresentationTest {
         assertEquals(connecting, observe(ConnectionUiState.Connecting))
     }
 
-    @Test fun autoplayStartupKeepsItsPassiveBackoff() {
+    @Test fun autoplayStartupShowsItsAutomaticBackoffAsTheReconnectingAlert() {
         val requests = ApplianceLaunchRequests()
         requests.request()
+        val startup = MainStartupState.Ready(at.bernhardberger.tvhplayer.settings.ServerSettings(host = "offline.invalid"), autoStartPlayback = true)
+        assertEquals(actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS),
+            mainStartupPresentation(startup, requests.state.value, unreachable, CurrentChannelReadiness.Waiting))
+        // Saved channels never block: autoplay then waits as reconnecting.
         assertEquals(MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
-            mainStartupPresentation(MainStartupState.Ready(at.bernhardberger.tvhplayer.settings.ServerSettings(host = "offline.invalid"), autoStartPlayback = true),
-                requests.state.value, unreachable, CurrentChannelReadiness.Waiting))
+            mainStartupPresentation(startup, requests.state.value, unreachable, CurrentChannelReadiness.Browsable(channels)))
+    }
+
+    @Test fun aFailureStaysThroughAutomaticAttemptsUntilTheServerAnswersAndRetryClearsIt() {
+        var failures = WaitingConnectionFailure().observe(unreachable)
+        for (connection in listOf(ConnectionUiState.Connecting, ConnectionUiState.Reconnecting)) {
+            assertEquals(unreachable, failures.shown(connection))
+            failures = failures.observe(connection)
+        }
+        assertEquals(null, failures.shown(ConnectionUiState.SyncingChannels))
+        assertEquals(WaitingConnectionFailure(), failures.observe(ConnectionUiState.SyncingChannels))
+        failures = WaitingConnectionFailure().observe(unreachable).retry()
+        assertEquals(null, failures.shown(unreachable))
+        failures = failures.observe(unreachable)
+        assertEquals(null, failures.shown(ConnectionUiState.Connecting))
+        failures = failures.observe(ConnectionUiState.Connecting)
+        assertEquals(unreachable, failures.shown(unreachable))
     }
 
     @Test fun aShownScreenStaysReadableAndOneNeverShownLeavesAtOnce() {

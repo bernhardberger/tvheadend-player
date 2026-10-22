@@ -141,12 +141,12 @@ class ChannelsScreenTest {
         drawer.requestFocus().assertIsFocused()
         composeRule.runOnIdle { showRecovery() }
         composeRule.waitForIdle()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.open_connection_settings))
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.action_connection_settings))
             .assertExists()
         drawer.assertIsFocused()
         composeRule.runOnIdle { settleDrawerFeedback() }
         composeRule.runOnIdle { closeDrawer() }
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.open_connection_settings))
+        composeRule.onNodeWithText(composeRule.activity.getString(R.string.action_connection_settings))
             .assertIsFocused()
     }
 

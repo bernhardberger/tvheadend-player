@@ -36,11 +36,12 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.MainStartupActionId
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.MainStartupLoadingTiming
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.mainStartupLoadingFeedback
+import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.MainStartupComposition
 import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
@@ -280,12 +281,11 @@ class StartupBrandCaptureTest {
                 motionEnabled.value = true
                 brandMillis.floatValue = StartupBrandDurationMillis
                 presentation.value = MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.RETRYABLE_FAILURE,
-                    listOf(MainStartupActionId.RETRY, MainStartupActionId.CONNECTION_SETTINGS),
+                    AppErrorCondition.UNREACHABLE.toAppError(),
                 )
             }
             rule.mainClock.advanceTimeBy(512)
-            rule.onNodeWithTag("main-startup-action-RETRY").assertIsFocused()
+            rule.onNodeWithTag("tv-recovery-primary").assertIsFocused()
             // Focus can arrive during Android layout after the paused Compose clock advances.
             // Settle the native TV focus treatment only after focus ownership is confirmed.
             rule.mainClock.advanceTimeBy(512)
@@ -295,12 +295,11 @@ class StartupBrandCaptureTest {
             assertBackgroundAt(StartupBrandDurationMillis, enabled = false)
             rule.runOnUiThread {
                 presentation.value = MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.AUTHENTICATION_FAILURE,
-                    listOf(MainStartupActionId.CONNECTION_SETTINGS),
+                    AppErrorCondition.AUTHENTICATION_REJECTED.toAppError(),
                 )
             }
             rule.mainClock.advanceTimeBy(512)
-            rule.onNodeWithTag("main-startup-action-CONNECTION_SETTINGS").assertIsFocused()
+            rule.onNodeWithTag("tv-recovery-primary").assertIsFocused()
             rule.mainClock.advanceTimeBy(512)
             capture("${language.language}-recovery-auth")
 
@@ -311,12 +310,11 @@ class StartupBrandCaptureTest {
             rule.mainClock.advanceTimeByFrame()
             rule.runOnUiThread {
                 presentation.value = MainStartupPresentation.Actionable(
-                    MainStartupMessageKind.AUTHENTICATION_FAILURE,
-                    listOf(MainStartupActionId.CONNECTION_SETTINGS),
+                    AppErrorCondition.AUTHENTICATION_REJECTED.toAppError(),
                 )
             }
             rule.mainClock.advanceTimeBy(512)
-            rule.onNodeWithTag("main-startup-action-CONNECTION_SETTINGS").assertIsFocused()
+            rule.onNodeWithTag("tv-recovery-primary").assertIsFocused()
             rule.mainClock.advanceTimeBy(512)
             capture("${language.language}-recovery-auth-direct")
         }

@@ -167,12 +167,9 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun readyEmptyIsAuthoritativeNoChannelsWithNormalActionsInOrder() {
+    fun readyEmptyIsNoChannelsWithRetryThenConnectionSettings() {
         assertEquals(
-            MainStartupPresentation.Actionable(
-                messageKind = MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
-                actions = normalActions,
-            ),
+            actionable(AppErrorCondition.NO_CHANNELS, *retryAndSettings),
             presentation(
                 connectionState = ConnectionUiState.Ready,
                 currentChannelReadiness = CurrentChannelReadiness.Ready(emptyList()),
@@ -181,30 +178,21 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun normalConfigurationAndCredentialFailuresExposeOnlyConnectionSettings() {
+    fun notConfiguredAndCredentialUnavailableExposeOnlyConnectionSettings() {
         assertEquals(
-            MainStartupPresentation.Actionable(
-                MainStartupMessageKind.CONFIGURATION_REQUIRED,
-                listOf(MainStartupActionId.CONNECTION_SETTINGS),
-            ),
+            actionable(AppErrorCondition.NOT_CONFIGURED, AppErrorAction.CONNECTION_SETTINGS),
             presentation(connectionState = ConnectionUiState.NeedsConfiguration),
         )
         assertEquals(
-            MainStartupPresentation.Actionable(
-                MainStartupMessageKind.CREDENTIAL_UNAVAILABLE,
-                listOf(MainStartupActionId.CONNECTION_SETTINGS),
-            ),
+            actionable(AppErrorCondition.CREDENTIAL_UNAVAILABLE, AppErrorAction.CONNECTION_SETTINGS),
             presentation(connectionState = ConnectionUiState.CredentialUnavailable),
         )
     }
 
     @Test
-    fun sessionFailureActionsFollowSdkRecoveryGuidanceInNormalMode() {
+    fun sessionFailureActionsFollowSdkRecoveryGuidance() {
         assertEquals(
-            MainStartupPresentation.Actionable(
-                MainStartupMessageKind.SYNCHRONIZATION_FAILURE,
-                normalActions,
-            ),
+            actionable(AppErrorCondition.LOAD_FAILED, *retryAndSettings),
             presentation(
                 connectionState = ConnectionUiState.Error(
                     ConnectionFailureKind.OTHER,
@@ -213,10 +201,7 @@ class MainStartupPresentationTest {
             ),
         )
         assertEquals(
-            MainStartupPresentation.Actionable(
-                MainStartupMessageKind.AUTHENTICATION_FAILURE,
-                listOf(MainStartupActionId.CONNECTION_SETTINGS),
-            ),
+            actionable(AppErrorCondition.AUTHENTICATION_REJECTED, AppErrorAction.CONNECTION_SETTINGS),
             presentation(
                 connectionState = ConnectionUiState.Error(
                     ConnectionFailureKind.AUTHENTICATION,
@@ -224,8 +209,9 @@ class MainStartupPresentationTest {
                 ),
             ),
         )
+        // 110: the SDK retries by itself, so no Retry; the alert's text says it is reconnecting.
         assertEquals(
-            MainStartupPresentation.Passive(MainStartupMessageKind.RECONNECTING),
+            actionable(AppErrorCondition.RECONNECTING, AppErrorAction.CONNECTION_SETTINGS),
             presentation(
                 connectionState = ConnectionUiState.Error(
                     ConnectionFailureKind.UNREACHABLE,
@@ -236,21 +222,22 @@ class MainStartupPresentationTest {
     }
 
     @Test
-    fun typedFailureCopyDoesNotChangeSdkActionPolicy() {
-        val kinds = mapOf(
-            ConnectionFailureKind.AUTHENTICATION to MainStartupMessageKind.AUTHENTICATION_FAILURE,
-            ConnectionFailureKind.PERMISSION_DENIED to MainStartupMessageKind.PERMISSION_DENIED,
-            ConnectionFailureKind.INCOMPATIBLE_SERVER to MainStartupMessageKind.INCOMPATIBLE_SERVER,
-            ConnectionFailureKind.TIMEOUT to MainStartupMessageKind.TIMEOUT_FAILURE,
-            ConnectionFailureKind.OTHER to MainStartupMessageKind.SYNCHRONIZATION_FAILURE,
+    fun everyFailureKindHasItsConditionAndTheSdkActionPolicy() {
+        val conditions = mapOf(
+            ConnectionFailureKind.UNREACHABLE to AppErrorCondition.UNREACHABLE,
+            ConnectionFailureKind.TIMEOUT to AppErrorCondition.TIMEOUT,
+            ConnectionFailureKind.AUTHENTICATION to AppErrorCondition.AUTHENTICATION_REJECTED,
+            ConnectionFailureKind.PERMISSION_DENIED to AppErrorCondition.PERMISSION_DENIED,
+            ConnectionFailureKind.INCOMPATIBLE_SERVER to AppErrorCondition.INCOMPATIBLE_SERVER,
+            ConnectionFailureKind.OTHER to AppErrorCondition.LOAD_FAILED,
         )
-        for ((kind, message) in kinds) {
+        for ((kind, condition) in conditions) {
             assertEquals(
-                MainStartupPresentation.Actionable(message, normalActions),
+                actionable(condition, *retryAndSettings),
                 presentation(ConnectionUiState.Error(kind, SessionRecoveryDisposition.EXPLICIT_RETRY)),
             )
             assertEquals(
-                MainStartupPresentation.Actionable(message, listOf(MainStartupActionId.CONNECTION_SETTINGS)),
+                actionable(condition, AppErrorAction.CONNECTION_SETTINGS),
                 presentation(ConnectionUiState.Error(kind, SessionRecoveryDisposition.PROFILE_CHANGE_REQUIRED)),
             )
         }
@@ -267,26 +254,8 @@ class MainStartupPresentationTest {
     }
 
 
-
-
-
-    @Test
-    fun stableActionIdsHaveTheSpecifiedOrder() {
-        assertEquals(
-            listOf(
-                MainStartupActionId.RETRY,
-                MainStartupActionId.CONNECTION_SETTINGS,
-            ),
-            MainStartupActionId.entries,
-        )
-        assertEquals(
-            listOf(
-                MainStartupActionId.RETRY,
-                MainStartupActionId.CONNECTION_SETTINGS,
-            ),
-            normalActions,
-        )
-    }
+    private fun actionable(condition: AppErrorCondition, vararg actions: AppErrorAction) =
+        MainStartupPresentation.Actionable(AppError(condition, actions.toList()))
 
     private fun presentation(
         connectionState: ConnectionUiState,
@@ -313,9 +282,6 @@ class MainStartupPresentationTest {
             server = at.bernhardberger.tvhplayer.settings.ServerSettings(host = "tvh.invalid"),
             autoStartPlayback = true,
         )
-        val normalActions = listOf(
-            MainStartupActionId.RETRY,
-            MainStartupActionId.CONNECTION_SETTINGS,
-        )
+        val retryAndSettings = arrayOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
     }
 }

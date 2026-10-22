@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.text
@@ -11,16 +12,19 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
+import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.SettingsSection
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import org.koin.compose.koinInject
 
@@ -38,30 +42,23 @@ internal fun settingsConnectionLevels(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val available = profile as? ServerProfileReadResult.Available
     val connection = presentation.connection
-    val saved = presentation.currentChannelReadiness is CurrentChannelReadiness.Browsable
-    val status = stringResource(when {
-        profile == null -> R.string.connection_overview_loading
-        profile == ServerProfileReadResult.Missing -> R.string.connection_overview_not_configured
-        profile == ServerProfileReadResult.Unavailable -> R.string.credential_unavailable
-        presentation.degraded && saved && (connection !is ConnectionUiState.Error ||
-            connection.kind == ConnectionFailureKind.UNREACHABLE) -> R.string.connection_offline_saved
-        presentation.degraded && connection !is ConnectionUiState.Error -> R.string.status_connection_failed_unreachable
-        else -> when (connection) {
-            ConnectionUiState.Connecting, ConnectionUiState.Reconnecting -> R.string.connection_overview_connecting
-            ConnectionUiState.SyncingChannels -> R.string.connection_overview_synchronizing
-            ConnectionUiState.Ready -> R.string.connection_overview_connected
-            ConnectionUiState.NeedsConfiguration -> R.string.connection_overview_not_configured
-            ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
-            is ConnectionUiState.Error -> when (connection.kind) {
-                ConnectionFailureKind.AUTHENTICATION -> R.string.status_connection_failed_authentication
-                ConnectionFailureKind.UNREACHABLE -> R.string.status_connection_failed_unreachable
-                ConnectionFailureKind.TIMEOUT -> R.string.status_connection_failed_timeout
-                ConnectionFailureKind.INCOMPATIBLE_SERVER -> R.string.status_connection_failed_incompatible
-                ConnectionFailureKind.PERMISSION_DENIED -> R.string.status_connection_failed_permission
-                ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
-            }
-        }
-    })
+    val context = LocalContext.current
+    val text = remember(context) { AppErrorText(context) }
+    val failure = connectionOverviewFailure(profile, presentation)
+    val status = if (failure != null) {
+        "${text.title(failure)}\n${text.reason(failure)}"
+    } else {
+        stringResource(when {
+            profile == null -> R.string.connection_overview_loading
+            profile == ServerProfileReadResult.Missing -> R.string.connection_overview_not_configured
+            presentation.degraded && presentation.currentChannelReadiness is CurrentChannelReadiness.Browsable ->
+                R.string.connection_offline_saved
+            connection == ConnectionUiState.SyncingChannels -> R.string.connection_overview_synchronizing
+            connection == ConnectionUiState.Ready -> R.string.connection_overview_connected
+            connection == ConnectionUiState.NeedsConfiguration -> R.string.connection_overview_not_configured
+            else -> R.string.connection_overview_connecting
+        })
+    }
     return listOf(
         settingsConnectionOverview(status, available?.host, available?.port,
             degraded = presentation.degraded, onRetry = onRetry,
@@ -77,6 +74,28 @@ internal fun settingsConnectionLevels(
                 })
             }),
     )
+}
+
+/**
+ * The catalog condition whose title and reason the overview's status shows, or null while it shows
+ * its own status: loading, not configured, offline with saved channels, connecting or connected.
+ * Without saved channels a degraded connection that is not an error is reconnecting (110).
+ */
+internal fun connectionOverviewFailure(
+    profile: ServerProfileReadResult?,
+    presentation: AppConnectionPresentation,
+): AppErrorCondition? {
+    val connection = presentation.connection
+    val saved = presentation.currentChannelReadiness is CurrentChannelReadiness.Browsable
+    return when {
+        profile == null || profile == ServerProfileReadResult.Missing -> null
+        profile == ServerProfileReadResult.Unavailable -> AppErrorCondition.CREDENTIAL_UNAVAILABLE
+        presentation.degraded && saved && (connection !is ConnectionUiState.Error ||
+            connection.kind == ConnectionFailureKind.UNREACHABLE) -> null
+        presentation.degraded && connection !is ConnectionUiState.Error -> AppErrorCondition.RECONNECTING
+        connection == ConnectionUiState.NeedsConfiguration -> null
+        else -> connection.toAppError()?.condition
+    }
 }
 
 /** Safe endpoint fields only. No editor state, credential read, username or password reaches this API. */

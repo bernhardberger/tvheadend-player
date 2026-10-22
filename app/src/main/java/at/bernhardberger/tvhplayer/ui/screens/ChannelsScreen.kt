@@ -48,12 +48,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.tv.material3.Button
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -75,6 +75,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.key
@@ -97,18 +98,18 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.channelNowStatus
-import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
+import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.awaitsGuide
 import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
-import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
+import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
@@ -189,6 +190,7 @@ fun ChannelsScreen(
     playerReturn: PlayerReturnFocus? = null,
     view: ChannelsView = ChannelsView(),
     connectionUiState: ConnectionUiState,
+    connectionFailure: ConnectionUiState? = connectionUiState,
     onRetryConnection: () -> Unit,
     onOpenConnectionSettings: () -> Unit,
     onPlay: (channelId: ChannelId, channelName: String) -> Unit,
@@ -226,6 +228,7 @@ fun ChannelsScreen(
         playbackChannelId = playbackChannelId,
         playbackIndicator = playbackIndicator,
         connectionUiState = connectionUiState,
+        connectionFailure = connectionFailure,
         onSelectChannel = selection::setSelected,
         onSelectTag = channelViewModel::selectTag,
         scopeStateProvider = { channelViewModel.scope.value },
@@ -255,6 +258,7 @@ internal fun ChannelsScreenContent(
     playbackChannelId: ChannelId? = playingChannelId,
     playbackIndicator: ChannelPlaybackIndicator = if (playingChannelId != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
     connectionUiState: ConnectionUiState,
+    connectionFailure: ConnectionUiState? = connectionUiState,
     onSelectChannel: (ChannelId) -> Unit,
     onSelectTag: (ChannelTagId?) -> Unit,
     onDismissTagNotice: () -> Unit,
@@ -295,6 +299,10 @@ internal fun ChannelsScreenContent(
         channels.associate { it.id to it.visibleChannelNumber }
     }
     var didInitialRestore by remember { mutableStateOf(false) }
+    // An alert replaced by channels while focused hands focus to them, whatever took it meanwhile:
+    // its exit can outlast the first restore, which the fallback focus then cancels.
+    var restoreAfterAlert by remember { mutableStateOf(false) }
+    var alertsGoneWithFocus by remember { mutableIntStateOf(0) }
     // One-shot per player return; AppRoot clears the request when the destination changes.
     var playerReturnPending by remember(playerReturn) { mutableStateOf(playerReturn != null) }
     var focusedChannelId by remember { mutableStateOf<ChannelId?>(null) }
@@ -572,7 +580,7 @@ internal fun ChannelsScreenContent(
 
     LaunchedEffect(
         channelScope.activeTagId, orderedChannelIds, channelScopeState.settingsLoaded,
-        initialFocusEnabled, tagResetGeneration, viewport,
+        initialFocusEnabled, tagResetGeneration, viewport, alertsGoneWithFocus,
     ) {
         val scopeChanged = positionedTagId != channelScope.activeTagId || awaitingTagChannels
         if (scopeChanged && !matchesRequestedRows(currentScope())) return@LaunchedEffect
@@ -603,6 +611,11 @@ internal fun ChannelsScreenContent(
             // A changed view shows the channel focus was left on, behind the panel that changed it.
             scopeEntryChannelId()?.let { viewport.requestScrollToChannel(orderedChannelIds.indexOf(it)) }
         }
+        if (!initialFocusEnabled && restoreAfterAlert && orderedChannelIds.isNotEmpty()) {
+            // Focus fell from the replaced alert to the rail; the header takes it back, the rail
+            // closes and the channels take it from there.
+            runCatching { headerEntryFocus.requestFocus() }
+        }
         if (!initialFocusEnabled) {
             scopeEntryRequested = false
             contentFocusOwned = false
@@ -614,12 +627,13 @@ internal fun ChannelsScreenContent(
             return@LaunchedEffect
         }
 
-        if (!didInitialRestore && initialFocusEnabled) {
+        if ((!didInitialRestore || restoreAfterAlert) && initialFocusEnabled) {
             // Player Back re-enters the channel that played; first entry the remembered one.
-            val playerReturnId = playerReturn?.takeIf { playerReturnPending }?.let {
+            val playerReturnId = playerReturn?.takeIf { playerReturnPending || restoreAfterAlert }?.let {
                 restoredChannelId(orderedChannelIds, it.playingChannelId, it.originChannelId)
             }
             playerReturnPending = false
+            restoreAfterAlert = false
             didInitialRestore = true
             contentFocusOwned = true
             // A retained destination can receive a newer shared selection from Guide.
@@ -725,7 +739,7 @@ internal fun ChannelsScreenContent(
                 selectedKey = channelScope.activeTagId,
                 state = {
                     ChannelsTabBody(
-                        channelScopeState, observation, connectionUiState, orderedChannelIds,
+                        channelScopeState, observation, connectionUiState, connectionFailure, orderedChannelIds,
                         channelNumbers, playingChannelId, recordingChannelIds, tagNotice,
                         { focusedChannelId }, ::scopeEntryChannelId, { nowSec }, initialFocusEnabled,
                         playbackChannelId, playbackIndicator,
@@ -773,12 +787,34 @@ internal fun ChannelsScreenContent(
                     )
                 } else {
                     EmptyChannelsState(
+                        connectionFailure = frame.failure,
                         state = connectionUiState.forEmptyChannelPresentation(
                             channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
                         ),
                         initialFocusEnabled = owner.isCurrent && frame.initialFocusEnabled,
-                        onRetry = { if (owner.isCurrent) onRetryConnection() },
-                        onOpenSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
+                        onAction = { action ->
+                            if (owner.isCurrent) {
+                                when (action) {
+                                    AppErrorAction.RETRY -> onRetryConnection()
+                                    AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
+                                    AppErrorAction.CLOSE -> Unit
+                                }
+                            }
+                        },
+                        onAlertLeftWithFocus = {
+                            if (owner.isCurrent) {
+                                // Focus waits in the header while the connection works; the
+                                // channels then take it as on first entry.
+                                runCatching { headerEntryFocus.requestFocus() }
+                                didInitialRestore = false
+                            }
+                        },
+                        onAlertGoneWithFocus = {
+                            if (owner.isCurrent) {
+                                restoreAfterAlert = true
+                                alertsGoneWithFocus++
+                            }
+                        },
                         modifier = Modifier
                             .padding(browseViewportPadding)
                             .padding(detailPanePadding)
@@ -1054,6 +1090,7 @@ internal data class ChannelsTabBody(
     val scope: ChannelScopeState,
     val observation: SessionObservation,
     val connection: ConnectionUiState,
+    val failure: ConnectionUiState?,
     val ids: List<ChannelId>,
     val numbers: Map<ChannelId, Long?>,
     val playingId: ChannelId?,
@@ -1111,29 +1148,63 @@ private fun EmptyTagState(
     }
 }
 
+/**
+ * Channels with none to show: the passive connecting text while the connection works, else the
+ * connection's alert inside the content area, 108 when a Ready session's catalog is empty. Its
+ * first button takes focus as the content would; Left leads to the rail. An alert leaving with focus
+ * calls [onAlertLeftWithFocus] while its buttons still hold it, before the passive text replaces it;
+ * one replaced by arriving channels while focused calls [onAlertGoneWithFocus] as it leaves.
+ */
 @Composable
 private fun EmptyChannelsState(
     state: ConnectionUiState,
+    connectionFailure: ConnectionUiState?,
     initialFocusEnabled: Boolean,
-    onRetry: () -> Unit,
-    onOpenSettings: () -> Unit,
+    onAction: (AppErrorAction) -> Unit,
+    onAlertLeftWithFocus: () -> Unit,
+    onAlertGoneWithFocus: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val error = connectionFailure?.browseAppError() ?:
+        state.browseAppError(noChannels = true).takeIf { state == ConnectionUiState.Ready }
     val actionFocus = remember { FocusRequester() }
-    val recoveryAction = state.primaryRecoveryAction()
-    val hasPrimaryAction = recoveryAction != ConnectionRecoveryAction.NONE
     val drawerState = LocalBrowseDrawerState.current
     val contentEntryEnabled by rememberUpdatedState(initialFocusEnabled)
+    var alertFocused by remember { mutableStateOf(false) }
 
-    LaunchedEffect(state, initialFocusEnabled, hasPrimaryAction) {
-        if (shouldRequestEmptyChannelsAction(initialFocusEnabled, hasPrimaryAction)) {
+    LaunchedEffect(error, initialFocusEnabled) {
+        if (error != null && shouldRequestEmptyChannelsAction(initialFocusEnabled, hasPrimaryAction = true)) {
             withFrameNanos { }
             if (contentEntryEnabled && drawerState?.currentValue != DrawerValue.Open) {
-                actionFocus.requestFocus()
+                runCatching { actionFocus.requestFocus() }
             }
         }
     }
+    // The alert's exit keeps its buttons a moment; focus leaves them before they go.
+    LaunchedEffect(error == null) {
+        if (error == null && alertFocused) onAlertLeftWithFocus()
+    }
+    // Channels arriving straight away replace the alert while it holds focus.
+    val latestAlertGone by rememberUpdatedState(onAlertGoneWithFocus)
+    val latestAlertFocused by rememberUpdatedState(alertFocused)
+    DisposableEffect(Unit) {
+        onDispose { if (latestAlertFocused) latestAlertGone() }
+    }
+    Box(modifier) {
+        if (error == null) ConnectingChannelsState(state, Modifier.fillMaxSize())
+        AppErrorAlert(
+            error = error,
+            onAction = onAction,
+            modifier = Modifier.fillMaxSize().onFocusChanged { alertFocused = it.hasFocus },
+            actionFocus = actionFocus,
+            leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
+            upExit = FocusRequester.Default,
+        )
+    }
+}
 
+@Composable
+private fun ConnectingChannelsState(state: ConnectionUiState, modifier: Modifier) {
     Surface(
         shape = MaterialTheme.shapes.medium,
         colors = SurfaceDefaults.colors(
@@ -1149,55 +1220,15 @@ private fun EmptyChannelsState(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
-            DelayedConnectionProgress(
-                visible = state.isConnectionProgress(),
-                modifier = Modifier.size(40.dp),
-            )
+            DelayedConnectionProgress(visible = true, modifier = Modifier.size(40.dp))
             Text(
-                text = connectionMessage(state),
+                text = connectingMessage(state),
                 style = MaterialTheme.typography.titleLarge,
-                color = if (state.isError()) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurface
-                },
+                color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier
-                    .padding(top = if (state.isConnectionProgress()) 20.dp else 0.dp)
+                    .padding(top = 20.dp)
                     .widthIn(max = 680.dp),
             )
-
-            when (recoveryAction) {
-                ConnectionRecoveryAction.SETTINGS -> {
-                    Button(
-                        onClick = onOpenSettings,
-                        modifier = Modifier
-                            .tabFocus()
-                            .padding(top = 24.dp)
-                            .focusRequester(actionFocus),
-                    ) {
-                        Text(stringResource(R.string.open_connection_settings))
-                    }
-                }
-
-                ConnectionRecoveryAction.RETRY -> {
-                    Row(
-                        modifier = Modifier.padding(top = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        Button(
-                            onClick = onRetry,
-                            modifier = Modifier.tabFocus().focusRequester(actionFocus),
-                        ) {
-                            Text(stringResource(R.string.retry))
-                        }
-                        OutlinedButton(onClick = onOpenSettings, modifier = Modifier.tabFocus()) {
-                            Text(stringResource(R.string.open_connection_settings))
-                        }
-                    }
-                }
-
-                ConnectionRecoveryAction.NONE -> Unit
-            }
         }
     }
 }
@@ -1223,34 +1254,13 @@ private fun DelayedConnectionProgress(
     }
 }
 
-private fun ConnectionUiState.isConnectionProgress(): Boolean =
-    this == ConnectionUiState.Connecting ||
-        this == ConnectionUiState.SyncingChannels ||
-        this == ConnectionUiState.Reconnecting
-
-private fun ConnectionUiState.isError(): Boolean =
-    this is ConnectionUiState.Error ||
-        this == ConnectionUiState.CredentialUnavailable
-
+/** The passive text while [state] connects, loads or reconnects; failures are alerts. */
 @Composable
-private fun connectionMessage(state: ConnectionUiState): String = stringResource(
+private fun connectingMessage(state: ConnectionUiState): String = stringResource(
     when (state) {
-        ConnectionUiState.NeedsConfiguration -> R.string.connection_configuration_required
-        ConnectionUiState.Connecting -> R.string.connection_connecting
         ConnectionUiState.SyncingChannels -> R.string.connection_loading_channels
-        ConnectionUiState.Ready -> R.string.no_channels_available
         ConnectionUiState.Reconnecting -> R.string.status_disconnected_reconnecting
-        ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
-        is ConnectionUiState.Error -> when (state.kind) {
-            ConnectionFailureKind.AUTHENTICATION -> R.string.status_connection_failed_authentication
-            ConnectionFailureKind.UNREACHABLE -> R.string.status_connection_failed_unreachable
-            ConnectionFailureKind.TIMEOUT -> R.string.status_connection_failed_timeout
-            ConnectionFailureKind.INCOMPATIBLE_SERVER ->
-                R.string.status_connection_failed_incompatible
-            ConnectionFailureKind.PERMISSION_DENIED ->
-                R.string.status_connection_failed_permission
-            ConnectionFailureKind.OTHER -> R.string.status_connection_failed_other
-        }
+        else -> R.string.connection_connecting
     }
 )
 

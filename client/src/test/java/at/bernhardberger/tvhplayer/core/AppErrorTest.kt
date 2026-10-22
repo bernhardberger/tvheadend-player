@@ -377,4 +377,30 @@ class AppErrorTest {
         assertNull(AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER, deviceFault = true).deviceFaultDetail())
         assertNull(AppPlaybackState.Playing.deviceFaultDetail())
     }
+
+    @Test
+    fun channelsAlertIsTheFailureOrNoChannelsWhileLoadingStaysPassive() {
+        fun channels(state: ConnectionUiState, catalogCurrent: Boolean = true) =
+            state.forEmptyChannelPresentation(catalogCurrent).browseAppError(noChannels = true)
+        val retryAndSettings = listOf(AppErrorAction.RETRY, AppErrorAction.CONNECTION_SETTINGS)
+        assertEquals(AppError(AppErrorCondition.NO_CHANNELS, retryAndSettings), channels(ConnectionUiState.Ready))
+        assertNull(channels(ConnectionUiState.Ready, catalogCurrent = false))
+        assertEquals(
+            AppError(AppErrorCondition.UNREACHABLE, retryAndSettings),
+            channels(ConnectionUiState.Error(ConnectionFailureKind.UNREACHABLE, SessionRecoveryDisposition.EXPLICIT_RETRY)),
+        )
+        assertEquals(
+            AppError(AppErrorCondition.RECONNECTING, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+            channels(ConnectionUiState.Error(ConnectionFailureKind.TIMEOUT, SessionRecoveryDisposition.AUTOMATIC_BACKOFF)),
+        )
+        assertEquals(
+            AppError(AppErrorCondition.NOT_CONFIGURED, listOf(AppErrorAction.CONNECTION_SETTINGS)),
+            channels(ConnectionUiState.NeedsConfiguration),
+        )
+        for (passive in listOf(ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels, ConnectionUiState.Reconnecting)) {
+            assertNull(channels(passive))
+        }
+        // Only Channels and the Guide treat an empty Ready catalog as 108.
+        assertNull(ConnectionUiState.Ready.browseAppError())
+    }
 }

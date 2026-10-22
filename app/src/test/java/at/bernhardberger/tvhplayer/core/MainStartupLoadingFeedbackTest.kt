@@ -40,7 +40,7 @@ class MainStartupLoadingFeedbackTest {
         for (presentation in listOf(
             MainStartupPresentation.Inactive,
             MainStartupPresentation.Enter(ApplianceLaunchRequest(1)),
-            MainStartupPresentation.Actionable(MainStartupMessageKind.RETRYABLE_FAILURE, listOf(MainStartupActionId.RETRY)),
+            MainStartupPresentation.Actionable(AppErrorCondition.UNREACHABLE.toAppError()),
         )) {
             assertEquals(MainStartupLoadingFeedback.HIDDEN, mainStartupLoadingFeedback(presentation, 10_000L))
         }

@@ -94,8 +94,9 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
-import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
+import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
@@ -122,7 +123,6 @@ import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
-import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.reconcileTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.resolveGuideFrontierOrigin
 import at.bernhardberger.tvhplayer.core.resolveGuideWindowFocus
@@ -150,7 +150,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideConnectionRecovery
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEmptyState
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePassiveNotice
 import at.bernhardberger.tvhplayer.ui.screens.guide.EpgSearchDialog
@@ -191,9 +191,7 @@ private data class GuideTabBody(
     val selected: () -> EpgFocusTarget?,
     val tagNotice: Boolean,
     val recovering: Boolean,
-    val hasRecovery: Boolean,
-    val needsSettings: Boolean,
-    val permissionDenied: Boolean,
+    val alert: AppError?,
     val coveragePending: (ChannelId) -> Boolean,
     val earlierContent: Boolean,
     val laterContent: Boolean,
@@ -299,6 +297,7 @@ fun EpgGridScreen(
     lastPlayedStore: LastPlayedChannelStore = koinInject(),
     guidePositionStore: GuidePositionStore = koinInject(),
     connectionUiState: ConnectionUiState = ConnectionUiState.Ready,
+    connectionFailure: ConnectionUiState? = connectionUiState,
     playerReturn: PlayerReturnFocus? = null,
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
@@ -367,12 +366,13 @@ fun EpgGridScreen(
     val scopeFocus = remember { FocusRequester() }
     val scopeCount = channelScope.tags.size + if (channelScope.allChannelsVisible) 1 else 0
     val hasScopeTabs = scopeCount > 1
-    val permissionDenied = connectionUiState is ConnectionUiState.Error &&
-        connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED
-    val guideRecoveryAction = connectionUiState.primaryRecoveryAction()
-    val hasGuideFailure = guideRecoveryAction == ConnectionRecoveryAction.RETRY
-    val needsGuideSettings = guideRecoveryAction == ConnectionRecoveryAction.SETTINGS
-    val hasGuideRecoveryAction = guideRecoveryAction != ConnectionRecoveryAction.NONE
+    val guideAlert = guideAppError(
+        hasChannels = channelScope.visibleChannels.isNotEmpty(),
+        isEmptyTag = channelScope.activeTagId != null,
+        connectionUiState = connectionUiState,
+        channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
+        connectionFailure = connectionFailure,
+    )
     val guideRecovering = connectionUiState == ConnectionUiState.Connecting ||
         connectionUiState == ConnectionUiState.SyncingChannels ||
         connectionUiState == ConnectionUiState.Reconnecting
@@ -524,7 +524,7 @@ fun EpgGridScreen(
         val programmeFocus = selectedTarget?.eventId?.let(eventFocusRequesters::get)
         val target = guideEntryFocusTarget(
             hasProgrammeTarget = selectedTarget != null,
-            hasRetryAction = hasGuideRecoveryAction,
+            hasRetryAction = guideAlert != null,
         )
         return when (target) {
             GuideEntryFocusTarget.PROGRAMME -> {
@@ -554,7 +554,7 @@ fun EpgGridScreen(
         return when (
             guideScopeExitFocusTarget(
                 hasProgrammeTarget = selectedTarget != null,
-                hasRetryAction = hasGuideRecoveryAction,
+                hasRetryAction = guideAlert != null,
             )
         ) {
             GuideScopeExitFocusTarget.PROGRAMME -> {
@@ -1892,7 +1892,7 @@ fun EpgGridScreen(
                          orderedChannelIds, channelNumbers,
                          preparedIndex.input.windowStartSec, preparedIndex.input.windowEndSec,
                         nowSecProvider, { selectedTarget }, tagNotice, guideRecovering,
-                        hasGuideRecoveryAction, needsGuideSettings, permissionDenied,
+                        guideAlert,
                         { channelId ->
                             coverageRequestVersion.let {
                                 coverageRequests.isPending(channelId, preparedIndex.input.windowStartSec)
@@ -1918,9 +1918,6 @@ fun EpgGridScreen(
             val nowSecProvider = rememberTabReader(frame.nowSec)
             val tagNotice = frame.tagNotice
             val guideRecovering = frame.recovering
-            val hasGuideRecoveryAction = frame.hasRecovery
-            val needsGuideSettings = frame.needsSettings
-            val permissionDenied = frame.permissionDenied
             val channelListState = rememberTabListState(channelListState)
             val terminalReserve = guideTerminalViewportReserve(
                 frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
@@ -1944,26 +1941,24 @@ fun EpgGridScreen(
                 Spacer(Modifier.height(TvSpacing8))
             }
 
-            if (channels.isNotEmpty() && hasGuideRecoveryAction) {
-                GuideConnectionRecovery(
-                    needsSettings = needsGuideSettings,
-                    permissionDenied = permissionDenied,
-                    focusRequester = if (owner.isCurrent) guideRetryFocus else remember { FocusRequester() },
-                    onRetry = { if (owner.isCurrent) onRetry() },
-                    onOpenConnectionSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
-                    modifier = Modifier.padding(start = startPadding, end = endPadding),
-                )
-                Spacer(Modifier.height(TvSpacing8))
-            }
-
             if (channels.isEmpty()) {
                 GuideEmptyState(
+                    alert = frame.alert,
                     isEmptyTag = channelScope.activeTagId != null,
                     connectionUiState = connectionUiState,
                     channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
-                    onRetry = { if (owner.isCurrent) onRetry() },
-                    onOpenConnectionSettings = { if (owner.isCurrent) onOpenConnectionSettings() },
-                    retryFocusRequester = if (owner.isCurrent) guideRetryFocus else remember { FocusRequester() },
+                    onAction = { action ->
+                        if (owner.isCurrent) {
+                            when (action) {
+                                AppErrorAction.RETRY -> onRetry()
+                                AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
+                                AppErrorAction.CLOSE -> Unit
+                            }
+                        }
+                    },
+                    actionFocus = if (owner.isCurrent) guideRetryFocus else remember { FocusRequester() },
+                    leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
+                    upExit = FocusRequester.Default,
                 )
             } else {
                 TimelineTimeRuler(
@@ -2264,26 +2259,30 @@ internal fun SessionObservation.currentDvrConfigurations(): List<DvrConfiguratio
         DvrConfigurationsState.Unknown -> emptyList()
     }
 
+/** The Guide's 1xx alert, shown only while it has no channels to draw: the connection's failure, or 108 when Ready has none. */
+internal fun guideAppError(
+    hasChannels: Boolean,
+    isEmptyTag: Boolean,
+    connectionUiState: ConnectionUiState,
+    channelCatalogCurrent: Boolean,
+    connectionFailure: ConnectionUiState? = connectionUiState,
+): AppError? = if (hasChannels) {
+    null
+} else {
+    connectionFailure?.browseAppError() ?: connectionUiState
+        .browseAppError(noChannels = channelCatalogCurrent && !isEmptyTag)
+        .takeIf { connectionUiState == ConnectionUiState.Ready }
+}
+
+/** The passive text of an empty Guide without an alert: loading, reconnecting, or an empty tag. */
 internal fun guideEmptyMessageRes(
     isEmptyTag: Boolean,
     connectionUiState: ConnectionUiState,
     channelCatalogCurrent: Boolean,
-): Int = when (connectionUiState) {
-    ConnectionUiState.Connecting,
-    ConnectionUiState.SyncingChannels -> R.string.epg_loading
-    ConnectionUiState.Reconnecting -> R.string.epg_reconnecting
-    is ConnectionUiState.Error -> if (connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED) {
-        R.string.epg_permission_denied
-    } else {
-        R.string.epg_server_failure
-    }
-    ConnectionUiState.NeedsConfiguration -> R.string.connection_configuration_required
-    ConnectionUiState.CredentialUnavailable -> R.string.credential_unavailable
-    ConnectionUiState.Ready -> when {
-        !channelCatalogCurrent -> R.string.epg_loading
-        isEmptyTag -> R.string.empty_channel_tag
-        else -> R.string.no_channels_available
-    }
+): Int = when {
+    connectionUiState == ConnectionUiState.Reconnecting -> R.string.epg_reconnecting
+    connectionUiState == ConnectionUiState.Ready && channelCatalogCurrent && isEmptyTag -> R.string.empty_channel_tag
+    else -> R.string.epg_loading
 }
 
 @Composable

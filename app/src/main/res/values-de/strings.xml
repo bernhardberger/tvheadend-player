@@ -125,7 +125,6 @@
     <string name="password">Passwort</string>
     <string name="clear_saved_password">Gespeichertes Passwort löschen</string>
     <string name="credential_save_failed">Die Zugangsdaten konnten nicht gespeichert werden. Lösche sie und gib sie erneut ein.</string>
-    <string name="credential_unavailable">Die gespeicherten Zugangsdaten sind nicht verfügbar. Öffne die Verbindungseinstellungen und gib sie erneut ein.</string>
     <string name="onboarding_title">Willkommen bei Tvheadend Player</string>
     <string name="onboarding_requirement">Tvheadend Player verbindet sich mit deinem Tvheadend-Server, um Sender, Programm und Aufnahmen zu laden.</string>
     <string name="trusted_network_guidance">Verbinde dich nur in einem vertrauenswürdigen Heimnetz oder über einen geschützten Tunnel. HTSP verschlüsselt weder Senderdaten noch Videostreams.</string>
@@ -175,7 +174,6 @@
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 
     <!-- Startup-Statusbildschirm -->
-    <string name="main_startup_actionable_title">Aktion erforderlich</string>
     <string name="main_startup_message_preparing">App wird vorbereitet</string>
     <string name="main_startup_message_connecting">Verbindung wird hergestellt</string>
     <string name="main_startup_message_syncing_metadata">Sender und Programm werden synchronisiert</string>
@@ -183,26 +181,6 @@
     <string name="main_startup_message_reconnecting">Verbindung wird wiederhergestellt</string>
     <string name="main_startup_message_starting_television">Wiedergabe wird gestartet</string>
     <string name="main_startup_message_resuming_playback">Wiedergabe wird fortgesetzt</string>
-    <string name="main_startup_title_no_channels">Keine Sender verfügbar</string>
-    <string name="main_startup_message_no_channels">Prüfe die Sender und Zugriffsrechte dieses Kontos und versuche es erneut.</string>
-    <string name="main_startup_title_retryable_failure">Keine Verbindung zu Tvheadend</string>
-    <string name="main_startup_message_retryable_failure">Prüfe, ob der Server läuft und erreichbar ist, und versuche es dann erneut.</string>
-    <string name="main_startup_title_authentication_failure">Anmeldung fehlgeschlagen</string>
-    <string name="main_startup_message_authentication_failure">Prüfe Benutzername und Passwort in den Verbindungseinstellungen.</string>
-    <string name="main_startup_title_permission_denied">Zugriff verweigert</string>
-    <string name="main_startup_message_permission_denied">Prüfe die Zugriffsrechte dieses Kontos in Tvheadend.</string>
-    <string name="main_startup_title_incompatible_server">Server nicht unterstützt</string>
-    <string name="main_startup_message_incompatible_server">Dieser Server unterstützt die benötigte Verbindung nicht. Prüfe seine Version und die Verbindungseinstellungen.</string>
-    <string name="main_startup_title_timeout_failure">TV-Daten konnten nicht rechtzeitig geladen werden</string>
-    <string name="main_startup_message_timeout_failure">Versuche es erneut. Prüfe bei wiederholten Zeitüberschreitungen deinen Tvheadend-Server.</string>
-    <string name="main_startup_title_synchronization_failure">TV-Daten konnten nicht geladen werden</string>
-    <string name="main_startup_message_synchronization_failure">Versuche es erneut oder prüfe bei anhaltenden Problemen die Verbindungseinstellungen.</string>
-    <string name="main_startup_title_configuration_required">Verbindung einrichten</string>
-    <string name="main_startup_message_configuration_required">Richte die Verbindung mit deinem Tvheadend-Server ein, um Sender zu laden.</string>
-    <string name="main_startup_title_credential_unavailable">Gespeicherte Anmeldung nicht verfügbar</string>
-    <string name="main_startup_message_credential_unavailable">Öffne die Verbindungseinstellungen und melde dich erneut an.</string>
-    <string name="main_startup_action_retry">Erneut versuchen</string>
-    <string name="main_startup_action_connection_settings">Verbindungseinstellungen</string>
 
     <string name="player_programme_progress_description">Programmfortschritt, %1$s von %2$s</string>
 
@@ -401,7 +379,6 @@
     <string name="recordings_empty">Keine Aufnahmen verfügbar.</string>
     <string name="recordings_loading">Aufnahmen werden geladen…</string>
     <string name="recordings_reconnecting">Verbindung wird wiederhergestellt. Gespeicherte Aufnahmedaten können veraltet sein…</string>
-    <string name="recordings_server_failure">Aufnahmen sind nicht verfügbar. Serververbindung erneut versuchen.</string>
     <string name="delete_recording">Aufnahme löschen</string>
     <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wird vom Server gelöscht.</string>
@@ -470,22 +447,12 @@
     <string name="tvh_scrambled">Sender ist verschlüsselt</string>
 
     <string name="status_disconnected_reconnecting">Verbindung getrennt. Neuer Verbindungsversuch\u2026</string>
-    <string name="connection_configuration_required">Richte die Verbindung mit deinem Tvheadend-Server ein, um Sender zu laden.</string>
     <string name="connection_connecting">Verbindung mit deinem Tvheadend-Server wird hergestellt\u2026</string>
     <string name="connection_loading_channels">Sender werden geladen\u2026</string>
-    <string name="no_channels_available">Es sind keine Sender verfügbar.</string>
     <string name="retry">Erneut versuchen</string>
     <string name="settings_channel_groups_loading">Sendergruppen werden geladen…</string>
     <string name="channel_settings_load_failed">Die Kanaleinstellungen konnten nicht geladen werden.</string>
     <string name="channel_settings_save_failed">Deine Kanaleinstellungen sind aktiv, konnten aber nicht gespeichert werden.</string>
-    <string name="open_connection_settings">Verbindungseinstellungen öffnen</string>
-    <string name="connection_settings_short">Verbindungseinstellungen</string>
-    <string name="status_connection_failed_authentication">Verbindung fehlgeschlagen: Anmeldung abgelehnt</string>
-    <string name="status_connection_failed_unreachable">Verbindung fehlgeschlagen: Server nicht erreichbar</string>
-    <string name="status_connection_failed_timeout">Verbindung fehlgeschlagen: Zeitüberschreitung beim Server</string>
-    <string name="status_connection_failed_incompatible">Verbindung fehlgeschlagen: Diese Tvheadend-Serverversion wird nicht unterstützt</string>
-    <string name="status_connection_failed_permission">Verbindung fehlgeschlagen: Dieses Konto darf keine Senderdaten lesen</string>
-    <string name="status_connection_failed_other">Verbindung fehlgeschlagen</string>
     <string name="recording_marker_label">Marke %1$d • %2$s</string>
     <string name="recording_markers_open">Aufnahmemarken durchsuchen</string>
     <string name="recording_marker_previous">Vorherige Marke</string>

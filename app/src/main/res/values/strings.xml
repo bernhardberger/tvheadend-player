@@ -127,7 +127,6 @@
     <string name="password">Password</string>
     <string name="clear_saved_password">Clear saved password</string>
     <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
-    <string name="credential_unavailable">The saved credential is unavailable. Open connection settings and enter it again.</string>
     <string name="onboarding_title">Welcome to Tvheadend Player</string>
     <string name="onboarding_requirement">Tvheadend Player connects to your Tvheadend server for channels, guide and recordings.</string>
     <string name="trusted_network_guidance">Connect only on a trusted home network or through a protected tunnel. HTSP does not encrypt the channel metadata or video stream.</string>
@@ -177,7 +176,6 @@
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
     <!-- Startup status screen -->
-    <string name="main_startup_actionable_title">Action needed</string>
     <string name="main_startup_message_preparing">Preparing app</string>
     <string name="main_startup_message_connecting">Connecting</string>
     <string name="main_startup_message_syncing_metadata">Syncing channels and guide</string>
@@ -185,26 +183,6 @@
     <string name="main_startup_message_reconnecting">Reconnecting</string>
     <string name="main_startup_message_starting_television">Starting playback</string>
     <string name="main_startup_message_resuming_playback">Resuming playback</string>
-    <string name="main_startup_title_no_channels">No channels available</string>
-    <string name="main_startup_message_no_channels">Check the channels and access permissions for this account, then try again.</string>
-    <string name="main_startup_title_retryable_failure">Can’t connect to Tvheadend</string>
-    <string name="main_startup_message_retryable_failure">Make sure the server is running and reachable, then try again.</string>
-    <string name="main_startup_title_authentication_failure">Sign-in failed</string>
-    <string name="main_startup_message_authentication_failure">Check your username and password in connection settings.</string>
-    <string name="main_startup_title_permission_denied">Access denied</string>
-    <string name="main_startup_message_permission_denied">Check this account’s access permissions in Tvheadend.</string>
-    <string name="main_startup_title_incompatible_server">Server not supported</string>
-    <string name="main_startup_message_incompatible_server">This server does not support the required connection. Check its version and connection settings.</string>
-    <string name="main_startup_title_timeout_failure">TV data took too long to load</string>
-    <string name="main_startup_message_timeout_failure">Try again. If loading keeps timing out, check your Tvheadend server.</string>
-    <string name="main_startup_title_synchronization_failure">Couldn’t load TV data</string>
-    <string name="main_startup_message_synchronization_failure">Try again, or check your connection settings if the problem continues.</string>
-    <string name="main_startup_title_configuration_required">Set up your connection</string>
-    <string name="main_startup_message_configuration_required">Set up your Tvheadend server connection to load channels.</string>
-    <string name="main_startup_title_credential_unavailable">Saved sign-in unavailable</string>
-    <string name="main_startup_message_credential_unavailable">Open connection settings and enter your sign-in again.</string>
-    <string name="main_startup_action_retry">Retry</string>
-    <string name="main_startup_action_connection_settings">Connection settings</string>
 
     <string name="player_programme_progress_description">Program progress, %1$s of %2$s</string>
 
@@ -515,7 +493,6 @@
     <string name="recordings_empty">No recordings are available.</string>
     <string name="recordings_loading">Loading recordings…</string>
     <string name="recordings_reconnecting">Reconnecting. Saved recording information may be out of date…</string>
-    <string name="recordings_server_failure">Recordings are unavailable. Retry the server connection.</string>
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete this recording?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) will be deleted from the server.</string>
@@ -590,22 +567,12 @@
     <string name="tvh_scrambled">Channel is scrambled</string>
 
     <string name="status_disconnected_reconnecting">Disconnected. Reconnecting\u2026</string>
-    <string name="connection_configuration_required">Set up your Tvheadend server connection to load channels.</string>
     <string name="connection_connecting">Connecting to your Tvheadend server\u2026</string>
     <string name="connection_loading_channels">Loading channels\u2026</string>
-    <string name="no_channels_available">No channels are available.</string>
     <string name="retry">Retry</string>
     <string name="settings_channel_groups_loading">Loading channel groups…</string>
     <string name="channel_settings_load_failed">Channel preferences could not be loaded.</string>
     <string name="channel_settings_save_failed">Your channel settings are active but could not be saved.</string>
-    <string name="open_connection_settings">Open connection settings</string>
-    <string name="connection_settings_short">Connection settings</string>
-    <string name="status_connection_failed_authentication">Connection failed: authentication rejected</string>
-    <string name="status_connection_failed_unreachable">Connection failed: server unreachable</string>
-    <string name="status_connection_failed_timeout">Connection failed: server timed out</string>
-    <string name="status_connection_failed_incompatible">Connection failed: this Tvheadend server version is not supported</string>
-    <string name="status_connection_failed_permission">Connection failed: this account cannot read channel metadata</string>
-    <string name="status_connection_failed_other">Connection failed</string>
     <string name="keep_channel_setting">Keep channel after leaving the app</string>
     <string name="keep_channel_off">Off</string>
     <string name="startup_buffer_setting">Start-up buffer</string>

@@ -62,7 +62,10 @@ data class TvRecoveryAction(val label: String, val onClick: () -> Unit)
  * puts a progress ring there instead, as does an alert without actions. [status] is a line under the
  * text that may change while shown, such as a countdown; the live region holds [message], [detail]
  * and [hint], not [status]. [footnote] is a faint line under them for a bug report, such as the
- * player's own error, also outside the live region.
+ * player's own error, also outside the live region. [actionFocus], when given, is the first
+ * action's requester for a caller that moves focus there itself, as a browse screen does after
+ * its navigation rail; the overlay then takes no focus on its own. [leadingExit] is where Left from
+ * the first action goes and [upExit] where Up from any action goes; both stay inside by default.
  */
 @Composable
 fun TvRecoveryOverlay(
@@ -83,6 +86,9 @@ fun TvRecoveryOverlay(
     icon: Painter? = null,
     busy: Boolean = false,
     footnote: String? = null,
+    actionFocus: FocusRequester? = null,
+    leadingExit: FocusRequester = FocusRequester.Cancel,
+    upExit: FocusRequester = FocusRequester.Cancel,
 ) {
     require(actions.size <= MaxRecoveryActions) { "At most $MaxRecoveryActions recovery actions" }
     val buttons = actions.ifEmpty {
@@ -99,14 +105,15 @@ fun TvRecoveryOverlay(
         // As before, a secondary action shows only beside a primary one.
         if (primary == null) emptyList() else listOfNotNull(primary, secondary)
     }
-    val buttonFocus = remember { List(MaxRecoveryActions) { FocusRequester() } }
+    val ownFocus = remember { List(MaxRecoveryActions) { FocusRequester() } }
+    val buttonFocus = if (actionFocus == null) ownFocus else listOf(actionFocus) + ownFocus.drop(1)
     val primaryVisible = buttons.isNotEmpty()
     val labels = buttons.map { it.label }
     val holderFocus = remember { FocusRequester() }
     var holding by remember { mutableStateOf(false) }
     var holderFocused by remember { mutableStateOf(false) }
     LaunchedEffect(visible, labels) {
-        if (visible && primaryVisible) {
+        if (visible && primaryVisible && actionFocus == null) {
             // Take focus from anything behind the overlay at once, then wait one frame
             // so the action is ready to draw its focused state.
             holding = true
@@ -239,9 +246,9 @@ fun TvRecoveryOverlay(
                             val buttonModifier = Modifier
                                 .focusRequester(buttonFocus[index])
                                 .focusProperties {
-                                    left = if (index > 0) buttonFocus[index - 1] else FocusRequester.Cancel
+                                    left = if (index > 0) buttonFocus[index - 1] else leadingExit
                                     right = if (index < buttons.lastIndex) buttonFocus[index + 1] else FocusRequester.Cancel
-                                    up = FocusRequester.Cancel
+                                    up = upExit
                                     down = FocusRequester.Cancel
                                 }
                                 .testTag(RecoveryActionTags[index])

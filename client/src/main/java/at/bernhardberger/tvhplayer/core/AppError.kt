@@ -151,6 +151,14 @@ fun ConnectionUiState.toAppError(closable: Boolean = false): AppError? {
 fun noChannelsAppError(closable: Boolean = false): AppError =
     AppErrorCondition.NO_CHANNELS.toAppError(closable = closable)
 
+/**
+ * The alert of a browse screen with nothing saved to show: the connection's failure, or 108 when
+ * a Ready session's authoritative channel catalog is empty ([noChannels]). Null while connecting,
+ * loading or reconnecting, which stay passive. Browse screens are not closable.
+ */
+fun ConnectionUiState.browseAppError(noChannels: Boolean = false): AppError? =
+    toAppError() ?: noChannelsAppError().takeIf { noChannels && this == ConnectionUiState.Ready }
+
 /** While the SDK retries on its own, reachability and timeout failures read as one reconnecting state. */
 fun ConnectionFailureKind.toAppErrorCondition(
     disposition: SessionRecoveryDisposition,

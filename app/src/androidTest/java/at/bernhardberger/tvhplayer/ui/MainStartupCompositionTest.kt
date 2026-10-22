@@ -42,7 +42,10 @@ import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchTarget
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
-import at.bernhardberger.tvhplayer.core.MainStartupActionId
+import at.bernhardberger.tvhplayer.core.AppErrorAction
+import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import at.bernhardberger.tvhplayer.core.noChannelsAppError
+import at.bernhardberger.tvhplayer.core.toAppError
 import at.bernhardberger.tvhplayer.core.MainStartupMessageKind
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.MainStartupLoadingTiming
@@ -148,13 +151,7 @@ class MainStartupCompositionTest {
             assertEquals(0, channelCompositions)
             assertEquals(0, railCompositions)
             state = MainStartupCompositionState(
-                presentation = MainStartupPresentation.Actionable(
-                    messageKind = MainStartupMessageKind.AUTHORITATIVE_NO_CHANNELS,
-                    actions = listOf(
-                        MainStartupActionId.RETRY,
-                        MainStartupActionId.CONNECTION_SETTINGS,
-                    ),
-                ),
+                presentation = MainStartupPresentation.Actionable(noChannelsAppError()),
                 navigationStartDestination = ChannelsKey,
                 navigationAllowed = false,
             )
@@ -488,12 +485,12 @@ class MainStartupCompositionTest {
         var settings = 0
 
         performMainStartupAction(
-            action = MainStartupActionId.RETRY,
+            action = AppErrorAction.RETRY,
             onRetry = { retries++ },
             onConnectionSettings = { settings++ },
         )
         performMainStartupAction(
-            action = MainStartupActionId.CONNECTION_SETTINGS,
+            action = AppErrorAction.CONNECTION_SETTINGS,
             onRetry = { retries++ },
             onConnectionSettings = { settings++ },
         )
@@ -780,13 +777,15 @@ class MainStartupCompositionTest {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.runOnIdle {
             state = state.copy(revealRequestId = null, presentation = MainStartupPresentation.Actionable(
-                MainStartupMessageKind.RETRYABLE_FAILURE, listOf(MainStartupActionId.RETRY),
+                AppErrorCondition.UNREACHABLE.toAppError(),
             ))
         }
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.onNodeWithTag("main-startup-action-RETRY").assertIsFocused()
+        // The startup backdrop is opaque at once; the alert then fades in over it.
         val recovery = composeRule.onRoot().captureToImage().toPixelMap()[8, 8]
         assertEquals(Color(0xFF0F1014), recovery)
+        repeat(3) { composeRule.mainClock.advanceTimeByFrame() }
+        composeRule.onNodeWithTag("tv-recovery-primary").assertIsFocused()
         composeRule.mainClock.advanceTimeBy(400L)
         composeRule.runOnIdle { assertEquals(1, revealed) }
     }
@@ -1082,10 +1081,10 @@ class MainStartupCompositionTest {
         assertWaitingFeedback("Syncing channels and guide")
         composeRule.runOnIdle {
             state = state.copy(presentation = MainStartupPresentation.Actionable(
-                MainStartupMessageKind.RETRYABLE_FAILURE, listOf(MainStartupActionId.RETRY),
+                AppErrorCondition.UNREACHABLE.toAppError(),
             ))
         }
-        composeRule.onNodeWithTag("main-startup-action-RETRY").assertIsFocused().performClick()
+        composeRule.onNodeWithTag("tv-recovery-primary").assertIsFocused().performClick()
         composeRule.onNodeWithTag("main-startup-status").assertDoesNotExist()
         composeRule.onNodeWithTag("main-startup-loader").assertDoesNotExist()
         composeRule.runOnIdle { state = state.copy(loadingFeedbackEnabled = false) }

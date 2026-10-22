@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
-import androidx.tv.material3.Button
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
@@ -72,13 +71,13 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.AppError
+import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
-import at.bernhardberger.tvhplayer.core.ConnectionRecoveryAction
+import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
-import at.bernhardberger.tvhplayer.core.primaryRecoveryAction
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
-import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -590,72 +589,27 @@ internal fun GuidePassiveNotice(
 }
 
 @Composable
-internal fun GuideConnectionRecovery(
-    needsSettings: Boolean,
-    permissionDenied: Boolean,
-    focusRequester: FocusRequester,
-    onRetry: () -> Unit,
-    onOpenConnectionSettings: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.small,
-        colors = SurfaceDefaults.colors(
-            containerColor = TvSurfaceColors.containerHigh,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-        ),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = stringResource(
-                    if (permissionDenied) {
-                        R.string.epg_permission_denied
-                    } else if (needsSettings) {
-                        R.string.connection_configuration_required
-                    } else {
-                        R.string.epg_server_failure
-                    },
-                ),
-                style = MaterialTheme.typography.bodyLarge,
-                modifier = Modifier.weight(1f),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Button(
-                onClick = if (needsSettings) onOpenConnectionSettings else onRetry,
-                modifier = Modifier.tabFocus().focusRequester(focusRequester),
-            ) {
-                Text(
-                    stringResource(
-                        if (needsSettings) {
-                            R.string.connection_settings_short
-                        } else {
-                            R.string.retry
-                        },
-                    ),
-                )
-            }
-        }
-    }
-}
-
-@Composable
 internal fun GuideEmptyState(
+    alert: AppError?,
     isEmptyTag: Boolean,
     connectionUiState: ConnectionUiState,
     channelCatalogCurrent: Boolean,
-    onRetry: () -> Unit,
-    onOpenConnectionSettings: () -> Unit,
-    retryFocusRequester: FocusRequester,
+    onAction: (AppErrorAction) -> Unit,
+    actionFocus: FocusRequester,
+    leadingExit: FocusRequester,
+    upExit: FocusRequester,
 ) {
-    val permissionDenied = connectionUiState is ConnectionUiState.Error &&
-        connectionUiState.kind == ConnectionFailureKind.PERMISSION_DENIED
-    val recoveryAction = connectionUiState.primaryRecoveryAction()
+    if (alert != null) {
+        AppErrorAlert(
+            error = alert,
+            onAction = onAction,
+            modifier = Modifier.fillMaxSize().testTag("guide-empty-state"),
+            actionFocus = actionFocus,
+            leadingExit = leadingExit,
+            upExit = upExit,
+        )
+        return
+    }
     val message = stringResource(
         guideEmptyMessageRes(
             isEmptyTag = isEmptyTag,
@@ -677,27 +631,6 @@ internal fun GuideEmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(message, style = MaterialTheme.typography.titleLarge)
-            if (recoveryAction != ConnectionRecoveryAction.NONE) {
-                Spacer(Modifier.height(12.dp))
-                Button(
-                    onClick = if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
-                        onOpenConnectionSettings
-                    } else {
-                        onRetry
-                    },
-                    modifier = Modifier.tabFocus().focusRequester(retryFocusRequester),
-                ) {
-                    Text(
-                        stringResource(
-                            if (recoveryAction == ConnectionRecoveryAction.SETTINGS) {
-                                R.string.connection_settings_short
-                            } else {
-                                R.string.retry
-                            },
-                        ),
-                    )
-                }
-            }
         }
     }
 }
