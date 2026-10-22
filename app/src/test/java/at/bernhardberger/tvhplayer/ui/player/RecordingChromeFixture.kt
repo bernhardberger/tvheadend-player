@@ -21,6 +21,7 @@ internal fun fixtureRecordingInfo(
     positionMs: Long = 1_800_000,
     durationMs: Long? = 3_600_000,
     nowSec: Long = 1_700_010_000,
+    stopExtra: kotlin.time.Duration? = null,
 ): PlayerInfoBarData =
     recordingInfoBarData(
         DvrEntry.create(
@@ -30,6 +31,7 @@ internal fun fixtureRecordingInfo(
             channelName = "Documentary",
             start = Instant.fromEpochSeconds(1_700_000_000),
             stop = Instant.fromEpochSeconds(1_700_003_600),
+            stopExtraMinutes = stopExtra,
             state = if (growing) at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
                 else at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED,
         ),

@@ -123,6 +123,17 @@ fun formatDurationMinutes(
     if (spoken) android.icu.text.MeasureFormat.FormatWidth.WIDE else android.icu.text.MeasureFormat.FormatWidth.NARROW,
 ).format(android.icu.util.Measure(minutes.coerceAtLeast(0L), android.icu.util.MeasureUnit.MINUTE))
 
+/** A recorded length: seconds while under a minute, otherwise whole minutes as [formatDurationMinutes]. */
+fun formatRecordedDuration(
+    seconds: Long,
+    resources: android.content.res.Resources,
+    spoken: Boolean = false,
+): String = if (seconds !in 1L until 60L) formatDurationMinutes(seconds / 60L, resources, spoken)
+else android.icu.text.MeasureFormat.getInstance(
+    resources.configuration.locales[0],
+    if (spoken) android.icu.text.MeasureFormat.FormatWidth.WIDE else android.icu.text.MeasureFormat.FormatWidth.NARROW,
+).format(android.icu.util.Measure(seconds, android.icu.util.MeasureUnit.SECOND))
+
 /** Whole-hour jump amounts, with the unit written out in the configured app locale. */
 fun formatWholeHours(hours: Long, resources: android.content.res.Resources): String =
     android.icu.text.MeasureFormat.getInstance(

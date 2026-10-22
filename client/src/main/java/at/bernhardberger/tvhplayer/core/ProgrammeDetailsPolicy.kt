@@ -87,11 +87,13 @@ fun programmeDetailsFacts(event: EpgEvent, nowSec: Long): List<DetailsFact> = bu
     }
 }
 
-/** [admission] is the SDK's admission of [recording]; the time left follows the Resume it offers. */
-fun recordingDetailsFacts(recording: DvrEntry, admission: RecordingPlaybackAdmission?): List<DetailsFact> = buildList {
+/**
+ * [admission] is the SDK's admission of [recording]; the time left follows the Resume it offers.
+ * The length is what was recorded ([recordingLengthSeconds]), not the scheduled length.
+ */
+fun recordingDetailsFacts(recording: DvrEntry, admission: RecordingPlaybackAdmission?, nowSec: Long): List<DetailsFact> = buildList {
     recording.start?.let { add(DetailsFact(DetailsFactKind.RECORDED, it.epochSeconds)) }
-    val length = recording.start?.let { start -> recording.stop?.let { (it - start).inWholeSeconds } }
-        ?.takeIf { it > 0 } ?: return@buildList
+    val length = recordingLengthSeconds(recording, nowSec)?.takeIf { it > 0 } ?: return@buildList
     add(DetailsFact(DetailsFactKind.LENGTH, length))
     offeredResumePosition(admission)?.inWholeSeconds?.takeIf { it > 0 && it < length }?.let {
         add(DetailsFact(DetailsFactKind.LEFT, length - it))

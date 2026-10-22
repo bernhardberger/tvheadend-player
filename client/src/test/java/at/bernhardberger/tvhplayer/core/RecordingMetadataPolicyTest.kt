@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.core
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Assert.*
 import org.junit.Test
@@ -27,6 +28,136 @@ class RecordingMetadataPolicyTest {
         assertEquals(300L, recordingSizeBytes(DvrEntry.create(DvrEntryId(1), files = files)))
         assertEquals(0L, recordingSizeBytes(DvrEntry.create(DvrEntryId(1), dataSizeBytes = 0, files = files)))
         assertNull(recordingSizeBytes(DvrEntry.create(DvrEntryId(1), files = listOf(DvrRecordingFile.create()))))
+    }
+
+    private fun at(seconds: Long) = Instant.fromEpochSeconds(seconds)
+
+    private fun timed(state: DvrEntryState, vararg files: DvrRecordingFile) = DvrEntry.create(DvrEntryId(1), state = state,
+        start = at(1_000), stop = at(1_000 + 61 * 60), files = files.toList().takeIf { it.isNotEmpty() })
+
+    @Test fun lengthSumsTheFilesTimesRatherThanTheSchedule() {
+        assertEquals(5L, recordingLengthSeconds(timed(DvrEntryState.COMPLETED,
+            DvrRecordingFile.create(start = at(1_010), stop = at(1_015))), nowSec = 99_999))
+        assertEquals(46L * 60, recordingLengthSeconds(timed(DvrEntryState.COMPLETED,
+            DvrRecordingFile.create(start = at(1_000), stop = at(1_000 + 30 * 60)),
+            DvrRecordingFile.create(start = at(5_000), stop = at(5_000 + 16 * 60))), nowSec = 99_999))
+    }
+
+    @Test fun runningLengthMergesClosedAndOpenFilesWithoutCountingGaps() {
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            assertEquals(600L, recordingLengthSeconds(timed(state,
+                DvrRecordingFile.create(start = at(1_300), stop = at(1_400)),
+                DvrRecordingFile.create(start = at(1_200))), nowSec = 1_800))
+            val closed = DvrRecordingFile.create(start = at(1_000), stop = at(1_100))
+            assertEquals(400L, recordingLengthSeconds(timed(state, closed,
+                DvrRecordingFile.create(start = at(1_500))), nowSec = 1_800))
+            assertEquals(400L, recordingLengthSeconds(timed(DvrEntryState.COMPLETED, closed,
+                DvrRecordingFile.create(start = at(1_500), stop = at(1_800))), nowSec = 1_800))
+            assertEquals(100L, recordingLengthSeconds(timed(state, closed), nowSec = 1_800))
+        }
+        assertTrue(recordingIsRunning(timed(DvrEntryState.RECORDING_ERROR)))
+        assertFalse(recordingIsRunning(timed(DvrEntryState.COMPLETED_ERROR)))
+    }
+
+    @Test fun onlyMissingFileTimesFallBackToThePlannedLength() {
+        assertEquals(61L * 60, recordingLengthSeconds(timed(DvrEntryState.COMPLETED), nowSec = 99_999))
+        assertEquals(61L * 60, recordingLengthSeconds(timed(DvrEntryState.COMPLETED,
+            DvrRecordingFile.create(sizeBytes = 7), DvrRecordingFile.create()), nowSec = 99_999))
+        assertNull(recordingLengthSeconds(timed(DvrEntryState.RECORDING,
+            DvrRecordingFile.create(sizeBytes = 7)), nowSec = 1_800))
+        assertNull(recordingLengthSeconds(timed(DvrEntryState.RECORDING_ERROR), nowSec = 1_800))
+        assertNull(recordingLengthSeconds(DvrEntry.create(DvrEntryId(1), start = at(1_000)), nowSec = 1_800))
+    }
+
+    @Test fun incompleteOrMixedTimelessFilesMakeTheTotalUnknown() {
+        val valid = DvrRecordingFile.create(start = at(1_000), stop = at(1_300))
+        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING)) {
+            for (invalid in listOf(
+                DvrRecordingFile.create(start = at(1_400)),
+                DvrRecordingFile.create(stop = at(1_500)),
+            )) {
+                for (files in listOf(listOf(invalid), listOf(valid, invalid))) {
+                    val entry = timed(state, *files.toTypedArray())
+                    assertNull(recordingLengthSeconds(entry, nowSec = 1_800))
+                    assertNull(recordingStoppedEarly(entry))
+                }
+            }
+            val mixed = timed(state, valid, DvrRecordingFile.create(sizeBytes = 1))
+            assertNull(recordingLengthSeconds(mixed, nowSec = 1_800))
+            assertNull(recordingStoppedEarly(mixed))
+        }
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            assertNull(recordingLengthSeconds(timed(state, valid,
+                DvrRecordingFile.create(stop = at(1_500))), nowSec = 1_800))
+            assertNull(recordingLengthSeconds(timed(state, valid,
+                DvrRecordingFile.create(sizeBytes = 1)), nowSec = 1_800))
+        }
+    }
+
+    @Test fun zeroRecordedLengthDoesNotProduceAStoppedEarlyHint() {
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED,
+            DvrRecordingFile.create(start = at(1_000), stop = at(1_000)))))
+    }
+
+    @Test fun overlappingFilesCountEachRecordedSecondOnlyOnce() {
+        val files = arrayOf(
+            DvrRecordingFile.create(start = at(1_200), stop = at(1_400)),
+            DvrRecordingFile.create(start = at(1_000), stop = at(1_300)),
+            DvrRecordingFile.create(start = at(1_100), stop = at(1_200)),
+            DvrRecordingFile.create(start = at(1_400), stop = at(1_500)),
+        )
+        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            assertEquals(500L, recordingLengthSeconds(timed(state, *files), nowSec = 1_800))
+        }
+        assertEquals(RecordingShortfall(500, 61 * 60), recordingStoppedEarly(timed(DvrEntryState.COMPLETED, *files)))
+    }
+
+    @Test fun paddingComesFromTheEntrysEffectiveExtraMinutes() {
+        val padded = DvrEntry.create(DvrEntryId(1), start = at(10_000), stop = at(12_000),
+            startExtraMinutes = 2.minutes, stopExtraMinutes = 120.minutes)
+        assertEquals(at(10_000 - 120), recordingPaddedStart(padded))
+        assertEquals(at(12_000 + 7_200), recordingPaddedStop(padded))
+        val unpadded = DvrEntry.create(DvrEntryId(1), start = at(10_000), stop = at(12_000))
+        assertEquals(at(10_000), recordingPaddedStart(unpadded))
+        assertEquals(at(12_000), recordingPaddedStop(unpadded))
+        assertNull(recordingPaddedStop(DvrEntry.create(DvrEntryId(1), start = at(10_000))))
+    }
+
+    @Test fun stoppedEarlyNeedsAFinishedFileUnderTheThreshold() {
+        val planned = 61L * 60
+        val threshold = (planned * RECORDING_STOPPED_EARLY_FRACTION).toLong()
+        fun file(seconds: Long) = DvrRecordingFile.create(start = at(1_000), stop = at(1_000 + seconds))
+        assertEquals(RecordingShortfall(5, planned), recordingStoppedEarly(timed(DvrEntryState.COMPLETED, file(5))))
+        assertEquals(RecordingShortfall(5, planned), recordingStoppedEarly(timed(DvrEntryState.COMPLETED_ERROR, file(5))))
+        assertNotNull(recordingStoppedEarly(timed(DvrEntryState.FILE_MISSING, file(threshold - 1))))
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED, file(threshold))))
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED, file(planned + 300))))
+        // A short programme under the share but missing less than two minutes is not flagged.
+        fun tenMinutes(recorded: Long) = DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED,
+            start = at(1_000), stop = at(1_000 + 600), files = listOf(file(recorded)))
+        assertNull(recordingStoppedEarly(tenMinutes(600 - 119)))
+        assertNotNull(recordingStoppedEarly(tenMinutes(600 - 120)))
+        // Running, scheduled and fallback lengths are not evidence of an early stop.
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.RECORDING, file(5))))
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.SCHEDULED)))
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED)))
+        assertNull(recordingStoppedEarly(timed(DvrEntryState.COMPLETED, DvrRecordingFile.create(sizeBytes = 7))))
+    }
+
+    @Test fun stoppedEarlyRequiresAnEarlyFinalStopNotALateStartOrGap() {
+        val stop = 1_000 + 61L * 60
+        fun file(start: Long, end: Long) = DvrRecordingFile.create(start = at(start), stop = at(end))
+        for (state in listOf(DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING)) {
+            assertNull(recordingStoppedEarly(timed(state, file(1_600, stop))))
+            assertNull(recordingStoppedEarly(timed(state, file(2_000, stop), file(1_000, 1_300))))
+            assertNull(recordingStoppedEarly(timed(state, file(1_600, stop - 119))))
+            assertEquals(RecordingShortfall(stop - 120 - 1_600, 61 * 60),
+                recordingStoppedEarly(timed(state, file(1_600, stop - 120))))
+        }
+        // Post-padding must not turn a normal programme end into an early stop.
+        assertNull(recordingStoppedEarly(DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED,
+            start = at(1_000), stop = at(stop), stopExtraMinutes = 5.minutes,
+            files = listOf(file(1_600, stop)))))
     }
 
     @Test fun errorsKeepUnknownDistinctFromZero() {

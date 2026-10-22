@@ -47,6 +47,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.recordingEndsAtSec
+import at.bernhardberger.tvhplayer.core.recordingPaddedStop
 import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -275,7 +276,7 @@ internal fun QuickZapTrayPreviewFrame(
 
 /**
  * The info bar for a recording: `Recorded 12 Sep • Ends 23:45` (now plus the remaining playback)
- * or, still recording, `Recording until 22:08`, above the title; the episode fills the last row.
+ * or, still recording, `Recording until 22:08` (the stop with its padding), above the title; the episode fills the last row.
  * A recording has no real next item, so there is no Next (UX-02).
  */
 @Composable
@@ -302,7 +303,7 @@ internal fun recordingInfoBarData(
             formatTimeIntervalSpoken(start.epochSeconds, stop.epochSeconds, androidx.compose.ui.platform.LocalResources.current)
         } else "",
         metadata = when {
-            growing -> stop?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) }
+            growing -> recordingPaddedStop(entry)?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) }
             recordedDate != null && endsAt != null -> stringResource(R.string.player_recorded_ends, recordedDate, formatClock(endsAt))
             else -> null
         },

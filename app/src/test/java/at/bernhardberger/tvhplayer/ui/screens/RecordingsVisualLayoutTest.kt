@@ -42,6 +42,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
+import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import java.io.File
 import java.util.Locale
@@ -329,6 +330,71 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test
+    @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
+    fun germanLargeStoppedEarlyHintStaysWholeInTheRow() {
+        Locale.setDefault(Locale.GERMANY)
+        show(scale = 1.3f, entries = listOf(recording(1,
+            "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis",
+            "Dokumentationen/Expedition.ts", recordedMinutes = 20)))
+        focused("recordings-folder-Dokumentationen")
+        key(Key.DirectionCenter)
+        focused("recording-list-entry-1")
+        assertMetadataBelowTitle(1)
+        val results = mutableListOf<TextLayoutResult>()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
+            hasText("Vorzeitig beendet", substring = true), useUnmergedTree = true)
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        val hint = results.single()
+        val shown = hint.layoutInput.text.text.substring(0, hint.getLineEnd(hint.lineCount - 1, visibleEnd = true))
+        assertTrue("'$shown' lines=${hint.lineCount} size=${hint.size} c=${hint.layoutInput.constraints}",
+            shown.startsWith("Vorzeitig beendet • 20 Min. von 90 Min."))
+        assertFalse("The stopped-early hint must remain whole", hint.hasVisualOverflow)
+        results.clear()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
+            hasText("Abgeschlossen", substring = true), useUnmergedTree = true)
+            .assertIsDisplayed()
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+        val metadata = results.single()
+        for (line in 0 until metadata.lineCount) {
+            assertFalse("Existing metadata line $line must not ellipsize", metadata.isLineEllipsized(line))
+        }
+        val subtitle = compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
+            hasText("A winter expedition", substring = true), useUnmergedTree = true)
+            .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue("The line below the hint must stay inside its row",
+            subtitle.bottom <= bounds("recording-list-entry-1").bottom + 0.5f)
+        assertNoCommands()
+    }
+
+    @Test fun runningMetadataPaneShowsElapsedLengthRatherThanUntil() {
+        val now = System.currentTimeMillis() / 1000L
+        val entry = DvrEntry.create(DvrEntryId(1), title = "Growing recording", state = DvrEntryState.RECORDING,
+            start = Instant.fromEpochSeconds(now - 1_200), stop = Instant.fromEpochSeconds(now + 3_600),
+            files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(now - 610))))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry, null, null)
+            }
+        }
+        val elapsed = formatRecordedDuration(600, ApplicationProvider.getApplicationContext<Application>().resources)
+        compose.onNodeWithText(elapsed, substring = true).assertIsDisplayed()
+        compose.onNodeWithText("until", substring = true).assertDoesNotExist()
+    }
+
+    @Test fun zeroLengthIsAbsentFromRowsAndPane() {
+        show(entries = listOf(recording(1, "Empty recording", "empty.ts", recordedMinutes = 0)))
+        focused("recording-list-entry-1")
+        val zeroLength = formatRecordedDuration(0, ApplicationProvider.getApplicationContext<Application>().resources)
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
+            hasText(zeroLength, substring = true), useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-pane")) and
+            hasText(zeroLength, substring = true), useUnmergedTree = true).assertDoesNotExist()
+        assertNoCommands()
+    }
+
     @Test fun channelPagingAndInterruptedModeSwitchCannotReactivateArchive() {
         show(entries = (1L..30L).map { recording(it, "Recording $it", "recording$it.ts") } +
             recording(40, "Scheduled", null, DvrEntryState.SCHEDULED))
@@ -582,13 +648,16 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,
-        startEpochSeconds: Long = 1_791_000_000 - id * 86400) =
+        startEpochSeconds: Long = 1_791_000_000 - id * 86400, recordedMinutes: Long? = null) =
         DvrEntry.create(
             id = DvrEntryId(id), title = title, state = state,
             folder = path?.split('/')?.filter(String::isNotEmpty)?.dropLast(1),
             start = Instant.fromEpochSeconds(startEpochSeconds),
             stop = Instant.fromEpochSeconds(startEpochSeconds + 90 * 60),
-            files = path?.let { listOf(DvrRecordingFile.create(sizeBytes = 2_400_000_000L)) }.orEmpty(),
+            files = path?.let { listOf(DvrRecordingFile.create(
+                start = recordedMinutes?.let { Instant.fromEpochSeconds(startEpochSeconds) },
+                stop = recordedMinutes?.let { Instant.fromEpochSeconds(startEpochSeconds + it * 60) },
+                sizeBytes = 2_400_000_000L)) }.orEmpty(),
             channelName = "Ridge Earth HD",
             image = if (id in 1L..5L) ArtworkId(100 + id.toInt()) else null,
             subtitle = if (id == 1L) "A winter expedition beyond the Arctic Circle" else null,

@@ -743,7 +743,7 @@ internal fun RecordingsScreenContent(
             val resumeFocus = remember { FocusRequester() }
             val startOverFocus = remember { FocusRequester() }
             var startOverFocused by remember(opened.id) { mutableStateOf(false) }
-            val durationMs = at.bernhardberger.tvhplayer.core.recordingDetailsFacts(opened, openedAdmission)
+            val durationMs = at.bernhardberger.tvhplayer.core.recordingDetailsFacts(opened, openedAdmission, nowSec)
                 .firstOrNull { it.kind == at.bernhardberger.tvhplayer.core.DetailsFactKind.LENGTH }?.seconds?.times(1000L)
             val positionMs = at.bernhardberger.tvhplayer.core.offeredResumePosition(openedAdmission)?.inWholeMilliseconds ?: 0L
             val resumeEnd = at.bernhardberger.tvhplayer.core.recordingEndsAtSec(nowSec, positionMs, durationMs)

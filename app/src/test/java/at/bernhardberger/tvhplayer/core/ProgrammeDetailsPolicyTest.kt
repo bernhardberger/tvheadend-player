@@ -14,7 +14,8 @@ class ProgrammeDetailsPolicyTest {
     private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null) = DvrEntry.create(
         DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds, files = files)
 
-    private fun file(path: String = "/rec/a.ts") = TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path)
+    private fun file(path: String = "/rec/a.ts", start: Instant? = null) =
+        TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path, start = start)
 
     private fun admission(entry: DvrEntry, capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED) =
         SessionObservation.create(recordingProgressCapability = capability).recordingPlaybackAdmission(entry)
@@ -23,7 +24,7 @@ class ProgrammeDetailsPolicyTest {
         recordingDetailsActions(entry, admission(entry), canModifyRecordings = true, canWatchChannel = canWatchChannel)
 
     private fun facts(entry: DvrEntry, capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED) =
-        recordingDetailsFacts(entry, admission(entry, capability))
+        recordingDetailsFacts(entry, admission(entry, capability), nowSec = 300)
 
     @Test fun programmeActionsPreservePermissionAndOrigin() {
         assertEquals(listOf(WATCH, RECORD), programmeDetailsActions(event, 150, null, null, true, true, true))
@@ -62,6 +63,9 @@ class ProgrammeDetailsPolicyTest {
             facts(recording(DvrEntryState.COMPLETED)))
         assertEquals(DetailsFact(DetailsFactKind.LEFT, 80), facts(recording(DvrEntryState.COMPLETED, 20)).last())
         assertFalse(facts(recording(DvrEntryState.COMPLETED, 100)).any { it.kind == DetailsFactKind.LEFT })
+        // The length is what the files hold, not the schedule.
+        assertEquals(DetailsFact(DetailsFactKind.LENGTH, 30), facts(recording(DvrEntryState.COMPLETED, files = listOf(
+            DvrRecordingFile.create(start = Instant.fromEpochSeconds(100), stop = Instant.fromEpochSeconds(130))))).last())
     }
 
     @Test fun progressIsShownOnlyWhereTheAdmissionOffersResume() {
@@ -69,10 +73,14 @@ class ProgrammeDetailsPolicyTest {
         listOf(RecordingProgressCapability.UNKNOWN, RecordingProgressCapability.UNSUPPORTED).forEach {
             assertFalse("$it", facts(partial, it).any { fact -> fact.kind == DetailsFactKind.LEFT })
         }
-        assertFalse(recordingDetailsFacts(partial, null).any { it.kind == DetailsFactKind.LEFT })
+        assertFalse(recordingDetailsFacts(partial, null, nowSec = 300).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.RECORDING, 20, listOf(file("/rec/a.mkv"))))
             .any { it.kind == DetailsFactKind.LEFT })
-        assertEquals(DetailsFact(DetailsFactKind.LEFT, 80), facts(recording(DvrEntryState.RECORDING, 20, listOf(file()))).last())
+        // A running recording's length is what its files hold so far; without file times it is unknown.
+        assertEquals(DetailsFact(DetailsFactKind.LEFT, 180),
+            facts(recording(DvrEntryState.RECORDING, 20, listOf(file(start = event.start)))).last())
+        assertFalse(facts(recording(DvrEntryState.RECORDING, 20, listOf(file())))
+            .any { it.kind == DetailsFactKind.LENGTH || it.kind == DetailsFactKind.LEFT })
     }
 
     @Test fun failedRecordingProgressFollowsTheSdkResumeOffer() {

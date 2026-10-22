@@ -235,13 +235,18 @@ class RecordingPlayerChromeScreenTest {
     @Test fun theInfoBarSaysWhenPlaybackEndsOrUntilWhenItRecords() {
         lateinit var finished: PlayerInfoBarData
         lateinit var growing: PlayerInfoBarData
+        lateinit var padded: PlayerInfoBarData
         compose.setContent {
             finished = fixtureRecordingInfo(positionMs = 1_800_000, durationMs = 3_600_000, nowSec = 1_700_010_000)
             growing = fixtureRecordingInfo(growing = true, positionMs = 1_800_000, durationMs = 2_000_000, nowSec = 1_700_010_000)
+            padded = fixtureRecordingInfo(growing = true, positionMs = 1_800_000, durationMs = 2_000_000, nowSec = 1_700_010_000,
+                stopExtra = kotlin.time.Duration.parse("2h"))
         }
         compose.waitForIdle()
         assertEquals("Recorded ${finished.recordedDate} • Ends ${formatClock(1_700_010_000 + 1_800)}", finished.metadata)
         assertEquals("Recording until ${formatClock(1_700_003_600)}", growing.metadata)
+        // Tvheadend stops after the post-padding, not at the programme's end.
+        assertEquals("Recording until ${formatClock(1_700_003_600 + 7_200)}", padded.metadata)
     }
 
     @Test fun aGrowingRecordingCarriesTheRecBadge() {

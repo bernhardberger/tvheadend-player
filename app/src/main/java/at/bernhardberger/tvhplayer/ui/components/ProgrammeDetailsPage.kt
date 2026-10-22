@@ -824,9 +824,7 @@ internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<Dv
         fact(R.string.details_errors, if (errors == 0L) resources.getString(R.string.details_no_errors)
             else resources.getQuantityString(R.plurals.details_error_count, errors.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), errors))
     }
-    recording.start?.let { start -> recording.stop?.let { stop ->
-        val paddedStart = start - (recording.startExtraMinutes ?: kotlin.time.Duration.ZERO)
-        val paddedStop = stop + (recording.stopExtraMinutes ?: kotlin.time.Duration.ZERO)
+    recordingPaddedStart(recording)?.let { paddedStart -> recordingPaddedStop(recording)?.let { paddedStop ->
         fact(R.string.details_recorded, formatTimeInterval(paddedStart.epochSeconds, paddedStop.epochSeconds,
             withDate = true, locale = locale, nowSec = nowSec))
     } }
@@ -922,7 +920,7 @@ private fun DetailsInformation(
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Column(Modifier.widthIn(max = 470.dp)) { synopsis() }
-        val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let { recordingDetailsFacts(it, recordingAdmission) }.orEmpty()
+        val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let { recordingDetailsFacts(it, recordingAdmission, nowSec) }.orEmpty()
         val resources = LocalContext.current.resources
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
@@ -1080,7 +1078,8 @@ private fun DetailsStatusChip(status: DetailsStatus?, label: String? = null) {
 internal fun detailsFactValue(fact: DetailsFact, nowSec: Long): String {
     val resources = LocalContext.current.resources
     return when (fact.kind) {
-        DetailsFactKind.LENGTH, DetailsFactKind.LEFT -> formatDurationMinutes(fact.seconds / 60, resources)
+        DetailsFactKind.LENGTH -> formatRecordedDuration(fact.seconds, resources)
+        DetailsFactKind.LEFT -> formatDurationMinutes(fact.seconds / 60, resources)
         DetailsFactKind.RECORDED -> formatRecordingSchedule(fact.seconds, dateOnly = true,
             locale = LocalConfiguration.current.locales[0], nowSec = nowSec)
         DetailsFactKind.STARTS, DetailsFactKind.STARTED -> {

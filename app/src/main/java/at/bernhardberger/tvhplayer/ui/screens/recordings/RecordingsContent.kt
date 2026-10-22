@@ -80,6 +80,10 @@ import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
+import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
+import at.bernhardberger.tvhplayer.core.recordingPaddedStop
+import at.bernhardberger.tvhplayer.core.recordingStoppedEarly
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
@@ -93,6 +97,7 @@ import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
+import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -280,6 +285,7 @@ internal fun RecordingMetadataPane(
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
         }
+        val nowSec = if (recordingIsRunning(entry)) rememberDetailsEpochSeconds() else 0L
         Text(
             text = buildString {
                 entry.channelName?.takeIf(String::isNotBlank)?.let {
@@ -287,10 +293,9 @@ internal fun RecordingMetadataPane(
                 }
                 append(recordingTimeRange(entry.start?.epochSeconds, entry.stop?.epochSeconds,
                     androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
-                val durationMinutes = recordingDurationMinutes(entry)
-                if (durationMinutes != null) {
-                    append(" • ").append(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(
-                        durationMinutes.toLong(), androidx.compose.ui.platform.LocalResources.current))
+                recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let {
+                    append(" • ").append(at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(
+                        it, androidx.compose.ui.platform.LocalResources.current))
                 }
             },
             color = TvTextColors.tertiary,
@@ -747,15 +752,13 @@ private fun RecordingSupportingMetadata(entry: DvrEntry, metadata: String) {
             text = buildList {
                 entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
                     .takeIf(String::isNotBlank)?.let(::add)
-                recordingDurationMinutes(entry)?.let {
-                    add(at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(
-                        it.toLong(), androidx.compose.ui.platform.LocalResources.current))
-                }
+                recordingLengthLabel(entry)?.let(::add)
                 add(dvrStateLabel(entry.state))
             }.joinToString(" • "),
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
         )
+        recordingStoppedEarlyLabel(entry)?.let { Text(text = it, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         if (metadata.isNotBlank()) Text(
             text = metadata,
             maxLines = 1,
@@ -854,8 +857,21 @@ internal fun recordingTimeRange(startSec: Long?, stopSec: Long?, locale: java.ut
     else -> ""
 }
 
-private fun recordingDurationMinutes(entry: DvrEntry): Long? {
-    val start = entry.start ?: return null
-    val stop = entry.stop ?: return null
-    return (stop - start).inWholeMinutes.coerceAtLeast(0L)
+/** While recording, until the stop with its padding; otherwise the length actually recorded. */
+@Composable
+private fun recordingLengthLabel(entry: DvrEntry): String? =
+    if (recordingIsRunning(entry)) recordingPaddedStop(entry)?.let {
+        stringResource(R.string.recordings_until, at.bernhardberger.tvhplayer.ui.common.formatClock(it.epochSeconds))
+    }
+    // Only a running recording measures to now, and that took the branch above.
+    else recordingLengthSeconds(entry, nowSec = 0L)?.takeIf { it > 0 }?.let {
+        at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(it, androidx.compose.ui.platform.LocalResources.current)
+    }
+
+@Composable
+private fun recordingStoppedEarlyLabel(entry: DvrEntry): String? = recordingStoppedEarly(entry)?.let {
+    val resources = androidx.compose.ui.platform.LocalResources.current
+    stringResource(R.string.recordings_stopped_early,
+        at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(it.recordedSeconds, resources),
+        at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(it.plannedSeconds, resources))
 }
