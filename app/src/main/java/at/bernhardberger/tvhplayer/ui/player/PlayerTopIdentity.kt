@@ -244,7 +244,7 @@ private fun IdentityContent(
     val ink = if (focused) LocalContentColor.current else MaterialTheme.colorScheme.onSurface
     Row(Modifier.padding(horizontal = IdentityInset, vertical = IdentityVerticalPadding),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdentityTextGap)) {
-        Box(Modifier.size(ChipWidth, ChipHeight).clip(ChipShape).background(TvSurfaceColors.containerLowest),
+        Box(Modifier.size(ChipWidth, ChipHeight).clip(PlayerChromeTokens.chipShape).background(TvSurfaceColors.containerLowest),
             contentAlignment = Alignment.Center) {
             if (content.picon != null) {
                 PiconBox(content.picon, Modifier.padding(4.dp).testTag("player-top-identity-logo"))
@@ -434,7 +434,6 @@ private val IdentityTextMaxWidth = 480.dp
 private val IdentityShape = RoundedCornerShape(12.dp)
 private val ChipWidth = 64.dp
 private val ChipHeight = 36.dp
-private val ChipShape = RoundedCornerShape(6.dp)
 private const val ArrowAlpha = TvPassiveAlpha
 
 /** The identity's share of the strip's chip: 48dp of 64dp. */

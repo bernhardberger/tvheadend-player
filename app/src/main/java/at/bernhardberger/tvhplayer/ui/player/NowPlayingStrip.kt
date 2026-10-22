@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
@@ -47,7 +46,7 @@ internal fun NowPlayingStrip(
     val current = programme?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(48.dp, 27.dp).clip(RoundedCornerShape(6.dp))
+        Box(Modifier.size(48.dp, 27.dp).clip(PlayerChromeTokens.chipShape)
             .background(TvSurfaceColors.containerLowest), contentAlignment = Alignment.Center) {
             if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
