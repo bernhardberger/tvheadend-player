@@ -399,7 +399,9 @@ internal fun RecordingsScreenContent(
         repeat(4) {
             withFrameNanos { }
             if (drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) return@LaunchedEffect
-            val focused = runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+            // The list may already have restored its row (Back from the player). Requesting the
+            // focused group again re-enters it at its first row and skips the list's own onEnter.
+            val focused = contentHasFocus || runCatching { contentFocus.requestFocus() }.getOrDefault(false)
             if (focused) {
                 requestContentFocus = false
                 return@LaunchedEffect

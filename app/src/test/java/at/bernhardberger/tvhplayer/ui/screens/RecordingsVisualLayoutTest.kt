@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
@@ -73,6 +74,8 @@ class RecordingsVisualLayoutTest {
     private var playbackRequests = 0
     private var navigationRequests = 0
     private val screenState = RecordingsScreenState()
+    // The app keeps this state while the player route replaces the Recordings entry.
+    private val screenShown = mutableStateOf(true)
 
     @Before fun prepare() {
         oldLocale = Locale.getDefault()
@@ -183,6 +186,24 @@ class RecordingsVisualLayoutTest {
         key(Key.Back)
         focused("recordings-folder-Documentaries")
         assertNoCommands()
+    }
+
+    @Test fun returningFromThePlayerFocusesThePlayedRecordingBelowFolders() {
+        show()
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-5")
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(1, playbackRequests) }
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
+        compose.runOnIdle { screenShown.value = true }
+        compose.waitForIdle()
+        focused("recording-list-entry-5")
+        compose.mainClock.advanceTimeBy(1_200)
+        focused("recording-list-entry-5")
+        compose.runOnIdle { assertEquals("recording:5", screenState.archiveNavigation.stack.active.focusedItemId) }
     }
 
     @Test fun longTextAtLargeFontGrowsNativeRowsWithoutClipping() {
@@ -536,7 +557,7 @@ class RecordingsVisualLayoutTest {
                             onNavigate = { navigationRequests++ },
                         ) { padding, drawer ->
                             val direction = LocalLayoutDirection.current
-                            RecordingsScreenContent(
+                            if (screenShown.value) RecordingsScreenContent(
                                 observation = liveObservation,
                                 currentObservation = { session.observation.value },
                                 state = screenState,
