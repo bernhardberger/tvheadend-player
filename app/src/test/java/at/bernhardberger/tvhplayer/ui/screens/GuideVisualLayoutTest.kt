@@ -1075,6 +1075,7 @@ class GuideVisualLayoutTest {
                 compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
                 compose.mainClock.advanceTimeBy(80)
             }
+            compose.onNode(hasText(title(1, 2)) and isFocused()).assertExists()
             compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
             compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
         } finally {
@@ -1084,6 +1085,51 @@ class GuideVisualLayoutTest {
         headlineTitle(title(1, 2))
         assertEquals(headline, bounds("guide-headline"))
         assertNoPlayback()
+    }
+
+    @Test fun aSlowGroupSwitchKeepsTheHeadlineAndItsArt() {
+        val armed = AtomicBoolean(false)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            show(headline = true, beforeCoverageBatch = { _, _ ->
+                if (armed.get()) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+            })
+            key(Key.DirectionDown)
+            focused(title(1, 0))
+            headlineTitle(title(1, 0))
+            key(Key.DirectionUp)
+            dateFocused()
+            key(Key.DirectionRight)
+            tagFocused("channels-group-button")
+            key(Key.Enter)
+            tagFocused("channels-group-all")
+            key(Key.DirectionDown)
+            tagFocused("channels-group-1")
+            val full = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+            armed.set(true)
+            key(Key.Enter)
+            compose.waitUntil(10_000) { entered.isCompleted }
+            // The new group's rows are empty until its programmes arrive, so the grid focuses nothing.
+            publishEvents(emptyList(), EpgSnapshot.create(events = emptyList(), historicalEvents = emptyList(), coverages = emptyList()), covered = false)
+            // Well past the settle while they load: still the programme, never "no information".
+            compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs * 4)
+            compose.waitForIdle()
+            compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
+            compose.onNodeWithTag("channels-immersive-background").assertExists()
+            publishEvents(full.events, full, covered = true)
+            release.complete(Unit)
+            // Having lost its programme, the grid takes the one at the window's start, as before.
+            key(Key.DirectionDown)
+            focused(title(1, -1))
+            headlineTitle(title(1, -1))
+        } finally {
+            armed.set(false)
+            release.complete(Unit)
+        }
     }
 
     @Test fun viewOptionsHideTheHeadlineAndItsArtAndKeepTheChoice() {
@@ -1132,6 +1178,83 @@ class GuideVisualLayoutTest {
         key(Key.Back)
         tagFocused("nav-epg")
         assertNoPlayback(additionalCoverageCalls = 1)
+    }
+
+    @Test fun backToNowFocusesTheProgrammeOnAirWhenItArrivesAfterTheJump() {
+        // 19:30-20:30, 20:30-21:30 ...: at 20:45 the hour's first programme is not the one on air.
+        assertTrue(SystemClock.setCurrentTimeMillis((hour + 45 * 60) * 1000))
+        val armed = AtomicBoolean(false)
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            show(eventHour = hour - 1800, beforeCoverageBatch = { _, _ ->
+                if (armed.get()) {
+                    entered.complete(Unit)
+                    release.await()
+                }
+            })
+            key(Key.DirectionDown)
+            key(Key.DirectionDown)
+            focused(title(2, 1))
+            val nowWindow = checkNotNull(position.position.value).windowStartSec
+            repeat(3) { key(Key.DirectionRight) }
+            focused(title(2, 4))
+            assertNotEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
+            val full = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+            publishEvents(full.events.filterNot { it.id == EventId(211) }, full, covered = false)
+            armed.set(true)
+            key(Key.Back)
+            compose.waitUntil(10_000) { entered.isCompleted }
+            publishEvents(full.events, full, covered = true)
+            release.complete(Unit)
+            focused(title(2, 1))
+            assertEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
+        } finally {
+            armed.set(false)
+            release.complete(Unit)
+        }
+    }
+
+    @Test fun anOpenPanelHidesTheGridFromAccessibilityAndItsEntriesStayReadable() {
+        val gridHidden = SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility) and
+            hasAnyDescendant(hasTestTag("epg-channel-row-1"))
+        fun gridHiddenCount() = compose.onAllNodes(gridHidden, useUnmergedTree = true).fetchSemanticsNodes().size
+        show()
+        assertEquals(0, gridHiddenCount())
+        key(Key.DirectionRight)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.HideFromAccessibility))
+        assertEquals(1, gridHiddenCount())
+        key(Key.Back)
+        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
+        assertEquals(0, gridHiddenCount())
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.HideFromAccessibility))
+        assertEquals(1, gridHiddenCount())
+        key(Key.Back)
+        compose.onNodeWithTag("guide-view-panel").assertDoesNotExist()
+        assertEquals(0, gridHiddenCount())
+    }
+
+    private fun publishEvents(events: List<EpgEvent>, snapshot: EpgSnapshot, covered: Boolean) {
+        compose.runOnIdle {
+            val observation = session.observation.value
+            session.publish(SessionObservation.create(
+                sessionState = observation.sessionState,
+                channelState = observation.channelState,
+                epgState = EpgRepositoryState.Current(EpgSnapshot.create(
+                    events = events, historicalEvents = snapshot.historicalEvents,
+                    coverages = if (covered) snapshot.coverages else emptyList(),
+                )),
+                dvrState = observation.dvrState,
+                dvrConfigurationsState = observation.dvrConfigurationsState,
+            ))
+        }
     }
 
     private fun selectHistory() {

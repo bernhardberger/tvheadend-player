@@ -134,6 +134,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineProgramme
+import at.bernhardberger.tvhplayer.ui.screens.guide.rememberSettledGuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideOverlayHost
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
@@ -736,6 +737,8 @@ fun EpgGridScreen(
 
     LaunchedEffect(initialFocusEnabled) {
         if (!initialFocusEnabled) {
+            consumeBackRelease = false
+            railOnBackRelease = false
             scopeEntryRequested = false
             cancelPendingProgrammeNavigation()
         }
@@ -1359,7 +1362,14 @@ fun EpgGridScreen(
         selectAnchored(target, anchorSec)
     }
 
-    fun jumpToWindow(targetSec: Long, channelId: ChannelId? = null, programme: EpgEventEntry? = null) {
+    // focusSec stands in for the programme's start when it is not loaded yet, so the focus lands on
+    // the programme airing then rather than the window's first.
+    fun jumpToWindow(
+        targetSec: Long,
+        channelId: ChannelId? = null,
+        programme: EpgEventEntry? = null,
+        focusSec: Long? = null,
+    ) {
         val channelIndex = channelId?.let { id -> channels.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
             ?: selectedTarget?.channelIndex
             ?: pendingInitialChannelIndex.takeIf { it >= 0 }
@@ -1378,7 +1388,7 @@ fun EpgGridScreen(
             coverageRequest = coverageRequest,
             throughSec = boundedTargetSec + visibleWindowSec,
             programmeId = programme?.id,
-            programmeStartSec = programme?.start?.epochSeconds,
+            programmeStartSec = programme?.start?.epochSeconds ?: focusSec,
         )
     }
 
@@ -1405,7 +1415,7 @@ fun EpgGridScreen(
         val onNow = displayEvents.firstOrNull {
             it.channelId == channelId && it.start.epochSeconds <= nowSec && it.stop.epochSeconds > nowSec
         }
-        jumpToWindow(nowWindowSec, channelId, onNow)
+        jumpToWindow(nowWindowSec, channelId, onNow, focusSec = nowSec)
         return true
     }
 
@@ -1677,8 +1687,24 @@ fun EpgGridScreen(
         @Composable
         fun GuideBrowseContent() {
         val browseAlpha = { 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
-        // Read by the headline and its picture alone, so focus steps don't recompose the screen.
-        val headlineProgramme = { guideHeadlineProgramme(selectedTarget, channels, focusRows) }
+        // Read by the headline and its picture alone, so neither focus steps nor a settle recompose the screen.
+        val settledHeadline = if (view.headline) {
+            rememberSettledGuideHeadline(
+                programme = { guideHeadlineProgramme(selectedTarget, channels, focusRows) },
+                repositioning = {
+                    guideAlert == null && (
+                        !initialPositionDone || windowFocusRequest != null ||
+                            channelFocusRequest != null || frontierRequest != null ||
+                            // Rows with programmes get a focus from reconciliation; empty ones may be loading.
+                            focusRows.any { it.events.isNotEmpty() } ||
+                            coverageRequestVersion.let {
+                                orderedChannelIds.any { coverageRequests.isPending(it, windowStartSec) }
+                            }
+                        )
+                },
+            )
+        } else null
+        val headlineProgramme = { settledHeadline?.value }
         if (view.headline) {
             GuideHeadlineBackground(
                 programme = headlineProgramme,
@@ -1695,7 +1721,7 @@ fun EpgGridScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = browseAlpha() }
-                .semantics { if (detailsEvent != null) hideFromAccessibility() }
+                .semantics { if (detailsEvent != null || openPanel != null) hideFromAccessibility() }
                 .focusProperties {
                     // As in Channels: entering from the rail returns to the remembered programme.
                     onEnter = {
@@ -1710,6 +1736,12 @@ fun EpgGridScreen(
                 .focusGroup()
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.Back) {
+                        // A release that never reached this Column (the focused cell can leave when
+                        // the window swaps) must not leave the next press dead.
+                        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                            consumeBackRelease = false
+                            railOnBackRelease = false
+                        }
                         if (consumeBackRelease) {
                             if (event.type == KeyEventType.KeyUp) {
                                 consumeBackRelease = false
@@ -1966,8 +1998,8 @@ fun EpgGridScreen(
                     it.channelId == channelId &&
                         it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
                 }
-                jumpToWindow(floorGuideWindowToHour(available?.start?.epochSeconds ?: nowSecProvider(), guideZoneId),
-                    channelId, available)
+                val focusSec = available?.start?.epochSeconds ?: nowSecProvider()
+                jumpToWindow(floorGuideWindowToHour(focusSec, guideZoneId), channelId, available, focusSec = focusSec)
             },
             showJumpDialog = showJumpDialog,
             windowStartSec = { windowStartSec },

@@ -275,6 +275,19 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-conflict-river-court")
     }
 
+    @Test fun headlineNamesAFailedRecordingAsDetailsDoes() {
+        showAt("2026-09-14T12:10:00")
+        moveToChannel(4)
+        val failed = eventsByFixtureId.getValue("evt-ch-ridge-cycle-20260914T1200")
+        seekEvent(failed)
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("guide-headline-title") and hasText(checkNotNull(failed.title)),
+                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasTestTag("recording-badge-failed") and hasAnyAncestor(hasTestTag("guide-headline")),
+            useUnmergedTree = true).assertIsDisplayed()
+    }
+
     @Test fun longGermanProgrammeKeepsItsFullAccessibleTitle() {
         showAt("2026-09-14T02:35:00")
         moveToChannel(20)
@@ -507,7 +520,7 @@ class GuideRealisticSceneTest {
         val inCell = hasAnyAncestor(isFocused())
         val text = compose.onNode(hasText(title) and inCell, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val mark = compose.onNode(hasContentDescription(context().getString(description)) and inCell,
-            useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         assertTrue("The mark follows the title: title=$text mark=$mark", mark.left >= text.right)
         assertTrue("The mark sits on the title line: title=$text mark=$mark",
             mark.top >= text.top - 1f && mark.bottom <= text.bottom + 1f)

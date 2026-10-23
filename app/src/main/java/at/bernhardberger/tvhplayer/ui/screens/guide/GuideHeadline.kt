@@ -14,11 +14,11 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Alignment
@@ -91,6 +91,38 @@ internal fun guideHeadlineProgramme(
 }
 
 /**
+ * The programme the headline and its picture show: [programme] once focus has rested on it
+ * ([GuideHeadlineSettleMs]); the first one shows at once. While the grid focuses nothing but is
+ * still finding its programme ([repositioning]: rows loading or a focus pending), the last one
+ * stays, so a slow group switch neither claims there is no guide data nor drops the picture. Read it
+ * only inside the headline's lambdas: focus steps and settles then recompose the headline, not the
+ * screen.
+ */
+@Composable
+internal fun rememberSettledGuideHeadline(
+    programme: () -> GuideHeadlineProgramme?,
+    repositioning: () -> Boolean,
+): State<GuideHeadlineProgramme?> {
+    val currentProgramme by rememberUpdatedState(programme)
+    val currentRepositioning by rememberUpdatedState(repositioning)
+    val shown = remember { mutableStateOf(Snapshot.withoutReadObservation { programme() }) }
+    LaunchedEffect(Unit) {
+        // Asks whether the grid is repositioning only when nothing is focused, so focus steps stay cheap.
+        snapshotFlow { currentProgramme().let { it to (it == null && currentRepositioning()) } }
+            .collectLatest { (next, hold) ->
+                if (shown.value == null) {
+                    shown.value = next
+                    return@collectLatest
+                }
+                if (hold) return@collectLatest
+                delay(GuideHeadlineSettleMs)
+                shown.value = next
+            }
+    }
+    return shown
+}
+
+/**
  * The focused programme's picture at the screen's top end behind the headline, or else its
  * channel's logo: the Channels screen's corner background, which waits for focus to rest itself.
  */
@@ -120,10 +152,9 @@ internal fun GuideHeadlineBackground(
 }
 
 /**
- * The Guide's headline: who and what the focused [programme] is, passive, at a fixed height so
- * the grid below stays put; shorter text sits on its bottom edge. It follows focus only once
- * focus has rested ([GuideHeadlineSettleMs]), and reads it here, so a held key neither recomposes
- * it per step nor the screen. Before anything is focused it shows the programme the grid enters.
+ * The Guide's headline: who and what the settled [programme] is ([rememberSettledGuideHeadline]),
+ * passive, at a fixed height so the grid below stays put; shorter text sits on its bottom edge.
+ * Before anything is focused it shows the programme the grid enters.
  */
 @Composable
 internal fun GuideHeadline(
@@ -134,15 +165,6 @@ internal fun GuideHeadline(
     nowSec: () -> Long,
     modifier: Modifier = Modifier,
 ) {
-    val currentProgramme by rememberUpdatedState(programme)
-    // The first programme shows at once; read unobserved, so focus steps don't recompose this.
-    var shown by remember { mutableStateOf(Snapshot.withoutReadObservation { programme() }) }
-    LaunchedEffect(Unit) {
-        snapshotFlow { currentProgramme() }.collectLatest { next ->
-            if (shown != null) delay(GuideHeadlineSettleMs)
-            shown = next
-        }
-    }
     val typography = MaterialTheme.typography
     // A step below the Channels hero's title, so the grid keeps its rows.
     val titleStyle = typography.headlineSmall
@@ -156,7 +178,7 @@ internal fun GuideHeadline(
     }
     ProvideArtworkSession(observation.currentSession, scopeObservation) {
         AnimatedContent(
-            targetState = shown,
+            targetState = programme(),
             transitionSpec = {
                 // The entry's programme, resolved a frame after the screen, replaces the
                 // placeholder at once rather than fading in over "no programme information".
@@ -203,9 +225,12 @@ private fun GuideHeadlineContent(
         }.orEmpty()
     }
     val now = nowSec()
-    // The rows' marks: a running recording or a scheduled one.
+    // The rows' marks, a running recording or a scheduled one, and a failed one as details names it.
     val recording = event?.let { observation.dvrEntryForEvent(it.id) }
-    val mark = recording?.state?.takeIf { recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED }
+    val mark = recording?.state?.takeIf {
+        recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED ||
+            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.FILE_MISSING
+    }
     ProgrammeHeadline(
         eyebrow = {
             if (programme != null) {
