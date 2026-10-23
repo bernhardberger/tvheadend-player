@@ -395,7 +395,7 @@ internal fun RecordingMetadataPane(
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     failure?.let {
                         ProgrammeStatusLine(it, R.drawable.ic_error_outlined, "recording-metadata-failure",
-                            MaterialTheme.colorScheme.error, maxLines = 2)
+                            color = MaterialTheme.colorScheme.error, maxLines = 2)
                     }
                     if (stoppedEarly) {
                         ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early),

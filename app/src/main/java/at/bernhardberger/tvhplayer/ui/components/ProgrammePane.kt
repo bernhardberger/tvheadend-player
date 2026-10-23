@@ -252,9 +252,9 @@ internal fun ProgrammeStatusLine(
     text: String,
     @DrawableRes icon: Int?,
     tag: String,
+    modifier: Modifier = Modifier,
     color: Color = TvTextColors.tertiary,
     maxLines: Int = 1,
-    modifier: Modifier = Modifier,
 ) {
     Row(modifier.testTag(tag), verticalAlignment = Alignment.CenterVertically) {
         if (icon != null) {
