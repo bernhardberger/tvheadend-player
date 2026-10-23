@@ -419,7 +419,9 @@ class GuideRealisticSceneTest {
                 }
             }
         }
-        focused(context().getString(R.string.all_channels))
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
         assertNotNull(model.observation.value.currentSession)
     }
 

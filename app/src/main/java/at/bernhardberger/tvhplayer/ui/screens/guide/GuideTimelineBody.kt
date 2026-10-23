@@ -39,6 +39,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -77,6 +78,7 @@ internal data class GuideTabBody(
     val coveragePending: (ChannelId) -> Boolean,
     val earlierContent: Boolean,
     val laterContent: Boolean,
+    val rows: GuideRows,
 )
 
 /**
@@ -136,6 +138,7 @@ internal fun GuideTimelineBody(
     val renderedWindowStartSec = frame.windowStart
     val windowEndSec = frame.windowEnd
     val nowSecProvider = rememberTabReader(frame.nowSec)
+    val rows = frame.rows
     val tagNotice = frame.tagNotice
     val guideRecovering = frame.recovering
     val channelListState = rememberTabListState(channelListState)
@@ -265,6 +268,7 @@ internal fun GuideTimelineBody(
                     ),
                     focusStartInset = horizontalFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
                     focusEndInset = horizontalFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
+                    rows = rows,
                 )
             }
         }

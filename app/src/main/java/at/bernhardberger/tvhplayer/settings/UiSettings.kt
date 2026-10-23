@@ -16,6 +16,7 @@ data class UiSettings(
     val clockFormat: ClockFormat = ClockFormat.SYSTEM,
     val recordingProfileId: DvrConfigId? = null,
     val channelsView: ChannelsView = ChannelsView(),
+    val guideView: GuideView = GuideView(),
 )
 
 fun resolveEpgMenuVisibility(storedValue: Boolean?): Boolean = storedValue ?: true
@@ -30,6 +31,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
         fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
+        val GUIDE_ROWS = stringPreferencesKey("guideRows")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
@@ -39,6 +41,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
             channelsView = resolveChannelsView(preferences[Keys.CHANNELS_LAYOUT]) { preferences[Keys.channelsProgramArt(it)] },
+            guideView = resolveGuideView(preferences[Keys.GUIDE_ROWS]),
         )
     }
 
@@ -52,6 +55,12 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
             ChannelsLayout.entries.forEach { preferences[Keys.channelsProgramArt(it)] = it in view.programArt }
+        }
+    }
+
+    suspend fun setGuideView(view: GuideView) {
+        dataStore.edit { preferences ->
+            preferences[Keys.GUIDE_ROWS] = view.rows.name
         }
     }
 

@@ -435,7 +435,7 @@ class BrowseCohesionEvidenceTest {
             )
             }
         }
-        awaitFocus(hasText("All channels"))
+        awaitFocus(hasTestTag("guide-date-button"))
         compose.runOnIdle { initialSdkCalls = session.calls.size }
     }
 

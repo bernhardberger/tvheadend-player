@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
@@ -72,6 +73,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -97,25 +99,31 @@ import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 
-private val GuideChannelLogoWidth = 60.dp
-private val GuideChannelLogoHeight = 36.dp
-private val GuideChannelHeaderVerticalPadding = 6.dp
+private fun GuideRows.logoWidth(): Dp = if (this == GuideRows.DENSE) 48.dp else 60.dp
+private fun GuideRows.logoHeight(): Dp = if (this == GuideRows.DENSE) 28.dp else 36.dp
+private fun GuideRows.headerVerticalPadding(): Dp = if (this == GuideRows.DENSE) 4.dp else 6.dp
 
+/**
+ * A Guide row's height: Material for TV's two-line list item minimum (dense 56dp, regular 64dp)
+ * at the current font scale, grown to fit the channel header and one title and time line with
+ * the list item's vertical content padding (dense 10dp, regular 12dp on each side).
+ */
 @Composable
-internal fun guideTimelineRowHeight(): Dp = with(LocalDensity.current) {
+internal fun guideTimelineRowHeight(rows: GuideRows = GuideRows.DENSE): Dp = with(LocalDensity.current) {
     val titleLine = MaterialTheme.typography.titleSmall.lineHeight.toDp()
     val numberLine = MaterialTheme.typography.labelMedium.lineHeight.toDp()
     val headerContent = maxOf(
-        GuideChannelLogoHeight,
+        rows.logoHeight(),
         numberLine,
         titleLine,
-    ) + GuideChannelHeaderVerticalPadding * 2
+    ) + rows.headerVerticalPadding() * 2
     // One programme title and time line, including native ListItem content padding;
     // headers either show number/logo or number/name, never all three.
+    val dense = rows == GuideRows.DENSE
     maxOf(
-        64.dp * fontScale,
+        (if (dense) 56.dp else 64.dp) * fontScale,
         headerContent,
-        titleLine + MaterialTheme.typography.bodySmall.lineHeight.toDp() + TvSpacing24,
+        titleLine + MaterialTheme.typography.bodySmall.lineHeight.toDp() + if (dense) 20.dp else TvSpacing24,
     )
 }
 
@@ -238,6 +246,7 @@ internal fun TimelineChannelRow(
     visibleRowWidthPx: Int? = null,
     focusStartInset: Dp = 0.dp,
     focusEndInset: Dp = 0.dp,
+    rows: GuideRows = GuideRows.DENSE,
 ) {
     val nowSec = nowSecProvider()
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
@@ -249,7 +258,7 @@ internal fun TimelineChannelRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(guideTimelineRowHeight())
+            .height(guideTimelineRowHeight(rows))
             .testTag("epg-channel-row-${channel.id.value}")
             .profileViewportItem { "guideRow:$channelIndex:$windowStartSec:${events.size}" },
         verticalAlignment = Alignment.CenterVertically,
@@ -258,6 +267,7 @@ internal fun TimelineChannelRow(
             channel = channel,
             number = number,
             selected = selectedEventId != null,
+            rows = rows,
         )
         Spacer(Modifier.width(GuideChannelGap))
         BoxWithConstraints(
@@ -323,6 +333,7 @@ internal fun TimelineChannelRow(
                         onOpenDetails = { onOpenDetails(event) },
                         onOpenContextMenu = onOpenContextMenu?.let { open -> { open(event) } },
                         width = width,
+                        rows = rows,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
                             // The 4dp gap is narrower than the focus scale: the focused
@@ -361,6 +372,7 @@ internal fun TimelineChannelHeader(
     channel: Channel,
     number: Long?,
     selected: Boolean = false,
+    rows: GuideRows = GuideRows.DENSE,
 ) {
     val currentSession = LocalArtworkContext.current.currentSession
     var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
@@ -386,7 +398,7 @@ internal fun TimelineChannelHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = TvSpacing16, vertical = GuideChannelHeaderVerticalPadding),
+                .padding(horizontal = TvSpacing16, vertical = rows.headerVerticalPadding()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
         ) {
@@ -403,8 +415,8 @@ internal fun TimelineChannelHeader(
                     piconPath = channel.icon,
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .widthIn(max = GuideChannelLogoWidth)
-                        .height(GuideChannelLogoHeight)
+                        .widthIn(max = rows.logoWidth())
+                        .height(rows.logoHeight())
                         .testTag("epg-channel-picon-${channel.id.value}"),
                     onError = { logoFailed = true },
                 )
@@ -435,6 +447,7 @@ internal fun TimelineProgrammeCell(
     width: Dp,
     modifier: Modifier,
     onOpenContextMenu: (() -> Unit)? = null,
+    rows: GuideRows = GuideRows.DENSE,
 ) {
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onOpenContextMenu)
     val stateText = when {
@@ -466,39 +479,52 @@ internal fun TimelineProgrammeCell(
     )
 
     Box(modifier = modifier) {
-        ListItem(
-            selected = selected,
-            onClick = onOpenDetails,
-            onLongClick = contextMenu.onLongClick,
-            headlineContent = {
-                Text(
-                    // Always render a label so no focusable cell is visually blank.
-                    text = event.title.orEmpty(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    style = MaterialTheme.typography.titleSmall,
-                )
-            },
-            supportingContent = if (width >= 90.dp) {
-                { ProgrammeTimeText(range = timeRange, start = startTime) }
-            } else {
-                null
-            },
-            modifier = Modifier
-                .tabFocus()
-                .fillMaxSize()
-                .padding(horizontal = TvSpacing4 / 2)
-                // The panel shape is drawn, not clipped: a clip here would cancel the
-                // library focus scale the surface applies outside this modifier.
-                .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
-                .focusRequester(focusRequester)
-                .then(contextMenu.modifier)
-                .onFocusChanged {
-                    focused = it.isFocused
-                    if (it.isFocused) onFocused()
-                }
-                .semantics { contentDescription = description },
-        )
+        val headline: @Composable () -> Unit = {
+            Text(
+                // Always render a label so no focusable cell is visually blank.
+                text = event.title.orEmpty(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                style = MaterialTheme.typography.titleSmall,
+            )
+        }
+        val supporting: (@Composable () -> Unit)? = if (width >= 90.dp) {
+            { ProgrammeTimeText(range = timeRange, start = startTime) }
+        } else {
+            null
+        }
+        val cellModifier = Modifier
+            .tabFocus()
+            .fillMaxSize()
+            .padding(horizontal = TvSpacing4 / 2)
+            // The panel shape is drawn, not clipped: a clip here would cancel the
+            // library focus scale the surface applies outside this modifier.
+            .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
+            .focusRequester(focusRequester)
+            .then(contextMenu.modifier)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused) onFocused()
+            }
+            .semantics { contentDescription = description }
+        when (rows) {
+            GuideRows.DENSE -> DenseListItem(
+                selected = selected,
+                onClick = onOpenDetails,
+                onLongClick = contextMenu.onLongClick,
+                headlineContent = headline,
+                supportingContent = supporting,
+                modifier = cellModifier,
+            )
+            GuideRows.REGULAR -> ListItem(
+                selected = selected,
+                onClick = onOpenDetails,
+                onLongClick = contextMenu.onLongClick,
+                headlineContent = headline,
+                supportingContent = supporting,
+                modifier = cellModifier,
+            )
+        }
         recording?.takeIf {
             recordingIsRunning(it) || it.state == DvrEntryState.SCHEDULED
         }?.let {

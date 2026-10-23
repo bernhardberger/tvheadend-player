@@ -879,6 +879,7 @@ fun AppRoot(
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
                             playerReturn = guideChannelRequest ?: playerReturnFor(GuideKey),
+                            view = uiSettings.guideView,
                             connectionUiState = connectionUiState,
                             connectionFailure = browseConnectionFailure,
                             onRetry = retryBrowseConnection,

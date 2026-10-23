@@ -221,6 +221,11 @@ class GuideHistoryScreenTest {
             compose.onNodeWithText(title).assertIsFocused()
         }
         fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
+        fun dateFocused() {
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+            }
+        }
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour 0")).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionDown)
         focused("Channel 1 hour 0")
@@ -372,11 +377,6 @@ class GuideHistoryScreenTest {
                 compose.runOnIdle { session.replaceGeneration(observation(false)) }
                 compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("details-play")).fetchSemanticsNodes().isEmpty() }
                 compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-                compose.waitUntil(10_000) {
-                    compose.onAllNodes(hasText(context.getString(R.string.now)) and isFocusable()).fetchSemanticsNodes().isNotEmpty()
-                }
-                compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
-                key(Key.DirectionCenter)
                 focused("Channel 1 hour 0")
             }
             return
@@ -404,24 +404,22 @@ class GuideHistoryScreenTest {
         key(Key.DirectionLeft)
         focused("Channel 1 hour -6")
         assertEquals("earliest past window stays local", calls, session.calls.size)
-        compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
-        key(Key.DirectionCenter)
+        key(Key.Back) // Back in the past returns to now on the same channel.
         focused("Channel 1 hour 0")
         key(Key.DirectionLeft)
         focused("Channel 1 hour -1")
         compose.runOnIdle { session.publish(observation(false)) }
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
-        focused(context.getString(R.string.now))
-        compose.onNodeWithText(context.getString(R.string.now)).requestFocus()
-        key(Key.DirectionCenter)
+        dateFocused()
+        key(Key.DirectionDown)
         focused("Channel 1 hour 0")
         compose.runOnIdle { session.publish(observation(true)) }
         key(Key.DirectionLeft)
         focused("Channel 1 hour -1")
         compose.runOnIdle { session.replaceGeneration(observation(false)) }
         compose.waitUntil(10_000) { compose.onAllNodes(hasText("Channel 1 hour -1")).fetchSemanticsNodes().isEmpty() }
-        focused(context.getString(R.string.now))
-        key(Key.DirectionCenter)
+        dateFocused()
+        key(Key.DirectionDown)
         focused("Channel 1 hour 0")
     }
 }

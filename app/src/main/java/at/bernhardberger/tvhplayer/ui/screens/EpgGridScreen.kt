@@ -122,7 +122,6 @@ import at.bernhardberger.tvhplayer.stores.GuidePosition
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
-import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
@@ -133,6 +132,9 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideOverlayHost
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
+import at.bernhardberger.tvhplayer.settings.GuideView
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
@@ -144,6 +146,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.ZoneId
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlin.time.Instant as KotlinInstant
@@ -155,13 +158,6 @@ private const val CHANNEL_PAGE_SIZE = 6
 private const val GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS = 10_000L
 // Hidden for 1.0, owner decision 2026-10-12.
 private const val GuideSearchEntryVisible = false
-
-private enum class GuideHeaderFocus {
-    DATE,
-    NOW,
-    SEARCH,
-    CLEAR_FILTER,
-}
 
 private data class FrontierRequest(
     val channelId: ChannelId,
@@ -247,6 +243,7 @@ internal fun guideTimelineContentPadding(
 fun EpgGridScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
+    view: GuideView = GuideView(),
     category: ProgrammeCategory = ProgrammeCategory.ALL,
     channelViewModel: ChannelsViewModel,
     selection: ChannelSelectionStore = koinInject(),
@@ -317,13 +314,10 @@ fun EpgGridScreen(
     val dvrEntries = observation.dvrEntries()
     val eventFocusRequesters = remember { mutableMapOf<EventId, FocusRequester>() }
     val guideDateFocus = remember { FocusRequester() }
-    val guideNowFocus = remember { FocusRequester() }
-    val guideSearchFocus = remember { FocusRequester() }
-    val guideClearFilterFocus = remember { FocusRequester() }
     val guideRetryFocus = remember { FocusRequester() }
-    val scopeFocus = remember { FocusRequester() }
-    val scopeCount = channelScope.tags.size + if (channelScope.allChannelsVisible) 1 else 0
-    val hasScopeTabs = scopeCount > 1
+    val groups = remember(channelScope) { channelsGroups(channelScope) }
+    val header = remember { ChannelsHeaderFocus() }
+    var openPanel by remember { mutableStateOf<ChannelsPanel?>(null) }
     val guideAlert = guideAppError(
         hasChannels = channelScope.visibleChannels.isNotEmpty(),
         isEmptyTag = channelScope.activeTagId != null,
@@ -390,6 +384,7 @@ fun EpgGridScreen(
     var scopeEntryRequested by remember { mutableStateOf(false) }
     var suppressActivationRelease by remember { mutableStateOf(false) }
     var consumeBackRelease by remember { mutableStateOf(false) }
+    var railOnBackRelease by remember { mutableStateOf(false) }
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
@@ -425,12 +420,11 @@ fun EpgGridScreen(
     var coverageTagId by remember { mutableStateOf(channelScope.activeTagId) }
     var coverageCategory by remember { mutableStateOf(category) }
     var lastPlayedId by remember { mutableStateOf<ChannelId?>(null) }
-    var lastHeaderFocus by remember { mutableStateOf(GuideHeaderFocus.DATE) }
     var programmeFocusOwned by remember { mutableStateOf(true) }
     var preparationEntryToScope by remember { mutableStateOf(false) }
     val mayFocusProgramme by rememberUpdatedState(
         initialFocusEnabled && programmeFocusOwned &&
-            detailsEvent == null && !showSearchDialog && !showJumpDialog &&
+            detailsEvent == null && !showSearchDialog && !showJumpDialog && openPanel == null &&
             channelFocusRequest == null
     )
 
@@ -463,16 +457,7 @@ fun EpgGridScreen(
 
     fun focusGuideHeader(): Boolean = runCatching {
         programmeFocusOwned = false
-        when (lastHeaderFocus) {
-            GuideHeaderFocus.DATE -> guideDateFocus.requestFocus()
-            GuideHeaderFocus.NOW -> guideNowFocus.requestFocus()
-            GuideHeaderFocus.SEARCH -> if (GuideSearchEntryVisible) {
-                guideSearchFocus.requestFocus()
-            } else {
-                guideNowFocus.requestFocus()
-            }
-            GuideHeaderFocus.CLEAR_FILTER -> guideClearFilterFocus.requestFocus()
-        }
+        guideDateFocus.requestFocus()
     }.getOrDefault(false)
 
     fun focusGuideContent(): Boolean {
@@ -553,10 +538,7 @@ fun EpgGridScreen(
     LaunchedEffect(showSearchDialog, restoreSearchHeaderFocus, indexCurrent) {
         if (indexCurrent && !showSearchDialog && restoreSearchHeaderFocus) {
             withFrameNanos { }
-            runCatching {
-                if (GuideSearchEntryVisible) guideSearchFocus.requestFocus()
-                else guideNowFocus.requestFocus()
-            }
+            runCatching { guideDateFocus.requestFocus() }
             restoreSearchHeaderFocus = false
         }
     }
@@ -744,15 +726,6 @@ fun EpgGridScreen(
         programmeFocusOwned = false
         cancelPendingProgrammeNavigation()
     }
-
-    fun focusScopeFromProgramme() {
-        releaseProgrammeFocus()
-        if (hasScopeTabs) scopeFocus.requestFocus() else focusGuideHeader()
-    }
-
-    val programmeBackEnabled = indexCurrent && initialFocusEnabled && programmeFocusOwned &&
-        detailsEvent == null && !showSearchDialog && !showJumpDialog
-    BackHandler(enabled = programmeBackEnabled) { focusScopeFromProgramme() }
 
     LaunchedEffect(initialFocusEnabled) {
         if (!initialFocusEnabled) {
@@ -1413,6 +1386,32 @@ fun EpgGridScreen(
         return true
     }
 
+    /**
+     * Back on a programme in a Guide moved away from now: returns to now on the same channel, on
+     * the programme airing there. False when now is already within the visible window.
+     */
+    fun backToNow(): Boolean {
+        val nowSec = nowSecProvider()
+        val channelId = selectedTarget?.channelIndex?.let(channels::getOrNull)?.id
+        if (nowSec in windowStartSec until windowEndSec || channelId == null) return false
+        val nowWindowSec = windowBounds.constrain(floorGuideWindowToHour(nowSec, guideZoneId))
+        val onNow = displayEvents.firstOrNull {
+            it.channelId == channelId && it.start.epochSeconds <= nowSec && it.stop.epochSeconds > nowSec
+        }
+        jumpToWindow(nowWindowSec, channelId, onNow)
+        return true
+    }
+
+    /** Back on a programme in a Guide at now: leaves for the navigation rail. */
+    fun backToRail() {
+        releaseProgrammeFocus()
+        navigationFocus?.let { runCatching { it.requestFocus() } } ?: focusGuideHeader()
+    }
+
+    val programmeBackEnabled = indexCurrent && initialFocusEnabled && programmeFocusOwned &&
+        detailsEvent == null && !showSearchDialog && !showJumpDialog && openPanel == null
+    BackHandler(enabled = programmeBackEnabled) { if (!backToNow()) backToRail() }
+
     fun moveFocus(direction: EpgFocusDirection): Boolean {
         if (channelViewModel.scope.value != channelScopeState) return true
         when (guidePendingNavigationAction(
@@ -1469,11 +1468,7 @@ fun EpgGridScreen(
                     requestChannelFocus(current, previousChannelIndex, -1)
                     return true
                 }
-                if (hasScopeTabs) {
-                    scopeFocus.requestFocus()
-                } else {
-                    focusGuideHeader()
-                }
+                focusGuideHeader()
                 return true
             }
             move.timeFrontierDirection != 0 -> {
@@ -1635,12 +1630,21 @@ fun EpgGridScreen(
         }
     }
 
-    val categoryLabel = programmeCategoryLabel(category)
+    val settingsStore: UiSettingsStore = koinInject()
+    val settingsScope = rememberCoroutineScope()
+
+    /** Closes the open side panel and returns focus to the header button that opened it. */
+    fun closePanel() {
+        val opener = if (openPanel == ChannelsPanel.GROUP) header.group else header.view
+        runCatching { opener.requestFocus() }
+        openPanel = null
+    }
+
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
         BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = preparedIndex != null,
             onPendingFocus = {
-                // Cold entry starts on the scope; a player return enters its programme.
+                // Cold entry starts on the header; a player return enters its programme.
                 preparationEntryToScope = (!initialPositionDone && pendingPlayerReturn == null) || !programmeFocusOwned
                 realizedTarget = null
                 if (preparationEntryToScope) programmeFocusOwned = false
@@ -1650,8 +1654,7 @@ fun EpgGridScreen(
                     channelViewModel.scope.value != channelScopeState
                 ) false else if (preparationEntryToScope) {
                     programmeFocusOwned = false
-                    if (hasScopeTabs) runCatching { scopeFocus.requestFocus() }.getOrDefault(false)
-                    else focusGuideHeader()
+                    focusGuideHeader()
                 } else {
                     selectedTarget?.eventId?.let(eventFocusRequesters::get)?.let {
                         runCatching { it.requestFocus() }.getOrDefault(false)
@@ -1672,22 +1675,33 @@ fun EpgGridScreen(
                 .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
                 .semantics { if (detailsEvent != null) hideFromAccessibility() }
                 .focusProperties {
+                    // As in Channels: entering from the rail returns to the remembered programme.
                     onEnter = {
-                        if (requestedFocusDirection == FocusDirection.Right) {
-                            if (hasScopeTabs) scopeFocus.requestFocus() else guideDateFocus.requestFocus()
+                        val awayFromNavigation = if (layoutDirection == LayoutDirection.Ltr) {
+                            FocusDirection.Right
+                        } else {
+                            FocusDirection.Left
                         }
+                        if (requestedFocusDirection == awayFromNavigation) focusGuideContent()
                     }
                 }
                 .focusGroup()
                 .onPreviewKeyEvent { event ->
                     if (event.key == Key.Back) {
                         if (consumeBackRelease) {
-                            if (event.type == KeyEventType.KeyUp) consumeBackRelease = false
+                            if (event.type == KeyEventType.KeyUp) {
+                                consumeBackRelease = false
+                                // The rail takes focus on the release, so it cannot receive it.
+                                if (railOnBackRelease) {
+                                    railOnBackRelease = false
+                                    backToRail()
+                                }
+                            }
                             return@onPreviewKeyEvent true
                         }
                         if (event.type == KeyEventType.KeyDown && programmeBackEnabled) {
                             consumeBackRelease = true
-                            focusScopeFromProgramme()
+                            railOnBackRelease = !backToNow()
                             return@onPreviewKeyEvent true
                         }
                     }
@@ -1701,76 +1715,27 @@ fun EpgGridScreen(
                 },
         ) {
             GuideHeader(
-                category = category,
-                categoryLabel = categoryLabel,
+                filter = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 windowStartSec = windowStartSec,
-                searchEntryVisible = GuideSearchEntryVisible,
-                hasScopeTabs = hasScopeTabs,
-                channelScope = channelScope,
+                nowSecProvider = nowSecProvider,
+                focus = header,
+                dateFocus = guideDateFocus,
+                showGroup = groups.size > 1,
+                navigationFocus = navigationFocus,
                 contentPadding = contentPadding,
                 startPadding = startPadding,
                 endPadding = endPadding,
                 density = density,
-                guideDateFocus = guideDateFocus,
-                guideNowFocus = guideNowFocus,
-                guideSearchFocus = guideSearchFocus,
-                guideClearFilterFocus = guideClearFilterFocus,
-                scopeFocus = scopeFocus,
                 onDateClick = {
                     releaseProgrammeFocus()
                     showJumpDialog = true
                 },
-                onNowClick = {
-                    val nowSec = nowSecProvider()
-                    jumpToWindow(floorGuideWindowToHour(nowSec, guideZoneId))
-                },
-                onSearchClick = {
+                onFocused = { releaseProgrammeFocus() },
+                onOpen = { panel ->
                     releaseProgrammeFocus()
-                    searchQuery = ""
-                    searchResult = null
-                    searchObservation = null
-                    searchRequest = null
-                    restoreSearchResultFocus = null
-                    showSearchDialog = true
-                },
-                onClearCategory = onClearCategory,
-                onDateFocused = {
-                    releaseProgrammeFocus()
-                    lastHeaderFocus = GuideHeaderFocus.DATE
-                },
-                onNowFocused = {
-                    releaseProgrammeFocus()
-                    lastHeaderFocus = GuideHeaderFocus.NOW
-                },
-                onSearchFocused = {
-                    releaseProgrammeFocus()
-                    lastHeaderFocus = GuideHeaderFocus.SEARCH
-                },
-                onClearFilterFocused = {
-                    releaseProgrammeFocus()
-                    lastHeaderFocus = GuideHeaderFocus.CLEAR_FILTER
-                },
-                onHeaderDown = {
-                    if (hasScopeTabs) {
-                        scopeFocus.requestFocus()
-                    } else {
-                        focusGuideContent()
-                    }
-                },
-                onSelectTag = {
-                    releaseProgrammeFocus()
-                    scopeMotion.select(it, buildList {
-                        if (channelScope.allChannelsVisible) add(null)
-                        addAll(channelScope.tags.map { tag -> tag.id })
-                    })
-                    channelViewModel.selectTag(it)
+                    openPanel = panel
                 },
                 onMoveToContent = { leaveGuideScope() },
-                onScopeFocused = {
-                    profileTrace("P48:focus:guideScope") { }
-                    releaseProgrammeFocus()
-                },
-                onScopeUp = { focusGuideHeader() },
             )
             Spacer(Modifier.height(4.dp))
             GuideTimelineBody(
@@ -1788,7 +1753,7 @@ fun EpgGridScreen(
                                 coverageRequests.isPending(channelId, preparedIndex.input.windowStartSec)
                             }
                         },
-                        earlierContent, laterContent,
+                        earlierContent, laterContent, view.rows,
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -1983,6 +1948,25 @@ fun EpgGridScreen(
                 jumpToWindow(target)
             },
         )
+        when (openPanel) {
+            ChannelsPanel.GROUP -> ChannelsGroupPanel(
+                groups = groups,
+                currentTagId = channelScope.activeTagId,
+                onSelect = { tagId ->
+                    closePanel()
+                    releaseProgrammeFocus()
+                    scopeMotion.select(tagId, groups.map { it.tagId })
+                    channelViewModel.selectTag(tagId)
+                },
+                onClose = ::closePanel,
+            )
+            ChannelsPanel.VIEW_OPTIONS -> GuideViewOptionsPanel(
+                view = view,
+                onViewChange = { settingsScope.launch { settingsStore.setGuideView(it) } },
+                onClose = ::closePanel,
+            )
+            null -> Unit
+        }
         }
         GuideOverlays()
 

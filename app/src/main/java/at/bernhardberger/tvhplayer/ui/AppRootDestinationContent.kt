@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.settings.GuideView
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -94,6 +95,7 @@ internal fun GuideRouteContent(
     contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
     playerReturn: PlayerReturnFocus?,
+    view: GuideView,
     connectionUiState: ConnectionUiState,
     connectionFailure: ConnectionUiState? = connectionUiState,
     onRetry: () -> Unit,
@@ -107,6 +109,7 @@ internal fun GuideRouteContent(
                 channelViewModel = channelsVm,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,
+                view = view,
                 connectionUiState = connectionUiState,
                 connectionFailure = connectionFailure,
                 playerReturn = playerReturn,

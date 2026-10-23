@@ -2,7 +2,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
-import org.koin.compose.KoinApplication
+import org.koin.compose.KoinIsolatedContext
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 
 import android.app.Application
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -60,6 +62,8 @@ import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePositionStore
 import at.bernhardberger.tvhplayer.stores.GuidePosition
@@ -125,6 +129,7 @@ class GuideVisualLayoutTest {
     private lateinit var loader: ImageLoader
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
+    private lateinit var model: ChannelsViewModel
     private lateinit var oldZone: TimeZone
     private lateinit var oldLocale: Locale
     private var lineColor = 0
@@ -170,14 +175,14 @@ class GuideVisualLayoutTest {
         val ruler = bounds("epg-time-ruler")
         assertEquals(262f, ruler.left, .1f)
         assertEquals(698f, ruler.width, .1f)
-        assertEquals(124f, ruler.top, .1f)
-        assertEquals(152f, ruler.bottom, .1f)
+        assertEquals(72f, ruler.top, .1f)
+        assertEquals(100f, ruler.bottom, .1f)
         val first = bounds("epg-channel-row-1")
         assertEquals(130f, first.left, .1f)
-        assertEquals(130f, compose.onNodeWithText(context().getString(R.string.all_channels)).fetchSemanticsNode().boundsInRoot.left, .1f)
-        assertEquals(160f, first.top, .1f)
-        assertEquals(64f, first.height, .1f)
-        assertEquals(228f, bounds("epg-channel-row-2").top, .1f)
+        compose.onNodeWithText(context().getString(R.string.all_channels)).assertDoesNotExist()
+        assertEquals(108f, first.top, .1f)
+        assertEquals("Dense rows by default", 56f, first.height, .1f)
+        assertEquals(168f, bounds("epg-channel-row-2").top, .1f)
         assertEquals(130f, bounds("epg-channel-header-1").left, .1f)
         assertEquals(254f, bounds("epg-channel-header-1").right, .1f)
         assertEquals("Ruler heading shares the 16dp channel text inset", 146f,
@@ -188,13 +193,13 @@ class GuideVisualLayoutTest {
         assertChannelHeader(bitmap, 1f)
         val start = checkNotNull(position.position.value).windowStartSec
         val x = ruler.left + guideTimePositionPx(now, start, start + 3 * 3600, ruler.width)
-        assertLine(bitmap, x, 222, 226, 290, 294, 358, 362, 426)
+        assertLine(bitmap, x, 162, 166, 222, 226, 282, 286, 342)
         val cell = compose.onNodeWithText(title(1, 0)).fetchSemanticsNode().boundsInRoot
         val tick = compose.onNodeWithText("20:00", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals("Ruler tick and cell start align, with the label's 6dp inset", cell.left + 6f, tick.left, 1f)
         val dotY = ruler.bottom.toInt() - 4
         assertEquals("Ruler dot and the continuous line share one mapping", lineColor, bitmap.getPixel(x.toInt(), dotY))
-        assertEquals("No line above the ruler", backgroundColor, bitmap.getPixel(x.toInt(), 118))
+        assertEquals("No line above the ruler", backgroundColor, bitmap.getPixel(x.toInt(), 66))
         assertReadableFocus()
         bitmap.recycle()
         key(Key.DirectionCenter)
@@ -251,7 +256,7 @@ class GuideVisualLayoutTest {
         }
         for (fontScale in listOf(1f, 1.3f, 1.6f)) {
             compose.runOnIdle { scale.value = fontScale }
-            val rowHeight = (64f * fontScale).roundToInt().toFloat()
+            val rowHeight = (56f * fontScale).roundToInt().toFloat()
             for ((id, description) in listOf(1 to "1001 $logoName", 2 to "4567 $noLogoName")) {
                 val header = compose.onNodeWithTag("epg-channel-header-$id")
                 header.assertContentDescriptionEquals(description)
@@ -273,8 +278,8 @@ class GuideVisualLayoutTest {
             val logoNumberBounds = logoNumber.fetchSemanticsNode().boundsInRoot
             assertEquals(bounds("epg-channel-header-1").left + 16f, logoNumberBounds.left, .1f)
             assertEquals(logoNumberBounds.right + 8f, logo.left, .1f)
-            assertEquals("Logo yields width to the complete channel number", minOf(60f, 92f - logoNumberBounds.width - 8f), logo.width, .1f)
-            assertEquals(36f, logo.height, .1f)
+            assertEquals("Logo yields width to the complete channel number", minOf(48f, 92f - logoNumberBounds.width - 8f), logo.width, .1f)
+            assertEquals(28f, logo.height, .1f)
             // Odd pixel row/text heights can centre an even-height logo half a pixel away.
             assertEquals(bounds("epg-channel-header-1").center.y, logo.center.y, .5f)
             val name = compose.onNodeWithText(noLogoName, useUnmergedTree = true)
@@ -296,7 +301,7 @@ class GuideVisualLayoutTest {
             assertEquals(number.center.y, nameBounds.center.y, .5f)
             assertEquals(bounds("epg-channel-header-2").center.y, nameBounds.center.y, .5f)
             assertTrue("The complete name line fits at $fontScale", text.getLineBottom(0) <= nameBounds.height)
-            assertTrue(nameBounds.bottom <= bounds("epg-channel-header-2").bottom - 6f)
+            assertTrue(nameBounds.bottom <= bounds("epg-channel-header-2").bottom - 4f)
             if (fontScale == 1.3f) {
                 compose.runOnIdle {
                     val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -385,19 +390,19 @@ class GuideVisualLayoutTest {
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertDoesNotExist()
         assertEquals("No session must not request artwork", 0, requests)
-        assertEquals(64f, bounds("epg-channel-header-1").height, .1f)
+        assertEquals(56f, bounds("epg-channel-header-1").height, .1f)
 
         compose.runOnIdle { currentSession.value = headerSession() }
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(1, requests)
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertDoesNotExist()
-        assertEquals("Loading preserves the dense row height", 64f, bounds("epg-channel-header-1").height, .1f)
+        assertEquals("Loading preserves the dense row height", 56f, bounds("epg-channel-header-1").height, .1f)
         compose.runOnIdle { loadingGate.complete(Unit) }
         compose.waitUntil(5_000) { compose.onAllNodesWithText(name.value, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("1001 ${name.value}")
-        assertEquals("Failure preserves the dense row height", 64f, bounds("epg-channel-header-1").height, .1f)
+        assertEquals("Failure preserves the dense row height", 56f, bounds("epg-channel-header-1").height, .1f)
         val fallbackNumber = compose.onNodeWithText("1001", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val fallbackName = compose.onNodeWithText(name.value, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals("Failed logo uses the same inline gap", fallbackNumber.right + 8f, fallbackName.left, .1f)
@@ -414,7 +419,7 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertIsDisplayed()
         assertEquals(4, requests)
         compose.onNodeWithText(name.value, useUnmergedTree = true).assertDoesNotExist()
-        assertEquals("Session replacement preserves the dense row height", 64f, bounds("epg-channel-header-1").height, .1f)
+        assertEquals("Session replacement preserves the dense row height", 56f, bounds("epg-channel-header-1").height, .1f)
         compose.runOnIdle { name.value = "  " }
         compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("1001")
     }
@@ -438,12 +443,12 @@ class GuideVisualLayoutTest {
         for ((connection, message) in states) {
             compose.runOnIdle { state.value = connection }
             val row = bounds("epg-channel-row-1")
-            assertEquals(64f, row.height, .1f)
+            assertEquals(56f, row.height, .1f)
             val text = compose.onNodeWithText(context().getString(message))
             text.assertIsDisplayed()
             val textLayouts = mutableListOf<TextLayoutResult>()
             text.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
-            assertFalse("State message must fit the 64dp lane", textLayouts.single().hasVisualOverflow)
+            assertFalse("State message must fit the dense lane", textLayouts.single().hasVisualOverflow)
             val textBounds = text.fetchSemanticsNode().boundsInRoot
             assertTrue(textBounds.top >= row.top && textBounds.bottom <= row.bottom)
         }
@@ -459,10 +464,10 @@ class GuideVisualLayoutTest {
         focused(title(2, 0))
         val bitmap = capture("guide-large-de", 1.3f, LayoutDirection.Ltr)
         val first = bounds("epg-channel-row-1")
-        assertEquals("Native text must grow the lane", 83f, first.height, .1f)
+        assertEquals("Native text must grow the lane", 73f, first.height, .1f)
         assertChannelHeader(bitmap, 1.3f)
         val ruler = bounds("epg-time-ruler")
-        assertTrue("Header and tabs must grow rather than clip", ruler.top > 124f)
+        assertTrue("Header must grow rather than clip", ruler.top > 72f)
         val start = checkNotNull(position.position.value).windowStartSec
         val cell = compose.onNode(hasText(title(2, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("One hour occupies about half the two-hour track", cell.width > ruler.width * .45f)
@@ -505,16 +510,17 @@ class GuideVisualLayoutTest {
     fun enlargedHeaderActionsKeepNativeFocusGrowthInsideTheSafeArea() {
         Locale.setDefault(Locale.GERMANY)
         show(scale = 1.3f)
-        key(Key.DirectionUp)
         key(Key.DirectionRight)
-        focused(context().getString(R.string.now))
         key(Key.DirectionRight)
-        focused(context().getString(R.string.now))
+        tagFocused("channels-view-button")
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
         compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
-        val now = compose.onNodeWithText(context().getString(R.string.now)).fetchSemanticsNode().boundsInRoot
-        assertEquals(902f, now.right, .1f)
-        val header = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
-        assertEquals("Actions stay centred on the header row", header.center.y, now.center.y, .1f)
+        val viewOptions = bounds("channels-view-button")
+        assertEquals(902f, viewOptions.right, .1f)
+        val heading = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
+        assertEquals("Actions stay centred on the header row", heading.center.y, viewOptions.center.y, .1f)
+        assertEquals("The date button shares the header row", heading.center.y, bounds("guide-date-button").center.y, .1f)
         val bitmap = capture("guide-header-focus-large-de", 1.3f, LayoutDirection.Ltr)
         assertTrue("Native focused button clears the 48dp physical safe area", nativeFocusBounds(bitmap).right <= 912f)
         bitmap.recycle()
@@ -524,21 +530,23 @@ class GuideVisualLayoutTest {
         show()
         compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
         compose.onNodeWithText(context().getString(R.string.epg_search)).assertDoesNotExist()
-        key(Key.DirectionUp)
+        compose.onNodeWithText(context().getString(R.string.now)).assertDoesNotExist()
         val date = compose.onNode(isFocused()).fetchSemanticsNode().id
         key(Key.DirectionRight)
-        focused(context().getString(R.string.now))
+        tagFocused("channels-group-button")
         key(Key.DirectionRight)
-        focused(context().getString(R.string.now))
-        key(Key.DirectionLeft)
-        assertEquals(date, compose.onNode(isFocused()).fetchSemanticsNode().id)
+        tagFocused("channels-view-button")
         key(Key.DirectionRight)
+        tagFocused("channels-view-button")
         key(Key.DirectionDown)
-        focused(context().getString(R.string.all_channels))
+        focused(title(1, 0))
+        // Up from the top programme row lands on the date button, not on the last header action.
         key(Key.DirectionUp)
-        focused(context().getString(R.string.now))
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
+        dateFocused()
+        assertEquals(date, compose.onNode(isFocused()).fetchSemanticsNode().id)
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        key(Key.DirectionRight)
         focused(title(1, 0))
         assertNoPlayback()
     }
@@ -559,9 +567,13 @@ class GuideVisualLayoutTest {
         assertNearBackground(bitmap.getPixel(750, 539), 8)
         assertNearBackground(bitmap.getPixel(959, 300), 8)
         bitmap.recycle()
+        val window = checkNotNull(position.position.value).windowStartSec
         key(Key.Back)
-        compose.onNodeWithText(context().getString(R.string.all_channels)).assertIsFocused()
-        assertNoPlayback()
+        focused(title(9, 0)) // Scrolled past now: Back returns to now on the same channel first.
+        assertNotEquals(window, checkNotNull(position.position.value).windowStartSec)
+        key(Key.Back)
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        assertNoPlayback(additionalCoverageCalls = 1)
     }
 
     @Test fun absentHistoryDoesNotPaintAnEarlierContinuationAndLeftOpensTheRail() {
@@ -573,10 +585,8 @@ class GuideVisualLayoutTest {
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-epg").assertIsFocused()
         assertEquals(before, position.position.value)
-        // Right from the rail enters the Guide at its header, as every rail entry does.
+        // Right from the rail returns to the remembered programme, as it does in Channels.
         key(Key.DirectionRight)
-        focused(context().getString(R.string.all_channels))
-        key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals(before, position.position.value)
         val bitmap = capture("guide-data-edge", 1f, LayoutDirection.Ltr)
@@ -759,12 +769,12 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
-    @Test fun removedHistoryDoesNotStealScopeFocus() {
+    @Test fun removedHistoryDoesNotStealHeaderFocus() {
         selectHistory()
-        key(Key.Back)
-        focused(context().getString(R.string.all_channels))
+        key(Key.DirectionUp)
+        dateFocused()
         removeHistory()
-        focused(context().getString(R.string.all_channels))
+        dateFocused()
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertNoPlayback()
@@ -772,14 +782,11 @@ class GuideVisualLayoutTest {
 
     @Test fun removedHistoryDoesNotStealDrawerFocus() {
         selectHistory()
-        key(Key.Back)
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-epg").assertIsFocused()
         removeHistory()
         compose.onNodeWithTag("nav-epg").assertIsFocused()
         key(Key.DirectionRight)
-        focused(context().getString(R.string.all_channels))
-        key(Key.DirectionDown)
         focused(title(1, 0))
         assertNoPlayback()
     }
@@ -789,8 +796,7 @@ class GuideVisualLayoutTest {
         removeHistory()
         compose.onNode(isFocused()).assert(hasAnyAncestor(hasTestTag("epg-screen")))
         compose.onNode(isFocused()).assert(hasAnyAncestor(hasTestTag("epg-programme-viewport")).not())
-        key(Key.DirectionDown)
-        focused(context().getString(R.string.all_channels))
+        dateFocused()
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertNoPlayback()
@@ -934,10 +940,10 @@ class GuideVisualLayoutTest {
         assertEquals(bounds("epg-time-ruler").width / 4, ticks[1].boundsInRoot.left - ticks[0].boundsInRoot.left, 1f)
         val pendingRow = hasText(context().getString(R.string.epg_loading)) and hasAnyAncestor(hasTestTag("epg-channel-row-3"))
         compose.onNode(pendingRow).assertIsDisplayed()
-        focused(context().getString(R.string.all_channels))
+        dateFocused()
         compose.runOnIdle { settle.complete(Unit) }
         compose.waitUntil(10_000) { compose.onAllNodes(pendingRow).fetchSemanticsNodes().isEmpty() }
-        focused(context().getString(R.string.all_channels))
+        dateFocused()
         key(Key.DirectionDown)
         focused(title(1, 0))
         if (atHorizon) {
@@ -967,6 +973,72 @@ class GuideVisualLayoutTest {
         val allowedCoverageCalls = if (reverse) 0..0 else 0..1
         assertTrue("Unexpected coverage call count: $additionalCoverageCalls", additionalCoverageCalls in allowedCoverageCalls)
         assertNoPlayback(additionalCoverageCalls = additionalCoverageCalls)
+    }
+
+    @Test fun groupPanelSelectsTheGroupAndReturnsFocusToTheGroupButton() {
+        show()
+        key(Key.DirectionRight)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+        tagFocused("channels-group-all")
+        key(Key.Back)
+        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
+        tagFocused("channels-group-button")
+        assertEquals(null, model.scope.value.scope.activeTagId)
+
+        key(Key.Enter)
+        tagFocused("channels-group-all")
+        key(Key.DirectionDown)
+        tagFocused("channels-group-1")
+        key(Key.Enter)
+        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
+        tagFocused("channels-group-button")
+        assertEquals(ChannelTagId(1), model.scope.value.scope.activeTagId)
+        compose.onNodeWithText(context().getString(R.string.browse_filtered_title,
+            context().getString(R.string.epg_title), "Favourites")).assertIsDisplayed()
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        assertNoPlayback(additionalCoverageCalls = 1)
+    }
+
+    @Test fun viewOptionsSwitchBetweenDenseAndRegularRows() {
+        show()
+        assertEquals("Dense rows by default", 56f, bounds("epg-channel-row-1").height, .1f)
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
+        tagFocused("guide-view-rows-dense")
+        key(Key.DirectionDown)
+        tagFocused("guide-view-rows-regular")
+        key(Key.Enter)
+        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height > 60f }
+        assertEquals("Regular rows keep the native list item height", 64f, bounds("epg-channel-row-1").height, .1f)
+        compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
+        key(Key.Back)
+        compose.onNodeWithTag("guide-view-panel").assertDoesNotExist()
+        tagFocused("channels-view-button")
+        assertNoPlayback()
+    }
+
+    @Test fun backReturnsAnOffNowGuideToNowOnTheSameChannelThenToTheRail() {
+        show()
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        val nowWindow = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        repeat(4) { key(Key.DirectionRight) }
+        focused(title(2, 4))
+        assertNotEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
+        key(Key.Back)
+        focused(title(2, 0))
+        assertEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
+        key(Key.Back)
+        tagFocused("nav-epg")
+        assertNoPlayback(additionalCoverageCalls = 1)
     }
 
     private fun selectHistory() {
@@ -1040,7 +1112,7 @@ class GuideVisualLayoutTest {
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
-        val model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
+        model = ChannelsViewModel(session, ChannelTagSettingsStore(preferences()))
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
         val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player), settings, profiles,
@@ -1050,14 +1122,15 @@ class GuideVisualLayoutTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
+        val uiSettings = UiSettingsStore(preferences())
         val noticeModule = module {
             single { notices }
-            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()) }
+            single { uiSettings }
             single { profiles }
             single<TvheadendSession> { session }
         }
         compose.setContent {
-            KoinApplication(application = { modules(noticeModule) }) {
+            KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale), LocalLayoutDirection provides direction) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
@@ -1066,7 +1139,8 @@ class GuideVisualLayoutTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
-                            EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, channelViewModel = model,
+                            val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
+                            EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view, channelViewModel = model,
                                 session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
                                 lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
                                 onPlayRecording = { playbackRequests++ }, notices = notices)
@@ -1076,7 +1150,7 @@ class GuideVisualLayoutTest {
             }
         }
         }
-        focused(context().getString(R.string.all_channels))
+        dateFocused()
         assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
         callsAtEntry = session.calls.size
     }
@@ -1171,10 +1245,10 @@ class GuideVisualLayoutTest {
         File(directory, "$name.txt").writeText(
             "canvas=960x540dp; density=1; locale=${Locale.getDefault()}; direction=$direction; fontScale=$scale; timezone=UTC\n" +
                 "syntheticClockStart=2026-10-04T20:15:00Z; captureClockMillis=${SystemClock.uptimeMillis()}\n" +
-                "focus=${compose.onNode(isFocused()).fetchSemanticsNode().config[SemanticsProperties.Text]}; " +
+                "focus=${compose.onNode(isFocused()).fetchSemanticsNode().config.let { it.getOrElseNullable(SemanticsProperties.Text) { null } ?: it.getOrElseNullable(SemanticsProperties.ContentDescription) { null } }}; " +
                 "bounds=${compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot}; position=${position.position.value}\n" +
                 "ruler=${bounds("epg-time-ruler")}; nativeFocusPixels=${nativeFocusBounds(bitmap)}\n" +
-                "headerRefinement=inline number/logo or number/name; gutter=124dp; headerInset=16dp; numberGap=8dp; cellGap=4dp; nameType=titleSmall14/20 single line; picon=max60x36dp Fit\n" +
+                "headerRefinement=inline number/logo or number/name; gutter=124dp; headerInset=16dp; numberGap=8dp; cellGap=4dp; nameType=titleSmall14/20 single line; picon=max48x28dp Fit (dense rows)\n" +
                 "production=TVHeadendPlayerTheme + SideRail + EpgGridScreen; native D-pad focus; fake SDK; intercepted synthetic picons\n" +
                 "background=opaque theme background, not live video; static Robolectric SDK34 native graphics only\n" +
                 "playbackRequests=$playbackRequests; navigationRequests=$navigationRequests; sdkCalls=${session.calls.size}\n",
@@ -1200,8 +1274,8 @@ class GuideVisualLayoutTest {
             .fetchSemanticsNode().config.contains(SemanticsProperties.Focused))
         val number = compose.onNodeWithText("2", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertEquals(124f, header.width, .1f)
-        assertEquals(60f, logo.width, .1f)
-        assertEquals(36f, logo.height, .1f)
+        assertEquals(48f, logo.width, .1f)
+        assertEquals(28f, logo.height, .1f)
         assertEquals(number.right + 8f, logo.left, .1f)
         assertEquals(header.left + 16f, number.left, .1f)
         assertEquals("Logo remains centred to native pixel precision", header.center.y, logo.center.y, .5f)
@@ -1224,7 +1298,7 @@ class GuideVisualLayoutTest {
         assertEquals(scale, text.layoutInput.density.fontScale, .001f)
         assertEquals("No-logo name occupies only one line", 1, text.lineCount)
         assertTrue("Name line is complete, not vertically clipped", text.getLineBottom(0) <= nameBounds.height)
-        assertTrue("Name retains bottom padding", nameBounds.bottom <= noLogoHeader.bottom - 6f)
+        assertTrue("Name retains bottom padding", nameBounds.bottom <= noLogoHeader.bottom - 4f)
         val programme = compose.onNodeWithText(title(2, 0), useUnmergedTree = true)
         val programmeLayouts = mutableListOf<TextLayoutResult>()
         programme.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(programmeLayouts) }
@@ -1236,7 +1310,7 @@ class GuideVisualLayoutTest {
         val timeBounds = compose.onNode(hasText(formatTimeInterval(hour, hour + 3600)) and hasAnyAncestor(hasTestTag("epg-channel-row-2")),
             useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("Native headline does not overlap its supporting time", programmeBounds.bottom <= timeBounds.top)
-        assertTrue("Native ListItem keeps its bottom content padding", timeBounds.bottom <= header.bottom - 12f)
+        assertTrue("Native dense list item keeps its bottom content padding", timeBounds.bottom <= header.bottom - 10f)
         val pixels = buildList {
             for (y in logo.top.toInt() until logo.bottom.toInt()) {
                 for (x in logo.left.toInt() until logo.right.toInt()) {
@@ -1245,8 +1319,8 @@ class GuideVisualLayoutTest {
             }
         }
         assertFalse("Production PiconBox must render the intercepted artwork", pixels.isEmpty())
-        assertEquals("Wide picon fills the 60dp allocation without stretching", 60, pixels.maxOf { it.first } - pixels.minOf { it.first } + 1)
-        assertEquals("88:20 artwork stays 4.4:1 inside the 60x36 box", 14, pixels.maxOf { it.second } - pixels.minOf { it.second } + 1)
+        assertEquals("Wide picon fills the 48dp allocation without stretching", 48, pixels.maxOf { it.first } - pixels.minOf { it.first } + 1)
+        assertEquals("88:20 artwork stays 4.4:1 inside the 48x28 box", 11, pixels.maxOf { it.second } - pixels.minOf { it.second } + 1)
         compose.onNodeWithTag("epg-channel-picon-3", useUnmergedTree = true).assertDoesNotExist()
     }
 
@@ -1261,10 +1335,13 @@ class GuideVisualLayoutTest {
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
     private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
-    private fun focused(text: String) {
+    private fun dateFocused() = tagFocused("guide-date-button")
+    private fun tagFocused(tag: String) = focused(hasTestTag(tag), tag)
+    private fun focused(text: String) = focused(hasText(text), text)
+    private fun focused(matcher: SemanticsMatcher, text: String) {
         try {
-            compose.waitUntil(10_000) { compose.onAllNodes(hasText(text) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
-            compose.onNode(hasText(text) and isFocused()).assertIsDisplayed().assertIsFocused()
+            compose.waitUntil(10_000) { compose.onAllNodes(matcher and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNode(matcher and isFocused()).assertIsDisplayed().assertIsFocused()
         } catch (failure: Throwable) {
             // Failure-only synthetic fixture evidence; retain the original exception and deadline.
             println("Guide focus failure: expected=$text position=${position.position.value}")
@@ -1274,7 +1351,7 @@ class GuideVisualLayoutTest {
             }
             println(runCatching { compose.onAllNodes(isFocused(), useUnmergedTree = true).printToString() }
                 .getOrElse { "Cannot read focused nodes: ${it.javaClass.simpleName}" })
-            println(runCatching { compose.onAllNodes(hasText(text), useUnmergedTree = true).printToString() }
+            println(runCatching { compose.onAllNodes(matcher, useUnmergedTree = true).printToString() }
                 .getOrElse { "Cannot read expected nodes: ${it.javaClass.simpleName}" })
             throw failure
         }

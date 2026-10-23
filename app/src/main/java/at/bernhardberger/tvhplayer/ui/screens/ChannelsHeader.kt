@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -53,6 +54,8 @@ private val ChannelsGroupButtonMaxWidth = 280.dp
  * content's remembered item, the start edge leads to the navigation rail (or back to content
  * that reached it with its end edge, see [onReturnToContent]) and Up stays.
  * A single visible group has nothing to choose, so its button is not shown.
+ * A [leading] action sits before the buttons and takes the start edge; it applies the modifier it
+ * receives to its first focusable.
  */
 @Composable
 internal fun ChannelsHeader(
@@ -66,14 +69,19 @@ internal fun ChannelsHeader(
     onMoveToContent: () -> Boolean,
     modifier: Modifier = Modifier,
     onReturnToContent: (() -> Boolean)? = null,
+    leading: (@Composable RowScope.(startEdge: Modifier) -> Unit)? = null,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val rail = navigationFocus ?: FocusRequester.Default
     val towardStart = if (ltr) Key.DirectionLeft else Key.DirectionRight
     // Content whose end edge leads here takes the start edge back; otherwise the rail does.
-    val startToContent = Modifier.onPreviewKeyEvent { event ->
-        event.type == KeyEventType.KeyDown && event.key == towardStart && onReturnToContent?.invoke() == true
-    }
+    val startEdge = Modifier
+        .onPreviewKeyEvent { event ->
+            event.type == KeyEventType.KeyDown && event.key == towardStart && onReturnToContent?.invoke() == true
+        }
+        .focusProperties { if (ltr) left = rail else right = rail }
+    val groupIsFirst = leading == null
+    val viewIsFirst = leading == null && !showGroup
     TopLevelBrowseHeader(
         title = title,
         modifier = modifier
@@ -82,6 +90,7 @@ internal fun ChannelsHeader(
             }
             .testTag("channels-header"),
         actions = {
+            leading?.invoke(this, startEdge.focusProperties { up = FocusRequester.Cancel })
             if (showGroup) {
                 val label = groupName ?: stringResource(R.string.all_channels)
                 val description = stringResource(R.string.channels_group)
@@ -89,14 +98,11 @@ internal fun ChannelsHeader(
                     onClick = { onOpen(ChannelsPanel.GROUP) },
                     // Vertical padding would grow the 40dp header slot past the round button it replaces.
                     contentPadding = PaddingValues(horizontal = 16.dp),
-                    modifier = startToContent
+                    modifier = (if (groupIsFirst) startEdge else Modifier)
                         .widthIn(max = ChannelsGroupButtonMaxWidth)
                         .focusRequester(focus.group)
                         .onFocusChanged { if (it.isFocused) onFocused() }
-                        .focusProperties {
-                            up = FocusRequester.Cancel
-                            if (ltr) left = rail else right = rail
-                        }
+                        .focusProperties { up = FocusRequester.Cancel }
                         .semantics {
                             contentDescription = description
                             stateDescription = label
@@ -113,11 +119,10 @@ internal fun ChannelsHeader(
                 onClick = { onOpen(ChannelsPanel.VIEW_OPTIONS) },
                 focusRequester = focus.view,
                 onFocused = onFocused,
-                modifier = (if (showGroup) Modifier else startToContent)
+                modifier = (if (viewIsFirst) startEdge else Modifier)
                     .focusProperties {
                         up = FocusRequester.Cancel
                         if (ltr) right = FocusRequester.Cancel else left = FocusRequester.Cancel
-                        if (!showGroup) { if (ltr) left = rail else right = rail }
                     }
                     .testTag("channels-view-button"),
             )
