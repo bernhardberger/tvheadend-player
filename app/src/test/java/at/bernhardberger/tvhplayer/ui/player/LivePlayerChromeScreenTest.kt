@@ -162,6 +162,7 @@ import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.After
 import org.junit.Before
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -395,7 +396,7 @@ class LivePlayerChromeScreenTest {
         assertEquals("an adopted tune is not owned by cancelled startup", epoch, runtime.videoPresentation.value.epoch)
     }
 
-    @Test fun ordinaryWarmReturnDoesNotRequireStartupSessionProofOrRetune() {
+    @Test fun ordinaryWarmReturnDoesNotRequireStartupSessionProofAndRetunesTheEndedSession() {
         screen()
         playerReady()
         settle()
@@ -411,7 +412,9 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionDown)
         assertTrue(exists("player-actions"))
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertEquals("ordinary adoption keeps its previous contract", epoch, runtime.videoPresentation.value.epoch)
+        // The adopted stream belonged to the ended session: the entry retunes it in the current one.
+        assertNotEquals(epoch, runtime.videoPresentation.value.epoch)
+        assertNotNull(runtime.liveTargetPresentation(selection))
     }
 
     @Test fun ordinaryChannelMissingFromTheCurrentSessionShowsUnavailableWithoutTuning() {

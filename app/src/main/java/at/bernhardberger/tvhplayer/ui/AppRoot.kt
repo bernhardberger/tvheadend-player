@@ -102,8 +102,13 @@ import at.bernhardberger.tvhplayer.ui.startup.StartupBrandDurationMillis
 import at.bernhardberger.tvhplayer.ui.startup.startupLoadingFeedback
 import at.bernhardberger.tvhplayer.ui.startup.mainStartupBrandPassiveHint
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 
@@ -598,6 +603,16 @@ fun AppRoot(
 
     val isPlayer = currentDestination is LivePlayerKey ||
         currentDestination is RecordingPlayerKey
+    // Warm live playback behind browse has no player screen to retune it after a reconnect;
+    // a channel paused there is stopped, since the restart ended what its Pause held.
+    LaunchedEffect(isPlayer, activeChannelId) {
+        if (isPlayer || activeChannelId == null) return@LaunchedEffect
+        tvheadendSession.observation.map { it.currentSession }.distinctUntilChanged { old, new -> old === new }
+            .filterNotNull().collect {
+                // Opening the player right after the reconnect must not abandon the retune halfway.
+                withContext(NonCancellable) { playbackRuntime.retuneAfterReconnect(stopIfPaused = true) }
+            }
+    }
     val enteringLaunchTarget =
         (applianceLaunchState as? ApplianceLaunchState.Entering)?.target
     val launchRequest = (applianceLaunchState as? ApplianceLaunchState.Pending)?.request ?: enteringLaunchTarget?.request

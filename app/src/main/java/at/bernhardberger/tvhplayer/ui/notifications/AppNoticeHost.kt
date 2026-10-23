@@ -137,6 +137,8 @@ internal fun AppNoticePresentation(
                         AppNoticeIcon.WARNING -> R.drawable.ic_error_outlined
                         AppNoticeIcon.CANCEL -> R.drawable.ic_close
                         AppNoticeIcon.DELETE -> R.drawable.ic_delete_outlined
+                        AppNoticeIcon.CONNECTED -> R.drawable.ic_power
+                        AppNoticeIcon.DISCONNECTED -> R.drawable.ic_power_off
                     }), contentDescription = null, modifier = Modifier.size(16.dp),
                         tint = if (icon == AppNoticeIcon.RECORDING) TvRecordingColor else LocalContentColor.current)
                 }

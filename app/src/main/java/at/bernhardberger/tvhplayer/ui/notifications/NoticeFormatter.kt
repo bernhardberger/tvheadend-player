@@ -19,7 +19,7 @@ import java.time.format.TextStyle
 import kotlin.time.Clock
 import kotlin.time.Instant
 
-internal enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE }
+internal enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED }
 internal data class FormattedNotice(val headline: String, val detail: String? = null, val icon: AppNoticeIcon? = null)
 
 /** The only resource/wording boundary for transient feedback. */
@@ -45,7 +45,11 @@ internal class NoticeFormatter(private val context: Context) {
                 else R.string.connection_notice_lost
             ConnectionNoticeKind.RESTORED -> R.string.connection_notice_restored
             ConnectionNoticeKind.LOGIN_REJECTED -> R.string.connection_notice_login_rejected
-        }))
+        }), icon = when (notice.kind) {
+            ConnectionNoticeKind.RESTORED -> AppNoticeIcon.CONNECTED
+            ConnectionNoticeKind.LOST -> AppNoticeIcon.DISCONNECTED
+            ConnectionNoticeKind.LOGIN_REJECTED -> AppNoticeIcon.WARNING
+        })
         is Notice.CacheClear -> FormattedNotice(context.getString(
             if (notice.success) R.string.cache_notice_cleared else R.string.cache_notice_failed))
         is Notice.BackgroundPlayback -> FormattedNotice(context.getString(when (notice.reason) {

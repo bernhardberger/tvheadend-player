@@ -236,6 +236,10 @@ class AppPlaybackRuntime(
     private var activeTargetEpoch: Long? = null
     @Volatile
     private var activeLiveSelection: LivePlaybackSelection? = null
+    /** The profile configuration [activeLiveSelection] was tuned under; a reconnect retunes only within it. */
+    private var activeLiveProfileGeneration = -1L
+    /** The target whose reconnect retune failed: its recovery attempts retry until one starts or the budget runs out. */
+    private var reconnectRecoveryEpoch: Long? = null
     /**
      * The epoch of the target the active one continues: a live recovery retune of the same
      * channel keeps it, every other commit begins its own. Written after [activeTargetEpoch], so a
@@ -602,9 +606,12 @@ class AppPlaybackRuntime(
         // The viewer's Retry (see retryLive): a fresh start, not recovery, for presentation and audio.
         viewerRetry: Boolean = false,
         recoveryFence: LiveRecoveryFence? = null,
+        // retuneAfterReconnect: the profile generation it admitted, which must hold until install.
+        reconnectGeneration: Long? = null,
     ): PlaybackTargetResult? {
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val recoveryIntent = playbackRequests.get()
+        val reconnectAdmitted = { reconnectGeneration == null || profileStillCurrent(reconnectGeneration) }
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
             if (!recovering && _activeTarget.value == null || viewerRetry && healthyActiveTarget() == null) {
                 presentation.publishStarting()
@@ -616,6 +623,11 @@ class AppPlaybackRuntime(
         // An explicit first request configures persisted output even when its target is
         // unavailable. Recovery defers all Player configuration until its reads are rechecked.
         if (recoveryFence == null) audioTracks.configureAudioOutputBeforeFirstTargetLocked(playerSettings)
+        // A server save counts its generation before it replaces the session: until the profile is
+        // applied again, the session read below may still be the previous server's.
+        val profileGeneration = profileOwner.configurationGeneration.value
+            .takeIf { profileOwner.serverProfile.value != null } ?: -1L
+        if (!reconnectAdmitted()) return null
         val profileSelection = currentLivePlaybackSelection(session.observation.value, channelId)
         if (profileSelection == null) {
             return completeUnavailableTarget(
@@ -672,10 +684,14 @@ class AppPlaybackRuntime(
         liveInstall = install
         val result = try { installTargetForPresentation(
             expectedPresentationEpoch = expectedPresentationEpoch,
-            canInstall = { recoveryFence == null || canContinueRecoveryLocked(recoveryFence) },
+            canInstall = {
+                reconnectAdmitted() && (recoveryFence == null || canContinueRecoveryLocked(recoveryFence))
+            },
             installTarget = {
                 if (!targetCommands.isOpen()) {
                     PlaybackTargetResult.SHUT_DOWN
+                } else if (!reconnectAdmitted()) {
+                    PlaybackTargetResult.NOT_READY
                 } else if (recoverySelection != null &&
                     (recoveryIntent != playbackRequests.get() || isPlaybackIntentStopped(recoveryIntent) ||
                         livePlaybackObservation.value == LivePlaybackObservation.Departed)
@@ -712,12 +728,16 @@ class AppPlaybackRuntime(
                         // callback and keep consuming silently until an explicit focus request.
                         audioInterruptions.retainInterruptionMuteLocked()
                     } else audioInterruptions.clearAudioInterruptionLocked()
-                    // A recovery retune replaces the very target its fence validated in this command.
-                    val continuesTarget = recoverySelection != null &&
+                    // A recovery retune replaces the very target its fence validated in this
+                    // command, a reconnect retune the very target retuneAfterReconnect validated.
+                    val continuesTarget = (recoverySelection != null || reconnectGeneration != null) &&
                         activeTargetEpoch == expectedPresentationEpoch &&
                         _activeTarget.value == AppPlaybackTarget.Live(selection.channelId)
                     activeTargetEpoch = epoch
                     activeLiveSelection = selection
+                    activeLiveProfileGeneration = profileGeneration
+                    // Whichever target this is, its epoch is new: no reconnect retry owns it.
+                    reconnectRecoveryEpoch = null
                     if (!continuesTarget) targetContinuity = epoch
                     servedGeneration?.let(servedIntent::set)
                     livePauseController.dropPendingLivePauseLocked()
@@ -1254,6 +1274,76 @@ class AppPlaybackRuntime(
         }
     }
 
+    /**
+     * Retunes a live target whose session ended (the server restarted or the connection
+     * dropped) once a session of the same profile is current again; until then it shows the
+     * ended stream's last picture. For warm playback behind browse, whose owner calls this
+     * when a session becomes current: a showing live screen stops its own target at the loss
+     * and retunes it itself, and startup retires its own. Recovery, not new intent: the retune
+     * serves the intent the target served. Null when nothing was owed.
+     *
+     * With [stopIfPaused] a target the viewer paused is stopped instead: the restart ended its
+     * timeshift buffer, so a retune could neither resume where it paused nor stay paused
+     * truthfully. A retune that fails retries as a live recovery, with its backoff, and stops
+     * the target once that budget runs out, rather than leaving the ended stream on screen.
+     */
+    suspend fun retuneAfterReconnect(stopIfPaused: Boolean = false): PlaybackTargetResult? = targetCommands.serialize(
+        onClosed = { PlaybackTargetResult.SHUT_DOWN },
+    ) {
+        val selection = activeLiveSelection ?: return@serialize null
+        val current = session.observation.value.currentSession ?: return@serialize null
+        val epoch = activeTargetEpoch
+        if (!foreground || selection.currentSession === current ||
+            epoch == null || _activeTarget.value != AppPlaybackTarget.Live(selection.channelId) ||
+            activeLiveProfileGeneration != profileOwner.configurationGeneration.value
+        ) return@serialize null
+        if (stopIfPaused && viewerPausedLocked(epoch)) {
+            explicitStopLocked()
+            return@serialize null
+        }
+        val startEpoch = presentationEpoch.snapshot()
+        val generation = playbackRequests.get()
+        val result = try {
+            playLive(
+                channelId = selection.channelId,
+                recovering = true,
+                expectedPresentationEpoch = startEpoch,
+                reconnectGeneration = activeLiveProfileGeneration,
+            )
+        } finally {
+            settleCancelledStartLocked(startEpoch, generation)
+        }
+        // Another server saved meanwhile: the current session is not this channel's to retry on.
+        if (reconnectRetuneFailed(result) && activeTargetEpoch == epoch &&
+            profileStillCurrent(activeLiveProfileGeneration)
+        ) {
+            val fence = currentLiveRecoveryFence(
+                reason = PlaybackRecoveryReason.LIVE_ENDED,
+                observation = session.observation.value,
+                activeTarget = _activeTarget.value,
+                activeTargetEpoch = epoch,
+            )
+            if (fence == null) {
+                publishRecoveryExhausted(PlaybackRecoveryReason.LIVE_ENDED)
+            } else {
+                // A new session: the budget spent on the ended one does not shorten this one.
+                liveRecovery.resetBackoffLocked()
+                reconnectRecoveryEpoch = epoch
+                dispatchLiveRecovery(fence.reason, origin = fence)
+            }
+        }
+        result
+    }
+
+    /** The server profile of [generation] is still the applied one, with no save since. */
+    private fun profileStillCurrent(generation: Long): Boolean =
+        profileOwner.serverProfile.value != null && profileOwner.configurationGeneration.value == generation
+
+    /** Failed before it could start, and the target (its ended stream) is still there. */
+    private fun reconnectRetuneFailed(result: PlaybackTargetResult?): Boolean =
+        result != null && !result.isStarted &&
+            result != PlaybackTargetResult.SHUT_DOWN && result != PlaybackTargetResult.DEPARTED
+
     fun onDeviceStandby() {
         scope.launch {
             targetCommands.serialize(onClosed = {}) {
@@ -1274,6 +1364,7 @@ class AppPlaybackRuntime(
         keepTimer = null
         if (timer !== currentCoroutineContext().job) timer?.cancel()
         bufferRecovery = null
+        reconnectRecoveryEpoch = null
         if (ownedMediaItem != null && player.currentMediaItem === ownedMediaItem &&
             livePlaybackObservation.value != LivePlaybackObservation.Departed
         ) player.pause()
@@ -1768,6 +1859,8 @@ class AppPlaybackRuntime(
             expectedPresentationEpoch = fence.targetEpoch,
             recoverySelection = fence.selection,
             recoveryFence = fence,
+            // A reconnect retry stays within the profile its retune was admitted for.
+            reconnectGeneration = activeLiveProfileGeneration.takeIf { reconnectRecoveryEpoch == fence.targetEpoch },
         )
     }
 
@@ -2470,6 +2563,15 @@ class AppPlaybackRuntime(
         fence: LiveRecoveryFence,
         result: PlaybackTargetResult?,
     ) {
+        if (reconnectRecoveryEpoch == fence.targetEpoch) {
+            if (reconnectRetuneFailed(result)) {
+                // A fresh identity, so this resolving attempt cannot claim the next one.
+                dispatchLiveRecovery(fence.reason, origin = fence.copy())
+                return
+            }
+            // An attempt that did not run (a Pause owes it again) keeps the target retrying.
+            if (result != null) reconnectRecoveryEpoch = null
+        }
         if (coordinator.playerCleanupPending.value) return
         if (shouldRepublishPlayerStateAfterRecovery(
                 result = result,

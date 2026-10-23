@@ -770,6 +770,8 @@ fun VideoPlayerScreen(
             initialPlaybackAdopted = true
             startupOutcomeDelivered = false
             adoptedPlaying = adoptionPresentation?.let { it.playing && (it.visible || it.audioOnly) } == true
+            // A reconnect the browse owner did not reach before this entry left the ended stream.
+            if (startupTarget == null) withContext(NonCancellable) { playbackRuntime.retuneAfterReconnect() }
             return@LaunchedEffect
         }
 

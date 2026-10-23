@@ -48,6 +48,7 @@ import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition
 import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
@@ -113,6 +114,7 @@ class LivePlayerServerWaitTest {
     private lateinit var player: ExoPlayer
     private lateinit var session: FakeTvheadendSession
     private lateinit var runtime: AppPlaybackRuntime
+    private lateinit var profiles: AppProfileOwner
     private var closes = 0
     /** Key events no player handler consumed. */
     private var unconsumed = 0
@@ -205,6 +207,54 @@ class LivePlayerServerWaitTest {
         compose.waitUntil(10_000) { binds() > before }
     }
 
+    @Test fun aProfileSavedDuringTheOutageRetunesNothingAway() {
+        screen(initial = ready())
+        compose.runOnIdle {
+            scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
+        }
+        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        settle()
+        val before = binds()
+        compose.runOnIdle { visible.value = false }
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
+        settle()
+        val generation = profiles.configurationGeneration.value
+        compose.runOnIdle { scope.launch { profiles.saveServer("other.test", 9982) } }
+        compose.waitUntil(10_000) { profiles.configurationGeneration.value > generation }
+        session.publish(ready())
+        settle()
+        val retunes = mutableListOf<PlaybackTargetResult?>()
+        compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
+        compose.waitUntil(10_000) { retunes.isNotEmpty() }
+        assertEquals(listOf(null), retunes)
+        assertEquals("channel one of another server is not this one", before, binds())
+    }
+
+    // Warm playback behind browse: the whole outage passes while no live screen is shown, and
+    // browse's owner asks for the retune when the session is current again.
+    @Test fun aLossAndReconnectWhileTheScreenIsAwayRetunesTheWarmTarget() {
+        screen(initial = ready())
+        compose.runOnIdle {
+            scope.launch { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(1)))) }
+        }
+        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(1)) }
+        settle()
+        val before = binds()
+        compose.runOnIdle { visible.value = false }
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting, channelState = ChannelRepositoryState.Stale(catalog)))
+        settle()
+        session.publish(ready())
+        settle()
+        val retunes = mutableListOf<PlaybackTargetResult?>()
+        compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
+        settle()
+        assertEquals(listOf(PlaybackTargetResult.STARTED), retunes)
+        compose.waitUntil(10_000) { binds() > before }
+        compose.runOnIdle { visible.value = true }
+        settle()
+        assertEquals("the returning screen adopts the retuned target", before + 1, binds())
+    }
+
     @Test fun aWaitWhoseConnectionRetriesByItselfOffersNoRetry() {
         screen()
         compose.runOnIdle {
@@ -281,7 +331,7 @@ class LivePlayerServerWaitTest {
         }
         val data = InMemoryData()
         val settings = PlayerSettingsStore(data)
-        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         val channels = ChannelsViewModel(session, ChannelTagSettingsStore(InMemoryData()))

@@ -8,8 +8,10 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -28,6 +30,12 @@ class NoticeFormatterTest {
             at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST)).headline)
         assertEquals("Connection lost • Showing saved channels", formatter.format(Notice.Connection(
             at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind.LOST, true)).headline)
+    }
+
+    @Test fun connectionNoticesShowWhetherThePlugIsIn() {
+        assertEquals(AppNoticeIcon.DISCONNECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.LOST)).icon)
+        assertEquals(AppNoticeIcon.CONNECTED, formatter.format(Notice.Connection(ConnectionNoticeKind.RESTORED)).icon)
+        assertEquals(AppNoticeIcon.WARNING, formatter.format(Notice.Connection(ConnectionNoticeKind.LOGIN_REJECTED)).icon)
     }
 
     @Test @Config(qualifiers = "de") fun lostNoticeWithAndWithoutSavedChannelsInGerman() {

@@ -1222,6 +1222,145 @@ class AudioInterruptionRuntimeTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
+    @Test fun sessionPauseQueuedDuringAReconnectRetuneHoldsTheRetunedChannel() = exercise {
+        live(timeshift = true)
+        // The server restarted: a new session of the same profile is current.
+        replaceSession()
+        // The system's Pause arrives while the reconnect retune is under way, before it commits.
+        var pause: Job? = null
+        beforeLiveBinding = { if (pause == null) pause = runtime.setSessionPlayWhenReady(false) { true } }
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { connection.subscribeCount == 2 }
+        val replacement = connection.awaitCollectionRegistered()
+        startSubscription(replacement)
+        await { retune.isCompleted && pause?.isCompleted == true }
+        assertEquals(PlaybackTargetResult.STARTED, retune.await())
+        connection.emit(replacement, SubscriptionEvent.Timeshift(0, 0, 0, 120_000_000, 100))
+        await { ((runtime.livePlaybackObservation.value as? LivePlaybackObservation.Active)
+            ?.timeshiftState as? LiveTimeshiftState.Available)?.playbackPaused != null }
+        markReady()
+        // The retuned target is the same channel for the same intent: the Pause holds it.
+        await { connection.speeds == listOf(0) }
+        settle()
+        assertFalse(player.playWhenReady)
+        assertEquals(2, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun aServerSavedWhileAReconnectRetuneReadsItsSettingsRetunesNothing() = exercise {
+        live(timeshift = false)
+        replaceSession()
+        val reading = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        beforeSettingsRead = {
+            beforeSettingsRead = {}
+            reading.complete(Unit)
+            release.await()
+        }
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        reading.await()
+        // The retune was admitted for this profile; another server is saved before it installs.
+        val generation = profiles.configurationGeneration.value
+        scope.launch { profiles.saveServer("other.test", 9982) }
+        await { profiles.configurationGeneration.value > generation && profiles.serverProfile.value != null }
+        release.complete(Unit)
+        await { retune.isCompleted }
+        settle()
+        assertNull(retune.await())
+        assertEquals("channel one of another server is not this one", 1, connection.subscribeCount)
+    }
+
+    @Test fun aServerSavedWhileAReconnectRetuneReadsItsAudioRetriesNothingThere() = exercise {
+        live(timeshift = false)
+        installManualAudio()
+        restartServer()
+        val reading = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        var reads = 0
+        // The first read is the player settings, the second the channel's stored audio.
+        beforeSettingsRead = {
+            if (++reads == 2) { beforeSettingsRead = {}; reading.complete(Unit); release.await() }
+        }
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        reading.await()
+        // Another server is saved and its session is current before the audio read returns.
+        val generation = profiles.configurationGeneration.value
+        scope.launch { profiles.saveServer("other.test", 9982) }
+        await { profiles.configurationGeneration.value > generation && profiles.serverProfile.value != null }
+        replaceSession()
+        release.complete(Unit)
+        await { retune.isCompleted }
+        settle()
+        assertFalse(retune.await()?.isStarted == true)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering)
+        assertEquals("channel one of another server is not this one", 1, connection.subscribeCount)
+    }
+
+    @Test fun aChannelChangeDuringAReconnectRetryEndsTheRetries() = exercise(virtualTime = true) {
+        live(timeshift = false)
+        restartServer()
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { retune.isCompleted }
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        // The viewer picks another channel while the retry waits.
+        session.scriptLivePlaybackSuccess(manager)
+        live(timeshift = false, channel = 2)
+        advanceRecoveryTime(40_001)
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertFalse(runtime.state.value is AppPlaybackState.Recovering || runtime.state.value is AppPlaybackState.Failed)
+        assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun aChannelPausedBehindBrowseStopsAtTheReconnectInsteadOfRetuning() = exercise {
+        live(timeshift = false)
+        runtime.pause()
+        await { !player.playWhenReady }
+        replaceSession()
+        val retune = scope.async { runtime.retuneAfterReconnect(stopIfPaused = true) }
+        await { retune.isCompleted }
+        assertNull(retune.await())
+        await { runtime.activeTarget.value == null }
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun aReconnectRetuneThatKeepsFailingRetriesWithBackoffThenStops() = exercise(virtualTime = true) {
+        live(timeshift = false)
+        restartServer()
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { retune.isCompleted }
+        assertFalse(retune.await()?.isStarted == true)
+        // The first retry follows at once; the later ones back off as any live recovery does.
+        for (delayMillis in listOf(2_000L, 5_000L, 10_000L, 20_000L)) {
+            await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == delayMillis }
+            advanceRecoveryTime(delayMillis + 1)
+        }
+        // Out of retries: the ended stream is stopped, not left frozen on screen.
+        await { runtime.state.value is AppPlaybackState.Failed }
+        assertNull(runtime.activeTarget.value)
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun aFailedReconnectRetuneRetriesUntilTheChannelComesBack() = exercise {
+        live(timeshift = false)
+        restartServer()
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { retune.isCompleted }
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        session.scriptLivePlaybackSuccess(manager)
+        await { connection.subscribeCount == 2 }
+        startSubscription(connection.awaitCollectionRegistered())
+        markReady()
+        await { runtime.state.value !is AppPlaybackState.Recovering }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertTrue(player.playWhenReady)
+        assertEquals(2, connection.subscribeCount)
+    }
+
     @Test fun channelChangeDuringARecoveryRetuneDropsTheSessionPauseQueuedBeforeIt() = exercise {
         live(timeshift = true)
         // The system's Pause arrives during the retune, and a channel change right after it.
@@ -2372,7 +2511,7 @@ class AudioInterruptionRuntimeTest {
                 }
             }
         })
-        private val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing }).also { owner -> scope.launch { owner.run() } }
         val output = TvheadendAudioOutputProvider(context)
         // Application-owned items such as file:///replacement stay loading: a real load failure
@@ -2472,6 +2611,30 @@ class AudioInterruptionRuntimeTest {
             }
         }
         private fun recover(reason: PlaybackRecoveryReason) { runtime.onRecoveryRequired(reason) }
+
+        /** A new session of the same profile becomes current, as after a server restart. */
+        fun replaceSession() {
+            val previous = session.observation.value
+            session.replaceGeneration(SessionObservation.create(
+                sessionState = previous.sessionState, channelState = previous.channelState,
+                epgState = previous.epgState, dvrState = previous.dvrState,
+            ))
+        }
+
+        /**
+         * The server restarts: its session ends, then the stream it carried, and a new session
+         * of the same profile becomes current.
+         */
+        suspend fun restartServer() {
+            val ready = session.observation.value
+            session.retire()
+            connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+            settle()
+            session.replaceGeneration(SessionObservation.create(
+                sessionState = ready.sessionState, channelState = ready.channelState,
+                epgState = ready.epgState, dvrState = ready.dvrState,
+            ))
+        }
 
         fun audioDisabled() = C.TRACK_TYPE_AUDIO in player.trackSelectionParameters.disabledTrackTypes
 

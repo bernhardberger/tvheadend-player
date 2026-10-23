@@ -72,12 +72,15 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -115,6 +118,7 @@ class StartupOfflineTest {
     private lateinit var player: ExoPlayer
     private lateinit var session: FakeTvheadendSession
     private lateinit var runtime: AppPlaybackRuntime
+    private lateinit var playerData: InMemoryData
 
     @After fun after() {
         scope.cancel()
@@ -302,6 +306,60 @@ class StartupOfflineTest {
         assertEquals("playback stays warm behind browse", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
 
+    @Test fun aServerRestartWhileBrowsingRetunesTheWarmChannelOnce() {
+        app(ready(catalog))
+        confirmRow(2, awaitWait = false)
+        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        settle()
+        key(Key.Back)
+        settle()
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        session.publish(connecting(catalog))
+        settle()
+        session.publish(ready(catalog))
+        settle()
+        compose.waitUntil(10_000) { binds() == 2 }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        // Returning to the player adopts the retuned channel.
+        key(Key.DirectionCenter)
+        settle()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("channel-row-2")).fetchSemanticsNodes().isEmpty() }
+        settle()
+        assertEquals(2, binds())
+    }
+
+    @Test fun reopeningThePlayerAsTheServerReturnsStillRetunesTheWarmChannelOnce() {
+        app(ready(catalog))
+        confirmRow(2, awaitWait = false)
+        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Live(ChannelId(2)) }
+        settle()
+        key(Key.Back)
+        settle()
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("channel-row-2") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        session.publish(connecting(catalog))
+        settle()
+        // The retune waits for its settings while OK opens the player: browse leaves before it is done.
+        val gate = CompletableDeferred<Unit>().also { playerData.readGate = it }
+        session.publish(ready(catalog))
+        settle()
+        assertEquals(1, binds())
+        key(Key.DirectionCenter)
+        settle()
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("channel-row-2")).fetchSemanticsNodes().isEmpty() }
+        playerData.readGate = null
+        gate.complete(Unit)
+        settle()
+        compose.waitUntil(10_000) { binds() == 2 }
+        settle()
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertEquals(2, binds())
+    }
+
     @Test fun twoOksInOneBurstOpenOnlyTheSecondChannel() {
         app()
         // Both confirms run before either request's coroutine pushes its player.
@@ -407,7 +465,7 @@ class StartupOfflineTest {
         profile: ServerProfileReadResult = ServerProfileReadResult.anonymous("offline.invalid", 9982),
     ) {
         session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
-        val data = InMemoryData()
+        val data = InMemoryData().also { playerData = it }
         val settings = PlayerSettingsStore(data)
         val profiles = AppProfileOwner(session, FakeServerProfileStore(profile),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
@@ -471,7 +529,12 @@ class StartupOfflineTest {
 
     private class InMemoryData : DataStore<Preferences> {
         val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
+        /** Holds every read that starts while set, as a slow store would. */
+        var readGate: CompletableDeferred<Unit>? = null
+        override val data: Flow<Preferences> get() = flow {
+            readGate?.await()
+            emitAll(state)
+        }
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
             transform(state.value).also { state.value = it }
     }
