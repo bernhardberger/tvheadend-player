@@ -137,9 +137,14 @@ internal fun GuideHeadlineBackground(
     endInset: Dp,
     modifier: Modifier = Modifier,
 ) {
+    // A slow group switch holds the last programme, whose channel the new group may not have.
+    val held = programme()?.channel
+    val lookup = remember(channels, held) {
+        if (held == null || channels.any { it.id == held.id }) channels else channels + held
+    }
     ProvideArtworkSession(observation.currentSession, scopeObservation) {
         ChannelsImmersiveBackground(
-            channels = channels,
+            channels = lookup,
             channelId = { programme()?.channel?.id },
             observation = observation,
             nowSec = nowSec,

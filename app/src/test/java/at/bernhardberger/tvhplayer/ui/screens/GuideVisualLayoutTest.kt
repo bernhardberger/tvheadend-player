@@ -1092,7 +1092,7 @@ class GuideVisualLayoutTest {
         val entered = CompletableDeferred<Unit>()
         val release = CompletableDeferred<Unit>()
         try {
-            show(headline = true, beforeCoverageBatch = { _, _ ->
+            show(headline = true, groupWithoutFirst = true, beforeCoverageBatch = { _, _ ->
                 if (armed.get()) {
                     entered.complete(Unit)
                     release.await()
@@ -1101,6 +1101,7 @@ class GuideVisualLayoutTest {
             key(Key.DirectionDown)
             focused(title(1, 0))
             headlineTitle(title(1, 0))
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
             key(Key.DirectionUp)
             dateFocused()
             key(Key.DirectionRight)
@@ -1109,23 +1110,30 @@ class GuideVisualLayoutTest {
             tagFocused("channels-group-all")
             key(Key.DirectionDown)
             tagFocused("channels-group-1")
+            // A group without the focused programme's channel.
+            key(Key.DirectionDown)
+            tagFocused("channels-group-2")
             val full = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+            // Only the focused channel's programmes are loaded, so the new group's rows stay empty
+            // until theirs arrive and the grid focuses nothing.
+            val first = full.events.filter { it.channelId == ChannelId(1) }
+            publishEvents(first, EpgSnapshot.create(events = first,
+                historicalEvents = full.historicalEvents.filter { it.channelId == ChannelId(1) },
+                coverages = full.coverages), covered = true)
             armed.set(true)
             key(Key.Enter)
             compose.waitUntil(10_000) { entered.isCompleted }
-            // The new group's rows are empty until its programmes arrive, so the grid focuses nothing.
-            publishEvents(emptyList(), EpgSnapshot.create(events = emptyList(), historicalEvents = emptyList(), coverages = emptyList()), covered = false)
             // Well past the settle while they load: still the programme, never "no information".
             compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs * 4)
             compose.waitForIdle()
             compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
-            compose.onNodeWithTag("channels-immersive-background").assertExists()
+            compose.onNodeWithTag("channels-immersive-picon").assertExists()
             publishEvents(full.events, full, covered = true)
             release.complete(Unit)
-            // Having lost its programme, the grid takes the one at the window's start, as before.
+            // The grid takes the new group's first programme at the window's start.
             key(Key.DirectionDown)
-            focused(title(1, -1))
-            headlineTitle(title(1, -1))
+            focused(title(2, -1))
+            headlineTitle(title(2, -1))
         } finally {
             armed.set(false)
             release.complete(Unit)
@@ -1284,11 +1292,13 @@ class GuideVisualLayoutTest {
     private fun show(scale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr, history: Boolean = true,
         lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
-        beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false) {
+        beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
+        groupWithoutFirst: Boolean = false) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
-                number = id, icon = if (id == 3L) null else ArtworkId(id.toInt()), tagIds = listOf(ChannelTagId(1)))
+                number = id, icon = if (id == 3L) null else ArtworkId(id.toInt()),
+                tagIds = if (groupWithoutFirst && id > 1L) listOf(ChannelTagId(1), ChannelTagId(2)) else listOf(ChannelTagId(1)))
         }
         fun event(channel: Channel, offset: Int) = EpgEvent.create(
             EventId(channel.id.value * 100 + offset + 10), channelId = channel.id,
@@ -1299,7 +1309,9 @@ class GuideVisualLayoutTest {
         session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels,
-                listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })))),
+                listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })) +
+                    if (groupWithoutFirst) listOf(ChannelTag.create(ChannelTagId(2), name = "News",
+                        channelIds = channels.drop(1).map { it.id })) else emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(
                 events = channels.filterNot { it.id == ChannelId(3) }.flatMap { ch ->
                     if (longProgramme && ch.id == ChannelId(1)) {
