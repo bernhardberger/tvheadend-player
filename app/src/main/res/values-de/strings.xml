@@ -36,6 +36,8 @@
     <string name="context_show_guide">Im Programm zeigen</string>
     <string name="context_resume">Fortsetzen</string>
     <string name="context_start_over">Von vorne starten</string>
+    <string name="context_mark_watched">Als gesehen markieren</string>
+    <string name="context_mark_unwatched">Als ungesehen markieren</string>
     <string name="context_delete">Löschen</string>
     <string name="stats_video_buffers">Videopuffer</string>
     <string name="stats_video_buffers_value">Angezeigt %1$d • Verworfen %2$d • Übersprungen %3$d</string>

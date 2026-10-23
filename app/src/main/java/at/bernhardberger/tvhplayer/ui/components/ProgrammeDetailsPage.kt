@@ -160,6 +160,8 @@ internal fun ProgrammeDetailsPage(
     fun restoreAction() {
         section = DetailsSection.ACTIONS
         (lastAction?.takeIf { it in actions }?.let(requesters::get)
+            ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) &&
+                it in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) }?.let(requesters::get)
             ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) &&
                 it in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) }?.let(requesters::get)
             ?: initialAction?.takeIf { it in actions }?.let(requesters::get)
@@ -1023,7 +1025,7 @@ private fun DetailsActions(
     Row(Modifier.horizontalScroll(rememberScrollState()).padding(8.dp).testTag("details-actions"),
         horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         actions.forEachIndexed { index, action ->
-            key(action) {
+            key(if (action == BrowseContextAction.MARK_UNWATCHED) BrowseContextAction.MARK_WATCHED else action) {
                 val modifier = Modifier.height(40.dp).focusRequester(requesters.getValue(action))
                     .onFocusChanged { if (it.isFocused) onFocused(action) }
                     .focusProperties {

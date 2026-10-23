@@ -36,8 +36,8 @@ class ProgrammeDetailsPolicyTest {
     }
 
     @Test fun recordingActionsFollowLifecycleAndPlaybackAuthority() {
-        assertEquals(listOf(PLAY, DELETE), actions(recording(DvrEntryState.COMPLETED)))
-        assertEquals(listOf(RESUME, START_OVER, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
+        assertEquals(listOf(PLAY, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED)))
+        assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
         assertEquals(listOf(WATCH, STOP), actions(recording(DvrEntryState.RECORDING, files = listOf(file()))))
         assertEquals(listOf(STOP), actions(recording(DvrEntryState.RECORDING)))
         assertEquals(listOf(WATCH, CANCEL), actions(recording(DvrEntryState.SCHEDULED)))
@@ -88,7 +88,7 @@ class ProgrammeDetailsPolicyTest {
             facts(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))).last())
         assertFalse(facts(recording(DvrEntryState.MISSED, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20)).any { it.kind == DetailsFactKind.LEFT })
-        assertEquals(listOf(RESUME, START_OVER, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))
         assertEquals(listOf(PLAY, DELETE), actions(recording(DvrEntryState.MISSED, 20, listOf(file()))))
         assertEquals(listOf(DELETE), actions(recording(DvrEntryState.MISSED, 20)))
     }

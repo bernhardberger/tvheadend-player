@@ -122,6 +122,7 @@ class RecordingsScreenTest {
                 stopEntry = onStopRecording,
                 cancelEntry = onCancelRecording,
                 deleteEntry = onDeleteRecording,
+                updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             )
         }
         val noticeContext = rememberUpdatedState(NoticeContext(0,

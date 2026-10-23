@@ -8,7 +8,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 enum class BrowseContextAction {
     WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
-    RESUME, START_OVER, PLAY, DELETE,
+    RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE,
 }
 
 fun channelContextActions(
@@ -70,6 +70,7 @@ fun recordingContextActions(
         } else add(BrowseContextAction.PLAY)
     }
     add(BrowseContextAction.DETAILS)
+    recordingWatchStateAction(entry, admission, canModifyRecordings)?.let(::add)
     if (canModifyRecordings) when (entry.state) {
         DvrEntryState.RECORDING -> add(BrowseContextAction.STOP)
         DvrEntryState.SCHEDULED -> add(BrowseContextAction.CANCEL)
@@ -78,4 +79,17 @@ fun recordingContextActions(
         DvrEntryState.FILE_MISSING -> add(BrowseContextAction.DELETE)
         else -> Unit
     }
+}
+
+/** Watch-state commands are only useful for playable, ended recordings with write authority. */
+@OptIn(ExperimentalTvheadendApi::class)
+fun recordingWatchStateAction(
+    entry: DvrEntry,
+    admission: RecordingPlaybackAdmission?,
+    canModifyRecordings: Boolean,
+): BrowseContextAction? {
+    if (!canModifyRecordings || !recordingPlaybackOffered(admission) ||
+        admission is RecordingPlaybackAdmission.Growing || entry.state == DvrEntryState.MISSED
+    ) return null
+    return if ((entry.playCount ?: 0) > 0) BrowseContextAction.MARK_UNWATCHED else BrowseContextAction.MARK_WATCHED
 }

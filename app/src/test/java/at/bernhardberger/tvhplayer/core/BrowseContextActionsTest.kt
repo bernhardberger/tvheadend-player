@@ -26,7 +26,9 @@ class BrowseContextActionsTest {
         position: Long = 0,
         files: List<DvrRecordingFile>? = null,
         dataSize: Long? = null,
-    ) = DvrEntry.create(DvrEntryId(1), state = state, playPosition = position.seconds, files = files, dataSizeBytes = dataSize)
+        playCount: Long? = 0,
+    ) = DvrEntry.create(DvrEntryId(1), state = state, playPosition = position.seconds, files = files,
+        dataSizeBytes = dataSize, playCount = playCount)
 
     @Test fun channelsWithoutProgrammeOrPermissionDoNotOfferRecording() {
         assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 100, null, true))
@@ -44,13 +46,18 @@ class BrowseContextActionsTest {
     }
 
     @Test fun completedRecordingsOfferResumeOnlyWithProgress() {
-        assertEquals(listOf(PLAY, DETAILS, DELETE), actions(recording(DvrEntryState.COMPLETED)))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
+        assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED)))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
+    }
+
+    @Test fun completedWatchedRecordingsOfferOnlyMarkUnwatchedAfterDetails() {
+        assertEquals(listOf(PLAY, DETAILS, MARK_UNWATCHED, DELETE),
+            actions(recording(DvrEntryState.COMPLETED, playCount = 2)))
     }
 
     @Test fun completedRecordingsWithoutSupportedProgressOfferOnlyPlay() {
         listOf(RecordingProgressCapability.UNKNOWN, RecordingProgressCapability.UNSUPPORTED).forEach {
-            assertEquals("$it", listOf(PLAY, DETAILS, DELETE), actions(recording(DvrEntryState.COMPLETED, 20), capability = it))
+            assertEquals("$it", listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20), capability = it))
         }
     }
 
@@ -76,9 +83,9 @@ class BrowseContextActionsTest {
 
     @Test fun failedRecordingWithAFilePlaysLikeACompletedOne() {
         val failed = DvrEntryState.COMPLETED_ERROR
-        assertEquals(listOf(PLAY, DETAILS, DELETE), actions(recording(failed, files = listOf(file()))))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, DELETE), actions(recording(failed, 20, listOf(file()))))
-        assertEquals(listOf(RESUME, START_OVER, DETAILS, DELETE), actions(recording(failed, 20, listOf(file()), dataSize = 1)))
+        assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, files = listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, 20, listOf(file()))))
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(failed, 20, listOf(file()), dataSize = 1)))
     }
 
     @Test fun missedRecordingWithAFileOnlyOffersPlay() {

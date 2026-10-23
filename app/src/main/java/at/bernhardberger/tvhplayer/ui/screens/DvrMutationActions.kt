@@ -5,12 +5,14 @@ import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrProgressResult
 import at.bernhardberger.tvheadend.sdk.core.DvrRepository
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
 import at.bernhardberger.tvheadend.sdk.core.DvrScheduleRequest
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
+import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -52,6 +54,7 @@ internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObser
     is DvrMutationAction.Delete -> true
 }
 
+@OptIn(ExperimentalTvheadendApi::class)
 internal class DvrMutationActions(
     private val scheduleEntry: suspend (
         CurrentSessionObservation,
@@ -69,13 +72,25 @@ internal class DvrMutationActions(
         CurrentSessionObservation,
         DvrEntryId,
     ) -> DvrMutationResult<Unit>,
+    private val updateWatchStateCommand: suspend (
+        CurrentSessionObservation,
+        DvrEntryId,
+        Boolean,
+    ) -> DvrProgressResult,
 ) {
     constructor(repository: DvrRepository) : this(
         scheduleEntry = repository::scheduleEntry,
         stopEntry = repository::stopEntry,
         cancelEntry = repository::cancelEntry,
         deleteEntry = repository::deleteEntry,
+        updateWatchStateCommand = repository::updateWatchState,
     )
+
+    suspend fun updateWatchState(
+        currentSession: CurrentSessionObservation,
+        recordingId: DvrEntryId,
+        watched: Boolean,
+    ): DvrProgressResult = updateWatchStateCommand(currentSession, recordingId, watched)
 
     suspend fun execute(action: DvrMutationAction?): DvrMutationResult<*> =
         when (action) {
@@ -103,7 +118,7 @@ internal class DvrMutationActions(
         }
 }
 
-@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+@OptIn(ExperimentalTvheadendApi::class)
 internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrMutationResult<*>, context: NoticeContext) {
     val feedback = result.toDvrMutationFeedback()
     if (!feedback.isFailure) return

@@ -36,6 +36,8 @@
     <string name="context_show_guide">Show in Guide</string>
     <string name="context_resume">Resume</string>
     <string name="context_start_over">Start over</string>
+    <string name="context_mark_watched">Mark as watched</string>
+    <string name="context_mark_unwatched">Mark as unwatched</string>
     <string name="context_delete">Delete</string>
     <string name="audio_subtitles_section">Audio &amp; subtitles</string>
     <string name="audio_language_first">Audio language</string>

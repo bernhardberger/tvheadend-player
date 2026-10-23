@@ -103,7 +103,8 @@ class ProgrammeDvrSdkAdoptionTest {
             return DvrMutationResult.Failed(TvheadendFailure.SERVER_REJECTED, false, null)
         }
         val actions = DvrMutationActions(scheduleEntry = { _, _ -> result() }, stopEntry = { _, _ -> result() },
-            cancelEntry = { _, _ -> result() }, deleteEntry = { _, _ -> error("unexpected delete") })
+            cancelEntry = { _, _ -> result() }, deleteEntry = { _, _ -> error("unexpected delete") },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") })
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, opening.currentSession?.generationIdentity) }
         lateinit var back: OnBackPressedDispatcher
         compose.setContent {
@@ -173,6 +174,7 @@ class ProgrammeDvrSdkAdoptionTest {
             stopEntry = { _, id -> stopped = id; DvrMutationResult.Confirmed(Unit) },
             cancelEntry = { _, _ -> error("unexpected cancel") },
             deleteEntry = { _, _ -> error("unexpected delete") },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         compose.setContent {
@@ -213,6 +215,7 @@ class ProgrammeDvrSdkAdoptionTest {
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, _ -> DvrMutationResult.Failed(failure, false, message) },
             cancelEntry = { _, _ -> error("unexpected cancel") }, deleteEntry = { _, _ -> error("unexpected delete") },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
         val notices = NoticeCenter({ 0L }) { NoticeContext(0, observation.currentSession?.generationIdentity) }
         notices.postDvrFailure(action, actions.execute(action), notices.context())

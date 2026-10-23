@@ -127,6 +127,7 @@ class InProgressRecordingResumeTest {
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             cancelEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {

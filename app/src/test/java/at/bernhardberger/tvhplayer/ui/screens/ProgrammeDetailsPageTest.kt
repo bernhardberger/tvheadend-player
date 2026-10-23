@@ -367,6 +367,37 @@ class ProgrammeDetailsPageTest {
         capture("recording-partly-watched", "u15-details-layout")
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
+    @Test fun recordingWatchButtonKeepsFocusAcrossMetadataAndRecoversWhenRemoved() {
+        val entry = androidx.compose.runtime.mutableStateOf(DvrEntry.create(DvrEntryId(1),
+            title = "Ridge Light", state = DvrEntryState.COMPLETED, playPosition = 20.seconds))
+        val writable = androidx.compose.runtime.mutableStateOf(true)
+        val selected = mutableListOf<BrowseContextAction>()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ProgrammeDetailsPage(event = null, recording = entry.value, channel = channel,
+                    nowSec = start.epochSeconds,
+                    actions = recordingDetailsActions(entry.value, admitted(entry.value), writable.value, false),
+                    recordingAdmission = admitted(entry.value), onAction = selected::add, onClose = {})
+            }
+        }
+        compose.onNodeWithTag("details-resume").assertIsFocused()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
+        compose.onNodeWithText("Mark as watched").assertIsFocused().assertHasClickAction()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        Assert.assertEquals(listOf(BrowseContextAction.MARK_WATCHED), selected)
+        compose.onNodeWithText("Mark as watched").assertIsFocused()
+        compose.runOnIdle { entry.value = DvrEntry.create(entry.value.id, title = "Ridge Light",
+            state = DvrEntryState.COMPLETED, playCount = 1, playPosition = 0.seconds) }
+        compose.onNodeWithText("Mark as unwatched").assertIsFocused()
+        compose.onNodeWithText("Mark as watched").assertDoesNotExist()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        Assert.assertEquals(listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED), selected)
+        compose.runOnIdle { writable.value = false }
+        compose.onNodeWithText("Mark as unwatched").assertDoesNotExist()
+        compose.onNodeWithTag("details-play").assertIsFocused()
+    }
+
     @Test fun upFocusesPanelAboveActionsAndBackReturnsToTheActions() {
         var closed = 0
         show(onClose = { closed++ }, noAirings = true)
@@ -936,7 +967,7 @@ class ProgrammeDetailsPageTest {
     @Test fun recordingDeleteChipAndFactsKeepTheAnchorWithoutAirings() {
         show(recording = true, recordingFacts = true, longSubtitle = true)
         compose.onNodeWithTag("details-resume").assertIsFocused()
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-delete").assertIsFocused()
         compose.onNodeWithText("Available until Tue, Sep 22").assertExists()
         assertBottomAnchored(peek = false)

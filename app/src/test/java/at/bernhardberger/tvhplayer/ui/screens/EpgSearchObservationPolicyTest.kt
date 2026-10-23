@@ -132,6 +132,7 @@ class EpgSearchObservationPolicyTest {
                 dispatchCount++
                 DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
 
         assertSame(mutation, currentDvrMutation(mutation, opened, opened))

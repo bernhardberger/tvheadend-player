@@ -82,6 +82,15 @@ import androidx.tv.material3.Text
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.OutlinedButtonDefaults
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrProgressResult
+import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
+import at.bernhardberger.tvhplayer.core.recordingWatchStateAction
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -737,6 +746,26 @@ internal fun RecordingsScreenContent(
                 ?.recordingPlaybackAdmission(entry)
         }
     }
+    fun markRecording(action: BrowseContextAction) {
+        val openingSession = selectedCapability ?: return
+        val entryId = opened?.id ?: return
+        scope.launch {
+            val current = latestObservationProvider()
+            if (current.currentSession !== openingSession) return@launch
+            val entry = current.dvrEntry(entryId) ?: return@launch
+            val canModify = (current.sessionState as? SessionState.Ready)
+                ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+            if (recordingWatchStateAction(entry, current.recordingPlaybackAdmission(entry), canModify) != action) return@launch
+            val noticeContext = notices.context()
+            when (val result = dvrMutationActions.updateWatchState(openingSession, entryId, action == BrowseContextAction.MARK_WATCHED)) {
+                DvrProgressResult.Accepted -> Unit
+                is DvrProgressResult.Failed -> {
+                    val feedback = result.toDvrMutationFeedback()
+                    notices.post(Notice.DvrActionFailed(DvrMutationKind.UPDATE, feedback), noticeContext)
+                }
+            }
+        }
+    }
     LaunchedEffect(detailsEntry, opened) {
         if (detailsEntry != null && opened == null) {
             showResumeChoice = false
@@ -910,6 +939,10 @@ internal fun RecordingsScreenContent(
                         pendingMutation = selectedCapability?.let { DvrMutationAction.Delete(it, opened.id) }
                         pendingAction = PendingRecordingAction.DELETE
                     }
+                    BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED -> {
+                        visibility.targetState = false
+                        markRecording(action)
+                    }
                     else -> Unit
                 }
             },
@@ -998,6 +1031,7 @@ internal fun RecordingsScreenContent(
                 pendingMutation = capability?.let { DvrMutationAction.Delete(it, opened.id) }
                 pendingAction = PendingRecordingAction.DELETE
                 }
+                BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED -> markRecording(action)
                 else -> Unit
                 }
             },

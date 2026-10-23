@@ -40,6 +40,76 @@ class RecordingConfirmationStateTest {
     @Test fun actionFailureIsPostedAfterDetailsClose() = delayedFailure(reopen = false)
     @Test fun actionFailureIsPostedAfterDetailsReopen() = delayedFailure(reopen = true)
 
+    @Test fun menuWatchStateRejectsReplacedSession() = watchStateBeforeRecomposition(false) {
+        it.replaceGeneration(observation(DvrEntryState.COMPLETED))
+    }
+    @Test fun detailsWatchStateRejectsReplacedSession() = watchStateBeforeRecomposition(true) {
+        it.replaceGeneration(observation(DvrEntryState.COMPLETED))
+    }
+    @Test fun menuWatchStateRejectsRevokedWritePermission() = watchStateBeforeRecomposition(false) {
+        it.publish(observation(DvrEntryState.COMPLETED, dvrWrite = CapabilityAccess.DENIED))
+    }
+    @Test fun detailsWatchStateRejectsRevokedWritePermission() = watchStateBeforeRecomposition(true) {
+        it.publish(observation(DvrEntryState.COMPLETED, dvrWrite = CapabilityAccess.DENIED))
+    }
+    @Test fun menuWatchStateRejectsRemovedEntry() = watchStateBeforeRecomposition(false) {
+        it.publish(observation(null))
+    }
+    @Test fun detailsWatchStateRejectsRemovedEntry() = watchStateBeforeRecomposition(true) {
+        it.publish(observation(null))
+    }
+    @Test fun menuWatchStateRejectsChangedWatchState() = watchStateBeforeRecomposition(false) {
+        it.publish(observation(DvrEntryState.COMPLETED, playCount = 1))
+    }
+    @Test fun detailsWatchStateRejectsChangedWatchState() = watchStateBeforeRecomposition(true) {
+        it.publish(observation(DvrEntryState.COMPLETED, playCount = 1))
+    }
+    @Test fun menuWatchStateDispatchesOnceWhileStillAdmitted() =
+        watchStateBeforeRecomposition(false, expectedWatched = listOf(true)) {}
+
+    private fun watchStateBeforeRecomposition(
+        fromDetails: Boolean,
+        expectedWatched: List<Boolean> = emptyList(),
+        beforeClick: (FakeTvheadendSession) -> Unit,
+    ) {
+        val session = FakeTvheadendSession(observation(DvrEntryState.COMPLETED, folder = emptyList()))
+        val calls = mutableListOf<Boolean>()
+        val actions = DvrMutationActions(
+            updateWatchStateCommand = { _, id, watched ->
+                assertEquals(DvrEntryId(1), id)
+                calls += watched
+                DvrProgressResult.Accepted
+            },
+            scheduleEntry = { _, _ -> error("Unexpected schedule") },
+            stopEntry = { _, _ -> error("Unexpected stop") },
+            cancelEntry = { _, _ -> error("Unexpected cancel") },
+            deleteEntry = { _, _ -> error("Unexpected delete") },
+        )
+        val state = RecordingsScreenState()
+        val notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                    currentObservation = { session.observation.value }, state = state,
+                    dvrMutationActions = actions, notices = notices)
+            }
+        }
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("recording-list-entry-1").fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        if (fromDetails) {
+            compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        }
+        val markWatched = compose.onNodeWithText("Mark as watched").requestFocus()
+        val click = requireNotNull(markWatched.fetchSemanticsNode().config[SemanticsActions.OnClick].action)
+        compose.runOnIdle {
+            beforeClick(session)
+            click()
+        }
+        compose.runOnIdle { assertEquals(expectedWatched, calls) }
+    }
+
     @Test fun confirmedDetailsDeleteClosesAndFocusesTheNeighbour() {
         val neighbour = DvrEntry.create(DvrEntryId(2), title = "Neighbour", state = DvrEntryState.COMPLETED, folder = emptyList())
         val entry = DvrEntry.create(DvrEntryId(1), title = "Recording", state = DvrEntryState.COMPLETED, folder = emptyList())
@@ -50,6 +120,7 @@ class RecordingConfirmationStateTest {
         val session = FakeTvheadendSession(snapshot(listOf(entry, neighbour)))
         var calls = 0
         val actions = DvrMutationActions(
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, _ -> error("unexpected stop") },
             cancelEntry = { _, _ -> error("unexpected cancel") },
@@ -100,6 +171,7 @@ class RecordingConfirmationStateTest {
         val session = FakeTvheadendSession(snapshot(survivors + entry))
         var calls = 0
         val actions = DvrMutationActions(
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> error("unexpected schedule") },
             stopEntry = { _, _ -> error("unexpected stop") },
             cancelEntry = { _, _ -> error("unexpected cancel") },
@@ -156,6 +228,7 @@ class RecordingConfirmationStateTest {
         val result = CompletableDeferred<DvrMutationResult<Unit>>()
         var calls = 0
         val actions = DvrMutationActions(
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             cancelEntry = { _, _ -> calls++; result.await() },
@@ -192,6 +265,7 @@ class RecordingConfirmationStateTest {
         val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
         var calls = 0
         val actions = DvrMutationActions(
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
             scheduleEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             cancelEntry = { _, _ -> calls++; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -241,14 +315,19 @@ class RecordingConfirmationStateTest {
         assertEquals(0, calls)
     }
 
-    private fun observation(state: DvrEntryState?) = SessionObservation.create(
+    private fun observation(
+        state: DvrEntryState?,
+        dvrWrite: CapabilityAccess = CapabilityAccess.ALLOWED,
+        playCount: Long? = null,
+        folder: List<String>? = null,
+    ) = SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(
-            streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
+            streaming = CapabilityAccess.ALLOWED, dvrWrite = dvrWrite,
         )),
         channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
         epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = state?.let {
-            listOf(DvrEntry.create(id = DvrEntryId(1), title = "Recording", state = it,
+            listOf(DvrEntry.create(id = DvrEntryId(1), title = "Recording", state = it, playCount = playCount, folder = folder,
                 start = kotlin.time.Instant.parse("2026-09-15T20:00:00Z"),
                 stop = kotlin.time.Instant.parse("2026-09-15T21:00:00Z")))
         }.orEmpty())),

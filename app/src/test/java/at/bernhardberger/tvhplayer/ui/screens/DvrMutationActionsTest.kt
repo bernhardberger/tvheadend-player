@@ -10,6 +10,7 @@ import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
+import at.bernhardberger.tvheadend.sdk.core.DvrProgressResult
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSchedule
@@ -57,6 +58,7 @@ class DvrMutationActionsTest {
                 deleted = currentSession to id
                 DvrMutationResult.Failed(TvheadendFailure.TRANSPORT_UNAVAILABLE, mayHaveApplied = false)
             },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
         val target = ProgrammeRecordingTarget(
             eventId = EventId(7),
@@ -109,12 +111,61 @@ class DvrMutationActionsTest {
             stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.AcceptedButUnconfirmed(Unit) },
             cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
 
         val feedback = actions.execute(DvrMutationAction.Stop(capability, DvrEntryId(4))).toDvrMutationFeedback()
 
         assertEquals(listOf("stop"), calls)
         assertEquals(DvrMutationFeedback.ACCEPTED_UNCONFIRMED, feedback)
+    }
+
+    @Test
+    fun watchStateDispatchesCapturedSessionAndDesiredStateOnceWithoutRetryingFailure() = runTest {
+        val capability = currentSession()
+        val recordingId = DvrEntryId(9)
+        val calls = mutableListOf<Triple<CurrentSessionObservation, DvrEntryId, Boolean>>()
+        val failure = DvrProgressResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true)
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> error("Unexpected schedule") },
+            stopEntry = { _, _ -> error("Unexpected stop") },
+            cancelEntry = { _, _ -> error("Unexpected cancel") },
+            deleteEntry = { _, _ -> error("Unexpected delete") },
+            updateWatchStateCommand = { session, id, watched ->
+                calls += Triple(session, id, watched)
+                if (watched) DvrProgressResult.Accepted else failure
+            },
+        )
+
+        assertSame(DvrProgressResult.Accepted, actions.updateWatchState(capability, recordingId, true))
+        assertSame(failure, actions.updateWatchState(capability, recordingId, false))
+        assertEquals(listOf(Triple(capability, recordingId, true), Triple(capability, recordingId, false)), calls)
+    }
+
+    @Test
+    fun watchStateFailuresPreserveExistingDvrFeedbackAndDispatchEvidence() {
+        val cases = listOf(
+            Triple(TvheadendFailure.ACCESS_DENIED, false, DvrMutationFeedback.PERMISSION_DENIED),
+            Triple(TvheadendFailure.CONNECTION_LIMIT, false, DvrMutationFeedback.CONNECTION_LIMIT),
+            Triple(TvheadendFailure.SERVER_REJECTED, false, DvrMutationFeedback.REJECTED),
+            Triple(TvheadendFailure.NOT_SUPPORTED, false, DvrMutationFeedback.NOT_SUPPORTED),
+            Triple(TvheadendFailure.TIMEOUT, true, DvrMutationFeedback.TIMEOUT),
+            Triple(TvheadendFailure.NOT_READY, false, DvrMutationFeedback.CONNECTION_UNAVAILABLE),
+            Triple(TvheadendFailure.OBSERVATION_EXPIRED, false, DvrMutationFeedback.CONNECTION_UNAVAILABLE),
+            Triple(TvheadendFailure.OBSERVATION_EXPIRED, true, DvrMutationFeedback.UNKNOWN_OUTCOME),
+            Triple(TvheadendFailure.CONNECTION_CHANGED, false, DvrMutationFeedback.CONNECTION_UNAVAILABLE),
+            Triple(TvheadendFailure.CONNECTION_CHANGED, true, DvrMutationFeedback.UNKNOWN_OUTCOME),
+            Triple(TvheadendFailure.TRANSPORT_UNAVAILABLE, false, DvrMutationFeedback.CONNECTION_UNAVAILABLE),
+            Triple(TvheadendFailure.TRANSPORT_UNAVAILABLE, true, DvrMutationFeedback.UNKNOWN_OUTCOME),
+            Triple(TvheadendFailure.MALFORMED_RESPONSE, false, DvrMutationFeedback.REJECTED),
+            Triple(TvheadendFailure.MALFORMED_RESPONSE, true, DvrMutationFeedback.UNKNOWN_OUTCOME),
+        )
+        cases.forEach { (failure, mayHaveApplied, expected) ->
+            val feedback = DvrProgressResult.Failed(failure, mayHaveApplied).toDvrMutationFeedback()
+            assertEquals("$failure mayHaveApplied=$mayHaveApplied", expected, feedback)
+            assertEquals(DvrMutationResult.Failed(failure, mayHaveApplied).toDvrMutationFeedback(), feedback)
+            assertTrue(feedback.isFailure)
+        }
     }
 
     @Test
@@ -137,6 +188,7 @@ class DvrMutationActionsTest {
                 dispatchCount++
                 DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false)
             },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
 
         val feedback = actions.execute(null).toDvrMutationFeedback()
@@ -198,6 +250,7 @@ class DvrMutationActionsTest {
             stopEntry = { _, _ -> calls += "stop"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
             cancelEntry = { _, _ -> calls += "cancel"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
             deleteEntry = { _, _ -> calls += "delete"; DvrMutationResult.Failed(TvheadendFailure.MALFORMED_RESPONSE, mayHaveApplied = true) },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
         val current = currentSession()
         val target = ProgrammeRecordingTarget(EventId(7), null, 100, 200, "News", current)

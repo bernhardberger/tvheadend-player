@@ -102,7 +102,8 @@ class GuideHistoryScreenTest {
             scheduleEntry = { _, value -> requests++; request = value; release.await(); DvrMutationResult.Confirmed(DvrEntryId(1)) },
             stopEntry = { _, _ -> error("unexpected stop") },
             cancelEntry = { _, _ -> error("unexpected cancel") },
-            deleteEntry = { _, _ -> error("unexpected delete") })
+            deleteEntry = { _, _ -> error("unexpected delete") },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") })
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(0, observation.currentSession?.generationIdentity)
         }

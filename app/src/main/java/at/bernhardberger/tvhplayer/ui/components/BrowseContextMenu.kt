@@ -124,6 +124,8 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.RESUME -> R.string.context_resume
     BrowseContextAction.START_OVER -> R.string.context_start_over
     BrowseContextAction.PLAY -> R.string.play_recording
+    BrowseContextAction.MARK_WATCHED -> R.string.context_mark_watched
+    BrowseContextAction.MARK_UNWATCHED -> R.string.context_mark_unwatched
     BrowseContextAction.DELETE -> R.string.context_delete
 }
 
@@ -134,5 +136,7 @@ internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DELETE -> R.drawable.ic_delete_outlined
     BrowseContextAction.SHOW_GUIDE -> R.drawable.ic_event
     BrowseContextAction.START_OVER -> R.drawable.ic_replay
+    BrowseContextAction.MARK_WATCHED -> R.drawable.ic_check_circle_outlined
+    BrowseContextAction.MARK_UNWATCHED -> R.drawable.ic_unpublished_outlined
     else -> R.drawable.ic_play_arrow
 }
