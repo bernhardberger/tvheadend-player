@@ -113,3 +113,26 @@ fun recordingPicture(recording: DvrEntry): String? = recording.files.orEmpty().f
         }
         "$quality $height"
     }
+
+/**
+ * What the viewer has seen of a recording. Tvheadend's play count counts file opens, not viewings,
+ * so it only separates watched from unwatched; a saved position makes it partly watched.
+ */
+sealed interface RecordingWatchState {
+    data object Unwatched : RecordingWatchState
+    data object Watched : RecordingWatchState
+    /** How far in, as a share of what was recorded; null when the length is unknown. */
+    data class PartlyWatched(val fraction: Double?) : RecordingWatchState
+}
+
+/** [resumePosition] is the position the recording offers to resume from, if any. */
+fun recordingWatchState(recording: DvrEntry, resumePosition: Duration?, nowSec: Long): RecordingWatchState = when {
+    resumePosition != null && resumePosition.isPositive() -> RecordingWatchState.PartlyWatched(
+        (recordingLengthSeconds(recording, nowSec) ?: recordingPlannedSeconds(recording))
+            ?.takeIf { it > 0 }
+            ?.let { (resumePosition.inWholeSeconds.toDouble() / it).coerceIn(0.0, 1.0) }
+    )
+    // Tvheadend ignores progress writes for a missed entry, so it never shows as watched.
+    (recording.playCount ?: 0L) > 0L && recording.state != DvrEntryState.MISSED -> RecordingWatchState.Watched
+    else -> RecordingWatchState.Unwatched
+}

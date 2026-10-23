@@ -673,6 +673,9 @@ internal fun RecordingsScreenContent(
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
+                            resumePositionForEntry = {
+                                at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
+                            },
                             initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
                                 if (owner.isCurrent && generation == focusRecoveryGeneration) {
@@ -714,6 +717,9 @@ internal fun RecordingsScreenContent(
                             },
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
+                            },
+                            resumePositionForEntry = {
+                                at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
                             },
                             initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {

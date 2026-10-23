@@ -743,6 +743,27 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun watchMarksEndTheTitleLineAndThePaneSaysWatchedNotACount() {
+        show(entries = listOf(
+            recording(1, "Half seen", "half.ts"),
+            recording(2, "Seen", "seen.ts", playCount = 147),
+            recording(3, "New", "new.ts"),
+        ))
+        focused("recording-list-entry-1")
+        assertWatchMark(1, "Partly watched")
+        assertWatchMark(2, "Watched")
+        compose.onNodeWithTag("recording-list-watched-3", useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-2")
+        compose.onNodeWithTag("recording-metadata-watched", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("147", substring = true).assertDoesNotExist()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-3")
+        compose.onNodeWithTag("recording-metadata-watched", useUnmergedTree = true).assertDoesNotExist()
+        capture("archive-watch-marks", 1f)
+        assertNoCommands()
+    }
+
     private fun publish(entries: List<DvrEntry>) {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
@@ -821,7 +842,7 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,
-        startEpochSeconds: Long = 1_791_000_000 - id * 86400, recordedMinutes: Long? = null) =
+        startEpochSeconds: Long = 1_791_000_000 - id * 86400, recordedMinutes: Long? = null, playCount: Long? = null) =
         DvrEntry.create(
             id = DvrEntryId(id), title = title, state = state,
             folder = path?.split('/')?.filter(String::isNotEmpty)?.dropLast(1),
@@ -837,6 +858,7 @@ class RecordingsVisualLayoutTest {
             description = "Follow a small team of naturalists through remote landscapes as they explore " +
                 "the changing seasons, meet local communities and discover wildlife at the edge of the world.",
             playPosition = if (id == 1L) 3723.seconds else null,
+            playCount = playCount,
         )
 
     private fun key(key: Key) {
@@ -865,6 +887,15 @@ class RecordingsVisualLayoutTest {
         assertTrue((mark.top + mark.bottom) / 2 in title.top..title.bottom)
         compose.onNode(hasTestTag("recording-list-metadata-$id") and hasText(description, substring = true),
             useUnmergedTree = true).assertDoesNotExist()
+    }
+
+    private fun assertWatchMark(id: Int, description: String) {
+        compose.onNodeWithTag("recording-list-watched-$id", useUnmergedTree = true)
+            .assertIsDisplayed().assertContentDescriptionEquals(description)
+        val mark = bounds("recording-list-watched-$id")
+        val title = bounds("recording-list-headline-$id")
+        assertTrue(mark.left > title.right)
+        assertTrue((mark.top + mark.bottom) / 2 in title.top..title.bottom)
     }
 
     private fun assertOverlineAboveTitle(id: Long) {

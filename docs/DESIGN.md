@@ -73,7 +73,10 @@ Meaning of colour:
     right end of the title line: channel rows, Recordings rows (Guide cells are
     decided with the Guide rework; today the cell corner). The lines above and
     below keep their full width, so progress and metadata never shorten for a
-    mark. Later row states (watched, partly watched) use the same place. The
+    mark. Watch state ends the same line in the muted content colour: a check
+    circle when watched, Material's clock loader filled about as far as the saved
+    position when partly watched, nothing when unwatched. Tvheadend's play count
+    counts file opens, so the app never shows it as a number. The
     trailing slot belongs to where OK leads, such as a folder's chevron.
     A running recording with errors adds the `error` "!" beside the dot. No dot
     on section headings or titles; the "Recording now" folder carries its dot

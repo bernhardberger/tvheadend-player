@@ -179,4 +179,19 @@ class RecordingMetadataPolicyTest {
         assertEquals("HD 1080", picture(720, 1080))
         assertEquals("UHD 2160", picture(1080, 2160))
     }
+
+    @Test fun watchStateIsUnwatchedWatchedOrPartlyWatchedButNeverACount() {
+        fun entry(playCount: Long?, state: DvrEntryState = DvrEntryState.COMPLETED) = DvrEntry.create(DvrEntryId(1),
+            state = state, start = at(0), stop = at(100 * 60), playCount = playCount)
+        assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(null), null, 0))
+        assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(0), null, 0))
+        assertEquals(RecordingWatchState.Watched, recordingWatchState(entry(147), null, 0))
+        assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(3, DvrEntryState.MISSED), null, 0))
+        // A saved position wins over the open count, and its share uses the recorded length.
+        assertEquals(RecordingWatchState.PartlyWatched(0.25), recordingWatchState(entry(2), 25.minutes, 0))
+        assertEquals(RecordingWatchState.PartlyWatched(1.0), recordingWatchState(entry(0), 200.minutes, 0))
+        assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(0), 0.minutes, 0))
+        assertEquals(RecordingWatchState.PartlyWatched(null), recordingWatchState(
+            DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED), 5.minutes, 0))
+    }
 }

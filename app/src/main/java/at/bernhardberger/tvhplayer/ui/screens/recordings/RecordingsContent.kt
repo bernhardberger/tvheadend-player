@@ -94,7 +94,9 @@ import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.DvrScheduleSectionKind
 import at.bernhardberger.tvhplayer.core.recordingFocusTargetKey
+import at.bernhardberger.tvhplayer.core.RecordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.recordingWatchState
 import at.bernhardberger.tvhplayer.core.recordingLengthSeconds
 import at.bernhardberger.tvhplayer.core.recordingPaddedStop
 import at.bernhardberger.tvhplayer.core.recordingStoppedEarly
@@ -105,6 +107,7 @@ import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
@@ -391,13 +394,10 @@ internal fun RecordingMetadataPane(
         entry.subscriptionError?.label()?.let {
             Text(text = it, color = MaterialTheme.colorScheme.error, maxLines = 2)
         }
-        // Tvheadend ignores progress writes for a missed entry, so it never shows as watched.
-        entry.playCount?.takeIf { it > 0 && entry.state != DvrEntryState.MISSED }?.let {
-            Text(
-                text = pluralStringResource(R.plurals.recordings_play_count,
-                    it.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), it),
-                color = TvTextColors.tertiary,
-            )
+        // Partly watched already shows as the resume line above.
+        if (recordingWatchState(entry, resumePosition, nowSec) == RecordingWatchState.Watched) {
+            Text(text = stringResource(R.string.recording_watched), color = TvTextColors.tertiary,
+                modifier = Modifier.testTag("recording-metadata-watched"))
         }
     }
 }
@@ -412,6 +412,7 @@ internal fun RecordingSchedule(
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     piconForEntry: (DvrEntry) -> ArtworkId?,
+    resumePositionForEntry: (DvrEntry) -> Duration?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
 ) {
@@ -529,6 +530,7 @@ internal fun RecordingSchedule(
                 RecordingListRow(
                     entry = entry,
                     piconPath = piconForEntry(entry),
+                    resumePosition = resumePositionForEntry(entry),
                     selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                     focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
                     selectedFocus = selectedFocus,
@@ -554,6 +556,7 @@ internal fun RecordingProblems(
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     piconForEntry: (DvrEntry) -> ArtworkId?,
+    resumePositionForEntry: (DvrEntry) -> Duration?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
 ) {
@@ -680,6 +683,7 @@ internal fun RecordingProblems(
                     RecordingListRow(
                         entry = entry,
                         piconPath = piconForEntry(entry),
+                        resumePosition = resumePositionForEntry(entry),
                         selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
                         focusTarget =
                             active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
@@ -707,6 +711,7 @@ internal enum class RecordingRowKind {
 internal fun RecordingListRow(
     entry: DvrEntry,
     piconPath: ArtworkId?,
+    resumePosition: Duration?,
     selected: Boolean,
     modifier: Modifier = Modifier,
     focusTarget: Boolean = selected,
@@ -723,6 +728,8 @@ internal fun RecordingListRow(
         onOpenContextMenu, enabled = { owner?.isCurrent != false })
     var focused by remember { mutableStateOf(false) }
     val itemKey = recordingItemKey(entry.id)
+    val nowSec = if (recordingIsRunning(entry)) rememberDetailsEpochSeconds() else 0L
+    val watchState = recordingWatchState(entry, resumePosition, nowSec)
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
@@ -754,6 +761,11 @@ internal fun RecordingListRow(
                             tint = errorMarkColor(focused),
                         )
                     }
+                }
+                // Watch state ends the line, so its marks form one column down the list.
+                if (watchState != RecordingWatchState.Unwatched) {
+                    Spacer(Modifier.width(TvSpacing8))
+                    RecordingWatchMark(watchState, Modifier.testTag("recording-list-watched-$itemKey"))
                 }
             }
         },
@@ -981,3 +993,33 @@ private fun recordingLengthLabel(entry: DvrEntry): String? =
         at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(it, androidx.compose.ui.platform.LocalResources.current)
     }
 
+/**
+ * Muted watch mark at the end of a recording row's title line: a check when watched, a clock
+ * loader filled about as far as the saved position when partly watched.
+ */
+@Composable
+private fun RecordingWatchMark(state: RecordingWatchState, modifier: Modifier = Modifier) {
+    val (icon, description) = when (state) {
+        RecordingWatchState.Unwatched -> return
+        RecordingWatchState.Watched -> R.drawable.ic_check_circle_outlined to R.string.recording_watched
+        is RecordingWatchState.PartlyWatched -> partlyWatchedIcon(state.fraction) to R.string.recording_partly_watched
+    }
+    Icon(
+        painter = painterResource(icon),
+        contentDescription = stringResource(description),
+        modifier = modifier.size(StatusIconSize),
+        tint = androidx.tv.material3.LocalContentColor.current.copy(alpha = TvTextSecondaryAlpha),
+    )
+}
+
+/** Material's clock loader comes in six steps; an unknown share shows the middle one. */
+@DrawableRes
+private fun partlyWatchedIcon(fraction: Double?): Int = when {
+    fraction == null -> R.drawable.ic_clock_loader_40_outlined
+    fraction < 0.15 -> R.drawable.ic_clock_loader_10_outlined
+    fraction < 0.3 -> R.drawable.ic_clock_loader_20_outlined
+    fraction < 0.5 -> R.drawable.ic_clock_loader_40_outlined
+    fraction < 0.7 -> R.drawable.ic_clock_loader_60_outlined
+    fraction < 0.85 -> R.drawable.ic_clock_loader_80_outlined
+    else -> R.drawable.ic_clock_loader_90_outlined
+}

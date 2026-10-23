@@ -132,6 +132,7 @@ internal fun ArchiveDepthContent(
                             ) { rowModifier, activate ->
                                 RecordingListRow(
                                     entry = item.entry, piconPath = latestPiconForEntry.value(item.entry),
+                                    resumePosition = latestResumePositionForEntry.value(item.entry),
                                     selected = false, modifier = rowModifier,
                                     onClick = activate,
                                     onOpenContextMenu = { latestOnOpenContextMenu.value?.invoke(item.entry) },
