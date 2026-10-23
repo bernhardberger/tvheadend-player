@@ -103,7 +103,7 @@ class RecordingsVisualLayoutTest {
         assertEquals(130f, bounds("recordings-header").left, .1f)
         assertEquals(28f, bounds("recordings-header").top, .1f)
         assertEquals(902f, bounds("recordings-header").right, .1f)
-        assertEquals(512f, bounds("recordings-archive-list").bottom, .1f)
+        assertEquals(540f, bounds("recordings-archive-list").bottom, .1f)
         assertEquals(130f, bounds("recordings-mode-tabs").left, .1f)
         assertEquals(76f, bounds("recordings-mode-tabs").top, .1f)
         val grown = bounds("recordings-folder-Documentaries")

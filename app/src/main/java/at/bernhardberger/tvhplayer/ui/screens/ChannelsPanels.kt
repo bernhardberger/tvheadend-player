@@ -63,6 +63,7 @@ import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelPadding
 import at.bernhardberger.tvhplayer.ui.player.containedFocus
 import at.bernhardberger.tvhplayer.ui.player.playbackListFade
 import kotlinx.coroutines.flow.first
+import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 /** Which Channels side panel is open. */
 internal enum class ChannelsPanel { GROUP, VIEW_OPTIONS }

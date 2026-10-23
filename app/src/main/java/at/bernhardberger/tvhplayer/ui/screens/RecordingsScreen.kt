@@ -493,10 +493,8 @@ internal fun RecordingsScreenContent(
                 }
                 false
             }
-            .padding(
-                top = contentPadding.calculateTopPadding(),
-                bottom = contentPadding.calculateBottomPadding(),
-            ),
+            // Lists run to the bottom edge and fade there; other content keeps the safe area.
+            .padding(top = contentPadding.calculateTopPadding()),
     ) {
         val spaceValue = recordingSpaceText(observation.dvrDiskSpaceState)
         val spaceDescription = spaceValue?.let { stringResource(R.string.recording_space_line_description, it) }
@@ -599,7 +597,8 @@ internal fun RecordingsScreenContent(
                 },
                 actionFocus = if (owner.isCurrent) contentFocus else remember { FocusRequester() },
                 upFocus = modeFocus,
-                modifier = Modifier.padding(start = startPadding, end = endPadding)
+                modifier = Modifier
+                    .padding(start = startPadding, end = endPadding, bottom = contentPadding.calculateBottomPadding())
                     .onFocusChanged {
                         if (owner.isCurrent) {
                             contentHasFocus = it.hasFocus
@@ -613,7 +612,10 @@ internal fun RecordingsScreenContent(
                 DvrLibraryMode.ARCHIVE -> ArchiveDepthContent(
                     root = frame.archive,
                     navigation = archiveNavigation,
-                    contentPadding = PaddingValues(start = startPadding + TvBrowseLeadingInset),
+                    contentPadding = PaddingValues(
+                        start = startPadding + TvBrowseLeadingInset,
+                        bottom = contentPadding.calculateBottomPadding(),
+                    ),
                     isCurrent = owner.isCurrent,
                     initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
                         detailsEntry == null && (contentFocusOwned || requestContentFocus),

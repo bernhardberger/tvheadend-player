@@ -35,6 +35,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
+import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
+import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
+import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -106,6 +109,9 @@ internal const val DepthAlphaMillis = 200
  * peeks out beside the rail, where its folder arrows would otherwise read as the rail's own.
  */
 internal const val DepthParentAlpha = 0.25f
+
+/** Top content reserve inside a depth list so the first focused row's scale is not clipped. */
+private val DepthListTopReserve = 4.dp
 private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
 private fun depthStripSpec() = tween<Float>(DepthSlideMillis, easing = DepthBrowseEasing)
 
@@ -544,7 +550,7 @@ private fun DepthStripPane(
     )
     val focus = remember { mutableStateMapOf<String, FocusRequester>() }
     val scope = rememberCoroutineScope()
-    val bringIntoViewSpec = LocalBringIntoViewSpec.current
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(list, DepthListTopReserve)
     var pageJob by remember { mutableStateOf<Job?>(null) }
     var pageTarget by remember { mutableStateOf<String?>(null) }
     DisposableEffect(active, capturedVisit, initialFocusEnabled, identities) {
@@ -615,75 +621,76 @@ private fun DepthStripPane(
                 column.level.emptyContent?.invoke()
                 return@Column
             }
-            LazyColumn(
-                state = list,
-                contentPadding = PaddingValues(
-                    top = 4.dp,
-                    bottom = maxOf(4.dp, contentPadding.calculateBottomPadding()),
-                ),
-                modifier = Modifier.fillMaxSize()
-                    .then(if (active && activeFocusRequester != null) Modifier.focusRequester(activeFocusRequester) else Modifier)
-                    .onFocusChanged {
-                        if (!it.hasFocus) { pageJob?.cancel(); pageTarget = null }
-                    }
-                    .onPreviewKeyEvent { event ->
-                        if (!active) return@onPreviewKeyEvent false
-                        val native = event.nativeKeyEvent
-                        val direction = pageKeyDirection?.invoke(native.keyCode)
-                        if (direction == null) {
-                            if (native.action == KeyEvent.ACTION_DOWN) { pageJob?.cancel(); pageTarget = null }
-                            return@onPreviewKeyEvent false
+            // The list runs to the bottom of the host and fades out where rows continue.
+            CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+                LazyColumn(
+                    state = list,
+                    contentPadding = PaddingValues(top = DepthListTopReserve, bottom = ListBottomReserve),
+                    modifier = Modifier.fillMaxSize()
+                        .listEdgeFades(list)
+                        .then(if (active && activeFocusRequester != null) Modifier.focusRequester(activeFocusRequester) else Modifier)
+                        .onFocusChanged {
+                            if (!it.hasFocus) { pageJob?.cancel(); pageTarget = null }
                         }
-                        if (native.action == KeyEvent.ACTION_DOWN) {
-                            val current = identities.indexOfFirst { it.id == (pageTarget ?: latestFocusedId.value) }
-                            val target = (current + direction * (list.layoutInfo.visibleItemsInfo.size - 1).coerceAtLeast(1))
-                                .coerceIn(0, identities.lastIndex)
-                            val id = identities[target].id
-                            pageJob?.cancel()
-                            pageTarget = id
-                            pageJob = scope.launch {
-                                val layout = list.layoutInfo
-                                val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                                    layout.beforeContentPadding.toFloat(),
-                                    (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat(),
-                                    layout.viewportSize.height.toFloat(),
-                                ).roundToInt()
-                                list.animateScrollToItem(target, focusOffset)
-                                snapshotFlow { focus[id] }.first { it != null }
-                                if (latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && pageTarget == id) {
-                                    focus[id]?.requestFocus()
-                                    pageTarget = null
+                        .onPreviewKeyEvent { event ->
+                            if (!active) return@onPreviewKeyEvent false
+                            val native = event.nativeKeyEvent
+                            val direction = pageKeyDirection?.invoke(native.keyCode)
+                            if (direction == null) {
+                                if (native.action == KeyEvent.ACTION_DOWN) { pageJob?.cancel(); pageTarget = null }
+                                return@onPreviewKeyEvent false
+                            }
+                            if (native.action == KeyEvent.ACTION_DOWN) {
+                                val current = identities.indexOfFirst { it.id == (pageTarget ?: latestFocusedId.value) }
+                                val target = (current + direction * (list.layoutInfo.visibleItemsInfo.size - 1).coerceAtLeast(1))
+                                    .coerceIn(0, identities.lastIndex)
+                                val id = identities[target].id
+                                pageJob?.cancel()
+                                pageTarget = id
+                                pageJob = scope.launch {
+                                    val layout = list.layoutInfo
+                                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                                        layout.beforeContentPadding.toFloat(),
+                                        (layout.visibleItemsInfo.firstOrNull()?.size ?: 0).toFloat(),
+                                        layout.viewportSize.height.toFloat(),
+                                    ).roundToInt()
+                                    list.animateScrollToItem(target, focusOffset)
+                                    snapshotFlow { focus[id] }.first { it != null }
+                                    if (latestStillOwning.value(capturedVisit) && latestFocusEnabled.value && pageTarget == id) {
+                                        focus[id]?.requestFocus()
+                                        pageTarget = null
+                                    }
                                 }
                             }
+                            true
                         }
-                        true
-                    }
-                    .focusProperties {
-                        onEnter = {
-                            if (latestActive.value) focus[latestFocusedId.value]?.requestFocus()
-                        }
-                    }.focusGroup(),
-            ) {
-                itemsIndexed(column.level.rows, key = { _, row -> row.item.id }) { _, row ->
-                    val requester = remember(row.item.id) { FocusRequester() }
-                    DisposableEffect(row.item.id, active) {
-                        if (active) focus[row.item.id] = requester
-                        onDispose { if (focus[row.item.id] === requester) focus.remove(row.item.id) }
-                    }
-                    row.content(
-                        Modifier.focusRequester(requester)
-                            .focusProperties {
-                                canFocus = active
-                                right = FocusRequester.Cancel
-                                if (stackCanPop) left = FocusRequester.Cancel
+                        .focusProperties {
+                            onEnter = {
+                                if (latestActive.value) focus[latestFocusedId.value]?.requestFocus()
                             }
-                            .onFocusChanged {
-                                if (it.isFocused && latestActive.value &&
-                                    latestStillOwning.value(capturedVisit)) {
-                                    onFocusItem(row.item.id, identities, capturedVisit)
+                        }.focusGroup(),
+                ) {
+                    itemsIndexed(column.level.rows, key = { _, row -> row.item.id }) { _, row ->
+                        val requester = remember(row.item.id) { FocusRequester() }
+                        DisposableEffect(row.item.id, active) {
+                            if (active) focus[row.item.id] = requester
+                            onDispose { if (focus[row.item.id] === requester) focus.remove(row.item.id) }
+                        }
+                        row.content(
+                            Modifier.focusRequester(requester)
+                                .focusProperties {
+                                    canFocus = active
+                                    right = FocusRequester.Cancel
+                                    if (stackCanPop) left = FocusRequester.Cancel
                                 }
-                            },
-                    ) { if (latestActive.value) onActivate(row, capturedVisit) }
+                                .onFocusChanged {
+                                    if (it.isFocused && latestActive.value &&
+                                        latestStillOwning.value(capturedVisit)) {
+                                        onFocusItem(row.item.id, identities, capturedVisit)
+                                    }
+                                },
+                        ) { if (latestActive.value) onActivate(row, capturedVisit) }
+                    }
                 }
             }
         }

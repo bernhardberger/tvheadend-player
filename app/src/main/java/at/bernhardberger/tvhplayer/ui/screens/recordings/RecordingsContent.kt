@@ -31,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -120,6 +121,9 @@ import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
+import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
+import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
+import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
 import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -444,7 +448,7 @@ internal fun RecordingSchedule(
         pageTargetKey ?: selectedKey,
     )
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
-    val bringIntoViewSpec = LocalBringIntoViewSpec.current
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, 0.dp)
     val scope = rememberCoroutineScope()
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     val lazyIndexes = remember(groups) {
@@ -465,96 +469,99 @@ internal fun RecordingSchedule(
             if (owner?.isCurrent != false) onScrollChanged(it)
         }
     }
-    LazyColumn(
-        state = listState,
-        userScrollEnabled = active,
-        // Full-width native rows grow by more than the narrow archive rows.
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .onFocusChanged {
-                if (!it.hasFocus) {
-                    pageFocusJob?.cancel()
-                    pageTargetKey = null
-                    pendingPageKey = null
-                }
-            }
-            .focusGroup()
-            .focusRestorer(selectedFocus)
-            .testTag("recordings-schedule-list")
-            .onPreviewKeyEvent { event ->
-                if (owner?.isCurrent == false) return@onPreviewKeyEvent true
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                pageFocusJob?.cancel()
-                pageTargetKey = null
-                val direction = ChannelNavigation.pageDirectionForKeyCode(
-                    event.nativeKeyEvent.keyCode
-                ) ?: run {
-                    pendingPageKey = null
-                    return@onPreviewKeyEvent false
-                }
-                val current = entries.indexOfFirst {
-                    "recording:${recordingItemKey(it.id)}" == pendingPageKey
-                }.takeIf { it >= 0 } ?: entries.indexOfFirst {
-                    "recording:${recordingItemKey(it.id)}" == selectedKey
-                }
-                val target = recordingListPageTargetIndex(
-                    entries.size,
-                    current,
-                    listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
-                    direction,
-                ) ?: run {
-                    pendingPageKey = null
-                    return@onPreviewKeyEvent true
-                }
-                pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
-                pageFocusJob = scope.launch {
-                    val layout = listState.layoutInfo
-                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                        layout.beforeContentPadding.toFloat(),
-                        (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
-                        layout.viewportSize.height.toFloat(),
-                    ).roundToInt()
-                    listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
-                    if (owner?.isCurrent == false) return@launch
-                    pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
-                }
-                true
-            },
-    ) {
-        groups.forEachIndexed { index, section ->
-            item(key = "header-${section.kind}-${section.date}") {
-                RecordingSectionHeader(
-                    text = scheduleSectionLabel(section),
-                    first = index == 0,
-                )
-            }
-            items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
-                val rowKey = "recording:${recordingItemKey(entry.id)}"
-                if (active && pageTargetKey == rowKey) {
-                    LaunchedEffect(rowKey) {
-                        if (owner?.isCurrent != false && pageTargetKey == rowKey) {
-                            runCatching { selectedFocus.requestFocus() }
-                            pageTargetKey = null
-                            pendingPageKey = null
-                        }
+    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+        LazyColumn(
+            state = listState,
+            userScrollEnabled = active,
+            // Full-width native rows grow by more than the narrow archive rows.
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = ListBottomReserve),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .listEdgeFades(listState)
+                .onFocusChanged {
+                    if (!it.hasFocus) {
+                        pageFocusJob?.cancel()
+                        pageTargetKey = null
+                        pendingPageKey = null
                     }
                 }
-                RecordingListRow(
-                    entry = entry,
-                    piconPath = piconForEntry(entry),
-                    resumePosition = resumePositionForEntry(entry),
-                    selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                    focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
-                    selectedFocus = selectedFocus,
-                    onFocused = {
-                        onFocused("recording:${recordingItemKey(entry.id)}")
-                    },
-                    onClick = { onOpen(entry) },
-                    onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
-                    kind = RecordingRowKind.SCHEDULE,
-                )
+                .focusGroup()
+                .focusRestorer(selectedFocus)
+                .testTag("recordings-schedule-list")
+                .onPreviewKeyEvent { event ->
+                    if (owner?.isCurrent == false) return@onPreviewKeyEvent true
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                    pageFocusJob?.cancel()
+                    pageTargetKey = null
+                    val direction = ChannelNavigation.pageDirectionForKeyCode(
+                        event.nativeKeyEvent.keyCode
+                    ) ?: run {
+                        pendingPageKey = null
+                        return@onPreviewKeyEvent false
+                    }
+                    val current = entries.indexOfFirst {
+                        "recording:${recordingItemKey(it.id)}" == pendingPageKey
+                    }.takeIf { it >= 0 } ?: entries.indexOfFirst {
+                        "recording:${recordingItemKey(it.id)}" == selectedKey
+                    }
+                    val target = recordingListPageTargetIndex(
+                        entries.size,
+                        current,
+                        listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
+                        direction,
+                    ) ?: run {
+                        pendingPageKey = null
+                        return@onPreviewKeyEvent true
+                    }
+                    pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
+                    pageFocusJob = scope.launch {
+                        val layout = listState.layoutInfo
+                        val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                            layout.beforeContentPadding.toFloat(),
+                            (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                            layout.viewportSize.height.toFloat(),
+                        ).roundToInt()
+                        listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
+                        if (owner?.isCurrent == false) return@launch
+                        pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
+                    }
+                    true
+                },
+        ) {
+            groups.forEachIndexed { index, section ->
+                item(key = "header-${section.kind}-${section.date}") {
+                    RecordingSectionHeader(
+                        text = scheduleSectionLabel(section),
+                        first = index == 0,
+                    )
+                }
+                items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
+                    val rowKey = "recording:${recordingItemKey(entry.id)}"
+                    if (active && pageTargetKey == rowKey) {
+                        LaunchedEffect(rowKey) {
+                            if (owner?.isCurrent != false && pageTargetKey == rowKey) {
+                                runCatching { selectedFocus.requestFocus() }
+                                pageTargetKey = null
+                                pendingPageKey = null
+                            }
+                        }
+                    }
+                    RecordingListRow(
+                        entry = entry,
+                        piconPath = piconForEntry(entry),
+                        resumePosition = resumePositionForEntry(entry),
+                        selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
+                        focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
+                        selectedFocus = selectedFocus,
+                        onFocused = {
+                            onFocused("recording:${recordingItemKey(entry.id)}")
+                        },
+                        onClick = { onOpen(entry) },
+                        onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
+                        kind = RecordingRowKind.SCHEDULE,
+                    )
+                }
             }
         }
     }
@@ -582,7 +589,7 @@ internal fun RecordingProblems(
     val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialScrollIndex)
-    val bringIntoViewSpec = LocalBringIntoViewSpec.current
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, 0.dp)
     val scope = rememberCoroutineScope()
     var pageFocusJob by remember { mutableStateOf<Job?>(null) }
     var pageTargetKey by remember { mutableStateOf<String?>(null) }
@@ -610,105 +617,108 @@ internal fun RecordingProblems(
             if (owner?.isCurrent != false) onScrollChanged(it)
         }
     }
-    LazyColumn(
-        state = listState,
-        userScrollEnabled = active,
-        contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = Modifier
-            .fillMaxSize()
-            .onFocusChanged {
-                if (!it.hasFocus) {
+    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+        LazyColumn(
+            state = listState,
+            userScrollEnabled = active,
+            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = ListBottomReserve),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .listEdgeFades(listState)
+                .onFocusChanged {
+                    if (!it.hasFocus) {
+                        pageFocusJob?.cancel()
+                        pageTargetKey = null
+                        pendingPageKey = null
+                    }
+                }
+                .focusGroup()
+                .focusRestorer(selectedFocus)
+                .testTag("recordings-problems-list")
+                .onPreviewKeyEvent { event ->
+                    if (owner?.isCurrent == false) return@onPreviewKeyEvent true
+                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                     pageFocusJob?.cancel()
                     pageTargetKey = null
-                    pendingPageKey = null
-                }
-            }
-            .focusGroup()
-            .focusRestorer(selectedFocus)
-            .testTag("recordings-problems-list")
-            .onPreviewKeyEvent { event ->
-                if (owner?.isCurrent == false) return@onPreviewKeyEvent true
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                pageFocusJob?.cancel()
-                pageTargetKey = null
-                val direction = ChannelNavigation.pageDirectionForKeyCode(
-                    event.nativeKeyEvent.keyCode
-                ) ?: run {
-                    pendingPageKey = null
-                    return@onPreviewKeyEvent false
-                }
-                val current = entries.indexOfFirst {
-                    "recording:${recordingItemKey(it.id)}" == pendingPageKey
-                }.takeIf { it >= 0 } ?: entries.indexOfFirst {
-                    "recording:${recordingItemKey(it.id)}" == selectedKey
-                }
-                val target = recordingListPageTargetIndex(
-                    entries.size,
-                    current,
-                    listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
-                    direction,
-                ) ?: run {
-                    pendingPageKey = null
-                    return@onPreviewKeyEvent true
-                }
-                pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
-                pageFocusJob = scope.launch {
-                    val layout = listState.layoutInfo
-                    val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                        layout.beforeContentPadding.toFloat(),
-                        (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
-                        layout.viewportSize.height.toFloat(),
-                    ).roundToInt()
-                    listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
-                    if (owner?.isCurrent == false) return@launch
-                    pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
-                }
-                true
-            },
-    ) {
-        val firstBucket = DvrProblemBucket.entries.firstOrNull { groups[it].orEmpty().isNotEmpty() }
-        DvrProblemBucket.entries.forEach { bucket ->
-            val bucketEntries = groups[bucket].orEmpty()
-            if (bucketEntries.isNotEmpty()) {
-                item(key = "header-$bucket") {
-                    RecordingSectionHeader(
-                        stringResource(
-                            if (bucket == DvrProblemBucket.FAILED) {
-                                R.string.recordings_failed
-                            } else {
-                                R.string.recordings_cancelled
-                            }
-                        ),
-                        first = bucket == firstBucket,
-                    )
-                }
-                items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
-                    val rowKey = "recording:${recordingItemKey(entry.id)}"
-                    if (active && pageTargetKey == rowKey) {
-                        LaunchedEffect(rowKey) {
-                            if (owner?.isCurrent != false && pageTargetKey == rowKey) {
-                                runCatching { selectedFocus.requestFocus() }
-                                pageTargetKey = null
-                                pendingPageKey = null
+                    val direction = ChannelNavigation.pageDirectionForKeyCode(
+                        event.nativeKeyEvent.keyCode
+                    ) ?: run {
+                        pendingPageKey = null
+                        return@onPreviewKeyEvent false
+                    }
+                    val current = entries.indexOfFirst {
+                        "recording:${recordingItemKey(it.id)}" == pendingPageKey
+                    }.takeIf { it >= 0 } ?: entries.indexOfFirst {
+                        "recording:${recordingItemKey(it.id)}" == selectedKey
+                    }
+                    val target = recordingListPageTargetIndex(
+                        entries.size,
+                        current,
+                        listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
+                        direction,
+                    ) ?: run {
+                        pendingPageKey = null
+                        return@onPreviewKeyEvent true
+                    }
+                    pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
+                    pageFocusJob = scope.launch {
+                        val layout = listState.layoutInfo
+                        val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                            layout.beforeContentPadding.toFloat(),
+                            (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                            layout.viewportSize.height.toFloat(),
+                        ).roundToInt()
+                        listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
+                        if (owner?.isCurrent == false) return@launch
+                        pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
+                    }
+                    true
+                },
+        ) {
+            val firstBucket = DvrProblemBucket.entries.firstOrNull { groups[it].orEmpty().isNotEmpty() }
+            DvrProblemBucket.entries.forEach { bucket ->
+                val bucketEntries = groups[bucket].orEmpty()
+                if (bucketEntries.isNotEmpty()) {
+                    item(key = "header-$bucket") {
+                        RecordingSectionHeader(
+                            stringResource(
+                                if (bucket == DvrProblemBucket.FAILED) {
+                                    R.string.recordings_failed
+                                } else {
+                                    R.string.recordings_cancelled
+                                }
+                            ),
+                            first = bucket == firstBucket,
+                        )
+                    }
+                    items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
+                        val rowKey = "recording:${recordingItemKey(entry.id)}"
+                        if (active && pageTargetKey == rowKey) {
+                            LaunchedEffect(rowKey) {
+                                if (owner?.isCurrent != false && pageTargetKey == rowKey) {
+                                    runCatching { selectedFocus.requestFocus() }
+                                    pageTargetKey = null
+                                    pendingPageKey = null
+                                }
                             }
                         }
+                        RecordingListRow(
+                            entry = entry,
+                            piconPath = piconForEntry(entry),
+                            resumePosition = resumePositionForEntry(entry),
+                            selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
+                            focusTarget =
+                                active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
+                            selectedFocus = selectedFocus,
+                            onFocused = {
+                                onFocused("recording:${recordingItemKey(entry.id)}")
+                            },
+                            onClick = { onOpen(entry) },
+                            onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
+                            kind = RecordingRowKind.PROBLEM,
+                        )
                     }
-                    RecordingListRow(
-                        entry = entry,
-                        piconPath = piconForEntry(entry),
-                        resumePosition = resumePositionForEntry(entry),
-                        selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                        focusTarget =
-                            active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
-                        selectedFocus = selectedFocus,
-                        onFocused = {
-                            onFocused("recording:${recordingItemKey(entry.id)}")
-                        },
-                        onClick = { onOpen(entry) },
-                        onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
-                        kind = RecordingRowKind.PROBLEM,
-                    )
                 }
             }
         }

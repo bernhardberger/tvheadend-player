@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.unit.Dp
-import at.bernhardberger.tvhplayer.ui.screens.InsetBringIntoViewSpec
+import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues

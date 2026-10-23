@@ -177,6 +177,7 @@ import kotlinx.coroutines.withContext
 import kotlin.time.Instant as KotlinInstant
 import kotlinx.coroutines.flow.first
 import org.koin.compose.koinInject
+import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 private data class GuideTabBody(
     val scope: ChannelScopeState,

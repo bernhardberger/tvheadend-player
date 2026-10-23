@@ -116,6 +116,9 @@ import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
 import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.ChannelRowEdgeInset
+import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
+import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
+import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
 import at.bernhardberger.tvhplayer.ui.components.ChannelRowGap
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
@@ -326,23 +329,8 @@ internal fun ChannelsScreenContent(
     val listState = rememberLazyListState()
     // Native focus scrolling and the explicit preview anchor share one viewport policy:
     // the readable band between the fades, with the original reserve at the top boundary.
-    val platformBringIntoViewSpec = LocalBringIntoViewSpec.current
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, ChannelsListTopReserve)
     val density = LocalDensity.current
-    val bringIntoViewSpec = remember(platformBringIntoViewSpec, density, listState) {
-        with(density) {
-            InsetBringIntoViewSpec(
-                delegate = platformBringIntoViewSpec,
-                topInsetPx = ChannelsListTopReserve.toPx(),
-                scrolledTopInsetPx = ChannelsListScrolledTopReserve.toPx(),
-                bottomInsetPx = ChannelsListBottomReserve.toPx(),
-                scrollBackAvailablePx = {
-                    if (listState.firstVisibleItemIndex == 0) {
-                        listState.firstVisibleItemScrollOffset.toFloat()
-                    } else Float.POSITIVE_INFINITY
-                },
-            )
-        }
-    }
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
     val rowOffscreenPx = with(density) { CompactZapRowOffscreen.roundToPx() }
@@ -925,11 +913,11 @@ internal fun ChannelsScreenContent(
                                     start = ChannelRowEdgeInset,
                                     end = ChannelRowEdgeInset,
                                     top = ChannelsListTopReserve,
-                                    bottom = ChannelsListBottomReserve,
+                                    bottom = ListBottomReserve,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
-                                    .listEdgeFadeMask(ChannelsListFadeHeight) { listState.canScrollBackward }
+                                    .listEdgeFades(listState)
                                     .testTag("channels-list")
                                     .then(contentEntry)
                                     .focusGroup()

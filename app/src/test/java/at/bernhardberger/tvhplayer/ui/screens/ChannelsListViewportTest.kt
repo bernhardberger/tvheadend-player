@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.abs
+import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
 /**
  * Rows may draw beneath either fade, but native focus scrolling must keep the focused
@@ -73,6 +74,15 @@ class ChannelsListViewportTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun boundaryHoldsAShortForwardMoveUnlessTheRowReachesTheBottomFade() {
+        // The scrolled pivot wants 12.8px; leaving for that would only tuck the first row under the fade.
+        scrollBackAvailable = 0f
+        assertEquals(0f, pivotSpec.calculateScrollDistance(160f, 64f, container), .001f)
+        // A row reaching 10px into the bottom reserve still moves out of it.
+        assertEquals(10f, spec.calculateScrollDistance(container - bottom - 46f, 56f, container), .001f)
     }
 
     @Test
@@ -179,7 +189,7 @@ class ChannelsListViewportTest {
             delegate = object : BringIntoViewSpec {
                 override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
                     seen += Triple(offset, size, containerSize)
-                    return 7f
+                    return 70f
                 }
             },
             topInsetPx = top,
@@ -188,14 +198,14 @@ class ChannelsListViewportTest {
             scrollBackAvailablePx = { scrollBackAvailable },
         )
 
-        assertEquals(7f, recording.calculateScrollDistance(offset = 100f, size = 56f, containerSize = container))
+        assertEquals(70f, recording.calculateScrollDistance(offset = 100f, size = 56f, containerSize = container))
         assertEquals(listOf(
             Triple(100f - top, 56f, container - top - bottom),
             Triple(100f - scrolledTop, 56f, container - scrolledTop - bottom),
         ), seen)
         seen.clear()
         scrollBackAvailable = Float.POSITIVE_INFINITY
-        assertEquals(7f, recording.calculateScrollDistance(offset = 100f, size = 56f, containerSize = container))
+        assertEquals(70f, recording.calculateScrollDistance(offset = 100f, size = 56f, containerSize = container))
         assertEquals(listOf(Triple(100f - scrolledTop, 56f, container - scrolledTop - bottom)), seen)
     }
 }

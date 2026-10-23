@@ -76,6 +76,8 @@ import at.bernhardberger.tvhplayer.ui.MainStartupComposition
 import at.bernhardberger.tvhplayer.ui.MainStartupCompositionState
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeHeight
+import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -369,13 +371,13 @@ class ChannelsStandardLayoutEvidenceTest {
 
         // The standard row stride still composes a partial row into the fade band.
         val rows = compose.onAllNodes(hasTestTag("channel-title"), useUnmergedTree = true).fetchSemanticsNodes()
-        assertTrue("list draws a partial row beneath the fade", rows.any { it.boundsInRoot.bottom > 492f })
+        assertTrue("list draws a partial row beneath the fade", rows.any { it.boundsInRoot.bottom > 540f - ListBottomFadeHeight.value })
 
         // Walk to the end: focus never enters the fade, and keeps its breathing room.
         repeat(CHANNEL_COUNT) { key(Key.DirectionDown) }
         row(CHANNEL_COUNT).assertIsFocused()
         val last = row(CHANNEL_COUNT).bounds()
-        assertTrue("focused last row bottom ${last.bottom} must clear the fade with 8dp room", last.bottom <= 540f - 56f + 2f)
+        assertTrue("focused last row bottom ${last.bottom} must clear the fade with 8dp room", last.bottom <= 540f - ListBottomReserve.value + 2f)
         assertEquals("list still runs to the bottom", 540f, compose.onNodeWithTag("channels-list").bounds().bottom, .5f)
     }
 
@@ -463,12 +465,14 @@ class ChannelsStandardLayoutEvidenceTest {
         assertFocusedShapePixels(1, rowHeight, scrolled = false)
         capture("en-font$fontScale-top-fade-initial-bright-video")
 
-        // These anchors leave a real, generated 5:3 picon crossing the top edge.
-        val downTarget = if (fontScale == 1f) 9 else 12
+        // At font scale 1.0 this anchor leaves a real, generated 5:3 picon crossing the top edge.
+        // Enlarged rows settle with the topmost logo just above the list, so the Up walk below
+        // proves their fade instead.
+        val downTarget = if (fontScale == 1f) 8 else 12
         repeat(downTarget - 1) { key(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
-        assertTopFadePixels(if (fontScale == 1f) 4 else 7)
+        if (fontScale == 1f) assertTopFadePixels(4)
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
         repeat(CHANNEL_COUNT - downTarget) { key(Key.DirectionDown) }
@@ -588,7 +592,7 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("complete native 1.05 pill width", 340f * 1.05f, (right - left + 1).toFloat(), 2f)
         assertEquals("complete native 1.05 pill height", rowHeight * 1.05f, (bottom - top + 1).toFloat(), 2f)
         assertTrue("opaque focus top $top must clear the top fade", top >= list.top + if (scrolled) 48f else 0f)
-        assertTrue("opaque focus bottom $bottom must clear the bottom fade", bottom < list.bottom - 48f)
+        assertTrue("opaque focus bottom $bottom must clear the bottom fade", bottom < list.bottom - ListBottomFadeHeight.value)
         // The straight upper/lower edges must retain the exact native fill, not a dimmed cap.
         for (y in top..bottom) {
             if (y < top + 8 || y > bottom - 8) {

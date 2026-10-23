@@ -499,6 +499,17 @@ tuner loss and interruption are failures, limit expiry is informational.
   component with orange playback position.
 - Unknown timing is shown as unknown; never interpolate across unrelated
   coordinates or imply seekability that is not verified.
+- **Browse list edges** (accepted 2026-10-23, after the TV Design Kit's Cards
+  example). The Channels list, Recordings Archive (active, preview and parent
+  columns), Schedule and Problems lists and Settings depth lists run to the
+  screen bottom. While rows continue below, the list fades out over its bottom
+  140dp; while rows have scrolled away above, a 48dp top fade appears. Focus
+  never settles in either fade: the TV pivot works inside the band between them,
+  with 8dp breathing room for the focus scale. At the first-row boundary the
+  list holds still for a pivot move shorter than the extra top room scrolling
+  would reserve, so the third row does not nudge the list under the top fade.
+  `ui/components/ListEdgeFade.kt` owns the sizes, mask and scroll policy. The
+  Guide keeps its own fades; modal side panels keep theirs (§10).
 
 ### Channels • layouts, headline and backdrop
 
@@ -522,9 +533,9 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
 - The list's leading axis includes the shell's 24dp inset and a further 26dp,
   with its 12dp focus reserve inside that additional inset. Standard rows are
   340dp wide, with a 92dp visual gap to the passive headline pane at x562.
-  The list runs to the screen bottom behind a
-  48dp fade. A matching local top fade appears only while earlier rows exist;
-  returning to the first-row boundary removes it. The header and the headline pane
+  The list follows the browse list edges in §9: it runs to the screen bottom
+  behind the 140dp fade, and the 48dp top fade appears only while earlier rows
+  exist; returning to the first-row boundary removes it. The header and the headline pane
   are outside these masks. Rows scroll out under the fades; **settled focus never
   enters them** — native scrolling and explicit restoration share the readable
   viewport, including focus-scale breathing room. The TV pivot policy must settle
