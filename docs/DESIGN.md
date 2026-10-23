@@ -661,6 +661,11 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   folder's immediate children, or passive metadata for a recording. It is not a
   recent-descendant shortcut and never receives focus independently. Both preview
   forms are excluded from accessibility traversal as well as D-pad actions.
+- **Archive backdrop.** Without warm playback, a focused recording puts the
+  Channels List backdrop behind the whole screen: its picture blurred, or else its
+  channel's logo colour behind a blurred logo, with the shared backdrop timing.
+  Folders, "Recording now", Schedule and Problems have none, so stepping onto them
+  fades it out.
 - OK/Right enters a folder. Left/Back returns to its parent and invoking row with
   the parent viewport retained. OK on a recording opens existing details; Right
   does not activate it. Details/confirmations return to the same recording. At

@@ -122,7 +122,9 @@ import at.bernhardberger.tvhplayer.ui.components.BrowsePreparationPending
 import at.bernhardberger.tvhplayer.ui.components.PreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveBackdrop
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveDepthContent
+import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveListItem
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelPath
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.reconcileArchiveStack
@@ -450,11 +452,26 @@ internal fun RecordingsScreenContent(
 
     val modeMotion = rememberTabContentMotion(mode) { screenState.mode.value }
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
+    val browseAlpha = { 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
+    // Behind the header from the screen's top, as on Channels, and fading with the content for details.
+    ProvideArtworkSession(currentSession, observation) {
+        ArchiveBackdrop(
+            focused = {
+                val key = archiveNavigation.stack.active.focusedItemId
+                if (mode != DvrLibraryMode.ARCHIVE) null
+                else archiveItems.firstNotNullOfOrNull { item ->
+                    (item as? ArchiveListItem.Recording)?.takeIf { it.key == key }?.entry
+                }
+            },
+            piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
+            modifier = Modifier.fillMaxSize().graphicsLayer { alpha = browseAlpha() },
+        )
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .semantics { if (detailsEntry != null) hideFromAccessibility() }
-            .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEntry != null && !showContextMenu && !showResumeChoice) 1f else 0f) }
+            .graphicsLayer { alpha = browseAlpha() }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
                     if (event.type == KeyEventType.KeyUp) relocatingKey = null

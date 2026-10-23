@@ -14,7 +14,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.graphicsLayer
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
@@ -88,5 +90,28 @@ internal fun <T> FocusBackdrop(
                 content(layer.target) { layer.ready = true }
             }
         }
+    }
+}
+
+/**
+ * The details page's backdrop over the whole screen: the [art] blurred, or else the [logo]
+ * blurred on its colour. Without either it is the plain screen background, so a step to an item
+ * without a picture fades the previous backdrop out. It is opaque, so it takes the shell's
+ * gradient directly. [onReady] waits for both its colour and its picture, so neither is seen to step.
+ */
+@Composable
+internal fun BlurredScreenBackdrop(art: ArtworkId?, logo: ArtworkId?, onReady: () -> Unit, modifier: Modifier = Modifier) {
+    var tintSettled by remember { mutableStateOf(false) }
+    var pictureSettled by remember { mutableStateOf(false) }
+    if (tintSettled && pictureSettled) LaunchedEffect(Unit) { onReady() }
+    val tint = rememberDetailsTint(art, logo, onSettled = { tintSettled = true })
+    // Once the opaque art shows, the tint beneath it would only cost another full-screen fill.
+    var artShown by remember(art) { mutableStateOf(false) }
+    Box(
+        Modifier.fillMaxSize().underBrowseShellScrim(opaque = true)
+            .drawBehind { if (!artShown) drawRect(tint.value) }.then(modifier),
+    ) {
+        DetailsHero(art, Modifier, blurred = true, picon = logo, onLoaded = { artShown = true },
+            onSettled = { pictureSettled = true })
     }
 }

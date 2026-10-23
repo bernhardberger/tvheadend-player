@@ -797,6 +797,33 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun aFocusedRecordingBlursItsPictureBehindTheScreenAndAFolderFadesItOut() {
+        show(entries = listOf(
+            recording(2, "Tide Watch", "Expeditions/blue.ts"),
+            recording(1, "Ridge Light", "ridge.ts"),
+        ))
+        focused("recordings-folder-Expeditions")
+        settleBackdrop()
+        compose.onNodeWithTag("recordings-backdrop").assertExists()
+        compose.onNodeWithTag("details-hero-blurred", useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-1")
+        settleBackdrop()
+        compose.onNode(hasTestTag("details-hero-blurred") and hasAnyAncestor(hasTestTag("recordings-backdrop")),
+            useUnmergedTree = true).assertExists()
+        capture("archive-backdrop", 1f)
+        key(Key.DirectionUp)
+        focused("recordings-folder-Expeditions")
+        settleBackdrop()
+        compose.onNodeWithTag("details-hero-blurred", useUnmergedTree = true).assertDoesNotExist()
+        assertNoCommands()
+    }
+
+    private fun settleBackdrop() {
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+    }
+
     private fun assertTimeLeft(start: String) {
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-time-left")) and hasText(start, substring = true),
             useUnmergedTree = true).assertIsDisplayed()
