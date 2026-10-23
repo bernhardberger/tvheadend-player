@@ -1012,11 +1012,13 @@ private fun recordingLengthLabel(entry: DvrEntry): String? =
  */
 @Composable
 private fun RecordingWatchMark(state: RecordingWatchState, modifier: Modifier = Modifier) {
-    val (icon, description) = when (state) {
+    @DrawableRes val icon = when (state) {
         RecordingWatchState.Unwatched -> return
-        RecordingWatchState.Watched -> R.drawable.ic_check_circle_outlined to R.string.recording_watched
-        is RecordingWatchState.PartlyWatched -> partlyWatchedIcon(state.fraction) to R.string.recording_partly_watched
+        RecordingWatchState.Watched -> R.drawable.ic_check_circle_outlined
+        is RecordingWatchState.PartlyWatched -> partlyWatchedIcon(state.fraction)
     }
+    val description =
+        if (state == RecordingWatchState.Watched) R.string.recording_watched else R.string.recording_partly_watched
     Icon(
         painter = painterResource(icon),
         contentDescription = stringResource(description),
