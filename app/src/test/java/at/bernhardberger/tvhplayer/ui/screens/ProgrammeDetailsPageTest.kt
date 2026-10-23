@@ -945,6 +945,24 @@ class ProgrammeDetailsPageTest {
     }
     @Test fun recordingWithoutLowerSectionsKeepsTheSameAnchor() { show(recording = true); assertBottomAnchored(peek = false) }
 
+    @Test fun recordingThatStoppedEarlySaysSoUnderItsTimeline() {
+        show(recording = true, stoppedEarly = true)
+        val line = compose.onNodeWithTag("details-stopped-early", useUnmergedTree = true).assertIsDisplayed()
+            .getUnclippedBoundsInRoot()
+        compose.onNode(hasText("Stopped early") and hasParent(hasTestTag("details-stopped-early")), useUnmergedTree = true)
+            .assertExists()
+        val timeline = compose.onNodeWithTag("details-timeline").getUnclippedBoundsInRoot()
+        Assert.assertTrue("$line below $timeline", line.top >= timeline.bottom)
+        Assert.assertEquals(timeline.left.value, line.left.value, .5f)
+        assertBottomAnchored(peek = false)
+        capture("recording-stopped-early", "u15-recording-round2")
+    }
+
+    @Test fun recordingThatRanItsCourseSaysNothingAboutStopping() {
+        show(recording = true)
+        compose.onNodeWithTag("details-stopped-early", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @Test fun oldRecordingHasTwoLineEllipsizedSubtitleAndDatedProgress() {
         show(recording = true, longSubtitle = true, pastYear = true)
         assertTwoLineSubtitle()
@@ -1077,7 +1095,7 @@ class ProgrammeDetailsPageTest {
         factsOnly: Boolean = false, longTitle: Boolean = false, noDescription: Boolean = false, heroVariant: Int? = null,
         withRating: Boolean = false, longSynopsis: Boolean = false, todayCard: Boolean = false, longFacts: Boolean = false, runningCard: Boolean = false,
         warm: Boolean = false, longMeta: Boolean = false, longSubtitle: Boolean = false, pastYear: Boolean = false,
-        recordingFacts: Boolean = false, cast: Boolean = false) {
+        recordingFacts: Boolean = false, cast: Boolean = false, stoppedEarly: Boolean = false) {
         val subtitle = if (longSubtitle && recordingFacts) "An extraordinary journey through the snowy mountains of the north, along the coast and across the wide valleys in the changing light of a long winter."
             else if (longSubtitle) "Eine außergewöhnliche Reise durch die verschneiten Berge des Nordens, entlang der Küste und über die weiten Täler im wechselnden Licht des langen Winters." else event.subtitle
         val shown = when {
@@ -1128,7 +1146,8 @@ class ProgrammeDetailsPageTest {
             files = if (recordingFacts) listOf(DvrRecordingFile.create(streams = listOf(
                 DvrRecordingStream(at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType.H264, height = 1080),
                 DvrRecordingStream(at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType.AAC, language = "eng"),
-                DvrRecordingStream(at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType.DVB_SUBTITLE, language = "deu")))) else null,
+                DvrRecordingStream(at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType.DVB_SUBTITLE, language = "deu"))))
+                else if (stoppedEarly) listOf(DvrRecordingFile.create(start = start, stop = start + 5400.seconds)) else null,
             start = if (pastYear) Instant.parse("2025-09-15T19:00:00Z") else start,
             stop = if (pastYear) Instant.parse("2025-09-15T21:00:00Z") else event.stop,
             subtitle = subtitle.takeIf { longSubtitle }, image = event.image.takeUnless { future }, summary = event.summary.takeUnless { future },

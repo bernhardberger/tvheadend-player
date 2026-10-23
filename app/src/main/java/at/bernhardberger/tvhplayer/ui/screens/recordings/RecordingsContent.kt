@@ -136,6 +136,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePictureGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeStatusLine
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
 import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
@@ -389,20 +390,20 @@ internal fun RecordingMetadataPane(
             status = if (failure == null && !stoppedEarly && !watched && timeLeft == null) null else { statusModifier ->
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     failure?.let {
-                        RecordingPaneStatusLine(it, R.drawable.ic_error_outlined, "recording-metadata-failure",
+                        ProgrammeStatusLine(it, R.drawable.ic_error_outlined, "recording-metadata-failure",
                             MaterialTheme.colorScheme.error, maxLines = 2)
                     }
                     if (stoppedEarly) {
-                        RecordingPaneStatusLine(stringResource(R.string.recordings_stopped_early),
+                        ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early),
                             R.drawable.ic_warning_outlined, "recording-metadata-stopped-early")
                     }
                     when {
-                        watched -> RecordingPaneStatusLine(stringResource(R.string.recording_watched),
+                        watched -> ProgrammeStatusLine(stringResource(R.string.recording_watched),
                             R.drawable.ic_check_circle_outlined, "recording-metadata-watched")
                         timeLeft != null -> {
                             val endsAt = stringResource(R.string.recording_ends_at, formatClock(nowSec + timeLeft.inWholeSeconds))
                             val partly = watchState as? RecordingWatchState.PartlyWatched
-                            RecordingPaneStatusLine(
+                            ProgrammeStatusLine(
                                 if (partly == null) endsAt
                                 else "${playerMinutesLeft(((timeLeft.inWholeSeconds + 59L) / 60L).toInt())} • $endsAt",
                                 partly?.let { partlyWatchedIcon(it.fraction) }, "recording-metadata-time-left",
@@ -1025,28 +1026,6 @@ private fun RecordingWatchMark(state: RecordingWatchState, modifier: Modifier = 
         modifier = modifier.size(StatusIconSize),
         tint = androidx.tv.material3.LocalContentColor.current.copy(alpha = TvTextSecondaryAlpha),
     )
-}
-
-/**
- * One line of the pane's status, led by the [icon] its row ends with; the text alone carries it
- * for TalkBack, so the icon stays silent.
- */
-@Composable
-private fun RecordingPaneStatusLine(
-    text: String,
-    @DrawableRes icon: Int?,
-    tag: String,
-    color: Color = TvTextColors.tertiary,
-    maxLines: Int = 1,
-) {
-    Row(Modifier.testTag(tag), verticalAlignment = Alignment.CenterVertically) {
-        if (icon != null) {
-            Icon(painterResource(icon), contentDescription = null, tint = color,
-                modifier = Modifier.padding(end = TvSpacing4).size(StatusIconSize))
-        }
-        Text(text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = maxLines,
-            overflow = TextOverflow.Ellipsis)
-    }
 }
 
 /** Material's clock loader comes in six steps; an unknown share shows the middle one. */

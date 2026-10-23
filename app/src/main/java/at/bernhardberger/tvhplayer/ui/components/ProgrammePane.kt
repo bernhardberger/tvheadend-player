@@ -1,5 +1,10 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import androidx.tv.material3.Icon
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.size
+import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -237,3 +242,26 @@ internal fun programmeSynopsis(title: String?, subtitle: String?, summary: Strin
     sequenceOf(summary, description)
         .mapNotNull { it?.replace("\\r\\n", "\n")?.replace("\\n", "\n")?.trim() }
         .firstOrNull { it.isNotBlank() && it != title?.trim() && it != subtitle?.trim() }
+
+/**
+ * One status line of a recording's pane or details page, led by the [icon] its row ends with; the
+ * text alone carries it for TalkBack, so the icon stays silent.
+ */
+@Composable
+internal fun ProgrammeStatusLine(
+    text: String,
+    @DrawableRes icon: Int?,
+    tag: String,
+    color: Color = TvTextColors.tertiary,
+    maxLines: Int = 1,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.testTag(tag), verticalAlignment = Alignment.CenterVertically) {
+        if (icon != null) {
+            Icon(painterResource(icon), contentDescription = null, tint = color,
+                modifier = Modifier.padding(end = TvSpacing4).size(StatusIconSize))
+        }
+        Text(text, style = MaterialTheme.typography.labelMedium, color = color, maxLines = maxLines,
+            overflow = TextOverflow.Ellipsis)
+    }
+}

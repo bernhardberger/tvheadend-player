@@ -976,6 +976,12 @@ private fun DetailsInformation(
                 // How far the viewer is, not time on air.
                 color = MaterialTheme.colorScheme.tertiary)
         }
+        // The same warning as the recording's row and pane.
+        if (recording != null && remember(recording) { recordingStoppedEarly(recording) != null }) {
+            Spacer(Modifier.height(8.dp))
+            ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early), R.drawable.ic_warning_outlined,
+                "details-stopped-early", modifier = Modifier.widthIn(max = 470.dp))
+        }
     }
 }
 
