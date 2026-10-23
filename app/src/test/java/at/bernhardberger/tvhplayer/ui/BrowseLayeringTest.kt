@@ -410,6 +410,7 @@ class BrowseLayeringTest {
             modifier = Modifier.fillMaxSize(),
             initialFocusEnabled = false,
             previewAlpha = previewAlpha,
+            parentAlpha = previewAlpha,
         )
     }
 

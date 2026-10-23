@@ -100,6 +100,12 @@ fun rememberDepthNavigationState(rootId: String, initialItemId: String? = null):
  */
 internal const val DepthSlideMillis = 1000
 internal const val DepthAlphaMillis = 200
+
+/**
+ * The parent column left of the active one dims further than the preview: its trailing edge
+ * peeks out beside the rail, where its folder arrows would otherwise read as the rail's own.
+ */
+internal const val DepthParentAlpha = 0.25f
 private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
 private fun depthStripSpec() = tween<Float>(DepthSlideMillis, easing = DepthBrowseEasing)
 
@@ -157,6 +163,7 @@ fun DepthNavigation(
     backEnabled: Boolean = true,
     onRootBack: (() -> Unit)? = null,
     previewAlpha: Float = TvPassiveAlpha,
+    parentAlpha: Float = DepthParentAlpha,
     isCurrent: Boolean = true,
     onRootLeft: (() -> Unit)? = onRootBack,
     onFirstRowUp: (() -> Unit)? = null,
@@ -362,6 +369,7 @@ fun DepthNavigation(
                             columnWidth = columnWidth,
                             contentPadding = contentPadding,
                             previewAlpha = previewAlpha,
+                            parentAlpha = parentAlpha,
                              initialFocusEnabled = initialFocusEnabled,
                              activeFocusRequester = activeFocusRequester,
                              pageKeyDirection = pageKeyDirection,
@@ -429,6 +437,7 @@ fun DepthNavigation(
                                                 columnWidth = columnWidth,
                                                 contentPadding = contentPadding,
                                                 previewAlpha = previewAlpha,
+                                                parentAlpha = parentAlpha,
                                                  initialFocusEnabled = initialFocusEnabled,
                                                  activeFocusRequester = null,
                                                  pageKeyDirection = null,
@@ -503,6 +512,7 @@ private fun DepthStripPane(
     columnWidth: Dp,
     contentPadding: PaddingValues,
     previewAlpha: Float,
+    parentAlpha: Float,
     initialFocusEnabled: Boolean,
     activeFocusRequester: FocusRequester?,
     pageKeyDirection: ((Int) -> Int?)?,
@@ -522,7 +532,11 @@ private fun DepthStripPane(
     val latestStillOwning = rememberUpdatedState(stillOwning)
     val latestFocusedId = rememberUpdatedState(focusedItemId)
     val latestFocusEnabled = rememberUpdatedState(initialFocusEnabled)
-    val targetAlpha = if (active || column.level.passiveContent != null) 1f else previewAlpha
+    val targetAlpha = when {
+        active || column.level.passiveContent != null -> 1f
+        column.path.size < activePath.size -> parentAlpha
+        else -> previewAlpha
+    }
     val alpha by animateFloatAsState(
         targetValue = targetAlpha,
         animationSpec = tween(DepthAlphaMillis),

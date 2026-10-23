@@ -155,6 +155,28 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
     }
 
+    /**
+     * Inside a folder the parent's folder arrows peek out at the screen edge beside the rail.
+     * They stay visible but much quieter than the preview, so they do not read as the rail's.
+     */
+    @Test fun parentArrowsBesideTheRailStayQuieterThanThePreview() {
+        show()
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionCenter)
+        focused("recordings-folder-Documentaries/Expeditions")
+        compose.waitForIdle()
+        val (parent, preview, background) = compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            fun brightest(xs: IntRange, ys: IntRange) =
+                xs.maxOf { x -> ys.maxOf { y -> android.graphics.Color.valueOf(bitmap.getPixel(x, y)).run { maxOf(red(), green(), blue()) } } }
+            Triple(brightest(0..30, 160..290), brightest(562..900, 160..230), brightest(0..30, 420..460))
+                .also { bitmap.recycle() }
+        }
+        assertTrue("the parent's arrows still show ($parent over $background)", parent > background + .05f)
+        assertTrue("the parent's arrows are well below the preview ($parent vs $preview)", parent < preview * .3f)
+    }
+
     @Test fun folderOkEntersInPlaceDetailsAndBackRestoreOrigin() {
         show()
         focused("recordings-folder-Documentaries")

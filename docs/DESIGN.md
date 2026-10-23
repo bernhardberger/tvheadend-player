@@ -417,7 +417,9 @@ Accepted 2026-09-15; static design in Penpot page
 
 - One active list column; the next level is a read-only **preview** to its
   right. Entering a level slides the child into the active slot and moves the
-  parent fully off-screen. The container supports arbitrary depth and is
+  parent off to the left; only its trailing edge stays beside the rail, dimmed
+  to 0.25 (below the preview's 0.6) so its folder arrows do not read as rail
+  marks (accepted 2026-10-23). The container supports arbitrary depth and is
   reused by Archive folder browsing (§9).
 - Shared-grid geometry on the 80dp shell: active column x130, width340; preview
   x562 (92dp gap), 432dp step. Playback and the warm scrim stay stationary; only
