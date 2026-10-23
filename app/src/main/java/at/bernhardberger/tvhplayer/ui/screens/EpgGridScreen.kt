@@ -11,7 +11,6 @@ import kotlinx.coroutines.ensureActive
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvhplayer.ui.components.BrowsePreparationPending
-import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 
 import androidx.activity.compose.BackHandler
@@ -19,11 +18,9 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -34,13 +31,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,17 +51,13 @@ import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
-import at.bernhardberger.tvhplayer.ui.components.LocalBrowseCullWidthPx
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -76,8 +65,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
@@ -90,12 +77,10 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.AppError
-import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.browseAppError
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
@@ -140,34 +125,21 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
-import at.bernhardberger.tvhplayer.ui.components.ChannelTagSelector
-import at.bernhardberger.tvhplayer.ui.components.TabContent
-import at.bernhardberger.tvhplayer.ui.components.tabFocus
-import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
-import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
-import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
-import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
-import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEmptyState
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePassiveNotice
-import at.bernhardberger.tvhplayer.ui.screens.guide.EpgSearchDialog
-import at.bernhardberger.tvhplayer.ui.screens.guide.JumpToTimeDialog
-import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
-import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideOverlayHost
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
-import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusHalfGrowth
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
-import at.bernhardberger.tvhplayer.ui.screens.guide.guideNowLine
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
-import at.bernhardberger.tvhplayer.ui.screens.guide.guideViewportFades
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import java.time.ZoneId
@@ -178,25 +150,6 @@ import kotlin.time.Instant as KotlinInstant
 import kotlinx.coroutines.flow.first
 import org.koin.compose.koinInject
 import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
-
-private data class GuideTabBody(
-    val scope: ChannelScopeState,
-    val observation: SessionObservation,
-    val connection: ConnectionUiState,
-    val index: TimelineEpgEventIndex,
-    val ids: List<ChannelId>,
-    val numbers: Map<ChannelId, Long?>,
-    val windowStart: Long,
-    val windowEnd: Long,
-    val nowSec: () -> Long,
-    val selected: () -> EpgFocusTarget?,
-    val tagNotice: Boolean,
-    val recovering: Boolean,
-    val alert: AppError?,
-    val coveragePending: (ChannelId) -> Boolean,
-    val earlierContent: Boolean,
-    val laterContent: Boolean,
-)
 
 private const val CHANNEL_PAGE_SIZE = 6
 private const val GUIDE_COVERAGE_NAVIGATION_TIMEOUT_MS = 10_000L
@@ -1747,189 +1700,80 @@ fun EpgGridScreen(
                     } ?: false
                 },
         ) {
-            TopLevelBrowseHeader(
-                title = stringResource(R.string.epg_title),
-                filter = categoryLabel.takeIf { category != ProgrammeCategory.ALL },
-                modifier = Modifier
-                    .padding(
-                        start = startPadding + TvBrowseLeadingInset,
-                        top = contentPadding.calculateTopPadding(),
-                        end = maxOf(endPadding, TvBrowseTrailingInset),
-                    )
-                    .heightIn(min = with(density) {
-                        maxOf(40.dp, MaterialTheme.typography.headlineMedium.lineHeight.toDp(),
-                            MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
-                    }),
-                actions = {
-                    OutlinedButton(
-                        onClick = {
-                            releaseProgrammeFocus()
-                            showJumpDialog = true
-                        },
-                        modifier = Modifier
-                            .focusRequester(guideDateFocus)
-                            .onFocusChanged {
-                                if (it.isFocused) {
-                                    releaseProgrammeFocus()
-                                    lastHeaderFocus = GuideHeaderFocus.DATE
-                                }
-                            }
-                            .onPreviewKeyEvent { event ->
-                                if (
-                                    event.type == KeyEventType.KeyDown &&
-                                    event.key == Key.DirectionDown
-                                ) {
-                                    if (hasScopeTabs) {
-                                        scopeFocus.requestFocus()
-                                    } else {
-                                        focusGuideContent()
-                                    }
-                                } else {
-                                    false
-                                }
-                            },
-                    ) {
-                        Text(windowStartSec.formatDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
-                    }
-                    OutlinedButton(
-                        onClick = {
-                            val nowSec = nowSecProvider()
-                            jumpToWindow(floorGuideWindowToHour(nowSec, guideZoneId))
-                        },
-                        modifier = Modifier
-                            .focusRequester(guideNowFocus)
-                            .onFocusChanged {
-                                if (it.isFocused) {
-                                    releaseProgrammeFocus()
-                                    lastHeaderFocus = GuideHeaderFocus.NOW
-                                }
-                            }
-                            .onPreviewKeyEvent { event ->
-                                if (
-                                    event.type == KeyEventType.KeyDown &&
-                                    event.key == Key.DirectionDown
-                                ) {
-                                    if (hasScopeTabs) {
-                                        scopeFocus.requestFocus()
-                                    } else {
-                                        focusGuideContent()
-                                    }
-                                } else {
-                                    false
-                                }
-                            },
-                    ) {
-                        Text(stringResource(R.string.now))
-                    }
-                    if (GuideSearchEntryVisible) {
-                        OutlinedButton(
-                            onClick = {
-                                releaseProgrammeFocus()
-                                searchQuery = ""
-                                searchResult = null
-                                searchObservation = null
-                                searchRequest = null
-                                restoreSearchResultFocus = null
-                                showSearchDialog = true
-                            },
-                            modifier = Modifier
-                                .focusRequester(guideSearchFocus)
-                                .onFocusChanged {
-                                    if (it.isFocused) {
-                                        releaseProgrammeFocus()
-                                        lastHeaderFocus = GuideHeaderFocus.SEARCH
-                                    }
-                                }
-                                .onPreviewKeyEvent { event ->
-                                    if (
-                                        event.type == KeyEventType.KeyDown &&
-                                        event.key == Key.DirectionDown
-                                    ) {
-                                        if (hasScopeTabs) {
-                                            scopeFocus.requestFocus()
-                                        } else {
-                                            focusGuideContent()
-                                        }
-                                    } else {
-                                        false
-                                    }
-                                }
-                                .testTag("epg-search-open"),
-                        ) {
-                            Text(stringResource(R.string.epg_search))
-                        }
-                    }
-                    if (category != ProgrammeCategory.ALL) {
-                        OutlinedButton(
-                            onClick = onClearCategory,
-                            modifier = Modifier
-                                .focusRequester(guideClearFilterFocus)
-                                .onFocusChanged {
-                                    if (it.isFocused) {
-                                        releaseProgrammeFocus()
-                                        lastHeaderFocus = GuideHeaderFocus.CLEAR_FILTER
-                                    }
-                                }
-                                .onPreviewKeyEvent { event ->
-                                    if (
-                                        event.type == KeyEventType.KeyDown &&
-                                        event.key == Key.DirectionDown
-                                    ) {
-                                        if (hasScopeTabs) {
-                                            scopeFocus.requestFocus()
-                                        } else {
-                                            focusGuideContent()
-                                        }
-                                    } else {
-                                        false
-                                    }
-                                },
-                        ) {
-                            Text(stringResource(R.string.epg_clear_filter))
-                        }
+            GuideHeader(
+                category = category,
+                categoryLabel = categoryLabel,
+                windowStartSec = windowStartSec,
+                searchEntryVisible = GuideSearchEntryVisible,
+                hasScopeTabs = hasScopeTabs,
+                channelScope = channelScope,
+                contentPadding = contentPadding,
+                startPadding = startPadding,
+                endPadding = endPadding,
+                density = density,
+                guideDateFocus = guideDateFocus,
+                guideNowFocus = guideNowFocus,
+                guideSearchFocus = guideSearchFocus,
+                guideClearFilterFocus = guideClearFilterFocus,
+                scopeFocus = scopeFocus,
+                onDateClick = {
+                    releaseProgrammeFocus()
+                    showJumpDialog = true
+                },
+                onNowClick = {
+                    val nowSec = nowSecProvider()
+                    jumpToWindow(floorGuideWindowToHour(nowSec, guideZoneId))
+                },
+                onSearchClick = {
+                    releaseProgrammeFocus()
+                    searchQuery = ""
+                    searchResult = null
+                    searchObservation = null
+                    searchRequest = null
+                    restoreSearchResultFocus = null
+                    showSearchDialog = true
+                },
+                onClearCategory = onClearCategory,
+                onDateFocused = {
+                    releaseProgrammeFocus()
+                    lastHeaderFocus = GuideHeaderFocus.DATE
+                },
+                onNowFocused = {
+                    releaseProgrammeFocus()
+                    lastHeaderFocus = GuideHeaderFocus.NOW
+                },
+                onSearchFocused = {
+                    releaseProgrammeFocus()
+                    lastHeaderFocus = GuideHeaderFocus.SEARCH
+                },
+                onClearFilterFocused = {
+                    releaseProgrammeFocus()
+                    lastHeaderFocus = GuideHeaderFocus.CLEAR_FILTER
+                },
+                onHeaderDown = {
+                    if (hasScopeTabs) {
+                        scopeFocus.requestFocus()
+                    } else {
+                        focusGuideContent()
                     }
                 },
+                onSelectTag = {
+                    releaseProgrammeFocus()
+                    scopeMotion.select(it, buildList {
+                        if (channelScope.allChannelsVisible) add(null)
+                        addAll(channelScope.tags.map { tag -> tag.id })
+                    })
+                    channelViewModel.selectTag(it)
+                },
+                onMoveToContent = { leaveGuideScope() },
+                onScopeFocused = {
+                    profileTrace("P48:focus:guideScope") { }
+                    releaseProgrammeFocus()
+                },
+                onScopeUp = { focusGuideHeader() },
             )
-            if (hasScopeTabs) {
-                Spacer(Modifier.height(TvSpacing8))
-                Box(Modifier.fillMaxWidth().heightIn(min = 44.dp).padding(bottom = 8.dp)) {
-                ChannelTagSelector(
-                    tags = channelScope.tags,
-                    activeTagId = channelScope.activeTagId,
-                    onSelectTag = {
-                        releaseProgrammeFocus()
-                        scopeMotion.select(it, buildList {
-                            if (channelScope.allChannelsVisible) add(null)
-                            addAll(channelScope.tags.map { tag -> tag.id })
-                        })
-                        channelViewModel.selectTag(it)
-                    },
-                    allChannelsVisible = channelScope.allChannelsVisible,
-                    activeFocusRequester = scopeFocus,
-                    onMoveToContent = { leaveGuideScope() },
-                    modifier = Modifier
-                        .padding(start = startPadding + TvBrowseLeadingInset)
-                        .onFocusChanged {
-                            if (it.hasFocus) {
-                                profileTrace("P48:focus:guideScope") { }
-                                releaseProgrammeFocus()
-                            }
-                        }
-                        .onPreviewKeyEvent { event ->
-                            if (
-                                event.type == KeyEventType.KeyDown &&
-                                event.key == Key.DirectionUp
-                            ) {
-                                focusGuideHeader()
-                            } else {
-                                false
-                            }
-                        },
-                )
-                }
-            }
             Spacer(Modifier.height(4.dp))
-            TabContent(
+            GuideTimelineBody(
                 motion = scopeMotion,
                 selectedKey = channelScope.activeTagId,
                 state = {
@@ -1948,320 +1792,197 @@ fun EpgGridScreen(
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
-            ) { frame, owner ->
-            val channelScopeState = frame.scope
-            val channelScope = channelScopeState.scope
-            val channels = channelScope.visibleChannels
-            val observation = frame.observation
-            val currentSession = observation.currentSession
-            val connectionUiState = frame.connection
-            val timelineEventIndex = frame.index
-            val eventsByChannel = timelineEventIndex.visibleEventsByChannel
-            val orderedChannelIds = frame.ids
-            val channelNumbers = frame.numbers
-            val renderedWindowStartSec = frame.windowStart
-            val windowEndSec = frame.windowEnd
-            val nowSecProvider = rememberTabReader(frame.nowSec)
-            val tagNotice = frame.tagNotice
-            val guideRecovering = frame.recovering
-            val channelListState = rememberTabListState(channelListState)
-            val terminalReserve = guideTerminalViewportReserve(
-                frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
-            )
-            val timelineContentPadding = guideTimelineContentPadding(contentPadding, layoutDirection, terminalReserve)
-            // Match layout's rounded padding so the continuous Now line and ruler coincide.
-            val terminalReservePx = with(density) { terminalReserve.roundToPx().toFloat() }
-            val trackWidthPx = timelineWidthPx - terminalReservePx
-            UnavailableTagNotice(
-                visible = tagNotice,
-                onDismiss = { if (owner.isCurrent) channelViewModel.dismissUnavailableTagNotice() },
-                modifier = Modifier.padding(start = startPadding, end = endPadding),
-            )
-            if (tagNotice) Spacer(Modifier.height(8.dp))
-
-            if (channels.isNotEmpty() && guideRecovering) {
-                GuidePassiveNotice(
-                    text = stringResource(R.string.epg_stale),
-                    modifier = Modifier.padding(start = startPadding, end = endPadding),
-                )
-                Spacer(Modifier.height(TvSpacing8))
-            }
-
-            if (channels.isEmpty()) {
-                GuideEmptyState(
-                    alert = frame.alert,
-                    isEmptyTag = channelScope.activeTagId != null,
-                    connectionUiState = connectionUiState,
-                    channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
-                    onAction = { action ->
-                        if (owner.isCurrent) {
-                            when (action) {
-                                AppErrorAction.RETRY -> onRetry()
-                                AppErrorAction.CONNECTION_SETTINGS -> onOpenConnectionSettings()
-                                AppErrorAction.CLOSE -> Unit
-                            }
+                channelListState = channelListState,
+                contentPadding = contentPadding,
+                layoutDirection = layoutDirection,
+                density = density,
+                startPadding = startPadding,
+                endPadding = endPadding,
+                timelineWidthPx = timelineWidthPx,
+                horizontalFocusReserve = horizontalFocusReserve,
+                guideBringIntoView = guideBringIntoView,
+                gridFocus = gridFocus,
+                guideRetryFocus = guideRetryFocus,
+                navigationFocus = navigationFocus,
+                eventFocusRequesters = eventFocusRequesters,
+                onDismissTagNotice = { channelViewModel.dismissUnavailableTagNotice() },
+                onRetry = onRetry,
+                onOpenConnectionSettings = onOpenConnectionSettings,
+                // Runs only for the current visit; the body consumes other visits' keys.
+                onViewportKey = viewportKey@{ event ->
+                    if (!initialFocusEnabled || !programmeFocusOwned) return@viewportKey false
+                    if (preparedIndex.input.category != category && event.key in listOf(
+                            Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+                        )) return@viewportKey true
+                    val unsettled = !indexCurrent || realizedTarget != selectedTarget || frontierRequest != null ||
+                        channelFocusRequest != null || windowFocusRequest != null
+                    if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
+                        if (event.type == KeyEventType.KeyDown) {
+                            // A new press ends an interrupted sequence; an internal
+                            // focus handoff or a held-key repeat does not.
+                            if (event.nativeKeyEvent.repeatCount == 0) suppressActivationRelease = false
+                            if (unsettled) suppressActivationRelease = true
                         }
-                    },
-                    actionFocus = if (owner.isCurrent) guideRetryFocus else remember { FocusRequester() },
-                    leadingExit = navigationFocus ?: FocusRequester.Default,
-                    upExit = FocusRequester.Default,
-                )
-            } else {
-                TimelineTimeRuler(
-                    windowStartSec = renderedWindowStartSec,
-                    windowEndSec = windowEndSec,
-                    nowSecProvider = nowSecProvider,
-                    earlierContent = frame.earlierContent,
-                    laterContent = frame.laterContent,
-                    modifier = Modifier.padding(
-                        start = timelineContentPadding.calculateStartPadding(layoutDirection),
-                        end = timelineContentPadding.calculateEndPadding(layoutDirection),
-                    ),
-                )
-                val trackLeftPx = if (layoutDirection == LayoutDirection.Ltr) {
-                    with(density) { (startPadding + TvBrowseLeadingInset + GuideChannelWidth + GuideChannelGap).toPx() }
-                } else terminalReservePx
-                Box(Modifier.weight(1f).fillMaxWidth()
-                    .guideViewportFades(trackLeftPx, trackWidthPx, frame.earlierContent, frame.laterContent,
-                        above = { channelListState.canScrollBackward }, below = { channelListState.canScrollForward })
-                    .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
-                        MaterialTheme.colorScheme.primary)
-                    .testTag("epg-timeline-content")) {
-                // A frame shows its pictures with the session of the observation it was built from, and
-                // its rows' saved logos with the observation their scope was resolved from.
-                ProvideArtworkSession(currentSession, channelScopeState.observation) { CompositionLocalProvider(LocalBringIntoViewSpec provides guideBringIntoView) {
-                LazyColumn(
-                    state = channelListState,
-                    userScrollEnabled = owner.isCurrent,
-                    contentPadding = timelineContentPadding,
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .then(if (owner.isCurrent) Modifier.focusRequester(gridFocus) else Modifier)
-                        .tabFocus()
-                        .onPreviewKeyEvent { event ->
-                            if (!owner.isCurrent) return@onPreviewKeyEvent true
-                            if (!initialFocusEnabled || !programmeFocusOwned) return@onPreviewKeyEvent false
-                            if (preparedIndex.input.category != category && event.key in listOf(
-                                    Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
-                                )) return@onPreviewKeyEvent true
-                            val unsettled = !indexCurrent || realizedTarget != selectedTarget || frontierRequest != null ||
-                                channelFocusRequest != null || windowFocusRequest != null
-                            if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
-                                if (event.type == KeyEventType.KeyDown) {
-                                    // A new press ends an interrupted sequence; an internal
-                                    // focus handoff or a held-key repeat does not.
-                                    if (event.nativeKeyEvent.repeatCount == 0) suppressActivationRelease = false
-                                    if (unsettled) suppressActivationRelease = true
-                                }
-                                val consume = unsettled || suppressActivationRelease
-                                if (event.type == KeyEventType.KeyUp) suppressActivationRelease = false
-                                return@onPreviewKeyEvent consume
-                            }
-                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                            when (event.key) {
-                                Key.DirectionLeft -> moveFocus(EpgFocusDirection.LEFT)
-                                Key.DirectionRight -> moveFocus(EpgFocusDirection.RIGHT)
-                                Key.DirectionUp -> moveFocus(EpgFocusDirection.UP)
-                                Key.DirectionDown -> moveFocus(EpgFocusDirection.DOWN)
-                                else -> false
-                            }
-                        }
-                        .focusable()
-                        .testTag("epg-programme-viewport"),
-                ) {
-                    itemsIndexed(channels, key = { _, channel -> channel.id.value }) {
-                            channelIndex, channel ->
-                        val selected = rememberTabReader(frame.selected)()
-                        val coveragePending = rememberTabReader { frame.coveragePending(channel.id) }()
-                        TimelineChannelRow(
-                            channel = channel,
-                            channelIndex = channelIndex,
-                            number = ChannelNavigation.numberForId(
-                                orderedChannelIds, channelNumbers, channel.id,
-                            ),
-                            selectedEventId = selected?.takeIf { it.channelIndex == channelIndex }?.eventId,
-                            eventFocusRequesters = eventFocusRequesters,
-                            windowStartSec = renderedWindowStartSec,
-                            windowEndSec = windowEndSec,
-                            nowSecProvider = nowSecProvider,
-                            events = eventsByChannel[channel.id].orEmpty(),
-                            hasCachedEvents = channel.id in timelineEventIndex.channelsWithEvents,
-                            hasMatchingCachedEvents =
-                                channel.id in timelineEventIndex.channelsWithMatchingEvents,
-                            connectionUiState = connectionUiState,
-                            coveragePending = coveragePending,
-                            onFocused = { event ->
-                                if (!owner.isCurrent) return@TimelineChannelRow
-                                if (!initialFocusEnabled || channelViewModel.scope.value != channelScopeState) return@TimelineChannelRow
-                                profileTrace("P44:focus:guide") {
-                                    if (BuildConfig.PROFILE_TRACE) {
-                                        profileTrace("P48:focus:guide:${channel.id.value}:${event.id.value}") { }
-                                    }
-                                    val target = EpgFocusTarget(channelIndex, event.id)
-                                    val settled = realizedTarget == selectedTarget
-                                    realizedTarget = target
-                                    if (settled || !programmeFocusOwned || selectedTarget == null) {
-                                        // Focus that arrives on another cell, or after the selection was cleared, starts a new anchor.
-                                        if (selectedTarget != target) focusAnchor = null
-                                        selectedTarget = target
-                                    }
-                                    programmeFocusOwned = true
-                                    if (target == selectedTarget) {
-                                        lastFocusedEvent = event
-                                        selection.setSelected(channel.id)
-                                        guidePositionStore.save(GuidePosition(
-                                            channelId = channel.id,
-                                            eventId = event.id,
-                                            eventStartSec = event.start.epochSeconds,
-                                            windowStartSec = windowStartSec,
-                                            firstVisibleColumn = channelListState.firstVisibleItemIndex,
-                                        ))
-                                    }
-                                }
-                            },
-                            recordingForEvent = { event ->
-                                profileTrace("P48:guideRecordingLookup") {
-                                    observation.dvrEntryForEvent(event)
-                                }
-                            },
-                            onOpenDetails = {
-                                if (!owner.isCurrent) return@TimelineChannelRow
-                                if (realizedTarget != selectedTarget || frontierRequest != null ||
-                                    channelFocusRequest != null || windowFocusRequest != null
-                                ) return@TimelineChannelRow
-                                releaseProgrammeFocus()
-                                selectedTarget = EpgFocusTarget(
-                                    channelIndex,
-                                    it.id,
-                                )
-                                detailsEvent = it
-                                detailsObservation = observation
-                                detailsFromSearch = false
-                                showContextMenu = false
-                            },
-                            onOpenContextMenu = {
-                                if (!owner.isCurrent) return@TimelineChannelRow
-                                if (realizedTarget != selectedTarget || frontierRequest != null ||
-                                    channelFocusRequest != null || windowFocusRequest != null
-                                ) return@TimelineChannelRow
-                                suppressActivationRelease = true
-                                releaseProgrammeFocus()
-                                selectedTarget = EpgFocusTarget(channelIndex, it.id)
-                                detailsEvent = it
-                                detailsObservation = observation
-                                detailsFromSearch = false
-                                showContextMenu = true
-                            },
-                            visibleRowWidthPx = LocalBrowseCullWidthPx.current?.minus(
-                                with(LocalDensity.current) {
-                                    timelineContentPadding.calculateStartPadding(layoutDirection).roundToPx()
-                                },
-                            ),
-                            focusStartInset = horizontalFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
-                            focusEndInset = horizontalFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
-                        )
+                        val consume = unsettled || suppressActivationRelease
+                        if (event.type == KeyEventType.KeyUp) suppressActivationRelease = false
+                        return@viewportKey consume
                     }
-                }
-                } }
-                }
-            }
-            }
+                    if (event.type != KeyEventType.KeyDown) return@viewportKey false
+                    when (event.key) {
+                        Key.DirectionLeft -> moveFocus(EpgFocusDirection.LEFT)
+                        Key.DirectionRight -> moveFocus(EpgFocusDirection.RIGHT)
+                        Key.DirectionUp -> moveFocus(EpgFocusDirection.UP)
+                        Key.DirectionDown -> moveFocus(EpgFocusDirection.DOWN)
+                        else -> false
+                    }
+                },
+                // The scope and list state are the focused row's frame; windowStartSec is the live window.
+                onProgrammeFocused = focused@{ frameScope, channelIndex, channelId, event, frameListState ->
+                    if (!initialFocusEnabled || channelViewModel.scope.value != frameScope) return@focused
+                    profileTrace("P44:focus:guide") {
+                        if (BuildConfig.PROFILE_TRACE) {
+                            profileTrace("P48:focus:guide:${channelId.value}:${event.id.value}") { }
+                        }
+                        val target = EpgFocusTarget(channelIndex, event.id)
+                        val settled = realizedTarget == selectedTarget
+                        realizedTarget = target
+                        if (settled || !programmeFocusOwned || selectedTarget == null) {
+                            // Focus that arrives on another cell, or after the selection was cleared, starts a new anchor.
+                            if (selectedTarget != target) focusAnchor = null
+                            selectedTarget = target
+                        }
+                        programmeFocusOwned = true
+                        if (target == selectedTarget) {
+                            lastFocusedEvent = event
+                            selection.setSelected(channelId)
+                            guidePositionStore.save(GuidePosition(
+                                channelId = channelId,
+                                eventId = event.id,
+                                eventStartSec = event.start.epochSeconds,
+                                windowStartSec = windowStartSec,
+                                firstVisibleColumn = frameListState.firstVisibleItemIndex,
+                            ))
+                        }
+                    }
+                },
+                onOpenProgrammeDetails = details@{ channelIndex, event, frameObservation ->
+                    if (realizedTarget != selectedTarget || frontierRequest != null ||
+                        channelFocusRequest != null || windowFocusRequest != null
+                    ) return@details
+                    releaseProgrammeFocus()
+                    selectedTarget = EpgFocusTarget(
+                        channelIndex,
+                        event.id,
+                    )
+                    detailsEvent = event
+                    detailsObservation = frameObservation
+                    detailsFromSearch = false
+                    showContextMenu = false
+                },
+                onOpenProgrammeContextMenu = menu@{ channelIndex, event, frameObservation ->
+                    if (realizedTarget != selectedTarget || frontierRequest != null ||
+                        channelFocusRequest != null || windowFocusRequest != null
+                    ) return@menu
+                    suppressActivationRelease = true
+                    releaseProgrammeFocus()
+                    selectedTarget = EpgFocusTarget(channelIndex, event.id)
+                    detailsEvent = event
+                    detailsObservation = frameObservation
+                    detailsFromSearch = false
+                    showContextMenu = true
+                },
+            )
         }
 
         }
         GuideBrowseContent()
         @Composable
         fun GuideOverlays() {
-        if (showSearchDialog && !detailsFromSearch) {
-            EpgSearchDialog(
-                contentPadding = contentPadding,
-                query = searchQuery,
-                result = searchResult,
-                searching = searchRequest != null,
-                searchEnabled = currentSession != null,
-                channelName = { channelId ->
-                    val resultObservation = searchObservation?.let {
-                        searchResultObservation(it, observation)
-                    }
-                    channelId?.let { resultObservation?.channel(it)?.name }
-                },
-                restoreFocusTo = restoreSearchResultFocus,
-                onFocusRestored = { restoreSearchResultFocus = null },
-                onQueryChange = { query ->
-                    searchQuery = query
+        GuideOverlayHost(
+            contentPadding = contentPadding,
+            showSearchDialog = showSearchDialog,
+            detailsFromSearch = detailsFromSearch,
+            searchQuery = searchQuery,
+            searchResult = searchResult,
+            searching = searchRequest != null,
+            searchEnabled = currentSession != null,
+            searchChannelName = { channelId ->
+                val resultObservation = searchObservation?.let {
+                    searchResultObservation(it, observation)
+                }
+                channelId?.let { resultObservation?.channel(it)?.name }
+            },
+            restoreSearchResultFocus = restoreSearchResultFocus,
+            onSearchFocusRestored = { restoreSearchResultFocus = null },
+            onSearchQueryChange = { query ->
+                searchQuery = query
+                searchResult = null
+                searchObservation = null
+                searchRequest = null
+            },
+            onSearch = {
+                currentSession?.let { capability ->
                     searchResult = null
                     searchObservation = null
-                    searchRequest = null
-                },
-                onSearch = {
-                    currentSession?.let { capability ->
-                        searchResult = null
-                        searchObservation = null
-                        searchRequest = GuideSearchRequest(
-                            observation = observation,
-                            currentSession = capability,
-                            query = searchQuery,
-                            tagId = channelScope.activeTagId,
-                        )
+                    searchRequest = GuideSearchRequest(
+                        observation = observation,
+                        currentSession = capability,
+                        query = searchQuery,
+                        tagId = channelScope.activeTagId,
+                    )
+                }
+            },
+            onOpenSearchDetails = { event ->
+                searchObservation?.let { searchedObservation ->
+                    val resultObservation = searchResultObservation(
+                        searchedObservation,
+                        observation,
+                    )
+                    if (resultObservation != null) {
+                        releaseProgrammeFocus()
+                        detailsEvent = event
+                        detailsObservation = resultObservation
+                        detailsFromSearch = true
+                        restoreSearchResultFocus = null
                     }
-                },
-                onOpenDetails = { event ->
-                    searchObservation?.let { searchedObservation ->
-                        val resultObservation = searchResultObservation(
-                            searchedObservation,
-                            observation,
-                        )
-                        if (resultObservation != null) {
-                            releaseProgrammeFocus()
-                            detailsEvent = event
-                            detailsObservation = resultObservation
-                            detailsFromSearch = true
-                            restoreSearchResultFocus = null
-                        }
-                    }
-                },
-                onDismiss = ::closeSearch,
-            )
-        }
-
-        detailsEvent?.let { openingEvent ->
-            val openingObservation = detailsObservation ?: return@let
-            ProgrammeDetailsHost(
-                openingEvent = openingEvent, openingObservation = openingObservation,
-                observation = observation, currentObservation = { observationState.value },
-                nowSecProvider = { System.currentTimeMillis() / 1000L }, fromGuide = true, showContextMenu = showContextMenu,
-                mutationScope = coroutineScope, mutationInFlight = detailsMutationInFlight,
-                onShowDetails = { showContextMenu = false },
-                mutations = dvrMutationActions, notices = notices, onPlay = onPlay,
-                onPlayRecording = onPlayRecording, onClose = ::closeDetails,
-                returnFocusRequester = eventFocusRequesters[openingEvent.id].takeUnless { detailsFromSearch },
-                onShowGuide = { channelId, programme ->
-                    showSearchDialog = false
-                    restoreDetailsFocus = false
-                    val available = programme?.id?.let(observation::event)?.takeIf {
-                        it.channelId == channelId &&
-                            it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
-                    }
-                    jumpToWindow(floorGuideWindowToHour(available?.start?.epochSeconds ?: nowSecProvider(), guideZoneId),
-                        channelId, available)
-                },
-            )
-        }
-
-        if (showJumpDialog) {
-            JumpToTimeDialog(
-                initialSec = windowStartSec,
-                bounds = windowBounds,
-                zoneId = guideZoneId,
-                nowSecProvider = nowSecProvider,
-                onDismiss = { showJumpDialog = false },
-                onJump = { target ->
-                    showJumpDialog = false
-                    jumpToWindow(target)
-                },
-            )
-        }
+                }
+            },
+            onDismissSearch = ::closeSearch,
+            detailsEvent = detailsEvent,
+            detailsObservation = detailsObservation,
+            observation = observation,
+            currentObservation = { observationState.value },
+            showContextMenu = showContextMenu,
+            mutationScope = coroutineScope,
+            mutationInFlight = detailsMutationInFlight,
+            mutations = dvrMutationActions,
+            notices = notices,
+            onShowDetails = { showContextMenu = false },
+            onPlay = onPlay,
+            onPlayRecording = onPlayRecording,
+            onCloseDetails = ::closeDetails,
+            eventFocusRequesters = eventFocusRequesters,
+            onShowGuide = { channelId, programme ->
+                showSearchDialog = false
+                restoreDetailsFocus = false
+                val available = programme?.id?.let(observation::event)?.takeIf {
+                    it.channelId == channelId &&
+                        it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
+                }
+                jumpToWindow(floorGuideWindowToHour(available?.start?.epochSeconds ?: nowSecProvider(), guideZoneId),
+                    channelId, available)
+            },
+            showJumpDialog = showJumpDialog,
+            windowStartSec = windowStartSec,
+            windowBounds = windowBounds,
+            zoneId = guideZoneId,
+            nowSecProvider = nowSecProvider,
+            onDismissJump = { showJumpDialog = false },
+            onJump = { target ->
+                showJumpDialog = false
+                jumpToWindow(target)
+            },
+        )
         }
         GuideOverlays()
 

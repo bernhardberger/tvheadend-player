@@ -76,7 +76,9 @@ class GuideSearchDetailsTest {
         val root = generateSequence(File(requireNotNull(System.getProperty("user.dir")))) { it.parentFile }
             .first { File(it, ".git").exists() }
         val screen = File(root, "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/EpgGridScreen.kt").readText()
-        assertTrue(screen.contains("if (showSearchDialog && !detailsFromSearch)"))
+        val overlay = File(root, "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/guide/GuideOverlayHost.kt").readText()
+        assertTrue(overlay.contains("if (showSearchDialog && !detailsFromSearch)"))
+        assertTrue(screen.contains("showSearchDialog = showSearchDialog,\n            detailsFromSearch = detailsFromSearch,"))
         assertTrue(screen.contains("if (detailsFromSearch) {\n                closeDetails()\n            }\n            closeSearch()"))
         assertTrue(screen.contains("restoreSearchResultFocus = searchEventId"))
         assertTrue(screen.contains(".semantics { if (detailsEvent != null) hideFromAccessibility() }"))

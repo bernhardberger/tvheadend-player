@@ -24,6 +24,10 @@ class GuideRenderingCostContractTest {
         repositoryRoot,
         "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/guide/EpgGridModals.kt",
     ).readText()
+    private val overlaySource = File(
+        repositoryRoot,
+        "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/guide/GuideOverlayHost.kt",
+    ).readText()
     private val appModuleSource = File(
         repositoryRoot,
         "app/src/main/java/at/bernhardberger/tvhplayer/di/AppModule.kt",
@@ -178,7 +182,7 @@ class GuideRenderingCostContractTest {
         val ownership = screenSource.section("val mayFocusProgramme", "fun focusGuideHeader()")
         assertTrue(ownership.contains("programmeFocusOwned"))
         assertFalse(ownership.contains("scopeRowFocused"))
-        assertTrue(screenSource.contains("onSelectTag = {\n                        releaseProgrammeFocus()"))
+        assertTrue(screenSource.contains("onSelectTag = {\n                    releaseProgrammeFocus()"))
     }
 
     @Test
@@ -204,11 +208,10 @@ class GuideRenderingCostContractTest {
         assertTrue(ruler.contains("val nowSec = nowSecProvider()"))
         assertTrue(row.contains("val nowSec = nowSecProvider()"))
         assertTrue(details.contains("nowSec = rememberDetailsEpochSeconds(nowSecProvider)"))
-        assertFalse(guide.substringAfter("ProgrammeDetailsHost(").substringBefore("onShowGuide =")
-            .contains("nowSecProvider = nowSecProvider"))
+        val detailsArguments = overlaySource.section("ProgrammeDetailsHost(", "onShowGuide =")
+        assertFalse(detailsArguments.contains("nowSecProvider = nowSecProvider"))
         // The Show in Guide event callback may read wall-clock now; composition must not.
-        assertFalse(guide.substringAfter("ProgrammeDetailsHost(").substringBefore("onShowGuide =")
-            .contains("nowSecProvider()"))
+        assertFalse(detailsArguments.contains("nowSecProvider()"))
         assertEquals(1, clock.count("mutableLongStateOf("))
         assertTrue(clock.contains("return remember(nowSec) { { nowSec.longValue } }"))
     }
