@@ -665,18 +665,16 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun heldRightWalksOneLevelPerRepeatAndRapidReverseKeepsInvokingRows() {
+    @Test fun heldRightEntersOneLevelAndRapidReverseKeepsInvokingRows() {
         show()
         focused("recordings-folder-Documentaries")
         compose.mainClock.autoAdvance = false
         try {
-            // As AOSP TvSettings: each key repeat enters the focused folder, down to a leaf.
+            // Repeats are swallowed: on the TV they outran the new level and escaped to the tabs.
             compose.onRoot().performKeyInput { keyDown(Key.DirectionRight) }
             compose.mainClock.advanceTimeBy(96)
             compose.onRoot().performKeyInput { advanceEventTime(800); keyUp(Key.DirectionRight) }
-            compose.runOnIdle { assertEquals(listOf("Documentaries", "Expeditions"), screenState.archivePath) }
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
-            compose.mainClock.advanceTimeBy(96)
+            compose.runOnIdle { assertEquals(listOf("Documentaries"), screenState.archivePath) }
             compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
             compose.mainClock.advanceTimeBy(96)
             compose.runOnIdle { assertTrue(screenState.archivePath.isEmpty()) }

@@ -439,10 +439,11 @@ Accepted 2026-09-15; static design in Penpot page
   a level ends in a chevron, with or without a leading icon, as Recordings
   folders do (revised 2026-10-23).
 - Up/Down browse; Right/OK enter a level; Left/Back return one level and restore
-  the parent's item and viewport. Holding Left or Right repeats that one level
-  per key repeat, as AOSP TvSettings does (held Left at the root goes on to the
-  drawer); a held Back acts once, and a held Left that leaves an editor stops
-  there. Focus alone never commits a setting. Switches
+  the parent's item and viewport. Holding Left repeats that one level per key
+  repeat, as AOSP TvSettings does (held Left at the root goes on to the drawer);
+  a held Right enters one level only, because on the TV its repeats outran the
+  new level and escaped to the tabs (revised 2026-10-23). A held Back acts once,
+  and a held Left that leaves an editor stops there. Focus alone never commits a setting. Switches
   act in place; choice lists (e.g. App language) are a level, not a dialog, and
   OK on a choice applies it and returns.
 - **Connection** enters a normal overview (Status, Server, HTSP port, `Edit

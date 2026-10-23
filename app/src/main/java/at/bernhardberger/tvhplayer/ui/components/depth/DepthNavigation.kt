@@ -311,8 +311,9 @@ fun DepthNavigation(
             }
             else -> null
         }
-        // Held Left/Right walk level by level; a held Back acts once.
-        val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount, repeats = code == KeyEvent.KEYCODE_DPAD_LEFT || right) {
+        // Held Left walks out level by level; held Right and Back act once, since Right's
+        // repeats outran the entering level on the TV and escaped to the tabs.
+        val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount, repeats = code == KeyEvent.KEYCODE_DPAD_LEFT) {
             when {
                 level.activeContent != null -> false // The editor/IME owns input before local Back.
                 back && backEnabled && state.stack.canPop -> { pop(); true }
