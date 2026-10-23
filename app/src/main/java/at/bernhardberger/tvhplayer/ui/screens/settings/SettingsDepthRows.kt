@@ -108,7 +108,7 @@ internal fun settingsRow(
                     colors = RadioButtonDefaults.colors(selectedColor = LocalContentColor.current,
                         unselectedColor = LocalContentColor.current)) })
                 trailingIcon != null -> ({ Icon(painterResource(trailingIcon), null, Modifier.size(24.dp)) })
-                child != null && icon == null -> ({ Icon(painterResource(R.drawable.ic_keyboard_arrow_right), null, Modifier.size(24.dp)) })
+                child != null -> ({ Icon(painterResource(R.drawable.ic_keyboard_arrow_right), null, Modifier.size(24.dp)) })
                 else -> null
             },
             colors = ListItemDefaults.colors(

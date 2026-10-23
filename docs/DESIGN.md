@@ -435,7 +435,9 @@ Accepted 2026-09-15; static design in Penpot page
   draws the same level twice.
 - Level 1 uses standard TV list rows with meaningful icons; deeper levels use
   icons only when meaningful; second lines carry values/status, never
-  descriptions of a submenu. Section headings group rows.
+  descriptions of a submenu. Section headings group rows. Every row that opens
+  a level ends in a chevron, with or without a leading icon, as Recordings
+  folders do (revised 2026-10-23).
 - Up/Down browse; Right/OK enter a level; Left/Back return one level and restore
   the parent's item and viewport. Focus alone never commits a setting. Switches
   act in place; choice lists (e.g. App language) are a level, not a dialog, and
