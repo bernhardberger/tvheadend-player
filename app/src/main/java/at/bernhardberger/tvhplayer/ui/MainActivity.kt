@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvheadend.sdk.core.channelCatalogAuthority
 import at.bernhardberger.tvheadend.sdk.core.channelCatalogForDisplay
-import at.bernhardberger.tvhplayer.core.toConnectionUiState
 
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
@@ -45,9 +44,6 @@ import at.bernhardberger.tvhplayer.ui.player.stopPlaybackAndClose
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyCycleOwner
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyDecision
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
-import at.bernhardberger.tvhplayer.ui.startup.LocalStartupBrandIntro
-import at.bernhardberger.tvhplayer.ui.startup.StartupBrandIntro
-import at.bernhardberger.tvhplayer.ui.startup.StartupBrandClock
 import at.bernhardberger.tvhplayer.viewmodels.MainStartupViewModel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -125,7 +121,6 @@ private fun Int.isStartupActivationKey(): Boolean = when (this) {
 }
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var startupBrandIntro: StartupBrandIntro
     private val startupViewModel: MainStartupViewModel by viewModel()
     private val playbackRuntime: AppPlaybackRuntime by inject()
     private val notices: NoticeCenter by inject()
@@ -168,14 +163,6 @@ class MainActivity : AppCompatActivity() {
         val platformSplashDeadlineUptimeMillis =
             SystemClock.uptimeMillis() + MAX_PLATFORM_SPLASH_HOLD_MILLIS
         super.onCreate(savedInstanceState)
-        startupBrandIntro = StartupBrandIntro(eligible = startupProcessEntry.claim(savedInstanceState != null))
-        lifecycleScope.launch {
-            tvheadendSession.observation.collect { observation ->
-                startupBrandIntro.observe(
-                    observation.sessionState.toConnectionUiState(),
-                )
-            }
-        }
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
                 playbackRuntime.backgroundNotice.collect { notice ->
@@ -201,9 +188,7 @@ class MainActivity : AppCompatActivity() {
             TVHeadendPlayerTheme {
                 CompositionLocalProvider(
                     LocalChannelAccents provides channelAccents,
-                    LocalStartupBrandIntro provides startupBrandIntro,
                 ) {
-                    StartupBrandClock(startupBrandIntro)
                     AppRoot(
                         startupState = startupState,
                         runtimeServerSettings = runtimeServerSettings,
@@ -237,7 +222,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onNewIntent(intent: Intent) {
-        startupBrandIntro.finish()
         super.onNewIntent(intent)
         setIntent(intent)
         requestApplianceEntry(intent)
@@ -266,7 +250,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun requestRootExit() {
-        startupBrandIntro.finish()
         val startupState = startupViewModel.state.value
         lifecycleScope.launch {
             playbackLifecycle.onRootExitRequested(startupState)
@@ -294,7 +277,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private companion object {
-        val startupProcessEntry = at.bernhardberger.tvhplayer.core.MainStartupProcessEntry()
         // Process-wide started owners; sessions themselves remain activity-local.
         val playbackOwners = MainActivityPlaybackOwners()
         const val MAX_PLATFORM_SPLASH_HOLD_MILLIS = 1_000L
@@ -307,27 +289,6 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         // The device clock format can change while the app is in the background.
         AppClock.systemUses24Hour = android.text.format.DateFormat.is24HourFormat(this)
-        startupBrandIntro.resumed(true)
-    }
-
-    override fun onPause() {
-        startupBrandIntro.resumed(false)
-        super.onPause()
-    }
-
-    override fun onWindowFocusChanged(hasFocus: Boolean) {
-        super.onWindowFocusChanged(hasFocus)
-        if (::startupBrandIntro.isInitialized) startupBrandIntro.focused(hasFocus)
-    }
-
-    override fun onEnterAnimationComplete() {
-        super.onEnterAnimationComplete()
-        if (::startupBrandIntro.isInitialized) startupBrandIntro.entranceReady()
-    }
-
-    override fun onDestroy() {
-        startupBrandIntro.finish()
-        super.onDestroy()
     }
 }
 

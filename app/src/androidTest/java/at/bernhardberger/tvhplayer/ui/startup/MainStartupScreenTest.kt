@@ -8,7 +8,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -205,34 +204,60 @@ class MainStartupScreenTest {
     }
 
     @Test
-    fun feedbackIsIndependentOfTheAssemblyFrame() {
-        val millis = mutableFloatStateOf(0f)
-        var presentation by mutableStateOf<MainStartupPresentation>(
-            MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
-        )
+    fun logoStaysHiddenThroughTheBriefWait() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 MainStartupScreen(
-                    presentation, TvFullScreenPadding,
-                    brandMillis = { millis.floatValue },
+                    MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
+                    TvFullScreenPadding,
+                    loadingFeedback = MainStartupLoadingFeedback.HIDDEN,
+                    motionEnabled = true,
+                )
+            }
+        }
+        val mark = composeRule.onNodeWithTag(MARK_TAG).captureToImage().toPixelMap()
+        val cyan = Color(0xFF00BCFA)
+        var matches = 0
+        for (y in 0 until mark.height) for (x in 0 until mark.width) {
+            val pixel = mark[x, y]
+            if (kotlin.math.abs(pixel.red - cyan.red) <= 2f / 255f &&
+                kotlin.math.abs(pixel.green - cyan.green) <= 2f / 255f &&
+                kotlin.math.abs(pixel.blue - cyan.blue) <= 2f / 255f
+            ) matches++
+        }
+        assertEquals("No logo before the stage text", 0, matches)
+    }
+
+    @Test
+    fun logoAndWordmarkAreSettledAndOpaqueOnTheFirstFrame() {
+        composeRule.mainClock.autoAdvance = false
+        composeRule.setContent {
+            TVHeadendPlayerTheme {
+                MainStartupScreen(
+                    MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING),
+                    TvFullScreenPadding,
                     loadingFeedback = MainStartupLoadingFeedback.WAITING,
                     motionEnabled = true,
                 )
             }
         }
-        for (time in listOf(0f, 400f, 900f, 1200f)) {
-            composeRule.runOnIdle { millis.floatValue = time }
-            composeRule.onNodeWithTag(STATUS_TAG).assertIsDisplayed()
-            composeRule.onNodeWithTag(LOADER_TAG).assertIsDisplayed()
+        val mark = composeRule.onNodeWithTag(MARK_TAG).captureToImage().toPixelMap()
+        val wordmark = composeRule.onNodeWithText("Tvheadend Player").captureToImage().toPixelMap()
+        fun count(pixels: androidx.compose.ui.graphics.PixelMap, color: Color): Int {
+            var matches = 0
+            for (y in 0 until pixels.height) for (x in 0 until pixels.width) {
+                val pixel = pixels[x, y]
+                if (kotlin.math.abs(pixel.red - color.red) <= 2f / 255f &&
+                    kotlin.math.abs(pixel.green - color.green) <= 2f / 255f &&
+                    kotlin.math.abs(pixel.blue - color.blue) <= 2f / 255f
+                ) matches++
+            }
+            return matches
         }
-        composeRule.runOnIdle { millis.floatValue = 1300f }
-        composeRule.onNodeWithTag(STATUS_TAG).assertIsDisplayed()
-        composeRule.onNodeWithTag(LOADER_TAG).assertIsDisplayed()
-        composeRule.runOnIdle {
-            millis.floatValue = 100f
-            presentation = unreachable
-        }
-        composeRule.onNodeWithTag(PRIMARY_TAG).assertIsDisplayed().assertIsFocused()
+        assertTrue("Full cyan ring", count(mark, Color(0xFF00BCFA)) > mark.width * mark.height / 10)
+        assertTrue("Full orange play", count(mark, Color(0xFFFA7F00)) > mark.width * mark.height / 40)
+        assertTrue("Opaque wordmark", count(wordmark, Color(0xFFE3E3E8)) > 0)
+        assertTrue("Opaque wordmark accent", count(wordmark, Color(0xFFFA7F00)) > 0)
     }
 
     @Test
@@ -245,7 +270,6 @@ class MainStartupScreenTest {
                     TvFullScreenPadding,
                     loadingFeedback = feedback,
                     motionEnabled = false,
-                    brandMillis = { 0f },
                 )
             }
         }

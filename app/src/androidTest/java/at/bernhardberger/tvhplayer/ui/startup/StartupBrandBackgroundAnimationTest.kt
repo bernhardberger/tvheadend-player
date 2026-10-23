@@ -22,12 +22,12 @@ import kotlin.math.abs
 class StartupBrandBackgroundAnimationTest {
     @get:Rule val rule = createComposeRule()
 
-    @Test fun settledGlowBreathesContinuouslyWithoutMovingAndStopsWhenDisabled() {
+    @Test fun glowFadesInThenBreathesContinuouslyWithoutMovingAndStopsWhenDisabled() {
         var enabled by mutableStateOf(true)
         rule.mainClock.autoAdvance = false
         rule.setContent {
             Box(Modifier.size(960.dp, 540.dp).background(Color(0xFF0F1014))) {
-                StartupBrandBackground(millis = { StartupBrandDurationMillis }, enabled = enabled)
+                StartupBrandBackground(enabled = enabled)
             }
         }
         rule.waitUntil(5_000) {
@@ -36,7 +36,19 @@ class StartupBrandBackgroundAnimationTest {
         }
         rule.mainClock.advanceTimeByFrame()
         val background = rule.onNodeWithTag("startup-background-prepared")
+        val arriving = background.captureToImage().toPixelMap()
+        // The fade-in ends on the resting glow, where breathing begins.
+        rule.mainClock.advanceTimeBy(400)
+        rule.mainClock.advanceTimeByFrame()
         val initial = background.captureToImage().toPixelMap()
+        var arrivedPixels = 0
+        for (y in 0 until initial.height) for (x in 0 until initial.width) {
+            val delta = initial[x, y].blue - arriving[x, y].blue
+            assertTrue("The plate fades in without moving", delta >= -0.001f)
+            if (delta > 3f / 255f) arrivedPixels++
+        }
+        assertTrue("The plate fades in to its resting glow",
+            arrivedPixels > initial.width * initial.height / 100)
         rule.mainClock.advanceTimeBy(500)
         val earlyRise = background.captureToImage().toPixelMap()
         rule.mainClock.advanceTimeBy(1_500)
@@ -58,7 +70,7 @@ class StartupBrandBackgroundAnimationTest {
             peakBrightnessGain += delta.coerceAtLeast(0f)
             assertTrue("A full cycle returns to the existing glow",
                 abs(returned[x, y].blue - initial[x, y].blue) <= 1.01f / 255f)
-            assertTrue("Breathing continues after the first cycle with the intro clock frozen",
+            assertTrue("Breathing continues after the first cycle",
                 abs(nextPeak[x, y].blue - peak[x, y].blue) <= 1.01f / 255f)
         }
         assertTrue("Settled loading has a meaningful brightness range",

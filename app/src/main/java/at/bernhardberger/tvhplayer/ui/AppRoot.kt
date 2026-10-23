@@ -97,10 +97,7 @@ import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
 import at.bernhardberger.tvhplayer.ui.screens.RecordingsScreenState
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupKeyMode
 import at.bernhardberger.tvhplayer.ui.startup.MainStartupScreen
-import at.bernhardberger.tvhplayer.ui.startup.LocalStartupBrandIntro
-import at.bernhardberger.tvhplayer.ui.startup.StartupBrandDurationMillis
 import at.bernhardberger.tvhplayer.ui.startup.startupLoadingFeedback
-import at.bernhardberger.tvhplayer.ui.startup.mainStartupBrandPassiveHint
 import at.bernhardberger.tvhplayer.viewmodels.AppConnectionViewModel
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -128,7 +125,6 @@ private data class MainStartupOutgoingVisual(
     val presentation: MainStartupPresentation,
     val feedback: at.bernhardberger.tvhplayer.core.MainStartupLoadingFeedback,
     val brandingVisible: Boolean,
-    val brandMillis: Float,
 )
 
 internal fun enteringNavigationAllowed(
@@ -245,7 +241,6 @@ internal fun MainStartupComposition(
         }
         latestOnRevealed()
     }
-    val brandIntro = LocalStartupBrandIntro.current
     val loadingFeedback = startupLoadingFeedback(
         presentation = livePresentation,
         timing = loadingTiming,
@@ -253,22 +248,15 @@ internal fun MainStartupComposition(
         enabled = state.loadingFeedbackEnabled,
     )
     var outgoing by remember { mutableStateOf<MainStartupOutgoingVisual?>(null) }
-    val retained = remember(revealRequestId) {
-        if (revealRequestId != null) outgoing?.copy(
-            brandMillis = brandIntro?.outgoingMillis ?: StartupBrandDurationMillis,
-        ) else null
-    }
+    val retained = remember(revealRequestId) { if (revealRequestId != null) outgoing else null }
     val renderedPresentation = retained?.presentation ?: livePresentation
     SideEffect {
         if (revealRequestId == null && livePresentation != MainStartupPresentation.Inactive) {
             outgoing = MainStartupOutgoingVisual(
                 livePresentation, loadingFeedback,
                 !state.hideBranding,
-                brandIntro?.millis ?: StartupBrandDurationMillis,
             )
         }
-        brandIntro?.passive(mainStartupBrandPassiveHint(livePresentation),
-            loadingFeedback == at.bernhardberger.tvhplayer.core.MainStartupLoadingFeedback.WAITING)
     }
     val keyMode = when (renderedPresentation) {
         MainStartupPresentation.Inactive -> MainStartupKeyMode.Inactive
@@ -316,7 +304,6 @@ internal fun MainStartupComposition(
                 modifier = Modifier.fillMaxSize().graphicsLayer {
                     alpha = if (revealRequestId != null) revealAlpha.value else 1f
                 },
-                brandMillis = { retained?.brandMillis ?: brandIntro?.millis ?: StartupBrandDurationMillis },
                 loadingFeedback = retained?.feedback ?: loadingFeedback,
                 // Pending cold art has zero-alpha tracks, but keeps its final layout.
                 // Only the existing-playback classification removes branding.
@@ -329,7 +316,7 @@ internal fun MainStartupComposition(
 
     BackHandler(
         enabled = renderedPresentation != MainStartupPresentation.Inactive,
-        onBack = { brandIntro?.finish(); onBack() },
+        onBack = onBack,
     )
 }
 

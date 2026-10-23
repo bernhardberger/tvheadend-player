@@ -91,33 +91,19 @@ The 1280×640 social preview is a prepared asset, not an upload.
 
 ## Startup artwork
 
-The silent **1850ms hybrid-synced adaptation** uses native Canvas paths and a
-single background image. The final ring/play reuse the canonical generated
-Android artwork; traces retain unclipped overflow. Layout, lifecycle, loading,
-recovery and readiness behavior are owned by
-[`docs/DESIGN.md`](../docs/DESIGN.md#startup).
-
-The timeline has a quiet opening, slower assembly and a 370ms settled hold
-after the play finishes at 1480ms, but never delays readiness. Traces fade in
-250–450ms and extend 250–880ms (cubic-out); bands fill 460–970ms (smoothstep),
-gaps converge 700–1120ms (cubic-out), ring fills 970–1240ms (smoothstep), trace
-stroke retires 1030–1270ms (smoothstep), play appears 1000–1330ms (smoothstep),
-and play scale 1.1→1 / dy −6→0 settle 1000–1480ms (cubic-out). Wordmark appears
-400–940ms (cubic-out), retaining the 2dp rise. No sound asset is packaged.
-Assembly is admitted for a continuing startup wait after the real 400ms grace
-at the first non-restored process-entry opportunity, regardless of connection
-stage or retained disk cache. The pending opening frame already occupies the final
-branded layout; an existing-player return stays spinner-only and never replays it.
-Feedback has no 1200–1400ms brand-clock delay. At readiness the outgoing
-visual frame freezes for dismissal, without completing unfinished assembly.
+The startup screen shows the canonical symbol
+(`app/src/main/res/drawable/startup_brand_symbol.xml`) and the wordmark static,
+without an assembly animation (owner decision 2026-10-23: a fast start cut the
+former 1850ms assembly off mid-build). Both stay transparent through the 400ms
+grace, so a start that finishes within it shows no logo, and appear together with
+the busy ring and stage text. Layout, lifecycle, loading, recovery and readiness
+behavior are owned by [`docs/DESIGN.md`](../docs/DESIGN.md#startup).
 On 960×540dp the 80dp symbol starts at y=156dp, followed by a 14dp gap and unscaled
 28sp/36sp Outfit 550 wordmark.
 The theme-primary busy ring is 44dp/stroke3dp, 32dp below the wordmark at
 (480,340); native TV status begins 16dp below the ring. Brand-free playback returns
 keep their separate player-centred indicator without moving this composition.
-Once return feedback is visible, it uses the same gently pulsing glow at the final
-drift position, independent of the brand clock; it does not replay the sweep.
-Ring placement does not depend on status text or font scale.
+Ring placement does not depend on status text or font scale. No sound asset is packaged.
 
 The original background-only plate supplies one light-only graded frame beneath
 startup content, not a second video decoder. Source in the creative-assets project
@@ -135,26 +121,15 @@ resource is `app/src/main/res/drawable-nodpi/startup_background_plate.webp`:
 960×540 pixels, 79,650 compressed bytes and 2,073,600 decoded ARGB8888 bytes
 (1.98MiB; below 2MiB).
 Resource SHA256: `ddf49691ce5612c1e148a823623af0b666c35194b671d784a9c7356d940e81a3`.
-One asynchronous decode prepares the image; draw reads use the same `brandMillis`
-as the logo/wordmark, outside safe content padding. Opacity is zero through
-120ms, smoothsteps to 0.5 at 950ms, then to a 0.20 baseline at 1850ms;
-on animated entry a decoded image fades in over 200ms independently of the brand
-clock, including when preparation completes after that clock has stopped. Static
-entry displays the 0.20 base glow immediately when prepared, without an arrival fade. Center
-crop uses 1.12× cover scale and diagonal travel of 4% screen width over
-100–1850ms. No new dwell is introduced. Once motion settles, including static
-entry, the glow stays at its final position. A composition-owned infinite reverse
-tween raises opacity from 0.20 to 0.30 over 2000ms, then returns over 2000ms.
-Each half uses `(1 - cos(π × fraction)) / 2` easing, producing a continuous
-four-second breathing cycle with rounded turns and no hold at either end.
-It starts only after the plate is prepared and assembly is settled, with its value
-read in the draw phase. The pulse leaves with the startup layer on readiness or
-cancellation; it neither replays assembly nor delays the handoff.
+One asynchronous decode prepares the image, drawn outside safe content padding with a
+centered 1.12× cover crop. Once decoded it fades in over 300ms to a 0.20 resting glow;
+a composition-owned infinite reverse tween then raises opacity from 0.20 to 0.30 over
+2000ms and returns over 2000ms. Each half uses `(1 - cos(π × fraction)) / 2` easing,
+producing a continuous four-second breathing cycle with rounded turns and no hold at
+either end, read in the draw phase. The glow does not move. It leaves with the startup
+layer on readiness or cancellation and never delays the handoff.
 Recovery and reduced motion remain exactly `#0F1014`.
 
-Source choreography/provenance in creative batch `grok-broadcast-20260911T004615Z`:
-`startup-motion/hybrid-synced/{HANDOFF.md,timings.json,build_hybrid_synced.py}`;
-segment geometry: `startup-motion/soft-tv-finalists/build_soft_tv_finalists.py`.
 Physical-TV motion acceptance remains a separate gate.
 
 ## Font provenance

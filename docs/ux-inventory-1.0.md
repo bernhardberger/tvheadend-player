@@ -320,8 +320,9 @@ decides and screens only ask.
 
 **Today**
 - The native splash is held for up to 1000 ms (`ui/MainActivity.kt:162`,
-  `:184-187`, `:295`). The brand intro plays once per process
-  (`StartupBrandTimeline.kt:11`).
+  `:184-187`, `:295`). The startup logo and wordmark are static from the
+  first frame; only the background glow fades in and then breathes
+  (`ui/startup/StartupBrandBackground.kt`).
 - The in-app startup screen shows only for autostart or appliance launches
   (`ui/startup/MainStartupPresentation.kt:53-58`). Its stages are Preparing,
   Connecting, "Syncing channels and guide", "Preparing channels", then

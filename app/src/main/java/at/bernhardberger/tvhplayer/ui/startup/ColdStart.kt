@@ -33,9 +33,9 @@ internal class ColdStart(
 /**
  * Shows [coldStartPresentation] until channels can be drawn, once per activity. Saved channels
  * restore beside connecting with no signal of their own. The startup screen's own brief wait
- * ([loadingTiming], the one grace) draws only its background, so channels arriving within it
- * lead straight to them; after it the brand assembles from its start with the stage text, and the
- * screen stays [at.bernhardberger.tvhplayer.core.ColdStartMinimumVisibleMillis]. A failure shows
+ * ([loadingTiming], the one grace) shows no stage text, so channels arriving within it lead
+ * straight to them; after it the stage text joins the static brand, and the screen stays
+ * [at.bernhardberger.tvhplayer.core.ColdStartMinimumVisibleMillis]. A failure shows
  * at once. A launch request ends it for good: autoplay keeps its own startup.
  */
 @Composable

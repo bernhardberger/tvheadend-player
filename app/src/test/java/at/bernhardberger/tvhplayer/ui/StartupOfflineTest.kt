@@ -5,7 +5,6 @@ package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
 import android.os.Looper
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -85,7 +84,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -98,9 +96,6 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.time.Duration
-import at.bernhardberger.tvhplayer.ui.startup.LocalStartupBrandIntro
-import at.bernhardberger.tvhplayer.ui.startup.StartupBrandClock
-import at.bernhardberger.tvhplayer.ui.startup.StartupBrandIntro
 
 /**
  * Startup and play before the session is ready. OK on a saved channel row opens the player for
@@ -229,22 +224,24 @@ class StartupOfflineTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("main-startup-root")).fetchSemanticsNodes().size)
     }
 
-    @Test fun withoutSavedChannelsTheBrandAssemblesAfterTheOneGraceAndStaysReadable() {
-        val intro = coldApp(SessionObservation.create(sessionState = SessionState.Connecting))
+    @Test fun withoutSavedChannelsTheStaticBrandShowsAtOnceAndStaysReadable() {
+        coldApp(SessionObservation.create(sessionState = SessionState.Connecting))
         advance(200)
-        // The one grace: the startup screen's background, no brand and no stage text yet.
+        // The one grace: the screen is laid out with its brand still transparent, no stage text yet.
         assertEquals(1, startupScreens())
         assertEquals(0, statusTexts())
-        assertFalse(intro.running)
-        // The brand assembles from its start after the grace; from then the screen stays readable.
-        repeat(20) { if (!intro.running) advance(50) }
-        assertTrue(intro.running)
-        assertTrue("the brand assembles from its start", intro.millis < 100f)
+        compose.onNodeWithTag("main-startup-mark").fetchSemanticsNode()
+        compose.onNode(hasText("Tvheadend Player")).fetchSemanticsNode()
+        // From the stage text on, readiness keeps the shown screen readable before it leaves.
+        // (Its 500ms minimum is checked in ColdStartPresentationTest: the glow's frames also
+        // move Robolectric's Handler clock, so a fixed wait here would measure the harness.)
+        repeat(20) { if (statusTexts() == 0) advance(50) }
+        assertEquals(1, statusTexts())
         session.publish(ready(catalog))
-        advance(250)
+        advance(50)
         assertEquals("shown screens stay readable", 1, startupScreens())
         assertEquals("the stage text follows the brand", 1, statusTexts())
-        advance(400)
+        advance(600)
         assertEquals(0, startupScreens())
         compose.onNodeWithTag("channel-row-1").fetchSemanticsNode()
     }
@@ -398,15 +395,9 @@ class StartupOfflineTest {
         compose.waitForIdle()
     }
 
-    /** A cold start with the production brand intro, as MainActivity provides it. */
-    private fun coldApp(initial: SessionObservation): StartupBrandIntro {
-        val intro = StartupBrandIntro(eligible = true).apply {
-            entranceReady()
-            resumed(true)
-            focused(true)
-        }
-        app(initial, awaitRows = false, intro = intro)
-        return intro
+    /** A cold start without saved channels. */
+    private fun coldApp(initial: SessionObservation) {
+        app(initial, awaitRows = false)
     }
 
     private fun confirmRow(id: Long, awaitWait: Boolean = true, confirm: Boolean = true) {
@@ -461,7 +452,6 @@ class StartupOfflineTest {
     private fun app(
         initial: SessionObservation = connecting(catalog),
         awaitRows: Boolean = true,
-        intro: StartupBrandIntro? = null,
         profile: ServerProfileReadResult = ServerProfileReadResult.anonymous("offline.invalid", 9982),
     ) {
         session = FakeTvheadendSession(initial).apply { scriptLivePlaybackSuccess() }
@@ -503,16 +493,13 @@ class StartupOfflineTest {
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
-                    CompositionLocalProvider(LocalStartupBrandIntro provides intro) {
-                        if (intro != null) StartupBrandClock(intro)
-                        AppRoot(
-                            startupState = MainStartupState.Ready(server, autoStartPlayback = false),
-                            runtimeServerSettings = server,
-                            applianceLaunchRequests = ApplianceLaunchRequests(),
-                            onPlayerVisibilityChanged = {},
-                            onRequestExit = {},
-                        )
-                    }
+                    AppRoot(
+                        startupState = MainStartupState.Ready(server, autoStartPlayback = false),
+                        runtimeServerSettings = server,
+                        applianceLaunchRequests = ApplianceLaunchRequests(),
+                        onPlayerVisibilityChanged = {},
+                        onRequestExit = {},
+                    )
                 }
             }
         }

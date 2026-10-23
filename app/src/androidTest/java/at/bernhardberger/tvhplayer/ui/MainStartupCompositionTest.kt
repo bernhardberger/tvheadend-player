@@ -792,25 +792,14 @@ class MainStartupCompositionTest {
 
     @Test
     fun hiddenFeedbackCannotAppearDuringRevealAfterRealGrace() {
-        val intro = at.bernhardberger.tvhplayer.ui.startup.StartupBrandIntro(
-            at.bernhardberger.tvhplayer.core.MainStartupProcessEntry().claim(false))
-        composeRule.runOnUiThread {
-            intro.resumed(true); intro.focused(true); intro.entranceReady()
-        }
         var state by mutableStateOf(MainStartupCompositionState(
             MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING), null, false,
         ))
         composeRule.mainClock.autoAdvance = false
-        composeRule.setContent { androidx.compose.runtime.CompositionLocalProvider(
-            at.bernhardberger.tvhplayer.ui.startup.LocalStartupBrandIntro provides intro,
-        ) { TVHeadendPlayerTheme {
+        composeRule.setContent { TVHeadendPlayerTheme {
             MainStartupComposition(state, {}, {}, { {} }, motionEnabled = true)
-        } } }
+        } }
         composeRule.onNodeWithTag("main-startup-status").assertDoesNotExist()
-        composeRule.runOnIdle {
-            assertEquals("Opening-frame regression requires enabled animation", 0f, intro.millis)
-        }
-        val before = composeRule.onNodeWithTag("main-startup-mark").captureToImage().toPixelMap()
         composeRule.runOnIdle { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1L) }
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeByFrame()
@@ -819,44 +808,22 @@ class MainStartupCompositionTest {
         composeRule.onNodeWithTag("main-startup-root").assertExists()
         composeRule.onNodeWithTag("main-startup-status").assertDoesNotExist()
         composeRule.onNodeWithTag("main-startup-loader").assertDoesNotExist()
-        val after = composeRule.onNodeWithTag("main-startup-mark").captureToImage().toPixelMap()
-        var newlyFilled = 0
-        for (y in 0 until before.height) for (x in 0 until before.width) {
-            if (before[x, y].red < 0.15f && after[x, y].red > 0.3f) newlyFilled++
-        }
-        assertEquals("pending opening art must not snap to its endpoint", 0, newlyFilled)
-        composeRule.runOnIdle { assertFalse(intro.running) }
+        composeRule.onNodeWithTag("main-startup-mark").assertExists()
     }
 
     @Test
-    fun partialAssemblyAndExistingStatusAreRetainedAtReadiness() {
-        val intro = at.bernhardberger.tvhplayer.ui.startup.StartupBrandIntro(true)
-        composeRule.runOnUiThread {
-            intro.observe(at.bernhardberger.tvhplayer.core.ConnectionUiState.SyncingChannels)
-            intro.resumed(true); intro.focused(true); intro.entranceReady()
-            intro.passive(true, gracePassed = true)
-            intro.frame(900f)
-            assertTrue("This handoff regression requires animator_duration_scale > 0", intro.running)
-            assertEquals(900f, intro.millis)
-        }
+    fun existingStatusIsRetainedAtReadiness() {
         var state by mutableStateOf(MainStartupCompositionState(
             MainStartupPresentation.Passive(MainStartupMessageKind.SYNCING_METADATA), null, false,
         ))
         val timing = MainStartupLoadingTiming().apply { observe(true, null, SystemClock.uptimeMillis() - 500L) }
         composeRule.mainClock.autoAdvance = false
-        composeRule.setContent {
-            androidx.compose.runtime.CompositionLocalProvider(
-                at.bernhardberger.tvhplayer.ui.startup.LocalStartupBrandIntro provides intro,
-            ) { TVHeadendPlayerTheme {
-                MainStartupComposition(state, {}, {}, { {} }, loadingTiming = timing, motionEnabled = true)
-            } }
-        }
+        composeRule.setContent { TVHeadendPlayerTheme {
+            MainStartupComposition(state, {}, {}, { {} }, loadingTiming = timing, motionEnabled = true)
+        } }
         composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Syncing channels and guide")
         // Production publishes metadata before it enters the passive video-tune wait.
         composeRule.runOnIdle {
-            intro.observe(at.bernhardberger.tvhplayer.core.ConnectionUiState.Ready)
-            assertTrue(intro.running)
-            assertEquals(900f, intro.millis)
             state = state.copy(presentation = MainStartupPresentation.Enter(ApplianceLaunchRequest(1L)))
         }
         composeRule.mainClock.advanceTimeByFrame()
@@ -864,66 +831,33 @@ class MainStartupCompositionTest {
             state = state.copy(presentation = MainStartupPresentation.Passive(MainStartupMessageKind.STARTING_TELEVISION))
         }
         composeRule.mainClock.advanceTimeByFrame()
-        composeRule.runOnIdle {
-            assertTrue(intro.running)
-            assertEquals(900f, intro.millis)
-        }
         composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Starting playback")
-        val before = composeRule.onNodeWithTag("main-startup-mark").captureToImage().toPixelMap()
         composeRule.runOnIdle { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1L) }
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeByFrame()
-        val after = composeRule.onNodeWithTag("main-startup-mark").captureToImage().toPixelMap()
         composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Starting playback")
         composeRule.onNodeWithText("Syncing channels and guide").assertDoesNotExist()
-        composeRule.runOnIdle {
-            assertEquals(1850f, intro.millis)
-            assertEquals(900f, intro.outgoingMillis)
-        }
-        // A fade can darken outgoing pixels; it must not fill the dark gaps with settled artwork.
-        var newlyFilled = 0
-        for (y in 0 until before.height) for (x in 0 until before.width) {
-            if (before[x, y].red < 0.15f && after[x, y].red > 0.3f) newlyFilled++
-        }
-        assertEquals("assembly gaps remain frozen during dismissal", 0, newlyFilled)
+        composeRule.onNodeWithTag("main-startup-mark").assertExists()
     }
 
     @Test
     fun connectingColdOpeningAndEarliestFeedbackKeepFinalBrandedCoordinates() {
-        val intro = at.bernhardberger.tvhplayer.ui.startup.StartupBrandIntro(
-            at.bernhardberger.tvhplayer.core.MainStartupProcessEntry().claim(false))
-        composeRule.runOnUiThread {
-            intro.observe(at.bernhardberger.tvhplayer.core.ConnectionUiState.Connecting)
-            intro.resumed(true); intro.focused(true)
-        }
         val timing = MainStartupLoadingTiming().apply {
             observe(true, null, SystemClock.uptimeMillis() - 500L)
         }
         composeRule.mainClock.autoAdvance = false
-        composeRule.setContent {
-            androidx.compose.runtime.CompositionLocalProvider(
-                at.bernhardberger.tvhplayer.ui.startup.LocalStartupBrandIntro provides intro,
-            ) { TVHeadendPlayerTheme {
-                MainStartupComposition(
-                    MainStartupCompositionState(
-                        MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING), null, false),
-                    {}, {}, { {} }, loadingTiming = timing, motionEnabled = true,
-                )
-            } }
-        }
-        // Admission goes through the production SideEffect, not a fixture's passive(true).
-        // Entrance is deliberately pending: even this opening frame must retain the mark slot.
+        composeRule.setContent { TVHeadendPlayerTheme {
+            MainStartupComposition(
+                MainStartupCompositionState(
+                    MainStartupPresentation.Passive(MainStartupMessageKind.CONNECTING), null, false),
+                {}, {}, { {} }, loadingTiming = timing, motionEnabled = true,
+            )
+        } }
+        // Even the opening frame holds the mark and indicator in their final slots.
         val openingMark = composeRule.onNodeWithTag("main-startup-mark").fetchSemanticsNode().boundsInRoot
         val openingLoader = composeRule.onNodeWithTag("main-startup-loader").fetchSemanticsNode().boundsInRoot
         composeRule.onNodeWithTag("main-startup-status").assertTextEquals("Connecting")
-        composeRule.runOnIdle {
-            assertFalse(intro.running)
-            assertEquals(0f, intro.millis)
-            intro.entranceReady()
-            assertTrue("This regression requires animator_duration_scale > 0", intro.running)
-            intro.frame(900f)
-        }
-        composeRule.mainClock.advanceTimeByFrame()
+        composeRule.mainClock.advanceTimeBy(900L)
         assertEquals(openingMark, composeRule.onNodeWithTag("main-startup-mark").fetchSemanticsNode().boundsInRoot)
         assertEquals(openingLoader, composeRule.onNodeWithTag("main-startup-loader").fetchSemanticsNode().boundsInRoot)
     }

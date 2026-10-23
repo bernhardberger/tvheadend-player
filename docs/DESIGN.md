@@ -96,39 +96,31 @@ so a launch without autoplay shows no startup layer after local resolution and
 Channels reports the connection state itself. Roadmap U9 records the owner's
 2026-10-16 direction: no in-app splash when saved data exists.
 
-Startup branding uses a silent, calmer 1850ms adaptation of the selected
-hybrid-synced choreography (accepted 2026-10-01). Keep the 80dp symbol, 14dp gap and
+Startup branding keeps the 80dp symbol, 14dp gap and
 28sp/36sp Outfit 550 wordmark (not font-scaled). On the 960×540dp reference
 canvas, the passive symbol starts at y=156dp, independent of feedback.
+The symbol and wordmark are static: there is no logo build, so a fast startup can
+never cut it off (owner decision 2026-10-23). They stay transparent through the
+400ms grace, so a start that finishes within it shows no logo, and appear fully
+opaque together with the busy ring and stage text.
 Under the content, one original creative cyan/orange diagonal light-sweep frame
 is graded to light-only values above `#0F1014`, with feathered edges so it cannot
-darken the field or reveal a rectangular rim. The light fades in gently, drifts
-diagonally, then breathes between 20% and 30% opacity over a four-second cycle
-for the remaining startup wait. Each two-second rise and fall uses sinusoidal easing,
-with softly rounded turns and no pause. The plate and logo stay still; the sweep does not
-replay. It fades out with the startup layer at first picture.
-Recovery and reduced motion retain the exact flat field. The shared-clock choreography,
-asset recipe and provenance are recorded in
+darken the field or reveal a rectangular rim. Once its image is decoded, the light
+fades in over 300ms to 20% opacity, then breathes between 20% and 30% opacity over a
+four-second cycle for the remaining startup wait. Each two-second rise and fall uses
+sinusoidal easing, with softly rounded turns and no pause. The plate stays still and
+follows no brand timeline. It fades out with the startup layer at first picture.
+Recovery and reduced motion retain the exact flat field. The asset recipe and
+provenance are recorded in
 [`artwork/README.md`](../artwork/README.md#startup-artwork).
-Motion belongs only to the first non-restored foreground Activity opportunity
-in a process, when a real startup wait continues past the 400ms request-owned grace.
-Connection stage and retained disk cache do not decide admission: Connecting,
-local preparation and cached cold entry can all animate while a wait remains.
-A terminated intro cannot later start assembly.
 This is never an extra screen or delay. The native splash remains static, with a maximum 1000ms
-local-bootstrap hold. Android owns its splash removal; Activity entrance-animation
-completion enables the intro once resumed/focused;
-static entry uses fully opaque logo/wordmark and an immediately held glow once
-its image is prepared, without an app-owned arrival fade.
+local-bootstrap hold; Android owns its splash removal.
 The pending opening frame uses the final branded layout, never a spinner-only
-intermediate layout or a settled-to-opening rewind.
-It skips entirely if no wait remains. Disabled motion means static branding.
+intermediate layout. Disabled motion means static branding without the glow.
 Startup does not play audio or
 request audio focus.
-Presented content, recovery, navigation, background or window-focus loss ends it;
-warm resume, recreation, later Activities, reconnect and retry never replay it.
 A return waiting for existing playback uses the stable ring and status over the
-same gently pulsing ambient glow, without logo or sweep replay. The glow appears with
+same gently pulsing ambient glow, without the logo. The glow appears with
 visible waiting feedback; the hidden grace period remains flat. Recovery focus, Back and key
 consumption keep their existing contracts.
 

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.startup
 
 import android.animation.ValueAnimator
 import androidx.annotation.StringRes
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -24,11 +25,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.heading
@@ -71,7 +73,6 @@ fun MainStartupScreen(
     contentPadding: PaddingValues,
     modifier: Modifier = Modifier,
     onAction: (AppErrorAction) -> Unit = {},
-    brandMillis: () -> Float = { StartupBrandDurationMillis },
     loadingFeedback: MainStartupLoadingFeedback = MainStartupLoadingFeedback.WAITING,
     motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
     brandingVisible: Boolean = true,
@@ -92,7 +93,6 @@ fun MainStartupScreen(
             presentation = presentation,
             contentPadding = contentPadding,
             modifier = modifier,
-            brandMillis = if (motionEnabled) brandMillis else { { StartupBrandDurationMillis } },
             loadingFeedback = loadingFeedback,
             motionEnabled = motionEnabled,
             brandingVisible = brandingVisible,
@@ -115,7 +115,6 @@ private fun MainStartupPassiveContent(
     presentation: MainStartupPresentation.Passive,
     contentPadding: PaddingValues,
     modifier: Modifier,
-    brandMillis: () -> Float,
     loadingFeedback: MainStartupLoadingFeedback,
     motionEnabled: Boolean,
     brandingVisible: Boolean,
@@ -123,10 +122,10 @@ private fun MainStartupPassiveContent(
     MainStartupFrame(
         contentPadding = contentPadding,
         modifier = modifier,
-        brandMillis = brandMillis,
         backgroundMotionEnabled = motionEnabled &&
             (brandingVisible || loadingFeedback == MainStartupLoadingFeedback.WAITING),
         brandingVisible = brandingVisible,
+        brandShown = loadingFeedback == MainStartupLoadingFeedback.WAITING,
     ) {
         when (loadingFeedback) {
             MainStartupLoadingFeedback.HIDDEN -> Unit
@@ -178,9 +177,10 @@ private fun MainStartupStatus(messageKind: MainStartupMessageKind) {
 private fun MainStartupFrame(
     contentPadding: PaddingValues,
     modifier: Modifier,
-    brandMillis: () -> Float = { StartupBrandDurationMillis },
     backgroundMotionEnabled: Boolean = false,
     brandingVisible: Boolean = true,
+    // Hidden through the brief wait, so a fast start shows no logo; the layout stays.
+    brandShown: Boolean = true,
     bodyContent: (@Composable () -> Unit)? = null,
 ) {
     Box(
@@ -190,10 +190,7 @@ private fun MainStartupFrame(
             .testTag(MainStartupRootTag),
         contentAlignment = Alignment.Center,
     ) {
-        StartupBrandBackground(
-            millis = if (brandingVisible) brandMillis else { { StartupBrandDurationMillis } },
-            enabled = backgroundMotionEnabled,
-        )
+        StartupBrandBackground(enabled = backgroundMotionEnabled)
         BoxWithConstraints(
             modifier = Modifier
                 .padding(contentPadding)
@@ -217,10 +214,12 @@ private fun MainStartupFrame(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (brandingVisible) {
-                    StartupBrandSymbol(
-                        millis = brandMillis,
+                    Image(
+                        painter = painterResource(R.drawable.startup_brand_symbol),
+                        contentDescription = null,
                         modifier = Modifier
                             .size(MainStartupMarkSize)
+                            .alpha(if (brandShown) 1f else 0f)
                             .testTag(MainStartupMarkTag),
                     )
                     Spacer(modifier = Modifier.height(14.dp))
@@ -237,11 +236,7 @@ private fun MainStartupFrame(
                             maxLines = 1,
                             textAlign = TextAlign.Center,
                             modifier = Modifier
-                                .graphicsLayer {
-                                    val frame = startupBrandFrame(brandMillis())
-                                    alpha = frame.wordmark
-                                    translationY = 2.dp.toPx() * (1f - frame.wordmark)
-                                }
+                                .alpha(if (brandShown) 1f else 0f)
                                 .semantics { heading() },
                         )
                     }
