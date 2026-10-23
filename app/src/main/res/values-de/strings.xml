@@ -368,7 +368,6 @@
     <string name="recordings_schedule_end_duration">bis %1$s • %2$s</string>
     <string name="recordings_failed">Fehlgeschlagen</string>
     <string name="recordings_cancelled">Abgebrochen</string>
-    <string name="recordings_problem_indicator">Aufnahmeproblem</string>
     <string name="recordings_upcoming_active">Geplant und aktiv</string>
     <string name="recordings_completed">Abgeschlossen</string>
     <string name="recordings_failed_cancelled">Fehlgeschlagen und abgebrochen</string>
@@ -473,7 +472,7 @@
     <string name="player_recorded_ends">Aufgenommen am %1$s • Endet %2$s</string>
     <string name="player_recording_until">Aufnahme bis %1$s</string>
     <string name="recordings_until">bis %1$s</string>
-    <string name="recordings_stopped_early">Vorzeitig beendet • %1$s von %2$s</string>
+    <string name="recordings_stopped_early">Vorzeitig beendet</string>
     <string name="player_playing">Wiedergabe</string>
     <string name="player_next">Danach • %1$s</string>
     <string name="player_minutes_left">Noch %1$s</string>

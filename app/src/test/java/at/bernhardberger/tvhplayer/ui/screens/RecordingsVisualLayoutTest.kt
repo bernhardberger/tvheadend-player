@@ -167,7 +167,7 @@ class RecordingsVisualLayoutTest {
         assertEquals(bounds("recording-list-metadata-1").left, bounds("recording-list-metadata-3").left, .1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-1")
-        assertMetadataBelowTitle(1)
+        assertOverlineAboveTitle(1)
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("recording-metadata-pane").assertDoesNotExist()
         val previewText = hasText("A winter expedition beyond the Arctic Circle") and
@@ -218,7 +218,7 @@ class RecordingsVisualLayoutTest {
         assertTrue("Native row must grow beyond the retired 56dp row: ${row.height}", row.height > 72f)
         val list = bounds("recordings-archive-list")
         assertGrowthInside(row, list)
-        assertMetadataBelowTitle(1)
+        assertOverlineAboveTitle(1)
         val title = textLayout("recording-list-headline-1")
         assertEquals(1, title.lineCount)
         assertTrue("Long title ellipsizes in its own text column", title.isLineEllipsized(0))
@@ -235,17 +235,25 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
-        assertMetadataBelowTitle(20)
+        assertOverlineAboveTitle(20)
         assertFullWidthFocusInside("recordings-schedule-list", 20)
+        // States other than completed show as symbols; their words remain for accessibility.
+        compose.onNodeWithTag("recording-list-state-scheduled", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasTestTag("recording-list-metadata-20") and hasText("Scheduled", substring = true),
+            useUnmergedTree = true).assertExists()
         capture("schedule", 1f, assertFullWidthFocusSafeArea(20))
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-21")
-        assertMetadataBelowTitle(21)
+        assertOverlineAboveTitle(21)
         assertFullWidthFocusInside("recordings-problems-list", 21)
-        compose.onNodeWithContentDescription("Recording problem").assertIsDisplayed()
+        compose.onNodeWithTag("recording-list-state-failed", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasTestTag("recording-list-metadata-21") and hasText("Failed", substring = true),
+            useUnmergedTree = true).assertExists()
+        // The state no longer leads the row, so the logo keeps the column it has on every other tab.
+        assertEquals(32f * 1.05f, bounds("recording-list-leading-21").width, .1f)
         capture("problems", 1f, assertFullWidthFocusSafeArea(21))
         assertNoCommands()
     }
@@ -303,6 +311,10 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-20")
         assertEquals(848f, bounds("recording-list-entry-20").right, .1f)
         assertFullWidthFocusInside("recordings-schedule-list", 20)
+        // States other than completed show as symbols; their words remain for accessibility.
+        compose.onNodeWithTag("recording-list-state-scheduled", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasTestTag("recording-list-metadata-20") and hasText("Scheduled", substring = true),
+            useUnmergedTree = true).assertExists()
         capture("schedule-end100", 1f, assertFullWidthFocusSafeArea(20))
         key(Key.DirectionUp)
         key(Key.DirectionRight)
@@ -324,10 +336,22 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Dokumentationen")
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
-        assertMetadataBelowTitle(1)
+        assertOverlineAboveTitle(1)
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
         capture("metadata-de-font1.3", 1.3f)
         assertNoCommands()
+    }
+
+    @Test fun stoppedEarlyOverlineFitsOneLine() {
+        show(entries = listOf(recording(1, "Ridge Light", "Documentaries/ridge.ts", recordedMinutes = 20)))
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionCenter)
+        focused("recording-list-entry-1")
+        compose.onNode(hasTestTag("recording-list-metadata-1") and hasText("• 20m Stopped early", substring = true),
+            useUnmergedTree = true).assertIsDisplayed()
+        // The early stop shows as a marker after the length; its words are only for accessibility.
+        compose.onNodeWithTag("recording-list-stopped-early", useUnmergedTree = true).assertIsDisplayed()
+        assertEquals(1, textLayout("recording-list-metadata-1").lineCount)
     }
 
     @Test
@@ -340,30 +364,23 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Dokumentationen")
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
-        assertMetadataBelowTitle(1)
+        assertOverlineAboveTitle(1)
         val results = mutableListOf<TextLayoutResult>()
-        compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
+        compose.onNode(hasTestTag("recording-list-metadata-1") and
             hasText("Vorzeitig beendet", substring = true), useUnmergedTree = true)
             .assertIsDisplayed()
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
         val hint = results.single()
         val shown = hint.layoutInput.text.text.substring(0, hint.getLineEnd(hint.lineCount - 1, visibleEnd = true))
         assertTrue("'$shown' lines=${hint.lineCount} size=${hint.size} c=${hint.layoutInput.constraints}",
-            shown.startsWith("Vorzeitig beendet • 20 Min. von 90 Min."))
-        assertFalse("The stopped-early hint must remain whole", hint.hasVisualOverflow)
-        results.clear()
-        compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
-            hasText("Abgeschlossen", substring = true), useUnmergedTree = true)
-            .assertIsDisplayed()
-            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
-        val metadata = results.single()
-        for (line in 0 until metadata.lineCount) {
-            assertFalse("Existing metadata line $line must not ellipsize", metadata.isLineEllipsized(line))
-        }
-        val subtitle = compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
-            hasText("A winter expedition", substring = true), useUnmergedTree = true)
+            shown.endsWith("20 Min. Vorzeitig beendet"))
+        assertFalse("The stopped-early marker must remain whole", hint.hasVisualOverflow)
+        // A plain completed recording does not repeat its state.
+        compose.onNode(hasTestTag("recording-list-metadata-1") and
+            hasText("Abgeschlossen", substring = true), useUnmergedTree = true).assertDoesNotExist()
+        val subtitle = compose.onNodeWithTag("recording-list-supporting-1", useUnmergedTree = true)
             .assertIsDisplayed().fetchSemanticsNode().boundsInRoot
-        assertTrue("The line below the hint must stay inside its row",
+        assertTrue("The line below the title must stay inside its row",
             subtitle.bottom <= bounds("recording-list-entry-1").bottom + 0.5f)
         assertNoCommands()
     }
@@ -387,11 +404,35 @@ class RecordingsVisualLayoutTest {
         show(entries = listOf(recording(1, "Empty recording", "empty.ts", recordedMinutes = 0)))
         focused("recording-list-entry-1")
         val zeroLength = formatRecordedDuration(0, ApplicationProvider.getApplicationContext<Application>().resources)
-        compose.onNode(hasAnyAncestor(hasTestTag("recording-list-metadata-1")) and
+        compose.onNode(hasTestTag("recording-list-metadata-1") and
             hasText(zeroLength, substring = true), useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-pane")) and
             hasText(zeroLength, substring = true), useUnmergedTree = true).assertDoesNotExist()
+        assertNoCommands()
+    }
+
+    @Test fun runningRowMarksItsTitleAndKeepsTheLogoAndOverlineAligned() {
+        val now = System.currentTimeMillis() / 1000L
+        show(entries = listOf(
+            recording(1, "Archived", "Documentaries/archived.ts"),
+            DvrEntry.create(DvrEntryId(30), title = "Live match", state = DvrEntryState.RECORDING,
+                start = Instant.fromEpochSeconds(now - 600), stop = Instant.fromEpochSeconds(now + 3_000),
+                channelName = "Ridge Earth HD", subtitle = "Second half"),
+        ))
+        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Schedule").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-30")
+        assertOverlineAboveTitle(30)
+        compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Recording now • until", substring = true),
+            useUnmergedTree = true).assertIsDisplayed()
+        // The dot follows the title; only the 32dp logo (with the focus scale) leads the row.
+        assertTrue(bounds("recording-list-running-30").left > bounds("recording-list-headline-30").right)
+        assertEquals(32f * 1.05f, bounds("recording-list-leading-30").width, .1f)
+        capture("schedule-running-row", 1f)
         assertNoCommands()
     }
 
@@ -806,15 +847,21 @@ class RecordingsVisualLayoutTest {
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true)
         .fetchSemanticsNode().boundsInRoot
 
-    private fun assertMetadataBelowTitle(id: Long) {
+    private fun assertOverlineAboveTitle(id: Long) {
         val title = bounds("recording-list-headline-$id")
         val metadata = bounds("recording-list-metadata-$id")
         val leading = bounds("recording-list-leading-$id")
         assertEquals(title.left, metadata.left, .1f)
-        assertTrue(title.bottom <= metadata.top)
+        assertTrue(metadata.bottom <= title.top)
         assertTrue(leading.right < title.left)
         val row = bounds("recording-list-entry-$id")
-        assertTrue(metadata.bottom <= row.bottom)
+        assertTrue(metadata.top >= row.top)
+        compose.onAllNodesWithTag("recording-list-supporting-$id", useUnmergedTree = true).fetchSemanticsNodes()
+            .forEach { supporting ->
+                assertEquals(title.left, supporting.boundsInRoot.left, .1f)
+                assertTrue(title.bottom <= supporting.boundsInRoot.top)
+                assertTrue(supporting.boundsInRoot.bottom <= row.bottom)
+            }
     }
 
     private fun assertFullWidthFocusInside(listTag: String, id: Long) {

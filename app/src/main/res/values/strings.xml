@@ -482,7 +482,6 @@
     <string name="recordings_schedule_end_duration">until %1$s • %2$s</string>
     <string name="recordings_failed">Failed</string>
     <string name="recordings_cancelled">Canceled</string>
-    <string name="recordings_problem_indicator">Recording problem</string>
     <string name="recordings_upcoming_active">Upcoming and active</string>
     <string name="recordings_completed">Completed</string>
     <string name="recordings_failed_cancelled">Failed and canceled</string>
@@ -588,7 +587,7 @@
     <string name="player_recorded_ends">Recorded %1$s • Ends %2$s</string>
     <string name="player_recording_until">Recording until %1$s</string>
     <string name="recordings_until">until %1$s</string>
-    <string name="recordings_stopped_early">Stopped early • %1$s of %2$s</string>
+    <string name="recordings_stopped_early">Stopped early</string>
     <string name="player_playing">Playing</string>
     <string name="player_next">Next • %1$s</string>
     <string name="player_minutes_left">%1$s left</string>
