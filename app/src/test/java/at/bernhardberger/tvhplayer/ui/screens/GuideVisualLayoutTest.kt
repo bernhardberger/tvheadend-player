@@ -564,12 +564,19 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
-    @Test fun absentHistoryDoesNotPaintAnEarlierContinuationAndLeftDoesNotInventOne() {
+    @Test fun absentHistoryDoesNotPaintAnEarlierContinuationAndLeftOpensTheRail() {
         show(history = false, lastOffset = 0)
         key(Key.DirectionDown)
         focused(title(1, 0))
         val before = position.position.value
-        repeat(3) { key(Key.DirectionLeft) }
+        // D32: with no earlier programme, Left leaves the grid for the rail instead of doing nothing.
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        assertEquals(before, position.position.value)
+        // Right from the rail enters the Guide at its header, as every rail entry does.
+        key(Key.DirectionRight)
+        focused(context().getString(R.string.all_channels))
+        key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals(before, position.position.value)
         val bitmap = capture("guide-data-edge", 1f, LayoutDirection.Ltr)

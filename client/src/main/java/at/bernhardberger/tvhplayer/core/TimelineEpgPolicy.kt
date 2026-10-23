@@ -245,11 +245,17 @@ fun reconcileTimelineEpgFocus(
     )
 }
 
+/**
+ * Left and Right step programme by programme. Up and Down pick the adjacent row's programme
+ * at [anchorSec], by default the focused programme's start. Callers keep the anchor across
+ * vertical moves so that repeated Up and Down never drift in time.
+ */
 fun moveTimelineEpgFocus(
     rows: List<EpgFocusColumn>,
     current: EpgFocusTarget,
     direction: EpgFocusDirection,
     visibleChannelRange: IntRange = rows.indices,
+    anchorSec: Long? = null,
 ): TimelineEpgFocusMove {
     val row = rows.getOrNull(current.channelIndex)
         ?: return TimelineEpgFocusMove(current)
@@ -275,13 +281,8 @@ fun moveTimelineEpgFocus(
         return TimelineEpgFocusMove(current, focusHeader = true)
     }
     channelIndex ?: return TimelineEpgFocusMove(current)
-    val adjacent = rows[channelIndex]
-    val best = adjacent.events.maxWithOrNull(
-        compareBy<EpgEventEntry>(
-            { overlapSeconds(currentEvent, it) },
-            { -abs(midpoint(currentEvent) - midpoint(it)) },
-        )
-    ) ?: return TimelineEpgFocusMove(current)
+    val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds)
+        ?: return TimelineEpgFocusMove(current)
 
     return TimelineEpgFocusMove(
         target = EpgFocusTarget(channelIndex, best.id),
@@ -341,6 +342,7 @@ fun timelinePageFocusTarget(
     preferredChannelIndex: Int,
     direction: Int,
     searchChannelIds: Set<ChannelId>? = null,
+    anchorSec: Long? = null,
 ): EpgFocusTarget? {
     val currentEvent = rows.getOrNull(current.channelIndex)
         ?.events
@@ -355,14 +357,19 @@ fun timelinePageFocusTarget(
                 (searchChannelIds == null || rows[it].channelId in searchChannelIds)
         }
         ?: return null
-    val targetEvent = rows[targetIndex].events.maxWithOrNull(
-        compareBy<EpgEventEntry>(
-            { overlapSeconds(currentEvent, it) },
-            { -abs(midpoint(currentEvent) - midpoint(it)) },
-        ),
-    ) ?: return null
+    val targetEvent = timelineEventAt(rows[targetIndex].events, anchorSec ?: currentEvent.start.epochSeconds)
+        ?: return null
     return EpgFocusTarget(targetIndex, targetEvent.id)
 }
+
+/** The programme on air at [anchorSec]; across an EPG gap the nearest one, the later on a tie. */
+fun timelineEventAt(events: List<EpgEventEntry>, anchorSec: Long): EpgEventEntry? =
+    events.minWithOrNull(
+        compareBy<EpgEventEntry>(
+            { maxOf(it.start.epochSeconds - anchorSec, anchorSec - it.stop.epochSeconds + 1, 0L) },
+            { -it.start.epochSeconds },
+        ),
+    )
 
 /** Logical leading-edge pixels work identically with relative placement in LTR and RTL. */
 fun shouldComposeTimelineCell(
@@ -390,16 +397,6 @@ fun timelineEventSpan(
         endFraction = (visibleEnd - windowStartSec).toFloat() / windowDuration,
     )
 }
-
-private fun overlapSeconds(left: EpgEventEntry, right: EpgEventEntry): Long =
-    max(
-        0L,
-        min(left.stop.epochSeconds, right.stop.epochSeconds) -
-            max(left.start.epochSeconds, right.start.epochSeconds),
-    )
-
-private fun midpoint(event: EpgEventEntry): Long =
-    event.start.epochSeconds + (event.stop.epochSeconds - event.start.epochSeconds) / 2
 
 fun epgFrontierSettled(coverage: EpgCoverage?, requestedThrough: Instant): Boolean =
     coverage?.knownTo?.let { it >= requestedThrough } == true

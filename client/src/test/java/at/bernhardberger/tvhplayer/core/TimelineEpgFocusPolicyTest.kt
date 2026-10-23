@@ -178,12 +178,44 @@ class TimelineEpgFocusPolicyTest {
     }
 
     @Test
-    fun upAndDownChooseBestTimeOverlapInAdjacentChannel() {
+    fun upAndDownChooseTheAdjacentProgrammeOnAirAtTheFocusedStart() {
         val down = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN)
         val up = moveTimelineEpgFocus(rows, down.target, EpgFocusDirection.UP)
 
         assertEquals(EventId(21), down.target.eventId)
         assertEquals(EventId(11), up.target.eventId)
+    }
+
+    @Test
+    fun repeatedDownAndUpKeepTheAnchorTimeInsteadOfDrifting() {
+        // D33: by best overlap, 11 (2:00) led to 21 and then 32, an hour earlier.
+        val rows = listOf(
+            row(1, event(11, 120, 180)),
+            row(2, event(21, 50, 160), event(22, 160, 240)),
+            row(3, event(31, 0, 60), event(32, 60, 120), event(33, 120, 180)),
+        )
+        val anchorSec = 120 * 60L
+
+        val down = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN, anchorSec = anchorSec)
+        val downAgain = moveTimelineEpgFocus(rows, down.target, EpgFocusDirection.DOWN, anchorSec = anchorSec)
+        val up = moveTimelineEpgFocus(rows, downAgain.target, EpgFocusDirection.UP, anchorSec = anchorSec)
+        val upAgain = moveTimelineEpgFocus(rows, up.target, EpgFocusDirection.UP, anchorSec = anchorSec)
+
+        assertEquals(focus(1, 21), down.target)
+        assertEquals(focus(2, 33), downAgain.target)
+        assertEquals(focus(1, 21), up.target)
+        assertEquals(focus(0, 11), upAgain.target)
+    }
+
+    @Test
+    fun anchorInAnEpgGapPicksTheNearestProgrammeAndTheLaterOneOnATie() {
+        val events = listOf(event(11, 0, 60), event(12, 90, 120))
+
+        assertEquals(EventId(11), timelineEventAt(events, 70 * 60L)?.id)
+        assertEquals(EventId(12), timelineEventAt(events, 80 * 60L)?.id)
+        assertEquals(EventId(12), timelineEventAt(events, 75 * 60L)?.id)
+        assertEquals(EventId(11), timelineEventAt(events, 60 * 60L - 1)?.id)
+        assertEquals(EventId(12), timelineEventAt(events, 90 * 60L)?.id)
     }
 
     @Test

@@ -239,7 +239,11 @@ private data class ChannelFocusRequest(
     val direction: Int,
     val coverageRequest: GuideCoverageRequestToken,
     val throughSec: Long,
+    val anchorSec: Long,
 )
+
+/** The time Up and Down keep while [target] stays focused; any other focus change drops it. */
+private data class GuideFocusAnchor(val target: EpgFocusTarget, val sec: Long)
 
 private data class WindowFocusRequest(
     val preferredChannelId: ChannelId,
@@ -425,6 +429,8 @@ fun EpgGridScreen(
     }
     val windowEndSec = windowStartSec + visibleWindowSec
     var selectedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
+    var focusAnchor by remember { mutableStateOf<GuideFocusAnchor?>(null) }
+    val navigationFocus = LocalBrowseNavigationFocus.current
     var realizedTarget by remember { mutableStateOf<EpgFocusTarget?>(null) }
     var lastFocusedEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
     val gridFocus = remember { FocusRequester() }
@@ -826,6 +832,18 @@ fun EpgGridScreen(
             coverageSettled = ::pageCoverageSettled,
         )
 
+    /** Up and Down keep this time; a new focus starts it at the programme's visible start. */
+    fun anchorSecFor(current: EpgFocusTarget): Long =
+        focusAnchor?.takeIf { it.target == current }?.sec
+            ?: focusRows.getOrNull(current.channelIndex)?.events?.firstOrNull { it.id == current.eventId }
+                ?.let { maxOf(it.start.epochSeconds, windowStartSec) }
+            ?: windowStartSec
+
+    fun selectAnchored(target: EpgFocusTarget, anchorSec: Long) {
+        selectedTarget = target
+        focusAnchor = GuideFocusAnchor(target, anchorSec)
+    }
+
     fun requestChannelFocus(
         current: EpgFocusTarget,
         preferredChannelIndex: Int,
@@ -842,6 +860,7 @@ fun EpgGridScreen(
             direction = direction,
             coverageRequest = coverageRequest,
             throughSec = windowEndSec,
+            anchorSec = anchorSecFor(current),
         )
     }
 
@@ -1277,6 +1296,7 @@ fun EpgGridScreen(
                 preferredChannelIndex = preferredChannelIndex,
                 direction = request.direction,
                 searchChannelIds = request.coverageRequest.generations.keys,
+                anchorSec = request.anchorSec,
             )
         }
         val through = KotlinInstant.fromEpochSeconds(request.throughSec)
@@ -1290,7 +1310,7 @@ fun EpgGridScreen(
         if (!coverageSettled && projectionBehind) return@LaunchedEffect
         if (coverageSettled && target != null) {
             pendingInitialChannelIndex = target.channelIndex
-            selectedTarget = target
+            selectAnchored(target, request.anchorSec)
         } else if (
             shouldWaitForGuideCoverage(
                 connectionReady = connectionUiState == ConnectionUiState.Ready,
@@ -1387,15 +1407,17 @@ fun EpgGridScreen(
             return
         }
         val targetPageIds = channelPageIds(targetIndex).toSet()
+        val anchorSec = anchorSecFor(current)
         val target = timelinePageFocusTarget(
             rows = focusRows,
             current = current,
             preferredChannelIndex = targetIndex,
             direction = direction,
             searchChannelIds = targetPageIds,
+            anchorSec = anchorSec,
         )
         if (target == null) return
-        selectedTarget = target
+        selectAnchored(target, anchorSec)
     }
 
     fun jumpToWindow(targetSec: Long, channelId: ChannelId? = null, programme: EpgEventEntry? = null) {
@@ -1419,6 +1441,17 @@ fun EpgGridScreen(
             programmeId = programme?.id,
             programmeStartSec = programme?.start?.epochSeconds,
         )
+    }
+
+    /**
+     * D32: Left with nothing earlier on the row leaves the grid for the navigation rail. Keys
+     * are not mirrored, so in RTL, where the rail sits on the right, the edge stays silent.
+     */
+    fun leaveTowardRail(direction: EpgFocusDirection): Boolean {
+        if (direction == EpgFocusDirection.LEFT && layoutDirection == LayoutDirection.Ltr) {
+            navigationFocus?.let { runCatching { it.requestFocus() } }
+        }
+        return true
     }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
@@ -1458,11 +1491,13 @@ fun EpgGridScreen(
         } else {
             visibleIndices.min()..visibleIndices.max()
         }
+        val anchorSec = anchorSecFor(current)
         val move = moveTimelineEpgFocus(
             rows = focusRows,
             current = current,
             direction = direction,
             visibleChannelRange = visibleRange,
+            anchorSec = anchorSec,
         )
         when {
             move.focusHeader -> {
@@ -1500,7 +1535,7 @@ fun EpgGridScreen(
                         minOf(windowStartSec - visibleWindowSec, boundarySec - visibleWindowSec)
                     }
                 )
-                if (targetWindowStartSec == windowStartSec) return true
+                if (targetWindowStartSec == windowStartSec) return leaveTowardRail(direction)
                 val originWindowStartSec = windowStartSec
                 if (targetWindowStartSec + visibleWindowSec <= nowSecProvider()) {
                     val channelId = channels[current.channelIndex].id
@@ -1521,7 +1556,7 @@ fun EpgGridScreen(
                     // An EPG gap can span the whole adjacent window. Continue to the row's
                     // nearest programme beyond it instead of stopping on this one.
                     val across = programmeAcrossGap(channelId, current.eventId, boundarySec, move.timeFrontierDirection)
-                        ?: return true
+                        ?: return leaveTowardRail(direction)
                     targetWindowStartSec = if (move.timeFrontierDirection < 0) {
                         windowStartShowingEarlier(across, targetWindowStartSec)
                     } else {
@@ -1560,7 +1595,11 @@ fun EpgGridScreen(
                     return true
                 }
                 val next = move.target
-                selectedTarget = next
+                if (direction == EpgFocusDirection.UP || direction == EpgFocusDirection.DOWN) {
+                    selectAnchored(next, anchorSec)
+                } else {
+                    selectedTarget = next
+                }
                 val event = focusRows.getOrNull(next.channelIndex)?.events
                     ?.firstOrNull { it.id == next.eventId }
                 if (mayFocusProgramme && event != null &&
@@ -1958,7 +1997,7 @@ fun EpgGridScreen(
                         }
                     },
                     actionFocus = if (owner.isCurrent) guideRetryFocus else remember { FocusRequester() },
-                    leadingExit = LocalBrowseNavigationFocus.current ?: FocusRequester.Default,
+                    leadingExit = navigationFocus ?: FocusRequester.Default,
                     upExit = FocusRequester.Default,
                 )
             } else {
