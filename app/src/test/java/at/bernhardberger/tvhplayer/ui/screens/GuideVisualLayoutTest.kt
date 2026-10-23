@@ -1128,13 +1128,27 @@ class GuideVisualLayoutTest {
             compose.waitForIdle()
             compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
             compose.onNodeWithTag("channels-immersive-picon").assertExists()
+            // Through the new programme's settle and reveal the outgoing logo keeps drawing.
+            compose.mainClock.autoAdvance = false
             publishEvents(full.events, full, covered = true)
             release.complete(Unit)
+            val next = hasTestTag("guide-headline-title") and hasText(title(2, -1))
+            var framesAfterSwitch = 0
+            for (frame in 0 until 600) {
+                compose.mainClock.advanceTimeByFrame()
+                assertTrue("logo missing at frame $frame",
+                    compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty())
+                if (compose.onAllNodes(next, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()) framesAfterSwitch++
+                if (framesAfterSwitch > 60) break
+            }
+            assertTrue("headline never moved to the new group", framesAfterSwitch > 60)
+            compose.mainClock.autoAdvance = true
             // The grid takes the new group's first programme at the window's start.
             key(Key.DirectionDown)
             focused(title(2, -1))
             headlineTitle(title(2, -1))
         } finally {
+            compose.mainClock.autoAdvance = true
             armed.set(false)
             release.complete(Unit)
         }

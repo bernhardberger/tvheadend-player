@@ -175,14 +175,15 @@ internal fun ChannelsImmersiveBackground(
         {
             val id = channelId()
             val art = id?.takeIf { programArt && session }?.let(picture)
-            val icon = channels.firstOrNull { it.id == id }?.icon
-            ChannelBackdrop(id, art, logo = session || icon?.let { artwork.logo(it).saved } != null)
+            val channel = channels.firstOrNull { it.id == id }
+            val icon = channel?.icon
+            ChannelBackdrop(id, art, icon, logo = channel != null && (session || icon?.let { artwork.logo(it).saved } != null))
         },
         // The art in the corner leaves the rest clear, so the gradient is kept off its holes.
         modifier.browseScreenBackdrop().underBrowseShellScrim().testTag("channels-immersive-background"),
         onReveal = { revealed = it },
     ) { shown, onReady ->
-        val channel = channels.firstOrNull { it.id == shown.channel }
+        val channel = shown.channel
         // Without a session or a saved logo neither colour nor picture can load; the plain background stays.
         if (channel == null || !shown.logo) {
             LaunchedEffect(Unit) { onReady() }
@@ -195,8 +196,8 @@ internal fun ChannelsImmersiveBackground(
             var glowSettled by remember { mutableStateOf(false) }
             var logoSettled by remember { mutableStateOf(false) }
             if (glowSettled && logoSettled) LaunchedEffect(Unit) { onReady() }
-            ChannelLogoGlow(channel.icon, channel.id, Modifier.testTag("channels-logo-glow"), onSettled = { glowSettled = true })
-            LoadDetailsHeroLogo(channel.icon, onSettled = { logoSettled = true })
+            ChannelLogoGlow(shown.icon, channel, Modifier.testTag("channels-logo-glow"), onSettled = { glowSettled = true })
+            LoadDetailsHeroLogo(shown.icon, onSettled = { logoSettled = true })
             return@FocusBackdrop
         }
         // Shown once both its colour and its picture are known, so no step of either is seen.
@@ -205,7 +206,7 @@ internal fun ChannelsImmersiveBackground(
         if (tintSettled && pictureSettled) LaunchedEffect(Unit) { onReady() }
         Box(Modifier.fillMaxSize()) {
             // The picture's colour fills the screen, as on the details page.
-            val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })
+            val tint = rememberDetailsTint(art, shown.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
             DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"), background = tint,
                 onSettled = { pictureSettled = true })
@@ -214,11 +215,11 @@ internal fun ChannelsImmersiveBackground(
     // The sharp logo belongs to the content: it moves with it as the drawer opens, while the
     // backdrop beneath stays put. It comes and changes as the backdrop fades in, which also
     // waits for the logo to be there.
-    val logoChannel = revealed?.takeIf { it.art == null && it.logo }?.channel
-    Crossfade(logoChannel, modifier, BrowseMotionPolicy.backdropFade(), label = "immersiveLogo") { id ->
-        val channel = channels.firstOrNull { it.id == id } ?: return@Crossfade
+    val logo = revealed?.takeIf { it.art == null && it.logo }
+    Crossfade(logo, modifier, BrowseMotionPolicy.backdropFade(), label = "immersiveLogo") { shown ->
+        if (shown == null) return@Crossfade
         Box(Modifier.fillMaxSize()) {
-            DetailsHeroLogo(channel.icon,
+            DetailsHeroLogo(shown.icon,
                 Modifier.align(Alignment.TopEnd).padding(top = logoTop + ImmersiveFallbackLogoTop, end = endInset)
                     .testTag("channels-immersive-picon"),
             )
@@ -228,9 +229,10 @@ internal fun ChannelsImmersiveBackground(
 
 /**
  * What a backdrop shows: the channel's programme picture, which needs the session, or else its
- * [logo], there with the session or before it as a saved copy.
+ * [logo], there with the session or before it as a saved copy. It carries the channel's [icon], so
+ * a backdrop fading out still draws after its channel has left the list.
  */
-private data class ChannelBackdrop(val channel: ChannelId?, val art: ArtworkId?, val logo: Boolean)
+private data class ChannelBackdrop(val channel: ChannelId?, val art: ArtworkId?, val icon: ArtworkId?, val logo: Boolean)
 
 /** What the immersive list's cards need from the screen. */
 internal class ChannelsImmersiveCards(
