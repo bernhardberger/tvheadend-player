@@ -53,7 +53,6 @@ import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -218,7 +217,6 @@ internal fun SideRail(
     ),
     rootBackPriority: Boolean = false,
     connectionDegraded: Boolean = false,
-    recordingsRunning: Int = 0,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
@@ -430,15 +428,6 @@ internal fun SideRail(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
                                 leadingContent = { PinnedRailIcon(item.icon) },
-                                // The open drawer says what records now; the closed rail stays unbadged.
-                                supportingContent = if (item.route == AppDestination.RECORDINGS && recordingsRunning > 0) {
-                                    {
-                                        Text(
-                                            pluralStringResource(R.plurals.recordings_in_progress_count, recordingsRunning, recordingsRunning),
-                                            modifier = Modifier.testTag("nav-recordings-running"),
-                                        )
-                                    }
-                                } else null,
                                 colors = drawerColors,
                                 modifier = Modifier
                                     .focusProperties { canFocus = !detailsOpen && !modalOpen }

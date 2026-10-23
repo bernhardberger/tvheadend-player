@@ -45,7 +45,6 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.dvrSnapshotForDisplay
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchRequests
 import at.bernhardberger.tvhplayer.core.ApplianceLaunchState
@@ -66,7 +65,6 @@ import at.bernhardberger.tvhplayer.core.serverSettingsForRuntime
 import at.bernhardberger.tvhplayer.core.showGlobalNavigationRail
 import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
-import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import at.bernhardberger.tvhplayer.data.ConnectionState
@@ -590,11 +588,6 @@ fun AppRoot(
         navigationStartDestination = navigationStartDestination,
     )
 
-    val recordingsRunning by remember(tvheadendSession) {
-        tvheadendSession.observation.map { observation ->
-            observation.dvrSnapshotForDisplay?.entries.orEmpty().count(::recordingIsRunning)
-        }.distinctUntilChanged()
-    }.collectAsStateWithLifecycle(0)
     val isPlayer = currentDestination is LivePlayerKey ||
         currentDestination is RecordingPlayerKey
     // Warm live playback behind browse has no player screen to retune it after a reconnect;
@@ -1156,7 +1149,6 @@ fun AppRoot(
                         // A fading rail keeps marking the page it fades with.
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
                         connectionDegraded = connectionPresentation.degraded,
-                        recordingsRunning = recordingsRunning,
                         rootRoute = AppDestination.CHANNELS,
                         showEpgMenu = uiSettings.showEpgMenu,
                         availableDestinations = buildSet {

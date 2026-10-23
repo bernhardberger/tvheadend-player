@@ -31,7 +31,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
-import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
@@ -423,22 +422,6 @@ class NavigationShellEvidenceTest {
         assertEquals("$state content beyond the fade", Color.Red.toArgb(), bitmap.getPixel(end + 8, 400))
     }
 
-    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun openDrawerSaysHowManyRecordingsRunUnderRecordingsAndTheClosedRailStaysQuiet() {
-        recordingsRunning = 2
-        settingsShell(1f)
-        compose.onNodeWithTag("nav-recordings-running", useUnmergedTree = true).assertDoesNotExist()
-        openDrawer()
-        val line = compose.onNodeWithTag("nav-recordings-running", useUnmergedTree = true)
-            .assertTextEquals("2 recordings in progress").fetchSemanticsNode().boundsInRoot
-        val item = bounds("nav-recordings")
-        assertTrue("$line inside $item", line.top >= item.top && line.bottom <= item.bottom && line.right <= item.right)
-        capture("en-font1.0-drawer-open-recordings-running", drawerOpen = true)
-        compose.runOnIdle { recordingsRunning = 0 }
-        compose.waitForIdle()
-        compose.onNodeWithTag("nav-recordings-running", useUnmergedTree = true).assertDoesNotExist()
-    }
-
     /** EN/DE at 1.0 and 1.3, drawer closed and open, over no playback and warm playback. */
     private fun captureShell(locale: String, fontScale: Float) {
         val warmLabel = "warm-fixture-still"
@@ -471,7 +454,6 @@ class NavigationShellEvidenceTest {
     }
 
     private var warmPlayback by mutableStateOf(false)
-    private var recordingsRunning by mutableStateOf(0)
 
     /** Settings root on the global shell, over an offline video-like still. */
     private fun settingsShell(fontScale: Float) {
@@ -492,7 +474,6 @@ class NavigationShellEvidenceTest {
                             showEpgMenu = true,
                             onRootBack = {},
                             onNavigate = {},
-                            recordingsRunning = recordingsRunning,
                         ) { padding, drawerActive ->
                             SettingsScreenNavigation(
                                 navigation,
