@@ -57,8 +57,13 @@ fun recordingOpenAction(entry: DvrEntry, admission: RecordingPlaybackAdmission?)
     if (admission is RecordingPlaybackAdmission.Growing) {
         return if (position != null) RecordingOpenAction.RESUME else RecordingOpenAction.START_OVER
     }
-    val duration = if (entry.start != null && entry.stop != null) entry.stop!! - entry.start!! else null
-    val finished = position != null && duration != null && duration.isPositive() &&
-        position >= duration * DvrProgressPolicy().orderlyCompletionFraction
-    return if (position == null || finished) RecordingOpenAction.START_OVER else RecordingOpenAction.RESUME_CHOICE
+    return if (position == null || recordingPositionFinished(entry, position)) RecordingOpenAction.START_OVER
+    else RecordingOpenAction.RESUME_CHOICE
+}
+
+/** Whether a saved [position] lies past the point where Tvheadend counts [entry] as watched to the end. */
+@OptIn(ExperimentalTvheadendApi::class)
+internal fun recordingPositionFinished(entry: DvrEntry, position: Duration): Boolean {
+    val duration = if (entry.start != null && entry.stop != null) entry.stop!! - entry.start!! else return false
+    return duration.isPositive() && position >= duration * DvrProgressPolicy().orderlyCompletionFraction
 }

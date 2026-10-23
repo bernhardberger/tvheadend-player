@@ -189,7 +189,10 @@ class RecordingMetadataPolicyTest {
         assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(3, DvrEntryState.MISSED), null, 0))
         // A saved position wins over the open count, and its share uses the recorded length.
         assertEquals(RecordingWatchState.PartlyWatched(0.25), recordingWatchState(entry(2), 25.minutes, 0))
-        assertEquals(RecordingWatchState.PartlyWatched(1.0), recordingWatchState(entry(0), 200.minutes, 0))
+        // Past the completion point opening starts over, so the open count decides again.
+        assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(0), 99.minutes, 0))
+        assertEquals(RecordingWatchState.Watched, recordingWatchState(entry(2), 99.minutes, 0))
+        assertEquals(RecordingWatchState.Watched, recordingWatchState(entry(2), 200.minutes, 0))
         assertEquals(RecordingWatchState.Unwatched, recordingWatchState(entry(0), 0.minutes, 0))
         assertEquals(RecordingWatchState.PartlyWatched(null), recordingWatchState(
             DvrEntry.create(DvrEntryId(1), state = DvrEntryState.COMPLETED), 5.minutes, 0))
