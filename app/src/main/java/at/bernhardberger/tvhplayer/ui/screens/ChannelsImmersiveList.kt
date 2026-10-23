@@ -100,7 +100,6 @@ import at.bernhardberger.tvhplayer.ui.components.CompactZapCardWidth
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.DetailsHero
 import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogo
-import at.bernhardberger.tvhplayer.ui.components.BlurredScreenBackdrop
 import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
@@ -191,14 +190,23 @@ internal fun ChannelsImmersiveBackground(
             return@FocusBackdrop
         }
         val art = shown.art
-        if (!corner) {
-            BlurredScreenBackdrop(art, channel.icon, onReady, Modifier.testTag("channels-backdrop"))
-            return@FocusBackdrop
-        }
         // Shown once both its colour and its picture are known, so no step of either is seen.
         var tintSettled by remember { mutableStateOf(false) }
         var pictureSettled by remember { mutableStateOf(false) }
         if (tintSettled && pictureSettled) LaunchedEffect(Unit) { onReady() }
+        if (!corner) {
+            val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })
+            // Once the opaque art shows, the tint beneath it would only cost another full-screen fill.
+            var artShown by remember(art) { mutableStateOf(false) }
+            Box(
+                Modifier.fillMaxSize().underBrowseShellScrim(opaque = true)
+                    .drawBehind { if (!artShown) drawRect(tint.value) }.testTag("channels-backdrop"),
+            ) {
+                DetailsHero(art, Modifier, blurred = true, picon = channel.icon, onLoaded = { artShown = true },
+                    onSettled = { pictureSettled = true })
+            }
+            return@FocusBackdrop
+        }
         Box(Modifier.fillMaxSize()) {
             // The picture's colour, or else the logo's, fills the screen, as on the details page.
             val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })

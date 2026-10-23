@@ -29,11 +29,7 @@ import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
-import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.components.BlurredScreenBackdrop
-import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
-import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
@@ -179,32 +175,6 @@ internal fun ArchiveDepthContent(
         pageKeyDirection = at.bernhardberger.tvhplayer.core.ChannelNavigation::pageDirectionForKeyCode,
         modifier = modifier.testTag("recordings-archive-list"),
     )
-}
-
-/** What the Archive's backdrop shows: a recording's picture, or else its channel's logo. */
-private data class ArchiveBackdropContent(val art: ArtworkId?, val logo: ArtworkId?)
-
-/**
- * The Archive's backdrop, as the Channels list has it: the [focused] recording's picture blurred
- * over the whole screen, or else its channel's logo. Folders and the other tabs have none, so a step
- * onto one fades it out. Warm playback keeps the video as the background, so nothing is drawn.
- */
-@Composable
-internal fun ArchiveBackdrop(
-    focused: () -> DvrEntry?,
-    piconForEntry: (DvrEntry) -> ArtworkId?,
-    modifier: Modifier = Modifier,
-) {
-    if (LocalWarmPlayback.current) return
-    FocusBackdrop(
-        {
-            val entry = focused()
-            ArchiveBackdropContent(entry?.let { it.image ?: it.fanartImage }, entry?.let(piconForEntry))
-        },
-        modifier.browseScreenBackdrop().testTag("recordings-backdrop"),
-    ) { shown, onReady ->
-        BlurredScreenBackdrop(shown.art, shown.logo, onReady)
-    }
 }
 
 /** Every Recordings tab's first heading uses this band, so first rows line up across tabs. */
