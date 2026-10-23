@@ -73,4 +73,17 @@ class DepthStackTest {
         assertTrue(cycle.handle(23, false, 0) { error("release must not act") })
         assertEquals(3, calls)
     }
+
+    @Test fun repeatingCycleRelocatesOnEachRepeatAndStaysConsumed() {
+        val cycle = DepthKeyCycle()
+        var calls = 0
+        assertTrue(cycle.handle(21, true, 0, repeats = true) { calls++; true })
+        repeat(3) { assertTrue(cycle.handle(21, true, it + 1, repeats = true) { calls++; it < 1 }) }
+        assertTrue(cycle.handle(21, false, 0, repeats = true) { error("release must not act") })
+        assertEquals(4, calls)
+        // A cycle begun without repeats, such as an editor's boundary pop, swallows them.
+        assertTrue(cycle.handle(21, true, 0) { calls++; true })
+        assertTrue(cycle.handle(21, true, 1, repeats = true) { error("repeat must not act") })
+        assertTrue(cycle.handle(21, false, 0) { error("release must not act") })
+    }
 }

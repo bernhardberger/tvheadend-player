@@ -72,17 +72,30 @@ data class DepthStack(val frames: List<DepthFrame>, val visit: Long = 0, val pre
     )
 }
 
-/** Keep relocation presses consumed even after focus moves to the new level. */
+/**
+ * Keep relocation presses consumed even after focus moves to the new level. A cycle started
+ * with [repeats] relocates again on each key repeat, as AOSP TvSettings walks levels while
+ * Left or Right is held; its repeats stay consumed either way.
+ */
 class DepthKeyCycle {
     private val held = mutableSetOf<Int>()
-    fun handle(keyCode: Int, down: Boolean, repeat: Int, relocate: () -> Boolean): Boolean {
-        if (!down) return held.remove(keyCode)
-        if (keyCode in held && repeat > 0) return true
+    private val repeating = mutableSetOf<Int>()
+    fun handle(keyCode: Int, down: Boolean, repeat: Int, repeats: Boolean = false, relocate: () -> Boolean): Boolean {
+        if (!down) {
+            repeating.remove(keyCode)
+            return held.remove(keyCode)
+        }
+        if (keyCode in held && repeat > 0) {
+            if (keyCode in repeating) relocate()
+            return true
+        }
         // A fresh Down after an interrupted/lost release starts a new physical cycle.
         held.remove(keyCode)
+        repeating.remove(keyCode)
         if (repeat > 0) return false
         if (!relocate()) return false
         held += keyCode
+        if (repeats) repeating += keyCode
         return true
     }
 }

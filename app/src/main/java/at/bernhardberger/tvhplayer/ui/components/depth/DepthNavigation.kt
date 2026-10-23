@@ -311,7 +311,8 @@ fun DepthNavigation(
             }
             else -> null
         }
-        val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
+        // Held Left/Right walk level by level; a held Back acts once.
+        val consumed = cycles.handle(code, native.action == KeyEvent.ACTION_DOWN, native.repeatCount, repeats = code == KeyEvent.KEYCODE_DPAD_LEFT || right) {
             when {
                 level.activeContent != null -> false // The editor/IME owns input before local Back.
                 back && backEnabled && state.stack.canPop -> { pop(); true }
