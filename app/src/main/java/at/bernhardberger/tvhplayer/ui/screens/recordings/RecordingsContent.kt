@@ -108,7 +108,7 @@ import at.bernhardberger.tvhplayer.core.recordingStoppedEarly
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
-import at.bernhardberger.tvhplayer.core.unwatchedCount
+import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -212,8 +212,8 @@ internal fun RecordingModeTabs(
 }
 
 /**
- * A folder row ends its name with the watched check once everything in it is watched; otherwise its
- * line says how many are still to see, unless that is all of them.
+ * A folder row ends its name with the watched check once everything in it is watched, or with the
+ * clock loader filled by the share watched to the end, which its line then counts.
  */
 @Composable
 internal fun FolderListRow(
@@ -227,7 +227,12 @@ internal fun FolderListRow(
     val summary = remember(folder) { summarizeDvrFolder(folder) }
     val latestResumePosition by rememberUpdatedState(resumePosition)
     // Resume positions arrive with the entries, so a new folder is the only reason to count again.
-    val unwatched = remember(folder) { folder.unwatchedCount { latestResumePosition(it) } }
+    val watched = remember(folder) { folder.watchedCount { latestResumePosition(it) } }
+    val watchState = when {
+        watched == 0 -> RecordingWatchState.Unwatched
+        watched == summary.recordingCount -> RecordingWatchState.Watched
+        else -> RecordingWatchState.PartlyWatched(watched.toDouble() / summary.recordingCount)
+    }
     val owner = LocalTabOwner.current
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
         onOpenContextMenu, enabled = { owner?.isCurrent != false })
@@ -240,9 +245,9 @@ internal fun FolderListRow(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false))
-                if (unwatched == 0) {
+                if (watchState != RecordingWatchState.Unwatched) {
                     Spacer(Modifier.width(TvSpacing8))
-                    RecordingWatchMark(RecordingWatchState.Watched, Modifier.testTag("recordings-folder-watched-$tag"))
+                    RecordingWatchMark(watchState, Modifier.testTag("recordings-folder-watched-$tag"))
                 }
             }
         },
@@ -256,8 +261,8 @@ internal fun FolderListRow(
                             summary.recordingCount,
                         )
                     )
-                    if (unwatched in 1 until summary.recordingCount) {
-                        append(" • ").append(pluralStringResource(R.plurals.recordings_folder_unwatched_count, unwatched, unwatched))
+                    if (watched in 1 until summary.recordingCount) {
+                        append(" • ").append(pluralStringResource(R.plurals.recordings_folder_watched_count, watched, watched))
                     }
                     if (summary.totalSizeBytes > 0) {
                         append(" • ").append(formatFileSize(summary.totalSizeBytes, LocalContext.current))

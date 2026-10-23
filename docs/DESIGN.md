@@ -75,8 +75,11 @@ Meaning of colour:
     below keep their full width, so progress and metadata never shorten for a
     mark. Watch state ends the same line in the muted content colour: a check
     circle when watched, Material's clock loader filled about as far as the saved
-    position when partly watched, nothing when unwatched. Tvheadend's play count
-    counts file opens, so the app never shows it as a number. The
+    position when partly watched, nothing when unwatched. A folder row uses the
+    same marks: the check when everything in it is watched, the clock loader
+    filled by the share watched to the end otherwise, which its line counts as
+    "N watched". Tvheadend's play count counts file opens, so the app never shows
+    it as a number. The
     trailing slot belongs to where OK leads, such as a folder's chevron.
     A running recording with errors adds the `error` "!" beside the dot. No dot
     on section headings or titles; the "Recording now" folder carries its dot

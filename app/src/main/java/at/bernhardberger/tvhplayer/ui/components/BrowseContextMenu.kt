@@ -140,8 +140,8 @@ internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
     BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop
-    BrowseContextAction.DELETE, BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL ->
-        R.drawable.ic_delete_outlined
+    BrowseContextAction.DELETE, BrowseContextAction.DELETE_WATCHED -> R.drawable.ic_delete_outlined
+    BrowseContextAction.DELETE_ALL -> R.drawable.ic_delete_sweep_outlined
     BrowseContextAction.SHOW_GUIDE -> R.drawable.ic_event
     BrowseContextAction.START_OVER -> R.drawable.ic_replay
     BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_ALL_WATCHED -> R.drawable.ic_check_circle_outlined

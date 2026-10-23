@@ -832,7 +832,7 @@ class RecordingsVisualLayoutTest {
         ))
         compose.onNodeWithTag("recordings-folder-watched-News", useUnmergedTree = true).assertIsDisplayed()
         compose.onNodeWithTag("recordings-folder-supporting-Documentaries", useUnmergedTree = true)
-            .assertTextEquals("3 recordings • 2 unwatched • 7.2 GB")
+            .assertTextEquals("3 recordings • 1 watched • 7.2 GB")
         capture("archive-folder-marks", 1f)
         compose.onNodeWithTag("recordings-folder-Documentaries").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()

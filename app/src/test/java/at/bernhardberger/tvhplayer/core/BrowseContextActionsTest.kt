@@ -157,14 +157,14 @@ class BrowseContextActionsTest {
         assertEquals(emptyList<BrowseContextAction>(),
             folderContextActions(folder, observation::recordingPlaybackAdmission, canModifyRecordings = false))
         // Partly watched still has something to see; the running one has not been watched at all.
-        assertEquals(3, folder.unwatchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
+        assertEquals(1, folder.watchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
 
         val season = checkNotNull(folder.folderAt(listOf("Season 1")))
         val seen = buildDvrArchive(listOf(watched)).folders.single()
         assertEquals(listOf(MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL),
             folderContextActions(seen, observation::recordingPlaybackAdmission, true))
-        assertEquals(0, seen.unwatchedCount { null })
-        assertEquals(1, season.unwatchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
+        assertEquals(1, seen.watchedCount { null })
+        assertEquals(1, season.watchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
     }
 
     private fun file(path: String = "/rec/a.ts") = TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path)

@@ -118,10 +118,11 @@ class FolderContextMenuTest {
             )
         )
         compose.onNodeWithTag("recordings-folder-watched-Seen", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("recordings-folder-watched-Mixed", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("recordings-folder-watched-Mixed", useUnmergedTree = true)
+            .assertContentDescriptionEquals("Partly watched")
         compose.onNodeWithTag("recordings-folder-watched-New", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("recordings-folder-supporting-Mixed", useUnmergedTree = true)
-            .assertTextEquals("3 recordings • 2 unwatched")
+            .assertTextEquals("3 recordings • 1 watched")
         compose.onNodeWithTag("recordings-folder-supporting-New", useUnmergedTree = true).assertTextEquals("1 recording")
         compose.onNodeWithTag("recordings-folder-supporting-Seen", useUnmergedTree = true).assertTextEquals("2 recordings")
     }

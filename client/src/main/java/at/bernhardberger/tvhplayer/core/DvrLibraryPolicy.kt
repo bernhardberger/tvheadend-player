@@ -87,11 +87,11 @@ private fun DvrArchiveFolder.descendantRecordings(): List<DvrEntry> =
 fun DvrArchiveFolder.allRecordings(): List<DvrEntry> = descendantRecordings()
 
 /**
- * How many recordings under the folder are not watched to the end; partly watched ones count,
- * since there is still something to see. Zero marks the whole folder as watched.
+ * How many recordings under the folder are watched to the end; partly watched ones don't count,
+ * since there is still something to see.
  */
-fun DvrArchiveFolder.unwatchedCount(resumePosition: (DvrEntry) -> Duration?): Int =
-    descendantRecordings().count { recordingWatchState(it, resumePosition(it), nowSec = 0L) != RecordingWatchState.Watched }
+fun DvrArchiveFolder.watchedCount(resumePosition: (DvrEntry) -> Duration?): Int =
+    descendantRecordings().count { recordingWatchState(it, resumePosition(it), nowSec = 0L) == RecordingWatchState.Watched }
 
 fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
     descendantRecordings().filter(::recordingIsRunning)

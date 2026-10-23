@@ -372,9 +372,9 @@
         <item quantity="one">%1$d Aufnahme</item>
         <item quantity="other">%1$d Aufnahmen</item>
     </plurals>
-    <plurals name="recordings_folder_unwatched_count">
-        <item quantity="one">%1$d ungesehen</item>
-        <item quantity="other">%1$d ungesehen</item>
+    <plurals name="recordings_folder_watched_count">
+        <item quantity="one">%1$d gesehen</item>
+        <item quantity="other">%1$d gesehen</item>
     </plurals>
     <string name="recordings_folder_recent_in">Neueste in %1$s</string>
     <string name="recording_watched">Gesehen</string>
