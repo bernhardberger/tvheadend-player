@@ -424,8 +424,7 @@ fun RecordingPlayerScreen(
     )
     val recordedLengthMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }
     val chromeState = playerStateCell(paused = !playWhenReady)
-    val glanceTracks = trackGlance(rememberPlayerTracks(player))
-    val chromeBadges = playerGlanceBadges(diagnostics, glanceTracks)
+    val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
     // The Banner hides after the first frame of the loaded recording; a newly loading one keeps it.
     val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
         tuneConfirmed = playbackAvailable &&
@@ -433,7 +432,7 @@ fun RecordingPlayerScreen(
             retainedSelection != null && retainedSelection.currentSession === currentSession,
         videoFrameVisible = videoPresentation.visible,
         playing = playbackState is AppPlaybackState.Playing,
-        audioOnly = glanceTracks.audioOnly,
+        audioOnly = audioOnly,
     )
     SideEffect {
         chrome.onBannerFramePresented(bannerFramePresented)
@@ -634,7 +633,6 @@ fun RecordingPlayerScreen(
                         recordedLengthMs, growing),
                     state = chromeState,
                     recordingNow = growing,
-                    badges = chromeBadges,
                     picon = channel?.icon,
                     artwork = entry.image ?: entry.fanartImage,
                     channelId = entry.channelId,

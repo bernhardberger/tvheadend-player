@@ -57,7 +57,6 @@ import androidx.tv.material3.OutlinedButton
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
-import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.ChannelNumberEntryReadiness
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
@@ -590,7 +589,7 @@ fun VideoPlayerScreen(
         aspectRatio = settings.aspectRatio
     }
 
-    // Only Stats for nerds needs full diagnostics; badges use the selected tracks.
+    // Only Stats for nerds needs full diagnostics.
     val diagnosticsWanted = layerState.statsVisible
     DisposableEffect(diagnosticsWanted) {
         videoPlayerViewModel.setDiagnosticsEnabled(diagnosticsWanted)
@@ -1181,7 +1180,7 @@ fun VideoPlayerScreen(
         layerState.chrome.updateAutoHideEligibility(autoHideEligible)
     }
     val chromeState = playerStateCell(paused = livePaused)
-    val glanceTracks = trackGlance(rememberPlayerTracks(player))
+    val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
     val initialPresentation = if (startupTarget == null) null else initialPlaybackSelection?.let {
         playbackRuntime.liveTargetPresentation(it, liveIntent)
     }
@@ -1210,7 +1209,7 @@ fun VideoPlayerScreen(
         tuneConfirmed = confirmedPlayingChannelId != null,
         videoFrameVisible = videoPresentation.visible,
         playing = playbackState is AppPlaybackState.Playing,
-        audioOnly = glanceTracks.audioOnly,
+        audioOnly = audioOnly,
     )
     val busyBlocked = channelUnavailable || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
     val busyTarget = AppPlaybackTarget.Live(currentChannelId)
@@ -1425,12 +1424,6 @@ fun VideoPlayerScreen(
     }
     if (contentAllowed) PlayerBackHandler(handlePlaybackBack)
 
-    // Until the displayed channel is confirmed playing, tracks and diagnostics may still
-    // describe the previous channel, so no badge is shown.
-    val badgesConfirmed = confirmedPlayingChannelId != null
-    val chromeBadges: @Composable () -> List<GlanceBadge> = {
-        if (badgesConfirmed) playerGlanceBadges(diagnostics, glanceTracks) else emptyList()
-    }
     val unavailableTitle = stringResource(R.string.player_info_unavailable_title)
     val controlsEvent = infoEvent.takeUnless { channelUnavailable }
     // During a quick step the Next line follows the step's target programme, so the block keeps its height.
@@ -1450,7 +1443,6 @@ fun VideoPlayerScreen(
             unavailableTitle = unavailableTitle,
         ),
         recordingNow = currentChannelId in recordingChannelIds,
-        badges = chromeBadges(),
         picon = currentChannel?.icon,
         // The info bar's artwork tile.
         artwork = controlsEvent?.image,

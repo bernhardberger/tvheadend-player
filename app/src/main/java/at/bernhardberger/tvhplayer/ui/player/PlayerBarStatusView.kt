@@ -6,7 +6,6 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,7 +46,8 @@ import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.hiddenStatusText
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineRowHeight
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvOnRecordingContainerColor
+import at.bernhardberger.tvhplayer.ui.TvRecordingContainerColor
 
 /**
  * What the bar row shows around the bar, the state cell before it and the end after it, and a live
@@ -219,18 +219,18 @@ internal fun PlayerHiddenStatusChip(state: PlayerStateCell, end: PlayerBarEnd?, 
     }
 }
 
-/** `● REC` in the badge row while the watched programme or recording is being recorded now. */
+/** A solid red `● REC` tile while the watched programme or recording is being recorded now. */
 @Composable
 internal fun PlayerRecBadge(modifier: Modifier = Modifier) {
     val description = stringResource(R.string.player_recording)
     Row(
-        modifier.testTag("player-rec-badge").border(1.dp, TvRecordingColor.copy(alpha = 0.8f), PlayerChromeTokens.badgeShape)
-            .height(PlayerChromeTokens.badgeHeight).padding(horizontal = 5.dp)
+        modifier.testTag("player-rec-badge").background(TvRecordingContainerColor, PlayerChromeTokens.badgeShape)
+            .height(PlayerChromeTokens.badgeHeight).padding(horizontal = 6.dp)
             .clearAndSetSemantics { contentDescription = description },
         horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(Modifier.size(6.dp).background(TvRecordingColor, androidx.compose.foundation.shape.CircleShape))
+        Box(Modifier.size(6.dp).background(TvOnRecordingContainerColor, androidx.compose.foundation.shape.CircleShape))
         Text(stringResource(R.string.player_status_rec), style = MaterialTheme.typography.labelMedium, maxLines = 1,
-            softWrap = false, color = TvRecordingColor)
+            softWrap = false, color = TvOnRecordingContainerColor)
     }
 }

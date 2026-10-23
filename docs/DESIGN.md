@@ -46,7 +46,9 @@ Every role is pinned in `Theme.kt`; no dynamic or wallpaper colour.
 | `surfaceVariant` / `onSurfaceVariant` | `#41484D` / `#C0C7CD` | |
 | `error` / `onError` | `#FFB4AB` / `#690005` | |
 | `errorContainer` / `onErrorContainer` | `#93000A` / `#FFDAD6` | |
-| recording red | `#FF5449` | REC state only; distinct from `error` |
+| recording red | `#FF5449` | REC mark and label on dark surfaces (5.8:1); distinct from `error` |
+| recording red, focused | `#BA1A1A` | REC mark on a focused light row or cell (5.0:1 on `inverseSurface`) |
+| recording red fill / on fill | `#D93025` / white | REC badge (4.8:1) |
 
 Surface ladder (roles TV Material lacks): lowest `#0C0F10`, low `#191C1E`,
 container `#1D2022`, high `#282A2C`, highest `#323537`, bright `#37393B`.
@@ -64,7 +66,18 @@ Meaning of colour:
   the current programme or a running recording is). One bar, one meaning; if a
   surface needs both, show two bars rather than one bar in two colours.
 - **Recording red** means "a recording exists or runs". **`error`** means "a
-  failure the user must act on". No component declares its own red.
+  failure the user must act on". No component declares its own red. Lists and
+  rows mark a running recording with the red dot (a clock when scheduled); the
+  player and programme details use the solid red `● REC` badge, after the
+  channel name in the player's top identity. The word "Recording" stands only
+  where the state is the row's topic, never as a red label by itself.
+- **Reds are picked by surface.** Recording red and `error` are tones of the
+  same Material error palette; each role has a tone for the dark surface, the
+  focused light container and a fill. Recording: `#FF5449` / `#BA1A1A` /
+  `#D93025` with white. Error: `error` / `errorContainer` / `errorContainer`
+  with `onErrorContainer`. The pink `error` (1.3:1) and `#FF5449` (2.5:1)
+  disappear on a focused row, so anything red inside a focusable item switches
+  to its focused tone. Recording and error stay apart by shape (dot versus "!").
 - Brand artwork keeps the exact brand cyan `#00BCFA` and orange `#FA7F00`.
 - State is never colour alone: shape, label or icon reinforce it.
 
@@ -683,9 +696,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   content or not, so nothing moves between programmes. It is bottom-aligned with
   the fixed-size card and may be slightly taller. The lines are a metadata row
   (live: programme times and genre; recordings:
-  `Recorded <date> • Ends HH:MM`, or `Recording until HH:MM` while growing) with a
-  red `REC` badge while the channel or recording records and the stream badges,
-  the title, the subtitle, and Next. A recording's episode stands under its title
+  `Recorded <date> • Ends HH:MM`, or `Recording until HH:MM` while growing), the title,
+  the subtitle, and Next. A recording's episode stands under its title
   and its last line stays empty. Nothing in the info bar shows tuning or
   buffering.
 - The programme block groups its title and subtitle closely: 4dp from the

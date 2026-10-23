@@ -15,6 +15,7 @@ fun ChannelNowIndicators(
     recordingNow: Boolean,
     modifier: Modifier = Modifier,
     announceState: Boolean = true,
+    focused: Boolean = false,
     playbackIndicator: ChannelPlaybackIndicator = if (playingNow) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
 ) {
     if (playbackIndicator == ChannelPlaybackIndicator.NONE && !recordingNow) return
@@ -29,6 +30,7 @@ fun ChannelNowIndicators(
             RecordingStatusIndicator(
                 state = DvrEntryState.RECORDING,
                 announceState = announceState,
+                focused = focused,
                 modifier = Modifier.testTag("channel-recording-indicator"),
             )
         }

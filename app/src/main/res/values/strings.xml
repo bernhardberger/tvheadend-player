@@ -577,12 +577,6 @@
     <string name="player_buffering">Buffering</string>
     <string name="player_tuning">Tuning</string>
     <string name="player_recording">Recording now</string>
-    <string name="player_ad">Audio description</string>
-    <string name="player_sub">Subtitles</string>
-    <string name="player_txt">Teletext available</string>
-    <string name="player_raster_spoken">%1$s lines</string>
-    <string name="player_video_spoken">Video %1$s</string>
-    <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_recorded_on">Recorded %1$s</string>
     <string name="player_recorded_ends">Recorded %1$s • Ends %2$s</string>
     <string name="player_recording_until">Recording until %1$s</string>
@@ -594,9 +588,6 @@
     <string name="player_scheduled">Recording scheduled</string>
     <string name="player_channel_spoken">Channel %1$s</string>
     <string name="player_now_spoken">Now: %1$s, %2$s</string>
-    <string name="player_ad_short">AD</string>
-    <string name="player_sub_short">SUB</string>
-    <string name="player_txt_short">TXT</string>
     <string name="player_time_range_spoken">%1$s to %2$s</string>
     <string name="player_recorded_spoken">%1$s, recorded %2$s, %3$s</string>
     <string name="player_recorded_date">%1$d %2$s</string>

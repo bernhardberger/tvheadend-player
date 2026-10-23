@@ -456,6 +456,7 @@ internal fun SideRail(
                     footerItems.forEach { item ->
                         key(item.route) {
                             val showConnectionBadge = item.route == AppDestination.SETTINGS && connectionDegraded
+                            var itemFocused by remember { mutableStateOf(false) }
                             NavigationDrawerItem(
                                 selected = selectedRoute == item.route,
                                 onClick = { requestRoute(item.route) },
@@ -479,10 +480,19 @@ internal fun SideRail(
                                 },
                                 trailingContent = if (showConnectionBadge) {
                                     {
+                                        // The pink error pill vanishes on the light focused item; use the deep container there.
                                         NavigationDrawerItemDefaults.TrailingBadge(
                                             text = stringResource(R.string.connection_offline_badge),
-                                            containerColor = MaterialTheme.colorScheme.error,
-                                            contentColor = MaterialTheme.colorScheme.onError,
+                                            containerColor = if (itemFocused) {
+                                                MaterialTheme.colorScheme.errorContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.error
+                                            },
+                                            contentColor = if (itemFocused) {
+                                                MaterialTheme.colorScheme.onErrorContainer
+                                            } else {
+                                                MaterialTheme.colorScheme.onError
+                                            },
                                         )
                                     }
                                 } else null,
@@ -495,6 +505,7 @@ internal fun SideRail(
                                     }
                                     .testTag(item.route.testTag)
                                     .onFocusChanged { focusState ->
+                                        itemFocused = focusState.isFocused
                                         if (
                                             drawerValue == DrawerValue.Open &&
                                             focusState.isFocused

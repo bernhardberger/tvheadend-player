@@ -61,7 +61,6 @@ import at.bernhardberger.tvheadend.sdk.playback.LiveSubscriptionSource
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionEvent
 import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
-import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
@@ -503,7 +502,6 @@ class PlayerChromeCaptureTest {
                 unavailableTitle = "Programme information unavailable"),
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
-            badges = playerGlanceBadges(diagnostics(true), TrackGlance(audioDescription = true, subtitles = true, teletext = true)),
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else LOGO,
             artwork = programme.image.takeUnless { noEpg },
         )
@@ -836,18 +834,6 @@ class PlayerChromeCaptureTest {
         if (tray != null && browser == null) ProvideArtworkSession(session) { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp)) }
         }
-    }
-
-    @OptIn(SubscriptionInfrastructureApi::class)
-    private fun diagnostics(dvb: Boolean): AppPlaybackDiagnostics {
-        var live = LiveSubscriptionDiagnostics.update(null, SubscriptionEvent.Started(null, null,
-            LiveSubscriptionSource.create(null, null, null, null, "Ridge Earth HD")))
-        if (dvb) live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Signal(53739, 12300, null, null, 0, 0, false))
-        live = LiveSubscriptionDiagnostics.update(live, SubscriptionEvent.Queue(0, 0, 0, 0, 0, 0))
-        return AppPlaybackDiagnostics(source = AppPlaybackSource.LIVE_TV,
-            videoDecoderCounters = at.bernhardberger.tvhplayer.playback.AppVideoDecoderCounters(12345, 6, 2),
-            video = AppPlaybackFormatDiagnostics("avc1.640028", resolution = "1920 × 1080", frameRate = 25f, sampleMimeType = "video/avc", width = 1920, height = 1080),
-            audio = AppPlaybackFormatDiagnostics("ec-3", channelCount = 6, sampleMimeType = "audio/eac3"), live = live)
     }
 
     private fun EpgEvent.copyWithoutImage() = EpgEvent.create(id, channelId, start, stop, title = title, summary = summary, genre = genre)

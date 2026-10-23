@@ -462,12 +462,6 @@
     <string name="player_buffering">Puffern</string>
     <string name="player_tuning">Sender wird eingestellt</string>
     <string name="player_recording">Aufnahme läuft</string>
-    <string name="player_ad">Audiodeskription</string>
-    <string name="player_sub">Untertitel</string>
-    <string name="player_txt">Teletext verfügbar</string>
-    <string name="player_raster_spoken">%1$s Zeilen</string>
-    <string name="player_video_spoken">Video %1$s</string>
-    <string name="player_audio_spoken">Audio %1$s</string>
     <string name="player_recorded_on">Aufgenommen am %1$s</string>
     <string name="player_recorded_ends">Aufgenommen am %1$s • Endet %2$s</string>
     <string name="player_recording_until">Aufnahme bis %1$s</string>
@@ -479,9 +473,6 @@
     <string name="player_scheduled">Aufnahme geplant</string>
     <string name="player_channel_spoken">Sender %1$s</string>
     <string name="player_now_spoken">Jetzt: %1$s, %2$s</string>
-    <string name="player_ad_short">AD</string>
-    <string name="player_sub_short">UT</string>
-    <string name="player_txt_short">VT</string>
     <string name="player_time_range_spoken">%1$s bis %2$s</string>
     <string name="player_recorded_spoken">%1$s, aufgenommen am %2$s, %3$s</string>
     <string name="player_recorded_date">%1$d. %2$s</string>

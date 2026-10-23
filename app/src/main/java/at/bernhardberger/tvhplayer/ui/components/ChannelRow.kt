@@ -137,6 +137,7 @@ fun ChannelRow(
                         playingNow = playingNow,
                         recordingNow = recordingNow,
                         playbackIndicator = playbackIndicator,
+                        focused = focused,
                     )
                 }
             }

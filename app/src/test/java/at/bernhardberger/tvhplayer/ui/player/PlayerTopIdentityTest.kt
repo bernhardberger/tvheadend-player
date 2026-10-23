@@ -178,7 +178,7 @@ class PlayerTopIdentityTest {
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun theTimelineStandsAsItsOwnBandBetweenTheProgrammeAndTheActions() {
         val info = PlayerInfoBarData("1", "One", "Title", "20:15–21:45", metadata = "Drama", subtitle = "Episode", next = "21:45 News")
-        chrome(PlayerChromeMode.CONTROLS, info = info, badges = sampleBadges)
+        chrome(PlayerChromeMode.CONTROLS, info = info)
         for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER)) {
             compose.runOnIdle { shownMode = mode }
             settle()
@@ -214,8 +214,8 @@ class PlayerTopIdentityTest {
         }
     }
 
-    @Test fun theTopIdentityIsOneLineWithoutStreamBadges() {
-        chrome(PlayerChromeMode.CONTROLS, badges = sampleBadges)
+    @Test fun theTopIdentityIsOneLine() {
+        chrome(PlayerChromeMode.CONTROLS)
         assertEquals("the identity names the channel only", listOf("Channel 1 One"),
             compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode()
                 .config.getOrNull(SemanticsProperties.ContentDescription))
@@ -225,14 +225,9 @@ class PlayerTopIdentityTest {
             val identity = bounds(PlayerTopIdentityTag)
             assertEquals("$mode: the name is centred on the chip's line", identity.center.y,
                 bounds("player-top-identity-name").center.y, 1f)
-            assertTrue("$mode: one line, no badge row (${identity.height}dp)", identity.height <= 36f + 12f + 0.5f)
-            assertEquals("$mode: no stream badge on the live chrome", 0,
-                compose.onAllNodes(hasContentDescription("1080", substring = true), useUnmergedTree = true).fetchSemanticsNodes().size)
+            assertTrue("$mode: one line (${identity.height}dp)", identity.height <= 36f + 12f + 0.5f)
         }
     }
-
-    private val sampleBadges = at.bernhardberger.tvhplayer.core.glanceBadges(videoHeight = 1080, videoSampleMimeType = "video/avc",
-        audioMimeType = "audio/eac3", audioChannelCount = 6, audioDescription = false, subtitles = true, teletext = true)
 
     @Test fun pauseKeepsItsFocusWhenTheTimeshiftBufferLeaves() {
         chrome(PlayerChromeMode.CONTROLS)
@@ -268,7 +263,6 @@ class PlayerTopIdentityTest {
         restore: String? = null,
         recents: List<RecentChannelPeek> = emptyList(),
         info: PlayerInfoBarData = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"),
-        badges: List<at.bernhardberger.tvhplayer.core.GlanceBadge> = emptyList(),
         /** Composed beside the chrome. */
         extra: @androidx.compose.runtime.Composable () -> Unit = {},
     ) {
@@ -279,7 +273,7 @@ class PlayerTopIdentityTest {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = shownMode,
-                    content = PlayerChromeContent("20:15", info, badges = badges),
+                    content = PlayerChromeContent("20:15", info),
                     timeline = PlayerChromeTimeline.Live(this.timeshift, nowSec = 1_800),
                     actions = PlayerChromeActions(active = shownMode == PlayerChromeMode.CONTROLS, paused = false,
                         livePause = livePause, restoreFocus = restoreFocus),

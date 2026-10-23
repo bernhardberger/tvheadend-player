@@ -35,7 +35,6 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
-import androidx.media3.common.Format
 import androidx.media3.common.Tracks
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -45,10 +44,8 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
-import at.bernhardberger.tvhplayer.core.GlanceBadge
 import at.bernhardberger.tvhplayer.core.recordingEndsAtSec
 import at.bernhardberger.tvhplayer.core.recordingPaddedStop
-import at.bernhardberger.tvhplayer.core.glanceBadges
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TvOverlayHeaderStatusGap
@@ -88,61 +85,9 @@ internal fun liveInfoBarData(
     nextScheduled = nextScheduled && next != null,
 )
 
-/** Track facts the glance badges show: selected video/audio formats, audio role and text-track presence. */
-internal data class TrackGlance(
-    val audioDescription: Boolean = false,
-    val subtitles: Boolean = false,
-    val teletext: Boolean = false,
-    /** Positively audio-only: the player reports audio tracks and no video track. */
-    val audioOnly: Boolean = false,
-    val videoHeight: Int? = null,
-    val videoSampleMimeType: String? = null,
-    val audioSampleMimeType: String? = null,
-    val audioChannelCount: Int? = null,
-)
-
-internal fun trackGlance(tracks: Tracks): TrackGlance {
-    val audioDescription = tracks.groups.any { group ->
-        group.type == C.TRACK_TYPE_AUDIO && (0 until group.length).any {
-            group.isTrackSelected(it) && (group.getTrackFormat(it).roleFlags and C.ROLE_FLAG_DESCRIBES_VIDEO) != 0
-        }
-    }
-    val text = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
-        .flatMap { group -> (0 until group.length).map { group.getTrackFormat(it).sampleMimeType } }
-    // Tvheadend delivers its teletext subtitles as Media3 cues (see TrackLabelPolicy).
-    val teletext = text.any { it == TELETEXT_CUES_MIME }
-    val audioOnly = tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO } &&
-        tracks.groups.none { it.type == C.TRACK_TYPE_VIDEO }
-    val video = selectedFormat(tracks, C.TRACK_TYPE_VIDEO)
-    val audio = selectedFormat(tracks, C.TRACK_TYPE_AUDIO)
-    return TrackGlance(
-        audioDescription,
-        subtitles = text.any { it != TELETEXT_CUES_MIME },
-        teletext = teletext,
-        audioOnly = audioOnly,
-        videoHeight = video?.height?.takeIf { it > 0 },
-        videoSampleMimeType = video?.sampleMimeType,
-        audioSampleMimeType = audio?.sampleMimeType,
-        audioChannelCount = audio?.channelCount?.takeIf { it > 0 },
-    )
-}
-
-private fun selectedFormat(tracks: Tracks, type: Int): Format? = tracks.groups
-    .firstOrNull { it.type == type && it.isSelected }
-    ?.let { group -> (0 until group.length).firstOrNull(group::isTrackSelected)?.let(group::getTrackFormat) }
-
-private const val TELETEXT_CUES_MIME = "application/x-media3-cues"
-
-/** Formats: diagnostics (Stats/details open) win when present, else the selected tracks. */
-internal fun playerGlanceBadges(diagnostics: AppPlaybackDiagnostics, tracks: TrackGlance): List<GlanceBadge> = glanceBadges(
-    videoHeight = diagnostics.video?.height ?: tracks.videoHeight,
-    videoSampleMimeType = diagnostics.video?.sampleMimeType ?: tracks.videoSampleMimeType,
-    audioMimeType = diagnostics.audio?.sampleMimeType ?: tracks.audioSampleMimeType,
-    audioChannelCount = diagnostics.audio?.channelCount ?: tracks.audioChannelCount,
-    audioDescription = tracks.audioDescription,
-    subtitles = tracks.subtitles,
-    teletext = tracks.teletext,
-)
+/** Positively audio-only: the player reports audio tracks and no video track. */
+internal fun tracksAudioOnly(tracks: Tracks): Boolean =
+    tracks.groups.any { it.type == C.TRACK_TYPE_AUDIO } && tracks.groups.none { it.type == C.TRACK_TYPE_VIDEO }
 
 /** Header slot: the top-end clock over a full-width top fade. */
 @Composable

@@ -13,16 +13,21 @@ import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.TvRecordingFocusedColor
 
 /** Icon size for status marks set next to small text: chips, guide cells, list rows. */
 val StatusIconSize: Dp = 16.dp
 
-/** Recording now, with or without errors, is the red dot; scheduled is a clock in the surrounding content colour. */
+/**
+ * Recording now, with or without errors, is the red dot; scheduled is a clock in the surrounding content colour.
+ * Pass [focused] when the mark sits on a focused, light row or cell: the dot turns deeper red.
+ */
 @Composable
 fun RecordingStatusIndicator(
     state: DvrEntryState,
     modifier: Modifier = Modifier,
     announceState: Boolean = true,
+    focused: Boolean = false,
 ) {
     val recording = when (state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> true
@@ -40,7 +45,11 @@ fun RecordingStatusIndicator(
         painter = painterResource(if (recording) R.drawable.ic_fiber_manual_record else R.drawable.ic_schedule),
         contentDescription = description.takeIf { announceState },
         modifier = modifier.size(StatusIconSize),
-        tint = if (recording) TvRecordingColor else LocalContentColor.current,
+        tint = when {
+            !recording -> LocalContentColor.current
+            focused -> TvRecordingFocusedColor
+            else -> TvRecordingColor
+        },
     )
 }
 

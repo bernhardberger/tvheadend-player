@@ -510,6 +510,7 @@ internal fun TimelineProgrammeCell(
             }
             CompositionLocalProvider(LocalContentColor provides contentColor) { RecordingStatusIndicator(
                 state = checkNotNull(it.state),
+                focused = focused,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .zIndex(2f)

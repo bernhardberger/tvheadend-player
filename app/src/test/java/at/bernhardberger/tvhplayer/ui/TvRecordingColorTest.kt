@@ -14,6 +14,16 @@ class TvRecordingColorTest {
             }
     }
 
+    @Test
+    fun focusedMarkStaysVisibleOnTheLightFocusedSurface() {
+        assertTrue(contrastRatio(TvRecordingFocusedColor, TvDarkColors.inverseSurface) >= 3f)
+    }
+
+    @Test
+    fun badgeTextMeetsSmallTextContrastOnTheRecordingFill() {
+        assertTrue(contrastRatio(TvOnRecordingContainerColor, TvRecordingContainerColor) >= 4.5f)
+    }
+
     private fun contrastRatio(foreground: Color, background: Color): Float {
         val lighter = maxOf(foreground.luminance(), background.luminance())
         val darker = minOf(foreground.luminance(), background.luminance())

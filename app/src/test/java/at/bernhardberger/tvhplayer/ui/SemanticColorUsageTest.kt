@@ -27,7 +27,7 @@ class SemanticColorUsageTest {
             "ui/components/ProgrammeDetailsPage.kt",
             "if (status == DetailsStatus.SCHEDULED) ScheduledIndicator(",
         )
-        assertContains("ui/player/PlayerBarStatusView.kt", "color = TvRecordingColor")
+        assertContains("ui/player/PlayerBarStatusView.kt", "background(TvRecordingContainerColor")
 
         val scopedSources = listOf(
             "ui/screens/OnboardingScreen.kt",

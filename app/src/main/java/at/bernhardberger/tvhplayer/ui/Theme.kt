@@ -9,8 +9,15 @@ import androidx.tv.material3.Shapes
 import androidx.tv.material3.Typography
 import androidx.tv.material3.darkColorScheme
 
-// Bright enough for small recording labels on the product's dark badge surface.
+// Recording red, picked by the surface it sits on. Tones of the Material error
+// palette, the same family as colorScheme.error (see DESIGN.md "Colour").
+/** The recording mark and label on the dark app surfaces (T60, 5.8:1 on surface). */
 val TvRecordingColor = Color(0xFFFF5449)
+/** The recording mark on a focused, light row or cell (T40, 5.0:1 on inverseSurface). */
+val TvRecordingFocusedColor = Color(0xFFBA1A1A)
+/** The REC badge's fill: recording red deep enough for white text (4.8:1). */
+val TvRecordingContainerColor = Color(0xFFD93025)
+val TvOnRecordingContainerColor = Color.White
 
 // Static neutral tones from the cyan Material palette. TV Material does not yet
 // expose the surface-container roles; use these for panels instead of tinting

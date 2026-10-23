@@ -100,12 +100,11 @@ class PlayerChromeEvidenceTest {
         images.install(loader)
     }
 
-    @Test fun passiveBarBadgesAndSlotHaveMergedSemanticsAndNoFocusActions() {
+    @Test fun passiveBarAndSlotHaveMergedSemanticsAndNoFocusActions() {
         compose.setContent { TVHeadendPlayerTheme {
             Column {
                 InfoBar(info(false), Modifier.fillMaxWidth().testTag("bar"))
                 PlayerStateCellView(PlayerStateCell.PLAYING, Modifier.testTag("chip"))
-                PlayerGlanceBadges(glanceBadges(audioDescription = true, subtitles = true, teletext = true), Modifier.width(400.dp).testTag("badges"))
             }
         } }
         val bar = compose.onNodeWithTag("bar").fetchSemanticsNode()
@@ -115,7 +114,6 @@ class PlayerChromeEvidenceTest {
         assertTrue(spoken.contains("Recording scheduled"))
         assertFalse("the info bar carries no stream badges", spoken.contains("1080 lines"))
         assertTrue(bar.children.isEmpty())
-        compose.onNodeWithContentDescription("Audio description, Subtitles, Teletext available").assertExists()
         compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsActions.RequestFocus), useUnmergedTree = true).assertCountEquals(0)
         compose.onAllNodes(hasClickAction(), useUnmergedTree = true).assertCountEquals(0)
     }
@@ -321,25 +319,6 @@ class PlayerChromeEvidenceTest {
         bitmap.recycle()
     }
 
-    @Test fun badgesAtLargeFontRetainAllAccessibilityBadges() {
-        compose.setContent { CompositionLocalProvider(LocalDensity provides Density(2f, 1.3f)) { TVHeadendPlayerTheme {
-            PlayerGlanceBadges(badges(), Modifier.width(864.dp).testTag("bar"))
-        } } }
-        val spoken = compose.onNodeWithTag("bar").fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString(" ")
-        listOf("DD+ 5.1", "Audio description", "Subtitles", "Teletext available").forEach { assertTrue(it, spoken.contains(it)) }
-    }
-
-    @Test fun badgesShareOneRowAndNoneIsDropped() {
-        compose.setContent { TVHeadendPlayerTheme {
-            PlayerGlanceBadges(badges(), Modifier.width(560.dp).testTag("bar"))
-        } }
-        val labels = listOf("1080", "H.264", "AD", "SUB", "TXT")
-        val bounds = labels.map { compose.onNodeWithText(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot }
-        val bar = compose.onNodeWithTag("bar").fetchSemanticsNode().boundsInRoot
-        bounds.forEach { assertTrue("badge inside the bar: $it", it.right <= bar.right + 0.5f) }
-        assertTrue("one row", bounds.maxOf { it.center.y } - bounds.minOf { it.center.y } < 1f)
-    }
-
     @Test fun theEyebrowLeadsTheInfoBarBesideTheArtwork() {
         compose.setContent { TVHeadendPlayerTheme {
             Box(Modifier.fillMaxSize()) {
@@ -376,11 +355,7 @@ class PlayerChromeEvidenceTest {
         compose.setContent { TVHeadendPlayerTheme {
             date = playerRecordedDate(LocalDate.of(2026, 9, 12))
             one = playerMinutesLeft(1, spoken = true); many = playerMinutesLeft(38, spoken = true)
-            PlayerGlanceBadges(glanceBadges(audioDescription = true, subtitles = true, teletext = true), Modifier.width(300.dp))
         } }
-        compose.onNodeWithText("AD", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("UT", useUnmergedTree = true).assertExists()
-        compose.onNodeWithText("VT", useUnmergedTree = true).assertExists()
         assertEquals("12. Sep.", date)
         assertEquals("Noch 1 Minute", one)
         assertEquals("Noch 38 Minuten", many)
@@ -482,7 +457,7 @@ class PlayerChromeEvidenceTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = captures("de", 1.3f)
 
-    private enum class Scene { STATUS, BRIGHT_SCRIM, BADGES, BADGES_SCAN, INFO, INFO_NO_LOGO, RECORDED, HERO_ART, HERO_FALLBACK, HERO_NEUTRAL, PREVIEW_ART, PREVIEW_TEXT }
+    private enum class Scene { STATUS, BRIGHT_SCRIM, INFO, INFO_NO_LOGO, RECORDED, HERO_ART, HERO_FALLBACK, HERO_NEUTRAL, PREVIEW_ART, PREVIEW_TEXT }
 
     private fun captures(locale: String, fontScale: Float) {
         lateinit var view: View
@@ -511,11 +486,6 @@ class PlayerChromeEvidenceTest {
                                         .forEach { EndLabel(it, emphasis) }
                                     PlayerRecBadge()
                                 }
-                            }
-                            Scene.BADGES_SCAN -> PlayerGlanceBadges(badges(VideoScan.INTERLACED))
-                            Scene.BADGES -> Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
-                                PlayerGlanceBadges(badges())
-                                PlayerGlanceBadges(glanceBadges(1080, "video/avc", "audio/aac", 2))
                             }
                             Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
                             Scene.HERO_ART, Scene.HERO_FALLBACK, Scene.HERO_NEUTRAL -> ProvideArtworkSession(session) { ProgrammeHero(
@@ -567,8 +537,5 @@ class PlayerChromeEvidenceTest {
         "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45", "Drama • S3 E4",
         "Eine neue Perspektive auf Menschen und ihre Geschichten", 38, if (recorded) null else "21:45 Nachrichten", !recorded,
         if (recorded) playerRecordedDate(LocalDate.of(2026, 9, 12)) else null, spokenTimeRange = "20:15 to 21:45")
-
-    private fun badges(scan: VideoScan? = null) = glanceBadges(1080, "video/avc", "audio/eac3", 6,
-        audioDescription = true, subtitles = true, teletext = true, scan = scan)
 
 }

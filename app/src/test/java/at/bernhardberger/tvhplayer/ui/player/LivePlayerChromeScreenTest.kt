@@ -752,7 +752,7 @@ class LivePlayerChromeScreenTest {
             TrackGroup(Format.Builder().setSampleMimeType(MimeTypes.AUDIO_AAC).build()),
             false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(true),
         )))
-        assertTrue(trackGlance(audioOnly).audioOnly)
+        assertTrue(tracksAudioOnly(audioOnly))
         forcedTracks = audioOnly
         playerListeners.toList().forEach { it.onTracksChanged(audioOnly) }
         playerReady()
