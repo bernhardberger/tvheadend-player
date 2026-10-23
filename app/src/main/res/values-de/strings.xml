@@ -293,6 +293,7 @@
     <string name="recording_status">Aufnahme: %1$s</string>
     <string name="recording_state_scheduled">Geplant</string>
     <string name="recording_state_recording">Wird aufgenommen</string>
+    <string name="recording_state_recording_errors">Aufnahme • Fehler</string>
     <string name="recording_state_completed">Abgeschlossen</string>
     <string name="recording_state_failed">Fehlgeschlagen</string>
     <string name="recording_state_cancelled">Abgebrochen</string>

@@ -47,9 +47,9 @@ internal fun DvrMutationAction.recordingStateIsCurrent(observation: SessionObser
     is DvrMutationAction.Cancel -> dvrMutationStateIsCurrent(
         currentSession, recordingId, DvrEntryState.SCHEDULED, observation,
     )
-    is DvrMutationAction.Stop -> dvrMutationStateIsCurrent(
-        currentSession, recordingId, DvrEntryState.RECORDING, observation,
-    )
+    is DvrMutationAction.Stop -> listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR).any {
+        dvrMutationStateIsCurrent(currentSession, recordingId, it, observation)
+    }
     is DvrMutationAction.CreateProgramme,
     is DvrMutationAction.Delete -> true
 }

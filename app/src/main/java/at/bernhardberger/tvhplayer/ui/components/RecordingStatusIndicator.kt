@@ -17,7 +17,7 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 /** Icon size for status marks set next to small text: chips, guide cells, list rows. */
 val StatusIconSize: Dp = 16.dp
 
-/** Recording now is the red dot; scheduled is a clock in the surrounding content colour. */
+/** Recording now, with or without errors, is the red dot; scheduled is a clock in the surrounding content colour. */
 @Composable
 fun RecordingStatusIndicator(
     state: DvrEntryState,
@@ -25,12 +25,16 @@ fun RecordingStatusIndicator(
     announceState: Boolean = true,
 ) {
     val recording = when (state) {
-        DvrEntryState.RECORDING -> true
+        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> true
         DvrEntryState.SCHEDULED -> false
         else -> return
     }
     val description = stringResource(
-        if (recording) R.string.recording_state_recording else R.string.recording_state_scheduled
+        when (state) {
+            DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
+            DvrEntryState.RECORDING -> R.string.recording_state_recording
+            else -> R.string.recording_state_scheduled
+        }
     )
     Icon(
         painter = painterResource(if (recording) R.drawable.ic_fiber_manual_record else R.drawable.ic_schedule),

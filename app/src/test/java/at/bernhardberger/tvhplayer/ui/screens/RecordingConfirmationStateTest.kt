@@ -36,6 +36,10 @@ class RecordingConfirmationStateTest {
     @Test fun stopDismissesWhenEntryRemoved() = transition(DvrEntryState.RECORDING, null)
     @Test fun cancelRechecksLatestObservationBeforeDispatch() = transition(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, true)
     @Test fun stopRechecksLatestObservationBeforeDispatch() = transition(DvrEntryState.RECORDING, DvrEntryState.COMPLETED, true)
+    @Test fun stopConfirmationSurvivesARecordingThatReportsErrors() =
+        stopDispatch(before = DvrEntryState.RECORDING, after = DvrEntryState.RECORDING_ERROR)
+    @Test fun runningRecordingWithErrorsIsListedInScheduleAndStopped() =
+        stopDispatch(before = DvrEntryState.RECORDING_ERROR, after = DvrEntryState.RECORDING_ERROR)
 
     @Test fun actionFailureIsPostedAfterDetailsClose() = delayedFailure(reopen = false)
     @Test fun actionFailureIsPostedAfterDetailsReopen() = delayedFailure(reopen = true)
@@ -313,6 +317,46 @@ class RecordingConfirmationStateTest {
         if (!clickBeforeRecomposition) compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.onNodeWithTag("recording-confirmation-confirm").assertDoesNotExist()
         assertEquals(0, calls)
+    }
+
+    private fun stopDispatch(before: DvrEntryState, after: DvrEntryState) {
+        val session = FakeTvheadendSession(observation(before))
+        val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        val stopped = mutableListOf<DvrEntryId>()
+        val unexpected: suspend (CurrentSessionObservation, DvrEntryId) -> DvrMutationResult<Unit> =
+            { _, _ -> error("unexpected mutation") }
+        val actions = DvrMutationActions(
+            scheduleEntry = { _, _ -> error("unexpected schedule") },
+            stopEntry = { _, id -> stopped += id; DvrMutationResult.Confirmed(Unit) },
+            cancelEntry = unexpected,
+            deleteEntry = unexpected,
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
+        )
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(0, session.observation.value.currentSession?.generationIdentity)
+        }
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingsScreenContent(
+                    observation = session.observation.collectAsState().value,
+                    currentObservation = { session.observation.value },
+                    state = state, dvrMutationActions = actions,
+                    notices = notices,
+                )
+            }
+        }
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("recording-list-entry-1").requestFocus()
+            .performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("details-stop").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { session.publish(observation(after)) }
+        compose.onNodeWithTag("recording-confirmation-confirm").requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitUntil(10_000) { stopped.isNotEmpty() }
+        assertEquals(listOf(DvrEntryId(1)), stopped)
     }
 
     private fun observation(

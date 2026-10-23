@@ -407,6 +407,7 @@
     <string name="recording_status">Recording: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
     <string name="recording_state_recording">Recording now</string>
+    <string name="recording_state_recording_errors">Recording • errors</string>
     <string name="recording_state_completed">Completed</string>
     <string name="recording_state_failed">Failed</string>
     <string name="recording_state_cancelled">Canceled</string>

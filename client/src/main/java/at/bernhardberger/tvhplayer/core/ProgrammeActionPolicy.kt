@@ -28,7 +28,7 @@ fun programmeActions(
             ProgrammeAction.WATCH,
             when (recording?.state) {
                 // Stopping keeps the partial recording; cancelling would abort it on the server.
-                DvrEntryState.RECORDING -> ProgrammeAction.STOP_RECORDING
+                DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> ProgrammeAction.STOP_RECORDING
                 DvrEntryState.SCHEDULED -> ProgrammeAction.CANCEL_RECORDING
                 else -> ProgrammeAction.RECORD
             },
@@ -36,7 +36,7 @@ fun programmeActions(
         event.start.epochSeconds > nowSec -> when (recording?.state) {
             DvrEntryState.SCHEDULED -> listOf(ProgrammeAction.CANCEL_RECORDING)
             // Stopping keeps the partial recording; cancelling would abort it on the server.
-            DvrEntryState.RECORDING -> listOf(ProgrammeAction.STOP_RECORDING)
+            DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> listOf(ProgrammeAction.STOP_RECORDING)
             else -> listOf(ProgrammeAction.RECORD)
         }
         serverTimeshiftCoversEvent ||

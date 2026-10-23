@@ -1059,7 +1059,7 @@ private fun DetailsStatusChip(status: DetailsStatus?, label: String? = null) {
     val color = when (status) {
         DetailsStatus.ON_NOW -> MaterialTheme.colorScheme.primary
         DetailsStatus.RECORDING -> TvRecordingColor
-        DetailsStatus.FAILED -> MaterialTheme.colorScheme.error
+        DetailsStatus.RECORDING_ERRORS, DetailsStatus.FAILED -> MaterialTheme.colorScheme.error
         DetailsStatus.SCHEDULED, null -> null
     }
     Row(Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
@@ -1069,6 +1069,7 @@ private fun DetailsStatusChip(status: DetailsStatus?, label: String? = null) {
         Text(label ?: stringResource(when (status) {
             DetailsStatus.ON_NOW -> R.string.details_status_on_now
             DetailsStatus.RECORDING -> R.string.recording_state_recording
+            DetailsStatus.RECORDING_ERRORS -> R.string.recording_state_recording_errors
             DetailsStatus.SCHEDULED -> R.string.details_status_scheduled
             DetailsStatus.FAILED -> R.string.details_status_failed
             null -> error("A status-less chip requires a label")

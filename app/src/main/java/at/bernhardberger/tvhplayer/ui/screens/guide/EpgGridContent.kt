@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.shape.CircleShape
+import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.shouldComposeTimelineCell
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.AbsoluteAlignment
@@ -499,7 +500,7 @@ internal fun TimelineProgrammeCell(
                 .semantics { contentDescription = description },
         )
         recording?.takeIf {
-            it.state == DvrEntryState.RECORDING || it.state == DvrEntryState.SCHEDULED
+            recordingIsRunning(it) || it.state == DvrEntryState.SCHEDULED
         }?.let {
             // The overlaid mark follows the cell's content colour, which inverts on focus.
             val contentColor = if (focused) {

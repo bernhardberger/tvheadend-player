@@ -909,7 +909,7 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         DvrEntryState.COMPLETED -> R.string.recording_state_completed
         DvrEntryState.MISSED,
         DvrEntryState.INVALID -> R.string.recording_state_cancelled
-        DvrEntryState.RECORDING_ERROR,
+        DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
         DvrEntryState.COMPLETED_ERROR,
         DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
         else -> R.string.recording_state_unknown

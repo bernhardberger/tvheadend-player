@@ -36,7 +36,8 @@ class BrowseContextActionsTest {
     }
 
     @Test fun channelsAndGuideReuseProgrammeRecordingPolicy() {
-        listOf(null to RECORD, DvrEntryState.RECORDING to STOP, DvrEntryState.SCHEDULED to CANCEL).forEach { (state, action) ->
+        listOf(null to RECORD, DvrEntryState.RECORDING to STOP, DvrEntryState.RECORDING_ERROR to STOP,
+            DvrEntryState.SCHEDULED to CANCEL).forEach { (state, action) ->
             val recording = state?.let { recording(it) }
             assertEquals(listOf(WATCH, DETAILS, action, SHOW_GUIDE), channelContextActions(event, 100, recording, true))
             assertEquals(listOf(DETAILS, action, WATCH), guideContextActions(event, 100, recording, true))
@@ -95,8 +96,8 @@ class BrowseContextActionsTest {
     }
 
     @Test fun failingRecordingIsWatchedLikeARunningOne() {
-        assertEquals(listOf(WATCH, START_OVER, DETAILS, DELETE), actions(recording(DvrEntryState.RECORDING_ERROR, 20, listOf(file()))))
-        assertEquals(listOf(WATCH, DETAILS, DELETE), actions(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file()))))
+        assertEquals(listOf(WATCH, START_OVER, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING_ERROR, 20, listOf(file()))))
+        assertEquals(listOf(WATCH, DETAILS, STOP), actions(recording(DvrEntryState.RECORDING_ERROR, files = listOf(file()))))
     }
 
     @Test fun growingRecordingWithoutOneTransportStreamFileOffersNoPlayback() {
@@ -109,7 +110,7 @@ class BrowseContextActionsTest {
             "not a transport stream" to listOf(file("/rec/a.mkv")),
         ).forEach { (case, files) ->
             assertEquals("RECORDING $case", listOf(DETAILS, STOP), actions(recording(DvrEntryState.RECORDING, 20, files)))
-            assertEquals("RECORDING_ERROR $case", listOf(DETAILS, DELETE),
+            assertEquals("RECORDING_ERROR $case", listOf(DETAILS, STOP),
                 actions(recording(DvrEntryState.RECORDING_ERROR, 20, files)))
         }
     }

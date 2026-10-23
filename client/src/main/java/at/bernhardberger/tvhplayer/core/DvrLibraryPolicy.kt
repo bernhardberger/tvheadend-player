@@ -96,9 +96,9 @@ fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibra
         }
         .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE },
     schedule = entries
-        .filter { it.state == DvrEntryState.RECORDING || it.state == DvrEntryState.SCHEDULED }
+        .filter { recordingIsRunning(it) || it.state == DvrEntryState.SCHEDULED }
         .sortedWith(
-            compareBy<DvrEntry> { it.state != DvrEntryState.RECORDING }
+            compareBy<DvrEntry> { !recordingIsRunning(it) }
                 .thenBy { it.start?.epochSeconds ?: Long.MAX_VALUE },
         ),
     problems = entries
@@ -106,7 +106,6 @@ fun partitionDvrLibrary(entries: List<DvrEntry>): DvrLibraryPartition = DvrLibra
             it.state in setOf(
                 DvrEntryState.MISSED,
                 DvrEntryState.INVALID,
-                DvrEntryState.RECORDING_ERROR,
                 DvrEntryState.COMPLETED_ERROR,
                 DvrEntryState.FILE_MISSING,
             )
@@ -135,7 +134,7 @@ fun groupDvrSchedule(
     zoneId: ZoneId = ZoneId.systemDefault(),
 ): List<DvrScheduleSection> {
     val today = Instant.ofEpochSecond(nowSec).atZone(zoneId).toLocalDate()
-    val recordingNow = entries.filter { it.state == DvrEntryState.RECORDING }
+    val recordingNow = entries.filter(::recordingIsRunning)
         .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
     val scheduledByDate = entries.filter {
         it.state == DvrEntryState.SCHEDULED && it.start != null
@@ -168,7 +167,6 @@ fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEnt
         entries.filter {
             when (bucket) {
                 DvrProblemBucket.FAILED -> it.state in setOf(
-                    DvrEntryState.RECORDING_ERROR,
                     DvrEntryState.COMPLETED_ERROR,
                     DvrEntryState.FILE_MISSING,
                 )

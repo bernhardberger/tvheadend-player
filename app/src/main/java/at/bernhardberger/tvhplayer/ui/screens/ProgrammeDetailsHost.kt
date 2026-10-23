@@ -141,7 +141,7 @@ internal fun ProgrammeDetailsHost(
                 val request = currentDvrMutation(mutation, sessionObservation, current) ?: return@launch
                 if (request is DvrMutationAction.CreateProgramme &&
                     current.dvrEntryForEvent(request.target.eventId)?.state in
-                    listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING)) return@launch
+                    listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) return@launch
                 val configured = if (request is DvrMutationAction.CreateProgramme)
                     request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred)) else request
                 val context = notices.context()
@@ -197,7 +197,7 @@ internal fun ProgrammeDetailsHost(
         mutationEvent = actionEvent
         when (action) {
             BrowseContextAction.RECORD -> if (current.event(programme.id) != null && actionCanModify &&
-                actionRecording?.state !in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING)) {
+                actionRecording?.state !in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
                 executeDirect(DvrMutationAction.CreateProgramme(actionEvent.programmeRecordingTarget(capability), null))
             }
             BrowseContextAction.STOP -> if (actionRecording != null && actionCanModify) {

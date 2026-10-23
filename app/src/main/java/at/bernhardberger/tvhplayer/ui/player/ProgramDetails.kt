@@ -405,7 +405,8 @@ internal fun ProgrammeInformation(
         tile = { ProgrammeTile(event, nowSec, tile, it) }, status = {
             if (status != null) status() else
             when (recording) {
-                DvrEntryState.RECORDING -> PlayerRecBadge(Modifier.testTag("details-recording-badge"))
+                DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR ->
+                    PlayerRecBadge(Modifier.testTag("details-recording-badge"))
                 DvrEntryState.SCHEDULED -> Row(verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("details-recording-badge")) {
                     RecordingStatusIndicator(recording, announceState = false)
@@ -531,7 +532,8 @@ private fun Schedule(
                             ProgrammeTile(event, nowSec, tile,
                                 Modifier.size(ScheduleTileWidth, ScheduleTileHeight), embeddedProgress = false, clipShape = false)
                             when (recordingFor(event)?.state) {
-                                DvrEntryState.RECORDING -> PlayerRecBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
+                                DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR ->
+                                    PlayerRecBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
                                 DvrEntryState.SCHEDULED -> RecordingStatusIndicator(DvrEntryState.SCHEDULED,
                                     Modifier.align(Alignment.TopEnd).padding(6.dp).clearAndSetSemantics {})
                                 else -> Unit

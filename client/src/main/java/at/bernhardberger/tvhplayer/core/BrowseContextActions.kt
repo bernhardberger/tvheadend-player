@@ -72,11 +72,10 @@ fun recordingContextActions(
     add(BrowseContextAction.DETAILS)
     recordingWatchStateAction(entry, admission, canModifyRecordings)?.let(::add)
     if (canModifyRecordings) when (entry.state) {
-        DvrEntryState.RECORDING -> add(BrowseContextAction.STOP)
+        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> add(BrowseContextAction.STOP)
         DvrEntryState.SCHEDULED -> add(BrowseContextAction.CANCEL)
         DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
-        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR,
-        DvrEntryState.FILE_MISSING -> add(BrowseContextAction.DELETE)
+        DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> add(BrowseContextAction.DELETE)
         else -> Unit
     }
 }

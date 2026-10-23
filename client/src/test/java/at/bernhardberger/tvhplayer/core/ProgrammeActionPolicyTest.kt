@@ -33,8 +33,10 @@ class ProgrammeActionPolicyTest {
 
     @Test
     fun airingRecordingOffersWatchThenStopKeepingThePartialRecording() {
-        assertEquals(listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
-            programmeActions(event, event.start.epochSeconds, recording(DvrEntryState.RECORDING)))
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            assertEquals("$state", listOf(ProgrammeAction.WATCH, ProgrammeAction.STOP_RECORDING),
+                programmeActions(event, event.start.epochSeconds, recording(state)))
+        }
     }
 
     @Test
@@ -103,10 +105,10 @@ class ProgrammeActionPolicyTest {
 
     @Test
     fun runningRecordingOfUpcomingProgrammeOffersStopInsteadOfCancel() {
-        assertEquals(
-            listOf(ProgrammeAction.STOP_RECORDING),
-            programmeActions(event, beforeStart, recording(DvrEntryState.RECORDING)),
-        )
+        for (state in listOf(DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR)) {
+            assertEquals("$state", listOf(ProgrammeAction.STOP_RECORDING),
+                programmeActions(event, beforeStart, recording(state)))
+        }
     }
 
     @Test

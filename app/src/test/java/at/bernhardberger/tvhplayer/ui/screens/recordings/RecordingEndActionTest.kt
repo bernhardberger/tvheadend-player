@@ -16,13 +16,14 @@ class RecordingEndActionTest {
     @Test
     fun runningRecordingIsStoppedAndScheduledRecordingIsCancelled() {
         assertEquals(BrowseContextAction.STOP, endAction(DvrEntryState.RECORDING))
+        assertEquals(BrowseContextAction.STOP, endAction(DvrEntryState.RECORDING_ERROR))
         assertEquals(BrowseContextAction.CANCEL, endAction(DvrEntryState.SCHEDULED))
     }
 
     @Test
     fun otherStatesOfferNeitherStopNorCancel() {
         listOf(DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.INVALID,
-            DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING,
+            DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING,
             DvrEntryState.UNKNOWN)
             .forEach { assertNull(endAction(it)) }
         assertNull(endAction(null))

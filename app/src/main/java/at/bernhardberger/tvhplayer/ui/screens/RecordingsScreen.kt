@@ -980,7 +980,7 @@ internal fun RecordingsScreenContent(
                 RecordingDetailsAction.CANCEL,
                 RecordingDetailsAction.STOP -> when (opened.state) {
                     DvrEntryState.SCHEDULED -> BrowseContextAction.CANCEL
-                    DvrEntryState.RECORDING -> BrowseContextAction.STOP
+                    DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> BrowseContextAction.STOP
                     else -> null
                 }
                 RecordingDetailsAction.RESUME -> BrowseContextAction.RESUME

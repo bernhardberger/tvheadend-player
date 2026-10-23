@@ -25,6 +25,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
 import at.bernhardberger.tvhplayer.core.livePauseUnavailable
 import androidx.compose.runtime.rememberUpdatedState
@@ -1444,7 +1445,7 @@ fun VideoPlayerScreen(
             event = controlsEvent,
             next = controlsNext,
             nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it) }?.state ==
-                at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED,
+                DvrEntryState.SCHEDULED,
             nowSec = nowSec,
             unavailableTitle = unavailableTitle,
         ),
@@ -1866,7 +1867,7 @@ fun VideoPlayerScreen(
                                 channelNumber = shownChannel?.visibleChannelNumber?.toString().orEmpty(),
                                 picon = shownChannel?.icon,
                                 modifier = tileModifier,
-                                recordingBadge = observation.dvrEntryForEvent(event)?.state == DvrEntryState.RECORDING,
+                                recordingBadge = observation.dvrEntryForEvent(event)?.let(::recordingIsRunning) == true,
                             )
                         },
                         recordingFor = { event -> observation.dvrEntryForEvent(event) },
