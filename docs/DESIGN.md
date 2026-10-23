@@ -70,7 +70,11 @@ Meaning of colour:
   from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), and a
   source test keeps the recording reds inside those two and the theme.
   - **Dot** (16dp, a clock when scheduled) only in rows and grid cells, at the
-    row's trailing edge: channel rows, Recordings rows, the Guide cell corner.
+    right end of the title line: channel rows, Recordings rows (Guide cells are
+    decided with the Guide rework; today the cell corner). The lines above and
+    below keep their full width, so progress and metadata never shorten for a
+    mark. Later row states (watched, partly watched) use the same place. The
+    trailing slot belongs to where OK leads, such as a folder's chevron.
     A running recording with errors adds the `error` "!" beside the dot. No dot
     on section headings or titles; the "Recording now" folder carries its dot
     as a badge on the folder icon.

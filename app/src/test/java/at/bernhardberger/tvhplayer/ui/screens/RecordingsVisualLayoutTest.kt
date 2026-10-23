@@ -858,7 +858,11 @@ class RecordingsVisualLayoutTest {
     private fun assertTrailingStateMark(id: Int, description: String) {
         compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
             .assertIsDisplayed().assertContentDescriptionEquals(description)
-        assertTrue(bounds("recording-list-state-$id").left > bounds("recording-list-headline-$id").right)
+        // At the right end of the title line, so the overline and supporting line keep their full width.
+        val mark = bounds("recording-list-state-$id")
+        val title = bounds("recording-list-headline-$id")
+        assertTrue(mark.left > title.right)
+        assertTrue((mark.top + mark.bottom) / 2 in title.top..title.bottom)
         compose.onNode(hasTestTag("recording-list-metadata-$id") and hasText(description, substring = true),
             useUnmergedTree = true).assertDoesNotExist()
     }

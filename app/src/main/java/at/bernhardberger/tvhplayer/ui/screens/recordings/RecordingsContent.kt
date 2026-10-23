@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -102,6 +103,7 @@ import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -725,30 +727,26 @@ internal fun RecordingListRow(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
         onLongClick = contextMenu.onLongClick,
+        // Running and scheduled recordings carry their mark at the right end of the title line,
+        // as channel rows do, so the lines above and below keep their full width.
         headlineContent = {
-            Text(
-                text = entry.title.orEmpty(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.testTag("recording-list-headline-$itemKey"),
-            )
-        },
-        overlineContent = {
-            RecordingOverline(entry, focused)
-        },
-        // Running and scheduled recordings carry their mark at the row's end, as channel rows do.
-        trailingContent = entry.state?.takeIf { recordingIsRunning(entry) || it == DvrEntryState.SCHEDULED }?.let { state ->
-            {
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(TvSpacing4),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+            val markState = entry.state?.takeIf { recordingIsRunning(entry) || it == DvrEntryState.SCHEDULED }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = entry.title.orEmpty(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f).testTag("recording-list-headline-$itemKey"),
+                )
+                if (markState != null) {
+                    Spacer(Modifier.width(TvSpacing8))
                     RecordingStatusIndicator(
-                        state = state,
+                        state = markState,
                         focused = focused,
                         modifier = Modifier.testTag("recording-list-state-$itemKey"),
                     )
-                    if (state == DvrEntryState.RECORDING_ERROR) {
+                    if (markState == DvrEntryState.RECORDING_ERROR) {
+                        Spacer(Modifier.width(TvSpacing4))
                         Icon(
                             painter = painterResource(R.drawable.ic_error_outlined),
                             contentDescription = null,
@@ -758,6 +756,9 @@ internal fun RecordingListRow(
                     }
                 }
             }
+        },
+        overlineContent = {
+            RecordingOverline(entry, focused)
         },
         supportingContent = metadata.takeIf(String::isNotBlank)?.let { text ->
             {
