@@ -130,16 +130,21 @@ internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this)
     BrowseContextAction.MARK_WATCHED -> R.string.context_mark_watched
     BrowseContextAction.MARK_UNWATCHED -> R.string.context_mark_unwatched
     BrowseContextAction.DELETE -> R.string.context_delete
+    BrowseContextAction.MARK_ALL_WATCHED -> R.string.context_mark_all_watched
+    BrowseContextAction.MARK_ALL_UNWATCHED -> R.string.context_mark_all_unwatched
+    BrowseContextAction.DELETE_WATCHED -> R.string.context_delete_watched
+    BrowseContextAction.DELETE_ALL -> R.string.context_delete_all
 }
 
 internal fun BrowseContextAction.icon(): Int = when (this) {
     BrowseContextAction.DETAILS -> R.drawable.ic_info
     BrowseContextAction.RECORD -> R.drawable.ic_fiber_manual_record
     BrowseContextAction.STOP, BrowseContextAction.CANCEL -> R.drawable.ic_stop
-    BrowseContextAction.DELETE -> R.drawable.ic_delete_outlined
+    BrowseContextAction.DELETE, BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL ->
+        R.drawable.ic_delete_outlined
     BrowseContextAction.SHOW_GUIDE -> R.drawable.ic_event
     BrowseContextAction.START_OVER -> R.drawable.ic_replay
-    BrowseContextAction.MARK_WATCHED -> R.drawable.ic_check_circle_outlined
-    BrowseContextAction.MARK_UNWATCHED -> R.drawable.ic_unpublished_outlined
+    BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_ALL_WATCHED -> R.drawable.ic_check_circle_outlined
+    BrowseContextAction.MARK_UNWATCHED, BrowseContextAction.MARK_ALL_UNWATCHED -> R.drawable.ic_unpublished_outlined
     else -> R.drawable.ic_play_arrow
 }

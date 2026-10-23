@@ -39,6 +39,10 @@
     <string name="context_mark_watched">Als gesehen markieren</string>
     <string name="context_mark_unwatched">Als ungesehen markieren</string>
     <string name="context_delete">Löschen</string>
+    <string name="context_mark_all_watched">Alle als gesehen markieren</string>
+    <string name="context_mark_all_unwatched">Alle als ungesehen markieren</string>
+    <string name="context_delete_watched">Gesehene löschen</string>
+    <string name="context_delete_all">Alle löschen</string>
     <string name="stats_video_buffers">Videopuffer</string>
     <string name="stats_video_buffers_value">Angezeigt %1$d • Verworfen %2$d • Übersprungen %3$d</string>
     <string name="audio_subtitles_section">Ton &amp; Untertitel</string>
@@ -323,6 +327,14 @@
     <string name="recording_action_failed_delete">Aufnahme konnte nicht gelöscht werden</string>
     <string name="recording_action_failed_change">Aufnahme konnte nicht geändert werden</string>
     <string name="recording_action_not_confirmed">Aufnahmeänderung nicht bestätigt</string>
+    <plurals name="recording_folder_action_failed_change">
+        <item quantity="one">%1$d von %2$d Aufnahme konnte nicht geändert werden</item>
+        <item quantity="other">%1$d von %2$d Aufnahmen konnten nicht geändert werden</item>
+    </plurals>
+    <plurals name="recording_folder_action_failed_delete">
+        <item quantity="one">%1$d von %2$d Aufnahme konnte nicht gelöscht werden</item>
+        <item quantity="other">%1$d von %2$d Aufnahmen konnten nicht gelöscht werden</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d Aufnahme abgebrochen</item>
         <item quantity="other">%d Aufnahmen abgebrochen</item>
@@ -360,6 +372,10 @@
         <item quantity="one">%1$d Aufnahme</item>
         <item quantity="other">%1$d Aufnahmen</item>
     </plurals>
+    <plurals name="recordings_folder_unwatched_count">
+        <item quantity="one">%1$d ungesehen</item>
+        <item quantity="other">%1$d ungesehen</item>
+    </plurals>
     <string name="recordings_folder_recent_in">Neueste in %1$s</string>
     <string name="recording_watched">Gesehen</string>
     <string name="recording_partly_watched">Teilweise gesehen</string>
@@ -376,6 +392,17 @@
     <string name="delete_recording">Aufnahme löschen</string>
     <string name="delete_recording_confirm_title">Diese Aufnahme löschen?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) wird vom Server gelöscht.</string>
+    <string name="delete_folder_all_confirm_title">Alle Aufnahmen in %1$s löschen?</string>
+    <string name="delete_folder_watched_confirm_title">Gesehene Aufnahmen in %1$s löschen?</string>
+    <plurals name="delete_folder_confirm_message">
+        <item quantity="one">%1$d Aufnahme (%2$s) wird vom Server gelöscht.</item>
+        <item quantity="other">%1$d Aufnahmen (%2$s) werden vom Server gelöscht.</item>
+    </plurals>
+    <plurals name="delete_folder_confirm_message_no_size">
+        <item quantity="one">%1$d Aufnahme wird vom Server gelöscht.</item>
+        <item quantity="other">%1$d Aufnahmen werden vom Server gelöscht.</item>
+    </plurals>
+    <string name="delete_folder_running_kept">Laufende Aufnahmen bleiben erhalten.</string>
     <string name="recording_loading">Aufnahme wird geladen…</string>
     <string name="recording_resume_from">Fortsetzen ab %1$s</string>
     <string name="recording_ends_at">Endet um %1$s</string>

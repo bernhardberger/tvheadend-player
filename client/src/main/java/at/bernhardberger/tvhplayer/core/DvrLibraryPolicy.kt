@@ -7,6 +7,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
+import kotlin.time.Duration
 
 enum class DvrLibraryMode {
     ARCHIVE,
@@ -81,6 +82,16 @@ fun summarizeDvrFolder(folder: DvrArchiveFolder): DvrFolderSummary {
 
 private fun DvrArchiveFolder.descendantRecordings(): List<DvrEntry> =
     recordings + folders.flatMap { it.descendantRecordings() }
+
+/** Every recording under the folder, at any depth. */
+fun DvrArchiveFolder.allRecordings(): List<DvrEntry> = descendantRecordings()
+
+/**
+ * How many recordings under the folder are not watched to the end; partly watched ones count,
+ * since there is still something to see. Zero marks the whole folder as watched.
+ */
+fun DvrArchiveFolder.unwatchedCount(resumePosition: (DvrEntry) -> Duration?): Int =
+    descendantRecordings().count { recordingWatchState(it, resumePosition(it), nowSec = 0L) != RecordingWatchState.Watched }
 
 fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
     descendantRecordings().filter(::recordingIsRunning)

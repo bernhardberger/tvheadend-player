@@ -136,6 +136,37 @@ class BrowseContextActionsTest {
             recording(DvrEntryState.COMPLETED, 20), admission = null, canModifyRecordings = true))
     }
 
+    @Test fun folderActionsChangeOnlyFinishedRecordingsAtAnyDepthAndOnlyShowWhenSomethingChanges() {
+        fun entry(id: Long, state: DvrEntryState, folder: List<String>, position: Long = 0, playCount: Long = 0) =
+            DvrEntry.create(DvrEntryId(id), state = state, folder = folder, playPosition = position.seconds, playCount = playCount)
+        val unwatched = entry(1, DvrEntryState.COMPLETED, listOf("Series"))
+        val watched = entry(2, DvrEntryState.COMPLETED, listOf("Series", "Season 1"), playCount = 2)
+        val partly = entry(3, DvrEntryState.COMPLETED, listOf("Series", "Season 1"), position = 20)
+        val running = entry(4, DvrEntryState.RECORDING, listOf("Series"), position = 20)
+        val folder = checkNotNull(buildDvrArchive(listOf(unwatched, watched, partly, running)).folderAt(listOf("Series")))
+        val observation = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+        fun targets(action: BrowseContextAction) =
+            folderActionTargets(folder, action, observation::recordingPlaybackAdmission, true).map { it.id.value }.sorted()
+
+        assertEquals(listOf(MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL),
+            folderContextActions(folder, observation::recordingPlaybackAdmission, true))
+        assertEquals(listOf(1L, 3L), targets(MARK_ALL_WATCHED))
+        assertEquals(listOf(2L), targets(MARK_ALL_UNWATCHED))
+        assertEquals(listOf(2L), targets(DELETE_WATCHED))
+        assertEquals(listOf(1L, 2L, 3L), targets(DELETE_ALL))
+        assertEquals(emptyList<BrowseContextAction>(),
+            folderContextActions(folder, observation::recordingPlaybackAdmission, canModifyRecordings = false))
+        // Partly watched still has something to see; the running one has not been watched at all.
+        assertEquals(3, folder.unwatchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
+
+        val season = checkNotNull(folder.folderAt(listOf("Season 1")))
+        val seen = buildDvrArchive(listOf(watched)).folders.single()
+        assertEquals(listOf(MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL),
+            folderContextActions(seen, observation::recordingPlaybackAdmission, true))
+        assertEquals(0, seen.unwatchedCount { null })
+        assertEquals(1, season.unwatchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
+    }
+
     private fun file(path: String = "/rec/a.ts") = TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path)
 
     private fun actions(

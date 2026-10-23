@@ -1,5 +1,17 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvhplayer.ui.components.CentredDialog
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.background
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.common.formatFileSize
+import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
+import at.bernhardberger.tvhplayer.core.runningRecordings
+import at.bernhardberger.tvhplayer.core.folderContextActions
+import at.bernhardberger.tvhplayer.core.folderActionTargets
+import at.bernhardberger.tvhplayer.ui.components.label
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -185,6 +197,18 @@ private data class RecordingsTabBody(
     val recoveryGeneration: Int,
 )
 
+/** A folder's menu: the folder by path, so it always shows what is there now, and the session it opened in. */
+private data class FolderMenuTarget(val path: List<String>, val session: CurrentSessionObservation)
+
+/** What a confirmed folder deletion removes, fixed when it was asked so nothing added later goes with it. */
+private data class FolderDeleteTarget(
+    val action: BrowseContextAction,
+    val name: String,
+    val recordingIds: List<DvrEntryId>,
+    val sizeBytes: Long,
+    val keepsRunning: Boolean,
+)
+
 @Composable
 fun RecordingsScreen(
     contentPadding: PaddingValues = PaddingValues(),
@@ -281,6 +305,24 @@ internal fun RecordingsScreenContent(
     var pendingMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
     var confirmationKey by remember { mutableStateOf<Key?>(null) }
     var pendingDetailsReturn by remember { mutableStateOf(false) }
+    var folderMenu by remember { mutableStateOf<FolderMenuTarget?>(null) }
+    var folderDelete by remember { mutableStateOf<FolderDeleteTarget?>(null) }
+
+    fun closeFolderMenu() {
+        if (folderMenu == null) return
+        // As for a recording's menu: restore the folder row before the menu leaves.
+        pendingDetailsReturn = !runCatching { contentFocus.requestFocus() }.getOrDefault(false)
+        folderDelete = null
+        folderMenu = null
+    }
+
+    fun runFolderAction(action: BrowseContextAction, session: CurrentSessionObservation, recordingIds: List<DvrEntryId>) {
+        scope.launch {
+            val noticeContext = notices.context()
+            dvrMutationActions.runFolderAction(action, session, recordingIds) { latestObservationProvider() }
+                ?.let { notices.post(it, noticeContext) }
+        }
+    }
 
     fun openRecording(entry: DvrEntry) {
         val capability = observation.currentSession
@@ -392,8 +434,9 @@ internal fun RecordingsScreenContent(
         alertShown,
         detailsEntry,
         pendingAction,
+        folderMenu,
     ) {
-        if (detailsEntry != null || pendingAction != null) return@LaunchedEffect
+        if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
         if (itemKeys.isEmpty() && !alertShown) {
             if (!initialFocusEnabled || (!requestContentFocus && !contentFocusOwned)) return@LaunchedEffect
             if (drawerState?.currentValue == androidx.tv.material3.DrawerValue.Open) return@LaunchedEffect
@@ -433,9 +476,10 @@ internal fun RecordingsScreenContent(
         pendingDetailsReturn,
         location,
         focusRecoveryGeneration,
+        folderMenu,
     ) {
         if (!pendingDetailsReturn) return@LaunchedEffect
-        if (detailsEntry != null || pendingAction != null) return@LaunchedEffect
+        if (detailsEntry != null || pendingAction != null || folderMenu != null) return@LaunchedEffect
         repeat(4) {
             withFrameNanos { }
             val restored = runCatching {
@@ -470,7 +514,7 @@ internal fun RecordingsScreenContent(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .semantics { if (detailsEntry != null) hideFromAccessibility() }
+            .semantics { if (detailsEntry != null || folderMenu != null) hideFromAccessibility() }
             .graphicsLayer { alpha = browseAlpha() }
             .onPreviewKeyEvent { event ->
                 if (event.key == relocatingKey) {
@@ -618,8 +662,8 @@ internal fun RecordingsScreenContent(
                     ),
                     isCurrent = owner.isCurrent,
                     initialFocusEnabled = owner.isCurrent && initialFocusEnabled &&
-                        detailsEntry == null && (contentFocusOwned || requestContentFocus),
-                    backEnabled = backEnabled && detailsEntry == null && contentFocusOwned,
+                        detailsEntry == null && folderMenu == null && (contentFocusOwned || requestContentFocus),
+                    backEnabled = backEnabled && detailsEntry == null && folderMenu == null && contentFocusOwned,
                     contentFocus = contentFocus,
                     onModeFocus = {
                         if (owner.isCurrent && modeFocus.requestFocus()) {
@@ -645,6 +689,18 @@ internal fun RecordingsScreenContent(
                             detailsEntry = it
                             detailsObservation = observation
                             showContextMenu = true
+                        }
+                    },
+                    onOpenFolderMenu = { folder ->
+                        val session = currentSession
+                        val canModify = (observation.sessionState as? SessionState.Ready)
+                            ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+                        // Without anything to change there is no menu, as for a row without one.
+                        if (owner.isCurrent && session != null &&
+                            folderContextActions(folder, observation::recordingPlaybackAdmission, canModify).isNotEmpty()
+                        ) {
+                            contentFocusOwned = false
+                            folderMenu = FolderMenuTarget(folder.path, session)
                         }
                     },
                     piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
@@ -834,7 +890,7 @@ internal fun RecordingsScreenContent(
                 ?.let { stringResource(R.string.recording_ends_at, at.bernhardberger.tvhplayer.ui.common.formatClock(it)) }.orEmpty()
             val spokenResume = stringResource(R.string.recording_resume_from,
                 at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(positionMs / 60_000L, resources, spoken = true))
-            at.bernhardberger.tvhplayer.ui.components.CentredDialog(
+            CentredDialog(
                 title = opened.title.orEmpty(),
                 secondaryText = programmeEpisodeLine(opened.episode, opened.subtitle, resources),
                 text = if (startOverFocused) startOverEnd else resumeEnd,
@@ -1123,6 +1179,77 @@ internal fun RecordingsScreenContent(
                 }
             },
         )
+    }
+    folderMenu?.let { menu ->
+        // The menu acts with the session it opened in, on the folder as it is now.
+        val session = menu.session.takeIf { observation.currentSession === it }
+        val folder = archive.folderAt(menu.path)?.takeIf { menu.path.isNotEmpty() }
+        val canModify = session != null && (observation.sessionState as? SessionState.Ready)
+            ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        val actions = folder?.let { folderContextActions(it, observation::recordingPlaybackAdmission, canModify) }.orEmpty()
+        LaunchedEffect(actions.isEmpty()) { if (actions.isEmpty()) closeFolderMenu() }
+        if (folder == null || session == null || actions.isEmpty()) return@let
+        val summary = remember(folder) { summarizeDvrFolder(folder) }
+        val context = LocalContext.current
+        BrowseContextMenu(
+            title = folder.name,
+            channel = pluralStringResource(R.plurals.recordings_folder_recording_count,
+                summary.recordingCount, summary.recordingCount),
+            episode = "",
+            time = summary.totalSizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }.orEmpty(),
+            actions = actions,
+            backEnabled = backEnabled && folderDelete == null,
+            onClose = ::closeFolderMenu,
+            onAction = { action ->
+                val targets = folderActionTargets(folder, action, observation::recordingPlaybackAdmission, canModify)
+                when (action) {
+                    BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL -> folderDelete = FolderDeleteTarget(
+                        action = action,
+                        name = folder.name,
+                        recordingIds = targets.map { it.id },
+                        sizeBytes = targets.sumOf { entry -> entry.files.orEmpty().sumOf { it.sizeBytes ?: 0L } },
+                        keepsRunning = folder.runningRecordings().isNotEmpty(),
+                    )
+                    else -> {
+                        closeFolderMenu()
+                        runFolderAction(action, session, targets.map { it.id })
+                    }
+                }
+            },
+            artwork = {
+                Box(
+                    Modifier.fillMaxSize().clip(MaterialTheme.shapes.small)
+                        .background(TvSurfaceColors.containerLowest).testTag("browse-context-folder"),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(painterResource(R.drawable.ic_folder), contentDescription = null, modifier = Modifier.size(48.dp))
+                }
+            },
+        )
+        folderDelete?.let { delete ->
+            val count = delete.recordingIds.size
+            val size = delete.sizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }
+            val message = buildString {
+                append(if (size != null) pluralStringResource(R.plurals.delete_folder_confirm_message, count, count, size)
+                    else pluralStringResource(R.plurals.delete_folder_confirm_message_no_size, count, count))
+                if (delete.keepsRunning) append(' ').append(stringResource(R.string.delete_folder_running_kept))
+            }
+            CentredDialog(
+                title = stringResource(if (delete.action == BrowseContextAction.DELETE_ALL)
+                    R.string.delete_folder_all_confirm_title else R.string.delete_folder_watched_confirm_title, delete.name),
+                message = message,
+                firstLabel = stringResource(R.string.keep),
+                secondLabel = stringResource(delete.action.label(watchChannel = false)),
+                onFirst = ::closeFolderMenu,
+                onSecond = {
+                    closeFolderMenu()
+                    runFolderAction(delete.action, session, delete.recordingIds)
+                },
+                onDismiss = ::closeFolderMenu,
+                backEnabled = backEnabled,
+                firstTag = "folder-delete-back", secondTag = "folder-delete-confirm",
+            )
+        }
     }
     }
 }

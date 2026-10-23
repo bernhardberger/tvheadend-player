@@ -39,6 +39,10 @@
     <string name="context_mark_watched">Mark as watched</string>
     <string name="context_mark_unwatched">Mark as unwatched</string>
     <string name="context_delete">Delete</string>
+    <string name="context_mark_all_watched">Mark all as watched</string>
+    <string name="context_mark_all_unwatched">Mark all as unwatched</string>
+    <string name="context_delete_watched">Delete watched</string>
+    <string name="context_delete_all">Delete all</string>
     <string name="audio_subtitles_section">Audio &amp; subtitles</string>
     <string name="audio_language_first">Audio language</string>
     <string name="audio_language_second">Second audio language</string>
@@ -437,6 +441,14 @@
     <string name="recording_action_failed_delete">Couldn’t delete recording</string>
     <string name="recording_action_failed_change">Couldn’t change recording</string>
     <string name="recording_action_not_confirmed">Recording change not confirmed</string>
+    <plurals name="recording_folder_action_failed_change">
+        <item quantity="one">Couldn’t change %1$d of %2$d recording</item>
+        <item quantity="other">Couldn’t change %1$d of %2$d recordings</item>
+    </plurals>
+    <plurals name="recording_folder_action_failed_delete">
+        <item quantity="one">Couldn’t delete %1$d of %2$d recording</item>
+        <item quantity="other">Couldn’t delete %1$d of %2$d recordings</item>
+    </plurals>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d recording canceled</item>
         <item quantity="other">%d recordings canceled</item>
@@ -474,6 +486,10 @@
         <item quantity="one">%1$d recording</item>
         <item quantity="other">%1$d recordings</item>
     </plurals>
+    <plurals name="recordings_folder_unwatched_count">
+        <item quantity="one">%1$d unwatched</item>
+        <item quantity="other">%1$d unwatched</item>
+    </plurals>
     <string name="recordings_folder_recent_in">Recent in %1$s</string>
     <string name="recording_watched">Watched</string>
     <string name="recording_partly_watched">Partly watched</string>
@@ -490,6 +506,17 @@
     <string name="delete_recording">Delete recording</string>
     <string name="delete_recording_confirm_title">Delete this recording?</string>
     <string name="delete_recording_confirm_message">%1$s (%2$s, %3$s) will be deleted from the server.</string>
+    <string name="delete_folder_all_confirm_title">Delete all recordings in %1$s?</string>
+    <string name="delete_folder_watched_confirm_title">Delete watched recordings in %1$s?</string>
+    <plurals name="delete_folder_confirm_message">
+        <item quantity="one">%1$d recording (%2$s) will be deleted from the server.</item>
+        <item quantity="other">%1$d recordings (%2$s) will be deleted from the server.</item>
+    </plurals>
+    <plurals name="delete_folder_confirm_message_no_size">
+        <item quantity="one">%1$d recording will be deleted from the server.</item>
+        <item quantity="other">%1$d recordings will be deleted from the server.</item>
+    </plurals>
+    <string name="delete_folder_running_kept">Recordings still running are kept.</string>
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_resume_from">Resume from %1$s</string>
     <string name="recording_ends_at">Ends at %1$s</string>

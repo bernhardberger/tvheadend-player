@@ -82,9 +82,11 @@ internal fun ArchiveDepthContent(
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     modifier: Modifier = Modifier,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
+    onOpenFolderMenu: ((DvrArchiveFolder) -> Unit)? = null,
 ) {
     val latestOnOpenRecording = rememberUpdatedState(onOpenRecording)
     val latestOnOpenContextMenu = rememberUpdatedState(onOpenContextMenu)
+    val latestOnOpenFolderMenu = rememberUpdatedState(onOpenFolderMenu)
     val latestPiconForEntry = rememberUpdatedState(piconForEntry)
     val latestAdmissionForEntry = rememberUpdatedState(admissionForEntry)
     val levels = remember(root) {
@@ -117,7 +119,9 @@ internal fun ArchiveDepthContent(
                         is ArchiveListItem.Folder -> DepthRow(
                             DepthItem(item.key, archiveLevelId(item.folder.path)),
                         ) { rowModifier, activate ->
-                            FolderListRow(item.folder, selected = false, modifier = rowModifier, onClick = activate)
+                            FolderListRow(item.folder, selected = false, modifier = rowModifier, onClick = activate,
+                                resumePosition = { offeredResumePosition(latestAdmissionForEntry.value(it)) },
+                                onOpenContextMenu = { latestOnOpenFolderMenu.value?.invoke(item.folder) })
                         }
                         is ArchiveListItem.Recording -> {
                             val previewId = "metadata:${item.entry.id.value}"

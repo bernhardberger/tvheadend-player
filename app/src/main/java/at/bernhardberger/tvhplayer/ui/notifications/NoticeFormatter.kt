@@ -22,6 +22,16 @@ import kotlin.time.Instant
 internal enum class AppNoticeIcon { SCHEDULE, RECORDING, CHECK, STOP, WARNING, CANCEL, DELETE, CONNECTED, DISCONNECTED }
 internal data class FormattedNotice(val headline: String, val detail: String? = null, val icon: AppNoticeIcon? = null)
 
+private fun dvrFailureReason(failure: DvrMutationFeedback): Int = when (failure) {
+    DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
+    DvrMutationFeedback.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
+    DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
+    DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
+    DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_check_first
+    DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
+    DvrMutationFeedback.CONFIRMED, DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> error("Not an action failure")
+}
+
 /** The only resource/wording boundary for transient feedback. */
 internal class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
@@ -35,15 +45,13 @@ internal class NoticeFormatter(private val context: Context) {
                 DvrMutationKind.DELETE -> R.string.recording_action_failed_delete
                 else -> R.string.recording_action_failed_change
             }
-        }), context.getString(when (notice.failure) {
-                DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
-                DvrMutationFeedback.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
-                DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
-                DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
-                DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_check_first
-                DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
-                DvrMutationFeedback.CONFIRMED, DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> error("Not an action failure")
-            }).let { generic -> notice.serverMessage?.let { "$generic $it" } ?: generic }, AppNoticeIcon.WARNING)
+        }), context.getString(dvrFailureReason(notice.failure))
+            .let { generic -> notice.serverMessage?.let { "$generic $it" } ?: generic }, AppNoticeIcon.WARNING)
+        is Notice.DvrFolderActionFailed -> FormattedNotice(context.resources.getQuantityString(
+            if (notice.action == DvrMutationKind.DELETE) R.plurals.recording_folder_action_failed_delete
+            else R.plurals.recording_folder_action_failed_change,
+            notice.total, notice.failed, notice.total,
+        ), context.getString(dvrFailureReason(notice.failure)), AppNoticeIcon.WARNING)
         is Notice.Connection -> FormattedNotice(context.getString(when (notice.kind) {
             ConnectionNoticeKind.LOST -> if (notice.showingSavedChannels) R.string.connection_notice_lost_saved
                 else R.string.connection_notice_lost

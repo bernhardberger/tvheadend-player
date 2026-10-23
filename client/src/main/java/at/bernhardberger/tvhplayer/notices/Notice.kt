@@ -50,6 +50,22 @@ sealed interface Notice {
         override fun toString(): String = "DvrActionFailed(action=$action, failure=$failure)"
     }
 
+    /** A folder action that [failed] on some of the [total] recordings it set out to change. */
+    data class DvrFolderActionFailed(
+        val action: DvrMutationKind,
+        val failed: Int,
+        val total: Int,
+        /** The first failure's reason, which the notice explains. */
+        val failure: DvrMutationFeedback,
+    ) : Notice {
+        init {
+            require(failure.isFailure)
+            require(failed in 1..total)
+        }
+        override val key = "dvr-action"
+        override val severity = NoticeSeverity.FAILURE
+    }
+
     data class Connection(val kind: ConnectionNoticeKind, val showingSavedChannels: Boolean = false) : Notice {
         override val key = "connection"
         override val severity = if (kind == ConnectionNoticeKind.RESTORED) NoticeSeverity.INFO else NoticeSeverity.FAILURE

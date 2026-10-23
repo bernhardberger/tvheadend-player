@@ -9,6 +9,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 enum class BrowseContextAction {
     WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
     RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE,
+    MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
 
 fun channelContextActions(
@@ -91,4 +92,54 @@ fun recordingWatchStateAction(
         admission is RecordingPlaybackAdmission.Growing || entry.state == DvrEntryState.MISSED
     ) return null
     return if ((entry.playCount ?: 0) > 0) BrowseContextAction.MARK_UNWATCHED else BrowseContextAction.MARK_WATCHED
+}
+
+private val FolderContextActions = listOf(
+    BrowseContextAction.MARK_ALL_WATCHED, BrowseContextAction.MARK_ALL_UNWATCHED,
+    BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL,
+)
+
+/** An Archive folder's menu offers only the actions that would change at least one recording under it. */
+@OptIn(ExperimentalTvheadendApi::class)
+fun folderContextActions(
+    folder: DvrArchiveFolder,
+    admission: (DvrEntry) -> RecordingPlaybackAdmission?,
+    canModifyRecordings: Boolean,
+): List<BrowseContextAction> = FolderContextActions.filter {
+    folderActionTargets(folder, it, admission, canModifyRecordings).isNotEmpty()
+}
+
+/** The recordings under [folder] that a folder [action] changes, newest first. */
+@OptIn(ExperimentalTvheadendApi::class)
+fun folderActionTargets(
+    folder: DvrArchiveFolder,
+    action: BrowseContextAction,
+    admission: (DvrEntry) -> RecordingPlaybackAdmission?,
+    canModifyRecordings: Boolean,
+): List<DvrEntry> = folder.allRecordings().filter {
+    folderActionApplies(it, action, admission(it), canModifyRecordings)
+}
+
+/**
+ * Whether a folder [action] changes [entry]: each recording follows its own menu's rules, and one
+ * that is still running is left alone, since it is neither finished to watch nor safe to delete.
+ */
+@OptIn(ExperimentalTvheadendApi::class)
+fun folderActionApplies(
+    entry: DvrEntry,
+    action: BrowseContextAction,
+    admission: RecordingPlaybackAdmission?,
+    canModifyRecordings: Boolean,
+): Boolean {
+    if (!canModifyRecordings || entry.state != DvrEntryState.COMPLETED) return false
+    return when (action) {
+        BrowseContextAction.MARK_ALL_WATCHED ->
+            recordingWatchStateAction(entry, admission, canModifyRecordings) == BrowseContextAction.MARK_WATCHED
+        BrowseContextAction.MARK_ALL_UNWATCHED ->
+            recordingWatchStateAction(entry, admission, canModifyRecordings) == BrowseContextAction.MARK_UNWATCHED
+        BrowseContextAction.DELETE_WATCHED ->
+            recordingWatchState(entry, offeredResumePosition(admission), nowSec = 0L) == RecordingWatchState.Watched
+        BrowseContextAction.DELETE_ALL -> true
+        else -> false
+    }
 }

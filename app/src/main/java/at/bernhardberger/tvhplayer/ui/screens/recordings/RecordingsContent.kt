@@ -35,6 +35,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -107,6 +108,7 @@ import at.bernhardberger.tvhplayer.core.recordingStoppedEarly
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
+import at.bernhardberger.tvhplayer.core.unwatchedCount
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -209,20 +211,40 @@ internal fun RecordingModeTabs(
     }
 }
 
+/**
+ * A folder row ends its name with the watched check once everything in it is watched; otherwise its
+ * line says how many are still to see, unless that is all of them.
+ */
 @Composable
 internal fun FolderListRow(
     folder: DvrArchiveFolder,
     selected: Boolean,
     modifier: Modifier,
     onClick: () -> Unit,
+    resumePosition: (DvrEntry) -> Duration? = { null },
+    onOpenContextMenu: (() -> Unit)? = null,
 ) {
     val summary = remember(folder) { summarizeDvrFolder(folder) }
+    val latestResumePosition by rememberUpdatedState(resumePosition)
+    // Resume positions arrive with the entries, so a new folder is the only reason to count again.
+    val unwatched = remember(folder) { folder.unwatchedCount { latestResumePosition(it) } }
     val owner = LocalTabOwner.current
+    val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
+        onOpenContextMenu, enabled = { owner?.isCurrent != false })
+    val tag = folder.path.joinToString("/")
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
+        onLongClick = contextMenu.onLongClick,
         headlineContent = {
-            Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false))
+                if (unwatched == 0) {
+                    Spacer(Modifier.width(TvSpacing8))
+                    RecordingWatchMark(RecordingWatchState.Watched, Modifier.testTag("recordings-folder-watched-$tag"))
+                }
+            }
         },
         supportingContent = {
             Text(
@@ -234,6 +256,9 @@ internal fun FolderListRow(
                             summary.recordingCount,
                         )
                     )
+                    if (unwatched in 1 until summary.recordingCount) {
+                        append(" • ").append(pluralStringResource(R.plurals.recordings_folder_unwatched_count, unwatched, unwatched))
+                    }
                     if (summary.totalSizeBytes > 0) {
                         append(" • ").append(formatFileSize(summary.totalSizeBytes, LocalContext.current))
                     }
@@ -241,6 +266,7 @@ internal fun FolderListRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 color = Color.Unspecified,
+                modifier = Modifier.testTag("recordings-folder-supporting-$tag"),
             )
         },
         leadingContent = {
@@ -257,7 +283,8 @@ internal fun FolderListRow(
         modifier = modifier
             .tabFocus()
             .fillMaxWidth()
-            .testTag("recordings-folder-${folder.path.joinToString("/")}"),
+            .testTag("recordings-folder-$tag")
+            .then(contextMenu.modifier),
     )
 }
 

@@ -824,6 +824,26 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun folderRowsShowWhatIsWatchedAndTheirMenuOffersTheFolderActions() {
+        show(entries = listOf(
+            recording(2, "Tide Watch", "Documentaries/blue.ts", playCount = 1),
+            recording(3, "Ridge Light", "Documentaries/mountains.ts"),
+            recording(6, "Coastal Miles", "Documentaries/coast.ts"),
+            recording(4, "Northline Tonight", "News/report.ts", playCount = 1),
+            recording(7, "Northline Weekend", "News/weekend.ts", playCount = 3),
+        ))
+        compose.onNodeWithTag("recordings-folder-watched-News", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("recordings-folder-supporting-Documentaries", useUnmergedTree = true)
+            .assertTextEquals("3 recordings • 2 unwatched • 7.2 GB")
+        capture("archive-folder-marks", 1f)
+        compose.onNodeWithTag("recordings-folder-Documentaries").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+        capture("archive-folder-menu", 1f)
+        compose.onNodeWithText("Delete all").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("folder-delete-back").assertIsFocused()
+        capture("archive-folder-delete", 1f)
+    }
+
     @Test fun watchMarksEndTheTitleLineAndThePaneSaysWatchedNotACount() {
         show(entries = listOf(
             recording(1, "Half seen", "half.ts"),

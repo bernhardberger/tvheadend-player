@@ -18,7 +18,11 @@ import at.bernhardberger.tvhplayer.notices.toDvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
+import at.bernhardberger.tvhplayer.core.folderActionApplies
 import at.bernhardberger.tvhplayer.core.dvrMutationStateIsCurrent
 
 internal sealed interface DvrMutationAction {
@@ -132,4 +136,60 @@ internal fun NoticeCenter.postDvrFailure(action: DvrMutationAction, result: DvrM
     val serverMessage = (result as? DvrMutationResult.Failed)?.serverMessage
         ?.takeIf { feedback == DvrMutationFeedback.REJECTED }
     post(Notice.DvrActionFailed(kind, feedback, serverMessage), context)
+}
+
+/**
+ * Applies a folder [action] to [recordingIds] one request at a time. Each recording is checked
+ * against the latest observation first, so one that changed or left since the menu opened is
+ * skipped; once the opening session is gone, the rest count as not done. Returns the notice to
+ * post when any request failed.
+ */
+@OptIn(ExperimentalTvheadendApi::class)
+internal suspend fun DvrMutationActions.runFolderAction(
+    action: BrowseContextAction,
+    openingSession: CurrentSessionObservation,
+    recordingIds: List<DvrEntryId>,
+    latestObservation: () -> SessionObservation,
+): Notice.DvrFolderActionFailed? {
+    val watched = when (action) {
+        BrowseContextAction.MARK_ALL_WATCHED -> true
+        BrowseContextAction.MARK_ALL_UNWATCHED -> false
+        BrowseContextAction.DELETE_WATCHED, BrowseContextAction.DELETE_ALL -> null
+        else -> error("Not a folder action: $action")
+    }
+    var attempted = 0
+    var failed = 0
+    var failure: DvrMutationFeedback? = null
+    for ((index, id) in recordingIds.withIndex()) {
+        val current = latestObservation()
+        val canModify = (current.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+        // A lost connection or permission fails the rest; an entry someone else changed is just skipped.
+        val stopped = when {
+            current.currentSession !== openingSession -> DvrMutationFeedback.CONNECTION_UNAVAILABLE
+            !canModify -> DvrMutationFeedback.PERMISSION_DENIED
+            else -> null
+        }
+        if (stopped != null) {
+            val rest = recordingIds.size - index
+            attempted += rest
+            failed += rest
+            failure = failure ?: stopped
+            break
+        }
+        val entry = current.dvrEntry(id) ?: continue
+        if (!folderActionApplies(entry, action, current.recordingPlaybackAdmission(entry), canModify)) continue
+        attempted++
+        val feedback = if (watched != null) {
+            when (val result = updateWatchState(openingSession, id, watched)) {
+                DvrProgressResult.Accepted -> null
+                is DvrProgressResult.Failed -> result.toDvrMutationFeedback()
+            }
+        } else execute(DvrMutationAction.Delete(openingSession, id)).toDvrMutationFeedback().takeIf { it.isFailure }
+        if (feedback != null) {
+            failed++
+            failure = failure ?: feedback
+        }
+    }
+    val kind = if (watched == null) DvrMutationKind.DELETE else DvrMutationKind.UPDATE
+    return failure?.let { Notice.DvrFolderActionFailed(kind, failed, attempted, it) }
 }
