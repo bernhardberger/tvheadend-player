@@ -69,7 +69,7 @@
     <string name="connection_overview_not_configured">Nicht eingerichtet</string>
     <string name="connection_overview_unavailable">Nicht verfügbar</string>
     <string name="cache_notice_cleared">Cache geleert</string>
-    <string name="cache_notice_failed">Cache konnte nicht geleert werden. Erneut „Cache leeren“ wählen.</string>
+    <string name="cache_notice_failed">Cache konnte nicht geleert werden. Versuche es erneut.</string>
     <string name="settings_app_language">App-Sprache</string>
     <string name="cache_usage">%1$s MB</string>
     <string name="settings_unavailable">Einstellungen nicht verfügbar</string>
@@ -124,7 +124,7 @@
     <string name="username">Benutzername</string>
     <string name="password">Passwort</string>
     <string name="clear_saved_password">Gespeichertes Passwort löschen</string>
-    <string name="credential_save_failed">Die Zugangsdaten konnten nicht gespeichert werden. Lösche sie und gib sie erneut ein.</string>
+    <string name="connection_save_failed">Die Verbindung konnte nicht gespeichert werden. Versuche es erneut.</string>
     <string name="onboarding_title">Willkommen bei Tvheadend Player</string>
     <string name="onboarding_requirement">Tvheadend Player verbindet sich mit deinem Tvheadend-Server, um Sender, Programm und Aufnahmen zu laden.</string>
     <string name="trusted_network_guidance">Verbinde dich nur in einem vertrauenswürdigen Heimnetz oder über einen geschützten Tunnel. HTSP verschlüsselt weder Senderdaten noch Videostreams.</string>
@@ -170,7 +170,6 @@
     <string name="appliance_accessibility_service_label">Tvheadend Player-Start</string>
     <string name="appliance_accessibility_service_description">Öffnet Tvheadend Player nach dem Starten und Aufwecken und belegt ausschließlich die TV-/GUIDE-Taste. Der Dienst kann keine Bildschirminhalte lesen.</string>
     <string name="appliance_starting_tv">Wiedergabe wird gestartet</string>
-    <string name="appliance_connection_recovering">Fernsehen ist gerade nicht verfügbar. Die Verbindung wird automatisch wiederhergestellt…</string>
     <string name="appliance_back_for_menu">Zurück öffnet Sender und Einstellungen.</string>
 
     <!-- Startup-Statusbildschirm -->
@@ -187,7 +186,6 @@
     <string name="loading_wait">Warten auf Ladevorgang…</string>
     <string name="not_connected">Nicht verbunden</string>
     <string name="loading">Wird geladen…</string>
-    <string name="loading_error">Fehler beim Laden</string>
     <string name="select_profile">Profil auswählen</string>
 
     <string name="error_prefix">Fehler:</string>
@@ -234,7 +232,7 @@
     <string name="epg_search_denied">Dieses Konto darf die Programmdaten nicht durchsuchen.</string>
     <string name="epg_search_connection_limit">Dein Tvheadend-Server bearbeitet zu viele Anfragen. Bitte kurz warten.</string>
     <string name="epg_search_not_supported">Dieser Tvheadend-Server unterstützt die Programmsuche nicht.</string>
-    <string name="epg_search_unavailable">Die Programmsuche ist nicht verfügbar. Erneut versuchen.</string>
+    <string name="epg_search_unavailable">Die Suche ist gerade nicht verfügbar.</string>
     <string name="epg_search_untitled">Sendung ohne Titel</string>
     <string name="epg_search_unknown_channel">Unbekannter Sender</string>
     <string name="epg_search_result_schedule">%1$s • %2$s</string>
@@ -271,7 +269,7 @@
     <string name="epg_stale">Programmdaten können während der Neuverbindung veraltet sein</string>
     <string name="epg_permission_denied">Dieses Konto darf keine Programmdaten lesen</string>
     <string name="epg_reconnecting">Verbindung mit deinem Tvheadend-Server wird wiederhergestellt…</string>
-    <string name="epg_server_failure">Programm nicht verfügbar. Serververbindung erneut versuchen.</string>
+    <string name="epg_server_failure">Programm nicht verfügbar</string>
     <string name="epg_filter_empty">Keine Sendungen entsprechen diesem Filter.</string>
     <string name="epg_state_now">läuft jetzt</string>
     <string name="epg_state_future">folgt</string>
@@ -285,19 +283,12 @@
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
     <string name="stop_recording">Aufnahme beenden</string>
-    <string name="recording_request_busy_title">„%1$s“ wird geplant…</string>
-    <string name="recording_request_busy_message">Die Antwort deines Tvheadend-Servers wird abgewartet. Das Schließen dieser Meldung bricht die Anfrage nicht ab.</string>
     <string name="recording_request_busy_action">Wird geplant…</string>
-    <string name="recording_request_success_title">Aufnahme geplant</string>
-    <string name="recording_request_success_message">Dein Tvheadend-Server hat die Aufnahmeanfrage für „%1$s“ angenommen.</string>
-    <string name="recording_request_failure_title">Aufnahmeanfrage fehlgeschlagen</string>
-    <string name="recording_request_failure_message">„%1$s“ wurde nicht geplant. %2$s</string>
     <string name="cancel_recording_confirm_title">Diese Aufnahme absagen?</string>
     <string name="cancel_recording_confirm_message">%1$s auf %2$s, %3$s, wird nicht aufgenommen.</string>
     <string name="stop_recording_confirm_title">Diese Aufnahme beenden?</string>
     <string name="stop_recording_confirm_message">Die Aufnahme von %1$s wird jetzt beendet. Das bisher Aufgenommene bleibt erhalten.</string>
     <string name="recording_status">Aufnahme: %1$s</string>
-    <string name="recording_failure_reason">Grund: %1$s</string>
     <string name="recording_state_scheduled">Geplant</string>
     <string name="recording_state_recording">Wird aufgenommen</string>
     <string name="recording_state_completed">Abgeschlossen</string>
@@ -315,20 +306,19 @@
     <string name="recording_notice_canceled">Aufnahme abgebrochen</string>
     <string name="recording_notice_deleted">Aufnahme gelöscht</string>
     <string name="recording_notice_fallback">Aufnahme</string>
-    <string name="recording_notice_no_signal">Kein Signal</string>
-    <string name="recording_notice_disk_full">Datenträger voll</string>
-    <string name="recording_notice_access">Zugriff verweigert</string>
-    <string name="recording_notice_limit">Kontolimit erreicht</string>
-    <string name="recording_notice_weak_stream">Schwacher Stream</string>
-    <string name="recording_notice_subscription_overridden">Aufnahme durch ein anderes Abonnement unterbrochen</string>
+    <string name="recording_notice_disk_full">Aufnahmespeicher voll</string>
     <string name="recording_notice_invalid_target">Aufnahmeziel nicht verfügbar</string>
-    <string name="recording_notice_unknown_error">Unbekannter Aufnahmefehler</string>
+    <string name="recording_notice_unknown_error">Unbekannter Fehler</string>
     <plurals name="recording_notice_count">
         <item quantity="one">%1$d Aufnahme</item>
         <item quantity="other">%1$d Aufnahmen</item>
     </plurals>
-    <string name="recording_action_failed">Aufnahmeaktion fehlgeschlagen</string>
-    <string name="recording_action_not_confirmed">Aufnahmeaktion nicht bestätigt</string>
+    <string name="recording_action_failed_schedule">Aufnahme konnte nicht geplant werden</string>
+    <string name="recording_action_failed_stop">Aufnahme konnte nicht gestoppt werden</string>
+    <string name="recording_action_failed_cancel">Aufnahme konnte nicht abgebrochen werden</string>
+    <string name="recording_action_failed_delete">Aufnahme konnte nicht gelöscht werden</string>
+    <string name="recording_action_failed_change">Aufnahme konnte nicht geändert werden</string>
+    <string name="recording_action_not_confirmed">Aufnahmeänderung nicht bestätigt</string>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d Aufnahme abgebrochen</item>
         <item quantity="other">%d Aufnahmen abgebrochen</item>
@@ -337,19 +327,17 @@
     <string name="connection_notice_lost_saved">Verbindung verloren • Gespeicherte Sender werden angezeigt</string>
     <string name="connection_problem_label">Einstellungen, Verbindungsproblem</string>
     <string name="connection_offline_badge">Offline</string>
-    <string name="connection_offline_saved">Tvheadend nicht erreichbar • Gespeicherte Sender werden angezeigt</string>
+    <string name="connection_offline_saved">Server nicht erreichbar • Gespeicherte Sender werden angezeigt</string>
     <string name="connection_try_again">Erneut versuchen</string>
     <string name="connection_retry_description">Tvheadend Player versucht es auch automatisch erneut</string>
     <string name="connection_notice_restored">Verbindung wiederhergestellt</string>
     <string name="connection_notice_login_rejected">Anmeldung abgelehnt</string>
     <string name="recording_action_permission">Dieses Konto darf Aufnahmen nicht verwalten.</string>
-    <string name="recording_action_conn_limit">Dein Tvheadend-Server hat die Anfrage abgelehnt: zu viele Verbindungen. Bitte kurz warten.</string>
-    <string name="recording_action_conflict">Dein Tvheadend-Server meldet einen Aufnahme- oder Tuner-Konflikt.</string>
-    <string name="recording_action_rejected">Dein Tvheadend-Server hat die Aufnahmeanfrage abgelehnt.</string>
-    <string name="recording_action_not_supported">Dein Tvheadend-Server unterstützt diese Aufnahmeaktion nicht.</string>
-    <string name="recording_action_timeout">Dein Tvheadend-Server hat nicht rechtzeitig geantwortet. Die Änderung kann trotzdem wirksam werden; prüfe die Aufnahme, bevor du es erneut versuchst.</string>
-    <string name="recording_action_unknown_outcome">Die Serverantwort konnte nicht gelesen werden. Die Änderung kann bereits wirksam sein; prüfe die Aufnahme, bevor du es erneut versuchst.</string>
-    <string name="recording_action_connection">Dein Tvheadend-Server konnte für die Aufnahmeanfrage nicht erreicht werden.</string>
+    <string name="recording_action_conn_limit">Der Server ist ausgelastet. Versuche es gleich noch einmal.</string>
+    <string name="recording_action_rejected">Der Server hat die Anfrage abgelehnt.</string>
+    <string name="recording_action_not_supported">Dieser Tvheadend-Server kann das nicht.</string>
+    <string name="recording_action_check_first">Prüfe die Aufnahme, bevor du es erneut versuchst.</string>
+    <string name="recording_action_connection">Nicht mit dem Server verbunden.</string>
     <string name="recording_already_scheduled">Diese Sendung wird aufgenommen oder ist geplant.</string>
     <string name="recordings_title">Aufnahmen</string>
     <string name="recordings_archive">Archiv</string>
@@ -386,9 +374,6 @@
     <string name="recording_resume_from">Fortsetzen ab %1$s</string>
     <string name="recording_ends_at">Endet um %1$s</string>
     <string name="recording_play_from_beginning">Von Anfang an abspielen</string>
-    <string name="recording_progress_read_only">Der vorhandene Wiedergabestand ist verfügbar. Neuer Fortschritt wird nicht gespeichert.</string>
-    <string name="recording_progress_unsupported">Dieser Server unterstützt die Wiedergabe ab Anfang, aber keinen synchronisierten Fortschritt.</string>
-    <string name="recording_progress_save_failed">Der Wiedergabefortschritt konnte nicht gespeichert werden.</string>
     <string name="recording_still_recording">Aufnahme läuft noch</string>
     <string name="recording_duration_unavailable">Dauer nicht verfügbar</string>
     <string name="recording_timeline_status_description">Vergangen: %1$s. %2$s.</string>
@@ -442,9 +427,6 @@
     <string name="tunneling_setting_description">Leitet das Video direkt an den Fernseher, wenn der Decoder das unterstützt. Kann das Bild kurz unterbrechen.</string>
     <string name="play">Abspielen</string>
     <string name="play_recording">Aufnahme abspielen</string>
-
-    <string name="tvh_no_free_adapter">Kein freier Tuner verfügbar</string>
-    <string name="tvh_scrambled">Sender ist verschlüsselt</string>
 
     <string name="status_disconnected_reconnecting">Verbindung getrennt. Neuer Verbindungsversuch\u2026</string>
     <string name="connection_connecting">Verbindung mit deinem Tvheadend-Server wird hergestellt\u2026</string>

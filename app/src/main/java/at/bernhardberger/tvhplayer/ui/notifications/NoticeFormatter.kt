@@ -26,17 +26,21 @@ internal data class FormattedNotice(val headline: String, val detail: String? = 
 internal class NoticeFormatter(private val context: Context) {
     fun format(notice: Notice, now: Instant = Clock.System.now()): FormattedNotice = when (notice) {
         is Notice.Dvr -> formatDvr(notice, now)
-        is Notice.DvrActionFailed -> FormattedNotice(context.getString(
-            if (notice.failure == DvrMutationFeedback.TIMEOUT ||
-                notice.failure == DvrMutationFeedback.UNKNOWN_OUTCOME) R.string.recording_action_not_confirmed
-            else R.string.recording_action_failed),
-            context.getString(when (notice.failure) {
+        is Notice.DvrActionFailed -> FormattedNotice(context.getString(when (notice.failure) {
+            DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_not_confirmed
+            else -> when (notice.action) {
+                DvrMutationKind.SCHEDULE -> R.string.recording_action_failed_schedule
+                DvrMutationKind.STOP -> R.string.recording_action_failed_stop
+                DvrMutationKind.CANCEL -> R.string.recording_action_failed_cancel
+                DvrMutationKind.DELETE -> R.string.recording_action_failed_delete
+                else -> R.string.recording_action_failed_change
+            }
+        }), context.getString(when (notice.failure) {
                 DvrMutationFeedback.PERMISSION_DENIED -> R.string.recording_action_permission
                 DvrMutationFeedback.CONNECTION_LIMIT -> R.string.recording_action_conn_limit
                 DvrMutationFeedback.REJECTED -> R.string.recording_action_rejected
                 DvrMutationFeedback.NOT_SUPPORTED -> R.string.recording_action_not_supported
-                DvrMutationFeedback.TIMEOUT -> R.string.recording_action_timeout
-                DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_unknown_outcome
+                DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME -> R.string.recording_action_check_first
                 DvrMutationFeedback.CONNECTION_UNAVAILABLE -> R.string.recording_action_connection
                 DvrMutationFeedback.CONFIRMED, DvrMutationFeedback.ACCEPTED_UNCONFIRMED -> error("Not an action failure")
             }).let { generic -> notice.serverMessage?.let { "$generic $it" } ?: generic }, AppNoticeIcon.WARNING)
@@ -115,16 +119,15 @@ internal class NoticeFormatter(private val context: Context) {
 internal fun DvrSubscriptionError.label(): String = label(LocalContext.current)
 
 internal fun DvrSubscriptionError.label(context: Context): String = context.getString(when (this) {
-    DvrSubscriptionError.NO_FREE_ADAPTER -> R.string.tvh_no_free_adapter
-    DvrSubscriptionError.SCRAMBLED -> R.string.tvh_scrambled
-    DvrSubscriptionError.BAD_SIGNAL, DvrSubscriptionError.TUNING_FAILED,
-    DvrSubscriptionError.MUX_NOT_ENABLED, DvrSubscriptionError.NO_SERVICE,
-    DvrSubscriptionError.INVALID_SERVICE -> R.string.recording_notice_no_signal
+    DvrSubscriptionError.NO_FREE_ADAPTER -> R.string.error_201_title
+    DvrSubscriptionError.BAD_SIGNAL, DvrSubscriptionError.TUNING_FAILED, DvrSubscriptionError.NO_SERVICE,
+    DvrSubscriptionError.INVALID_SERVICE, DvrSubscriptionError.WEAK_STREAM -> R.string.error_202_title
+    DvrSubscriptionError.MUX_NOT_ENABLED -> R.string.error_203_title
+    DvrSubscriptionError.SCRAMBLED -> R.string.error_204_title
+    DvrSubscriptionError.USER_ACCESS -> R.string.error_205_title
+    DvrSubscriptionError.SUBSCRIPTION_OVERRIDDEN -> R.string.error_206_title
+    DvrSubscriptionError.USER_LIMIT -> R.string.error_208_title
     DvrSubscriptionError.NO_DISK_SPACE -> R.string.recording_notice_disk_full
-    DvrSubscriptionError.USER_ACCESS -> R.string.recording_notice_access
-    DvrSubscriptionError.USER_LIMIT -> R.string.recording_notice_limit
-    DvrSubscriptionError.WEAK_STREAM -> R.string.recording_notice_weak_stream
-    DvrSubscriptionError.SUBSCRIPTION_OVERRIDDEN -> R.string.recording_notice_subscription_overridden
     DvrSubscriptionError.INVALID_TARGET -> R.string.recording_notice_invalid_target
     else -> R.string.recording_notice_unknown_error
 })

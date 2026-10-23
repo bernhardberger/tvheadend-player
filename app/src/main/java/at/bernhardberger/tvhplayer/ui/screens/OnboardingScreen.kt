@@ -184,7 +184,7 @@ internal fun OnboardingConnection(
 
         if (form.feedback == ConnectionFormFeedback.SAVE_FAILED) {
             Text(
-                text = stringResource(R.string.credential_save_failed),
+                text = stringResource(R.string.connection_save_failed),
                 color = MaterialTheme.colorScheme.error,
             )
         }

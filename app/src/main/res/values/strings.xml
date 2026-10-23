@@ -67,7 +67,7 @@
     <string name="connection_overview_not_configured">Not configured</string>
     <string name="connection_overview_unavailable">Unavailable</string>
     <string name="cache_notice_cleared">Cache cleared</string>
-    <string name="cache_notice_failed">Couldn’t clear cache. Try Clear cache again.</string>
+    <string name="cache_notice_failed">Couldn’t clear the cache. Try again.</string>
     <string name="settings_app_language">App language</string>
     <string name="cache_usage">%1$s MB</string>
     <string name="settings_unavailable">Settings unavailable</string>
@@ -126,7 +126,7 @@
     <string name="username">Username</string>
     <string name="password">Password</string>
     <string name="clear_saved_password">Clear saved password</string>
-    <string name="credential_save_failed">The credential could not be stored. Try clearing it and entering it again.</string>
+    <string name="connection_save_failed">Couldn’t save the connection. Try again.</string>
     <string name="onboarding_title">Welcome to Tvheadend Player</string>
     <string name="onboarding_requirement">Tvheadend Player connects to your Tvheadend server for channels, guide and recordings.</string>
     <string name="trusted_network_guidance">Connect only on a trusted home network or through a protected tunnel. HTSP does not encrypt the channel metadata or video stream.</string>
@@ -156,7 +156,7 @@
     <string name="profile">Stream profile</string>
     <string name="profile_server_default">Server default</string>
     <string name="profile_direct_streaming">Direct streaming</string>
-    <string name="stream_profiles_unavailable">Stream profiles are unavailable.</string>
+    <string name="stream_profiles_unavailable">Stream profiles aren’t available.</string>
     <string name="audio_language">Audio Language</string>
     <string name="subtitle_language">Subtitle Language</string>
 
@@ -172,7 +172,6 @@
     <string name="appliance_accessibility_service_label">Tvheadend Player appliance entry</string>
     <string name="appliance_accessibility_service_description">Opens Tvheadend Player at startup and wake, and maps only the TV/GUIDE button. It cannot read screen content.</string>
     <string name="appliance_starting_tv">Starting playback</string>
-    <string name="appliance_connection_recovering">Television is currently unavailable. Reconnecting automatically…</string>
     <string name="appliance_back_for_menu">Press Back for channels and settings.</string>
 
     <!-- Startup status screen -->
@@ -189,7 +188,6 @@
     <string name="loading_wait">Waiting for loading…</string>
     <string name="not_connected">Not connected</string>
     <string name="loading">Loading…</string>
-    <string name="loading_error">Loading error</string>
     <string name="select_profile">Select profile</string>
 
     <string name="error_prefix">Error:</string>
@@ -348,7 +346,7 @@
     <string name="epg_search_denied">This account is not allowed to search guide data.</string>
     <string name="epg_search_connection_limit">Your Tvheadend server is handling too many requests. Try again shortly.</string>
     <string name="epg_search_not_supported">This Tvheadend server does not support guide search.</string>
-    <string name="epg_search_unavailable">Guide search is unavailable. Try again.</string>
+    <string name="epg_search_unavailable">Search isn’t available right now.</string>
     <string name="epg_search_untitled">Untitled program</string>
     <string name="epg_search_unknown_channel">Unknown channel</string>
     <string name="epg_search_result_schedule">%1$s • %2$s</string>
@@ -383,9 +381,9 @@
     <string name="epg_empty_day">No programs in this time window</string>
     <string name="epg_partial">Partial guide data</string>
     <string name="epg_stale">Guide data may be out of date while reconnecting</string>
-    <string name="epg_permission_denied">This account cannot read guide data</string>
+    <string name="epg_permission_denied">This account can’t read guide data</string>
     <string name="epg_reconnecting">Reconnecting to your Tvheadend server…</string>
-    <string name="epg_server_failure">Guide unavailable. Retry the server connection.</string>
+    <string name="epg_server_failure">Guide unavailable</string>
     <string name="epg_filter_empty">No programs match this filter.</string>
     <string name="epg_state_now">on now</string>
     <string name="epg_state_future">upcoming</string>
@@ -399,19 +397,12 @@
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
     <string name="stop_recording">Stop recording</string>
-    <string name="recording_request_busy_title">Scheduling “%1$s”…</string>
-    <string name="recording_request_busy_message">Waiting for your Tvheadend server to answer. Closing this message does not cancel the request.</string>
     <string name="recording_request_busy_action">Scheduling…</string>
-    <string name="recording_request_success_title">Recording scheduled</string>
-    <string name="recording_request_success_message">Your Tvheadend server accepted the recording request for “%1$s”.</string>
-    <string name="recording_request_failure_title">Recording request failed</string>
-    <string name="recording_request_failure_message">“%1$s” was not scheduled. %2$s</string>
     <string name="cancel_recording_confirm_title">Cancel this recording?</string>
     <string name="cancel_recording_confirm_message">%1$s on %2$s, %3$s, won\'t be recorded.</string>
     <string name="stop_recording_confirm_title">Stop this recording?</string>
     <string name="stop_recording_confirm_message">%1$s stops recording now. What\'s recorded so far is kept.</string>
     <string name="recording_status">Recording: %1$s</string>
-    <string name="recording_failure_reason">Reason: %1$s</string>
     <string name="recording_state_scheduled">Scheduled</string>
     <string name="recording_state_recording">Recording now</string>
     <string name="recording_state_completed">Completed</string>
@@ -429,20 +420,19 @@
     <string name="recording_notice_canceled">Recording canceled</string>
     <string name="recording_notice_deleted">Recording deleted</string>
     <string name="recording_notice_fallback">Recording</string>
-    <string name="recording_notice_no_signal">No signal</string>
-    <string name="recording_notice_disk_full">Disk full</string>
-    <string name="recording_notice_access">Access denied</string>
-    <string name="recording_notice_limit">Account limit reached</string>
-    <string name="recording_notice_weak_stream">Weak stream</string>
-    <string name="recording_notice_subscription_overridden">Recording interrupted by another subscription</string>
+    <string name="recording_notice_disk_full">Recording storage full</string>
     <string name="recording_notice_invalid_target">Recording target unavailable</string>
-    <string name="recording_notice_unknown_error">Unknown recording error</string>
+    <string name="recording_notice_unknown_error">Unknown error</string>
     <plurals name="recording_notice_count">
         <item quantity="one">%1$d recording</item>
         <item quantity="other">%1$d recordings</item>
     </plurals>
-    <string name="recording_action_failed">Recording action failed</string>
-    <string name="recording_action_not_confirmed">Recording action not confirmed</string>
+    <string name="recording_action_failed_schedule">Couldn’t schedule recording</string>
+    <string name="recording_action_failed_stop">Couldn’t stop recording</string>
+    <string name="recording_action_failed_cancel">Couldn’t cancel recording</string>
+    <string name="recording_action_failed_delete">Couldn’t delete recording</string>
+    <string name="recording_action_failed_change">Couldn’t change recording</string>
+    <string name="recording_action_not_confirmed">Recording change not confirmed</string>
     <plurals name="recording_notice_canceled_count">
         <item quantity="one">%d recording canceled</item>
         <item quantity="other">%d recordings canceled</item>
@@ -451,19 +441,17 @@
     <string name="connection_notice_lost_saved">Connection lost • Showing saved channels</string>
     <string name="connection_problem_label">Settings, connection problem</string>
     <string name="connection_offline_badge">Offline</string>
-    <string name="connection_offline_saved">Can\'t reach Tvheadend • Showing saved channels</string>
+    <string name="connection_offline_saved">Can’t reach the server • Showing saved channels</string>
     <string name="connection_try_again">Try again</string>
     <string name="connection_retry_description">Tvheadend Player also retries on its own</string>
     <string name="connection_notice_restored">Connection restored</string>
     <string name="connection_notice_login_rejected">Login rejected</string>
-    <string name="recording_action_permission">This account is not allowed to manage recordings.</string>
-    <string name="recording_action_conn_limit">Your Tvheadend server refused the request: too many connections. Try again shortly.</string>
-    <string name="recording_action_conflict">Your Tvheadend server reported a recording or tuner conflict.</string>
-    <string name="recording_action_rejected">Your Tvheadend server rejected the recording request.</string>
-    <string name="recording_action_not_supported">Your Tvheadend server does not support this recording action.</string>
-    <string name="recording_action_timeout">Your Tvheadend server did not answer in time. The change may still apply; check the recording before trying again.</string>
-    <string name="recording_action_unknown_outcome">The server reply could not be read. The change may have applied; check the recording before trying again.</string>
-    <string name="recording_action_connection">The recording request could not reach your Tvheadend server.</string>
+    <string name="recording_action_permission">This account can’t manage recordings.</string>
+    <string name="recording_action_conn_limit">The server is busy. Try again in a moment.</string>
+    <string name="recording_action_rejected">The server refused the request.</string>
+    <string name="recording_action_not_supported">This Tvheadend server can’t do this.</string>
+    <string name="recording_action_check_first">Check the recording before trying again.</string>
+    <string name="recording_action_connection">Not connected to the server.</string>
     <string name="recording_already_scheduled">This program is recording or scheduled.</string>
     <string name="recordings_title">Recordings</string>
     <string name="recordings_archive">Archive</string>
@@ -500,9 +488,6 @@
     <string name="recording_resume_from">Resume from %1$s</string>
     <string name="recording_ends_at">Ends at %1$s</string>
     <string name="recording_play_from_beginning">Play from beginning</string>
-    <string name="recording_progress_read_only">Existing resume progress is available. New progress won’t be saved.</string>
-    <string name="recording_progress_unsupported">This server supports playback from the beginning, but not synchronized progress.</string>
-    <string name="recording_progress_save_failed">Playback progress couldn’t be saved.</string>
     <string name="recording_still_recording">Still recording</string>
     <string name="recording_duration_unavailable">Duration unavailable</string>
     <string name="recording_timeline_status_description">Elapsed %1$s. %2$s.</string>
@@ -563,16 +548,13 @@
     <string name="play">Play</string>
     <string name="play_recording">Play recording</string>
 
-    <string name="tvh_no_free_adapter">No free tuner available</string>
-    <string name="tvh_scrambled">Channel is scrambled</string>
-
     <string name="status_disconnected_reconnecting">Disconnected. Reconnecting\u2026</string>
     <string name="connection_connecting">Connecting to your Tvheadend server\u2026</string>
     <string name="connection_loading_channels">Loading channels\u2026</string>
     <string name="retry">Retry</string>
     <string name="settings_channel_groups_loading">Loading channel groups…</string>
-    <string name="channel_settings_load_failed">Channel preferences could not be loaded.</string>
-    <string name="channel_settings_save_failed">Your channel settings are active but could not be saved.</string>
+    <string name="channel_settings_load_failed">Couldn’t load channel preferences.</string>
+    <string name="channel_settings_save_failed">Your channel settings are active but couldn’t be saved.</string>
     <string name="keep_channel_setting">Keep channel after leaving the app</string>
     <string name="keep_channel_off">Off</string>
     <string name="startup_buffer_setting">Start-up buffer</string>

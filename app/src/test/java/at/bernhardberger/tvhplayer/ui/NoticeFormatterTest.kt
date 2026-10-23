@@ -8,6 +8,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
+import at.bernhardberger.tvheadend.sdk.core.DvrSubscriptionError
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
@@ -47,8 +48,50 @@ class NoticeFormatterTest {
 
     @Test fun malformedMutationDoesNotClaimRejectionOrSuccess() {
         val result = formatter.format(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.UNKNOWN_OUTCOME))
-        assertEquals("Recording action not confirmed", result.headline)
-        assertEquals("The server reply could not be read. The change may have applied; check the recording before trying again.", result.detail)
+        assertEquals("Recording change not confirmed", result.headline)
+        assertEquals("Check the recording before trying again.", result.detail)
+    }
+
+    @Test fun failedActionHeadlineNamesTheAction() {
+        val headlines = listOf(DvrMutationKind.SCHEDULE, DvrMutationKind.STOP, DvrMutationKind.CANCEL, DvrMutationKind.DELETE).associateWith {
+            formatter.format(Notice.DvrActionFailed(it, DvrMutationFeedback.PERMISSION_DENIED)).headline
+        }
+        assertEquals(mapOf(
+            DvrMutationKind.SCHEDULE to "Couldn’t schedule recording",
+            DvrMutationKind.STOP to "Couldn’t stop recording",
+            DvrMutationKind.CANCEL to "Couldn’t cancel recording",
+            DvrMutationKind.DELETE to "Couldn’t delete recording",
+        ), headlines)
+    }
+
+    @Test fun timeoutAndUnknownOutcomeShareOneNotConfirmedText() {
+        for (action in listOf(DvrMutationKind.SCHEDULE, DvrMutationKind.DELETE)) for (failure in listOf(DvrMutationFeedback.TIMEOUT, DvrMutationFeedback.UNKNOWN_OUTCOME)) {
+            val result = formatter.format(Notice.DvrActionFailed(action, failure))
+            assertEquals("Recording change not confirmed", result.headline)
+            assertEquals("Check the recording before trying again.", result.detail)
+        }
+    }
+
+    @Test fun failedActionDetailNamesTheServerNotTheProduct() {
+        fun detail(failure: DvrMutationFeedback, serverMessage: String? = null) =
+            formatter.format(Notice.DvrActionFailed(DvrMutationKind.STOP, failure, serverMessage)).detail
+        assertEquals("This account can’t manage recordings.", detail(DvrMutationFeedback.PERMISSION_DENIED))
+        assertEquals("The server refused the request.", detail(DvrMutationFeedback.REJECTED))
+        assertEquals("The server refused the request. Disk quota", detail(DvrMutationFeedback.REJECTED, "Disk quota"))
+        assertEquals("This Tvheadend server can’t do this.", detail(DvrMutationFeedback.NOT_SUPPORTED))
+        assertEquals("The server is busy. Try again in a moment.", detail(DvrMutationFeedback.CONNECTION_LIMIT))
+        assertEquals("Not connected to the server.", detail(DvrMutationFeedback.CONNECTION_UNAVAILABLE))
+    }
+
+    @Test fun recordingFailureReasonReusesTheCatalogTitlesOfTheSameCondition() {
+        fun detail(error: DvrSubscriptionError) = formatter.format(Notice.Dvr(DvrChangeKind.RECORDING_FAILED,
+            DvrEntry.create(DvrEntryId(1), title = "Show", subscriptionError = error), DvrChangeOrigin.External)).detail
+        assertEquals("Show • No free tuner", detail(DvrSubscriptionError.NO_FREE_ADAPTER))
+        assertEquals("Show • No signal", detail(DvrSubscriptionError.BAD_SIGNAL))
+        assertEquals("Show • Channel not available", detail(DvrSubscriptionError.MUX_NOT_ENABLED))
+        assertEquals("Show • Channel can’t be decrypted", detail(DvrSubscriptionError.SCRAMBLED))
+        assertEquals("Show • Recording storage full", detail(DvrSubscriptionError.NO_DISK_SPACE))
+        assertEquals("Show • Recording target unavailable", detail(DvrSubscriptionError.INVALID_TARGET))
     }
 
     @Test fun recordingStartedIncludesTheSuppliedEpisodeBeforeTheChannel() {

@@ -1591,7 +1591,7 @@ class RecordingsScreenTest {
         composeRule.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         composeRule.onNodeWithTag("details-play").assertIsFocused()
         composeRule.onAllNodesWithText(
-            composeRule.activity.getString(R.string.recording_action_failed)
+            composeRule.activity.getString(R.string.recording_action_failed_delete)
         ).assertCountEquals(1)
     }
 
@@ -1624,7 +1624,7 @@ class RecordingsScreenTest {
         composeRule.onNodeWithText("Details").assertIsFocused()
         composeRule.runOnIdle { result.complete(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)) }
         composeRule.onAllNodesWithText(
-            composeRule.activity.getString(R.string.recording_action_failed)
+            composeRule.activity.getString(R.string.recording_action_failed_delete)
         ).assertCountEquals(0)
         composeRule.onNodeWithText("Details").assertIsFocused()
     }
@@ -1661,7 +1661,7 @@ class RecordingsScreenTest {
         }
         if (failedRecording) {
             composeRule.onNodeWithTag("recording-list-entry-7").assertIsFocused().openDetailsFromMenu()
-            composeRule.onNode(hasText(composeRule.activity.getString(R.string.tvh_no_free_adapter)) and
+            composeRule.onNode(hasText(composeRule.activity.getString(R.string.error_201_title)) and
                 hasAnyAncestor(hasTestTag("programme-details-page"))).assertIsDisplayed()
             composeRule.onNodeWithTag("details-delete").assertIsFocused().pressCenter()
         } else {
