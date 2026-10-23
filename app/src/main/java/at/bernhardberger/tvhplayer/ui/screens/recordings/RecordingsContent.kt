@@ -380,7 +380,7 @@ internal fun RecordingMetadataPane(
                 }.orEmpty())
                 recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let {
                     if (isNotEmpty()) append(" • ")
-                    append(formatRecordedDuration(it, resources))
+                    append(resources.getString(R.string.recording_length_recorded, formatRecordedDuration(it, resources)))
                 }
             }.takeIf(String::isNotEmpty),
             // How far it was watched, as the details page's timeline.

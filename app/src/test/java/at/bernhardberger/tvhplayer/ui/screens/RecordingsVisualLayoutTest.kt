@@ -431,7 +431,7 @@ class RecordingsVisualLayoutTest {
             }
         }
         val elapsed = formatRecordedDuration(600, ApplicationProvider.getApplicationContext<Application>().resources)
-        compose.onNodeWithText(elapsed, substring = true).assertIsDisplayed()
+        compose.onNodeWithText("$elapsed recorded", substring = true).assertIsDisplayed()
         compose.onNodeWithText("until", substring = true).assertDoesNotExist()
     }
 

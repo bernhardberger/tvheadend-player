@@ -493,6 +493,8 @@
     <string name="recording_loading">Loading recording…</string>
     <string name="recording_resume_from">Resume from %1$s</string>
     <string name="recording_ends_at">Ends at %1$s</string>
+    <!-- Beside the programme's time range, so a padded file's longer length does not read as a contradiction. -->
+    <string name="recording_length_recorded">%1$s recorded</string>
     <string name="recording_play_from_beginning">Play from beginning</string>
     <string name="recording_still_recording">Still recording</string>
     <string name="recording_duration_unavailable">Duration unavailable</string>
