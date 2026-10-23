@@ -6,6 +6,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.background
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.common.formatDateRange
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.runningRecordings
@@ -124,6 +125,7 @@ import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
+import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
@@ -1173,12 +1175,19 @@ internal fun RecordingsScreenContent(
         LaunchedEffect(actions.isEmpty()) { if (actions.isEmpty()) closeFolderMenu() }
         if (folder == null || session == null || actions.isEmpty()) return@let
         val summary = remember(folder) { summarizeDvrFolder(folder) }
+        val watched = remember(folder) {
+            folder.watchedCount { at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it)) }
+        }
         val context = LocalContext.current
         BrowseContextMenu(
             title = folder.name,
-            channel = pluralStringResource(R.plurals.recordings_folder_recording_count,
-                summary.recordingCount, summary.recordingCount),
-            episode = "",
+            channel = listOfNotNull(
+                pluralStringResource(R.plurals.recordings_folder_recording_count, summary.recordingCount, summary.recordingCount),
+                watched.takeIf { it > 0 }?.let { pluralStringResource(R.plurals.recordings_folder_watched_count, it, it) },
+            ).joinToString(" • "),
+            episode = summary.oldestStart?.let { oldest ->
+                formatDateRange(oldest, summary.newestStart ?: oldest)
+            }.orEmpty(),
             time = summary.totalSizeBytes.takeIf { it > 0 }?.let { formatFileSize(it, context) }.orEmpty(),
             actions = actions,
             backEnabled = backEnabled && folderDelete == null,

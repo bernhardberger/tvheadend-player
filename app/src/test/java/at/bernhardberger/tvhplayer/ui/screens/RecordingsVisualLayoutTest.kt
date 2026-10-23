@@ -836,6 +836,12 @@ class RecordingsVisualLayoutTest {
         capture("archive-folder-marks", 1f)
         compose.onNodeWithTag("recordings-folder-Documentaries").requestFocus().performKeyInput { pressKey(Key.Menu) }
         compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+        // The menu's header counts what the folder holds and spans its days, oldest first.
+        compose.onNode(hasText("3 recordings • 1 watched • 7.2 GB") and hasAnyAncestor(hasTestTag("browse-context-item")),
+            useUnmergedTree = true).assertIsDisplayed()
+        // The range keeps each day together with non-breaking spaces.
+        compose.onNode(hasText("Sep\u00a027", substring = true) and hasText("Oct\u00a01", substring = true) and
+            hasAnyAncestor(hasTestTag("browse-context-item")), useUnmergedTree = true).assertIsDisplayed()
         capture("archive-folder-menu", 1f)
         compose.onNodeWithText("Delete all").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("folder-delete-back").assertIsFocused()

@@ -222,6 +222,30 @@ fun formatTimeInterval(
     return keepEndpointsTogether(range)
 }
 
+/**
+ * The days from [startSec] to [stopSec] through ICU's DateIntervalFormat ("Sep 27 – Oct 1"), one date when
+ * both fall on the same day, with the year only when a day is outside the current year.
+ */
+fun formatDateRange(
+    startSec: Long,
+    stopSec: Long,
+    locale: Locale = Locale.getDefault(),
+    nowSec: Long = System.currentTimeMillis() / 1000L,
+): String {
+    val zone = ZoneId.systemDefault()
+    val currentYear = Instant.ofEpochSecond(nowSec).atZone(zone).year
+    val years = listOf(startSec, stopSec).map { Instant.ofEpochSecond(it).atZone(zone).year }
+    val skeleton = if (years.all { it == currentYear }) "MMMd" else "yMMMd"
+    val format = intervalFormats.getOrPut(skeleton to locale) {
+        android.icu.text.DateIntervalFormat.getInstance(skeleton, locale)
+    }
+    val range = synchronized(format) {
+        format.setTimeZone(android.icu.util.TimeZone.getTimeZone(zone.id))
+        format.format(android.icu.util.DateInterval(startSec * 1000L, maxOf(stopSec, startSec) * 1000L))
+    }
+    return keepEndpointsTogether(range)
+}
+
 /** The spoken form of [formatTimeInterval] for the clock times alone: built from the instants, never from display text. */
 fun formatTimeIntervalSpoken(
     startSec: Long,
