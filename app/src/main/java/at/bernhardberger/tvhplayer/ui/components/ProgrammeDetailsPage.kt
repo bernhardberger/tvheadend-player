@@ -972,7 +972,9 @@ private fun DetailsInformation(
                 stringResource(R.string.details_recording_progress_spoken,
                     formatDurationMinutes(position / 60, resources, spoken = true),
                     formatDurationMinutes(length / 60, resources, spoken = true),
-                    playerMinutesLeft(minutesLeft, spoken = true)), Modifier.widthIn(max = 470.dp).fillMaxWidth())
+                    playerMinutesLeft(minutesLeft, spoken = true)), Modifier.widthIn(max = 470.dp).fillMaxWidth(),
+                // How far the viewer is, not time on air.
+                color = MaterialTheme.colorScheme.tertiary)
         }
     }
 }
@@ -1004,13 +1006,14 @@ internal fun ProgrammeAgeRatingBox(rating: String, tag: String) {
 @Composable
 private fun DetailsTimeline(
     startLabel: String, progress: Float, endLabel: String, spokenDescription: String, modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
 ) {
     Row(modifier.testTag("details-timeline").semantics(mergeDescendants = true) {
         contentDescription = spokenDescription
     },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(startLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
-        ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
+        ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), color = color, trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
         Text(endLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
     }
 }

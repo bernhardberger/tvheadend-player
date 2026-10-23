@@ -16,10 +16,18 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.Placeable
+import androidx.compose.ui.layout.layoutId
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
@@ -81,10 +89,12 @@ internal fun ProgrammePanePicture(
 }
 
 /**
- * A programme's headline, in the details page's order: who and what, its facts, its time and the
- * synopsis, then the [footer] in the quietest tone. Channels and Recordings fill the same parts
+ * A programme's headline, in the details page's order: who and what, its facts, its time with the
+ * [status] that belongs to it, and the synopsis, then the [footer] in the quietest tone. Channels and Recordings fill the same parts
  * from their own data. With [fitSynopsis] the synopsis takes only whole lines of what the rest
- * leaves, up to [synopsisLines]. While [loading], the title and its time hold their lines.
+ * leaves, up to [synopsisLines]; parts that don't fit give way rather than being cut off, as
+ * [HeadlineColumn] orders. While [loading], the title and its time hold their lines.
+ * [progressColor] follows what the bar measures: on-air time cyan, the viewer's place orange.
  * Every part is tagged `<tagPrefix>-<part>`.
  */
 @Composable
@@ -99,26 +109,32 @@ internal fun ProgrammeHeadline(
     rating: String? = null,
     timing: String? = null,
     progress: Float? = null,
+    progressColor: Color = MaterialTheme.colorScheme.primary,
     synopsis: String? = null,
     fitSynopsis: Boolean = false,
     loading: Boolean = false,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    status: (@Composable (Modifier) -> Unit)? = null,
     footer: (@Composable (Modifier) -> Unit)? = null,
 ) {
     val typography = MaterialTheme.typography
     val colors = MaterialTheme.colorScheme
-    Column(modifier) {
-        eyebrow()
-        if (loading) {
+    if (loading) {
+        Column(modifier) {
+            eyebrow()
             CompositionLocalProvider(LocalContentColor provides colors.onSurface) {
                 SkeletonLine(Modifier.padding(top = 8.dp).testTag("$tagPrefix-loading"), titleStyle, widthFraction = 0.7f)
                 SkeletonLine(Modifier.padding(top = ProgrammeHeadlineLineGap), typography.labelMedium, widthFraction = 0.35f)
             }
-            return@Column
         }
+        return
+    }
+    val titleLineHeight = with(LocalDensity.current) { titleStyle.lineHeight.toDp() } + 8.dp
+    HeadlineColumn(modifier, titleLineHeight) {
+        Box(Modifier.layoutId(HeadlinePart.EYEBROW)) { eyebrow() }
         Text(title, style = titleStyle, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp).testTag("$tagPrefix-title"))
+            modifier = Modifier.layoutId(HeadlinePart.TITLE).padding(top = 8.dp).testTag("$tagPrefix-title"))
         subtitle?.takeIf(String::isNotBlank)?.let {
             // Regular weight, as the kit's dialog keeps everything under its title; white, as it
             // names the episode with the title.
@@ -128,23 +144,25 @@ internal fun ProgrammeHeadline(
         }
         if (facts.isNotEmpty() || rating != null) {
             ProgrammeFacts(facts, rating, "$tagPrefix-rating",
-                Modifier.padding(top = ProgrammeHeadlineLineGap).testTag("$tagPrefix-facts"))
+                Modifier.layoutId(HeadlinePart.FACTS).padding(top = ProgrammeHeadlineLineGap).testTag("$tagPrefix-facts"))
         }
         if (timing != null) {
             Row(Modifier.padding(top = ProgrammeHeadlineLineGap).testTag("$tagPrefix-metadata"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(timing, style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 1)
                 // Shorter rather than pushed off the end by a long time line.
-                if (progress != null) ProgressStrip(progress, Modifier.weight(1f, fill = false).width(160.dp))
+                if (progress != null) ProgressStrip(progress, Modifier.weight(1f, fill = false).width(160.dp), progressColor)
             }
         }
+        status?.invoke(Modifier.padding(top = ProgrammeHeadlineLineGap))
         synopsis?.takeIf(String::isNotBlank)?.let { text ->
             val synopsisText = @Composable { lines: Int ->
                 Text(text, style = synopsisStyle, color = TvTextColors.secondary,
                     maxLines = lines, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = ProgrammeHeadlineSynopsisGap).testTag("$tagPrefix-synopsis"))
             }
-            if (!fitSynopsis) synopsisText(synopsisLines) else BoxWithConstraints(Modifier.weight(1f, fill = false)) {
+            if (!fitSynopsis) Box(Modifier.layoutId(HeadlinePart.SYNOPSIS)) { synopsisText(synopsisLines) }
+            else BoxWithConstraints(Modifier.layoutId(HeadlinePart.SYNOPSIS)) {
                 // Only whole lines in what the rest leaves, and none rather than a cut one.
                 val lineHeight = with(LocalDensity.current) { synopsisStyle.lineHeight.toDp() }
                 val lines = minOf(synopsisLines, ((maxHeight - ProgrammeHeadlineSynopsisGap) / lineHeight).toInt())
@@ -154,7 +172,50 @@ internal fun ProgrammeHeadline(
         // A lone title keeps the footer close; otherwise it starts a group of its own.
         val details = subtitle?.isNotBlank() == true || facts.isNotEmpty() || rating != null || timing != null ||
             synopsis?.isNotBlank() == true
-        footer?.invoke(Modifier.padding(top = if (details) ProgrammeHeadlineSynopsisGap else ProgrammeHeadlineLineGap))
+        footer?.invoke(Modifier.layoutId(HeadlinePart.FOOTER)
+            .padding(top = if (details) ProgrammeHeadlineSynopsisGap else ProgrammeHeadlineLineGap))
+    }
+}
+
+/** The headline's parts placed apart from the rest; after the title, the ones that go in this order. */
+private enum class HeadlinePart { TITLE, FOOTER, FACTS, EYEBROW, SYNOPSIS }
+
+/**
+ * Stacks the headline's parts as a column. When they are taller than the space, the title gives
+ * way first, down to one line ([titleLineHeight] with its gap), then whole [HeadlinePart]s go,
+ * footer first, rather than the bottom being cut off; the subtitle, the time and status always
+ * stay. The synopsis is measured last and gets what is left.
+ */
+@Composable
+private fun HeadlineColumn(modifier: Modifier, titleLineHeight: Dp, content: @Composable () -> Unit) {
+    Layout(content, modifier) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val title = measurables.firstOrNull { it.layoutId == HeadlinePart.TITLE }
+        val synopsis = measurables.firstOrNull { it.layoutId == HeadlinePart.SYNOPSIS }
+        val placeables = HashMap<Measurable, Placeable>()
+        measurables.filter { it !== synopsis && it !== title }.forEach { placeables[it] = it.measure(loose) }
+        var used = placeables.values.sumOf { it.height }
+        if (constraints.hasBoundedHeight) {
+            val oneLine = if (title == null) 0 else titleLineHeight.roundToPx()
+            for (part in listOf(HeadlinePart.FOOTER, HeadlinePart.FACTS, HeadlinePart.EYEBROW)) {
+                if (used + oneLine <= constraints.maxHeight) break
+                placeables.keys.filter { it.layoutId == part }.forEach { used -= placeables.remove(it)!!.height }
+            }
+        }
+        // An ellipsized title takes only the whole lines that fit what the rest leaves, but at least one.
+        if (title != null) placeables[title] = title.measure(
+            if (!constraints.hasBoundedHeight) loose
+            else loose.copy(maxHeight = (constraints.maxHeight - used).coerceAtLeast(titleLineHeight.roundToPx())),
+        ).also { used += it.height }
+        if (synopsis != null) placeables[synopsis] = synopsis.measure(
+            if (!constraints.hasBoundedHeight) loose else loose.copy(maxHeight = (constraints.maxHeight - used).coerceAtLeast(0)),
+        )
+        val shown = measurables.mapNotNull(placeables::get)
+        layout(constraints.constrainWidth(shown.maxOfOrNull { it.width } ?: 0),
+            constraints.constrainHeight(shown.sumOf { it.height })) {
+            var y = 0
+            shown.forEach { it.placeRelative(0, y); y += it.height }
+        }
     }
 }
 

@@ -629,9 +629,7 @@ internal fun RecordingsScreenContent(
                         }
                     },
                     piconForEntry = { it.channelId?.let(channelsById::get)?.icon },
-                    resumePositionForEntry = {
-                        at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
-                    },
+                    admissionForEntry = { observation.recordingPlaybackAdmission(it) },
                     modifier = Modifier.fillMaxSize().onFocusChanged {
                         if (owner.isCurrent) {
                             contentHasFocus = it.hasFocus

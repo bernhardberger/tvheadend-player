@@ -6,6 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 enum class RecordingOpenAction { START_OVER, RESUME_CHOICE, RESUME, DETAILS }
 
@@ -32,6 +33,20 @@ fun offeredResumePosition(admission: RecordingPlaybackAdmission?): Duration? = w
     admission is RecordingPlaybackAdmission.Completed -> admission.resumePosition
     admission is RecordingPlaybackAdmission.Growing -> admission.resumePosition
     else -> null
+}
+
+/**
+ * What is left to watch of a finished recording: what was recorded less the position it offers to
+ * resume from, or all of it when opening starts over. Null unless [admission] offers its completed
+ * file with a known length; a growing one is still recording.
+ */
+@OptIn(ExperimentalTvheadendApi::class)
+fun recordingTimeLeft(entry: DvrEntry, admission: RecordingPlaybackAdmission?): Duration? {
+    if (admission !is RecordingPlaybackAdmission.Completed) return null
+    val length = recordingLengthSeconds(entry, nowSec = 0L)?.takeIf { it > 0L }?.seconds ?: return null
+    val position = offeredResumePosition(admission)
+        ?.takeIf { recordingOpenAction(entry, admission) == RecordingOpenAction.RESUME_CHOICE } ?: Duration.ZERO
+    return (length - position).coerceAtLeast(Duration.ZERO)
 }
 
 /** How opening [entry] starts, following the SDK's [admission] of it from the observation it was read from. */

@@ -72,7 +72,7 @@ class ArchiveDepthOwnershipTest {
                             onModeFocus = {}, onDrawerFocus = null,
                             onOpenRecording = { opened += it.id },
                             piconForEntry = { null },
-                            resumePositionForEntry = { null },
+                            admissionForEntry = { null },
                         )
                     }
                 }

@@ -396,6 +396,32 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("until", substring = true).assertDoesNotExist()
     }
 
+    @Test fun crowdedPaneShortensItsTitleAndKeepsSubtitleAndStatus() {
+        val start = 1_791_000_000L - 86_400L
+        val entry = DvrEntry.create(DvrEntryId(1), title = LONG_TITLE, state = DvrEntryState.COMPLETED, folder = emptyList(),
+            start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + 215 * 60),
+            files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
+                stop = Instant.fromEpochSeconds(start + 151 * 60), sizeBytes = 2_400_000_000L)),
+            channelName = "Ridge Earth Mountain Channel HD Extra", subtitle = "A winter expedition beyond the Arctic Circle",
+            episode = EpgEpisode(null, null, 2, 5, 7, 10, null, null, "S2 E7"), copyrightYear = 2018,
+            rating = EpgRating(0, null, null, null, null, null),
+            description = "Follow a small team of naturalists through remote landscapes.")
+        show(scale = 1.3f, entries = listOf(entry))
+        focused("recording-list-entry-1")
+        capture("archive-crowded-pane", 1.3f)
+        val pane = bounds("recording-metadata-pane")
+        listOf("recording-metadata-title", "recording-metadata-subtitle", "recording-metadata-metadata",
+            "recording-metadata-stopped-early").forEach {
+            compose.onNodeWithTag(it, useUnmergedTree = true).assertIsDisplayed()
+            assertTrue("$it ends inside the pane", bounds(it).bottom <= pane.bottom + 0.5f)
+        }
+        // The title gives way to one line first; the subtitle says what the recording is.
+        val title = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithTag("recording-metadata-title", useUnmergedTree = true)
+            .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(title) }
+        assertEquals(1, title.single().lineCount)
+    }
+
     @Test fun zeroLengthIsAbsentFromRowsAndPane() {
         show(entries = listOf(recording(1, "Empty recording", "empty.ts", recordedMinutes = 0)))
         focused("recording-list-entry-1")
@@ -753,15 +779,27 @@ class RecordingsVisualLayoutTest {
         assertWatchMark(1, "Partly watched")
         assertWatchMark(2, "Watched")
         compose.onNodeWithTag("recording-list-watched-3", useUnmergedTree = true).assertDoesNotExist()
+        // 1:02:03 into 90 minutes leaves 27:57, rounded up, ending that long from now.
+        assertTimeLeft("28m left • Ends at ")
+        capture("archive-watch-partly", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
         compose.onNodeWithTag("recording-metadata-watched", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("recording-metadata-time-left", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithText("147", substring = true).assertDoesNotExist()
+        capture("archive-watch-seen", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-3")
         compose.onNodeWithTag("recording-metadata-watched", useUnmergedTree = true).assertDoesNotExist()
+        assertTimeLeft("Ends at ")
+        compose.onNodeWithText("left", substring = true).assertDoesNotExist()
         capture("archive-watch-marks", 1f)
         assertNoCommands()
+    }
+
+    private fun assertTimeLeft(start: String) {
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-time-left")) and hasText(start, substring = true),
+            useUnmergedTree = true).assertIsDisplayed()
     }
 
     private fun publish(entries: List<DvrEntry>) {

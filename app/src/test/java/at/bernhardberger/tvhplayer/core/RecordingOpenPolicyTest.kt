@@ -98,6 +98,18 @@ class RecordingOpenPolicyTest {
         assertEquals(RecordingOpenAction.DETAILS, recordingOpenAction(entry(position = 300), null))
         assertNull(offeredResumePosition(null))
     }
+    @Test fun timeLeftIsTheRestFromWhereOpeningStartsAndOnlyForAFinishedFile() {
+        val observation = SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+        fun left(entry: DvrEntry) = recordingTimeLeft(entry, observation.recordingPlaybackAdmission(entry))
+        assertEquals(600.seconds, left(entry()))
+        assertEquals(300.seconds, left(entry(position = 300)))
+        // Past the completion point opening starts over, so all of it is left.
+        assertEquals(600.seconds, left(entry(position = 590)))
+        assertNull(left(entry(duration = null)))
+        assertNull(left(entry(DvrEntryState.RECORDING, 300, files = listOf(file()))))
+        assertNull(left(entry(DvrEntryState.SCHEDULED)))
+        assertNull(recordingTimeLeft(entry(position = 300), null))
+    }
     @Test fun resumeOfferFollowsTheAdmissionPosition() {
         assertEquals(300.seconds, offeredResumePosition(TvheadendTestResultFactory.completedRecordingAdmission(
             300.seconds, RecordingProgressCapability.SUPPORTED)))
