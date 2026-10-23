@@ -320,7 +320,7 @@ private fun detailsActions(
         ))
     }
     if (future) add(DetailsAction("details-remind", R.drawable.ic_event, stringResource(R.string.details_action_remind)))
-    add(DetailsAction("details-record-series", R.drawable.ic_video_library, stringResource(R.string.details_action_record_series)))
+    add(DetailsAction("details-record-series", R.drawable.ic_fiber_smart_record, stringResource(R.string.details_action_record_series)))
     add(DetailsAction("details-other-airings", R.drawable.ic_schedule, stringResource(R.string.details_action_other_airings)))
 }
 
