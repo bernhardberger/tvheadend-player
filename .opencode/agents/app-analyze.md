@@ -15,7 +15,7 @@ permission:
   question: deny
   publish_artifact: deny
 model: openai/gpt-6-astra
-variant: medium
+variant: high
 ---
 
 Diagnose one concrete post-plan ambiguity, failed invariant, unexpected behavior,

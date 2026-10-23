@@ -15,7 +15,7 @@ permission:
   question: deny
   publish_artifact: deny
 model: openai/gpt-6-astra
-variant: low
+variant: high
 ---
 
 Independently review one frozen, tested TVHeadend Player package packet.
