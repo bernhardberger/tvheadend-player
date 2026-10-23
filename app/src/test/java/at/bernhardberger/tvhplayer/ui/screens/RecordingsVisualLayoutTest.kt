@@ -177,6 +177,23 @@ class RecordingsVisualLayoutTest {
         assertTrue("the parent's arrows are well below the preview ($parent vs $preview)", parent < preview * .3f)
     }
 
+    @Test fun theListFadeKeepsTheScaledFocusedRowWhole() {
+        show()
+        focused("recordings-folder-Documentaries")
+        compose.waitForIdle()
+        val list = bounds("depth-active")
+        val row = bounds("recordings-folder-Documentaries")
+        val (outside, background) = compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            fun brightness(x: Float, y: Float) =
+                android.graphics.Color.valueOf(bitmap.getPixel(x.toInt(), y.toInt())).run { maxOf(red(), green(), blue()) }
+            (brightness(list.left - 3f, row.center.y) to brightness(list.left - 3f, row.bottom + 40f))
+                .also { bitmap.recycle() }
+        }
+        assertTrue("the focused row's scaled end shows left of the list ($outside over $background)", outside > background + .5f)
+    }
+
     @Test fun folderOkEntersInPlaceDetailsAndBackRestoreOrigin() {
         show()
         focused("recordings-folder-Documentaries")

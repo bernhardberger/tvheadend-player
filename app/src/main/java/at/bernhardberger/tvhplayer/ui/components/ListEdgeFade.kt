@@ -15,9 +15,11 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.offset
 
 // Browse lists run to the bottom edge of the screen and fade out where rows continue,
 // as the Cards example of the TV Design Kit does: opaque to about three quarters of
@@ -107,10 +109,27 @@ internal fun rememberListEdgeBringIntoView(listState: LazyListState, topReserve:
     }
 }
 
-/** Fades a list's edges only while rows continue past them; read during drawing. */
-internal fun Modifier.listEdgeFades(listState: LazyListState): Modifier =
-    listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { listState.canScrollBackward }) {
+/** Room beside a faded list for its focused row's native scale, which the mask's layer would clip. */
+private val ListFocusOverhang = 24.dp
+
+/**
+ * Fades a list's edges only while rows continue past them; read during drawing. The mask's
+ * offscreen layer reaches [ListFocusOverhang] past both sides of the list without changing its
+ * layout, so a scaled focused row keeps its rounded ends.
+ */
+internal fun Modifier.listEdgeFades(listState: LazyListState): Modifier = this
+    .layout { measurable, constraints ->
+        val overhang = ListFocusOverhang.roundToPx()
+        val placeable = measurable.measure(constraints.offset(horizontal = 2 * overhang))
+        layout(placeable.width - 2 * overhang, placeable.height) { placeable.placeRelative(-overhang, 0) }
+    }
+    .listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { listState.canScrollBackward }) {
         listState.canScrollForward
+    }
+    .layout { measurable, constraints ->
+        val overhang = ListFocusOverhang.roundToPx()
+        val placeable = measurable.measure(constraints.offset(horizontal = -2 * overhang))
+        layout(placeable.width + 2 * overhang, placeable.height) { placeable.placeRelative(overhang, 0) }
     }
 
 /** Local transparent edge masks; the scroll-dependent edges are read only during drawing. */
