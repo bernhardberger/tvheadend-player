@@ -1,7 +1,7 @@
 ---
 description: Writable TVHeadend Player implementer for one delegated, bounded code slice with tests and a build gate; never commits, releases, or touches devices
 mode: subagent
-model: claude-code/claude-sonnet-5-5
+model: claude-code/claude-opus-5-5[1m]
 variant: high
 steps: 300
 permission:
