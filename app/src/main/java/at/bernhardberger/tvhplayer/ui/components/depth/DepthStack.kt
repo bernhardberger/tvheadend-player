@@ -17,9 +17,21 @@ data class DepthFrame(
 
 data class DepthPreviewKey(val visit: Long, val revision: Long, val levelId: String, val itemId: String, val childLevelId: String)
 
-/** An arbitrary-depth local stack; no destination registry or product commands. */
+/** How many left levels keep their focused row and viewport; the oldest left is forgotten first. */
+internal const val DepthRememberedLevels = 64
+
+/**
+ * An arbitrary-depth local stack; no destination registry or product commands. A level left
+ * by [pop] stays in [remembered], so entering it again lands on the row it was left on, as
+ * Kodi returns to the item last selected in a folder.
+ */
 @Serializable
-data class DepthStack(val frames: List<DepthFrame>, val visit: Long = 0, val previewRevision: Long = 0) {
+data class DepthStack(
+    val frames: List<DepthFrame>,
+    val visit: Long = 0,
+    val previewRevision: Long = 0,
+    val remembered: Map<String, DepthFrame> = emptyMap(),
+) {
     init { require(frames.isNotEmpty()) }
     val active: DepthFrame get() = frames.last()
     val canPop: Boolean get() = frames.size > 1
@@ -49,14 +61,25 @@ data class DepthStack(val frames: List<DepthFrame>, val visit: Long = 0, val pre
         ))
     }
 
-    fun enter(item: DepthItem, items: List<DepthItem>): DepthStack {
+    /** [restore] is false for a choice level, which always opens on its current choice. */
+    fun enter(item: DepthItem, items: List<DepthItem>, restore: Boolean = true): DepthStack {
         // A stale rendered row cannot enter a replacement branch. Leaves never push.
         if (items.none { it == item } || item.id != active.focusedItemId) return this
         val child = item.childLevelId ?: return this
-        return copy(frames = frames + DepthFrame(child), visit = visit + 1)
+        return copy(frames = frames + if (restore) frameFor(child) else DepthFrame(child), visit = visit + 1)
     }
 
-    fun pop(): DepthStack = if (canPop) copy(frames = frames.dropLast(1), visit = visit + 1) else this
+    fun pop(): DepthStack = if (canPop) {
+        val kept = (remembered - active.levelId).entries.toList().takeLast(DepthRememberedLevels - 1)
+        copy(
+            frames = frames.dropLast(1),
+            visit = visit + 1,
+            remembered = kept.associate { it.toPair() } + (active.levelId to active),
+        )
+    } else this
+
+    /** The frame a level opens with: where it was left, or its first row. */
+    fun frameFor(levelId: String): DepthFrame = remembered[levelId] ?: DepthFrame(levelId)
 
     fun previewKey(items: List<DepthItem>): DepthPreviewKey? = items
         .firstOrNull { it.id == active.focusedItemId }?.let { item ->

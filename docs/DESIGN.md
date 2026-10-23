@@ -449,6 +449,11 @@ Accepted 2026-09-15; static design in Penpot page
   and a held Left that leaves an editor stops there. Focus alone never commits a setting. Switches
   act in place; choice lists (e.g. App language) are a level, not a dialog, and
   OK on a choice applies it and returns.
+- Entering a level again opens it on the row and viewport it was left on, as
+  Kodi returns to a folder's last selected item, and its preview shows that same
+  place. A row that is gone gives way to its nearest neighbour. The 64 most
+  recently left levels are remembered while the app runs, across switches to
+  other screens, but not over a restart. Choice levels always open on their current choice (accepted 2026-10-24).
 - **Connection** enters a normal overview (Status, Server, HTSP port, `Edit
   connection` with an edit icon). The edit action opens the existing secure
   editor as a dedicated flow; no inline text inputs, per-field rows or

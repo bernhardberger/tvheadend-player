@@ -698,6 +698,29 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun aFolderOpensAgainOnTheRowItWasLeftOn() {
+        show(entries = List(12) { recording(it + 1L, "Episode ${it + 1}", "Series/episode-$it.ts") } +
+            recording(20, "Northline Tonight", "News/report.ts"))
+        // Folders come newest first, so Series leads.
+        focused("recordings-folder-Series")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-1")
+        repeat(9) { key(Key.DirectionDown) }
+        focused("recording-list-entry-10")
+        key(Key.DirectionLeft)
+        focused("recordings-folder-Series")
+        // Another folder in between does not make Series forget its row.
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        focused("recording-list-entry-20")
+        key(Key.DirectionLeft)
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        focused("recording-list-entry-10")
+        compose.runOnIdle { assertEquals(listOf("Series"), screenState.archivePath) }
+        assertNoCommands()
+    }
+
     @OptIn(TvheadendTestingApi::class)
     @Test fun recordingNowIsFirstEntersFlatListAndBackRestoresItsRow() {
         show(entries = listOf(
@@ -741,6 +764,9 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         focused("recordings-recording-now-folder")
         key(Key.DirectionRight)
+        // Recording now opens again on the recording it was left on.
+        focused("recording-list-entry-10")
+        key(Key.DirectionUp)
         focused("recording-list-entry-11")
         key(Key.DirectionDown)
         focused("recording-list-entry-10")

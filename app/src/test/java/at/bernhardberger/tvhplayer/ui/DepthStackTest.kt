@@ -22,6 +22,23 @@ class DepthStackTest {
         assertEquals(stack, stack.pop())
     }
 
+    @Test fun aLeftLevelReopensOnItsRowAndViewportUntilItIsTheOldestOfTooMany() {
+        val folders = List(DepthRememberedLevels + 1) { DepthItem("folder-$it", "level-$it") }
+        val rows = List(20) { DepthItem("row-$it") }
+        var stack = DepthStack(listOf(DepthFrame("root"))).reconcile(folders)
+        folders.forEach { folder ->
+            stack = stack.focus(folder.id, folders).enter(folder, folders)
+                .reconcile(rows).focus("row-12", rows).viewport("row-9", 9, 31)
+                .pop()
+        }
+        val reopened = stack.focus("folder-1", folders).enter(folders[1], folders).active
+        assertEquals(DepthFrame("level-1", "row-12", 12, "row-9", 9, 31), reopened)
+        assertEquals(reopened, Json.decodeFromString<DepthStack>(Json.encodeToString(stack)).frameFor("level-1"))
+        // The first folder left is the one forgotten, and it opens on its first row again.
+        assertEquals(DepthFrame("level-0"), stack.focus("folder-0", folders).enter(folders[0], folders).active)
+        assertEquals(DepthRememberedLevels, stack.remembered.size)
+    }
+
     @Test fun missingItemsUseNearestRemainingIndexAndEmptyRecoveryIsDeterministic() {
         val items = (0..4).map { DepthItem("item-$it") }
         val stack = DepthStack(listOf(DepthFrame("root"))).reconcile(items)

@@ -227,6 +227,9 @@ fun DepthNavigation(
         state.update(state.stack.viewport(ids.getOrNull(index)?.id, index, list.firstVisibleItemScrollOffset))
     }
     fun pop() { saveViewport(); state.pop() }
+    // A choice level opens on its current choice; a browse level where it was left.
+    fun openingFrame(stack: DepthStack, levelId: String) =
+        if (resolve(levelId).initialItemId != null) DepthFrame(levelId) else stack.frameFor(levelId)
     fun editorLeft(native: KeyEvent): Boolean {
         if (!isCurrent || state.stack.visit != stack.visit || level.activeContent == null) return false
         return cycles.handle(native.keyCode, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
@@ -244,7 +247,8 @@ fun DepthNavigation(
         if (row.item !in currentItems) return
         if (row.item.childLevelId != null) {
             saveViewport()
-            state.update(state.stack.enter(row.item, currentItems))
+            state.update(state.stack.enter(row.item, currentItems,
+                restore = resolve(row.item.childLevelId).initialItemId == null))
         } else if (!enterOnly) {
             val current = currentRows.first { it.item == row.item }
             if (current.leafLevelId != null) {
@@ -273,7 +277,7 @@ fun DepthNavigation(
             if (childId != null) {
                 val previewLevel = resolve(childId)
                 if (previewLevel.activeContent == null) {
-                    add(DepthStripColumn(reconciled.path + childId, previewLevel, DepthFrame(childId)))
+                    add(DepthStripColumn(reconciled.path + childId, previewLevel, openingFrame(reconciled, childId)))
                 }
             }
         }
@@ -425,7 +429,7 @@ fun DepthNavigation(
                                     val childId = path.last()
                                     val previewLevel = resolve(childId)
                                     if (previewLevel.activeContent == null) {
-                                        val column = DepthStripColumn(path, previewLevel, DepthFrame(childId))
+                                        val column = DepthStripColumn(path, previewLevel, openingFrame(state.stack, childId))
                                         key(column.path) {
                                             val columnVisit = state.stack.visit
                                             DepthStripPane(
