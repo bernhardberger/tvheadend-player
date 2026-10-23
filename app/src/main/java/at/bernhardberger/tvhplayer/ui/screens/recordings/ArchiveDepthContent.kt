@@ -122,7 +122,8 @@ internal fun ArchiveDepthContent(
                                 heading = { ArchiveLevelHeading("", it) },
                                 passiveContent = {
                                     RecordingMetadataPane(item.entry, latestPiconForEntry.value(item.entry),
-                                        latestResumePositionForEntry.value(item.entry))
+                                        latestResumePositionForEntry.value(item.entry),
+                                        Modifier.padding(bottom = contentPadding.calculateBottomPadding()))
                                 },
                             )
                             DepthRow(

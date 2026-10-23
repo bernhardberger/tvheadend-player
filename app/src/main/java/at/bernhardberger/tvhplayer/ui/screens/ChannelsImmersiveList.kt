@@ -93,7 +93,6 @@ import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
-import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
@@ -103,13 +102,15 @@ import at.bernhardberger.tvhplayer.ui.components.DetailsHero
 import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
-import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeAgeRatingBox
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
-import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineSynopsisGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
+import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
-import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
 import at.bernhardberger.tvhplayer.ui.components.browseDrawerUnderlap
 import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
@@ -132,15 +133,6 @@ private val ImmersiveFocusRoom = 12.dp
 
 /** Between the hero's last line and the row's focus room: the kit's and JetStream's 40dp to the cards. */
 private val ImmersiveHeroGap = 40.dp - ImmersiveFocusRoom
-
-/** The kit's gap between the title group and the description. */
-private val ImmersiveSynopsisGap = 20.dp
-
-/** Between the facts and time lines of the headline beside the list. */
-private val ImmersiveListLineGap = 8.dp
-
-/** The facts line, as tall as its outlined age rating. */
-private val ImmersiveFactsLineHeight = 22.dp
 
 private const val ImmersiveSynopsisLines = 2
 private const val ImmersiveListSynopsisLines = 3
@@ -434,9 +426,9 @@ internal fun ChannelsImmersiveHero(
     val height = with(LocalDensity.current) {
         typography.labelMedium.lineHeight.toDp() + 8.dp + typography.headlineLarge.lineHeight.toDp() * 2 +
             4.dp + typography.bodyLarge.lineHeight.toDp() +
-            ImmersiveListLineGap + ImmersiveFactsLineHeight + ImmersiveListLineGap + typography.labelMedium.lineHeight.toDp() +
-            ImmersiveSynopsisGap + typography.bodyLarge.lineHeight.toDp() * ImmersiveSynopsisLines +
-            ImmersiveSynopsisGap + typography.labelMedium.lineHeight.toDp()
+            ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() +
+            ProgrammeHeadlineSynopsisGap + typography.bodyLarge.lineHeight.toDp() * ImmersiveSynopsisLines +
+            ProgrammeHeadlineSynopsisGap + typography.labelMedium.lineHeight.toDp()
     }
     AnimatedContent(
         targetState = channelId,
@@ -471,28 +463,13 @@ internal fun ChannelsImmersiveHero(
     }
 }
 
-/** The facts and age rating of a programme, on one line. */
-@Composable
-private fun ProgrammeFacts(metadata: List<String>, rating: String?, modifier: Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        if (metadata.isNotEmpty()) {
-            Text(programmeFactsSegments(metadata), Modifier.weight(1f, fill = false),
-                style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        if (rating != null) ProgrammeAgeRatingBox(rating, "channels-immersive-rating")
-    }
-}
-
 /** Avoid repeating a supplied subtitle as the synopsis when a fuller description exists. */
 internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
-    sequenceOf(event.summary, event.description)
-        .mapNotNull { it?.replace("\\r\\n", "\n")?.replace("\\n", "\n")?.trim() }
-        .firstOrNull { it.isNotBlank() && it != event.title?.trim() && it != event.subtitle?.trim() }
+    programmeSynopsis(event.title, event.subtitle, event.summary, event.description)
 
 /**
- * The headline of the immersive row and beside the list, in the details page's order: who and
- * what is on, its facts, its time and the synopsis, then what follows in the quietest tone.
+ * The headline of the immersive row and beside the list: who and what is on now, then what
+ * follows in the quietest tone.
  */
 @Composable
 private fun ChannelsHeadline(
@@ -501,73 +478,39 @@ private fun ChannelsHeadline(
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
 ) {
-    val typography = MaterialTheme.typography
-    val colors = MaterialTheme.colorScheme
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0]
-    Column(modifier) {
-        // Everything here is on now, so only a recording earns a mark: the player's REC badge.
-        ProgrammeEyebrow(channel, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
-            Modifier.semantics(mergeDescendants = true) {}.testTag("channels-headline-channel")) {
-            if (recording) RecordingBadge(DvrEntryState.RECORDING)
-        }
-        if (current == null && loading) {
-            // The title and its time hold their lines until the guide arrives.
-            CompositionLocalProvider(LocalContentColor provides colors.onSurface) {
-                SkeletonLine(Modifier.padding(top = 8.dp).testTag("channels-immersive-loading"), titleStyle,
-                    widthFraction = 0.7f)
-                SkeletonLine(Modifier.padding(top = ImmersiveListLineGap), typography.labelMedium, widthFraction = 0.35f)
-            }
-            return@Column
-        }
-        Text(
-            current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
-            style = titleStyle, color = colors.onSurface,
-            maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 8.dp).testTag("channels-immersive-title"),
-        )
-        if (current != null) {
-            // With EIT it is often the only text besides the title.
-            current.subtitle?.takeIf(String::isNotBlank)?.let {
-                // Regular weight, as the kit's dialog keeps everything under its title; white, as it
-                // names the episode with the title.
-                Text(it, style = typography.bodyLarge, color = TvTextColors.primary,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 4.dp).testTag("channels-immersive-subtitle"))
-            }
-            val metadata = remember(current, resources, locale) {
-                programmeHeaderMetadata(programmeAboutFacts(current, null, resources, locale), resources,
-                    current.episode, current.firstAired, locale)
-            }
-            val rating = current.rating?.let { programmeAgeRating(it.label, it.age) }
-            if (metadata.isNotEmpty() || rating != null) {
-                ProgrammeFacts(metadata, rating, Modifier.padding(top = ImmersiveListLineGap).testTag("channels-list-facts"))
-            }
-            Row(Modifier.padding(top = ImmersiveListLineGap).testTag("channels-immersive-metadata"),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(formatTimeInterval(current.start.epochSeconds, current.stop.epochSeconds),
-                    style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 1)
-                ProgressStrip(current.progress(now), Modifier.width(160.dp))
-            }
-        }
-        current?.let(::channelsProgrammeSynopsis)?.let { synopsis ->
-            val text = @Composable { lines: Int ->
-                Text(synopsis, style = synopsisStyle, color = TvTextColors.secondary,
-                    maxLines = lines, overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = ImmersiveSynopsisGap).testTag("channels-headline-synopsis"))
-            }
-            if (!fitSynopsis) text(synopsisLines) else BoxWithConstraints(Modifier.weight(1f, fill = false)) {
-                // Only whole lines in what the rest leaves, and none rather than a cut one.
-                val lineHeight = with(LocalDensity.current) { synopsisStyle.lineHeight.toDp() }
-                val lines = minOf(synopsisLines, ((maxHeight - ImmersiveSynopsisGap) / lineHeight).toInt())
-                if (lines > 0) text(lines)
-            }
-        }
-        // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
-        next?.let {
-            NextProgramme(it, nextScheduled, modifier = Modifier.padding(top = if (current != null) ImmersiveSynopsisGap else ImmersiveListLineGap))
-        }
+    val metadata = remember(current, resources, locale) {
+        current?.let {
+            programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale)
+        }.orEmpty()
     }
+    ProgrammeHeadline(
+        eyebrow = {
+            // Everything here is on now, so only a recording earns a mark: the player's REC badge.
+            ProgrammeEyebrow(channel.icon, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
+                Modifier.semantics(mergeDescendants = true) {}.testTag("channels-headline-channel")) {
+                if (recording) RecordingBadge(DvrEntryState.RECORDING)
+            }
+        },
+        title = current?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
+        tagPrefix = "channels-immersive",
+        synopsisLines = synopsisLines,
+        modifier = modifier,
+        // With EIT it is often the only text besides the title.
+        subtitle = current?.subtitle,
+        facts = metadata,
+        rating = current?.rating?.let { programmeAgeRating(it.label, it.age) },
+        timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
+        progress = current?.progress(now),
+        synopsis = current?.let(::channelsProgrammeSynopsis),
+        fitSynopsis = fitSynopsis,
+        loading = current == null && loading,
+        titleStyle = titleStyle,
+        synopsisStyle = synopsisStyle,
+        // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
+        footer = next?.let { { footerModifier -> NextProgramme(it, nextScheduled, footerModifier) } },
+    )
 }
 
 /** What follows, with a scheduled recording marked on the programme as the rows mark theirs. */
@@ -605,7 +548,7 @@ internal fun ChannelsListArt(
     AnimatedContent(
         targetState = channelId,
         transitionSpec = { fadeIn(tween(ChannelsDetailCrossfadeMillis)) togetherWith fadeOut(tween(ChannelsDetailCrossfadeMillis)) },
-        modifier = modifier.width(ListArtWidth).aspectRatio(16f / 9f).testTag("channels-list-art"),
+        modifier = modifier.width(ProgrammePaneWidth).aspectRatio(16f / 9f).testTag("channels-list-art"),
         label = "listArt",
     ) { id ->
         val channel = channels.firstOrNull { it.id == id } ?: return@AnimatedContent
@@ -613,27 +556,6 @@ internal fun ChannelsListArt(
         val art = remember(frame.observation, id, now, programArt) {
             if (programArt) frame.observation.eventAt(channel.id, Instant.fromEpochSeconds(now))?.image else null
         }
-        // The eyebrow below already names the channel, so the artwork goes without its logo plate.
-        if (art != null && LocalArtworkContext.current.currentSession != null) {
-            ProgrammeArtwork(art, channelIcon = null, progress = null, Modifier.fillMaxSize())
-        } else {
-            // The logo cards' ambient colour; with no text on it, it keeps its strength to the bottom.
-            Box(Modifier.fillMaxSize().clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
-                ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize(), bottomShare = 1f)
-                PiconBox(channel.icon,
-                    Modifier.align(Alignment.Center).fillMaxWidth(ListArtLogoWidthFraction).fillMaxHeight(ListArtLogoHeightFraction)
-                        .testTag("channels-list-art-logo"))
-            }
-        }
+        ProgrammePanePicture(art, channel.icon, channel.id, "channels-list-art-logo", Modifier.fillMaxSize())
     }
 }
-
-/**
- * The List's picture is the kit's four-column card, 268 by 151, and the headline below keeps to
- * its width: one column, as JetFit's details card, rather than a picture over wider text.
- */
-internal val ListArtWidth = TvGridColumnWidth * 4 + TvGridGutter * 3
-
-/** The logo's room in the List's picture: as wide as on the logo cards, half the picture tall. */
-private const val ListArtLogoWidthFraction = 0.6f
-private const val ListArtLogoHeightFraction = 0.5f

@@ -1826,9 +1826,9 @@ class RecordingsScreenTest {
         )
             .assertIsDisplayed()
         composeRule.onNodeWithText("ORF SPORT +", substring = true).assertIsDisplayed()
+        // One synopsis, as on the Channels pane: the summary, with the description kept for the details page.
         composeRule.onNodeWithText("The complete programme summary.").assertIsDisplayed()
-        composeRule.onNodeWithText("A longer recording description shown in the detail pane.")
-            .assertIsDisplayed()
+        composeRule.onNodeWithText("A longer recording description shown in the detail pane.").assertDoesNotExist()
     }
 
     @Test

@@ -683,7 +683,7 @@ class ChannelsStandardLayoutEvidenceTest {
                 detail("channels-immersive-title").assertTextEquals(noEpg)
                 detail("channels-immersive-next").assertDoesNotExist()
                 detail("channels-immersive-subtitle").assertDoesNotExist()
-                detail("channels-headline-synopsis").assertDoesNotExist()
+                detail("channels-immersive-synopsis").assertDoesNotExist()
             } else {
                 assertTrue("Next closes the headline above the safe bottom",
                     detail("channels-immersive-next").bounds().bottom <= 512.5f)
@@ -692,7 +692,7 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     private fun assertDescriptionFits(expectedLines: Int) {
-        val description = detail("channels-headline-synopsis")
+        val description = detail("channels-immersive-synopsis")
         val subtitle = detail("channels-immersive-subtitle").bounds()
         val time = detail("channels-immersive-metadata").bounds()
         val next = detail("channels-immersive-next").bounds()
@@ -1046,8 +1046,8 @@ class ChannelsStandardLayoutEvidenceTest {
         }
         val picture = compose.onAllNodesWithTag("channels-list-art", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
         val next = compose.onAllNodesWithTag("channels-immersive-next", useUnmergedTree = true).fetchSemanticsNodes().singleOrNull()
-        val synopsisLines = if (compose.onAllNodesWithTag("channels-headline-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
-            detail("channels-headline-synopsis").textLayout().lineCount
+        val synopsisLines = if (compose.onAllNodesWithTag("channels-immersive-synopsis", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) 0 else
+            detail("channels-immersive-synopsis").textLayout().lineCount
         File(directory, "$name.txt").writeText(
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +

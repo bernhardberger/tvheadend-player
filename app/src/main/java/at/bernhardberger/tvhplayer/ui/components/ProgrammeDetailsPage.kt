@@ -903,7 +903,7 @@ private fun DetailsInformation(
 ) {
     // Only the title spans the page; the remaining information keeps its narrow text column.
     Column(Modifier.fillMaxWidth().testTag("details-information")) {
-        ProgrammeEyebrow(channel, channelTitleText(channel?.number, channel?.name.orEmpty()),
+        ProgrammeEyebrow(channel?.icon, channelTitleText(channel?.number, channel?.name.orEmpty()),
             Modifier.widthIn(max = 470.dp)) {
             val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
             if (removal != null) {
@@ -979,12 +979,12 @@ private fun DetailsInformation(
 
 @Composable
 internal fun ProgrammeEyebrow(
-    channel: Channel?, text: String,
+    picon: ArtworkId?, text: String,
     modifier: Modifier = Modifier, piconModifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {},
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        channel?.icon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp)) }
+        picon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp)) }
         Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
             color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing()

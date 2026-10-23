@@ -119,6 +119,8 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelRowEdgeInset
 import at.bernhardberger.tvhplayer.ui.components.ChannelRowGap
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePictureGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
 import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
@@ -150,9 +152,6 @@ internal fun channelsDetailPanePadding(
     end = maxOf(contentPadding.calculateEndPadding(layoutDirection), TvBrowseTrailingInset),
     bottom = contentPadding.calculateBottomPadding(),
 )
-
-/** Between the picture beside the list and the headline hanging from it: the kit's content gap. */
-private val ChannelsListArtGap = 20.dp
 
 private const val CHANNEL_EMPTY_GROUP_FOCUS_FRAMES = 4
 
@@ -1036,7 +1035,7 @@ internal fun ChannelsScreenContent(
                         ChannelsListArt(channels, frame, nowSecProvider, view.showsProgramArt,
                             Modifier.padding(top = ChannelsListTopReserve))
                         ChannelsImmersiveHero(channels, frame, nowSecProvider,
-                            Modifier.padding(top = ChannelsListArtGap).weight(1f).widthIn(max = ListArtWidth), besideList = true)
+                            Modifier.padding(top = ProgrammePanePictureGap).weight(1f).widthIn(max = ProgrammePaneWidth), besideList = true)
                     }
                 }
             }

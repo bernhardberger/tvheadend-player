@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -40,7 +41,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -57,7 +57,6 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -122,6 +121,20 @@ import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.layout.aspectRatio
+import at.bernhardberger.tvhplayer.core.programmeAgeRating
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration
+import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
+import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePictureGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
+import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
+import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
+import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -288,14 +301,20 @@ internal fun RecordingNowFolderRow(
     )
 }
 
+/**
+ * The focused recording beside the list, laid out as the Channels pane: its picture, then the
+ * channel and day with the recording's state, what it is, its facts, when it ran with how far it
+ * was watched, and the synopsis; how it ended and whether it was watched close it.
+ */
 @Composable
 internal fun RecordingMetadataPane(
     entry: DvrEntry?,
     piconPath: ArtworkId?,
     resumePosition: Duration?,
+    modifier: Modifier = Modifier,
 ) {
     if (entry == null) {
-        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Icon(
                 painter = painterResource(R.drawable.ic_video_library),
                 contentDescription = null,
@@ -305,100 +324,79 @@ internal fun RecordingMetadataPane(
         }
         return
     }
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .testTag("recording-metadata-pane"),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        val artworkPath = LocalArtworkContext.current.currentSession?.let { entry.image ?: entry.fanartImage }
-        PiconBox(
-            piconPath = artworkPath ?: piconPath,
-            contentScale = if (artworkPath != null) ContentScale.Crop else ContentScale.Fit,
-            modifier = Modifier
-                .width(if (artworkPath != null) 176.dp else 92.dp)
-                .height(if (artworkPath != null) 99.dp else 64.dp)
-                .clip(MaterialTheme.shapes.small),
+    val resources = LocalContext.current.resources
+    val locale = LocalConfiguration.current.locales[0]
+    val nowSec = if (recordingIsRunning(entry)) rememberDetailsEpochSeconds() else 0L
+    val watchState = recordingWatchState(entry, resumePosition, nowSec)
+    val facts = remember(entry, resources, locale) {
+        programmeHeaderMetadata(programmeAboutFacts(null, entry, resources, locale), resources, entry.episode, null, locale)
+    }
+    val stoppedEarly = remember(entry) { recordingStoppedEarly(entry) != null }
+    val failure = entry.subscriptionError?.label()
+    val watched = watchState == RecordingWatchState.Watched
+    // Level with the first row, below the list's own top padding.
+    Column(modifier.fillMaxSize().padding(top = 4.dp).testTag("recording-metadata-pane")) {
+        ProgrammePanePicture(
+            art = LocalArtworkContext.current.currentSession?.let { entry.image ?: entry.fanartImage },
+            logo = piconPath, accent = entry.channelId, logoTag = "recording-metadata-logo",
+            modifier = Modifier.width(ProgrammePaneWidth).aspectRatio(16f / 9f).testTag("recording-metadata-art"),
         )
-        // The pane's eyebrow badge, as on the details page; a completed recording needs none.
-        when (entry.state) {
-            DvrEntryState.MISSED, DvrEntryState.INVALID ->
-                StatusBadge(dvrStateLabel(entry.state), StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_cancel_outlined)
-            else -> RecordingBadge(entry.state)
-        }
-        Text(
-            text = entry.title.orEmpty(),
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-        entry.subtitle?.takeIf(String::isNotBlank)?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.titleMedium,
-                color = TvTextColors.primary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        resumePosition?.inWholeSeconds?.takeIf { it > 0 }?.let { seconds ->
-            Text(
-                stringResource(R.string.recording_resume_from,
-                    at.bernhardberger.tvhplayer.core.formatPlaybackDuration(
-                        seconds.coerceAtMost(Long.MAX_VALUE / 1000L) * 1000L)),
-                style = MaterialTheme.typography.bodyMedium,
-                color = TvTextColors.tertiary,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-        }
-        val nowSec = if (recordingIsRunning(entry)) rememberDetailsEpochSeconds() else 0L
-        Text(
-            text = buildString {
-                entry.channelName?.takeIf(String::isNotBlank)?.let {
-                    append(it).append(" • ")
-                }
-                append(recordingTimeRange(entry.start?.epochSeconds, entry.stop?.epochSeconds,
-                    androidx.compose.ui.platform.LocalConfiguration.current.locales[0]))
-                recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let {
-                    append(" • ").append(at.bernhardberger.tvhplayer.ui.common.formatRecordedDuration(
-                        it, androidx.compose.ui.platform.LocalResources.current))
+        ProgrammeHeadline(
+            eyebrow = {
+                ProgrammeEyebrow(piconPath, listOfNotNull(
+                    entry.channelName?.takeIf(String::isNotBlank),
+                    entry.start?.epochSeconds?.let { formatRecordingDate(it, dateOnly = true, locale = locale) },
+                ).joinToString(" • "), Modifier.testTag("recording-metadata-eyebrow")) {
+                    // The pane's eyebrow badge, as on the details page; a completed recording needs none.
+                    when (entry.state) {
+                        DvrEntryState.MISSED, DvrEntryState.INVALID ->
+                            StatusBadge(dvrStateLabel(entry.state), StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_cancel_outlined)
+                        else -> RecordingBadge(entry.state)
+                    }
                 }
             },
-            color = TvTextColors.tertiary,
-            style = MaterialTheme.typography.bodyMedium,
-            maxLines = 2, overflow = TextOverflow.Ellipsis,
+            title = entry.title.orEmpty(),
+            tagPrefix = "recording-metadata",
+            // As many whole lines as the column leaves: the synopsis is what a recording is chosen by.
+            synopsisLines = Int.MAX_VALUE,
+            modifier = Modifier.padding(top = ProgrammePanePictureGap).weight(1f).widthIn(max = ProgrammePaneWidth),
+            subtitle = entry.subtitle,
+            facts = facts,
+            rating = entry.rating?.let { programmeAgeRating(it.label, it.age) },
+            timing = buildString {
+                append(entry.start?.epochSeconds?.let { start ->
+                    entry.stop?.epochSeconds?.let { formatTimeInterval(start, it) } ?: formatClock(start)
+                }.orEmpty())
+                recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let {
+                    if (isNotEmpty()) append(" • ")
+                    append(formatRecordedDuration(it, resources))
+                }
+            }.takeIf(String::isNotEmpty),
+            // How far it was watched, as the details page's timeline.
+            progress = (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat(),
+            synopsis = programmeSynopsis(entry.title, entry.subtitle, entry.summary, entry.description),
+            fitSynopsis = true,
+            titleStyle = MaterialTheme.typography.titleLarge,
+            synopsisStyle = MaterialTheme.typography.bodyMedium,
+            footer = if (failure == null && !stoppedEarly && !watched) null else { footerModifier ->
+                Column(footerModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    val style = MaterialTheme.typography.labelMedium
+                    failure?.let {
+                        Text(it, style = style, color = MaterialTheme.colorScheme.error, maxLines = 2,
+                            overflow = TextOverflow.Ellipsis, modifier = Modifier.testTag("recording-metadata-failure"))
+                    }
+                    if (stoppedEarly) {
+                        Text(stringResource(R.string.recordings_stopped_early), style = style, color = TvTextColors.tertiary,
+                            modifier = Modifier.testTag("recording-metadata-stopped-early"))
+                    }
+                    // Partly watched already shows as the timeline's progress.
+                    if (watched) {
+                        Text(stringResource(R.string.recording_watched), style = style, color = TvTextColors.tertiary,
+                            modifier = Modifier.testTag("recording-metadata-watched"))
+                    }
+                }
+            },
         )
-        val resources = androidx.compose.ui.platform.LocalContext.current.resources
-        at.bernhardberger.tvhplayer.ui.common.episodeLabel(entry.episode, resources, onscreenFallback = false)?.let {
-            Text(text = it, color = TvTextColors.tertiary,
-                style = MaterialTheme.typography.bodyMedium, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics {
-                    contentDescription = at.bernhardberger.tvhplayer.ui.common.episodeLabel(entry.episode, resources, spoken = true).orEmpty()
-                })
-        }
-        entry.summary?.takeIf(String::isNotBlank)?.let {
-            Text(text = it, style = MaterialTheme.typography.bodyMedium, color = TvTextColors.secondary,
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        entry.description?.takeIf { it.isNotBlank() && it != entry.summary }?.let {
-            Text(
-                text = it,
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 7,
-                overflow = TextOverflow.Ellipsis,
-                color = TvTextColors.secondary,
-                modifier = Modifier.weight(1f, fill = false),
-            )
-        }
-        entry.subscriptionError?.label()?.let {
-            Text(text = it, color = MaterialTheme.colorScheme.error, maxLines = 2)
-        }
-        // Partly watched already shows as the resume line above.
-        if (recordingWatchState(entry, resumePosition, nowSec) == RecordingWatchState.Watched) {
-            Text(text = stringResource(R.string.recording_watched), color = TvTextColors.tertiary,
-                modifier = Modifier.testTag("recording-metadata-watched"))
-        }
     }
 }
 
