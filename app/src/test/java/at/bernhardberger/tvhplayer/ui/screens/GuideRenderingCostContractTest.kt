@@ -28,6 +28,10 @@ class GuideRenderingCostContractTest {
         repositoryRoot,
         "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/guide/GuideOverlayHost.kt",
     ).readText()
+    // Rendering moved out of the screen; forbidden patterns stay forbidden there too.
+    private val movedGuideSource = listOf("GuideHeader.kt", "GuideTimelineBody.kt", "GuideOverlayHost.kt").joinToString("\n") {
+        File(repositoryRoot, "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/guide/$it").readText()
+    }
     private val appModuleSource = File(
         repositoryRoot,
         "app/src/main/java/at/bernhardberger/tvhplayer/di/AppModule.kt",
@@ -57,8 +61,8 @@ class GuideRenderingCostContractTest {
         assertEquals(1, guide.count("indexTimelineEventsByChannel("))
         assertTrue(guide.contains("windowStartSec = input.windowStartSec"))
         assertTrue(guide.contains("windowEndSec = input.windowEndSec"))
-        assertFalse(guide.contains("indexTimelineEventsByChannel(snapshotEvents)"))
-        assertFalse(guide.contains("snapshotEvents.filter { it.channelId == channel.id }"))
+        assertFalse((guide + movedGuideSource).contains("indexTimelineEventsByChannel(snapshotEvents)"))
+        assertFalse((guide + movedGuideSource).contains("snapshotEvents.filter { it.channelId == channel.id }"))
         assertTrue(
             guide.contains(
                 """val through = KotlinInstant.fromEpochSeconds(
@@ -153,7 +157,7 @@ class GuideRenderingCostContractTest {
             "LaunchedEffect(\n        epgState,\n        focusRows,\n        channels,",
         ).substringAfter("if (initialFocusEnabled && !scopeRowFocused) {")
 
-        assertFalse(guide.contains("delay(80)"))
+        assertFalse((guide + movedGuideSource).contains("delay(80)"))
         assertTrue(
             guide.contains(
                 """LaunchedEffect(currentEventIds) {
@@ -204,7 +208,7 @@ class GuideRenderingCostContractTest {
         val clock = screenSource.substringAfter("private fun rememberCurrentEpochSeconds()")
 
         assertEquals(1, guide.count("val nowSecProvider = rememberCurrentEpochSeconds()"))
-        assertFalse(guide.contains("var nowSec by remember"))
+        assertFalse((guide + movedGuideSource).contains("var nowSec by remember"))
         assertTrue(ruler.contains("val nowSec = nowSecProvider()"))
         assertTrue(row.contains("val nowSec = nowSecProvider()"))
         assertTrue(details.contains("nowSec = rememberDetailsEpochSeconds(nowSecProvider)"))

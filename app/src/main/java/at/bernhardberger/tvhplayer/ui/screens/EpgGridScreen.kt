@@ -1973,7 +1973,7 @@ fun EpgGridScreen(
                     channelId, available)
             },
             showJumpDialog = showJumpDialog,
-            windowStartSec = windowStartSec,
+            windowStartSec = { windowStartSec },
             windowBounds = windowBounds,
             zoneId = guideZoneId,
             nowSecProvider = nowSecProvider,

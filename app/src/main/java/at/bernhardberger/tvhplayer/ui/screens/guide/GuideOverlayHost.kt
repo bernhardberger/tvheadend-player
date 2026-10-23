@@ -51,7 +51,7 @@ internal fun GuideOverlayHost(
     eventFocusRequesters: Map<EventId, FocusRequester>,
     onShowGuide: (ChannelId, EpgEventEntry?) -> Unit,
     showJumpDialog: Boolean,
-    windowStartSec: Long,
+    windowStartSec: () -> Long,
     windowBounds: GuideWindowBounds,
     zoneId: ZoneId,
     nowSecProvider: () -> Long,
@@ -92,7 +92,7 @@ internal fun GuideOverlayHost(
 
     if (showJumpDialog) {
         JumpToTimeDialog(
-            initialSec = windowStartSec,
+            initialSec = windowStartSec(),
             bounds = windowBounds,
             zoneId = zoneId,
             nowSecProvider = nowSecProvider,
