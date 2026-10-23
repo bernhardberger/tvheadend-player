@@ -61,6 +61,7 @@ import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -72,6 +73,7 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineSettleMs
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimePositionPx
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -93,7 +95,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
 import org.junit.Before
@@ -130,6 +134,7 @@ class GuideVisualLayoutTest {
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
     private lateinit var model: ChannelsViewModel
+    private lateinit var uiSettings: UiSettingsStore
     private lateinit var oldZone: TimeZone
     private lateinit var oldLocale: Locale
     private var lineColor = 0
@@ -1044,6 +1049,73 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun headlineShowsTheSettledProgrammeAboveAboutFourAndAHalfRows() {
+        show(headline = true)
+        // On the header, before the grid has focus: the programme the grid enters.
+        headlineTitle(title(1, 0))
+        val header = bounds("guide-date-button")
+        val headline = bounds("guide-headline")
+        val ruler = bounds("epg-time-ruler")
+        assertTrue("Headline below the header: header=$header headline=$headline", headline.top >= header.bottom)
+        assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
+        val first = bounds("epg-channel-row-1").top
+        val rows = (540f - first) / (bounds("epg-channel-row-2").top - first)
+        assertEquals("About four and a half rows below the headline", 4.5f, rows, .3f)
+        compose.onNodeWithTag("channels-immersive-background").assertExists()
+        compose.onNodeWithTag("guide-headline").assert(hasText(title(1, 0), substring = true))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        assertEquals("The headline's height does not depend on its text", headline, bounds("guide-headline"))
+        capture("guide-headline", 1f, LayoutDirection.Ltr).recycle()
+        // Quick presses, as a held key repeats, keep the settled headline until focus rests.
+        compose.mainClock.autoAdvance = false
+        try {
+            repeat(2) {
+                compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
+                compose.mainClock.advanceTimeBy(80)
+            }
+            compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
+            compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        focused(title(1, 2))
+        headlineTitle(title(1, 2))
+        assertEquals(headline, bounds("guide-headline"))
+        assertNoPlayback()
+    }
+
+    @Test fun viewOptionsHideTheHeadlineAndItsArtAndKeepTheChoice() {
+        show(headline = true)
+        headlineTitle(title(1, 0))
+        val withHeadline = bounds("epg-time-ruler").top
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        key(Key.Enter)
+        tagFocused("guide-view-rows-dense")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        tagFocused("guide-view-headline")
+        compose.onNodeWithTag("guide-view-headline").assertIsOn()
+        key(Key.Enter)
+        compose.waitUntil(5_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
+        compose.onNodeWithTag("guide-view-headline").assertIsOff()
+        assertEquals("The grid takes the headline's room", 72f, bounds("epg-time-ruler").top, .1f)
+        assertTrue(withHeadline > 72f)
+        assertFalse("The choice is kept", runBlocking { uiSettings.settings.first() }.guideView.headline)
+        key(Key.Back)
+        tagFocused("channels-view-button")
+        assertNoPlayback()
+    }
+
+    private fun headlineTitle(title: String) = compose.waitUntil(5_000) {
+        compose.onAllNodes(hasTestTag("guide-headline-title") and hasText(title), useUnmergedTree = true)
+            .fetchSemanticsNodes().isNotEmpty()
+    }
+
     @Test fun backReturnsAnOffNowGuideToNowOnTheSameChannelThenToTheRail() {
         show()
         key(Key.DirectionDown)
@@ -1089,7 +1161,7 @@ class GuideVisualLayoutTest {
     private fun show(scale: Float = 1f, direction: LayoutDirection = LayoutDirection.Ltr, history: Boolean = true,
         lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
-        beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null) {
+        beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -1143,7 +1215,9 @@ class GuideVisualLayoutTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
-        val uiSettings = UiSettingsStore(preferences())
+        uiSettings = UiSettingsStore(preferences())
+        // The grid's geometry without the headline; headline tests keep the default view.
+        if (!headline) runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
         val noticeModule = module {
             single { notices }
             single { uiSettings }

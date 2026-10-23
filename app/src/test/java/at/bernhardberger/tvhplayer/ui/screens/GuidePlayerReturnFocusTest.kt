@@ -61,6 +61,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.GuidePosition
@@ -300,6 +301,8 @@ class GuidePlayerReturnFocusTest {
                 Box(Modifier.fillMaxSize().background(androidx.tv.material3.MaterialTheme.colorScheme.background)) {
                 EpgGridScreen(
                     initialFocusEnabled = focusEnabled,
+                    // Grid focus only: the headline would repeat the focused title.
+                    view = GuideView(headline = false),
                     channelViewModel = model, session = session, playerSession = runtime,
                     selection = ChannelSelectionStore(), guidePositionStore = position,
                     lastPlayedStore = LastPlayedChannelStore(context),

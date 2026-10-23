@@ -161,8 +161,15 @@ class GuideRealisticSceneTest {
         showAt("2026-09-15T19:40:00")
         capture("guide-fixture-evening-initial")
         moveToChannel(5)
-        seekEvent(eventsByFixtureId.getValue("evt-ch-northline-news-20260915T1930"))
-        compose.onNodeWithContentDescription(context().getString(R.string.recording_state_recording),
+        val recordingNow = eventsByFixtureId.getValue("evt-ch-northline-news-20260915T1930")
+        seekEvent(recordingNow)
+        assertMarkOnTitleLine(R.string.recording_state_recording, checkNotNull(recordingNow.title))
+        // The headline follows the settled focus and carries the same recording.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("guide-headline-title") and hasText(checkNotNull(recordingNow.title)),
+                useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNode(hasTestTag("recording-badge") and hasAnyAncestor(hasTestTag("guide-headline")),
             useUnmergedTree = true).assertIsDisplayed()
         capture("guide-fixture-recording-now")
 
@@ -255,7 +262,9 @@ class GuideRealisticSceneTest {
     @Test fun scheduledConflictPairRetainsBothScheduledBadges() {
         showAt("2026-09-16T19:30:00")
         moveToChannel(1)
-        seekEvent(eventsByFixtureId.getValue("evt-ch-harbor-sport-20260916T1900"))
+        val harborSport = eventsByFixtureId.getValue("evt-ch-harbor-sport-20260916T1900")
+        seekEvent(harborSport)
+        assertMarkOnTitleLine(R.string.recording_state_scheduled, checkNotNull(harborSport.title))
         for (channel in listOf(1, 3)) {
             compose.onNode(hasContentDescription(context().getString(R.string.recording_state_scheduled)) and
                 hasAnyAncestor(hasTestTag("epg-channel-row-$channel")), useUnmergedTree = true).assertExists()
@@ -491,6 +500,17 @@ class GuideRealisticSceneTest {
     private fun focused(title: String) {
         compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNode(hasText(title) and isFocused()).assertIsDisplayed().assertIsFocused()
+    }
+
+    /** The focused cell's recording mark ends its title line: in the title's band, after the title. */
+    private fun assertMarkOnTitleLine(description: Int, title: String) {
+        val inCell = hasAnyAncestor(isFocused())
+        val text = compose.onNode(hasText(title) and inCell, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val mark = compose.onNode(hasContentDescription(context().getString(description)) and inCell,
+            useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("The mark follows the title: title=$text mark=$mark", mark.left >= text.right)
+        assertTrue("The mark sits on the title line: title=$text mark=$mark",
+            mark.top >= text.top - 1f && mark.bottom <= text.bottom + 1f)
     }
 
     private fun focusedChannel(channel: Int) {

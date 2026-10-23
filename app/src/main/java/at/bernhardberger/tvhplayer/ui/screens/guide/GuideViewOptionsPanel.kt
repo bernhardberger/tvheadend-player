@@ -9,7 +9,10 @@ import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelEntry
 import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 
-/** The Guide's View options: the row density as a single choice. Each change applies at once; Back closes. */
+/**
+ * The Guide's View options: the row density as a single choice, then the headline switch. Each
+ * change applies at once; Back closes.
+ */
 @Composable
 internal fun GuideViewOptionsPanel(
     view: GuideView,
@@ -26,6 +29,14 @@ internal fun GuideViewOptionsPanel(
                 onClick = { onViewChange(view.copy(rows = rows)) },
             ))
         }
+        add(BrowsePanelEntry.Divider)
+        add(BrowsePanelEntry.Choice(
+            key = "guide-view-headline",
+            label = stringResource(R.string.guide_view_headline),
+            selected = false,
+            onClick = { onViewChange(view.copy(headline = !view.headline)) },
+            checked = view.headline,
+        ))
     }
     BrowseSidePanel(stringResource(R.string.channels_view_options), "guide-view-panel", onClose) {
         BrowsePanelList(entries, radio = true)

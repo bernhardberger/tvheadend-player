@@ -142,15 +142,16 @@ private const val ImmersiveListSynopsisLines = 3
 /** The channel logo standing in for a missing programme picture, this far below the header. */
 private val ImmersiveFallbackLogoTop = 24.dp
 
-private val ImmersiveHeroWidth = 480.dp
+internal val ImmersiveHeroWidth = 480.dp
 
 /**
  * Background of the immersive Channels list for the focused channel, as the kit's immersive list
  * has it: the programme picture at the screen's top end under the kit's cinematic scrim, on the
  * picture's colour, or else the logo below the header ([logoTop]) on the glow of its colour.
- * Without [programArt] the logo stands in, matching cards that show logos. It reaches under the
- * closed rail, beneath the shell's gradient. Warm playback keeps the video as the background, so
- * nothing is drawn.
+ * Without [programArt] the logo stands in, matching cards that show logos. The picture is the
+ * channel's on-now programme's unless [picture] picks another, as the Guide's focused programme.
+ * It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps the video as
+ * the background, so nothing is drawn.
  */
 @Composable
 internal fun ChannelsImmersiveBackground(
@@ -162,6 +163,7 @@ internal fun ChannelsImmersiveBackground(
     endInset: Dp,
     modifier: Modifier = Modifier,
     programArt: Boolean = true,
+    picture: (ChannelId) -> ArtworkId? = { observation.eventAt(it, Instant.fromEpochSeconds(nowSec()))?.image },
 ) {
     if (LocalWarmPlayback.current) return
     val session = observation.currentSession != null
@@ -172,7 +174,7 @@ internal fun ChannelsImmersiveBackground(
         // arrival fade in like a focus step rather than popping in piece by piece.
         {
             val id = channelId()
-            val art = id?.takeIf { programArt && session }?.let { observation.eventAt(it, Instant.fromEpochSeconds(nowSec())) }?.image
+            val art = id?.takeIf { programArt && session }?.let(picture)
             val icon = channels.firstOrNull { it.id == id }?.icon
             ChannelBackdrop(id, art, logo = session || icon?.let { artwork.logo(it).saved } != null)
         },

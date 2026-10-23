@@ -70,8 +70,8 @@ Meaning of colour:
   from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), and a
   source test keeps the recording reds inside those two and the theme.
   - **Dot** (16dp, a clock when scheduled) only in rows and grid cells, at the
-    right end of the title line: channel rows, Recordings rows (Guide cells are
-    decided with the Guide rework; today the cell corner). The lines above and
+    right end of the title line: channel rows, Recordings rows, Guide cells
+    (the title ellipsizes first). The lines above and
     below keep their full width, so progress and metadata never shorten for a
     mark. Watch state ends the same line in the muted content colour: a check
     circle when watched, Material's clock loader filled about as far as the saved

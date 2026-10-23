@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.ListItem
-import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -478,15 +476,26 @@ internal fun TimelineProgrammeCell(
         stateText,
     )
 
+    val markState = recording?.state?.takeIf { recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED }
     Box(modifier = modifier) {
+        // Running and scheduled recordings carry their mark at the right end of the title line, as
+        // channel and Recordings rows do: the title ellipsizes first and the time line keeps its width.
         val headline: @Composable () -> Unit = {
-            Text(
-                // Always render a label so no focusable cell is visually blank.
-                text = event.title.orEmpty(),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                style = MaterialTheme.typography.titleSmall,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    // Always render a label so no focusable cell is visually blank.
+                    text = event.title.orEmpty(),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (markState != null) {
+                    Spacer(Modifier.width(TvSpacing4))
+                    // The mark follows the cell's content colour, which inverts on focus.
+                    RecordingStatusIndicator(state = markState, focused = focused)
+                }
+            }
         }
         val supporting: (@Composable () -> Unit)? = if (width >= 90.dp) {
             { ProgrammeTimeText(range = timeRange, start = startTime) }
@@ -524,24 +533,6 @@ internal fun TimelineProgrammeCell(
                 supportingContent = supporting,
                 modifier = cellModifier,
             )
-        }
-        recording?.takeIf {
-            recordingIsRunning(it) || it.state == DvrEntryState.SCHEDULED
-        }?.let {
-            // The overlaid mark follows the cell's content colour, which inverts on focus.
-            val contentColor = if (focused) {
-                MaterialTheme.colorScheme.inverseOnSurface
-            } else {
-                MaterialTheme.colorScheme.onSurface
-            }
-            CompositionLocalProvider(LocalContentColor provides contentColor) { RecordingStatusIndicator(
-                state = checkNotNull(it.state),
-                focused = focused,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .zIndex(2f)
-                    .padding(6.dp),
-            ) }
         }
     }
 }

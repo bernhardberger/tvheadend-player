@@ -210,7 +210,8 @@ class GuideHistoryScreenTest {
                     onDispose { noticeApplication.close() }
                 }
                 CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
-                    TVHeadendPlayerTheme { EpgGridScreen(channelViewModel = model, session = session,
+                    // Grid focus only: the headline would repeat the focused title.
+                    TVHeadendPlayerTheme { EpgGridScreen(view = GuideView(headline = false), channelViewModel = model, session = session,
                         playerSession = runtime, selection = selection, guidePositionStore = position,
                         lastPlayedStore = lastPlayed, onPlayRecording = {}, onPlay = { _, _ -> }) }
                 }

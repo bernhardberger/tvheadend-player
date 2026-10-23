@@ -158,6 +158,7 @@
     <string name="guide_view_rows">Rows</string>
     <string name="guide_view_rows_dense">Dense</string>
     <string name="guide_view_rows_regular">Regular</string>
+    <string name="guide_view_headline">Show headline</string>
     <string name="channels_show_all">Show all channels</string>
     <string name="channels_empty_group">No channels in this group</string>
     <string name="clock_format_12_hour">12-hour (8:15\u00A0PM)</string>

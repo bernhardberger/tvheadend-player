@@ -62,6 +62,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.max
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.tv.material3.MaterialTheme
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -82,6 +83,7 @@ import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.browseAppError
+import at.bernhardberger.tvhplayer.core.awaitsGuide
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusDirection
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
@@ -129,13 +131,18 @@ import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineProgramme
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideOverlayHost
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
+import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
@@ -1669,10 +1676,25 @@ fun EpgGridScreen(
         // (VerifyError: an int parameter read from an unassigned register).
         @Composable
         fun GuideBrowseContent() {
+        val browseAlpha = { 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
+        // Read by the headline and its picture alone, so focus steps don't recompose the screen.
+        val headlineProgramme = { guideHeadlineProgramme(selectedTarget, channels, focusRows) }
+        if (view.headline) {
+            GuideHeadlineBackground(
+                programme = headlineProgramme,
+                channels = channels,
+                observation = observation,
+                scopeObservation = channelScopeState.observation,
+                nowSec = nowSecProvider,
+                logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
+                endInset = max(endPadding, TvBrowseTrailingInset),
+                modifier = Modifier.fillMaxSize().graphicsLayer { alpha = browseAlpha() },
+            )
+        }
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
+                .graphicsLayer { alpha = browseAlpha() }
                 .semantics { if (detailsEvent != null) hideFromAccessibility() }
                 .focusProperties {
                     // As in Channels: entering from the rail returns to the remembered programme.
@@ -1737,6 +1759,16 @@ fun EpgGridScreen(
                 },
                 onMoveToContent = { leaveGuideScope() },
             )
+            if (view.headline && channels.isNotEmpty()) {
+                GuideHeadline(
+                    programme = headlineProgramme,
+                    observation = observation,
+                    scopeObservation = channelScopeState.observation,
+                    loading = connectionUiState.awaitsGuide(observation.epgState),
+                    nowSec = nowSecProvider,
+                    modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
+                )
+            }
             Spacer(Modifier.height(4.dp))
             GuideTimelineBody(
                 motion = scopeMotion,

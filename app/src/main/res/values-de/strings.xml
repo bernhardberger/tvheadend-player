@@ -156,6 +156,7 @@
     <string name="guide_view_rows">Zeilen</string>
     <string name="guide_view_rows_dense">Kompakt</string>
     <string name="guide_view_rows_regular">Normal</string>
+    <string name="guide_view_headline">Kopfzeile anzeigen</string>
     <string name="channels_show_all">Alle Sender anzeigen</string>
     <string name="channels_empty_group">Keine Sender in dieser Gruppe</string>
     <string name="clock_format_12_hour">12 Stunden (8:15\u00A0PM)</string>
