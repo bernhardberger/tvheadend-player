@@ -82,6 +82,10 @@ fun summarizeDvrFolder(folder: DvrArchiveFolder): DvrFolderSummary {
 private fun DvrArchiveFolder.descendantRecordings(): List<DvrEntry> =
     recordings + folders.flatMap { it.descendantRecordings() }
 
+fun DvrArchiveFolder.runningRecordings(): List<DvrEntry> =
+    descendantRecordings().filter(::recordingIsRunning)
+        .sortedBy { it.start?.epochSeconds ?: Long.MAX_VALUE }
+
 fun chooseDvrConfig(configs: List<DvrConfiguration>, preferredId: DvrConfigId? = null): DvrConfigId? =
     (configs.firstOrNull { it.id == preferredId } ?: configs.firstOrNull { it.name.isBlank() } ?: configs.firstOrNull())?.id
 

@@ -458,6 +458,11 @@
     <string name="recordings_title">Recordings</string>
     <string name="recordings_archive">Archive</string>
     <string name="recordings_archive_all">All recordings</string>
+    <string name="recordings_recording_now_folder">Recording now</string>
+    <plurals name="recordings_in_progress_count">
+        <item quantity="one">%1$d recording in progress</item>
+        <item quantity="other">%1$d recordings in progress</item>
+    </plurals>
     <string name="recordings_schedule">Schedule</string>
     <string name="recordings_problems">Problems</string>
     <string name="recordings_archive_empty">No playable recordings in this folder.</string>

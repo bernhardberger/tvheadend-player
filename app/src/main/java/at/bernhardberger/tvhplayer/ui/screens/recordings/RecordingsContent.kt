@@ -37,6 +37,12 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
@@ -87,6 +93,7 @@ import at.bernhardberger.tvhplayer.core.recordingStoppedEarly
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
+import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -105,6 +112,10 @@ import kotlinx.coroutines.launch
 internal sealed interface ArchiveListItem {
     val key: String
 
+    data class RecordingNow(val entries: List<DvrEntry>) : ArchiveListItem {
+        override val key = "meta:recording-now"
+    }
+
     data class Folder(val folder: DvrArchiveFolder) : ArchiveListItem {
         override val key = "folder:${folder.path.joinToString("/")}"
     }
@@ -116,8 +127,13 @@ internal sealed interface ArchiveListItem {
 
 internal fun recordingItemKey(id: DvrEntryId): Long = id.value
 
-internal fun DvrArchiveFolder.listItems(): List<ArchiveListItem> =
-    folders.map(ArchiveListItem::Folder) + recordings.map(ArchiveListItem::Recording)
+internal fun DvrArchiveFolder.listItems(): List<ArchiveListItem> = buildList {
+    if (path.isEmpty()) {
+        runningRecordings().takeIf { it.isNotEmpty() }?.let { add(ArchiveListItem.RecordingNow(it)) }
+    }
+    addAll(folders.map(ArchiveListItem::Folder))
+    addAll(recordings.map(ArchiveListItem::Recording))
+}
 
 @Composable
 internal fun RecordingModeTabs(
@@ -204,6 +220,53 @@ internal fun FolderListRow(
             .tabFocus()
             .fillMaxWidth()
             .testTag("recordings-folder-${folder.path.joinToString("/")}"),
+    )
+}
+
+@Composable
+internal fun RecordingNowFolderRow(
+    recordingCount: Int,
+    modifier: Modifier,
+    onClick: () -> Unit,
+) {
+    val owner = LocalTabOwner.current
+    ListItem(
+        selected = false,
+        onClick = { if (owner?.isCurrent != false) onClick() },
+        headlineContent = {
+            Text(stringResource(R.string.recordings_recording_now_folder), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        supportingContent = {
+            Text(pluralStringResource(R.plurals.recordings_in_progress_count, recordingCount, recordingCount),
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+        leadingContent = {
+            // The red dot sits on the folder's top-right corner, cut out of the folder by a thin gap.
+            val dotCenter = { size: Size -> Offset(size.width * 0.915f, size.height * 0.25f) }
+            Icon(
+                painterResource(R.drawable.ic_folder),
+                contentDescription = null,
+                tint = androidx.tv.material3.LocalContentColor.current,
+                modifier = Modifier
+                    .size(32.dp)
+                    .drawWithContent {
+                        drawContent()
+                        drawCircle(TvRecordingColor, radius = 7.dp.toPx(), center = dotCenter(size))
+                    }
+                    .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+                    .drawWithContent {
+                        drawContent()
+                        drawCircle(Color.Black, radius = 9.dp.toPx(), center = dotCenter(size), blendMode = BlendMode.Clear)
+                    },
+            )
+        },
+        trailingContent = {
+            Icon(painterResource(R.drawable.ic_keyboard_arrow_right), contentDescription = null)
+        },
+        modifier = modifier
+            .tabFocus()
+            .fillMaxWidth()
+            .testTag("recordings-recording-now-folder"),
     )
 }
 

@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -23,21 +24,34 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
+import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import kotlin.time.Duration
 
 internal fun archiveLevelId(path: List<String>): String = "archive:${path.joinToString("/")}"
 
+internal const val RecordingNowLevelId = "recording-now"
+
 internal fun archiveLevelPath(id: String): List<String> =
-    id.removePrefix("archive:").split('/').filter(String::isNotEmpty)
+    if (id.startsWith("archive:")) id.removePrefix("archive:").split('/').filter(String::isNotEmpty)
+    else emptyList()
+
+internal fun archiveLevelItems(root: DvrArchiveFolder, levelId: String): List<ArchiveListItem>? =
+    when {
+        levelId == RecordingNowLevelId -> root.runningRecordings().takeIf { it.isNotEmpty() }
+            ?.map(ArchiveListItem::Recording)
+        levelId.startsWith("archive:") -> root.folderAt(archiveLevelPath(levelId))?.listItems()
+        else -> null
+    }
 
 /** Preserve every surviving parent viewport and reconcile selection by the depth owner's index policy. */
 internal fun reconcileArchiveStack(stack: DepthStack, root: DvrArchiveFolder): DepthStack {
-    val frames = stack.frames.takeWhile { root.folderAt(archiveLevelPath(it.levelId)) != null }
+    val frames = stack.frames.takeWhile { archiveLevelItems(root, it.levelId) != null }
         .map { frame ->
-            val items = requireNotNull(root.folderAt(archiveLevelPath(frame.levelId))).listItems()
+            val items = requireNotNull(archiveLevelItems(root, frame.levelId))
             DepthStack(listOf(frame)).reconcile(items.map { DepthItem(it.key) }).active
         }
     return stack.copy(
@@ -70,13 +84,12 @@ internal fun ArchiveDepthContent(
     val latestResumePositionForEntry = rememberUpdatedState(resumePositionForEntry)
     val levels = remember(root) {
         val levels = linkedMapOf<String, DepthLevel>()
-        fun addFolder(folder: DvrArchiveFolder) {
-            val id = archiveLevelId(folder.path)
+        fun addLevel(id: String, heading: @Composable () -> String, items: List<ArchiveListItem>) {
             levels[id] = DepthLevel(
                 id = id,
                 heading = { emphasis ->
                     ArchiveLevelHeading(
-                        if (folder.path.isEmpty()) stringResource(R.string.recordings_archive_all) else folder.name,
+                        heading(),
                         emphasis,
                     )
                 },
@@ -84,8 +97,18 @@ internal fun ArchiveDepthContent(
                     Text(stringResource(R.string.recordings_archive_empty), style = MaterialTheme.typography.titleLarge,
                         color = MaterialTheme.colorScheme.onSurface)
                 },
-                rows = folder.listItems().map { item ->
+                rows = items.map { item ->
                     when (item) {
+                        is ArchiveListItem.RecordingNow -> {
+                            addLevel(RecordingNowLevelId, { stringResource(R.string.recordings_recording_now_folder) },
+                                item.entries.map(ArchiveListItem::Recording))
+                            DepthRow(DepthItem(item.key, RecordingNowLevelId)) { rowModifier, activate ->
+                                Column {
+                                    RecordingNowFolderRow(item.entries.size, rowModifier, activate)
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = TvSpacing8))
+                                }
+                            }
+                        }
                         is ArchiveListItem.Folder -> DepthRow(
                             DepthItem(item.key, archiveLevelId(item.folder.path)),
                         ) { rowModifier, activate ->
@@ -118,6 +141,11 @@ internal fun ArchiveDepthContent(
                     }
                 },
             )
+        }
+        fun addFolder(folder: DvrArchiveFolder) {
+            addLevel(archiveLevelId(folder.path), {
+                if (folder.path.isEmpty()) stringResource(R.string.recordings_archive_all) else folder.name
+            }, folder.listItems())
             folder.folders.forEach(::addFolder)
         }
         addFolder(root)

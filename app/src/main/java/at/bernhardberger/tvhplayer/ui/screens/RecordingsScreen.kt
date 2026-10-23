@@ -111,6 +111,7 @@ import at.bernhardberger.tvhplayer.core.buildDvrArchive
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
+import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
@@ -123,6 +124,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.screens.recordings.ArchiveDepthContent
 import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelPath
+import at.bernhardberger.tvhplayer.ui.screens.recordings.archiveLevelItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.reconcileArchiveStack
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthNavigationState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthStack
@@ -253,8 +255,8 @@ internal fun RecordingsScreenContent(
     val selectedKeys = screenState.selectedKeys
     val archiveScrollPositions = screenState.archiveScrollPositions
     var mode by screenState.mode
-    val archivePath = screenState.archivePath
     val archiveNavigation = screenState.archiveNavigation
+    val archiveLevel = archiveNavigation.stack.active.levelId
     val drawerFocus = LocalBrowseNavigationFocus.current
     var requestContentFocus by remember { mutableStateOf(true) }
     var contentHasFocus by remember { mutableStateOf(false) }
@@ -298,14 +300,14 @@ internal fun RecordingsScreenContent(
     }
 
     val location = when (mode) {
-        DvrLibraryMode.ARCHIVE -> "archive:${archivePath.joinToString("/")}"
+        DvrLibraryMode.ARCHIVE -> archiveLevel
         DvrLibraryMode.SCHEDULE -> "schedule"
         DvrLibraryMode.PROBLEMS -> "problems"
     }
     val prepared = rememberPreparedBrowseData(preparationAuthority, observation.dvrSnapshotForDisplay) { snapshot ->
         val library = partitionDvrLibrary(snapshot?.entries.orEmpty())
         currentCoroutineContext().ensureActive()
-        val archive = buildDvrArchive(library.archive)
+        val archive = buildDvrArchive(library.archive + snapshot?.entries.orEmpty().filter(::recordingIsRunning))
         currentCoroutineContext().ensureActive()
         RecordingLibraryPresentation(
             library = library,
@@ -334,26 +336,23 @@ internal fun RecordingsScreenContent(
     val retainedEntries = retained.input?.entries.orEmpty()
     val observedLibrary = prepared.value.library
     val observedArchive = prepared.value.archive
-    val survivingArchivePath = remember(observedArchive, archivePath) {
-        var path = archivePath
-        while (path.isNotEmpty() && observedArchive.folderAt(path) == null) path = path.dropLast(1)
-        path
+    val reconciledArchiveStack = remember(observedArchive, archiveNavigation.stack) {
+        reconcileArchiveStack(archiveNavigation.stack, observedArchive)
     }
     val observedKeys = when (mode) {
-        DvrLibraryMode.ARCHIVE -> requireNotNull(observedArchive.folderAt(survivingArchivePath)).listItems().map { it.key }
+        DvrLibraryMode.ARCHIVE -> requireNotNull(archiveLevelItems(observedArchive, reconciledArchiveStack.active.levelId)).map { it.key }
         DvrLibraryMode.SCHEDULE -> observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> observedLibrary.problems.map { "recording:${recordingItemKey(it.id)}" }
     }
     val removalHandoff = contentFocusOwned && retainedEntries != observedEntries &&
         ((if (mode == DvrLibraryMode.ARCHIVE) archiveNavigation.stack.active.focusedItemId
             else selectedKeys[location])?.let { it !in observedKeys } == true ||
-            (mode == DvrLibraryMode.ARCHIVE && survivingArchivePath != archivePath))
+            (mode == DvrLibraryMode.ARCHIVE && reconciledArchiveStack.active.levelId != archiveLevel))
     val entries = if (removalHandoff) retainedEntries else observedEntries
     val presentation = if (removalHandoff) retained.value else prepared.value
     val library = presentation.library
     val archive = presentation.archive
-    val archiveFolder = archive.folderAt(archivePath) ?: archive
-    val archiveItems = remember(archiveFolder) { archiveFolder.listItems() }
+    val archiveItems = remember(archive, archiveLevel) { archiveLevelItems(archive, archiveLevel) ?: archive.listItems() }
     val scheduleGroups = presentation.schedule
     val problemGroups = presentation.problems
     val itemKeys = when (mode) {

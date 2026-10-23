@@ -570,6 +570,130 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @OptIn(TvheadendTestingApi::class)
+    @Test fun recordingNowIsFirstEntersFlatListAndBackRestoresItsRow() {
+        show(entries = listOf(
+            DvrEntry.create(DvrEntryId(10), title = "Later", state = DvrEntryState.RECORDING,
+                folder = listOf("Series", "Season"), start = Instant.fromEpochSeconds(200),
+                stop = Instant.fromEpochSeconds(500),
+                files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "Series/Season/later.ts"))),
+            recording(11, "Earlier", "Recording now/earlier.ts", DvrEntryState.RECORDING_ERROR, startEpochSeconds = 100),
+        ))
+        focused("recordings-recording-now-folder")
+        compose.onNodeWithText("2 recordings in progress").assertIsDisplayed()
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recordings-recording-now-folder")
+        capture("recording-now-root", 1f)
+        key(Key.DirectionCenter)
+        focused("recording-list-entry-11")
+        compose.onNodeWithTag("archive-level-heading").assertTextEquals("Recording now")
+        compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
+        capture("recording-now-flat", 1f)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-10")
+        key(Key.Menu)
+        compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
+        key(Key.Back)
+        focused("recording-list-entry-10")
+        key(Key.Back)
+        focused("recordings-recording-now-folder")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Series")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Recording now")
+        key(Key.DirectionCenter)
+        focused("recording-list-entry-11")
+        key(Key.Back)
+        focused("recordings-folder-Recording now")
+        assertNoCommands()
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        focused("recordings-recording-now-folder")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-11")
+        key(Key.DirectionDown)
+        focused("recording-list-entry-10")
+        key(Key.DirectionCenter)
+        compose.runOnIdle { assertEquals(1, playbackRequests) }
+    }
+
+    @Test fun finishingLastRecordingInsideMetaFolderReturnsFocusToSurvivingRootFolder() {
+        val running = recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING)
+        show(entries = listOf(running))
+        focused("recordings-recording-now-folder")
+        compose.onNodeWithText("1 recording in progress").assertIsDisplayed()
+        key(Key.DirectionRight)
+        focused("recording-list-entry-10")
+
+        publish(listOf(recording(10, "Finished", "Series/Season/growing.ts")))
+
+        focused("recordings-folder-Series")
+        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(listOf("archive:"), screenState.archiveNavigation.stack.path) }
+        key(Key.DirectionRight)
+        focused("recordings-folder-Series/Season")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-10")
+        assertNoCommands()
+    }
+
+    @Test fun finishingLastRecordingWithContextMenuOpenReturnsToSurvivingRootFolder() {
+        show(entries = listOf(recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING)))
+        focused("recordings-recording-now-folder")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-10")
+        key(Key.Menu)
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+        compose.onNodeWithText("Stop recording").requestFocus().assertIsFocused()
+
+        publish(listOf(recording(10, "Finished", "Series/Season/growing.ts")))
+
+        compose.onNodeWithTag("browse-context-menu").assertIsDisplayed()
+        compose.onNodeWithText("Stop recording").assertDoesNotExist()
+        compose.onNodeWithText("Delete").assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("browse-context-menu")) and isFocused()).assertExists()
+        compose.onNodeWithText("Finished").assertIsDisplayed()
+        compose.runOnIdle { assertEquals(listOf("archive:"), screenState.archiveNavigation.stack.path) }
+        key(Key.Back)
+        compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
+        focused("recordings-folder-Series")
+        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
+        assertNoCommands()
+    }
+
+    @Test fun disappearingMetaFolderAtRootHandsFocusToNextRow() {
+        show(entries = listOf(recording(10, "Growing", "Series/growing.ts", DvrEntryState.RECORDING)))
+        focused("recordings-recording-now-folder")
+
+        publish(listOf(recording(10, "Finished", "Series/growing.ts")))
+
+        focused("recordings-folder-Series")
+        compose.onNodeWithTag("recordings-recording-now-folder").assertDoesNotExist()
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        assertNoCommands()
+    }
+
+    @Test fun runningRecordingFinishesInPlaceAtFullFolderDepth() {
+        show(entries = listOf(recording(10, "Growing", "Series/Season/growing.ts", DvrEntryState.RECORDING)))
+        focused("recordings-recording-now-folder")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Series")
+        key(Key.DirectionRight)
+        focused("recordings-folder-Series/Season")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-10")
+
+        publish(listOf(recording(10, "Finished", "Series/Season/growing.ts")))
+
+        focused("recording-list-entry-10")
+        compose.runOnIdle { assertEquals(listOf("Series", "Season"), screenState.archivePath) }
+        assertNoCommands()
+    }
+
     private fun publish(entries: List<DvrEntry>) {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
