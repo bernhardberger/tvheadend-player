@@ -625,6 +625,27 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun aTripToTheRailKeepsTheAnchorOfTheProgrammeItReturnsTo() {
+        // Channel 1 runs one programme from 20:00 to 22:00 at the earliest edge; channel 2 is hourly.
+        show(history = false, longProgramme = true, longProgrammeHours = 2, longProgrammeSuccessor = true)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        key(Key.DirectionRight)
+        focused(title(2, 1))
+        key(Key.DirectionUp)
+        focused(title(1, 0))
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        key(Key.DirectionRight)
+        focused(title(1, 0))
+        // The rail did not move the Guide's time, so Down still undoes Up.
+        key(Key.DirectionDown)
+        focused(title(2, 1))
+        assertNoPlayback()
+    }
+
     @Test fun leftCrossesAnEpgGapWiderThanTheEarlierWindowToTheRowsPreviousProgramme() {
         // Five empty hours exceed the three-hour window Left would otherwise search.
         show(historyOffset = -6)

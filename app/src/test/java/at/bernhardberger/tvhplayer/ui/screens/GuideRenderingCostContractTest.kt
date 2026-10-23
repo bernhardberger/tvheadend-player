@@ -58,7 +58,7 @@ class GuideRenderingCostContractTest {
             "private fun SessionObservation.dvrEntries()",
         )
 
-        assertEquals(1, guide.count("indexTimelineEventsByChannel("))
+        assertEquals(1, (guide + movedGuideSource).count("indexTimelineEventsByChannel("))
         assertTrue(guide.contains("windowStartSec = input.windowStartSec"))
         assertTrue(guide.contains("windowEndSec = input.windowEndSec"))
         assertFalse((guide + movedGuideSource).contains("indexTimelineEventsByChannel(snapshotEvents)"))
@@ -207,7 +207,7 @@ class GuideRenderingCostContractTest {
             "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ProgrammeDetailsHost.kt").readText()
         val clock = screenSource.substringAfter("private fun rememberCurrentEpochSeconds()")
 
-        assertEquals(1, guide.count("val nowSecProvider = rememberCurrentEpochSeconds()"))
+        assertEquals(1, (guide + movedGuideSource).count("val nowSecProvider = rememberCurrentEpochSeconds()"))
         assertFalse((guide + movedGuideSource).contains("var nowSec by remember"))
         assertTrue(ruler.contains("val nowSec = nowSecProvider()"))
         assertTrue(row.contains("val nowSec = nowSecProvider()"))
