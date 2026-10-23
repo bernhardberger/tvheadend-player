@@ -357,7 +357,7 @@ class PlayerTimelineGeometryTest {
                     .fetchSemanticsNodes().flatMap { it.config.getOrElse(SemanticsProperties.Text) { emptyList() } }.joinToString(" ") { it.text }
                 assertFalse("$case: no recording dot in the row: $texts", texts.contains("●"))
                 // The badge beside the top identity's name, not the bar row, says the recording still runs.
-                assertEquals("$case: the badge", stillRecording, exists("player-rec-badge"))
+                assertEquals("$case: the badge", stillRecording, exists("recording-badge"))
                 assertEquals("$case: the identity speaks it: ${identitySpeech(compose)}", stillRecording,
                     identitySpeech(compose).contains("Recording now"))
             }

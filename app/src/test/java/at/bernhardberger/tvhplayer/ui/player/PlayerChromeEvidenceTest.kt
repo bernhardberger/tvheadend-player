@@ -61,6 +61,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
@@ -484,7 +485,7 @@ class PlayerChromeEvidenceTest {
                                     listOfNotNull(recordingBarEnd(600_000L, 4_350_000L, growing = false),
                                         recordingBarEnd(600_000L, 4_350_000L, growing = true))
                                         .forEach { EndLabel(it, emphasis) }
-                                    PlayerRecBadge()
+                                    RecordingBadge(DvrEntryState.RECORDING)
                                 }
                             }
                             Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))

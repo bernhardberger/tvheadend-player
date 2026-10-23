@@ -12,9 +12,7 @@ internal object PlayerChromeTokens {
     /** Behind a chip's text over a picture or video: the kit's 60% scrim step. */
     val chipScrim = Color.Black.copy(alpha = 0.60f)
     val heroShape = RoundedCornerShape(12.dp)
-    val badgeShape = RoundedCornerShape(4.dp)
     val chipHeight = 24.dp
-    val badgeHeight = 20.dp
     val identityWidth = 128.dp
     val identityHeight = 72.dp
     val heroWidth = 360.dp

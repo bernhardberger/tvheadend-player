@@ -295,6 +295,7 @@
     <string name="recording_state_recording">Wird aufgenommen</string>
     <string name="recording_state_recording_errors">Aufnahme • Fehler</string>
     <string name="recording_state_completed">Abgeschlossen</string>
+    <string name="recording_badge_errors">Fehler</string>
     <string name="recording_state_failed">Fehlgeschlagen</string>
     <string name="recording_state_cancelled">Abgebrochen</string>
     <string name="recording_state_unknown">Serverstatus unbekannt</string>

@@ -369,8 +369,11 @@ class PlayerChromeCaptureTest {
                 val card = hasAnyAncestor(hasTestTag("player-channel-card-1"))
                 val label = compose.onNodeWithTag("player-channel-1-now", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val playing = compose.onNode(hasTestTag("channel-playing-indicator") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val recording = compose.onNode(hasTestTag("channel-recording-indicator") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertTrue("the card's markers trail its programme", label.right <= playing.left && playing.right < recording.left)
+                val recording = compose.onNode(hasTestTag("recording-badge") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                assertTrue("the playing marker trails the programme", label.right <= playing.left)
+                // As on the Channels cards, the recording badge sits in the picture's corner, not beside the name.
+                assertTrue("the recording badge sits in the picture above", recording.bottom < label.top)
+                compose.onNode(hasTestTag("channel-recording-indicator") and card, useUnmergedTree = true).assertDoesNotExist()
             }
             if (next == Scene.PROGRAMME_MORE_INFO) compose.onNodeWithTag("player-info-reading").assertIsFocused()
             if (next == Scene.PROGRAMME_SCHEDULE || next == Scene.RAIL_SCHEDULE) {
@@ -432,7 +435,7 @@ class PlayerChromeCaptureTest {
             }
             if (next == Scene.PROGRAMME_SCHEDULE) {
                 val mark = compose.onAllNodesWithTag("programme-fallback-mark", useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot
-                val badge = compose.onNodeWithTag("player-rec-badge", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+                val badge = compose.onNodeWithTag("recording-badge", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 assertTrue("the compact picon stays clear of the shared REC badge", mark.right < badge.left)
                 compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
                 compose.mainClock.advanceTimeBy(200)

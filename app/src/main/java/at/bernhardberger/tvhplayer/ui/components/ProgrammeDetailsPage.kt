@@ -64,7 +64,6 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.*
@@ -908,9 +907,9 @@ private fun DetailsInformation(
             Modifier.widthIn(max = 470.dp)) {
             val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
             if (removal != null) {
-                DetailsStatusChip(null, stringResource(R.string.details_available_until,
+                DetailsStatusBadge(null, stringResource(R.string.details_available_until,
                     formatRecordingDate(removal, dateOnly = true, locale = LocalConfiguration.current.locales[0], nowSec = nowSec)))
-            } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusChip(it) }
+            } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusBadge(it) }
         }
         Spacer(Modifier.height(8.dp))
         Text(event?.title ?: recording?.title.orEmpty(), Modifier.fillMaxWidth().testTag("details-title"),
@@ -1050,30 +1049,16 @@ private fun DetailsActions(
     }
 }
 
-/** The clock fits the chip's small label as the dot does. */
-private val DetailsStatusIconSize = 12.dp
-
+/** The page's status in the eyebrow: the recording badges, or a neutral fact badge. */
 @Composable
-private fun DetailsStatusChip(status: DetailsStatus?, label: String? = null) {
-    // Scheduled is the clock, as in the Guide and the player; the red dot means recording now.
-    val color = when (status) {
-        DetailsStatus.ON_NOW -> MaterialTheme.colorScheme.primary
-        DetailsStatus.RECORDING -> TvRecordingColor
-        DetailsStatus.RECORDING_ERRORS, DetailsStatus.FAILED -> MaterialTheme.colorScheme.error
-        DetailsStatus.SCHEDULED, null -> null
-    }
-    Row(Modifier.border(1.dp, MaterialTheme.colorScheme.onSurfaceVariant, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (status == DetailsStatus.SCHEDULED) ScheduledIndicator(Modifier.size(DetailsStatusIconSize))
-        if (color != null) Box(Modifier.size(6.dp).background(color, CircleShape))
-        Text(label ?: stringResource(when (status) {
-            DetailsStatus.ON_NOW -> R.string.details_status_on_now
-            DetailsStatus.RECORDING -> R.string.recording_state_recording
-            DetailsStatus.RECORDING_ERRORS -> R.string.recording_state_recording_errors
-            DetailsStatus.SCHEDULED -> R.string.details_status_scheduled
-            DetailsStatus.FAILED -> R.string.details_status_failed
-            null -> error("A status-less chip requires a label")
-        }), style = MaterialTheme.typography.labelSmall, maxLines = 1)
+private fun DetailsStatusBadge(status: DetailsStatus?, label: String? = null) {
+    when (status) {
+        DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING)
+        DetailsStatus.RECORDING_ERRORS -> RecordingBadge(DvrEntryState.RECORDING_ERROR)
+        DetailsStatus.SCHEDULED -> RecordingBadge(DvrEntryState.SCHEDULED)
+        DetailsStatus.FAILED -> RecordingBadge(DvrEntryState.COMPLETED_ERROR)
+        DetailsStatus.ON_NOW -> StatusBadge(stringResource(R.string.details_status_on_now), StatusBadgeTone.NEUTRAL)
+        null -> StatusBadge(checkNotNull(label) { "A status-less badge requires a label" }, StatusBadgeTone.NEUTRAL)
     }
 }
 

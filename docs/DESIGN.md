@@ -66,16 +66,31 @@ Meaning of colour:
   the current programme or a running recording is). One bar, one meaning; if a
   surface needs both, show two bars rather than one bar in two colours.
 - **Recording red** means "a recording exists or runs". **`error`** means "a
-  failure the user must act on". No component declares its own red. Lists and
-  rows mark a running recording with the red dot (a clock when scheduled); the
-  player and programme details use the solid red `● REC` badge, after the
-  channel name in the player's top identity. The word "Recording" stands only
-  where the state is the row's topic, never as a red label by itself.
+  failure the user must act on". No component declares its own red: marks come
+  from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), and a
+  source test keeps the recording reds inside those two and the theme.
+  - **Dot** (16dp, a clock when scheduled) only in rows and grid cells, at the
+    row's trailing edge: channel rows, Recordings rows, the Guide cell corner.
+    A running recording with errors adds the `error` "!" beside the dot. No dot
+    on section headings or titles; the "Recording now" folder carries its dot
+    as a badge on the folder icon.
+  - **Badge** (one size: 20dp, 4dp corners, `labelMedium`) in eyebrows, info
+    headers, menu headers, side panes and image corners: the solid red `● REC`
+    after the channel name in the player's top identity, the Channels headline
+    and cards, the zap rail cards, the player's programme info and schedule
+    tiles, programme details, the context menu header and the Recordings pane.
+    Scheduled is a neutral badge with a clock and "Scheduled", failed an `error`
+    badge with "Failed", errors while recording a red `● REC` plus an `error`
+    "Errors" badge. "On now" and "Available until" are neutral badges.
+  - In Recordings overlines a failure is an `error` "!" symbol; cancelled,
+    missed and stopped early are muted symbols. A running row's overline shows
+    its start and "until …", not the word "Recording". The word stands only
+    where the state is the topic, never as a red label by itself.
 - **Reds are picked by surface.** Recording red and `error` are tones of the
   same Material error palette; each role has a tone for the dark surface, the
   focused light container and a fill. Recording: `#FF5449` / `#BA1A1A` /
-  `#D93025` with white. Error: `error` / `errorContainer` / `errorContainer`
-  with `onErrorContainer`. The pink `error` (1.3:1) and `#FF5449` (2.5:1)
+  `#D93025` with white. Error: `error` / `errorContainer` / `error` with
+  `onError` (Material's badge colours). The pink `error` (1.3:1) and `#FF5449` (2.5:1)
   disappear on a focused row, so anything red inside a focusable item switches
   to its focused tone. Recording and error stay apart by shape (dot versus "!").
 - Brand artwork keeps the exact brand cyan `#00BCFA` and orange `#FA7F00`.

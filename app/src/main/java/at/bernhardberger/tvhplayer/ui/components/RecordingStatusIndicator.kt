@@ -45,13 +45,12 @@ fun RecordingStatusIndicator(
         painter = painterResource(if (recording) R.drawable.ic_fiber_manual_record else R.drawable.ic_schedule),
         contentDescription = description.takeIf { announceState },
         modifier = modifier.size(StatusIconSize),
-        tint = when {
-            !recording -> LocalContentColor.current
-            focused -> TvRecordingFocusedColor
-            else -> TvRecordingColor
-        },
+        tint = if (recording) recordingMarkColor(focused) else LocalContentColor.current,
     )
 }
+
+/** The red of a recording mark drawn outside this indicator: deeper on a focused, light row. */
+fun recordingMarkColor(focused: Boolean): Color = if (focused) TvRecordingFocusedColor else TvRecordingColor
 
 /** Scheduled mark for places that only know "scheduled", not a DVR entry state. */
 @Composable

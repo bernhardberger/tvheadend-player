@@ -123,9 +123,9 @@ import at.bernhardberger.tvhplayer.ui.components.rememberDetailsTint
 import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.underBrowseShellScrim
-import at.bernhardberger.tvhplayer.ui.player.PlayerRecBadge
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
 import kotlin.time.Instant
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 
 /** Room above and below the cards for their native focus scale and outline. */
 private val ImmersiveFocusRoom = 12.dp
@@ -509,7 +509,7 @@ private fun ChannelsHeadline(
         // Everything here is on now, so only a recording earns a mark: the player's REC badge.
         ProgrammeEyebrow(channel, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
             Modifier.semantics(mergeDescendants = true) {}.testTag("channels-headline-channel")) {
-            if (recording) PlayerRecBadge()
+            if (recording) RecordingBadge(DvrEntryState.RECORDING)
         }
         if (current == null && loading) {
             // The title and its time hold their lines until the guide arrives.

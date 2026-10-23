@@ -38,7 +38,7 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
+import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.notices.NoticeSeverity
@@ -140,7 +140,7 @@ internal fun AppNoticePresentation(
                         AppNoticeIcon.CONNECTED -> R.drawable.ic_power
                         AppNoticeIcon.DISCONNECTED -> R.drawable.ic_power_off
                     }), contentDescription = null, modifier = Modifier.size(16.dp),
-                        tint = if (icon == AppNoticeIcon.RECORDING) TvRecordingColor else LocalContentColor.current)
+                        tint = if (icon == AppNoticeIcon.RECORDING) recordingMarkColor(focused = false) else LocalContentColor.current)
                 }
                 Column(Modifier.weight(1f, fill = false)) {
                     Text(message, style = labelStyle,

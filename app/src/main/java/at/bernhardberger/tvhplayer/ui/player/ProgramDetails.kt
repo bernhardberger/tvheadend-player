@@ -107,6 +107,7 @@ import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
 import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 
 /**
  * Trial: the program details layer's own navigation. A program opened from the schedule and the
@@ -405,13 +406,8 @@ internal fun ProgrammeInformation(
         tile = { ProgrammeTile(event, nowSec, tile, it) }, status = {
             if (status != null) status() else
             when (recording) {
-                DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR ->
-                    PlayerRecBadge(Modifier.testTag("details-recording-badge"))
-                DvrEntryState.SCHEDULED -> Row(verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.testTag("details-recording-badge")) {
-                    RecordingStatusIndicator(recording, announceState = false)
-                    Text(stringResource(R.string.recording_state_scheduled), style = MaterialTheme.typography.labelLarge)
-                }
+                DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR, DvrEntryState.SCHEDULED ->
+                    RecordingBadge(recording, Modifier.testTag("details-recording-badge"))
                 else -> Unit
             }
         })
@@ -531,12 +527,12 @@ private fun Schedule(
                         image = {
                             ProgrammeTile(event, nowSec, tile,
                                 Modifier.size(ScheduleTileWidth, ScheduleTileHeight), embeddedProgress = false, clipShape = false)
-                            when (recordingFor(event)?.state) {
-                                DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR ->
-                                    PlayerRecBadge(Modifier.align(Alignment.TopEnd).padding(6.dp))
-                                DvrEntryState.SCHEDULED -> RecordingStatusIndicator(DvrEntryState.SCHEDULED,
-                                    Modifier.align(Alignment.TopEnd).padding(6.dp).clearAndSetSemantics {})
-                                else -> Unit
+                            recordingFor(event)?.state?.takeIf {
+                                it == DvrEntryState.RECORDING || it == DvrEntryState.RECORDING_ERROR || it == DvrEntryState.SCHEDULED
+                            }?.let { state ->
+                                // The tile announces its schedule itself; only recording now adds to it.
+                                RecordingBadge(state, Modifier.align(Alignment.TopEnd).padding(6.dp)
+                                    .then(if (state == DvrEntryState.SCHEDULED) Modifier.clearAndSetSemantics {} else Modifier), label = false)
                             }
                         },
                         // 1.1's title slot has no built-in padding. Use the card label's 12dp inset.

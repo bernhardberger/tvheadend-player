@@ -43,6 +43,7 @@ internal fun ProgrammeContextMenu(
             listOfNotNull(BrowseContextAction.SHOW_GUIDE.takeIf { showGuide }),
         watchChannel = !event.isRunning(nowSec), programDetailsLabel = !fromGuide,
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
+        recordingState = recording?.state,
         artwork = {
             // The menu shows its pictures with the session it was opened with.
             ProvideArtworkSession(currentSession, observation) {

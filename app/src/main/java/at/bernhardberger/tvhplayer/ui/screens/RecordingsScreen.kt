@@ -896,6 +896,7 @@ internal fun RecordingsScreenContent(
             time = recordingTimeRange(opened.start?.epochSeconds, opened.stop?.epochSeconds,
                 androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
+            recordingState = opened.state,
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,

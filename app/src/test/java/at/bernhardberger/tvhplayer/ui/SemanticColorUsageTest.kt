@@ -20,14 +20,9 @@ class SemanticColorUsageTest {
         )
         assertContains(
             "ui/components/ProgrammeDetailsPage.kt",
-            "DetailsStatus.RECORDING -> TvRecordingColor",
+            "DetailsStatus.RECORDING -> RecordingBadge(DvrEntryState.RECORDING)",
         )
-        // A scheduled recording carries the clock the player and rows use, not the recording red.
-        assertContains(
-            "ui/components/ProgrammeDetailsPage.kt",
-            "if (status == DetailsStatus.SCHEDULED) ScheduledIndicator(",
-        )
-        assertContains("ui/player/PlayerBarStatusView.kt", "background(TvRecordingContainerColor")
+        assertContains("ui/components/StatusBadge.kt", "StatusBadgeTone.RECORDING -> TvRecordingContainerColor")
 
         val scopedSources = listOf(
             "ui/screens/OnboardingScreen.kt",
@@ -53,6 +48,21 @@ class SemanticColorUsageTest {
         }
         assertTrue(scopedSources.contains("MaterialTheme.colorScheme.error"))
     }
+    @Test
+    fun recordingRedsAreDrawnOnlyByTheSharedBadgeAndDot() {
+        // Every recording mark goes through RecordingBadge or RecordingStatusIndicator, so each surface
+        // gets the red picked for it.
+        val owners = setOf("ui/Theme.kt", "ui/components/RecordingStatusIndicator.kt", "ui/components/StatusBadge.kt")
+        val reds = Regex("""\bTv(OnRecordingContainer|RecordingContainer|RecordingFocused|Recording)Color\b""")
+        val sourceRoot = File(repositoryRoot, "app/src/main/java/at/bernhardberger/tvhplayer")
+        val offenders = sourceRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .map { it.relativeTo(sourceRoot).invariantSeparatorsPath }
+            .filter { it !in owners && reds.containsMatchIn(source(it)) }
+            .toList()
+        assertTrue("Recording reds used outside the shared badge and dot: $offenders", offenders.isEmpty())
+    }
+
     private fun assertContains(relativePath: String, expected: String) {
         assertTrue("$relativePath must contain $expected", source(relativePath).contains(expected))
     }

@@ -237,10 +237,8 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-20")
         assertOverlineAboveTitle(20)
         assertFullWidthFocusInside("recordings-schedule-list", 20)
-        // States other than completed show as symbols; their words remain for accessibility.
-        compose.onNodeWithTag("recording-list-state-scheduled", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasTestTag("recording-list-metadata-20") and hasText("Scheduled", substring = true),
-            useUnmergedTree = true).assertExists()
+        // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
+        assertTrailingStateMark(20, "Scheduled")
         capture("schedule", 1f, assertFullWidthFocusSafeArea(20))
         key(Key.DirectionUp)
         key(Key.DirectionRight)
@@ -311,10 +309,8 @@ class RecordingsVisualLayoutTest {
         focused("recording-list-entry-20")
         assertEquals(848f, bounds("recording-list-entry-20").right, .1f)
         assertFullWidthFocusInside("recordings-schedule-list", 20)
-        // States other than completed show as symbols; their words remain for accessibility.
-        compose.onNodeWithTag("recording-list-state-scheduled", useUnmergedTree = true).assertIsDisplayed()
-        compose.onNode(hasTestTag("recording-list-metadata-20") and hasText("Scheduled", substring = true),
-            useUnmergedTree = true).assertExists()
+        // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
+        assertTrailingStateMark(20, "Scheduled")
         capture("schedule-end100", 1f, assertFullWidthFocusSafeArea(20))
         key(Key.DirectionUp)
         key(Key.DirectionRight)
@@ -412,13 +408,16 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
-    @Test fun runningRowMarksItsTitleAndKeepsTheLogoAndOverlineAligned() {
+    @Test fun runningRowMarksItsEndAndKeepsTheLogoAndOverlineAligned() {
         val now = System.currentTimeMillis() / 1000L
         show(entries = listOf(
             recording(1, "Archived", "Documentaries/archived.ts"),
             DvrEntry.create(DvrEntryId(30), title = "Live match", state = DvrEntryState.RECORDING,
                 start = Instant.fromEpochSeconds(now - 600), stop = Instant.fromEpochSeconds(now + 3_000),
                 channelName = "Ridge Earth HD", subtitle = "Second half"),
+            DvrEntry.create(DvrEntryId(31), title = "Weak signal", state = DvrEntryState.RECORDING_ERROR,
+                start = Instant.fromEpochSeconds(now - 300), stop = Instant.fromEpochSeconds(now + 3_300),
+                channelName = "Ridge Earth HD"),
         ))
         compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionUp)
@@ -427,11 +426,20 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recording-list-entry-30")
         assertOverlineAboveTitle(30)
-        compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Recording now • until", substring = true),
+        // The overline gives the start and the stop; the state is the dot at the row's end.
+        compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("• until", substring = true),
             useUnmergedTree = true).assertIsDisplayed()
-        // The dot follows the title; only the 32dp logo (with the focus scale) leads the row.
-        assertTrue(bounds("recording-list-running-30").left > bounds("recording-list-headline-30").right)
+        compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Recording", substring = true),
+            useUnmergedTree = true).assertDoesNotExist()
+        assertTrailingStateMark(30, "Recording now")
+        // Only the 32dp logo (with the focus scale) leads the row.
         assertEquals(32f * 1.05f, bounds("recording-list-leading-30").width, .1f)
+        compose.onNodeWithTag("recording-list-errors-30", useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-31")
+        // Errors while recording add the error mark beside the dot.
+        assertTrailingStateMark(31, "Recording • errors")
+        assertTrue(bounds("recording-list-errors-31").left > bounds("recording-list-state-31").right)
         capture("schedule-running-row", 1f)
         assertNoCommands()
     }
@@ -846,6 +854,14 @@ class RecordingsVisualLayoutTest {
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true)
         .fetchSemanticsNode().boundsInRoot
+
+    private fun assertTrailingStateMark(id: Int, description: String) {
+        compose.onNodeWithTag("recording-list-state-$id", useUnmergedTree = true)
+            .assertIsDisplayed().assertContentDescriptionEquals(description)
+        assertTrue(bounds("recording-list-state-$id").left > bounds("recording-list-headline-$id").right)
+        compose.onNode(hasTestTag("recording-list-metadata-$id") and hasText(description, substring = true),
+            useUnmergedTree = true).assertDoesNotExist()
+    }
 
     private fun assertOverlineAboveTitle(id: Long) {
         val title = bounds("recording-list-headline-$id")

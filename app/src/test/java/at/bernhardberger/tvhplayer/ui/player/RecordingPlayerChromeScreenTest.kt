@@ -253,10 +253,10 @@ class RecordingPlayerChromeScreenTest {
         var growing by mutableStateOf(true)
         compose.setContent { TVHeadendPlayerTheme { RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = growing) } }
         compose.waitForIdle()
-        assertTrue(exists("player-rec-badge"))
+        assertTrue(exists("recording-badge"))
         compose.runOnIdle { growing = false }
         compose.waitForIdle()
-        assertFalse(exists("player-rec-badge"))
+        assertFalse(exists("recording-badge"))
     }
 
     @Test fun bannerHidesFiveSecondsAfterTheFirstFrame() {
@@ -356,7 +356,7 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the annotation names the distance from the recording head", texts("30:00 behind live"))
         assertEquals("Behind live", description("player-live-state"))
         assertEquals("the length carries no recording dot", "1:00:00", endClock())
-        assertEquals("the badge says it", "Recording now", description("player-rec-badge"))
+        assertEquals("the badge says it", "Recording now", description("recording-badge"))
         assertTrue("and the top identity, which carries it, speaks it", identitySpeech(compose).contains("Recording now"))
     }
 

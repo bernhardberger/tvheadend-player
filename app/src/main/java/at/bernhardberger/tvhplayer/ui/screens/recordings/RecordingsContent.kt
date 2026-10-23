@@ -101,14 +101,18 @@ import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.runningRecordings
-import at.bernhardberger.tvhplayer.ui.TvRecordingColor
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
+import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
+import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
@@ -237,6 +241,7 @@ internal fun RecordingNowFolderRow(
     onClick: () -> Unit,
 ) {
     val owner = LocalTabOwner.current
+    var focused by remember { mutableStateOf(false) }
     ListItem(
         selected = false,
         onClick = { if (owner?.isCurrent != false) onClick() },
@@ -258,7 +263,7 @@ internal fun RecordingNowFolderRow(
                     .size(32.dp)
                     .drawWithContent {
                         drawContent()
-                        drawCircle(TvRecordingColor, radius = 7.dp.toPx(), center = dotCenter(size))
+                        drawCircle(recordingMarkColor(focused), radius = 7.dp.toPx(), center = dotCenter(size))
                     }
                     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                     .drawWithContent {
@@ -273,6 +278,7 @@ internal fun RecordingNowFolderRow(
         modifier = modifier
             .tabFocus()
             .fillMaxWidth()
+            .onFocusChanged { focused = it.isFocused }
             .testTag("recordings-recording-now-folder"),
     )
 }
@@ -309,25 +315,11 @@ internal fun RecordingMetadataPane(
                 .height(if (artworkPath != null) 99.dp else 64.dp)
                 .clip(MaterialTheme.shapes.small),
         )
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            RecordingStatusIndicator(state = entry.state ?: DvrEntryState.UNKNOWN)
-            Text(
-                text = dvrStateLabel(entry.state),
-                style = MaterialTheme.typography.labelLarge,
-                color = when (entry.state) {
-                    DvrEntryState.SCHEDULED,
-                    DvrEntryState.RECORDING -> TvRecordingColor
-                    DvrEntryState.MISSED,
-                    DvrEntryState.INVALID,
-                    DvrEntryState.RECORDING_ERROR,
-                    DvrEntryState.COMPLETED_ERROR,
-                    DvrEntryState.FILE_MISSING -> MaterialTheme.colorScheme.error
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            )
+        // The pane's eyebrow badge, as on the details page; a completed recording needs none.
+        when (entry.state) {
+            DvrEntryState.MISSED, DvrEntryState.INVALID ->
+                StatusBadge(dvrStateLabel(entry.state), StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_cancel_outlined)
+            else -> RecordingBadge(entry.state)
         }
         Text(
             text = entry.title.orEmpty(),
@@ -518,7 +510,6 @@ internal fun RecordingSchedule(
             item(key = "header-${section.kind}-${section.date}") {
                 RecordingSectionHeader(
                     text = scheduleSectionLabel(section),
-                    recordingNow = section.kind == DvrScheduleSectionKind.RECORDING_NOW,
                     first = index == 0,
                 )
             }
@@ -728,32 +719,45 @@ internal fun RecordingListRow(
     val owner = LocalTabOwner.current
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(
         onOpenContextMenu, enabled = { owner?.isCurrent != false })
+    var focused by remember { mutableStateOf(false) }
+    val itemKey = recordingItemKey(entry.id)
     ListItem(
         selected = selected,
         onClick = { if (owner?.isCurrent != false) onClick() },
         onLongClick = contextMenu.onLongClick,
         headlineContent = {
-            // A running recording marks its title, as channel rows do, so every text line keeps one left edge.
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = entry.title.orEmpty(),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false).testTag(
-                        "recording-list-headline-${recordingItemKey(entry.id)}"
-                    ),
-                )
-                if (recordingIsRunning(entry)) {
-                    RecordingStatusIndicator(state = DvrEntryState.RECORDING, announceState = false,
-                        modifier = Modifier.size(12.dp).testTag("recording-list-running-${recordingItemKey(entry.id)}"))
-                }
-            }
+            Text(
+                text = entry.title.orEmpty(),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.testTag("recording-list-headline-$itemKey"),
+            )
         },
         overlineContent = {
-            RecordingOverline(entry)
+            RecordingOverline(entry, focused)
+        },
+        // Running and scheduled recordings carry their mark at the row's end, as channel rows do.
+        trailingContent = entry.state?.takeIf { recordingIsRunning(entry) || it == DvrEntryState.SCHEDULED }?.let { state ->
+            {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(TvSpacing4),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RecordingStatusIndicator(
+                        state = state,
+                        focused = focused,
+                        modifier = Modifier.testTag("recording-list-state-$itemKey"),
+                    )
+                    if (state == DvrEntryState.RECORDING_ERROR) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_error_outlined),
+                            contentDescription = null,
+                            modifier = Modifier.size(StatusIconSize).testTag("recording-list-errors-$itemKey"),
+                            tint = errorMarkColor(focused),
+                        )
+                    }
+                }
+            }
         },
         supportingContent = metadata.takeIf(String::isNotBlank)?.let { text ->
             {
@@ -778,61 +782,48 @@ internal fun RecordingListRow(
             .testTag("recording-list-entry-${recordingItemKey(entry.id)}")
             .then(contextMenu.modifier)
             .then(if (focusTarget && selectedFocus != null) Modifier.focusRequester(selectedFocus) else Modifier)
-            .onFocusChanged { if (owner?.isCurrent != false && it.isFocused) onFocused() },
+            .onFocusChanged {
+                focused = it.isFocused
+                if (owner?.isCurrent != false && it.isFocused) onFocused()
+            },
     )
 }
 
 @Composable
 private fun RecordingSectionHeader(
     text: String,
-    recordingNow: Boolean = false,
     first: Boolean = false,
 ) {
     // Headings use the Archive heading band; later ones keep a gap to the section above.
     Box(Modifier.padding(top = if (first) 0.dp else 8.dp).height(recordingsHeadingBandHeight())) {
-        Row(
-            modifier = Modifier.semantics { heading() },
-            horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (recordingNow) {
-                RecordingStatusIndicator(
-                    state = DvrEntryState.RECORDING,
-                    announceState = false,
-                )
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.titleLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-        }
+        Text(
+            text = text,
+            modifier = Modifier.align(Alignment.CenterStart).semantics { heading() },
+            style = MaterialTheme.typography.titleLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 
 /**
- * The row's overline: a running recording shows its state and when it stops; any other recording
- * shows its programme start and length, then marks an early stop and any state but completed with
- * muted symbols whose words are read out by accessibility services.
+ * The row's overline: the programme start and length (a running recording says when it stops), then
+ * symbols for an early stop, a failure or a cancellation whose words are read out by accessibility
+ * services. Only a failure is drawn in the error colour; the others stay muted.
  */
 @Composable
-private fun RecordingOverline(entry: DvrEntry) {
-    val running = recordingIsRunning(entry)
+private fun RecordingOverline(entry: DvrEntry, focused: Boolean) {
     val leading = buildList {
-        if (running) {
-            add(dvrStateLabel(entry.state))
-        } else {
-            entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
-                .takeIf(String::isNotBlank)?.let(::add)
-        }
+        entry.start?.epochSeconds.recordingDateTime(androidx.compose.ui.platform.LocalConfiguration.current.locales[0])
+            .takeIf(String::isNotBlank)?.let(::add)
         recordingLengthLabel(entry)?.let(::add)
     }.joinToString(" • ")
     val marks = buildList {
-        if (running) return@buildList
+        if (recordingIsRunning(entry)) return@buildList
         // The pane spells the early stop out with the planned times.
         if (recordingStoppedEarly(entry) != null) add(RecordingOverlineMark.STOPPED_EARLY to stringResource(R.string.recordings_stopped_early))
         recordingStateMark(entry.state)?.let { add(it to dvrStateLabel(entry.state)) }
     }
+    val failedTint = errorMarkColor(focused)
     Text(
         text = buildAnnotatedString {
             append(leading)
@@ -841,7 +832,18 @@ private fun RecordingOverline(entry: DvrEntry) {
                 appendInlineContent(mark.name, label)
             }
         },
-        inlineContent = RecordingOverlineMarks,
+        inlineContent = remember(failedTint) {
+            RecordingOverlineMark.entries.associate { mark ->
+                mark.name to InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
+                    Icon(
+                        painter = painterResource(mark.icon),
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize().testTag(mark.tag),
+                        tint = if (mark == RecordingOverlineMark.FAILED) failedTint else androidx.tv.material3.LocalContentColor.current,
+                    )
+                }
+            }
+        },
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.testTag("recording-list-metadata-${recordingItemKey(entry.id)}"),
@@ -850,14 +852,12 @@ private fun RecordingOverline(entry: DvrEntry) {
 
 private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: String) {
     STOPPED_EARLY(R.drawable.ic_warning_outlined, "recording-list-stopped-early"),
-    SCHEDULED(R.drawable.ic_schedule, "recording-list-state-scheduled"),
     FAILED(R.drawable.ic_error_outlined, "recording-list-state-failed"),
     CANCELLED(R.drawable.ic_cancel_outlined, "recording-list-state-cancelled"),
 }
 
-/** A completed recording is the normal case and carries no mark; a running one says its state in words. */
+/** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */
 private fun recordingStateMark(state: DvrEntryState?): RecordingOverlineMark? = when (state) {
-    DvrEntryState.SCHEDULED -> RecordingOverlineMark.SCHEDULED
     DvrEntryState.COMPLETED_ERROR,
     DvrEntryState.FILE_MISSING -> RecordingOverlineMark.FAILED
     DvrEntryState.MISSED,
@@ -865,11 +865,10 @@ private fun recordingStateMark(state: DvrEntryState?): RecordingOverlineMark? = 
     else -> null
 }
 
-private val RecordingOverlineMarks = RecordingOverlineMark.entries.associate { mark ->
-    mark.name to InlineTextContent(Placeholder(1.em, 1.em, PlaceholderVerticalAlign.TextCenter)) {
-        Icon(painterResource(mark.icon), contentDescription = null, modifier = Modifier.fillMaxSize().testTag(mark.tag))
-    }
-}
+/** The error colour of a mark: pink on the dark surface, dark red on a focused, light row. */
+@Composable
+private fun errorMarkColor(focused: Boolean): Color =
+    if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error
 
 /** The Recordings 1xx alert, shown only while there are no recordings to list. */
 internal fun recordingsAppError(

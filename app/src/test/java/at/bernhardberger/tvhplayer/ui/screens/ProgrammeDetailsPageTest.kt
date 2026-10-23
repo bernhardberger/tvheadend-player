@@ -969,7 +969,7 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-resume").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-delete").assertIsFocused()
-        compose.onNodeWithText("Available until Tue, Sep 22").assertExists()
+        compose.onNodeWithContentDescription("Available until Tue, Sep 22").assertExists()
         assertBottomAnchored(peek = false)
         assertTwoLineSubtitle()
         compose.onNodeWithTag("details-airings").assertDoesNotExist()

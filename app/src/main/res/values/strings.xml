@@ -409,6 +409,7 @@
     <string name="recording_state_recording">Recording now</string>
     <string name="recording_state_recording_errors">Recording • errors</string>
     <string name="recording_state_completed">Completed</string>
+    <string name="recording_badge_errors">Errors</string>
     <string name="recording_state_failed">Failed</string>
     <string name="recording_state_cancelled">Canceled</string>
     <string name="recording_state_unknown">Server status unknown</string>

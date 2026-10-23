@@ -47,12 +47,12 @@ import at.bernhardberger.tvhplayer.images.LogoHaloTransformation
 import at.bernhardberger.tvhplayer.images.ScrimTransformation
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
-import at.bernhardberger.tvhplayer.ui.player.PlayerRecBadge
 import at.bernhardberger.tvhplayer.ui.player.leaving
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 
 /** Width of a compact zap card in a row; grids let the card fill its column instead. */
 internal val CompactZapCardWidth = 196.dp
@@ -145,9 +145,8 @@ internal fun CompactZapCard(
                         transformation = haloTransformation,
                     )
                 }
-                // On the Channels cards the kit's embed corner holds the recording badge, as on the
-                // player's schedule tiles; the rail keeps it beside the name.
-                if (channelLed && recording) PlayerRecBadge(Modifier.align(Alignment.TopEnd).padding(CompactZapEmbedInset))
+                // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
+                if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(CompactZapEmbedInset))
             }
         },
         title = {
@@ -168,7 +167,7 @@ internal fun CompactZapCard(
                     label = "zap-card-marker",
                 ) { indicator ->
                     if (!leaving) ChannelNowIndicators(playingNow = indicator == ChannelPlaybackIndicator.PLAYING,
-                        recordingNow = recording && !channelLed, playbackIndicator = indicator)
+                        recordingNow = false, playbackIndicator = indicator)
                 }
             }
         },

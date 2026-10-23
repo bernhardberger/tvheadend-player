@@ -13,6 +13,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 
@@ -65,6 +66,7 @@ internal fun BrowseContextMenu(
     watchChannel: Boolean = false,
     programDetailsLabel: Boolean = false,
     backEnabled: Boolean = true,
+    recordingState: DvrEntryState? = null,
     artwork: @Composable () -> Unit,
 ) {
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
@@ -91,6 +93,7 @@ internal fun BrowseContextMenu(
                         color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
                     if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }

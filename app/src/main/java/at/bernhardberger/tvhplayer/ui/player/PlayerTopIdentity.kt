@@ -75,6 +75,8 @@ import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 
 /** The live top identity's test tag. */
 internal const val PlayerTopIdentityTag = "player-top-identity"
@@ -259,7 +261,7 @@ private fun IdentityContent(
             // The focusable identity's description, or the Banner's info bar, names the channel.
             modifier = Modifier.weight(1f, fill = false).widthIn(max = IdentityTextMaxWidth)
                 .testTag("player-top-identity-name").clearAndSetSemantics {})
-        if (content.recordingNow) PlayerRecBadge()
+        if (content.recordingNow) RecordingBadge(DvrEntryState.RECORDING)
     }
 }
 
