@@ -1,9 +1,12 @@
+import hashlib
 import importlib.util
+import io
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -163,6 +166,31 @@ sys.exit(subprocess.run(["/bin/bash", "-c", command]).returncode)
             self.assertFalse((root / "keys").exists())
             self.assertIn("am force-stop at.bernhardberger.tvhplayer", (root / "cleanup").read_text())
             self.assertFalse((output / "run-1.mp4").exists())
+
+    def test_trace_processor_is_only_used_when_it_matches_the_pinned_checksum(self):
+        spec = importlib.util.spec_from_file_location("trace_processor", ROOT / "tools/profiling/trace_processor.py")
+        assert spec is not None and spec.loader is not None
+        pinned = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(pinned)
+        good = b"pinned binary"
+        pinned.PREBUILTS = {key: ("fixture-arch", hashlib.sha256(good).hexdigest()) for key in pinned.PREBUILTS}
+        served = []
+
+        def urlopen(url, timeout):
+            served.append(url)
+            return io.BytesIO(b"tampered binary")
+
+        pinned.urllib.request.urlopen = urlopen
+        with tempfile.TemporaryDirectory() as cache, unittest.mock.patch.dict(os.environ, {"XDG_CACHE_HOME": cache}):
+            with self.assertRaises(SystemExit):
+                pinned.ensure()
+            self.assertEqual(len(served), 1)
+            directory = Path(cache) / "tvheadend-player/perfetto"
+            self.assertEqual(list(directory.iterdir()), [])
+            binary = directory / f"trace_processor_shell-{pinned.VERSION}-fixture-arch"
+            binary.write_bytes(good)
+            self.assertEqual(pinned.ensure(), binary)
+            self.assertEqual(len(served), 1)
 
 
 if __name__ == "__main__":

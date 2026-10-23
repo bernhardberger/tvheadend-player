@@ -2,6 +2,7 @@
 """Run standard Trace Processor queries on one capture batch; retain private CSV evidence."""
 import argparse
 import csv
+import importlib.util
 import io
 import json
 import os
@@ -52,14 +53,24 @@ def parse_metadata(text):
     return metadata
 
 
+def pinned_trace_processor():
+    spec = importlib.util.spec_from_file_location("trace_processor", Path(__file__).with_name("trace_processor.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.ensure()
+
+
 def main():
     os.umask(0o077)
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--trace-processor", required=True, type=Path)
+    parser.add_argument("--trace-processor", type=Path,
+                        help="trace_processor_shell to use; defaults to the pinned one from trace_processor.py")
     parser.add_argument("--focus-kind", action="append", choices=("guide", "channel", "control", "rail"))
     parser.add_argument("--focus-count", type=int)
     parser.add_argument("directory", type=Path)
     args = parser.parse_args()
+    if args.trace_processor is None:
+        args.trace_processor = pinned_trace_processor()
     directory = args.directory
     (directory / "analysis.json").unlink(missing_ok=True)
     metadata = parse_metadata((directory / "capture-metadata.txt").read_text())

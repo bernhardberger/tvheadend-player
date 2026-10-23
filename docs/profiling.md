@@ -50,8 +50,13 @@ Check only the package's dexopt line:
 ## Current capture workflow
 
 Use `tools/profiling/capture` and the standard Perfetto Trace Processor through
-`tools/profiling/analyze.py`. Keep traces, CSVs, screenshots and source snapshots
-private. Device authorization and exact-target checks in `device-targets.md` and
+`tools/profiling/analyze.py`. `tools/profiling/trace_processor.py` fetches the
+pinned official `trace_processor_shell` (v58.2) into the user cache on first use
+and checks its SHA-256; `analyze.py` uses it unless `--trace-processor` names
+another binary. Run it without arguments for the binary's path, or with
+arguments to query a trace directly. Moving to a newer release means updating
+its version and checksums from that release's prebuilt manifest. Keep traces,
+CSVs, screenshots and source snapshots private. Device authorization and exact-target checks in `device-targets.md` and
 `android-tooling.md` apply. Explicitly authorized unattended profiling does not
 require a new attended confirmation; human motion acceptance remains separate.
 
@@ -184,7 +189,7 @@ For an already prepared Channels first-row focus, for example:
 
 ```bash
 bash tools/profiling/capture causal "${TVHPLAYER_ADB_SERIAL:?select the authorized device}" at.bernhardberger.tvhplayer "$PRIVATE_OUTPUT" 3 20 20 20 20 19 19 19 19
-python3 tools/profiling/analyze.py --trace-processor "$TRACE_PROCESSOR" --focus-kind channel --focus-count 8 "$PRIVATE_OUTPUT"
+python3 tools/profiling/analyze.py --focus-kind channel --focus-count 8 "$PRIVATE_OUTPUT"
 ```
 
 For sustained journeys, `TVHPLAYER_PROFILE_DURATION_SECONDS=30|60` permits up to
