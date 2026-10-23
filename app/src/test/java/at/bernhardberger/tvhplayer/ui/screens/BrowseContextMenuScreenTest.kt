@@ -657,10 +657,11 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("recording-resume").assertIsFocused()
         compose.runOnIdle {
             val previous = session.observation.value
+            // The SDK marks a recording watched to the end by counting a play and clearing its position.
             val watched = previous.dvrSnapshotForDisplay!!.entries.map { entry ->
                 if (entry.id != DvrEntryId(1)) entry else DvrEntry.create(entry.id, channelId = entry.channelId,
                     eventId = entry.eventId, title = entry.title, folder = emptyList(), channelName = entry.channelName,
-                    state = entry.state, playPosition = 5300.seconds, start = entry.start, stop = entry.stop)
+                    state = entry.state, playPosition = 0.seconds, playCount = 1, start = entry.start, stop = entry.stop)
             }
             session.publish(SessionObservation.create(previous.sessionState, previous.channelState, previous.epgState,
                 DvrRepositoryState.Current(DvrSnapshot.create(watched)),

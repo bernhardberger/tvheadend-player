@@ -134,12 +134,11 @@ sealed interface RecordingWatchState {
 }
 
 /**
- * [resumePosition] is the position the recording offers to resume from, if any. A position past the
- * completion point is not partly watched: opening starts over, so the play count decides.
+ * [resumePosition] is the position the recording offers to resume from, if any. The SDK clears it when
+ * it marks the recording watched, so a saved position always means partly watched.
  */
 fun recordingWatchState(recording: DvrEntry, resumePosition: Duration?, nowSec: Long): RecordingWatchState = when {
-    resumePosition != null && resumePosition.isPositive() &&
-        !recordingPositionFinished(recording, resumePosition) -> RecordingWatchState.PartlyWatched(
+    resumePosition != null && resumePosition.isPositive() -> RecordingWatchState.PartlyWatched(
         (recordingLengthSeconds(recording, nowSec) ?: recordingPlannedSeconds(recording))
             ?.takeIf { it > 0 }
             ?.let { (resumePosition.inWholeSeconds.toDouble() / it).coerceIn(0.0, 1.0) }

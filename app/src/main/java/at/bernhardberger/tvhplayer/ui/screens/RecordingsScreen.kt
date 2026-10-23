@@ -326,7 +326,7 @@ internal fun RecordingsScreenContent(
 
     fun openRecording(entry: DvrEntry) {
         val capability = observation.currentSession
-        val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(entry,
+        val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
             capability?.let { observation.recordingPlaybackAdmission(entry) })
         showContextMenu = false
         if (capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
@@ -858,7 +858,7 @@ internal fun RecordingsScreenContent(
                     onPlayRecording(RecordingPlaybackSelection(capability, opened.id), intent)
                 }
             }
-            val choice = at.bernhardberger.tvhplayer.core.recordingOpenAction(opened, openedAdmission) ==
+            val choice = at.bernhardberger.tvhplayer.core.recordingOpenAction(openedAdmission) ==
                 at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
             LaunchedEffect(choice) {
                 if (!choice) closeResume()

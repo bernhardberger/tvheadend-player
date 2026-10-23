@@ -25,16 +25,17 @@ class RecordingOpenPolicyTest {
     private fun open(
         entry: DvrEntry,
         capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
-    ) = recordingOpenAction(entry, SessionObservation.create(recordingProgressCapability = capability)
+    ) = recordingOpenAction(SessionObservation.create(recordingProgressCapability = capability)
         .recordingPlaybackAdmission(entry))
 
-    @Test fun unstartedAndFinishedPlayFromBeginning() {
-        listOf(null, 0L, 570L, 600L, 800L).forEach {
+    @Test fun unstartedPlaysFromBeginning() {
+        listOf(null, 0L).forEach {
             assertEquals(RecordingOpenAction.START_OVER, open(entry(position = it)))
         }
     }
-    @Test fun positiveProgressBelowSdkCompletionPointPrompts() {
-        listOf(1L, 300L, 569L).forEach {
+    @Test fun anySavedPositionPrompts() {
+        // The SDK clears the position when it marks a recording watched, so even a late one is a resume point.
+        listOf(1L, 300L, 569L, 590L).forEach {
             assertEquals(RecordingOpenAction.RESUME_CHOICE, open(entry(position = it)))
         }
         assertEquals(RecordingOpenAction.RESUME_CHOICE, open(entry(position = 300, duration = null)))
@@ -75,7 +76,7 @@ class RecordingOpenPolicyTest {
         assertEquals(RecordingOpenAction.START_OVER, open(entry(failed, files = listOf(file()))))
         assertEquals(RecordingOpenAction.RESUME_CHOICE, open(entry(failed, 300, files = listOf(file()))))
         assertEquals(RecordingOpenAction.RESUME_CHOICE, open(entry(failed, 300, files = listOf(file()), dataSize = 1)))
-        assertEquals(RecordingOpenAction.START_OVER, open(entry(failed, 590, files = listOf(file()))))
+        assertEquals(RecordingOpenAction.RESUME_CHOICE, open(entry(failed, 590, files = listOf(file()))))
     }
     @Test fun missedRecordingWithAFileAlwaysStartsOver() {
         listOf(null, 300L).forEach {
@@ -95,7 +96,7 @@ class RecordingOpenPolicyTest {
         assertEquals(RecordingOpenAction.DETAILS, open(entry(DvrEntryState.INVALID, 300, files = listOf(file()))))
     }
     @Test fun noAdmissionOffersNoPlaybackOrResume() {
-        assertEquals(RecordingOpenAction.DETAILS, recordingOpenAction(entry(position = 300), null))
+        assertEquals(RecordingOpenAction.DETAILS, recordingOpenAction(null))
         assertNull(offeredResumePosition(null))
     }
     @Test fun timeLeftIsTheRestFromWhereOpeningStartsAndOnlyForAFinishedFile() {
@@ -103,8 +104,7 @@ class RecordingOpenPolicyTest {
         fun left(entry: DvrEntry) = recordingTimeLeft(entry, observation.recordingPlaybackAdmission(entry))
         assertEquals(600.seconds, left(entry()))
         assertEquals(300.seconds, left(entry(position = 300)))
-        // Past the completion point opening starts over, so all of it is left.
-        assertEquals(600.seconds, left(entry(position = 590)))
+        assertEquals(10.seconds, left(entry(position = 590)))
         assertNull(left(entry(duration = null)))
         assertNull(left(entry(DvrEntryState.RECORDING, 300, files = listOf(file()))))
         assertNull(left(entry(DvrEntryState.SCHEDULED)))

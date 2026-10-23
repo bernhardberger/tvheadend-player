@@ -189,8 +189,8 @@ now, recordings, upcoming recordings; initial focus on the last channel), with B
   (owner: "long press imho is context menu"). Details is an entry in that menu.
 - "Upcoming recordings" stays a Home row.
 - Home's Recordings row shows recordings that are recording now, partly
-  watched, or new and unwatched; one leaves the row when watched to about 95%
-  (the app's existing completion point) or deleted. Most recent activity first.
+  watched, or new and unwatched; one leaves the row once the SDK marks it
+  watched (95% of the file, or its end) or it is deleted. Most recent activity first.
 
 **U15 shared patterns: guideline check and owner answers (2026-10-12)**
 
