@@ -593,6 +593,28 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
+    @Test fun leftAndRightBackToTheAnchoredProgrammeStartANewAnchor() {
+        // Channel 1 runs one programme from 20:00 to 22:00; channel 2 is hourly.
+        show(longProgramme = true, longProgrammeHours = 2, longProgrammeSuccessor = true)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        key(Key.DirectionRight)
+        focused(title(2, 1))
+        // Up keeps 21:00 as the anchor inside the long programme.
+        key(Key.DirectionUp)
+        focused(title(1, 0))
+        key(Key.DirectionRight)
+        focused(title(1, 2))
+        key(Key.DirectionLeft)
+        focused(title(1, 0))
+        // Left made a new focus, so Down starts from the programme's visible start, not the old 21:00.
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        assertNoPlayback()
+    }
+
     @Test fun leftCrossesAnEpgGapWiderThanTheEarlierWindowToTheRowsPreviousProgramme() {
         // Five empty hours exceed the three-hour window Left would otherwise search.
         show(historyOffset = -6)

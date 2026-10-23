@@ -832,9 +832,9 @@ fun EpgGridScreen(
             coverageSettled = ::pageCoverageSettled,
         )
 
-    /** Up and Down keep this time; a new focus starts it at the programme's visible start. */
+    /** Up and Down keep this time, inside the window on screen; a new focus starts it at the programme's visible start. */
     fun anchorSecFor(current: EpgFocusTarget): Long =
-        focusAnchor?.takeIf { it.target == current }?.sec
+        focusAnchor?.takeIf { it.target == current }?.sec?.coerceIn(windowStartSec, windowEndSec - 1)
             ?: focusRows.getOrNull(current.channelIndex)?.events?.firstOrNull { it.id == current.eventId }
                 ?.let { maxOf(it.start.epochSeconds, windowStartSec) }
             ?: windowStartSec
@@ -842,6 +842,12 @@ fun EpgGridScreen(
     fun selectAnchored(target: EpgFocusTarget, anchorSec: Long) {
         selectedTarget = target
         focusAnchor = GuideFocusAnchor(target, anchorSec)
+    }
+
+    /** Left, Right and time jumps start a new anchor, even when they land on the anchored programme again. */
+    fun selectUnanchored(target: EpgFocusTarget?) {
+        selectedTarget = target
+        focusAnchor = null
     }
 
     fun requestChannelFocus(
@@ -921,7 +927,7 @@ fun EpgGridScreen(
         pendingInitialChannelIndex = targetChannelIndex
         requestVisibleWindow(windowStartSec, targetChannelIndex)
         if (target != null) {
-            selectedTarget = target
+            selectUnanchored(target)
             channelListState.scrollToItem(
                 restored?.firstVisibleColumn?.coerceIn(channels.indices)
                     ?: (targetChannelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
@@ -990,7 +996,7 @@ fun EpgGridScreen(
             )
         }
         if (replacement == current) return@LaunchedEffect
-        selectedTarget = replacement
+        selectUnanchored(replacement)
         if (replacement != null) {
             channelRecoveryPage = null
             pendingInitialChannelIndex = replacement.channelIndex
@@ -1080,7 +1086,7 @@ fun EpgGridScreen(
             is GuideDeferredOriginResolution.Restore -> {
                 windowStartSec = origin.windowStartSec
                 pendingInitialChannelIndex = resolution.target.channelIndex
-                selectedTarget = resolution.target
+                selectUnanchored(resolution.target)
                 pendingFrontierOrigin = null
             }
         }
@@ -1240,7 +1246,7 @@ fun EpgGridScreen(
             if (mayFocusProgramme && !retainGridFocus()) return@LaunchedEffect
             pendingInitialChannelIndex = target.channelIndex
             windowStartSec = targetWindowStartSec
-            selectedTarget = target
+            selectUnanchored(target)
         } else if (
             shouldWaitForGuideCoverage(
                 connectionReady = connectionUiState == ConnectionUiState.Ready,
@@ -1363,10 +1369,10 @@ fun EpgGridScreen(
             GuideCoverageFocusResolution.Release -> Unit
             is GuideCoverageFocusResolution.Select -> {
                 pendingInitialChannelIndex = resolution.target.channelIndex
-                selectedTarget = request.programmeId?.let { id ->
+                selectUnanchored(request.programmeId?.let { id ->
                     initialTimelineEpgFocus(focusRows, resolution.target.channelIndex,
                         request.programmeStartSec ?: request.windowStartSec, id)
-                } ?: resolution.target
+                } ?: resolution.target)
                 channelListState.scrollToItem((resolution.target.channelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE)
             }
         }
@@ -1430,7 +1436,7 @@ fun EpgGridScreen(
         clearAllCoverage()
         programmeFocusOwned = true
         pendingInitialChannelIndex = channelIndex
-        selectedTarget = null
+        selectUnanchored(null)
         windowStartSec = boundedTargetSec
         val coverageRequest = requestVisibleWindow(boundedTargetSec, channelIndex) ?: return
         windowFocusRequest = WindowFocusRequest(
@@ -1550,7 +1556,7 @@ fun EpgGridScreen(
                     )
                     if (target != null) {
                         windowStartSec = targetWindowStartSec
-                        selectedTarget = target.copy(channelIndex = current.channelIndex)
+                        selectUnanchored(target.copy(channelIndex = current.channelIndex))
                         return true
                     }
                     // An EPG gap can span the whole adjacent window. Continue to the row's
@@ -1565,7 +1571,7 @@ fun EpgGridScreen(
                     }
                     if (targetWindowStartSec + visibleWindowSec <= nowSecProvider()) {
                         windowStartSec = targetWindowStartSec
-                        selectedTarget = EpgFocusTarget(current.channelIndex, across.id)
+                        selectUnanchored(EpgFocusTarget(current.channelIndex, across.id))
                         return true
                     }
                 }
@@ -1598,7 +1604,7 @@ fun EpgGridScreen(
                 if (direction == EpgFocusDirection.UP || direction == EpgFocusDirection.DOWN) {
                     selectAnchored(next, anchorSec)
                 } else {
-                    selectedTarget = next
+                    selectUnanchored(next)
                 }
                 val event = focusRows.getOrNull(next.channelIndex)?.events
                     ?.firstOrNull { it.id == next.eventId }
@@ -2095,7 +2101,11 @@ fun EpgGridScreen(
                                     val target = EpgFocusTarget(channelIndex, event.id)
                                     val settled = realizedTarget == selectedTarget
                                     realizedTarget = target
-                                    if (settled || !programmeFocusOwned || selectedTarget == null) selectedTarget = target
+                                    if (settled || !programmeFocusOwned || selectedTarget == null) {
+                                        // Focus that arrives on another cell, or after the selection was cleared, starts a new anchor.
+                                        if (selectedTarget != target) focusAnchor = null
+                                        selectedTarget = target
+                                    }
                                     programmeFocusOwned = true
                                     if (target == selectedTarget) {
                                         lastFocusedEvent = event
