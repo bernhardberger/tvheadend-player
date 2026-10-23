@@ -9,16 +9,14 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
-import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import at.bernhardberger.tvhplayer.ui.screens.ProgrammeDetailsHost
-import java.time.ZoneId
 import kotlinx.coroutines.CoroutineScope
 
-/** The Guide's search dialog, programme details and jump-to-time dialog over the browse content. */
+/** The Guide's search dialog and programme details over the browse content. */
 @Composable
 internal fun GuideOverlayHost(
     contentPadding: PaddingValues,
@@ -50,13 +48,6 @@ internal fun GuideOverlayHost(
     onCloseDetails: () -> Unit,
     eventFocusRequesters: Map<EventId, FocusRequester>,
     onShowGuide: (ChannelId, EpgEventEntry?) -> Unit,
-    showJumpDialog: Boolean,
-    windowStartSec: () -> Long,
-    windowBounds: GuideWindowBounds,
-    zoneId: ZoneId,
-    nowSecProvider: () -> Long,
-    onDismissJump: () -> Unit,
-    onJump: (Long) -> Unit,
 ) {
     if (showSearchDialog && !detailsFromSearch) {
         EpgSearchDialog(
@@ -87,17 +78,6 @@ internal fun GuideOverlayHost(
             onPlayRecording = onPlayRecording, onClose = onCloseDetails,
             returnFocusRequester = eventFocusRequesters[openingEvent.id].takeUnless { detailsFromSearch },
             onShowGuide = onShowGuide,
-        )
-    }
-
-    if (showJumpDialog) {
-        JumpToTimeDialog(
-            initialSec = windowStartSec(),
-            bounds = windowBounds,
-            zoneId = zoneId,
-            nowSecProvider = nowSecProvider,
-            onDismiss = onDismissJump,
-            onJump = onJump,
         )
     }
 }

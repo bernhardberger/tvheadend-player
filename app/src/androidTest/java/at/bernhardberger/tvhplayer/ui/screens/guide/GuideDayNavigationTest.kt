@@ -1,15 +1,14 @@
 package at.bernhardberger.tvhplayer.ui.screens.guide
 
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertIsNotEnabled
-import androidx.compose.ui.test.junit4.v2.createComposeRule
-import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsSelected
+import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import androidx.test.platform.app.InstrumentationRegistry
-import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.guideWindowBounds
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.time.LocalDateTime
@@ -24,7 +23,6 @@ class GuideDayNavigationTest {
     @get:Rule
     val composeRule = createComposeRule()
 
-    private val context = InstrumentationRegistry.getInstrumentation().targetContext
     private val zone = ZoneId.of("UTC")
     private val openedAtSec = LocalDateTime.of(2026, 2, 10, 12, 0)
         .atZone(zone)
@@ -32,54 +30,51 @@ class GuideDayNavigationTest {
     private val bounds = guideWindowBounds(openedAtSec, zone)
 
     @Test
-    fun earliestWindowFocusesNowAndCommitsTheNextCalendarDay() {
-        var jumpedTo: Long? = null
+    fun earliestWindowFocusesTodayAndAppliesTheNextCalendarDay() {
+        var appliedDay: Long? = null
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                JumpToTimeDialog(
-                    initialSec = bounds.earliestStartSec,
+                GuideTimePanel(
+                    windowStartSec = bounds.earliestStartSec,
                     bounds = bounds,
                     zoneId = zone,
                     nowSecProvider = { openedAtSec },
-                    onDismiss = {},
-                    onJump = { jumpedTo = it },
+                    onDay = { appliedDay = it },
+                    onHour = {},
+                    onNow = {},
+                    onClose = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.now)).assertIsFocused()
-        composeRule.onNodeWithText(context.getString(R.string.previous_day)).assertIsNotEnabled()
-        composeRule.onNodeWithText(context.getString(R.string.next_day))
-            .assertIsEnabled()
-            .performSemanticsAction(SemanticsActions.OnClick)
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText(context.getString(R.string.epg_jump_action))
-            .assertIsEnabled()
+        composeRule.onNodeWithTag("guide-time-day-0").assertIsFocused().assertIsSelected()
+        composeRule.onNodeWithTag("guide-time-day-1")
             .performSemanticsAction(SemanticsActions.OnClick)
 
         composeRule.runOnIdle {
-            assertEquals(openedAtSec + 24 * 3600L, jumpedTo)
+            assertEquals(bounds.earliestStartSec + 24 * 3600L, appliedDay)
         }
     }
 
     @Test
-    fun latestWindowDisablesForwardDayAndHourNavigation() {
+    fun latestWindowEndsTheDaysAndHoursAtTheBounds() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
-                JumpToTimeDialog(
-                    initialSec = bounds.latestStartSec,
+                GuideTimePanel(
+                    windowStartSec = bounds.latestStartSec,
                     bounds = bounds,
                     zoneId = zone,
                     nowSecProvider = { openedAtSec },
-                    onDismiss = {},
-                    onJump = {},
+                    onDay = {},
+                    onHour = {},
+                    onNow = {},
+                    onClose = {},
                 )
             }
         }
 
-        composeRule.onNodeWithText(context.getString(R.string.next_day)).assertIsNotEnabled()
-        composeRule.onNodeWithText(context.getString(R.string.next_hour,
-            at.bernhardberger.tvhplayer.ui.common.formatWholeHours(1, context.resources))).assertIsNotEnabled()
-        composeRule.onNodeWithText(context.getString(R.string.previous_day)).assertIsEnabled()
+        // Opens on the final day, scrolled to it; the day after the horizon is not offered.
+        composeRule.onNodeWithTag("guide-time-day-7").assertIsFocused().assertIsSelected()
+        composeRule.onAllNodesWithTag("guide-time-day-8").assertCountEquals(0)
     }
 }

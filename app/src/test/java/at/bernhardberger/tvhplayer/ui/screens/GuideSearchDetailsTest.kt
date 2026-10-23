@@ -81,6 +81,6 @@ class GuideSearchDetailsTest {
         assertTrue(screen.contains("showSearchDialog = showSearchDialog,\n            detailsFromSearch = detailsFromSearch,"))
         assertTrue(screen.contains("if (detailsFromSearch) {\n                closeDetails()\n            }\n            closeSearch()"))
         assertTrue(screen.contains("restoreSearchResultFocus = searchEventId"))
-        assertTrue(screen.contains(".semantics { if (detailsEvent != null || openPanel != null) hideFromAccessibility() }"))
+        assertTrue(screen.contains(".semantics { if (detailsEvent != null || openPanel != null || showTimePanel) hideFromAccessibility() }"))
     }
 }

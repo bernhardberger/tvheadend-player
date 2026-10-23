@@ -33,8 +33,10 @@ import at.bernhardberger.tvhplayer.ui.screens.ChannelsHeader
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsHeaderFocus
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsPanel
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 /**
  * The Guide's title row in the Channels header pattern: the title with the active group, then the
@@ -92,8 +94,7 @@ internal fun GuideHeader(
 }
 
 /**
- * A ghost button naming the Guide's day and time, "Today · 19:30"; OK opens the time picker.
- * Today and tomorrow are named, other days get their short weekday and date.
+ * A ghost button naming the Guide's day and time, "Today · 19:30"; OK opens the day and time panel.
  */
 @Composable
 private fun GuideDateButton(
@@ -109,16 +110,7 @@ private fun GuideDateButton(
         derivedStateOf { Instant.ofEpochSecond(nowSecProvider()).atZone(zone).toLocalDate() }
     }
     val start = Instant.ofEpochSecond(windowStartSec).atZone(zone)
-    val day = when (ChronoUnit.DAYS.between(today, start.toLocalDate())) {
-        0L -> stringResource(R.string.today)
-        1L -> stringResource(R.string.tomorrow)
-        else -> formatRecordingDate(
-            windowStartSec,
-            dateOnly = true,
-            locale = locale,
-            nowSec = today.atStartOfDay(zone).toEpochSecond(),
-        )
-    }
+    val day = guideDayLabel(start.toLocalDate(), today, zone, locale)
     val time = formatClock(start, locale)
     val description = stringResource(R.string.epg_date_button_description, day, time)
     Button(
@@ -134,3 +126,18 @@ private fun GuideDateButton(
         Text(stringResource(R.string.epg_date_button, day, time), maxLines = 1)
     }
 }
+
+/** Today, tomorrow and yesterday are named, other days get their short weekday and date. */
+@Composable
+internal fun guideDayLabel(date: LocalDate, today: LocalDate, zone: ZoneId, locale: Locale): String =
+    when (ChronoUnit.DAYS.between(today, date)) {
+        0L -> stringResource(R.string.today)
+        1L -> stringResource(R.string.tomorrow)
+        -1L -> stringResource(R.string.yesterday)
+        else -> formatRecordingDate(
+            date.atStartOfDay(zone).toEpochSecond(),
+            dateOnly = true,
+            locale = locale,
+            nowSec = today.atStartOfDay(zone).toEpochSecond(),
+        )
+    }

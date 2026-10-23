@@ -1049,6 +1049,119 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun theDateButtonOpensTheDayAndTimePanelOnTheCheckedDay() {
+        val gridHidden = SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility) and
+            hasAnyDescendant(hasTestTag("epg-channel-row-1"))
+        show()
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.HideFromAccessibility))
+        assertEquals(1, compose.onAllNodes(gridHidden, useUnmergedTree = true).fetchSemanticsNodes().size)
+        tagFocused("guide-time-day-0")
+        compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
+        compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
+        assertDateButton("Today", hour)
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun aDayAppliesAtOnceAndKeepsThePanelAndItsFocus() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionDown)
+        tagFocused("guide-time-day-1")
+        key(Key.Enter)
+        compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600) }
+        compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
+        tagFocused("guide-time-day-1")
+        compose.onNodeWithTag("guide-time-day-1").assertIsSelected()
+        compose.onNodeWithTag("guide-time-day-0").assertIsNotSelected()
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        tagFocused("guide-time-day-1")
+        key(Key.Back)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        assertDateButton("Tomorrow", hour + 24 * 3600)
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun anHourJumpsToTheCheckedDayClosesThePanelAndLeavesFocusOnTheDateButton() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionDown)
+        key(Key.Enter)
+        compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600) }
+        // Six more days, then the first hour of tomorrow, then 03:00.
+        repeat(6 + 1 + 3) { key(Key.DirectionDown) }
+        tagFocused("guide-time-hour-03")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600 - 17 * 3600) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        dateFocused()
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun nowJumpsBackToTheCurrentHourFromALaterDay() {
+        show()
+        key(Key.Enter)
+        key(Key.DirectionDown)
+        key(Key.Enter)
+        compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600) }
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        tagFocused("guide-time-now")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        compose.waitUntil(5_000) { dateButtonShows("Today", hour) }
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun theHoursStayWithinTheWindowBounds() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        // Earliest start is six hours before the opening hour, 14:00; the week ends on day 7.
+        repeat(7 + 1) { key(Key.DirectionDown) }
+        tagFocused("guide-time-hour-14")
+        key(Key.DirectionUp)
+        tagFocused("guide-time-day-7")
+        key(Key.Enter)
+        // 20:00 is past the last start of the final day, so the window settles on 17:00.
+        compose.waitUntil(5_000) { dateButtonShows("Sun, Oct 11", hour + 7 * 24 * 3600 - 3 * 3600) }
+        repeat(1 + 17) { key(Key.DirectionDown) }
+        tagFocused("guide-time-hour-17")
+        compose.onNodeWithTag("guide-time-hour-17").assertIsSelected()
+        key(Key.DirectionDown)
+        tagFocused("guide-time-hour-17")
+    }
+
+    @Test fun backClosesThePanelOntoTheDateButton() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        key(Key.Back)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        assertDateButton("Today", hour)
+    }
+
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
+    fun theDayAndTimePanelIsGerman() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        compose.onAllNodesWithText("Tag und Uhrzeit").fetchSemanticsNodes().isNotEmpty().also(::assertTrue)
+        compose.onNodeWithText("Jetzt").assertIsDisplayed()
+        compose.onNodeWithText("Heute").assertIsDisplayed()
+        compose.onNodeWithText("Morgen").assertIsDisplayed()
+    }
+
     @Test fun headlineShowsTheSettledProgrammeAboveAboutFourAndAHalfRows() {
         show(headline = true)
         // On the header, before the grid has focus: the programme the grid enters.
@@ -1579,6 +1692,13 @@ class GuideVisualLayoutTest {
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
     private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
+    private fun dateButtonText(day: String, startSec: Long) = context().getString(R.string.epg_date_button, day,
+        at.bernhardberger.tvhplayer.ui.common.formatClock(
+            java.time.Instant.ofEpochSecond(startSec).atZone(java.time.ZoneOffset.UTC), Locale.getDefault()))
+    private fun dateButtonShows(day: String, startSec: Long) =
+        compose.onAllNodes(hasTestTag("guide-date-button") and hasText(dateButtonText(day, startSec))).fetchSemanticsNodes().isNotEmpty()
+    private fun assertDateButton(day: String, startSec: Long) =
+        compose.onNodeWithTag("guide-date-button").assert(hasText(dateButtonText(day, startSec)))
     private fun dateFocused() = tagFocused("guide-date-button")
     private fun tagFocused(tag: String) = focused(hasTestTag(tag), tag)
     private fun focused(text: String) = focused(hasText(text), text)

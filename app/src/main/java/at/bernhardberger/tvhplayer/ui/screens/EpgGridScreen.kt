@@ -138,6 +138,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.rememberSettledGuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideOverlayHost
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -400,7 +401,7 @@ fun EpgGridScreen(
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
     var restoreDetailsFocus by remember { mutableStateOf(false) }
     var detailsFromSearch by remember { mutableStateOf(false) }
-    var showJumpDialog by remember { mutableStateOf(false) }
+    var showTimePanel by remember { mutableStateOf(false) }
     var showSearchDialog by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResult by remember { mutableStateOf<EpgSearchResult?>(null) }
@@ -432,7 +433,7 @@ fun EpgGridScreen(
     var preparationEntryToScope by remember { mutableStateOf(false) }
     val mayFocusProgramme by rememberUpdatedState(
         initialFocusEnabled && programmeFocusOwned &&
-            detailsEvent == null && !showSearchDialog && !showJumpDialog && openPanel == null &&
+            detailsEvent == null && !showSearchDialog && !showTimePanel && openPanel == null &&
             channelFocusRequest == null
     )
 
@@ -1426,7 +1427,7 @@ fun EpgGridScreen(
     }
 
     val programmeBackEnabled = indexCurrent && initialFocusEnabled && programmeFocusOwned &&
-        detailsEvent == null && !showSearchDialog && !showJumpDialog && openPanel == null
+        detailsEvent == null && !showSearchDialog && !showTimePanel && openPanel == null
     BackHandler(enabled = programmeBackEnabled) { if (!backToNow()) backToRail() }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
@@ -1657,6 +1658,14 @@ fun EpgGridScreen(
         openPanel = null
     }
 
+    /** Closes the day and time panel, jumping first when [jumpToSec] is given, and returns focus to the date button. */
+    fun closeTimePanel(jumpToSec: Long? = null) {
+        showTimePanel = false
+        jumpToSec?.let { jumpToWindow(it) }
+        releaseProgrammeFocus()
+        runCatching { guideDateFocus.requestFocus() }
+    }
+
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
         BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = preparedIndex != null,
@@ -1721,7 +1730,7 @@ fun EpgGridScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = browseAlpha() }
-                .semantics { if (detailsEvent != null || openPanel != null) hideFromAccessibility() }
+                .semantics { if (detailsEvent != null || openPanel != null || showTimePanel) hideFromAccessibility() }
                 .focusProperties {
                     // As in Channels: entering from the rail returns to the remembered programme.
                     onEnter = {
@@ -1782,7 +1791,7 @@ fun EpgGridScreen(
                 density = density,
                 onDateClick = {
                     releaseProgrammeFocus()
-                    showJumpDialog = true
+                    showTimePanel = true
                 },
                 onFocused = { releaseProgrammeFocus() },
                 onOpen = { panel ->
@@ -2001,17 +2010,20 @@ fun EpgGridScreen(
                 val focusSec = available?.start?.epochSeconds ?: nowSecProvider()
                 jumpToWindow(floorGuideWindowToHour(focusSec, guideZoneId), channelId, available, focusSec = focusSec)
             },
-            showJumpDialog = showJumpDialog,
-            windowStartSec = { windowStartSec },
-            windowBounds = windowBounds,
-            zoneId = guideZoneId,
-            nowSecProvider = nowSecProvider,
-            onDismissJump = { showJumpDialog = false },
-            onJump = { target ->
-                showJumpDialog = false
-                jumpToWindow(target)
-            },
         )
+        if (showTimePanel) {
+            GuideTimePanel(
+                windowStartSec = windowStartSec,
+                bounds = windowBounds,
+                zoneId = guideZoneId,
+                nowSecProvider = nowSecProvider,
+                // A day applies at once and the panel stays; the hour and Now close it onto the date button.
+                onDay = { jumpToWindow(it) },
+                onHour = { closeTimePanel(it) },
+                onNow = { closeTimePanel(floorGuideWindowToHour(nowSecProvider(), guideZoneId)) },
+                onClose = { closeTimePanel() },
+            )
+        }
         when (openPanel) {
             ChannelsPanel.GROUP -> ChannelsGroupPanel(
                 groups = groups,
