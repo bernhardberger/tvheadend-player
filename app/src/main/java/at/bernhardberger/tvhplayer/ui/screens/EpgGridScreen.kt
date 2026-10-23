@@ -68,7 +68,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalDensity
-import at.bernhardberger.tvhplayer.ui.components.LocalBrowseVisibleWidthPx
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseCullWidthPx
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -2143,7 +2143,7 @@ fun EpgGridScreen(
                                 detailsFromSearch = false
                                 showContextMenu = true
                             },
-                            visibleRowWidthPx = LocalBrowseVisibleWidthPx.current?.minus(
+                            visibleRowWidthPx = LocalBrowseCullWidthPx.current?.minus(
                                 with(LocalDensity.current) {
                                     timelineContentPadding.calculateStartPadding(layoutDirection).roundToPx()
                                 },

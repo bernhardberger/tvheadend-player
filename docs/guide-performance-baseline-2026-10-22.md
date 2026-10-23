@@ -80,3 +80,39 @@ recomposition.
 After three runs of 8 Down and 8 Up, grid focus had drifted from the current
 programme (19:00) to one starting at 17:56. The opposite moves are not
 symmetric. This was not investigated further.
+
+## Follow-up, 2026-10-23: drawer A/B on the G10
+
+Same setup and journeys, three gfxinfo runs per build, on `feat/u5-guide`
+builds from main `b2d3dcb2`. The drawer journey is Left and Right four times,
+0.8 s apart.
+
+| Build | Drawer p50 | Drawer p90 | Drawer frames >33 ms | Up/Down p50 |
+|---|---|---|---|---|
+| `d3277266` (this baseline's APK) | 42–46 ms | 61 ms | 78–87% | 42–48 ms |
+| A: `b2d3dcb2` | 42–46 ms | 61–65 ms | 83–90% | 48 ms |
+| B: no cell culling | 42–44 ms | 57 ms | 62–70% | 48 ms |
+| C: B plus a layer on the browse content | 42 ms | 57 ms | 64–65% | 48 ms |
+| D: A plus that layer | 40–44 ms | 57–61 ms | 81–88% | 40–46 ms |
+| E: culling against a width rounded up to 64 dp | 40–44 ms | 57 ms | 61–73% | 42–48 ms |
+
+The baseline APK measures like A, so the commits between them did not slow the
+Guide. This round's method does not reproduce the 16–24 ms grid figures above;
+the difference is unexplained.
+
+Perfetto traces of A, B, E and the Settings screen show why no build moves the
+p50:
+
+- A spends p50 9.5 ms a frame in `Recomposer:recompose`; B and E bring that
+  to under 1 ms. Their main thread then waits in `draw` instead, because
+  RenderThread waits p50 12–13 ms in `dequeueBuffer`.
+- In every trace, Settings included, the Realtek composer's
+  `gdma commit thread` takes p50 20 ms (p90 21 ms) per frame, more than one
+  16.7 ms vsync. SurfaceFlinger composes the app layer on the GPU each frame.
+  On this TV the display path, not the app, sets the frame rate of any
+  animation.
+
+The earlier "GPU near 9 ms, so CPU-bound" reading above is therefore wrong for
+the frame rate. E is kept: it removes the per-frame recomposition and the
+recording lookups (31 per frame) while keeping the culling. Traces are in
+`/root/projects/.worktrees/u5-guide/build/ab/` (ignored build output).

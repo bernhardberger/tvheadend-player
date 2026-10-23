@@ -161,6 +161,14 @@ private fun PinnedRailIcon(icon: @Composable () -> Unit) {
 /** Current measure's visible extent from the browse content's logical leading edge. */
 internal val LocalBrowseVisibleWidthPx = compositionLocalOf<Int?> { null }
 
+/**
+ * [LocalBrowseVisibleWidthPx] rounded up to [BrowseCullStep]: never narrower than what is visible,
+ * and changing only a few times while the drawer moves, so content culled by it does not
+ * recompose on every frame of the motion.
+ */
+internal val LocalBrowseCullWidthPx = compositionLocalOf<Int?> { null }
+private val BrowseCullStep = 64.dp
+
 /** Read the widget's current focus ownership at deferred focus-request time. */
 internal val LocalBrowseDrawerState = staticCompositionLocalOf<DrawerState?> { null }
 internal val LocalBrowseNavigationFocus = staticCompositionLocalOf<FocusRequester?> { null }
@@ -620,9 +628,12 @@ private fun BrowseViewport(
             .browseShellLayer(layering, width + ClosedDrawerWidth),
     ) { constraints ->
         val fixedWidth = width.roundToPx()
+        val cullStep = BrowseCullStep.roundToPx()
+        val cullWidth = (constraints.maxWidth + cullStep - 1) / cullStep * cullStep
         val placeable = subcompose(Unit) {
             CompositionLocalProvider(
                 LocalBrowseVisibleWidthPx provides constraints.maxWidth,
+                LocalBrowseCullWidthPx provides cullWidth,
                 LocalBrowseContentLayering provides layering,
             ) {
                 Box(Modifier.fillMaxSize()) { content() }
