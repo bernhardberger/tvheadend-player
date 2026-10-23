@@ -825,10 +825,12 @@ internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<Dv
         fact(R.string.details_errors, if (errors == 0L) resources.getString(R.string.details_no_errors)
             else resources.getQuantityString(R.plurals.details_error_count, errors.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), errors))
     }
-    recordingPaddedStart(recording)?.let { paddedStart -> recordingPaddedStop(recording)?.let { paddedStop ->
-        fact(R.string.details_recorded, formatTimeInterval(paddedStart.epochSeconds, paddedStop.epochSeconds,
+    (recordingRecordedSpan(recording, nowSec) ?: recordingPaddedStart(recording)?.let { paddedStart ->
+        recordingPaddedStop(recording)?.let { paddedStart to it }
+    })?.let { (start, stop) ->
+        fact(R.string.details_recorded, formatTimeInterval(start.epochSeconds, stop.epochSeconds,
             withDate = true, locale = locale, nowSec = nowSec))
-    } }
+    }
     if (recording.removalDays == RECORDING_REMOVAL_WHEN_SPACE_NEEDED)
         fact(R.string.details_retention, resources.getString(R.string.details_kept_until_space_needed))
 }

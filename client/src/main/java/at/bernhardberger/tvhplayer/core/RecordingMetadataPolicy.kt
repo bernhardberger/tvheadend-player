@@ -41,10 +41,14 @@ fun recordingLengthSeconds(recording: DvrEntry, nowSec: Long): Long? = when {
     else -> recordingPlannedSeconds(recording)
 }
 
-private fun recordedFileSeconds(recording: DvrEntry, nowSec: Long): Long? {
+/** From the first file's start to the last file's stop, which is when the recording actually ran. */
+fun recordingRecordedSpan(recording: DvrEntry, nowSec: Long): Pair<Instant, Instant>? =
+    recordedFileIntervals(recording, nowSec)?.let { it.first().first to it.maxOf { (_, stop) -> stop } }
+
+private fun recordedFileIntervals(recording: DvrEntry, nowSec: Long): List<Pair<Instant, Instant>>? {
     val files = recording.files.orEmpty()
     if (files.isEmpty()) return null
-    val intervals = files.map { file ->
+    return files.map { file ->
         val start = file.start ?: return null
         val stop = file.stop ?: if (recordingIsRunning(recording)) {
             maxOf(start, Instant.fromEpochSeconds(nowSec))
@@ -52,6 +56,10 @@ private fun recordedFileSeconds(recording: DvrEntry, nowSec: Long): Long? {
         if (stop < start) return null
         start to stop
     }.sortedBy { it.first }
+}
+
+private fun recordedFileSeconds(recording: DvrEntry, nowSec: Long): Long? {
+    val intervals = recordedFileIntervals(recording, nowSec) ?: return null
     var start = intervals.first().first
     var stop = intervals.first().second
     var total = Duration.ZERO

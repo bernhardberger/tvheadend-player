@@ -9,6 +9,8 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingDateTime
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.DvrRecordingFile
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.Locale
@@ -166,6 +168,12 @@ class TimeIntervalFormatTest {
             val recorded = recordingMetadataFacts(recording, emptyList(), context, Locale.US, now)
                 .single { it.first == context.getString(R.string.details_recorded) }.second
             assertEquals("Tue, Sep 15, 18:58 – 21:05", recorded)
+            val stoppedEarly = DvrEntry.create(DvrEntryId(2), state = DvrEntryState.COMPLETED,
+                start = Instant.fromEpochSeconds(sameDay.first), stop = Instant.fromEpochSeconds(sameDay.second),
+                files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(sameDay.first),
+                    stop = Instant.fromEpochSeconds(sameDay.first + 30 * 60))))
+            assertEquals("Tue, Sep 15, 18:58 – 19:28", recordingMetadataFacts(stoppedEarly, emptyList(), context, Locale.US, now)
+                .single { it.first == context.getString(R.string.details_recorded) }.second)
         } finally {
             AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.SYSTEM
         }

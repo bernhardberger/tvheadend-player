@@ -59,6 +59,16 @@ class RecordingMetadataPolicyTest {
         assertFalse(recordingIsRunning(timed(DvrEntryState.COMPLETED_ERROR)))
     }
 
+    @Test fun recordedSpanRunsFromTheFirstFileToTheLastStopOrNowWhileRecording() {
+        assertEquals(at(1_000) to at(5_960), recordingRecordedSpan(timed(DvrEntryState.COMPLETED,
+            DvrRecordingFile.create(start = at(5_000), stop = at(5_960)),
+            DvrRecordingFile.create(start = at(1_000), stop = at(2_800))), nowSec = 99_999))
+        assertEquals(at(1_200) to at(1_800), recordingRecordedSpan(timed(DvrEntryState.RECORDING,
+            DvrRecordingFile.create(start = at(1_200))), nowSec = 1_800))
+        assertNull(recordingRecordedSpan(timed(DvrEntryState.COMPLETED), nowSec = 99_999))
+        assertNull(recordingRecordedSpan(timed(DvrEntryState.COMPLETED, DvrRecordingFile.create()), nowSec = 99_999))
+    }
+
     @Test fun onlyMissingFileTimesFallBackToThePlannedLength() {
         assertEquals(61L * 60, recordingLengthSeconds(timed(DvrEntryState.COMPLETED), nowSec = 99_999))
         assertEquals(61L * 60, recordingLengthSeconds(timed(DvrEntryState.COMPLETED,
