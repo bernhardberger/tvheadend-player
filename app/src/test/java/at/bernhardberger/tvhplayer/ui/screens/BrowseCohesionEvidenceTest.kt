@@ -615,11 +615,21 @@ class BrowseCohesionEvidenceTest {
         // The Channels backdrop follows focus after a pause and a fade.
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
-        val bitmap = draw(dialog)
+        var bitmap = draw(dialog)
         assertEquals(960, bitmap.width)
         assertEquals(540, bitmap.height)
-        compose.waitForIdle()
-        val settled = draw(dialog)
+        // Pictures load off the main thread, so a slow run may still be revealing one; redraw until it rests.
+        var settled: Bitmap
+        var attempts = 0
+        while (true) {
+            compose.waitForIdle()
+            settled = draw(dialog)
+            if (bitmap.sameAs(settled) || ++attempts == 20) break
+            bitmap.recycle()
+            bitmap = settled
+            Thread.sleep(100)
+            compose.mainClock.advanceTimeBy(1_500)
+        }
         assertTrue("$name captured mid-animation", bitmap.sameAs(settled))
         settled.recycle()
         val directory = File("build/outputs/browse-cohesion/implemented").apply { mkdirs() }
