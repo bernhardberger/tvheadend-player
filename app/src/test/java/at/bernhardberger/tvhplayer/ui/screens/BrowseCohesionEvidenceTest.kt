@@ -298,16 +298,21 @@ class BrowseCohesionEvidenceTest {
         val width = origin.size.width
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        var arrived = false
         repeat((PlayerMotion.MediumMs + 96) / 16) {
             compose.mainClock.advanceTimeByFrame()
             compose.waitForIdle()
             assertEquals(before, origin.positionInRoot())
             assertEquals(width, origin.size.width)
-            // The page arrives a frame after the click; from then on it never slides.
-            compose.onAllNodes(hasTestTag("programme-details-page")).fetchSemanticsNodes().singleOrNull()?.let {
-                assertEquals(0f, it.layoutInfo.coordinates.positionInRoot().x, .1f)
+            // The page may arrive a frame after the click; from then on it is the only page and never slides.
+            val pages = compose.onAllNodes(hasTestTag("programme-details-page")).fetchSemanticsNodes()
+            if (arrived || pages.isNotEmpty()) {
+                arrived = true
+                assertEquals(1, pages.size)
+                assertEquals(0f, pages.single().layoutInfo.coordinates.positionInRoot().x, .1f)
             }
         }
+        assertTrue(arrived)
         val page = compose.onNodeWithTag("programme-details-page").fetchSemanticsNode().layoutInfo.coordinates
         compose.runOnIdle { back.onBackPressed() }
         repeat((PlayerMotion.MediumMs + 96) / 16) {
