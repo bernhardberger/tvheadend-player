@@ -382,6 +382,11 @@ class GuideRealisticSceneTest {
         tagFocused("guide-time-day-0")
         compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
         capture("u5-time-panel")
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-18")
+        capture("u5-time-panel-times")
     }
 
     @Test fun u5RegularRowsAreTallerThanDense() {

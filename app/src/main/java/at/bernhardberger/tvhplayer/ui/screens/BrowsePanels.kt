@@ -29,6 +29,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -40,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -56,6 +58,7 @@ import at.bernhardberger.tvhplayer.ui.player.PlaybackListTopFade
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionRow
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelHeaderTop
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelPadding
+import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelWidth
 import at.bernhardberger.tvhplayer.ui.player.containedFocus
 import at.bernhardberger.tvhplayer.ui.player.playbackListFade
 import kotlinx.coroutines.flow.first
@@ -69,6 +72,9 @@ internal sealed interface BrowsePanelEntry {
     /**
      * A row; [checked] makes it a switch, [opensLevel] a row that opens a level and shows its
      * current value as [supporting] text, and [dot] marks it with a small color dot before the label.
+     * [leading] and [trailing] put a short value such as a clock before or after the label; a row
+     * that is not [enabled] is drawn disabled and skipped by focus. [modifier] lets the panel
+     * follow or move the row's focus.
      */
     class Choice(
         val key: String,
@@ -80,18 +86,24 @@ internal sealed interface BrowsePanelEntry {
         val supporting: String? = null,
         val opensLevel: Boolean = false,
         val dot: Color? = null,
+        val leading: String? = null,
+        val trailing: String? = null,
+        val enabled: Boolean = true,
+        val modifier: Modifier = Modifier,
     ) : BrowsePanelEntry
 }
 
 /**
  * The floating side panel over the dimmed browse shell, the rail included. It holds focus until
- * Back closes it; the release of the key that opened it never reaches a row.
+ * Back closes it; the release of the key that opened it never reaches a row. Back runs [onClose],
+ * so a panel with a second pane can step back to the first instead.
  */
 @Composable
 internal fun BrowseSidePanel(
     title: String,
     panelTag: String,
     onClose: () -> Unit,
+    width: Dp = PlaybackPanelWidth,
     content: @Composable () -> Unit,
 ) {
     val layering = LocalBrowseContentLayering.current
@@ -106,6 +118,7 @@ internal fun BrowseSidePanel(
     PlaybackOptionsOverlayFrame(
         paneTitle = title,
         panelTag = panelTag,
+        panelWidth = width,
         modifier = Modifier
             .browseDetailsViewport()
             .onPreviewKeyEvent { event ->
@@ -133,18 +146,25 @@ internal fun BrowseSidePanel(
 
 /**
  * One renderer for every panel list; the checked choice, or the [focusKey] choice when given,
- * takes focus as the panel opens. [radio] marks choices with radio buttons, otherwise the checked
- * one carries a trailing check.
+ * takes focus as the panel opens, unless [takeFocus] is false. [radio] marks choices with radio
+ * buttons, otherwise the checked one carries a trailing check.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun BrowsePanelList(entries: List<BrowsePanelEntry>, radio: Boolean, focusKey: String? = null) {
-    val choices = entries.filterIsInstance<BrowsePanelEntry.Choice>()
+internal fun BrowsePanelList(
+    entries: List<BrowsePanelEntry>,
+    radio: Boolean,
+    focusKey: String? = null,
+    takeFocus: Boolean = true,
+) {
+    // Only enabled choices take part in focus, so Up and Down step over disabled ones.
+    val choices = entries.filterIsInstance<BrowsePanelEntry.Choice>().filter { it.enabled }
     val requesterStore = remember { mutableMapOf<String, FocusRequester>() }
     val choiceKeys = choices.map { it.key }
     val requesters = remember(choiceKeys) { choiceKeys.map { requesterStore.getOrPut(it) { FocusRequester() } } }
     val listState = rememberLazyListState()
     LaunchedEffect(Unit) {
+        if (!takeFocus) return@LaunchedEffect
         val target = choices.indexOfFirst { it.key == focusKey }.takeIf { it >= 0 }
             ?: choices.indexOfFirst { it.selected }.coerceAtLeast(0)
         val lazyIndex = entries.indexOf(choices.getOrNull(target) ?: return@LaunchedEffect)
@@ -216,8 +236,13 @@ internal fun BrowsePanelList(entries: List<BrowsePanelEntry>, radio: Boolean, fo
                             supportingLabel = entry.supporting,
                             showChevron = entry.opensLevel,
                             leadingDot = entry.dot,
+                            leadingLabel = entry.leading,
+                            trailingLabel = entry.trailing,
+                            enabled = entry.enabled,
                             modifier = Modifier
-                                .containedFocus(requesters[index], requesters, index, lazy = true)
+                                .then(if (index < 0) Modifier.focusProperties { canFocus = false }
+                                    else Modifier.containedFocus(requesters[index], requesters, index, lazy = true))
+                                .then(entry.modifier)
                                 .testTag(entry.key),
                         )
                     }

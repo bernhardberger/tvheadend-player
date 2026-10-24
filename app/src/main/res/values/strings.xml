@@ -380,8 +380,12 @@
     <string name="epg_loading">Loading guide…</string>
     <string name="epg_jump">Jump to time</string>
     <string name="guide_time_title">Day and time</string>
-    <string name="guide_time_day">Day</string>
-    <string name="guide_time_hour">Time</string>
+    <string name="guide_time_morning">Morning</string>
+    <string name="guide_time_midday">Midday</string>
+    <string name="guide_time_afternoon">Afternoon</string>
+    <string name="guide_time_evening">Evening</string>
+    <string name="guide_time_prime_time">Prime time</string>
+    <string name="guide_time_late_night">Late night</string>
     <string name="epg_date_button">%1$s · %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Change the time</string>
     <string name="today">Today</string>

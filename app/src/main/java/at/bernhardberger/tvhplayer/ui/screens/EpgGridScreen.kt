@@ -2011,9 +2011,8 @@ fun EpgGridScreen(
                 bounds = windowBounds,
                 zoneId = guideZoneId,
                 nowSecProvider = nowSecProvider,
-                // A day applies at once and the panel stays; the hour and Now close it onto the date button.
-                onDay = { jumpToWindow(it) },
-                onHour = { closeTimePanel(it) },
+                // A day, a time and Now each jump and close the panel.
+                onJump = { closeTimePanel(it) },
                 onNow = { closeTimePanel(floorGuideWindowToHour(nowSecProvider(), guideZoneId)) },
                 onClose = { closeTimePanel() },
             )

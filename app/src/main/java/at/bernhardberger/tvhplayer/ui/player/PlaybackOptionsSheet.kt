@@ -112,6 +112,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing48
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.first
@@ -1123,21 +1124,30 @@ internal fun PlaybackOptionRow(
     leadingIcon: Int? = null,
     checked: Boolean? = null,
     leadingDot: Color? = null,
+    leadingLabel: String? = null,
+    trailingLabel: String? = null,
 ) {
     ListItem(
         enabled = enabled,
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            if (leadingDot == null) {
-                Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            } else {
+            when {
                 // Inline rather than leading content, which would raise the row above the panel's 48dp.
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                leadingDot != null -> Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(12.dp).background(leadingDot, CircleShape).testTag("option-dot"))
                     Spacer(Modifier.width(TvSpacing12))
                     Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
+                // The value is measured first and never cut; a long label gives way with an ellipsis.
+                leadingLabel != null -> Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(text = leadingLabel, maxLines = 1, softWrap = false)
+                    Spacer(Modifier.width(TvSpacing8))
+                    val color = androidx.tv.material3.LocalContentColor.current
+                    Text(text = label, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = color.copy(alpha = color.alpha * TvTextSecondaryAlpha))
+                }
+                else -> Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         },
         leadingContent = leadingIcon?.let { icon ->
@@ -1170,6 +1180,7 @@ internal fun PlaybackOptionRow(
                     contentDescription = null,
                 )
                 selected -> Icon(painterResource(R.drawable.ic_check), contentDescription = null)
+                trailingLabel != null -> Text(text = trailingLabel, maxLines = 1, softWrap = false)
             }
         },
         modifier = modifier

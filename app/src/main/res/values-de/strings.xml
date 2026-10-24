@@ -266,8 +266,12 @@
     <string name="epg_loading">Programm wird geladen…</string>
     <string name="epg_jump">Zu Datum und Zeit</string>
     <string name="guide_time_title">Tag und Uhrzeit</string>
-    <string name="guide_time_day">Tag</string>
-    <string name="guide_time_hour">Uhrzeit</string>
+    <string name="guide_time_morning">Morgen</string>
+    <string name="guide_time_midday">Mittag</string>
+    <string name="guide_time_afternoon">Nachmittag</string>
+    <string name="guide_time_evening">Abend</string>
+    <string name="guide_time_prime_time">Hauptabend</string>
+    <string name="guide_time_late_night">Spätabend</string>
     <string name="epg_date_button">%1$s · %2$s</string>
     <string name="epg_date_button_description">%1$s, %2$s. Zeit ändern</string>
     <string name="today">Heute</string>

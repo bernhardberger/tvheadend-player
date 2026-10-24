@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.guide
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -30,8 +31,8 @@ class GuideDayNavigationTest {
     private val bounds = guideWindowBounds(openedAtSec, zone)
 
     @Test
-    fun earliestWindowFocusesTodayAndAppliesTheNextCalendarDay() {
-        var appliedDay: Long? = null
+    fun earliestWindowFocusesTodayAndJumpsToTheNextCalendarDay() {
+        var jumpedTo: Long? = null
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 GuideTimePanel(
@@ -39,8 +40,7 @@ class GuideDayNavigationTest {
                     bounds = bounds,
                     zoneId = zone,
                     nowSecProvider = { openedAtSec },
-                    onDay = { appliedDay = it },
-                    onHour = {},
+                    onJump = { jumpedTo = it },
                     onNow = {},
                     onClose = {},
                 )
@@ -52,12 +52,12 @@ class GuideDayNavigationTest {
             .performSemanticsAction(SemanticsActions.OnClick)
 
         composeRule.runOnIdle {
-            assertEquals(bounds.earliestStartSec + 24 * 3600L, appliedDay)
+            assertEquals(bounds.earliestStartSec + 24 * 3600L, jumpedTo)
         }
     }
 
     @Test
-    fun latestWindowEndsTheDaysAndHoursAtTheBounds() {
+    fun latestWindowEndsTheDaysAndTimesAtTheBounds() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 GuideTimePanel(
@@ -65,8 +65,7 @@ class GuideDayNavigationTest {
                     bounds = bounds,
                     zoneId = zone,
                     nowSecProvider = { openedAtSec },
-                    onDay = {},
-                    onHour = {},
+                    onJump = {},
                     onNow = {},
                     onClose = {},
                 )
@@ -76,5 +75,7 @@ class GuideDayNavigationTest {
         // Opens on the final day, scrolled to it; the day after the horizon is not offered.
         composeRule.onNodeWithTag("guide-time-day-7").assertIsFocused().assertIsSelected()
         composeRule.onAllNodesWithTag("guide-time-day-8").assertCountEquals(0)
+        // The final window starts at 09:00, so the times from Midday on are past the bound.
+        composeRule.onNodeWithTag("guide-time-preset-12").assertIsNotEnabled()
     }
 }

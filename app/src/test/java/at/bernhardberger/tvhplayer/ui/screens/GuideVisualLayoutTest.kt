@@ -1086,61 +1086,133 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
-    @Test fun theDateButtonOpensTheDayAndTimePanelOnTheCheckedDay() {
+    @Test fun theDateButtonOpensTheDayAndTimePanelOnTheShownDay() {
         val gridHidden = SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility) and
             hasAnyDescendant(hasTestTag("epg-channel-row-1"))
         show()
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.HideFromAccessibility))
+        assertEquals(464f, bounds("guide-time-panel").width, .5f)
         assertEquals(1, compose.onAllNodes(gridHidden, useUnmergedTree = true).fetchSemanticsNodes().size)
         tagFocused("guide-time-day-0")
         compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
         compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
+        // Now carries the current clock; the times of the shown day follow without taking focus.
+        compose.onNodeWithTag("guide-time-now").assert(hasText("20:15"))
+        compose.onNodeWithTag("guide-time-presets").assert(hasAnyDescendant(hasText("Today") and isHeading()))
+        compose.onNodeWithTag("guide-time-preset-20").assertIsNotFocused().assertIsSelected()
+            .assert(hasText("20:00") and hasText("Prime time"))
+        compose.onNodeWithTag("guide-time-preset-22").assertIsEnabled().assertIsNotSelected()
         assertDateButton("Today", hour)
         assertEquals(0, playbackRequests)
     }
 
-    @Test fun aDayAppliesAtOnceAndKeepsThePanelAndItsFocus() {
+    @Test fun todaysEndedTimesAreDisabledInPlaceAndSkipped() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        // At 20:15 every period up to Evening has ended; the rows stay where another day has them.
+        listOf("06", "12", "15", "18").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsNotEnabled() }
+        val today = (listOf("06", "12", "15", "18", "20", "22")).map { bounds("guide-time-preset-$it").top }
+        key(Key.DirectionDown)
+        tagFocused("guide-time-day-1")
+        compose.onNodeWithTag("guide-time-presets").assert(hasAnyDescendant(hasText("Tomorrow") and isHeading()))
+        listOf("06", "12", "15", "18", "20", "22").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsEnabled() }
+        assertEquals(today, listOf("06", "12", "15", "18", "20", "22").map { bounds("guide-time-preset-$it").top })
+        key(Key.DirectionUp)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionUp)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionDown)
+        tagFocused("guide-time-preset-22")
+        key(Key.DirectionDown)
+        tagFocused("guide-time-preset-22")
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun aDayJumpsAtTheSameTimeOfDayAndCloses() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
         tagFocused("guide-time-day-1")
         key(Key.Enter)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
         compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600) }
-        compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
+        // The panel reopens on the day it jumped to; OK there closes without a jump.
+        key(Key.Enter)
         tagFocused("guide-time-day-1")
         compose.onNodeWithTag("guide-time-day-1").assertIsSelected()
         compose.onNodeWithTag("guide-time-day-0").assertIsNotSelected()
-        compose.mainClock.advanceTimeBy(1_000)
-        compose.waitForIdle()
-        tagFocused("guide-time-day-1")
-        key(Key.Back)
+        key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         assertDateButton("Tomorrow", hour + 24 * 3600)
         assertEquals(0, playbackRequests)
     }
 
-    @Test fun anHourJumpsToTheCheckedDayClosesThePanelAndLeavesFocusOnTheDateButton() {
+    @Test fun rightEntersTheFocusedDaysTimesAndLeftOrBackReturnToTheDay() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
+        // Left on the days and Right on Now go nowhere.
+        key(Key.DirectionLeft)
+        tagFocused("guide-time-day-0")
         key(Key.DirectionDown)
+        tagFocused("guide-time-day-1")
+        key(Key.DirectionRight)
+        // The window's 20:15 lies in Prime time; no time is checked on another day.
+        tagFocused("guide-time-preset-20")
+        compose.onNodeWithTag("guide-time-preset-20").assertIsNotSelected()
+        // The day whose times have focus reads as selected beside the shown day.
+        compose.onNodeWithTag("guide-time-day-1").assertIsSelected()
+        compose.onNodeWithTag("guide-time-day-0").assertIsSelected()
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionUp)
+        tagFocused("guide-time-preset-18")
+        key(Key.DirectionLeft)
+        tagFocused("guide-time-day-1")
+        compose.onNodeWithTag("guide-time-day-1").assertIsNotSelected()
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-20")
+        key(Key.Back)
+        compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
+        tagFocused("guide-time-day-1")
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        tagFocused("guide-time-now")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-now")
+        key(Key.Back)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        dateFocused()
+        assertDateButton("Today", hour)
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun aTimeJumpsToItsStartClosesThePanelAndKeepsTheChannel() {
+        show()
         key(Key.Enter)
-        compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600) }
-        // Six more days, then the first hour of tomorrow, then 03:00.
-        repeat(6 + 1 + 3) { key(Key.DirectionDown) }
-        tagFocused("guide-time-hour-03")
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionDown)
+        tagFocused("guide-time-preset-22")
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
-        compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600 - 17 * 3600) }
+        compose.waitUntil(5_000) { dateButtonShows("Today", hour + 2 * 3600) }
         // Past the Guide's 10 s wait for coverage after a jump: a late window request still leaves focus here.
         compose.mainClock.advanceTimeBy(11_000)
         compose.waitForIdle()
         dateFocused()
+        key(Key.DirectionDown)
+        focused(title(1, 2))
         assertEquals(0, playbackRequests)
     }
 
@@ -1166,8 +1238,8 @@ class GuideVisualLayoutTest {
             compose.waitUntil(5_000) { compose.onAllNodesWithText(notLoaded).fetchSemanticsNodes().isNotEmpty() }
             compose.onAllNodesWithText(emptyDay).assertCountEquals(0)
             compose.onAllNodesWithTag("guide-row-skeleton").assertCountEquals(0)
-            // The panel stays open on the chosen day; neither state takes focus.
-            tagFocused("guide-time-day-1")
+            // The panel closed onto the date button; neither state takes focus.
+            dateFocused()
             // Coverage through the week proves the day: its one programme shows and the other rows are empty.
             compose.runOnIdle {
                 val observation = session.observation.value
@@ -1192,7 +1264,7 @@ class GuideVisualLayoutTest {
             compose.waitUntil(5_000) { compose.onAllNodesWithText(notLoaded).fetchSemanticsNodes().isEmpty() }
             compose.onNodeWithText("Tomorrow on Ridge Earth").assertIsDisplayed()
             assertTrue(compose.onAllNodesWithText(emptyDay).fetchSemanticsNodes().isNotEmpty())
-            tagFocused("guide-time-day-1")
+            dateFocused()
             assertEquals(0, playbackRequests)
         } finally {
             farRequest.complete(Unit)
@@ -1205,9 +1277,13 @@ class GuideVisualLayoutTest {
         key(Key.DirectionDown)
         key(Key.Enter)
         compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600) }
+        key(Key.Enter)
+        tagFocused("guide-time-day-1")
         key(Key.DirectionUp)
         key(Key.DirectionUp)
         tagFocused("guide-time-now")
+        // Now shows today's times.
+        compose.onNodeWithTag("guide-time-presets").assert(hasAnyDescendant(hasText("Today") and isHeading()))
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
@@ -1215,24 +1291,24 @@ class GuideVisualLayoutTest {
         assertEquals(0, playbackRequests)
     }
 
-    @Test fun theHoursStayWithinTheWindowBounds() {
+    @Test fun theLastDaysTimesStopAtTheWindowBounds() {
         show()
         key(Key.Enter)
         tagFocused("guide-time-day-0")
-        // Earliest start is six hours before the opening hour, 14:00; the week ends on day 7.
-        repeat(7 + 1) { key(Key.DirectionDown) }
-        tagFocused("guide-time-hour-14")
-        compose.onNodeWithTag("guide-time-hour-13").assertDoesNotExist()
-        key(Key.DirectionUp)
+        // The week ends on day 7, whose last window starts at 17:00.
+        repeat(7) { key(Key.DirectionDown) }
         tagFocused("guide-time-day-7")
-        key(Key.Enter)
-        // 20:00 is past the last start of the final day, so the window settles on 17:00.
-        compose.waitUntil(5_000) { dateButtonShows("Sun, Oct 11", hour + 7 * 24 * 3600 - 3 * 3600) }
-        repeat(1 + 17) { key(Key.DirectionDown) }
-        tagFocused("guide-time-hour-17")
-        compose.onNodeWithTag("guide-time-hour-17").assertIsSelected()
+        compose.onAllNodesWithTag("guide-time-day-8").assertCountEquals(0)
+        listOf("06", "12", "15").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsEnabled() }
+        listOf("18", "20", "22").forEach { compose.onNodeWithTag("guide-time-preset-$it").assertIsNotEnabled() }
+        // Prime time is past the bound, so Right enters at the last time before it.
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-15")
         key(Key.DirectionDown)
-        tagFocused("guide-time-hour-17")
+        tagFocused("guide-time-preset-15")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
+        compose.waitUntil(5_000) { dateButtonShows("Sun, Oct 11", hour + 7 * 24 * 3600 - 5 * 3600) }
     }
 
     @Test fun backClosesThePanelOntoTheDateButton() {
@@ -1251,9 +1327,29 @@ class GuideVisualLayoutTest {
         key(Key.Enter)
         tagFocused("guide-time-day-0")
         compose.onAllNodesWithText("Tag und Uhrzeit").fetchSemanticsNodes().isNotEmpty().also(::assertTrue)
-        compose.onNodeWithText("Jetzt").assertIsDisplayed()
-        compose.onNodeWithText("Heute").assertIsDisplayed()
-        compose.onNodeWithText("Morgen").assertIsDisplayed()
+        compose.onNodeWithTag("guide-time-now").assert(hasText("Jetzt"))
+        compose.onNodeWithTag("guide-time-day-0").assert(hasText("Heute"))
+        compose.onNodeWithTag("guide-time-day-1").assert(hasText("Morgen"))
+        compose.onNodeWithTag("guide-time-preset-06").assert(hasText("Morgen"))
+        compose.onNodeWithTag("guide-time-preset-20").assert(hasText("Hauptabend"))
+        compose.onNodeWithTag("guide-time-preset-22").assert(hasText("Spätabend"))
+    }
+
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
+    fun largeGermanTextShortensATimesLabelButNeverItsClock() {
+        show(scale = 1.3f)
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        listOf("06", "12", "15", "18", "20", "22").forEach { hour ->
+            val clock = compose.onNode(hasText("$hour:00") and hasAnyAncestor(hasTestTag("guide-time-preset-$hour")),
+                useUnmergedTree = true).fetchSemanticsNode()
+            val layouts = mutableListOf<TextLayoutResult>()
+            checkNotNull(clock.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
+            val layout = layouts.single()
+            assertTrue("Clock $hour:00 is cut", !layout.hasVisualOverflow && !layout.isLineEllipsized(0))
+            assertTrue("Clock $hour:00 is within its row",
+                clock.boundsInRoot.right <= bounds("guide-time-preset-$hour").right)
+        }
     }
 
     @Test fun headlineShowsTheSettledProgrammeAboveAboutFourAndAHalfRows() {
