@@ -284,7 +284,7 @@
     <string name="epg_state_future">folgt</string>
     <string name="epg_state_past">beendet</string>
     <string name="epg_cell_description">%1$s, %2$s bis %3$s, %4$s, %5$s</string>
-    <string name="epg_cell_outside_genre">nicht %1$s</string>
+    <string name="epg_cell_outside_genre">%1$s, nicht %2$s</string>
     <string name="epg_details_action_hint">Sendungsaktionen erscheinen in diesem Bereich. Die Wiedergabe startet nie direkt aus dem Programm.</string>
     <string name="epg_no_actions">Für diese Sendung sind keine Aktionen verfügbar.</string>
     <string name="epg_already_aired">Diese Sendung ist bereits ausgestrahlt. Die Details bleiben zur Information verfügbar.</string>

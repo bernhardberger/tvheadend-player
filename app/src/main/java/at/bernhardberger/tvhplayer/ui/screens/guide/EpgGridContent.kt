@@ -258,9 +258,8 @@ internal fun TimelineChannelRow(
     genreColors: Boolean = true,
 ) {
     val nowSec = nowSecProvider()
-    // One label for the row's cells outside the chosen genre.
-    val outsideGenre = if (genre == ProgrammeCategory.ALL) null
-        else stringResource(R.string.epg_cell_outside_genre, programmeCategoryLabel(genre))
+    // One genre label for the row's cells outside the chosen genre.
+    val outsideGenre = if (genre == ProgrammeCategory.ALL) null else programmeCategoryLabel(genre)
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
     val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
@@ -498,7 +497,7 @@ internal fun TimelineProgrammeCell(
         event.title.orEmpty(),
         stateText,
     )
-    val description = if (outside && outsideGenre != null) "$cellDescription, $outsideGenre" else cellDescription
+    val description = if (outside && outsideGenre != null) stringResource(R.string.epg_cell_outside_genre, cellDescription, outsideGenre) else cellDescription
     val contentAlpha = if (dimmed) Modifier.alpha(GuideOutsideGenreAlpha) else Modifier
 
     val markState = recording?.state?.takeIf {

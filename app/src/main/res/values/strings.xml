@@ -398,7 +398,7 @@
     <string name="epg_state_future">upcoming</string>
     <string name="epg_state_past">ended</string>
     <string name="epg_cell_description">%1$s, %2$s to %3$s, %4$s, %5$s</string>
-    <string name="epg_cell_outside_genre">not %1$s</string>
+    <string name="epg_cell_outside_genre">%1$s, not %2$s</string>
     <string name="epg_details_action_hint">Program actions are shown in this panel. Playback never starts directly from the guide.</string>
     <string name="epg_no_actions">There are no available actions for this program.</string>
     <string name="epg_already_aired">This program has already aired. Details remain available for reference.</string>
