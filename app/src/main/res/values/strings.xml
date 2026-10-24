@@ -416,6 +416,7 @@
     <string name="recording_badge_errors">Errors</string>
     <string name="recording_state_failed">Failed</string>
     <string name="recording_state_cancelled">Canceled</string>
+    <string name="recording_state_missed">Missed</string>
     <string name="recording_state_unknown">Server status unknown</string>
     <string name="recording_notice_scheduled">Recording scheduled</string>
     <string name="recording_notice_series_scheduled">Series recording scheduled</string>

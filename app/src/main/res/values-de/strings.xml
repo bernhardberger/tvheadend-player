@@ -302,6 +302,7 @@
     <string name="recording_badge_errors">Fehler</string>
     <string name="recording_state_failed">Fehlgeschlagen</string>
     <string name="recording_state_cancelled">Abgebrochen</string>
+    <string name="recording_state_missed">Verpasst</string>
     <string name="recording_state_unknown">Serverstatus unbekannt</string>
     <string name="recording_notice_scheduled">Aufnahme geplant</string>
     <string name="recording_notice_series_scheduled">Serienaufnahme geplant</string>

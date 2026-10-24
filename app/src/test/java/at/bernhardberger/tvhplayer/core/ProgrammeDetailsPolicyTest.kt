@@ -100,7 +100,8 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(DetailsStatus.RECORDING, detailsStatus(event, recording(DvrEntryState.RECORDING), 150))
         assertEquals(DetailsStatus.SCHEDULED, detailsStatus(event, recording(DvrEntryState.SCHEDULED), 50))
         assertEquals(DetailsStatus.RECORDING_ERRORS, detailsStatus(event, recording(DvrEntryState.RECORDING_ERROR), 150))
-        listOf(DvrEntryState.MISSED, DvrEntryState.INVALID,
+        assertEquals(DetailsStatus.MISSED, detailsStatus(null, recording(DvrEntryState.MISSED), 150))
+        listOf(DvrEntryState.INVALID,
             DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
             assertEquals(DetailsStatus.FAILED, detailsStatus(null, recording(it), 150))
         }

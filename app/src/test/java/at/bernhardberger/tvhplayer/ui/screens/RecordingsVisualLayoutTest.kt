@@ -435,6 +435,39 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("until", substring = true).assertDoesNotExist()
     }
 
+    @Test fun missedRecordingIsListedWithTheFailuresAndSaysMissed() {
+        show(entries = listOf(recording(1, "Kept match", "Sport/kept.ts"),
+            recording(30, "Missed match", null, DvrEntryState.MISSED),
+            recording(31, "Broken match", null, DvrEntryState.COMPLETED_ERROR)))
+        focused("recordings-folder-Sport")
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-30")
+        // One "Failed" section holds both; a missed row carries the failure mark, read out as what happened.
+        compose.onNodeWithText("Failed").assertIsDisplayed()
+        compose.onNodeWithText("Canceled").assertDoesNotExist()
+        compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Missed", substring = true),
+            useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithTag("recording-list-state-failed", useUnmergedTree = true).assertCountEquals(2)
+        compose.onNodeWithTag("recording-list-state-cancelled", useUnmergedTree = true).assertDoesNotExist()
+        capture("problems-missed", 1f)
+    }
+
+    @Test fun missedRecordingPaneBadgeSaysMissedInTheErrorTone() {
+        val entry = recording(30, "Missed match", null, DvrEntryState.MISSED)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry, null, null)
+            }
+        }
+        compose.onNodeWithTag("recording-badge-missed", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithContentDescription("Recording missed").assertExists()
+        compose.onNodeWithText("Canceled", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @Test fun crowdedPaneShortensItsTitleAndKeepsSubtitleAndStatus() {
         val start = 1_791_000_000L - 86_400L
         val entry = DvrEntry.create(DvrEntryId(1), title = LONG_TITLE, state = DvrEntryState.COMPLETED, folder = emptyList(),

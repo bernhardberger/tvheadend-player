@@ -27,4 +27,15 @@ class DvrLibraryPartitionTest {
         assertEquals(listOf(recording, withErrors), recordingNow.entries)
         assertEquals(listOf(failed), groupDvrProblems(listOf(withErrors, failed))[DvrProblemBucket.FAILED])
     }
+
+    @Test fun missedRecordingsAreFailuresAndOnlyInvalidOnesAreCanceled() {
+        val missed = entry(1, DvrEntryState.MISSED, 300)
+        val failed = entry(2, DvrEntryState.COMPLETED_ERROR, 200)
+        val invalid = entry(3, DvrEntryState.INVALID, 100)
+
+        val groups = groupDvrProblems(partitionDvrLibrary(listOf(missed, failed, invalid)).problems)
+
+        assertEquals(listOf(missed, failed), groups[DvrProblemBucket.FAILED])
+        assertEquals(listOf(invalid), groups[DvrProblemBucket.CANCELLED])
+    }
 }

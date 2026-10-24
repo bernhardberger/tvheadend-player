@@ -392,7 +392,7 @@ internal fun RecordingMetadataPane(
                 ).joinToString(" • "), Modifier.testTag("recording-metadata-eyebrow")) {
                     // The pane's eyebrow badge, as on the details page; a completed recording needs none.
                     when (entry.state) {
-                        DvrEntryState.MISSED, DvrEntryState.INVALID ->
+                        DvrEntryState.INVALID ->
                             StatusBadge(dvrStateLabel(entry.state), StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_cancel_outlined)
                         else -> RecordingBadge(entry.state)
                     }
@@ -930,8 +930,8 @@ private enum class RecordingOverlineMark(@DrawableRes val icon: Int, val tag: St
 /** A completed recording is the normal case and carries no mark; running and scheduled ones carry theirs at the row's end. */
 private fun recordingStateMark(state: DvrEntryState?): RecordingOverlineMark? = when (state) {
     DvrEntryState.COMPLETED_ERROR,
-    DvrEntryState.FILE_MISSING -> RecordingOverlineMark.FAILED
-    DvrEntryState.MISSED,
+    DvrEntryState.FILE_MISSING,
+    DvrEntryState.MISSED -> RecordingOverlineMark.FAILED
     DvrEntryState.INVALID -> RecordingOverlineMark.CANCELLED
     else -> null
 }
@@ -1018,7 +1018,7 @@ internal fun dvrStateLabel(state: DvrEntryState?): String = stringResource(
         DvrEntryState.SCHEDULED -> R.string.recording_state_scheduled
         DvrEntryState.RECORDING -> R.string.recording_state_recording
         DvrEntryState.COMPLETED -> R.string.recording_state_completed
-        DvrEntryState.MISSED,
+        DvrEntryState.MISSED -> R.string.recording_state_missed
         DvrEntryState.INVALID -> R.string.recording_state_cancelled
         DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
         DvrEntryState.COMPLETED_ERROR,

@@ -90,12 +90,15 @@ Meaning of colour:
     and cards, the zap rail cards, the player's programme info and schedule
     tiles, programme details, the context menu header and the Recordings pane.
     Scheduled is a neutral badge with a clock and "Scheduled", failed an `error`
-    badge with "Failed", errors while recording a red `● REC` plus an `error`
-    "Errors" badge. "On now" and "Available until" are neutral badges.
-  - In Recordings overlines a failure is an `error` "!" symbol; cancelled,
-    missed and stopped early are muted symbols. A running row's overline shows
-    its start and "until …", not the word "Recording". The word stands only
-    where the state is the topic, never as a red label by itself.
+    badge with "Failed" (or "Missed" for a recording that never ran), errors
+    while recording a red `● REC` plus an `error` "Errors" badge. "On now"
+    and "Available until" are neutral badges.
+  - In Recordings overlines a failure, missed recordings included, is an
+    `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
+    lists missed recordings under "Failed"; only invalid entries are "Canceled"
+    (decided 2026-10-24). A running row's overline shows its start and
+    "until …", not the word "Recording". The word stands only where the state
+    is the topic, never as a red label by itself.
 - **Reds are picked by surface.** Recording red and `error` are tones of the
   same Material error palette; each role has a tone for the dark surface, the
   focused light container and a fill. Recording: `#FF5449` / `#BA1A1A` /

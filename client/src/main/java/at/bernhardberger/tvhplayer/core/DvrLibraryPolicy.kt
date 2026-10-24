@@ -177,14 +177,13 @@ fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEnt
     DvrProblemBucket.entries.associateWith { bucket ->
         entries.filter {
             when (bucket) {
+                // A missed recording failed to happen; only one never meant to happen is canceled.
                 DvrProblemBucket.FAILED -> it.state in setOf(
                     DvrEntryState.COMPLETED_ERROR,
                     DvrEntryState.FILE_MISSING,
-                )
-                DvrProblemBucket.CANCELLED -> it.state in setOf(
                     DvrEntryState.MISSED,
-                    DvrEntryState.INVALID,
                 )
+                DvrProblemBucket.CANCELLED -> it.state == DvrEntryState.INVALID
             }
         }.sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
     }
