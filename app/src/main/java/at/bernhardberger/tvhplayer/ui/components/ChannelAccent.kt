@@ -83,10 +83,10 @@ fun rememberChannelAccent(
  * The page background lit by the channel's colour from its logo, the logo cards' colour, for a
  * programme without a picture: [logoGlowPixels], a soft glow from the top right. Opaque. It is
  * baked once per colour and size off the main thread, at half the size and stretched smoothly,
- * so it costs a frame no more than a picture does. Until it is baked the plain background shows,
- * and only then does [onSettled] report it. As [scrolled] goes to 1 the glow gives way to an even
- * tint of the same colour over the whole page, as a scrolled picture does to its even dim; a
- * flat fill cannot band.
+ * so it costs a frame no more than a picture does. It is looked up or baked only once the colour
+ * has settled; until then the plain background shows, and only then does [onSettled] report it.
+ * As [scrolled] goes to 1 the glow gives way to an even tint of the same colour over the whole
+ * page, as a scrolled picture does to its even dim; a flat fill cannot band.
  */
 @Composable
 internal fun ChannelLogoGlow(
@@ -103,10 +103,12 @@ internal fun ChannelLogoGlow(
     var size by remember { mutableStateOf(IntSize.Zero) }
     val key = LogoGlowKey(accent.toArgb() and 0xffffff, background.toArgb() and 0xffffff,
         (size.width / LogoGlowScale).coerceAtLeast(1), (size.height / LogoGlowScale).coerceAtLeast(1))
-    val glow by produceState(LogoGlows[key], key, accentSettled, size != IntSize.Zero) {
-        value = LogoGlows[key]
-        if (value == null && accentSettled && size != IntSize.Zero) value = LogoGlows.bake(key)
+    // Kept with the key it was baked for: a glow of a colour not yet settled, or of an earlier
+    // colour or size, is neither shown nor reported.
+    val produced by produceState<Pair<LogoGlowKey, ImageBitmap>?>(null, key, accentSettled, size != IntSize.Zero) {
+        if (accentSettled && size != IntSize.Zero) value = key to (LogoGlows[key] ?: LogoGlows.bake(key))
     }
+    val glow = produced?.takeIf { it.first == key }?.second
     val currentOnSettled by rememberUpdatedState(onSettled)
     if (glow != null) LaunchedEffect(key) { currentOnSettled?.invoke() }
     val tint = lerp(background, accent, LogoTintShare)

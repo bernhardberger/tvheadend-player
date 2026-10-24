@@ -102,6 +102,7 @@ import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.DetailsHero
 import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
+import at.bernhardberger.tvhplayer.ui.components.LoadDetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
@@ -187,8 +188,13 @@ internal fun ChannelsImmersiveBackground(
         }
         val art = shown.art
         if (art == null) {
-            // The logo's colour glows from the top right, as on the details page, under the sharp logo.
-            ChannelLogoGlow(channel.icon, channel.id, Modifier.testTag("channels-logo-glow"), onSettled = onReady)
+            // The logo's colour glows from the top right, as on the details page, under the sharp
+            // logo. Shown once the glow is baked and the logo loaded, so the logo comes with it.
+            var glowSettled by remember { mutableStateOf(false) }
+            var logoSettled by remember { mutableStateOf(false) }
+            if (glowSettled && logoSettled) LaunchedEffect(Unit) { onReady() }
+            ChannelLogoGlow(channel.icon, channel.id, Modifier.testTag("channels-logo-glow"), onSettled = { glowSettled = true })
+            LoadDetailsHeroLogo(channel.icon, onSettled = { logoSettled = true })
             return@FocusBackdrop
         }
         // Shown once both its colour and its picture are known, so no step of either is seen.

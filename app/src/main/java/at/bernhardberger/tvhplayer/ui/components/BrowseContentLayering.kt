@@ -70,18 +70,17 @@ internal fun BrowseContentLayer(
 
 /**
  * A screen's backdrop sits under the shell's gradient like the shell's own background, not over it.
- * An [opaque] backdrop takes the gradient directly, without the offscreen layer that keeps it off
- * transparent pixels. Content already drawn [inOffscreenLayer] lets that layer keep it off them, and
- * darkens only as the drawer opens.
+ * Content already drawn [inOffscreenLayer] lets that layer keep the gradient off transparent pixels,
+ * and darkens only as the drawer opens.
  */
 @Composable
-internal fun Modifier.underBrowseShellScrim(opaque: Boolean = false, inOffscreenLayer: Boolean = false): Modifier =
+internal fun Modifier.underBrowseShellScrim(inOffscreenLayer: Boolean = false): Modifier =
     LocalBrowseContentLayering.current?.let {
-        then(BrowseDepartureElement(it, if (opaque) BrowseScrimMode.OVER else if (inOffscreenLayer) BrowseScrimMode.ATOP else BrowseScrimMode.LAYERED))
+        then(BrowseDepartureElement(it, if (inOffscreenLayer) BrowseScrimMode.ATOP else BrowseScrimMode.LAYERED))
     } ?: this
 
-/** How a node takes the shell's gradient: in its own layer, straight over opaque content, or atop a caller's layer as the drawer opens. */
-internal enum class BrowseScrimMode { LAYERED, OVER, ATOP }
+/** How a node takes the shell's gradient: in its own layer, or atop a caller's layer as the drawer opens. */
+internal enum class BrowseScrimMode { LAYERED, ATOP }
 
 internal fun Modifier.browseShellLayer(layering: BrowseContentLayering, fullWidth: Dp): Modifier =
     then(BrowseShellElement(layering, fullWidth))
@@ -209,11 +208,6 @@ internal class BrowseDepartureNode(private val layering: BrowseContentLayering, 
             frame.edgeAlpha,
             frame.opening,
         )
-        if (mode == BrowseScrimMode.OVER) {
-            drawContent()
-            drawScrim(mapped, BlendMode.SrcOver, 1f - layering.detailsAlpha())
-            return
-        }
         if (mode == BrowseScrimMode.ATOP) {
             // Foreground content reaches the closed rail's gradient at its keyline, so it darkens
             // only as the drawer opens over it, and at the edge no more than the kit's modal scrim.

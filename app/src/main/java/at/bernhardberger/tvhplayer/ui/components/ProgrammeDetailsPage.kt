@@ -71,6 +71,7 @@ import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.images.BackdropTransformation
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
@@ -716,6 +717,7 @@ private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -
             .transformations(BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius))
             .build()
     }
+    var blurredLoaded by remember(blurred) { mutableStateOf(false) }
     // Scrolled, Google TV trades the scrim for an even dim: the rows then run across the whole width.
     Box(Modifier.fillMaxSize()
         .drawWithContent {
@@ -723,12 +725,14 @@ private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -
             drawRect(background.value, alpha = blur() * DetailsScrolledDimAlpha)
         }
         .unditheredGradient(over = true, alpha = { 1f - blur() }) { size -> detailsScrim(background.value, size) }) {
-        // The blur fades in over the sharp picture, which goes once it is covered.
+        // The blur fades in over the sharp picture, which goes once the loaded blur covers it.
         AsyncImage(source, null, contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = if (blur() < 1f) 1f else 0f }
+            modifier = Modifier.fillMaxSize()
+                .graphicsLayer { this.alpha = if (blur() >= 1f && blurredLoaded) 0f else 1f }
                 .testTag("details-hero"))
         AsyncImage(blurred, null, contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = blur() }.testTag("details-hero-blurred"))
+            modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = blur() }.testTag("details-hero-blurred"),
+            onSuccess = { blurredLoaded = true })
     }
 }
 
@@ -763,34 +767,55 @@ private const val DetailsScrolledDimAlpha = .4f
  */
 @Composable
 internal fun DetailsHero(
-    image: ArtworkId?,
+    image: ArtworkId,
     modifier: Modifier,
-    background: State<Color>? = null,
+    background: State<Color>,
     onSettled: (() -> Unit)? = null,
 ) {
     val session = LocalArtworkContext.current.currentSession
-    val source = image?.let { session?.let { AppArtworkSource(it, image) } }
-    if (source == null) {
+    if (session == null) {
         if (onSettled != null) LaunchedEffect(Unit) { onSettled() }
         return
     }
-    val neutral = MaterialTheme.colorScheme.background
-    AsyncImage(source, null,
+    AsyncImage(AppArtworkSource(session, image), null,
         contentScale = ContentScale.Crop,
         modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
             .testTag("details-hero")
-            .unditheredGradient(over = true) { size -> kitCinematicScrim(background?.value ?: neutral, size) },
+            .unditheredGradient(over = true) { size -> kitCinematicScrim(background.value, size) },
         onSuccess = { onSettled?.invoke() },
         onError = { onSettled?.invoke() })
 }
 
 /**
- * The channel's logo where [DetailsHero]'s corner art would be, for a programme without art. At
- * this size a placeholder would be the loudest thing on the page, so only the logo itself shows.
+ * The channel's logo for a programme without art: in the immersive Channels list in the corner
+ * below the header, and on the details page in the corner over the glow, scrolling away with the
+ * page. At this size a placeholder would be the loudest thing on the page, so only the logo itself
+ * shows.
  */
 @Composable
 internal fun DetailsHeroLogo(picon: ArtworkId?, modifier: Modifier) {
     PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second), placeholders = false)
+}
+
+/**
+ * Loads [DetailsHeroLogo]'s logo ahead, as its [PiconBox] asks for it and at its size, so that it
+ * is in memory and shows at once when it comes. [onSettled] reports once it has loaded or failed,
+ * or at once when there is none.
+ */
+@Composable
+internal fun LoadDetailsHeroLogo(picon: ArtworkId?, onSettled: () -> Unit) {
+    val artwork = LocalArtworkContext.current
+    val context = LocalPlatformContext.current
+    val density = LocalDensity.current
+    val currentOnSettled by rememberUpdatedState(onSettled)
+    val model by remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }
+    LaunchedEffect(model, density) {
+        model?.let {
+            val (width, height) = with(density) { DetailsHeroLogoSize.first.roundToPx() to DetailsHeroLogoSize.second.roundToPx() }
+            SingletonImageLoader.get(context).execute(ImageRequest.Builder(context).data(it).size(width, height).build())
+        }
+        currentOnSettled()
+    }
 }
 
 /**

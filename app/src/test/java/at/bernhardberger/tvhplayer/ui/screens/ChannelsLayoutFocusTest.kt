@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
+import android.graphics.Bitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOff
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.ui.components.ClosedDrawerWidth
@@ -27,6 +29,12 @@ import org.junit.Assert.assertTrue
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import org.junit.Rule
 import org.junit.Test
+import coil3.ImageLoader
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.intercept.Interceptor
+import coil3.request.SuccessResult
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -488,6 +496,30 @@ class ChannelsLayoutFocusTest {
         val hero = compose.onNodeWithTag("channels-immersive-hero").getUnclippedBoundsInRoot()
         val title = compose.onNodeWithTag("channels-immersive-title").getUnclippedBoundsInRoot()
         assertEquals(hero.bottom.value, title.bottom.value, 1f)
+    }
+
+    @Test fun immersiveLogoWithoutArtComesOnlyOnceItHasLoaded() {
+        val logos = CompletableDeferred<Unit>()
+        fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
+            imageLoader = ImageLoader.Builder(fixture.context).components {
+                add(Interceptor { chain ->
+                    // Logos wait; the samples of their colour and the programme pictures load at once.
+                    val id = (chain.request.data as? AppArtworkSource)?.id
+                    if (id != null && id.value <= 18 && chain.request.memoryCachePolicy.writeEnabled) logos.await()
+                    SuccessResult(Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).asImage(), chain.request, DataSource.MEMORY)
+                })
+            }.build())
+        fixture.awaitFocus(card(1))
+        repeat(7) { fixture.key(Key.DirectionRight) }
+        fixture.awaitFocus(card(8))
+        compose.mainClock.advanceTimeBy(800)
+        // The glow bakes off the main thread; the backdrop still waits for the logo, well within its timeout.
+        Thread.sleep(500)
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithTag("channels-logo-glow").assertExists()
+        compose.onNodeWithTag("channels-immersive-picon").assertDoesNotExist()
+        logos.complete(Unit)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
     }
 
     @Test fun aGuideStillOnItsWayShowsPlaceholderLinesInsteadOfNoEpg() {

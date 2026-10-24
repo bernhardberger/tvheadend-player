@@ -153,6 +153,41 @@ class DetailsTintTest {
         assertEquals(1, samples.get())
     }
 
+    @Test fun aCachedNeutralGlowIsNeitherShownNorReportedWhileTheLogosColourIsSampled() {
+        val noLogo = ChannelId(9)
+        val sampled = ChannelId(1)
+        val settled = mutableListOf<ChannelId>()
+        var shown by mutableStateOf(noLogo)
+        compose.setContent {
+            CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    ProvideArtworkSession(session) {
+                        // A new glow per channel, as each backdrop of the immersive list is.
+                        key(shown) {
+                            val id = shown
+                            ChannelLogoGlow(picon.takeIf { id == sampled }, id, Modifier.fillMaxSize(),
+                                onSettled = { settled += id })
+                        }
+                    }
+                }
+            }
+        }
+        // A channel without a logo bakes the neutral glow at this size.
+        compose.waitUntil(10_000) { noLogo in settled }
+        compose.runOnIdle { shown = sampled }
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        // Its colour is still being sampled: the neutral glow found in the cache is not its glow.
+        assertEquals(listOf(noLogo), settled)
+        assertPixel(1919, 0, neutral.toArgb())
+        releaseSample.complete(Unit)
+        compose.waitUntil(10_000) { sampled in settled }
+        assertEquals(listOf(noLogo, sampled), settled)
+        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store["tint-test-2"])).copy(alpha = .55f)
+            .compositeOver(neutral))
+    }
+
     @Test fun failedArtFallsBackToTheStoredPiconAccent() {
         fail = true
         releaseSample.complete(Unit)
