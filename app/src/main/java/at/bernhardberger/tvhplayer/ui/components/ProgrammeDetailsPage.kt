@@ -322,7 +322,7 @@ internal fun ProgrammeDetailsPage(
             // Without one the logo scrolls away with the page, like the photo on Google TV's actor
             // page, and the glow gives way to an even tint of its colour; the reader replaces the
             // page, so the logo fades with it.
-            if (art != null) DetailsBackdrop(art, background, backdrop)
+            if (art != null) DetailsBackdrop(art, background, backdrop, reading = { readingProgress.value })
             else if (glowChannel != null) {
                 ChannelLogoGlow(picon, glowChannel, Modifier.testTag("details-logo-glow"), scrolled = backdrop)
                 DetailsHeroLogo(picon,
@@ -704,10 +704,11 @@ private const val DetailsHeroWidthFraction = 758f / 960f
  * top under [detailsScrim] in the page's [background] colour, and as the page scrolls or reads
  * ([blur]) the same picture blurred under an even dim of that colour instead. The blur
  * is baked into a small decode, which stretches smoothly, instead of blurred by the GPU on every
- * frame. Until the picture loads the page's colour beneath shows through.
+ * frame. Until the picture loads the page's colour beneath shows through. The reader ([reading]),
+ * all text, dims it further, so bright art stays behind its lines.
  */
 @Composable
-private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -> Float) {
+private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -> Float, reading: () -> Float) {
     val session = LocalArtworkContext.current.currentSession ?: return
     val context = LocalPlatformContext.current
     val source = remember(session, art) { AppArtworkSource(session, art) }
@@ -722,7 +723,8 @@ private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -
     Box(Modifier.fillMaxSize()
         .drawWithContent {
             drawContent()
-            drawRect(background.value, alpha = blur() * DetailsScrolledDimAlpha)
+            drawRect(background.value, alpha = blur() * DetailsScrolledDimAlpha +
+                reading() * (DetailsReadingDimAlpha - DetailsScrolledDimAlpha))
         }
         .unditheredGradient(over = true, alpha = { 1f - blur() }) { size -> detailsScrim(background.value, size) }) {
         // The blur fades in over the sharp picture, which goes once the loaded blur covers it.
@@ -759,6 +761,8 @@ private val DetailsScrimStops = floatArrayOf(0f, .3f, .55f, .8f, 1f)
 private val DetailsScrimAlphas = floatArrayOf(.05f, .2f, .6f, .85f, .92f)
 /** Google TV's scrolled details page measured about 0.6 of the sharp art's brightness. */
 private const val DetailsScrolledDimAlpha = .4f
+/** The reader's dim, at which the brightest blurred art still keeps its text at about 4.5:1. */
+private const val DetailsReadingDimAlpha = .6f
 
 /**
  * The kit's immersive background: top-right 16:9 art under [KitCinematicScrim] in the
