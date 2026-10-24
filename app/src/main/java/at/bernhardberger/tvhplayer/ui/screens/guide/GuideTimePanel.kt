@@ -75,11 +75,12 @@ internal fun GuideTimePanel(
     val nowMinuteSec by remember(nowSecProvider) { derivedStateOf { nowSecProvider() / 60 * 60 } }
     // The days and which times have ended stay as the panel opened, so a period ending, or
     // midnight, never disables or moves the row that has focus. Only Now's clock runs on.
-    val openedSec = remember { nowSecProvider() / 60 * 60 }
+    val openedNowSec = remember { nowSecProvider() }
+    val openedSec = openedNowSec / 60 * 60
     val panelBounds = remember { bounds }
     val today = Instant.ofEpochSecond(openedSec).atZone(zoneId).toLocalDate()
     // The time the date button names: now while the window shows it, else the window's start.
-    val nowShown = openedSec >= windowStartSec && openedSec < windowEndSec
+    val nowShown = guideWindowShowsNow(openedNowSec, windowStartSec, windowEndSec)
     val shownSec = if (nowShown) openedSec else windowStartSec
     val windowDay = Instant.ofEpochSecond(shownSec).atZone(zoneId).toLocalDate()
     val firstDay = Instant.ofEpochSecond(panelBounds.earliestStartSec).atZone(zoneId).toLocalDate()

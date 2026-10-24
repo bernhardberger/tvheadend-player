@@ -72,6 +72,30 @@ class GuideWindowPolicyTest {
     }
 
     @Test
+    fun theNowWindowOpensHalfAnHourBeforeNowDownToTheZonesHalfHour() {
+        fun sec(local: String) = java.time.OffsetDateTime.parse(local).toEpochSecond()
+        val open = GuideWindowBounds(0, Long.MAX_VALUE)
+        val berlin = ZoneId.of("Europe/Berlin")
+        assertEquals(sec("2026-10-04T20:30+02:00"), guideNowWindowStart(sec("2026-10-04T21:00+02:00"), open, berlin))
+        assertEquals(sec("2026-10-04T20:30+02:00"), guideNowWindowStart(sec("2026-10-04T21:29+02:00"), open, berlin))
+        assertEquals(sec("2026-10-04T21:00+02:00"), guideNowWindowStart(sec("2026-10-04T21:31+02:00"), open, berlin))
+        // Clamped to the earliest and latest window starts.
+        val bounds = GuideWindowBounds(sec("2026-10-04T21:00+02:00"), sec("2026-10-04T22:00+02:00"))
+        assertEquals(bounds.earliestStartSec, guideNowWindowStart(sec("2026-10-04T21:10+02:00"), bounds, berlin))
+        assertEquals(bounds.latestStartSec, guideNowWindowStart(sec("2026-10-04T23:45+02:00"), bounds, berlin))
+        // Half-hour and quarter-hour offsets floor to the local half hour.
+        assertEquals(sec("2026-10-04T20:30+05:30"),
+            guideNowWindowStart(sec("2026-10-04T21:10+05:30"), open, ZoneId.of("Asia/Kolkata")))
+        assertEquals(sec("2026-10-04T20:30+05:45"),
+            guideNowWindowStart(sec("2026-10-04T21:10+05:45"), open, ZoneId.of("Asia/Kathmandu")))
+        // Clocks go back from 03:00 CEST to 02:00 CET on 2026-10-25; 02:00-03:00 happens twice.
+        assertEquals(sec("2026-10-25T02:00+02:00"), guideNowWindowStart(sec("2026-10-25T02:40+02:00"), open, berlin))
+        assertEquals(sec("2026-10-25T02:30+02:00"), guideNowWindowStart(sec("2026-10-25T02:10+01:00"), open, berlin))
+        assertEquals(sec("2026-10-25T02:00+01:00"), guideNowWindowStart(sec("2026-10-25T02:45+01:00"), open, berlin))
+        assertEquals(sec("2026-10-25T02:30+01:00"), guideNowWindowStart(sec("2026-10-25T03:15+01:00"), open, berlin))
+    }
+
+    @Test
     fun appSelectsSevenDaySdkCoveragePolicy() {
         assertEquals(7.days, GUIDE_EPG_COVERAGE_POLICY.futureHorizon)
     }

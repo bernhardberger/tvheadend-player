@@ -36,6 +36,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -1071,8 +1072,21 @@ fun EpgGridScreen(
         if (it) realizedTarget = null
     }
 
+    // A window kept for the programme on air trims its cell; when the clock ends that programme the
+    // cell grows back under the fade, so positioning runs again. Changes only then, not every tick.
+    val selectedOnAir by remember(focusRows, nowSecProvider) {
+        derivedStateOf {
+            val target = selectedTarget
+            val now = nowSecProvider()
+            target != null && focusRows.getOrNull(target.channelIndex)?.events
+                ?.firstOrNull { it.id == target.eventId }
+                ?.let { now in it.start.epochSeconds until it.stop.epochSeconds } == true
+        }
+    }
+
     LaunchedEffect(
         selectedTarget,
+        selectedOnAir,
         windowStartSec,
         visibleWindowSec,
         focusTrackWidthPx,

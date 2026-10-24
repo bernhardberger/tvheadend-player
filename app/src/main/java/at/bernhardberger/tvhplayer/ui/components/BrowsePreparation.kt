@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
@@ -98,10 +99,13 @@ internal fun BrowsePreparationPending(
     if (ready && !focused) return
     if (skeleton != null) {
         // The skeleton shows what is coming and speaks for the anchor, which draws nothing itself.
+        // Ready while the anchor still has focus, it covers the screen rather than show it with no
+        // visible focus while keys still come here.
         Box(
             Modifier
                 .fillMaxSize()
                 .zIndex(1f)
+                .then(if (ready) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
                 .testTag("browse-preparing")
                 .semantics(mergeDescendants = true) {}
                 .focusRequester(focus)
@@ -111,7 +115,7 @@ internal fun BrowsePreparationPending(
                 }
                 .focusable(),
         ) {
-            if (!ready) skeleton()
+            skeleton()
         }
         return
     }

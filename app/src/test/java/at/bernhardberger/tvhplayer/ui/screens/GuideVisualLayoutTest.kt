@@ -318,6 +318,25 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun aFocusedProgrammeThatEndsWhileTheWindowKeepsItForNowMovesClearOfTheFade() {
+        // 19:30-20:30 is on air at 20:15 and starts with the 19:30 window, under its fade.
+        show(eventHour = hour - 1800)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        val start = checkNotNull(position.position.value).windowStartSec
+        assertEquals("The window keeps now for the programme on air", hour - 1800, start)
+        assertReadableFocus()
+        // It ends with no new EPG data: only the clock moves on.
+        assertTrue(SystemClock.setCurrentTimeMillis((hour + 31 * 60) * 1000))
+        compose.mainClock.advanceTimeBy(6_000)
+        compose.waitForIdle()
+        focused(title(1, 0))
+        assertReadableFocus()
+        assertTrue("The window moved to the ended programme",
+            checkNotNull(position.position.value).windowStartSec < start)
+        assertNoPlayback()
+    }
+
     @Test fun aConnectingGuideShowsItsSkeletonAndNoLoadingText() {
         show(connecting = true)
         compose.waitUntil(5_000) {
@@ -1548,8 +1567,15 @@ class GuideVisualLayoutTest {
                 compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
                 compose.mainClock.advanceTimeBy(80)
             }
-            // Focus has left programme 0 while the headline still shows it.
-            compose.onNode(hasText(title(1, 0)) and isFocused()).assertDoesNotExist()
+            // Programme 2 runs past the window, so focus reaches it a few frames after the window moves;
+            // wait for it frame by frame, well inside the settle that follows the last press.
+            val lastPress = compose.mainClock.currentTime - 80
+            val programme2 = hasText(title(1, 2)) and isFocused()
+            while (compose.onAllNodes(programme2).fetchSemanticsNodes().isEmpty() &&
+                compose.mainClock.currentTime - lastPress < GuideHeadlineSettleMs - 40
+            ) compose.mainClock.advanceTimeByFrame()
+            // Focus rests on programme 2 while the headline still shows programme 0.
+            compose.onNode(programme2).assertExists()
             compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
             compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
         } finally {

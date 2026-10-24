@@ -103,6 +103,10 @@ internal fun GuideHeader(
     )
 }
 
+/** Whether the window shows now, on the raw clock: the date button and the day and time panel agree. */
+internal fun guideWindowShowsNow(nowSec: Long, windowStartSec: Long, windowEndSec: Long): Boolean =
+    nowSec in windowStartSec until windowEndSec
+
 /**
  * A pill on the header's resting fill naming the Guide's day and time: "Today · Now" while now is
  * in the window, otherwise the window's start down to the half hour, "Sat · 20:00", as a long
@@ -124,7 +128,7 @@ private fun GuideDateButton(
         derivedStateOf { Instant.ofEpochSecond(nowSecProvider()).atZone(zone).toLocalDate() }
     }
     val nowShown by remember(nowSecProvider, windowStartSec, windowEndSec) {
-        derivedStateOf { nowSecProvider() in windowStartSec until windowEndSec }
+        derivedStateOf { guideWindowShowsNow(nowSecProvider(), windowStartSec, windowEndSec) }
     }
     val windowStart = Instant.ofEpochSecond(windowStartSec).atZone(zone)
     val start = windowStart.truncatedTo(ChronoUnit.HOURS).plusMinutes(windowStart.minute / 30 * 30L)
