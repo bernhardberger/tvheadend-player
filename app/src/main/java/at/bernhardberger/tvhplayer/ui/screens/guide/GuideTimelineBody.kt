@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelTagId
+import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -77,6 +78,8 @@ internal data class GuideTabBody(
     val recovering: Boolean,
     val alert: AppError?,
     val coveragePending: (ChannelId) -> Boolean,
+    /** The channel's coverage in the snapshot the rows were indexed from. */
+    val coverage: (ChannelId) -> EpgCoverage?,
     val earlierContent: Boolean,
     val laterContent: Boolean,
     val rows: GuideRows,
@@ -233,6 +236,7 @@ internal fun GuideTimelineBody(
                     channelIndex, channel ->
                 val selected = rememberTabReader(frame.selected)()
                 val coveragePending = rememberTabReader { frame.coveragePending(channel.id) }()
+                val coverage = rememberTabReader { frame.coverage(channel.id) }()
                 TimelineChannelRow(
                     channel = channel,
                     channelIndex = channelIndex,
@@ -248,6 +252,7 @@ internal fun GuideTimelineBody(
                     hasCachedEvents = channel.id in timelineEventIndex.channelsWithEvents,
                     connectionUiState = connectionUiState,
                     coveragePending = coveragePending,
+                    coverage = coverage,
                     onFocused = { event ->
                         if (!owner.isCurrent) return@TimelineChannelRow
                         onProgrammeFocused(channelScopeState, channelIndex, channel.id, event, channelListState)

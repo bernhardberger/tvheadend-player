@@ -64,6 +64,7 @@ class EpgColumnStatePolicyTest {
                 100,
                 ConnectionUiState.Ready,
                 hasCachedEvents = true,
+                windowCoverageProven = true,
             ),
         )
         assertEquals(
@@ -90,6 +91,54 @@ class EpgColumnStatePolicyTest {
                 ConnectionUiState.Ready,
             ),
         )
+    }
+
+    @Test
+    fun aFutureWindowIsEmptyOnlyOnceCoverageReachesItsEnd() {
+        val channelId = ChannelId(1)
+        // Three days ahead; the channel has programmes, just none loaded for this window.
+        val windowStart = 3 * 86_400L
+        val windowEnd = windowStart + 7_200L
+        val now = 0L
+        fun state(coverage: EpgCoverage?) = epgColumnDataState(
+            visibleEvents = emptyList(),
+            windowStartSec = windowStart,
+            windowEndSec = windowEnd,
+            connectionState = ConnectionUiState.Ready,
+            coveragePending = false,
+            hasCachedEvents = true,
+            windowCoverageProven = epgWindowCoverageProven(coverage, windowEnd, now),
+        )
+        val short = EpgCoverage.create(
+            channelId, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(86_400),
+        )
+        val partway = EpgCoverage.create(
+            channelId, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(86_400),
+            queriedTo = Instant.fromEpochSeconds(windowEnd - 1),
+        )
+
+        assertEquals(EpgColumnDataState.NOT_LOADED, state(null))
+        assertEquals(EpgColumnDataState.NOT_LOADED, state(short))
+        assertEquals(EpgColumnDataState.NOT_LOADED, state(partway))
+        assertEquals(
+            EpgColumnDataState.EMPTY_DAY,
+            state(EpgCoverage.empty(channelId, queriedTo = Instant.fromEpochSeconds(windowEnd))),
+        )
+        assertEquals(
+            EpgColumnDataState.EMPTY_DAY,
+            state(
+                EpgCoverage.create(
+                    channelId, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(86_400),
+                    queriedTo = Instant.fromEpochSeconds(windowEnd + 3_600),
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun anEndedWindowNeedsNoCoverageToBeEmpty() {
+        assertEquals(true, epgWindowCoverageProven(null, windowEndSec = 100, nowSec = 100))
+        assertEquals(false, epgWindowCoverageProven(null, windowEndSec = 101, nowSec = 100))
     }
 
     private fun event(start: Long, stop: Long) = EpgEvent.create(

@@ -88,6 +88,12 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
 import at.bernhardberger.tvhplayer.core.EpgColumnDataState
 import at.bernhardberger.tvhplayer.core.epgColumnDataState
+import at.bernhardberger.tvhplayer.core.epgWindowCoverageProven
+import at.bernhardberger.tvhplayer.core.TimelineEventSpan
+import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
+import at.bernhardberger.tvheadend.sdk.core.EpgCoverage
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
@@ -260,6 +266,7 @@ internal fun TimelineChannelRow(
     rows: GuideRows = GuideRows.DENSE,
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
+    coverage: EpgCoverage? = null,
 ) {
     val nowSec = nowSecProvider()
     // One genre label for the row's cells outside the chosen genre.
@@ -366,17 +373,27 @@ internal fun TimelineChannelRow(
             }
 
             if (events.isEmpty()) {
-                TimelineRowState(
-                    state = epgColumnDataState(
-                        visibleEvents = events,
+                val state = epgColumnDataState(
+                    visibleEvents = events,
+                    windowStartSec = windowStartSec,
+                    windowEndSec = windowEndSec,
+                    connectionState = connectionUiState,
+                    coveragePending = coveragePending,
+                    hasCachedEvents = hasCachedEvents,
+                    windowCoverageProven = epgWindowCoverageProven(coverage, windowEndSec, nowSec),
+                )
+                if (state == EpgColumnDataState.LOADING) {
+                    TimelineRowSkeleton(
                         windowStartSec = windowStartSec,
                         windowEndSec = windowEndSec,
-                        connectionState = connectionUiState,
-                        coveragePending = coveragePending,
-                        hasCachedEvents = hasCachedEvents,
-                    ),
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                        trackWidth = maxWidth,
+                        visibleTrackWidthPx = visibleTrackWidthPx,
+                        rows = rows,
+                        modifier = Modifier.matchParentSize(),
+                    )
+                } else {
+                    TimelineRowState(state = state, modifier = Modifier.align(Alignment.Center))
+                }
             }
 
         }
@@ -633,6 +650,91 @@ private fun ProgrammeTimeText(range: String, start: String, modifier: Modifier =
     }
 }
 
+/**
+ * A row whose programmes are still loading: passive cells in the grid's cell shape, one per hour
+ * of the window, each with a title and a time line. The row says it is loading.
+ */
+@Composable
+private fun TimelineRowSkeleton(
+    windowStartSec: Long,
+    windowEndSec: Long,
+    trackWidth: Dp,
+    visibleTrackWidthPx: Int?,
+    rows: GuideRows,
+    modifier: Modifier,
+) {
+    val description = stringResource(R.string.epg_loading)
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    val horizontalPadding = if (rows == GuideRows.DENSE) TvSpacing12 else TvSpacing16
+    Box(
+        modifier
+            .semantics { contentDescription = description }
+            .testTag("guide-row-skeleton"),
+    ) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            guideSkeletonSpans(windowStartSec, windowEndSec).forEachIndexed { index, span ->
+                val start = trackWidth * span.startFraction
+                val width = trackWidth * (span.endFraction - span.startFraction)
+                if (!shouldComposeTimelineCell(
+                        startPx = with(density) {
+                            (if (layoutDirection == LayoutDirection.Rtl) trackWidth - start - width else start).roundToPx()
+                        },
+                        widthPx = with(density) { width.roundToPx() },
+                        visibleWidthPx = visibleTrackWidthPx,
+                        isFocusTarget = false,
+                    )
+                ) return@forEachIndexed
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .align(AbsoluteAlignment.TopLeft)
+                        .absoluteOffset(x = start)
+                        .width(width)
+                        .fillMaxHeight()
+                        .padding(horizontal = TvSpacing4 / 2)
+                        .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
+                        .padding(horizontal = horizontalPadding),
+                ) {
+                    SkeletonLine(
+                        style = MaterialTheme.typography.titleSmall,
+                        widthFraction = GuideSkeletonTitleFractions[index % GuideSkeletonTitleFractions.size],
+                    )
+                    // As in programme cells, a narrow cell has no time line.
+                    if (width >= 90.dp) {
+                        SkeletonLine(style = MaterialTheme.typography.bodySmall, widthFraction = GuideSkeletonTimeFraction)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The window split at its whole hours, so the placeholders stand where programmes often begin. */
+private fun guideSkeletonSpans(windowStartSec: Long, windowEndSec: Long): List<TimelineEventSpan> {
+    val duration = windowEndSec - windowStartSec
+    if (duration <= 0L) return emptyList()
+    val bounds = buildList {
+        add(windowStartSec)
+        var hour = (windowStartSec / GuideSkeletonBlockSec + 1) * GuideSkeletonBlockSec
+        while (hour < windowEndSec) {
+            add(hour)
+            hour += GuideSkeletonBlockSec
+        }
+        add(windowEndSec)
+    }
+    return bounds.zipWithNext { start, end ->
+        TimelineEventSpan(
+            startFraction = (start - windowStartSec).toFloat() / duration,
+            endFraction = (end - windowStartSec).toFloat() / duration,
+        )
+    }
+}
+
+private const val GuideSkeletonBlockSec = 3_600L
+private val GuideSkeletonTitleFractions = floatArrayOf(0.7f, 0.5f, 0.6f)
+private const val GuideSkeletonTimeFraction = 0.4f
+
 @Composable
 private fun TimelineRowState(
     state: EpgColumnDataState,
@@ -644,6 +746,7 @@ private fun TimelineRowState(
             EpgColumnDataState.LOADING -> R.string.epg_loading
             EpgColumnDataState.NO_DATA -> R.string.epg_no_data
             EpgColumnDataState.EMPTY_DAY -> R.string.epg_empty_day
+            EpgColumnDataState.NOT_LOADED -> R.string.epg_not_loaded
             EpgColumnDataState.PARTIAL -> R.string.epg_partial
             EpgColumnDataState.STALE -> R.string.epg_stale
             EpgColumnDataState.PERMISSION_DENIED -> R.string.epg_permission_denied

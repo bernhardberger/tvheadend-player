@@ -489,12 +489,21 @@ enum class EpgColumnDataState {
     LOADING,
     NO_DATA,
     EMPTY_DAY,
+    /** Nothing shown and nothing proves the window empty, though the request has settled. */
+    NOT_LOADED,
     PARTIAL,
     STALE,
     PERMISSION_DENIED,
     RECONNECTING,
     SERVER_FAILURE,
 }
+
+/**
+ * Whether a row's window is known: an ended window shows the retained programmes as they are,
+ * and a later one is known once the channel's coverage reaches its end.
+ */
+fun epgWindowCoverageProven(coverage: EpgCoverage?, windowEndSec: Long, nowSec: Long): Boolean =
+    windowEndSec <= nowSec || epgFrontierSettled(coverage, Instant.fromEpochSeconds(windowEndSec))
 
 fun epgColumnDataState(
     visibleEvents: List<EpgEventEntry>,
@@ -503,6 +512,7 @@ fun epgColumnDataState(
     connectionState: ConnectionUiState,
     coveragePending: Boolean = false,
     hasCachedEvents: Boolean = visibleEvents.isNotEmpty(),
+    windowCoverageProven: Boolean = false,
 ): EpgColumnDataState = when {
     connectionState is ConnectionUiState.Error &&
         connectionState.kind == ConnectionFailureKind.PERMISSION_DENIED ->
@@ -517,6 +527,8 @@ fun epgColumnDataState(
         if (!hasCachedEvents) EpgColumnDataState.LOADING else EpgColumnDataState.STALE
     coveragePending -> EpgColumnDataState.LOADING
     visibleEvents.isEmpty() && !hasCachedEvents -> EpgColumnDataState.NO_DATA
+    // A request that timed out proves nothing about the window.
+    visibleEvents.isEmpty() && !windowCoverageProven -> EpgColumnDataState.NOT_LOADED
     visibleEvents.isEmpty() -> EpgColumnDataState.EMPTY_DAY
     visibleEvents.minOf { it.start.epochSeconds } > windowStartSec ||
         visibleEvents.maxOf { it.stop.epochSeconds } < windowEndSec ->

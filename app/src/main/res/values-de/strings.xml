@@ -275,6 +275,7 @@
     <string name="epg_state_ready">Programmdaten verfügbar</string>
     <string name="epg_no_data">Keine Programmdaten für diesen Sender</string>
     <string name="epg_empty_day">Keine Sendungen in diesem Zeitraum</string>
+    <string name="epg_not_loaded">Programmdaten noch nicht geladen</string>
     <string name="epg_partial">Unvollständige Programmdaten</string>
     <string name="epg_stale">Programmdaten können während der Neuverbindung veraltet sein</string>
     <string name="epg_permission_denied">Dieses Konto darf keine Programmdaten lesen</string>

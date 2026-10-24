@@ -389,6 +389,7 @@
     <string name="epg_state_ready">Guide data available</string>
     <string name="epg_no_data">No guide data for this channel</string>
     <string name="epg_empty_day">No programs in this time window</string>
+    <string name="epg_not_loaded">Guide data not loaded yet</string>
     <string name="epg_partial">Partial guide data</string>
     <string name="epg_stale">Guide data may be out of date while reconnecting</string>
     <string name="epg_permission_denied">This account can’t read guide data</string>

@@ -554,6 +554,10 @@ fun EpgGridScreen(
 
     val epgState = preparedIndex?.input?.state ?: observation.epgState
     val timelineEventIndex = preparedIndex?.value?.index ?: emptyGuideIndex
+    // From the same snapshot as the rows' programmes, so a row is never proven empty before they arrive.
+    val coverageByChannel = remember(epgState) {
+        epgState.currentEpgSnapshot()?.coverages?.associateBy { it.channelId }.orEmpty()
+    }
     val currentEventIds = preparedIndex?.value?.eventIds.orEmpty()
     LaunchedEffect(currentEventIds) {
         eventFocusRequesters.keys.retainAll(currentEventIds)
@@ -1811,6 +1815,7 @@ fun EpgGridScreen(
                                 coverageRequests.isPending(channelId, preparedIndex.input.windowStartSec)
                             }
                         },
+                        { channelId -> coverageByChannel[channelId] },
                         earlierContent, laterContent, view.rows, genre, view.genreColors,
                     )
                 },

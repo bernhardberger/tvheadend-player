@@ -437,21 +437,35 @@ class GuideVisualLayoutTest {
     @Test fun loadingEmptyAndErrorRowStatesFitTheDenseLane() {
         val channel = Channel.create(ChannelId(1), name = "Northline News", number = 1)
         val state = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
+        val cached = mutableStateOf(false)
         val requesters = mutableMapOf<EventId, FocusRequester>()
         compose.setContent {
             TVHeadendPlayerTheme {
                 TimelineChannelRow(channel, 0, 1, null, requesters, 0, 10800,
-                    { 0 }, emptyList(), false, state.value, false,
+                    { 0 }, emptyList(), cached.value, state.value, false,
                     { null }, {}, {})
             }
         }
+        compose.runOnIdle { state.value = ConnectionUiState.Connecting }
+        val loadingRow = bounds("epg-channel-row-1")
+        assertEquals(56f, loadingRow.height, .1f)
+        val loading = context().getString(R.string.epg_loading)
+        val skeleton = compose.onNodeWithTag("guide-row-skeleton")
+        // Passive: the placeholders take no focus.
+        skeleton.assertIsDisplayed().assertContentDescriptionEquals(loading)
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
+        val skeletonBounds = skeleton.fetchSemanticsNode().boundsInRoot
+        assertTrue(skeletonBounds.top >= loadingRow.top && skeletonBounds.bottom <= loadingRow.bottom)
+        compose.onNodeWithText(loading).assertDoesNotExist()
         val states = listOf(
-            ConnectionUiState.Ready to R.string.epg_no_data,
-            ConnectionUiState.Connecting to R.string.epg_loading,
-            ConnectionUiState.Error(ConnectionFailureKind.PERMISSION_DENIED, SessionRecoveryDisposition.NO_RETRY) to R.string.epg_permission_denied,
+            Triple(ConnectionUiState.Ready, false, R.string.epg_no_data),
+            Triple(ConnectionUiState.Ready, true, R.string.epg_not_loaded),
+            Triple(ConnectionUiState.Error(ConnectionFailureKind.PERMISSION_DENIED, SessionRecoveryDisposition.NO_RETRY), false,
+                R.string.epg_permission_denied),
         )
-        for ((connection, message) in states) {
-            compose.runOnIdle { state.value = connection }
+        for ((connection, hasCachedEvents, message) in states) {
+            compose.runOnIdle { state.value = connection; cached.value = hasCachedEvents }
+            compose.onNodeWithTag("guide-row-skeleton").assertDoesNotExist()
             val row = bounds("epg-channel-row-1")
             assertEquals(56f, row.height, .1f)
             val text = compose.onNodeWithText(context().getString(message))
@@ -969,7 +983,7 @@ class GuideVisualLayoutTest {
             useUnmergedTree = true).fetchSemanticsNodes()
         assertEquals("The displayed two-hour window has four half-hour ticks", 4, ticks.size)
         assertEquals(bounds("epg-time-ruler").width / 4, ticks[1].boundsInRoot.left - ticks[0].boundsInRoot.left, 1f)
-        val pendingRow = hasText(context().getString(R.string.epg_loading)) and hasAnyAncestor(hasTestTag("epg-channel-row-3"))
+        val pendingRow = hasTestTag("guide-row-skeleton") and hasAnyAncestor(hasTestTag("epg-channel-row-3"))
         compose.onNode(pendingRow).assertIsDisplayed()
         dateFocused()
         compose.runOnIdle { settle.complete(Unit) }
@@ -1110,6 +1124,61 @@ class GuideVisualLayoutTest {
         compose.waitForIdle()
         dateFocused()
         assertEquals(0, playbackRequests)
+    }
+
+    @Test fun aLaterDayWhoseCoverageTimesOutSaysNotLoadedUntilCoverageArrives() {
+        val tomorrow = hour + 24 * 3600
+        val farRequest = CompletableDeferred<Unit>()
+        try {
+            show(initialCoverage = false, beforeCoverageBatch = { _, through ->
+                if (through.epochSeconds > tomorrow) farRequest.await()
+            })
+            key(Key.Enter)
+            tagFocused("guide-time-day-0")
+            key(Key.DirectionDown)
+            key(Key.Enter)
+            compose.waitUntil(5_000) { dateButtonShows("Tomorrow", tomorrow) }
+            val loading = context().getString(R.string.epg_loading)
+            val notLoaded = context().getString(R.string.epg_not_loaded)
+            val emptyDay = context().getString(R.string.epg_empty_day)
+            compose.waitUntil(5_000) { compose.onAllNodesWithTag("guide-row-skeleton").fetchSemanticsNodes().isNotEmpty() }
+            compose.onAllNodesWithText(loading).assertCountEquals(0)
+            // Past the Guide's 10 s wait the request proves nothing: the day is not called empty.
+            compose.mainClock.advanceTimeBy(11_000)
+            compose.waitUntil(5_000) { compose.onAllNodesWithText(notLoaded).fetchSemanticsNodes().isNotEmpty() }
+            compose.onAllNodesWithText(emptyDay).assertCountEquals(0)
+            compose.onAllNodesWithTag("guide-row-skeleton").assertCountEquals(0)
+            // The panel stays open on the chosen day; neither state takes focus.
+            tagFocused("guide-time-day-1")
+            // Coverage through the week proves the day: its one programme shows and the other rows are empty.
+            compose.runOnIdle {
+                val observation = session.observation.value
+                val snapshot = checkNotNull(observation.epgSnapshotForDisplay)
+                val channels = (1L..12L).map(::ChannelId)
+                session.publish(SessionObservation.create(
+                    sessionState = observation.sessionState,
+                    channelState = observation.channelState,
+                    epgState = EpgRepositoryState.Current(EpgSnapshot.create(
+                        events = snapshot.events + EpgEvent.create(EventId(9_001), channelId = ChannelId(1),
+                            start = Instant.fromEpochSeconds(tomorrow), stop = Instant.fromEpochSeconds(tomorrow + 3600),
+                            title = "Tomorrow on Ridge Earth"),
+                        historicalEvents = snapshot.historicalEvents,
+                        coverages = channels.map {
+                            EpgCoverage.create(it, Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
+                        },
+                    )),
+                    dvrState = observation.dvrState,
+                    dvrConfigurationsState = observation.dvrConfigurationsState,
+                ))
+            }
+            compose.waitUntil(5_000) { compose.onAllNodesWithText(notLoaded).fetchSemanticsNodes().isEmpty() }
+            compose.onNodeWithText("Tomorrow on Ridge Earth").assertIsDisplayed()
+            assertTrue(compose.onAllNodesWithText(emptyDay).fetchSemanticsNodes().isNotEmpty())
+            tagFocused("guide-time-day-1")
+            assertEquals(0, playbackRequests)
+        } finally {
+            farRequest.complete(Unit)
+        }
     }
 
     @Test fun nowJumpsBackToTheCurrentHourFromALaterDay() {

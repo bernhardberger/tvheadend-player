@@ -437,10 +437,10 @@ class GuideRealisticSceneTest {
         val coverage = CompletableDeferred<Unit>()
         try {
             showAt("2026-09-15T19:40:00", holdCoverage = coverage)
-            // Only a row with nothing in the window says it is loading; Harbor Sport Plus's guide has ended.
+            // Only a row with nothing in the window shows placeholders; Harbor Sport Plus's guide has ended.
             val row = channelIds.getValue("ch-harbor-sport-plus").value
             compose.waitUntil(10_000) {
-                compose.onAllNodes(hasText(context().getString(R.string.epg_loading)) and
+                compose.onAllNodes(hasTestTag("guide-row-skeleton") and
                     hasAnyAncestor(hasTestTag("epg-channel-row-$row"))).fetchSemanticsNodes().isNotEmpty()
             }
             capture("u5-loading")
