@@ -12,6 +12,7 @@ enum class BrowseContextAction {
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
 
+/** One order for every channel and programme menu, so a held OK always lands on Watch. */
 fun channelContextActions(
     event: EpgEvent?,
     nowSec: Long,
@@ -24,17 +25,6 @@ fun channelContextActions(
         addAll(programmeContextRecordingActions(event, nowSec, recording, canModifyRecordings))
     }
     add(BrowseContextAction.SHOW_GUIDE)
-}
-
-fun guideContextActions(
-    event: EpgEvent,
-    nowSec: Long,
-    recording: DvrEntry?,
-    canModifyRecordings: Boolean,
-): List<BrowseContextAction> = buildList {
-    add(BrowseContextAction.DETAILS)
-    addAll(programmeContextRecordingActions(event, nowSec, recording, canModifyRecordings))
-    add(BrowseContextAction.WATCH)
 }
 
 private fun programmeContextRecordingActions(

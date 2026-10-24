@@ -147,19 +147,19 @@ class BrowseContextMenuScreenTest {
         val bounds = card.fetchSemanticsNode().boundsInRoot
         card.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN))
         card.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN, 1))
-        compose.onNodeWithText("Details", substring = false).assertIsFocused()
-        listOf("Record", "Watch channel", "Show in Guide").forEach { compose.onNodeWithText(it).assertExists() }
+        compose.onNodeWithText("Watch channel").assertIsFocused()
+        listOf("Details", "Record", "Show in Guide").forEach { compose.onNodeWithText(it).assertExists() }
         compose.onNode(hasText("100 Ridge Earth SD • ", substring = true) and hasAnyAncestor(hasTestTag("browse-context-menu"))).assertExists()
         compose.onNodeWithTag("browse-context-artwork").assertExists()
         compose.onNodeWithTag("nav-channels").assertDoesNotExist()
         compose.onRoot().performKeyPress(activation(android.view.KeyEvent.ACTION_UP))
-        compose.onNodeWithText("Details", substring = false).assertIsFocused()
+        compose.onNodeWithText("Watch channel").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
         card.assertIsFocused()
         assertEquals(scroll, detailsScroll())
         assertEquals(bounds, card.fetchSemanticsNode().boundsInRoot)
         card.performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Details", substring = false).assertIsFocused()
+        compose.onNodeWithText("Watch channel").assertIsFocused()
         compose.runOnIdle { back.onBackPressed() }
         card.assertIsFocused()
         assertEquals(scroll, detailsScroll())
@@ -170,7 +170,7 @@ class BrowseContextMenuScreenTest {
         openAirings()
         compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-4").performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Details", substring = false).performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithText("Details", substring = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-show_guide").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(EventId(4), guideProgramme?.id)
         assertEquals(ChannelId(2), guideRequest)
@@ -250,7 +250,8 @@ class BrowseContextMenuScreenTest {
         val title = compose.onNodeWithText("Ridge Light")
         val channel = compose.onNodeWithText("101 Ridge Earth HD • On now • until ", substring = true)
         assertTrue(title.getUnclippedBoundsInRoot().bottom <= channel.getUnclippedBoundsInRoot().top)
-        compose.onNodeWithText("Details").assertIsFocused()
+        // The same order as the Channels menu: Watch first.
+        compose.onNodeWithText("Watch").assertIsFocused()
         assertMoreOptionsGeometry()
         capture("guide-header", "u15-menu-headers")
     }

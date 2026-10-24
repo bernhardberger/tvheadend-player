@@ -992,8 +992,10 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - **Context menu** (hold OK or Menu on any card): full-screen, opaque app
   background, rail hidden. Kit Two Column / JetFit more-options layout: item
   card 268dp left, 268dp WideButton column right, columns top-aligned, the
-  container centred. An action that needs a confirmation closes the menu for
-  good; Keep, Cancel and Back return focus to the originating card. Details
+  container centred. Channel and programme menus share one order on every
+  surface (Channels, Guide, airings): Watch, Details, the recording action,
+  Show in Guide, so a held OK always lands on the same action. An action that
+  needs a confirmation closes the menu for good; Keep, Cancel and Back return focus to the originating card. Details
   opened from a menu return to the card on Back, never to the menu.
 - **Prompts and confirmations** (resume or start over; cancel, stop or delete a
   recording): kit Standard card centred over a 60% black scrim, drawn in the
