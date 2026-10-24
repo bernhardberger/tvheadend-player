@@ -57,6 +57,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -445,6 +446,21 @@ internal fun TimelineChannelHeader(
     }
 }
 
+/**
+ * A title-line mark after a gap, always at [StatusIconSize]: a cell too narrow for it leaves it
+ * out rather than shrinking it beside full-size marks in wider cells.
+ */
+private fun Modifier.markAtFullSizeOrNone(): Modifier = layout { measurable, constraints ->
+    val gap = TvSpacing4.roundToPx()
+    val size = StatusIconSize.roundToPx()
+    if (constraints.maxWidth < gap + size || constraints.maxHeight < size) {
+        layout(0, 0) {}
+    } else {
+        val mark = measurable.measure(Constraints.fixed(size, size))
+        layout(gap + size, size) { mark.placeRelative(gap, 0) }
+    }
+}
+
 @Composable
 internal fun TimelineProgrammeCell(
     event: EpgEventEntry,
@@ -525,21 +541,19 @@ internal fun TimelineProgrammeCell(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 if (markState != null) {
-                    Spacer(Modifier.width(TvSpacing4))
                     // The mark follows the cell's content colour, which inverts on focus.
                     RecordingStatusIndicator(
                         state = markState,
                         focused = focused,
-                        modifier = Modifier.testTag("guide-cell-recording-mark"),
+                        modifier = Modifier.markAtFullSizeOrNone().testTag("guide-cell-recording-mark"),
                     )
                 }
                 if (failed != null) {
-                    Spacer(Modifier.width(TvSpacing4))
                     Icon(
                         painter = painterResource(R.drawable.ic_error_outlined),
                         // The dot of a running recording already names its errors.
                         contentDescription = stringResource(failed).takeIf { markState == null },
-                        modifier = Modifier.size(StatusIconSize).testTag("guide-cell-failed-mark"),
+                        modifier = Modifier.markAtFullSizeOrNone().size(StatusIconSize).testTag("guide-cell-failed-mark"),
                         tint = if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error,
                     )
                 }

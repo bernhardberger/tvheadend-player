@@ -36,6 +36,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
+import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
@@ -1461,6 +1462,19 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun aCellTooNarrowForTheMarkLeavesItOutInsteadOfShrinkingIt() {
+        fun scheduled(id: Long, eventId: Long) =
+            DvrEntry.create(DvrEntryId(id), eventId = EventId(eventId), state = DvrEntryState.SCHEDULED)
+        show(shortSecondMinutes = 3, recordings = listOf(scheduled(1, 111), scheduled(2, 112)))
+        fun mark(offset: Int) = compose.onNode(
+            hasTestTag("guide-cell-recording-mark") and hasAnyAncestor(hasContentDescription(title(1, offset), substring = true)),
+            useUnmergedTree = true,
+        )
+        mark(1).assertIsNotDisplayed()
+        mark(2).assertIsDisplayed().assertWidthIsEqualTo(StatusIconSize).assertHeightIsEqualTo(StatusIconSize)
+        assertNoPlayback()
+    }
+
     @Test fun genreColorsTurnOffAndTheGenreLevelLosesItsDots() {
         show(genres = true)
         key(Key.DirectionRight)
@@ -1571,7 +1585,7 @@ class GuideVisualLayoutTest {
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
         groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
-        recordings: List<DvrEntry> = emptyList()) {
+        recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -1581,7 +1595,9 @@ class GuideVisualLayoutTest {
         fun event(channel: Channel, offset: Int) = EpgEvent.create(
             EventId(channel.id.value * 100 + offset + 10), channelId = channel.id,
             start = Instant.fromEpochSeconds(eventHour + offset * 3600),
-            stop = Instant.fromEpochSeconds(eventHour + (offset + if (longProgramme && channel.id == ChannelId(1) && offset == 0) longProgrammeHours else 1) * 3600),
+            stop = if (shortSecondMinutes != null && channel.id == ChannelId(1) && offset == 1) {
+                Instant.fromEpochSeconds(eventHour + 3600 + shortSecondMinutes * 60L)
+            } else Instant.fromEpochSeconds(eventHour + (offset + if (longProgramme && channel.id == ChannelId(1) && offset == 0) longProgrammeHours else 1) * 3600),
             title = title(channel.id.value.toInt(), offset), summary = "Synthetic offline programme metadata.",
             // Sport on the first channel, no genre code on the second, children's programmes after.
             contentGenre = if (genres) ContentGenre.fromContentType(when (channel.id.value) { 1L -> 0x40L; 2L -> null; else -> 0x50L }) else null,
