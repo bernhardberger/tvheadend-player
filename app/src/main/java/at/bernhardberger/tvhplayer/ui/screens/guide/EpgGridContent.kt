@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.absoluteOffset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
@@ -49,6 +50,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -61,6 +63,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.DenseListItem
+import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
@@ -100,6 +103,7 @@ import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
+import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 
@@ -497,10 +501,18 @@ internal fun TimelineProgrammeCell(
     val description = if (outside && outsideGenre != null) "$cellDescription, $outsideGenre" else cellDescription
     val contentAlpha = if (dimmed) Modifier.alpha(GuideOutsideGenreAlpha) else Modifier
 
-    val markState = recording?.state?.takeIf { recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED }
+    val markState = recording?.state?.takeIf {
+        recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED
+    }
+    // A failed recording is the `error` "!" alone; one still running with errors adds it beside its dot.
+    val failed = when (recording?.state) {
+        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> true
+        else -> false
+    }
     Box(modifier = modifier) {
-        // Running and scheduled recordings carry their mark at the right end of the title line, as
-        // channel and Recordings rows do: the title ellipsizes first and the time line keeps its width.
+        // Recordings carry their mark at the right end of the title line, as channel and Recordings
+        // rows do: the title ellipsizes first and the time line keeps its width. Missed and invalid
+        // ones carry none, which keeps the grid quiet.
         val headline: @Composable () -> Unit = {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = contentAlpha) {
                 Text(
@@ -514,7 +526,22 @@ internal fun TimelineProgrammeCell(
                 if (markState != null) {
                     Spacer(Modifier.width(TvSpacing4))
                     // The mark follows the cell's content colour, which inverts on focus.
-                    RecordingStatusIndicator(state = markState, focused = focused)
+                    RecordingStatusIndicator(
+                        state = markState,
+                        focused = focused,
+                        modifier = Modifier.testTag("guide-cell-recording-mark"),
+                    )
+                }
+                if (failed) {
+                    Spacer(Modifier.width(TvSpacing4))
+                    Icon(
+                        painter = painterResource(R.drawable.ic_error_outlined),
+                        // The dot of a running recording already names its errors.
+                        contentDescription = stringResource(R.string.recording_state_failed)
+                            .takeIf { markState == null },
+                        modifier = Modifier.size(StatusIconSize).testTag("guide-cell-failed-mark"),
+                        tint = if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error,
+                    )
                 }
             }
         }

@@ -1407,6 +1407,45 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun aFinishedRecordingIsTheDotAndAFailedOneTheErrorMarkWhileMissedHasNone() {
+        // Past programmes come from the history fixture: channel 1 recorded, 2 failed, 4 missed.
+        fun recording(id: Long, channel: Int, state: DvrEntryState) =
+            DvrEntry.create(DvrEntryId(id), eventId = EventId(channel * 100L + 9), state = state)
+        show(recordings = listOf(
+            recording(1, 1, DvrEntryState.COMPLETED),
+            recording(2, 2, DvrEntryState.COMPLETED_ERROR),
+            recording(3, 4, DvrEntryState.MISSED),
+            // Channel 1's current programme is still recording, with errors.
+            DvrEntry.create(DvrEntryId(4), eventId = EventId(110), state = DvrEntryState.RECORDING_ERROR),
+        ))
+        fun mark(tag: String, channel: Int, offset: Int) = compose.onAllNodes(
+            hasTestTag(tag) and hasAnyAncestor(hasContentDescription(title(channel, offset), substring = true)),
+            useUnmergedTree = true,
+        ).fetchSemanticsNodes().size
+        fun description(channel: Int, offset: Int) = compose.onNode(hasContentDescription(title(channel, offset), substring = true))
+            .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }.orEmpty().joinToString()
+
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        assertEquals("A running recording with errors keeps its dot", 1, mark("guide-cell-recording-mark", 1, 0))
+        assertEquals("and adds the error mark", 1, mark("guide-cell-failed-mark", 1, 0))
+        key(Key.DirectionLeft)
+        focused(title(1, -1))
+        assertEquals(1, mark("guide-cell-recording-mark", 1, -1))
+        assertEquals(0, mark("guide-cell-failed-mark", 1, -1))
+        assertTrue(description(1, -1), description(1, -1).contains(context().getString(R.string.details_recorded)))
+        key(Key.DirectionDown)
+        focused(title(2, -1))
+        assertEquals(0, mark("guide-cell-recording-mark", 2, -1))
+        assertEquals(1, mark("guide-cell-failed-mark", 2, -1))
+        assertTrue(description(2, -1), description(2, -1).contains(context().getString(R.string.recording_state_failed)))
+        // The history window is open, so the missed programme's cell is in the grid without focus.
+        compose.onNode(hasContentDescription(title(4, -1), substring = true)).assertExists()
+        assertEquals(0, mark("guide-cell-recording-mark", 4, -1))
+        assertEquals(0, mark("guide-cell-failed-mark", 4, -1))
+        assertNoPlayback()
+    }
+
     @Test fun genreColorsTurnOffAndTheGenreLevelLosesItsDots() {
         show(genres = true)
         key(Key.DirectionRight)
@@ -1516,7 +1555,8 @@ class GuideVisualLayoutTest {
         lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
-        groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true) {
+        groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
+        recordings: List<DvrEntry> = emptyList()) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -1548,7 +1588,7 @@ class GuideVisualLayoutTest {
                     EpgCoverage.create(it.id, Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
                 } else emptyList(),
             )),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(emptyList())),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(emptyList()),
         ))
         // Observe and suspend only the released fake's request boundary; its settlements

@@ -19,8 +19,9 @@ import at.bernhardberger.tvhplayer.ui.TvRecordingFocusedColor
 val StatusIconSize: Dp = 16.dp
 
 /**
- * Recording now, with or without errors, is the red dot; scheduled is a clock in the surrounding content colour.
- * Pass [focused] when the mark sits on a focused, light row or cell: the dot turns deeper red.
+ * Recording now, with or without errors, and a finished recording are the red dot; scheduled is a clock in the
+ * surrounding content colour. Pass [focused] when the mark sits on a focused, light row or cell: the dot turns
+ * deeper red.
  */
 @Composable
 fun RecordingStatusIndicator(
@@ -30,7 +31,7 @@ fun RecordingStatusIndicator(
     focused: Boolean = false,
 ) {
     val recording = when (state) {
-        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> true
+        DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED -> true
         DvrEntryState.SCHEDULED -> false
         else -> return
     }
@@ -38,6 +39,7 @@ fun RecordingStatusIndicator(
         when (state) {
             DvrEntryState.RECORDING_ERROR -> R.string.recording_state_recording_errors
             DvrEntryState.RECORDING -> R.string.recording_state_recording
+            DvrEntryState.COMPLETED -> R.string.details_recorded
             else -> R.string.recording_state_scheduled
         }
     )

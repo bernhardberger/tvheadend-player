@@ -81,7 +81,9 @@ Meaning of colour:
     "N watched". Tvheadend's play count counts file opens, so the app never shows
     it as a number. The
     trailing slot belongs to where OK leads, such as a folder's chevron.
-    A running recording with errors adds the `error` "!" beside the dot. No dot
+    A running recording with errors adds the `error` "!" beside the dot. Guide
+    cells also mark a finished recording with the dot and a failed one with the
+    `error` "!". No dot
     on section headings or titles; the "Recording now" folder carries its dot
     as a badge on the folder icon.
   - **Badge** (one size: 20dp, 4dp corners, `labelMedium`) in eyebrows, info
