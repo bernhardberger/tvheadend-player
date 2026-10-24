@@ -23,6 +23,6 @@ class GuideGenreColorsTest {
         val sport = tvGenreColors(ProgrammeCategory.SPORT)!!
         assertEquals(Color(0xFF73F094), sport.base)
         assertEquals(Color(0xFF314238), sport.tint)
-        assertEquals(Color(0xFFBFE6CC), sport.wash)
+        assertEquals(Color(0xFFCEEBD8), sport.wash)
     }
 }
