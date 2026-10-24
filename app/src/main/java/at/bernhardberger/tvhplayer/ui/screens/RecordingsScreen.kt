@@ -160,6 +160,10 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingItemKey
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingTimeRange
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import org.koin.compose.koinInject
@@ -316,11 +320,17 @@ internal fun RecordingsScreenContent(
         folderMenu = null
     }
 
+    val folderActionLock = remember { Mutex() }
     fun runFolderAction(action: BrowseContextAction, session: CurrentSessionObservation, recordingIds: List<DvrEntryId>) {
         scope.launch {
             val noticeContext = notices.context()
-            dvrMutationActions.runFolderAction(action, session, recordingIds) { latestObservationProvider() }
-                ?.let { notices.post(it, noticeContext) }
+            // A folder action finishes and reports even when the screen leaves halfway, and a second
+            // one waits for the first so both never send the same recording.
+            withContext(NonCancellable) {
+                folderActionLock.withLock {
+                    dvrMutationActions.runFolderAction(action, session, recordingIds) { latestObservationProvider() }
+                }?.let { notices.post(it, noticeContext) }
+            }
         }
     }
 

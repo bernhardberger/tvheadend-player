@@ -81,7 +81,11 @@ fun recordingContextActions(
     }
 }
 
-/** Watch-state commands are only useful for playable, ended recordings with write authority. */
+/**
+ * Watch-state commands are only useful for playable, ended recordings with write authority. The
+ * command follows the shown watch state: only a watched recording offers unwatched, and a partly
+ * watched one offers watched even when an earlier viewing already counted.
+ */
 @OptIn(ExperimentalTvheadendApi::class)
 fun recordingWatchStateAction(
     entry: DvrEntry,
@@ -91,7 +95,8 @@ fun recordingWatchStateAction(
     if (!canModifyRecordings || !recordingPlaybackOffered(admission) ||
         admission is RecordingPlaybackAdmission.Growing || entry.state == DvrEntryState.MISSED
     ) return null
-    return if ((entry.playCount ?: 0) > 0) BrowseContextAction.MARK_UNWATCHED else BrowseContextAction.MARK_WATCHED
+    val watched = recordingWatchState(entry, offeredResumePosition(admission), nowSec = 0L) == RecordingWatchState.Watched
+    return if (watched) BrowseContextAction.MARK_UNWATCHED else BrowseContextAction.MARK_WATCHED
 }
 
 private val FolderContextActions = listOf(

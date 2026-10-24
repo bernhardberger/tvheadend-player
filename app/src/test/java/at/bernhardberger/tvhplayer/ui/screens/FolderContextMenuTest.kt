@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -10,6 +11,7 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.notices.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import kotlinx.coroutines.CompletableDeferred
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -28,6 +30,8 @@ class FolderContextMenuTest {
     private val deleteCalls = mutableListOf<DvrEntryId>()
     private var onWatchCall: (DvrEntryId) -> DvrProgressResult = { DvrProgressResult.Accepted }
     private var onDeleteCall: (DvrEntryId) -> DvrMutationResult<Unit> = { DvrMutationResult.Confirmed(Unit) }
+    private var watchGate: CompletableDeferred<Unit>? = null
+    private val screenShown = mutableStateOf(true)
 
     @Test fun markAllAsWatchedChangesEachFinishedUnwatchedRecordingAndReturnsToTheFolder() {
         show(seriesFolder())
@@ -106,6 +110,45 @@ class FolderContextMenuTest {
         }
     }
 
+    @Test fun aFolderActionFinishesAndReportsAfterTheScreenLeaves() {
+        val gate = CompletableDeferred<Unit>().also { watchGate = it }
+        onWatchCall = { id ->
+            if (id == DvrEntryId(3)) DvrProgressResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false)
+            else DvrProgressResult.Accepted
+        }
+        show(seriesFolder())
+        openFolderMenu()
+        compose.onNodeWithText("Mark all as watched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitUntil(10_000) { watchCalls.size == 1 }
+        screenShown.value = false
+        compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
+        gate.complete(Unit)
+        compose.waitUntil(10_000) { notices.state.value.candidate != null }
+        compose.runOnIdle {
+            assertEquals(listOf(DvrEntryId(1) to true, DvrEntryId(3) to true), watchCalls)
+            assertEquals(
+                Notice.DvrFolderActionFailed(DvrMutationKind.UPDATE, failed = 1, total = 2, DvrMutationFeedback.PERMISSION_DENIED),
+                notices.state.value.candidate?.notice,
+            )
+        }
+    }
+
+    @Test fun aSecondFolderActionWaitsForTheFirst() {
+        val gate = CompletableDeferred<Unit>().also { watchGate = it }
+        show(seriesFolder())
+        openFolderMenu()
+        compose.onNodeWithText("Mark all as watched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.waitUntil(10_000) { watchCalls.size == 1 }
+        openFolderMenu()
+        compose.onNodeWithText("Mark all as unwatched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(listOf(DvrEntryId(1) to true), watchCalls) }
+        gate.complete(Unit)
+        compose.waitUntil(10_000) { watchCalls.size == 3 }
+        compose.runOnIdle {
+            assertEquals(listOf(DvrEntryId(1) to true, DvrEntryId(3) to true, DvrEntryId(2) to false), watchCalls)
+        }
+    }
+
     @Test fun aWatchedFolderEndsItsNameWithTheCheckAndAMixedOneCountsWhatIsLeft() {
         show(
             listOf(
@@ -151,7 +194,11 @@ class FolderContextMenuTest {
     private fun show(entries: List<DvrEntry>): FakeTvheadendSession {
         val session = FakeTvheadendSession(observation(entries))
         val actions = DvrMutationActions(
-            updateWatchStateCommand = { _, id, watched -> watchCalls += id to watched; onWatchCall(id) },
+            updateWatchStateCommand = { _, id, watched ->
+                watchCalls += id to watched
+                watchGate?.await()
+                onWatchCall(id)
+            },
             scheduleEntry = { _, _ -> error("Unexpected schedule") },
             stopEntry = { _, _ -> error("Unexpected stop") },
             cancelEntry = { _, _ -> error("Unexpected cancel") },
@@ -160,7 +207,7 @@ class FolderContextMenuTest {
         notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
         compose.setContent {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(observation = session.observation.collectAsState().value,
+                if (screenShown.value) RecordingsScreenContent(observation = session.observation.collectAsState().value,
                     currentObservation = { session.observation.value }, state = RecordingsScreenState(),
                     dvrMutationActions = actions, notices = notices)
             }

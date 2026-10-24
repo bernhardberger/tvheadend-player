@@ -56,6 +56,11 @@ class BrowseContextActionsTest {
             actions(recording(DvrEntryState.COMPLETED, playCount = 2)))
     }
 
+    @Test fun partlyWatchedRecordingsOfferWatchedEvenWhenAnEarlierViewingCounted() {
+        assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE),
+            actions(recording(DvrEntryState.COMPLETED, 20, playCount = 2)))
+    }
+
     @Test fun completedRecordingsWithoutSupportedProgressOfferOnlyPlay() {
         listOf(RecordingProgressCapability.UNKNOWN, RecordingProgressCapability.UNSUPPORTED).forEach {
             assertEquals("$it", listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20), capability = it))
@@ -165,6 +170,13 @@ class BrowseContextActionsTest {
             folderContextActions(seen, observation::recordingPlaybackAdmission, true))
         assertEquals(1, seen.watchedCount { null })
         assertEquals(1, season.watchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
+
+        // A partly watched recording seen once before is still partly watched, so the folder actions agree.
+        val rewatching = buildDvrArchive(listOf(entry(5, DvrEntryState.COMPLETED, listOf("Again"), position = 20, playCount = 1)))
+            .folders.single()
+        assertEquals(listOf(MARK_ALL_WATCHED, DELETE_ALL),
+            folderContextActions(rewatching, observation::recordingPlaybackAdmission, true))
+        assertEquals(0, rewatching.watchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
     }
 
     private fun file(path: String = "/rec/a.ts") = TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path)
