@@ -208,7 +208,7 @@ internal fun ChannelsImmersiveBackground(
             // The picture's colour fills the screen, as on the details page.
             val tint = rememberDetailsTint(art, shown.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
-            DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"), background = tint,
+            DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"),
                 onSettled = { pictureSettled = true })
         }
     }

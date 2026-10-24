@@ -71,6 +71,7 @@ import at.bernhardberger.tvhplayer.ui.common.*
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.images.BackdropTransformation
+import at.bernhardberger.tvhplayer.images.CinematicScrimTransformation
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -765,15 +766,14 @@ private const val DetailsScrolledDimAlpha = .4f
 private const val DetailsReadingDimAlpha = .6f
 
 /**
- * The kit's immersive background: top-right 16:9 art under [KitCinematicScrim] in the
- * [background] colour. [onSettled] reports once the picture has loaded or failed, or at once
- * when there is none.
+ * The kit's immersive background: top-right 16:9 art with the kit's cinematic scrim baked in, to
+ * draw over the page's colour. [onSettled] reports once the picture has loaded or failed, or at
+ * once when there is none.
  */
 @Composable
 internal fun DetailsHero(
     image: ArtworkId,
     modifier: Modifier,
-    background: State<Color>,
     onSettled: (() -> Unit)? = null,
 ) {
     val session = LocalArtworkContext.current.currentSession
@@ -781,11 +781,15 @@ internal fun DetailsHero(
         if (onSettled != null) LaunchedEffect(Unit) { onSettled() }
         return
     }
-    AsyncImage(AppArtworkSource(session, image), null,
+    val context = LocalPlatformContext.current
+    val request = remember(session, image, context) {
+        ImageRequest.Builder(context).data(AppArtworkSource(session, image))
+            .transformations(CinematicScrimTransformation).build()
+    }
+    AsyncImage(request, null,
         contentScale = ContentScale.Crop,
         modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
-            .testTag("details-hero")
-            .unditheredGradient(over = true) { size -> kitCinematicScrim(background.value, size) },
+            .testTag("details-hero"),
         onSuccess = { onSettled?.invoke() },
         onError = { onSettled?.invoke() })
 }
@@ -822,23 +826,6 @@ internal fun LoadDetailsHeroLogo(picon: ArtworkId?, onSettled: () -> Unit) {
         }
         currentOnSettled()
     }
-}
-
-/**
- * The kit's "Cinematic scrim" (Figma 8689:24742 › Scrim): a radial gradient centred at the frame's
- * top-right, page background at 10% there and fully opaque from 70.74% of the way to the
- * bottom-left corner. The matrix is the kit's SVG gradientTransform on its 960×540 viewBox.
- */
-private fun kitCinematicScrim(color: Color, size: androidx.compose.ui.geometry.Size): Shader {
-    val shader = android.graphics.RadialGradient(0f, 0f, 10f,
-        intArrayOf(color.copy(alpha = .1f).toArgb(), color.toArgb()), floatArrayOf(0f, .7074f),
-        android.graphics.Shader.TileMode.CLAMP)
-    val sx = size.width / 960f
-    val sy = size.height / 540f
-    shader.setLocalMatrix(android.graphics.Matrix().apply {
-        setValues(floatArrayOf(-91.24f * sx, -91.24f * sx, 912.4f * sx, 54f * sy, -50.1f * sy, 0f, 0f, 0f, 1f))
-    })
-    return shader
 }
 
 /**
