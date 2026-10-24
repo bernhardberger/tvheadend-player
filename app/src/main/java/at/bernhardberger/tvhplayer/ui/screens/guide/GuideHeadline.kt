@@ -127,6 +127,7 @@ internal fun rememberSettledGuideHeadline(
 /**
  * The focused programme's picture at the screen's top end behind the headline, or else its
  * channel's logo: the Channels screen's corner background, which waits for focus to rest itself.
+ * The picture is scaled down to the space above the grid, so the grid's rows stay clear of it.
  */
 @Composable
 internal fun GuideHeadlineBackground(
@@ -154,9 +155,35 @@ internal fun GuideHeadlineBackground(
             endInset = endInset,
             modifier = modifier,
             picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.image },
+            pictureHeight = logoTop + guideHeadlineHeight() + GuideHeadlinePictureReach,
         )
     }
 }
+
+/** A step below the Channels hero's title, so the grid keeps its rows. */
+private val GuideHeadlineTitleStyle @Composable get() = MaterialTheme.typography.headlineSmall
+
+/**
+ * Room for the eyebrow, a one-line title, the facts, the time and one synopsis line, as the
+ * Channels hero computes it, so about four and a half rows stay below. A second title line or a
+ * subtitle takes the synopsis's place: HeadlineColumn gives way inside it, the grid stays.
+ */
+@Composable
+private fun guideHeadlineHeight(): Dp {
+    val typography = MaterialTheme.typography
+    return with(LocalDensity.current) {
+        maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + 8.dp +
+            GuideHeadlineTitleStyle.lineHeight.toDp() + ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight +
+            ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineSynopsisGap +
+            typography.bodyLarge.lineHeight.toDp()
+    }
+}
+
+/**
+ * How far the headline's picture reaches below the headline: over the gap and the time ruler and a
+ * little into the first row, so it fills the space above the grid without covering the grid.
+ */
+private val GuideHeadlinePictureReach = 48.dp
 
 /**
  * The Guide's headline: who and what the settled [programme] is ([rememberSettledGuideHeadline]),
@@ -172,17 +199,8 @@ internal fun GuideHeadline(
     nowSec: () -> Long,
     modifier: Modifier = Modifier,
 ) {
-    val typography = MaterialTheme.typography
-    // A step below the Channels hero's title, so the grid keeps its rows.
-    val titleStyle = typography.headlineSmall
-    // Room for the eyebrow, a one-line title, the facts, the time and one synopsis line, as the
-    // Channels hero computes it, so about four and a half rows stay below. A second title line or
-    // a subtitle takes the synopsis's place: HeadlineColumn gives way inside it, the grid stays.
-    val height = with(LocalDensity.current) {
-        maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + 8.dp + titleStyle.lineHeight.toDp() +
-            ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() +
-            ProgrammeHeadlineSynopsisGap + typography.bodyLarge.lineHeight.toDp()
-    }
+    val titleStyle = GuideHeadlineTitleStyle
+    val height = guideHeadlineHeight()
     ProvideArtworkSession(observation.currentSession, scopeObservation) {
         AnimatedContent(
             targetState = programme(),

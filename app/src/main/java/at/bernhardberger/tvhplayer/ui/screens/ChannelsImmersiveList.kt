@@ -150,6 +150,7 @@ internal val ImmersiveHeroWidth = 480.dp
  * picture's colour, or else the logo below the header ([logoTop]) on the glow of its colour.
  * Without [programArt] the logo stands in, matching cards that show logos. The picture is the
  * channel's on-now programme's unless [picture] picks another, as the Guide's focused programme.
+ * The picture is as wide as the kit's unless [pictureHeight] scales it down to a height.
  * It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps the video as
  * the background, so nothing is drawn.
  */
@@ -164,6 +165,7 @@ internal fun ChannelsImmersiveBackground(
     modifier: Modifier = Modifier,
     programArt: Boolean = true,
     picture: (ChannelId) -> ArtworkId? = { observation.eventAt(it, Instant.fromEpochSeconds(nowSec()))?.image },
+    pictureHeight: Dp? = null,
 ) {
     if (LocalWarmPlayback.current) return
     val session = observation.currentSession != null
@@ -209,7 +211,7 @@ internal fun ChannelsImmersiveBackground(
             val tint = rememberDetailsTint(art, shown.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
             DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"),
-                onSettled = { pictureSettled = true })
+                onSettled = { pictureSettled = true }, height = pictureHeight)
         }
     }
     // The sharp logo belongs to the content: it moves with it as the drawer opens, while the

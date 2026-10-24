@@ -107,6 +107,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
+import androidx.compose.ui.test.getUnclippedBoundsInRoot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -277,6 +278,12 @@ class BrowseCohesionEvidenceTest {
         showGuide(1f)
         key(Key.DirectionDown)
         capture("guide-current", 1f, "Guide first channel current programme", hasText(CURRENT_TITLE))
+        // The picture fills the space above the grid and reaches only a little past the headline.
+        val art = compose.onNodeWithTag("channels-immersive-art", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val headline = compose.onNodeWithTag("guide-headline", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(0f, art.top.value, .5f)
+        assertEquals(48f, (art.bottom - headline.bottom).value, .5f)
+        assertEquals(16f / 9f, (art.right - art.left) / (art.bottom - art.top), .01f)
         key(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()
         capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"), fullscreenDetails = true)

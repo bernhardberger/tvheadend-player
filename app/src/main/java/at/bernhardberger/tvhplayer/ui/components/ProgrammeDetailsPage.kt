@@ -54,6 +54,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
@@ -767,14 +768,15 @@ private const val DetailsReadingDimAlpha = .6f
 
 /**
  * The kit's immersive background: top-right 16:9 art with the kit's cinematic scrim baked in, to
- * draw over the page's colour. [onSettled] reports once the picture has loaded or failed, or at
- * once when there is none.
+ * draw over the page's colour, as wide as the kit's or as tall as [height]. [onSettled] reports
+ * once the picture has loaded or failed, or at once when there is none.
  */
 @Composable
 internal fun DetailsHero(
     image: ArtworkId,
     modifier: Modifier,
     onSettled: (() -> Unit)? = null,
+    height: Dp? = null,
 ) {
     val session = LocalArtworkContext.current.currentSession
     if (session == null) {
@@ -788,7 +790,11 @@ internal fun DetailsHero(
     }
     AsyncImage(request, null,
         contentScale = ContentScale.Crop,
-        modifier = modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
+        modifier = modifier
+            .then(
+                if (height == null) Modifier.fillMaxWidth(DetailsHeroWidthFraction).aspectRatio(16f / 9f)
+                else Modifier.height(height).aspectRatio(16f / 9f, matchHeightConstraintsFirst = true),
+            )
             .testTag("details-hero"),
         onSuccess = { onSettled?.invoke() },
         onError = { onSettled?.invoke() })
