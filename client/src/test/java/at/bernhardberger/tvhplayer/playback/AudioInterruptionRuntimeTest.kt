@@ -1680,21 +1680,36 @@ class AudioInterruptionRuntimeTest {
     }
 
     @Test fun failedSwitchAllowsFreshExhaustionAndRetirementReportsForRetainedChannel() = exercise {
+        fun retainedSubscriptions() = subscribedChannels.count { it == 1L }
         for (reason in listOf(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED,
             PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED)) {
             live(timeshift = false)
-            val previousItem = player.currentMediaItem
-            failNextPrepare = true
-            val failed = scope.async {
-                runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+            // The rollback and the recovery open collectors on Dispatchers.Default. Feed whichever
+            // open, so the next live() receives its own collector rather than a stale one.
+            val startup = scope.launch {
+                while (isActive) startSubscription(connection.awaitCollectionRegistered())
             }
-            await { failed.isCompleted }
-            assertFalse(failed.await()?.isStarted == true)
-            assertSame(previousItem, player.currentMediaItem)
-            val count = connection.subscribeCount
-            if (reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED) exhaust()
-            else runtime.onRecoveryRequired(reason)
-            await { connection.subscribeCount == count + 1 }
+            try {
+                val retained = retainedSubscriptions()
+                val previousItem = player.currentMediaItem
+                failNextPrepare = true
+                val failed = scope.async {
+                    runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(2))))
+                }
+                await { failed.isCompleted }
+                assertFalse(failed.await()?.isStarted == true)
+                assertSame(previousItem, player.currentMediaItem)
+                // The restored source re-subscribes the retained channel after the switch returned,
+                // and the switch target may have subscribed first: count the retained channel only.
+                await { retainedSubscriptions() == retained + 1 }
+                val count = retainedSubscriptions()
+                if (reason == PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED) exhaust()
+                else runtime.onRecoveryRequired(reason)
+                await { retainedSubscriptions() == count + 1 }
+                settle()
+            } finally {
+                startup.cancelAndJoin()
+            }
             assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         }
     }
@@ -2481,10 +2496,20 @@ class AudioInterruptionRuntimeTest {
         private val registeredSessions = java.util.concurrent.ConcurrentHashMap.newKeySet<SubscriptionId>()
         private val cleanedSessions = java.util.concurrent.ConcurrentHashMap.newKeySet<SubscriptionId>()
         val pendingSessions: Int get() = registeredSessions.count { it !in cleanedSessions }
+        /** The channel of each subscribe: a failed switch may subscribe its target before rolling back. */
+        val subscribedChannels = java.util.concurrent.ConcurrentLinkedQueue<Long>()
         val manager = createSubscriptionManager(object : SubscriptionConnection by connection {
             override fun events(id: SubscriptionId): Flow<SubscriptionEvent> {
                 registeredSessions += id
                 return connection.events(id)
+            }
+            override suspend fun subscribe(
+                id: SubscriptionId,
+                channelId: SubscriptionChannelId,
+                options: SubscriptionOptions,
+            ): SubscriptionOperationResult<SubscriptionConfirmation> {
+                subscribedChannels += channelId.value
+                return connection.subscribe(id, channelId, options)
             }
             override suspend fun unsubscribe(id: SubscriptionId): SubscriptionOperationResult<Unit> =
                 try { connection.unsubscribe(id) } finally { cleanedSessions += id }
