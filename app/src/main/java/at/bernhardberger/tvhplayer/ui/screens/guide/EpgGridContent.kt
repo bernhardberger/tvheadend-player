@@ -21,9 +21,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
-import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
-import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
-import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
@@ -793,7 +791,7 @@ private val GuideSkeletonTitleFractions = floatArrayOf(0.7f, 0.5f, 0.6f)
 private const val GuideSkeletonTimeFraction = 0.4f
 
 /**
- * The whole Guide while it prepares its first frame: the title where the header stands, the loading
+ * The whole Guide while it prepares its first frame: the header's empty row, the loading
  * headline when shown, and [GuideSkeletonGrid] below, in the real screen's places.
  */
 @Composable
@@ -809,17 +807,12 @@ internal fun GuidePreparationSkeleton(
     rows: GuideRows,
 ) {
     Column(Modifier.fillMaxSize()) {
-        TopLevelBrowseHeader(
-            title = stringResource(R.string.epg_title),
-            modifier = Modifier
-                .padding(
-                    start = startPadding + TvBrowseLeadingInset,
-                    top = contentPadding.calculateTopPadding(),
-                    end = maxOf(endPadding, TvBrowseTrailingInset),
-                )
+        // The header draws no title, so its row stands empty until the real buttons arrive.
+        Spacer(
+            Modifier
+                .padding(top = contentPadding.calculateTopPadding())
                 .heightIn(min = with(LocalDensity.current) {
-                    maxOf(40.dp, MaterialTheme.typography.headlineMedium.lineHeight.toDp(),
-                        MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
+                    maxOf(TvBrowseHeaderHeight, MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
                 }),
         )
         headline?.invoke()

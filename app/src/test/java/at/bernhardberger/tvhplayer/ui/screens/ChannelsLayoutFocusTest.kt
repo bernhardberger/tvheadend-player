@@ -170,7 +170,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(tagsButton)
-        compose.onNode(tagsButton).assertContentDescriptionEquals("Tags")
+        assertTag("All channels")
         pickGroup(group(2), steps = 2)
         fixture.awaitFocus(row(7))
         assertTag("Entertainment")

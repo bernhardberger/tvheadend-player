@@ -6,6 +6,8 @@ package at.bernhardberger.tvhplayer.ui
 import android.app.Application
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -131,8 +133,8 @@ class GuideGenreSurvivesNavigationTest {
         key(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertDoesNotExist()
         compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(sportFilter)
-        // The title names only the destination; the genre lives on its button.
-        compose.onNodeWithText(context.getString(R.string.epg_title)).assertIsDisplayed()
+        // The header is named by its pane title; the genre lives on its button.
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context.getString(R.string.epg_title))).assertExists()
 
         openDestination("nav-epg", Key.DirectionUp, "nav-channels")
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }

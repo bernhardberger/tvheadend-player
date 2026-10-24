@@ -631,10 +631,10 @@ class ChannelsStandardLayoutEvidenceTest {
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun enlargedTextGrowsRowsWithoutOverlap() {
         channelsShell(1.3f)
-        val group = groupButton().bounds()
-        val label = compose.onNode(hasText("All channels") and hasAnyAncestor(hasTestTag("channels-group-button")), useUnmergedTree = true).bounds()
-        assertTrue("group button keeps its whole label", label.left >= group.left && label.right <= group.right)
-        assertTrue("group button stays inside the header", group.top >= header().bounds().top - .5f && group.bottom <= header().bounds().bottom + .5f)
+        val group = tagsButton().bounds()
+        val label = compose.onNode(hasText("All channels") and hasAnyAncestor(hasTestTag("channels-tags-button")), useUnmergedTree = true).bounds()
+        assertTrue("Tags keeps its whole label", label.left >= group.left && label.right <= group.right)
+        assertTrue("Tags stays inside the header", group.top >= header().bounds().top - .5f && group.bottom <= header().bounds().bottom + .5f)
         assertTrue("rows stay below the enlarged header", row(1).bounds().top >= header().bounds().bottom + 8f - 1f)
         enterAndFocus(PLAYING)
 

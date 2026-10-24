@@ -192,7 +192,10 @@ class GuideVisualLayoutTest {
         assertEquals(100f, ruler.bottom, .1f)
         val first = bounds("epg-channel-row-1")
         assertEquals(130f, first.left, .1f)
-        compose.onNodeWithText(context().getString(R.string.all_channels)).assertDoesNotExist()
+        // The header draws no title; Tags names the whole channel set.
+        compose.onNode(hasText(context().getString(R.string.epg_title)) and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("channels-tags-button").assertContentDescriptionEquals(context().getString(
+            R.string.header_button_value_description, context().getString(R.string.browse_tags), context().getString(R.string.all_channels)))
         assertEquals(108f, first.top, .1f)
         assertEquals("Dense rows by default", 56f, first.height, .1f)
         assertEquals(168f, bounds("epg-channel-row-2").top, .1f)
@@ -1207,8 +1210,8 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
         tagFocused("channels-tags-button")
         assertEquals(ChannelTagId(1), model.scope.value.scope.activeTagId)
-        // The title names only the destination; the tag lives on its button.
-        compose.onNodeWithText(context().getString(R.string.epg_title)).assertIsDisplayed()
+        // The header is named by its pane title; the tag lives on its button.
+        guidePaneTitle().assertExists()
         compose.onNodeWithTag("channels-tags-button").assertContentDescriptionEquals(context().getString(
             R.string.header_button_value_description, context().getString(R.string.browse_tags), "Favourites"))
         key(Key.DirectionDown)
@@ -1768,12 +1771,12 @@ class GuideVisualLayoutTest {
         key(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertDoesNotExist()
         tagFocused("guide-filter-button")
-        // The button names the genre after its color dot; the title stays the destination's.
+        // The button names the genre after its color dot; the pane title stays the destination's.
         compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(context().getString(
             R.string.header_button_value_description, context().getString(R.string.guide_filter), "Sport"))
         compose.onNode(hasTestTag("header-button-dot") and hasAnyAncestor(hasTestTag("guide-filter-button")), useUnmergedTree = true)
             .assertIsDisplayed()
-        compose.onNodeWithText(context().getString(R.string.epg_title)).assertIsDisplayed()
+        guidePaneTitle().assertExists()
         assertEquals("The tag stays", null, model.scope.value.scope.activeTagId)
         key(Key.Enter)
         tagFocused("guide-genre-sport")
@@ -2173,6 +2176,9 @@ class GuideVisualLayoutTest {
         assertTrue("Native focused surface must be visible", right >= left && bottom >= top)
         return Rect(left.toFloat(), top.toFloat(), right + 1f, bottom + 1f)
     }
+
+    private fun guidePaneTitle() =
+        compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title)))
 
     private fun capture(name: String, scale: Float, direction: LayoutDirection): Bitmap {
         assertNoPlayback()
