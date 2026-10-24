@@ -37,6 +37,7 @@ class GuideDayNavigationTest {
             TVHeadendPlayerTheme {
                 GuideTimePanel(
                     windowStartSec = bounds.earliestStartSec,
+                    windowEndSec = bounds.earliestStartSec + 3 * 3600L,
                     bounds = bounds,
                     zoneId = zone,
                     nowSecProvider = { openedAtSec },
@@ -62,6 +63,7 @@ class GuideDayNavigationTest {
             TVHeadendPlayerTheme {
                 GuideTimePanel(
                     windowStartSec = bounds.latestStartSec,
+                    windowEndSec = bounds.latestStartSec + 3 * 3600L,
                     bounds = bounds,
                     zoneId = zone,
                     nowSecProvider = { openedAtSec },

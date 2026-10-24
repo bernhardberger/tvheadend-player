@@ -250,7 +250,8 @@ class GuideRealisticSceneTest {
     }
 
     @Test fun sevenHourOvernightEventKeepsFocusInTheVisibleFragment() {
-        showAt("2026-09-15T01:00:00")
+        // At 02:00 the window opens at 00:30, after Harbor Sport Plus's last programme ended at 00:00.
+        showAt("2026-09-15T02:00:00")
         moveToChannel(12)
         val event = eventsByFixtureId.getValue("evt-ch-coastal-miles-20260914T2300")
         seekEvent(event)
@@ -281,7 +282,8 @@ class GuideRealisticSceneTest {
     }
 
     @Test fun onlyTheInnerEdgesFadeWhileTheOuterEdgesCutAtFullStrength() {
-        showAt("2026-09-15T19:40:00")
+        // The window around 20:00 runs 18:30 to 21:30, so hourly rows cross both of its edges.
+        showAt("2026-09-15T20:00:00")
         moveToChannel(14)
         val viewport = compose.onNodeWithTag("epg-timeline-content").fetchSemanticsNode().boundsInRoot
         fun rowBounds(channel: Long) = compose.onAllNodesWithTag("epg-channel-row-$channel")
@@ -289,18 +291,23 @@ class GuideRealisticSceneTest {
         fun cells(channel: Long) = compose.onAllNodes(isFocusable() and hasAnyAncestor(hasTestTag("epg-channel-row-$channel")))
             .fetchSemanticsNodes().map { it.boundsInRoot }
         val rows = channels.mapNotNull { channel -> rowBounds(channel.id.value)?.let { channel.id.value to it } }
-        val focusedRow = checkNotNull(rowBounds(14))
-        val rowCells = cells(14)
+        // The row above the focus: the focused programme on air keeps its ring off the edges.
+        val measuredRow = checkNotNull(rowBounds(13))
+        val rowCells = cells(13)
         val bitmap = snapshot()
         fun hex(x: Float, y: Float) = Integer.toHexString(bitmap.getPixel(x.toInt(), y.toInt()))
-        val y = focusedRow.top + 4f
+        val y = measuredRow.top + 4f
         // Later edge: the last cell reaches the screen edge and is drawn at full strength up to it.
         val last = rowCells.maxBy { it.right }
         assertTrue("The last cell reaches the outer edge", last.right > viewport.right - 4f && last.width > 60f)
-        assertEquals("No later fade: the outer end of the cell is as strong as its inside",
-            hex(last.left + 30f, y), hex(last.right - 4f, y))
+        // The fill over the backdrop varies by one level; a fade would move it by several.
+        val lastInside = bitmap.getPixel((last.left + 30f).toInt(), y.toInt())
+        val lastEdge = bitmap.getPixel((last.right - 4f).toInt(), y.toInt())
+        assertTrue("No later fade: the outer end of the cell is as strong as its inside: ${hex(last.left + 30f, y)} ${hex(last.right - 4f, y)}",
+            listOf(android.graphics.Color::red, android.graphics.Color::green, android.graphics.Color::blue)
+                .all { kotlin.math.abs(it(lastInside) - it(lastEdge)) <= 1 })
         // Earlier edge: the first cell fades in from the channel column.
-        val trackLeft = compose.onNodeWithTag("epg-channel-header-14").fetchSemanticsNode().boundsInRoot.right + 8f
+        val trackLeft = compose.onNodeWithTag("epg-channel-header-13").fetchSemanticsNode().boundsInRoot.right + 8f
         assertTrue("A cell spans the earlier fade", rowCells.any { it.left < trackLeft + 4f && it.right > trackLeft + 60f })
         assertNotEquals("The earlier fade is still there", hex(trackLeft + 44f, y), hex(trackLeft + 4f, y))
         // Below: the row cut by the viewport's bottom edge shows its fill unfaded. Above: the row cut by the
@@ -541,8 +548,8 @@ class GuideRealisticSceneTest {
     }
 
     @Test fun u5RecordingNowAndScheduledMarksShowBesideTheirTitles() {
-        showAt("2026-09-15T19:40:00")
-        // Without the headline the grid shows Northline Tonight (recording now) and Amber Stage (scheduled twice) together.
+        showAt("2026-09-15T20:00:00")
+        // Without the headline the window around 20:00 shows Northline Tonight (recording) and Amber Stage (scheduled twice) together.
         runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
         compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
         moveToChannel(9)

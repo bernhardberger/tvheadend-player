@@ -59,6 +59,7 @@ import at.bernhardberger.tvhplayer.ui.components.UnavailableTagNotice
 import at.bernhardberger.tvhplayer.ui.components.rememberTabListState
 import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
+import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 import at.bernhardberger.tvhplayer.ui.screens.guideTimelineContentPadding
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 
@@ -172,10 +173,24 @@ internal fun GuideTimelineBody(
         Spacer(Modifier.height(TvSpacing8))
     }
 
-    if (channels.isEmpty()) {
+    val isEmptyTag = channelScope.activeTagId != null
+    if (channels.isEmpty() && frame.alert == null && guideEmptyMessageRes(
+            isEmptyTag, connectionUiState, channelScopeState.channelCatalogCurrent,
+        ) == R.string.epg_loading
+    ) {
+        // Plain loading shows the grid's shape rather than a message.
+        GuideSkeletonGrid(
+            windowStartSec = renderedWindowStartSec,
+            windowEndSec = windowEndSec,
+            nowSecProvider = nowSecProvider,
+            contentPadding = timelineContentPadding,
+            rows = rows,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
+    } else if (channels.isEmpty()) {
         GuideEmptyState(
             alert = frame.alert,
-            isEmptyTag = channelScope.activeTagId != null,
+            isEmptyTag = isEmptyTag,
             connectionUiState = connectionUiState,
             channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
             onAction = { action ->
@@ -207,13 +222,14 @@ internal fun GuideTimelineBody(
         val trackLeftPx = if (layoutDirection == LayoutDirection.Ltr) {
             with(density) { (startPadding + TvBrowseLeadingInset + guideChannelWidth(rows) + GuideChannelGap).toPx() }
         } else terminalReservePx
+        // Now draws outside the faded layer, so it stays solid under the top and inner fades.
         Box(Modifier.weight(1f).fillMaxWidth()
+            .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
+                MaterialTheme.colorScheme.primary)
             .guideViewportFades(trackLeftPx, trackWidthPx,
                 guideInnerContinuation(frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl),
                 layoutDirection == LayoutDirection.Rtl,
                 above = { channelListState.canScrollBackward })
-            .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
-                MaterialTheme.colorScheme.primary)
             .testTag("epg-timeline-content")) {
         // A frame shows its pictures with the session of the observation it was built from, and
         // its rows' saved logos with the observation their scope was resolved from.

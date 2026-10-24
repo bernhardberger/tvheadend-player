@@ -156,7 +156,7 @@
     <string name="guide_view_rows">Zeilen</string>
     <string name="guide_view_rows_dense">Kompakt</string>
     <string name="guide_view_rows_regular">Normal</string>
-    <string name="guide_view_headline">Kopfzeile anzeigen</string>
+    <string name="guide_view_headline">Sendungsinfo anzeigen</string>
     <string name="guide_view_genre_colors">Genrefarben</string>
     <string name="guide_filter">Filter</string>
     <string name="guide_filter_title">Nach Genre filtern</string>
@@ -261,7 +261,6 @@
     <string name="programme_category_society_politics">Gesellschaft &amp; Politik</string>
     <string name="programme_category_education_factual">Bildung &amp; Wissen</string>
     <string name="programme_category_lifestyle_leisure">Lifestyle &amp; Freizeit</string>
-    <string name="epg_channels_heading">Sender</string>
     <string name="epg_schedule">Programmübersicht</string>
     <string name="epg_loading">Programm wird geladen…</string>
     <string name="epg_jump">Zu Datum und Zeit</string>

@@ -58,6 +58,9 @@ internal fun guideVisibleWindowSec(trackWidthPx: Float, timeLabelWidthPx: Int, d
     return hours * 3600L
 }
 
+/** How much of the programme on air must be readable for it to keep the window around now. */
+private const val GuideOnAirReadableSec = 1800L
+
 /** Move the existing time window, not the cells, to keep a focused cell clear of the insets. */
 internal fun guideFocusWindowStart(
     eventStartSec: Long,
@@ -69,6 +72,7 @@ internal fun guideFocusWindowStart(
     rightInsetPx: Float,
     earliestWindowSec: Long,
     latestWindowSec: Long,
+    nowSec: Long? = null,
 ): Long {
     if (trackWidthPx <= leftInsetPx + rightInsetPx) return windowStartSec
     val secondsPerPixel = windowDurationSec.toDouble() / trackWidthPx
@@ -78,6 +82,13 @@ internal fun guideFocusWindowStart(
     // Its visible fragment is clipped to that viewport, never stretched or overlapped.
     if (eventEndSec - eventStartSec > rightLimit - leftReserve &&
         eventStartSec < windowStartSec + rightLimit && eventEndSec > windowStartSec + leftReserve
+    ) return windowStartSec
+    // The programme on air keeps a window that shows now with half an hour of it readable, so
+    // now stays where Now put it; its cell is clipped as a long one is.
+    if (nowSec != null && nowSec in eventStartSec until eventEndSec &&
+        nowSec in windowStartSec + leftReserve until windowStartSec + rightLimit &&
+        minOf(eventEndSec, windowStartSec + rightLimit) - maxOf(eventStartSec, windowStartSec + leftReserve) >=
+        GuideOnAirReadableSec
     ) return windowStartSec
     return when {
         eventStartSec < windowStartSec + leftReserve -> eventStartSec - leftReserve

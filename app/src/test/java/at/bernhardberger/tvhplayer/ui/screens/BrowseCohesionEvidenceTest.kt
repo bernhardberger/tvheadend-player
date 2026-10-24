@@ -282,7 +282,7 @@ class BrowseCohesionEvidenceTest {
         val art = compose.onNodeWithTag("channels-immersive-art", useUnmergedTree = true).getUnclippedBoundsInRoot()
         val headline = compose.onNodeWithTag("guide-headline", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals(0f, art.top.value, .5f)
-        assertEquals(48f, (art.bottom - headline.bottom).value, .5f)
+        assertEquals(116f, (art.bottom - headline.bottom).value, .5f)
         assertEquals(16f / 9f, (art.right - art.left) / (art.bottom - art.top), .01f)
         key(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()

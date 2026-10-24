@@ -158,7 +158,7 @@
     <string name="guide_view_rows">Rows</string>
     <string name="guide_view_rows_dense">Dense</string>
     <string name="guide_view_rows_regular">Regular</string>
-    <string name="guide_view_headline">Show headline</string>
+    <string name="guide_view_headline">Show program info</string>
     <string name="guide_view_genre_colors">Genre colors</string>
     <string name="guide_filter">Filter</string>
     <string name="guide_filter_title">Filter by genre</string>
@@ -375,7 +375,6 @@
     <string name="programme_category_society_politics">Society &amp; Politics</string>
     <string name="programme_category_education_factual">Education &amp; Factual</string>
     <string name="programme_category_lifestyle_leisure">Lifestyle &amp; Leisure</string>
-    <string name="epg_channels_heading">Channels</string>
     <string name="epg_schedule">Schedule</string>
     <string name="epg_loading">Loading guide…</string>
     <string name="epg_jump">Jump to time</string>

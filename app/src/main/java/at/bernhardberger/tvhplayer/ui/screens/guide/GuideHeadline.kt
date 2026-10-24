@@ -10,6 +10,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
@@ -43,7 +44,6 @@ import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
-import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
@@ -51,7 +51,6 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
-import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineSynopsisGap
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge
@@ -62,7 +61,6 @@ import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsDetailCrossfadeMillis
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsImmersiveBackground
 import at.bernhardberger.tvhplayer.ui.screens.ImmersiveHeroWidth
-import at.bernhardberger.tvhplayer.ui.screens.channelsProgrammeSynopsis
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -156,7 +154,7 @@ internal fun GuideHeadlineBackground(
             endInset = endInset,
             modifier = modifier,
             picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.image },
-            pictureHeight = logoTop + guideHeadlineHeight() + GuideHeadlinePictureReach,
+            pictureHeight = logoTop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
         )
     }
 }
@@ -165,10 +163,9 @@ internal fun GuideHeadlineBackground(
 private val GuideHeadlineTitleStyle @Composable get() = MaterialTheme.typography.headlineSmall
 
 /**
- * Room for the eyebrow, a one-line title, the facts, the time and one synopsis line, as the
- * Channels hero computes it with the Guide's smaller synopsis, so about four and a half rows stay
- * below. A second title line or a subtitle takes the synopsis's place: HeadlineColumn gives way
- * inside it, the grid stays.
+ * Room for the eyebrow, a one-line title, the facts and the time, as the Channels hero computes
+ * it without a synopsis, so about five rows stay below. A second title line or a subtitle has no
+ * room of its own: HeadlineColumn gives way inside it, the grid stays.
  */
 @Composable
 private fun guideHeadlineHeight(): Dp {
@@ -176,16 +173,19 @@ private fun guideHeadlineHeight(): Dp {
     return with(LocalDensity.current) {
         maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + 8.dp +
             GuideHeadlineTitleStyle.lineHeight.toDp() + ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight +
-            ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineSynopsisGap +
-            typography.bodyMedium.lineHeight.toDp()
+            ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp()
     }
 }
 
+/** The room between the headline and the time ruler below it. */
+private val GuideHeadlineRulerGap = 12.dp
+
 /**
- * How far the headline's picture reaches below the headline: over the gap and the time ruler and a
- * little into the first row, so it fills the space above the grid without covering the grid.
+ * How far the headline's picture reaches below the headline and its gap: over the time ruler and
+ * the first row, about 300dp tall at the default font. Its scrim clears it above the ruler, so it
+ * fills the space above the grid without covering the grid.
  */
-private val GuideHeadlinePictureReach = 48.dp
+private val GuideHeadlinePictureReach = 104.dp
 
 /**
  * The Guide's headline: who and what the settled [programme] is ([rememberSettledGuideHeadline]),
@@ -219,7 +219,7 @@ internal fun GuideHeadline(
             },
             contentAlignment = Alignment.BottomStart,
             contentKey = { it?.event?.id },
-            modifier = modifier.height(height).widthIn(max = ImmersiveHeroWidth)
+            modifier = modifier.padding(bottom = GuideHeadlineRulerGap).height(height).widthIn(max = ImmersiveHeroWidth)
                 .semantics(mergeDescendants = true) {}.testTag("guide-headline"),
             label = "guideHeadline",
         ) { shownProgramme ->
@@ -280,20 +280,16 @@ private fun GuideHeadlineContent(
         },
         title = event?.title?.takeIf(String::isNotBlank) ?: stringResource(R.string.no_epg),
         tagPrefix = "guide-headline",
-        synopsisLines = 1,
+        synopsisLines = 0,
         modifier = modifier,
         subtitle = event?.subtitle,
         facts = metadata,
         rating = event?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = event?.let { guideHeadlineTiming(it, now) },
         progress = event?.takeIf { it.isRunning(now) }?.progress(now),
-        synopsis = event?.let(::channelsProgrammeSynopsis),
-        fitSynopsis = true,
+        // No synopsis: in the Guide the grid below carries the weight.
         loading = event == null && loading,
         titleStyle = titleStyle,
-        // A step quieter than Channels: in the Guide the grid below carries the weight.
-        synopsisStyle = MaterialTheme.typography.bodyMedium,
-        synopsisColor = TvTextColors.tertiary,
     )
 }
 

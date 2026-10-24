@@ -63,6 +63,7 @@ import java.time.temporal.ChronoUnit
 @Composable
 internal fun GuideTimePanel(
     windowStartSec: Long,
+    windowEndSec: Long,
     bounds: GuideWindowBounds,
     zoneId: ZoneId,
     nowSecProvider: () -> Long,
@@ -77,7 +78,10 @@ internal fun GuideTimePanel(
     val openedSec = remember { nowSecProvider() / 60 * 60 }
     val panelBounds = remember { bounds }
     val today = Instant.ofEpochSecond(openedSec).atZone(zoneId).toLocalDate()
-    val windowDay = Instant.ofEpochSecond(windowStartSec).atZone(zoneId).toLocalDate()
+    // The time the date button names: now while the window shows it, else the window's start.
+    val nowShown = openedSec >= windowStartSec && openedSec < windowEndSec
+    val shownSec = if (nowShown) openedSec else windowStartSec
+    val windowDay = Instant.ofEpochSecond(shownSec).atZone(zoneId).toLocalDate()
     val firstDay = Instant.ofEpochSecond(panelBounds.earliestStartSec).atZone(zoneId).toLocalDate()
     val lastDay = Instant.ofEpochSecond(panelBounds.latestStartSec).atZone(zoneId).toLocalDate()
     val days = generateSequence(firstDay) { it.plusDays(1) }.takeWhile { !it.isAfter(lastDay) }.toList()
@@ -88,11 +92,11 @@ internal fun GuideTimePanel(
     var timesDay by remember { mutableStateOf(windowDay) }
     var nowFocused by remember { mutableStateOf(false) }
     var inTimes by remember { mutableStateOf(false) }
-    val presets = guideTimePresets(timesDay, windowStartSec, openedSec, panelBounds, zoneId)
+    val presets = guideTimePresets(timesDay, shownSec, openedSec, panelBounds, zoneId, nowShown)
 
     fun enterTimes() {
-        val entered = guideTimePresets(timesDay, windowStartSec, openedSec, panelBounds, zoneId)
-        val index = guideTimePresetEntry(entered, windowStartSec, zoneId) ?: return
+        val entered = guideTimePresets(timesDay, shownSec, openedSec, panelBounds, zoneId, nowShown)
+        val index = guideTimePresetEntry(entered, shownSec, zoneId) ?: return
         runCatching { presetFocus.getValue(entered[index].period).requestFocus() }
     }
     fun backToDay() {
@@ -123,7 +127,7 @@ internal fun GuideTimePanel(
                 onClick = {
                     if (day == windowDay) onClose() else {
                         val delta = ChronoUnit.DAYS.between(windowDay, day).toInt()
-                        onJump(floorGuideWindowToHour(moveGuideWindowByDays(windowStartSec, delta, panelBounds, zoneId), zoneId))
+                        onJump(floorGuideWindowToHour(moveGuideWindowByDays(shownSec, delta, panelBounds, zoneId), zoneId))
                     }
                 },
                 modifier = Modifier.focusRequester(dayFocus.getValue(day))
@@ -222,7 +226,8 @@ internal data class GuideTimePreset(
 /**
  * The periods of [day]: a period whose whole span has ended by [nowSec], or that starts after the
  * last window start, is disabled; one still running before the earliest bound stays enabled, its
- * jump constrained. A period is checked only when the window starts exactly at it.
+ * jump constrained. A period is checked only when the window starts exactly at it, or, while the
+ * window shows now ([nowShown], [windowStartSec] then being now), when it holds now.
  */
 internal fun guideTimePresets(
     day: LocalDate,
@@ -230,6 +235,7 @@ internal fun guideTimePresets(
     nowSec: Long,
     bounds: GuideWindowBounds,
     zoneId: ZoneId,
+    nowShown: Boolean = false,
 ): List<GuideTimePreset> {
     val starts = GuideTimePeriod.entries.map { ZonedDateTime.ofLocal(day.atTime(it.hour, 0), zoneId, null).toEpochSecond() }
     val ends = starts.drop(1) + day.plusDays(1).atStartOfDay(zoneId).toEpochSecond()
@@ -238,7 +244,7 @@ internal fun guideTimePresets(
             period = period,
             startSec = starts[index],
             enabled = ends[index] > nowSec && starts[index] <= bounds.latestStartSec,
-            checked = windowStartSec == starts[index],
+            checked = windowStartSec == starts[index] || nowShown && windowStartSec >= starts[index] && windowStartSec < ends[index],
         )
     }
 }

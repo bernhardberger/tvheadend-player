@@ -102,6 +102,7 @@ import at.bernhardberger.tvhplayer.core.firstUnsettledGuidePageIndex
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
 import at.bernhardberger.tvhplayer.core.guideChannelPageCoverageSettled
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
+import at.bernhardberger.tvhplayer.core.guideNowWindowStart
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
 import at.bernhardberger.tvhplayer.core.guideWindowBounds
 import at.bernhardberger.tvhplayer.core.guideDisplayEvents
@@ -134,6 +135,7 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineProgramme
 import at.bernhardberger.tvhplayer.ui.screens.guide.rememberSettledGuideHeadline
@@ -213,6 +215,8 @@ private data class WindowFocusRequest(
     val throughSec: Long,
     val programmeId: EventId? = null,
     val programmeStartSec: Long? = null,
+    /** Now and Back-to-now: the programme on air is anchored at now, as on entry. */
+    val atNow: Boolean = false,
 )
 
 private data class GuideSearchRequest(
@@ -381,7 +385,7 @@ fun EpgGridScreen(
     var windowStartSec by remember {
         mutableLongStateOf(
             restoredTimelinePosition?.windowStartSec?.takeIf { playerReturnChannelId == null }
-                ?: floorGuideWindowToHour(openedAtSec, guideZoneId)
+                ?: guideNowWindowStart(openedAtSec, windowBounds, guideZoneId)
         )
     }
     val windowEndSec = windowStartSec + visibleWindowSec
@@ -589,7 +593,7 @@ fun EpgGridScreen(
     fun focusWindowFor(event: EpgEventEntry): Long = guideFocusWindowStart(
         event.start.epochSeconds, event.stop.epochSeconds, windowStartSec, visibleWindowSec,
         focusTrackWidthPx, with(density) { focusStartInset.toPx() }, with(density) { focusEndInset.toPx() },
-        windowBounds.earliestStartSec, windowBounds.latestStartSec,
+        windowBounds.earliestStartSec, windowBounds.latestStartSec, nowSecProvider(),
     )
     fun channelPageRange(channelIndex: Int): IntRange {
         if (channels.isEmpty()) return 0 until 0
@@ -788,6 +792,15 @@ fun EpgGridScreen(
         focusAnchor = null
     }
 
+    /** Entry and Now land on the programme on air anchored at now, so Up and Down keep now; others start a new anchor. */
+    fun selectAtNow(target: EpgFocusTarget?) {
+        val nowSec = nowSecProvider()
+        val event = target?.let { focusRows.getOrNull(it.channelIndex)?.events?.firstOrNull { e -> e.id == it.eventId } }
+        if (target != null && event != null && nowSec in windowStartSec until windowEndSec &&
+            nowSec in event.start.epochSeconds until event.stop.epochSeconds
+        ) selectAnchored(target, nowSec) else selectUnanchored(target)
+    }
+
     fun requestChannelFocus(
         current: EpgFocusTarget,
         preferredChannelIndex: Int,
@@ -831,8 +844,11 @@ fun EpgGridScreen(
             return@LaunchedEffect
         }
         if (playerReturnChannelId != null) {
-            val nowWindow = windowBounds.constrain(floorGuideWindowToHour(
-                requestedProgramme?.start?.epochSeconds ?: nowSecProvider(), guideZoneId))
+            val nowSec = nowSecProvider()
+            // A programme played from its start shows from its hour; one on air, as live, opens just before now.
+            val nowWindow = requestedProgramme?.takeUnless { nowSec in it.start.epochSeconds until it.stop.epochSeconds }
+                ?.let { windowBounds.constrain(floorGuideWindowToHour(it.start.epochSeconds, guideZoneId)) }
+                ?: guideNowWindowStart(nowSec, windowBounds, guideZoneId)
             // Re-enters once the index for the current-hour window is prepared.
             if (windowStartSec != nowWindow) {
                 windowStartSec = nowWindow
@@ -864,7 +880,7 @@ fun EpgGridScreen(
         pendingInitialChannelIndex = targetChannelIndex
         requestVisibleWindow(windowStartSec, targetChannelIndex)
         if (target != null) {
-            selectUnanchored(target)
+            selectAtNow(target)
             channelListState.scrollToItem(
                 restored?.firstVisibleColumn?.coerceIn(channels.indices)
                     ?: (targetChannelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
@@ -925,15 +941,17 @@ fun EpgGridScreen(
                 acquisitionPending = false,
             ) as? GuideCoverageFocusResolution.Select)?.target
         } else {
+            // A first focus, as rows arrive after entry, takes the programme on air while the window shows now.
+            val nowSec = nowSecProvider()
             reconcileTimelineEpgFocus(
                 rows = focusRows,
                 current = current,
                 preferredChannelIndex = preferredIndex,
-                targetSec = windowStartSec,
+                targetSec = if (current == null && nowSec in windowStartSec until windowEndSec) nowSec else windowStartSec,
             )
         }
         if (replacement == current) return@LaunchedEffect
-        selectUnanchored(replacement)
+        if (current == null) selectAtNow(replacement) else selectUnanchored(replacement)
         if (replacement != null) {
             channelRecoveryPage = null
             pendingInitialChannelIndex = replacement.channelIndex
@@ -1292,10 +1310,11 @@ fun EpgGridScreen(
             GuideCoverageFocusResolution.Release -> Unit
             is GuideCoverageFocusResolution.Select -> {
                 pendingInitialChannelIndex = resolution.target.channelIndex
-                selectUnanchored(request.programmeId?.let { id ->
+                val target = request.programmeId?.let { id ->
                     initialTimelineEpgFocus(focusRows, resolution.target.channelIndex,
                         request.programmeStartSec ?: request.windowStartSec, id)
-                } ?: resolution.target)
+                } ?: resolution.target
+                if (request.atNow) selectAtNow(target) else selectUnanchored(target)
                 channelListState.scrollToItem((resolution.target.channelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE)
             }
         }
@@ -1356,6 +1375,7 @@ fun EpgGridScreen(
         channelId: ChannelId? = null,
         programme: EpgEventEntry? = null,
         focusSec: Long? = null,
+        atNow: Boolean = false,
     ) {
         val channelIndex = channelId?.let { id -> channels.indexOfFirst { it.id == id }.takeIf { it >= 0 } }
             ?: selectedTarget?.channelIndex
@@ -1376,7 +1396,20 @@ fun EpgGridScreen(
             throughSec = boundedTargetSec + visibleWindowSec,
             programmeId = programme?.id,
             programmeStartSec = programme?.start?.epochSeconds ?: focusSec,
+            atNow = atNow,
         )
+    }
+
+    /** Now in the day and time panel and Back-to-now: the window opens just before now, on the programme on air there. */
+    fun jumpToNow(channelId: ChannelId?) {
+        val nowSec = nowSecProvider()
+        val onNow = channelId?.let { id ->
+            displayEvents.firstOrNull {
+                it.channelId == id && it.start.epochSeconds <= nowSec && it.stop.epochSeconds > nowSec
+            }
+        }
+        jumpToWindow(guideNowWindowStart(nowSec, windowBounds, guideZoneId), channelId, onNow,
+            focusSec = nowSec, atNow = true)
     }
 
     /**
@@ -1398,11 +1431,7 @@ fun EpgGridScreen(
         val nowSec = nowSecProvider()
         val channelId = selectedTarget?.channelIndex?.let(channels::getOrNull)?.id
         if (nowSec in windowStartSec until windowEndSec || channelId == null) return false
-        val nowWindowSec = windowBounds.constrain(floorGuideWindowToHour(nowSec, guideZoneId))
-        val onNow = displayEvents.firstOrNull {
-            it.channelId == channelId && it.start.epochSeconds <= nowSec && it.stop.epochSeconds > nowSec
-        }
-        jumpToWindow(nowWindowSec, channelId, onNow, focusSec = nowSec)
+        jumpToNow(channelId)
         return true
     }
 
@@ -1647,10 +1676,10 @@ fun EpgGridScreen(
         openPanel = null
     }
 
-    /** Closes the day and time panel, jumping first when [jumpToSec] is given, and returns focus to the date button. */
-    fun closeTimePanel(jumpToSec: Long? = null) {
+    /** Closes the day and time panel, making its [jump] first, and returns focus to the date button. */
+    fun closeTimePanel(jump: () -> Unit = {}) {
         showTimePanel = false
-        jumpToSec?.let { jumpToWindow(it) }
+        jump()
         releaseProgrammeFocus()
         runCatching { guideDateFocus.requestFocus() }
     }
@@ -1677,6 +1706,30 @@ fun EpgGridScreen(
                 }
             },
             handoffKey = Triple(channelScopeState, selectedTarget, indexCurrent),
+            skeleton = {
+                GuidePreparationSkeleton(
+                    windowStartSec = windowStartSec,
+                    windowEndSec = windowEndSec,
+                    nowSecProvider = nowSecProvider,
+                    headline = if (view.headline && channels.isNotEmpty()) {
+                        {
+                            GuideHeadline(
+                                programme = { null },
+                                observation = observation,
+                                scopeObservation = channelScopeState.observation,
+                                loading = true,
+                                nowSec = nowSecProvider,
+                                modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
+                            )
+                        }
+                    } else null,
+                    contentPadding = contentPadding,
+                    timelineContentPadding = guideTimelineContentPadding(contentPadding, layoutDirection, terminalReserve),
+                    startPadding = startPadding,
+                    endPadding = endPadding,
+                    rows = view.rows,
+                )
+            },
         )
         if (preparedIndex == null) return@content
         // Keep rendering in separate generated methods. As one body this lambda needed
@@ -1771,6 +1824,7 @@ fun EpgGridScreen(
                 genre = genre.takeIf { it != ProgrammeCategory.ALL }?.let { programmeCategoryLabel(it) },
                 genreDot = if (view.genreColors) tvGenreColors(genre)?.base else null,
                 windowStartSec = windowStartSec,
+                windowEndSec = windowEndSec,
                 nowSecProvider = nowSecProvider,
                 focus = header,
                 dateFocus = guideDateFocus,
@@ -2003,12 +2057,13 @@ fun EpgGridScreen(
         if (showTimePanel) {
             GuideTimePanel(
                 windowStartSec = windowStartSec,
+                windowEndSec = windowEndSec,
                 bounds = windowBounds,
                 zoneId = guideZoneId,
                 nowSecProvider = nowSecProvider,
                 // A day, a time and Now each jump and close the panel.
-                onJump = { closeTimePanel(it) },
-                onNow = { closeTimePanel(floorGuideWindowToHour(nowSecProvider(), guideZoneId)) },
+                onJump = { closeTimePanel { jumpToWindow(it) } },
+                onNow = { closeTimePanel { jumpToNow(selectedTarget?.channelIndex?.let(channels::getOrNull)?.id) } },
                 onClose = { closeTimePanel() },
             )
         }

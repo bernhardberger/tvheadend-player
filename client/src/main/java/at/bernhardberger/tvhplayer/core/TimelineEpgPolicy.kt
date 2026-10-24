@@ -67,6 +67,18 @@ fun floorGuideWindowToHour(epochSec: Long, zoneId: ZoneId): Long =
         .withNano(0)
         .toEpochSecond()
 
+/**
+ * The window start that opens on [nowSec]: half an hour earlier, down to the half hour, so the
+ * programme on air starts in view while the rest of the window shows what comes next. The server
+ * drops programmes once they end, so a window further back would mostly be empty.
+ */
+fun guideNowWindowStart(nowSec: Long, bounds: GuideWindowBounds, zoneId: ZoneId): Long {
+    val start = JavaInstant.ofEpochSecond(nowSec - GuideNowLeadSec).atZone(zoneId)
+    return bounds.constrain(start.withMinute(start.minute / 30 * 30).withSecond(0).withNano(0).toEpochSecond())
+}
+
+private const val GuideNowLeadSec = 30 * 60L
+
 fun shouldWaitForGuideCoverage(
     connectionReady: Boolean,
     hasCurrentSnapshot: Boolean,

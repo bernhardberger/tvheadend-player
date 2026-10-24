@@ -7,6 +7,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
@@ -18,6 +19,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
+import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
+import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -31,6 +39,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +66,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -108,7 +118,6 @@ import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
@@ -144,7 +153,7 @@ internal fun guideTimelineRowHeight(rows: GuideRows = GuideRows.DENSE): Dp = wit
     maxOf(
         (if (dense) 56.dp else 64.dp) * fontScale,
         headerContent,
-        titleLine + MaterialTheme.typography.bodySmall.lineHeight.toDp() + if (dense) 20.dp else TvSpacing24,
+        titleLine + MaterialTheme.typography.labelSmall.lineHeight.toDp() + if (dense) 20.dp else TvSpacing24,
     )
 }
 
@@ -163,29 +172,12 @@ internal fun TimelineTimeRuler(
         modifier = modifier
             .fillMaxWidth()
             .height(with(LocalDensity.current) {
-                maxOf(28.dp, MaterialTheme.typography.labelMedium.lineHeight.toDp() + 12.dp)
+                maxOf(28.dp, MaterialTheme.typography.labelSmall.lineHeight.toDp() + 12.dp)
             }),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Surface(
-            modifier = Modifier
-                .width(guideChannelWidth(rows))
-                .fillMaxHeight(),
-            shape = MaterialTheme.shapes.small,
-            colors = SurfaceDefaults.colors(
-                containerColor = Color.Transparent,
-                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            ),
-        ) {
-            Box(contentAlignment = Alignment.CenterStart) {
-                Text(
-                    text = stringResource(R.string.epg_channels_heading),
-                    style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = rows.headerHorizontalPadding()),
-                )
-            }
-        }
-        Spacer(Modifier.width(GuideChannelGap))
+        // The channel column needs no heading: the space only aligns the ruler with the track.
+        Spacer(Modifier.width(guideChannelWidth(rows) + GuideChannelGap))
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
@@ -201,33 +193,27 @@ internal fun TimelineTimeRuler(
             val nowClock = if (nowSec in windowStartSec until windowEndSec) formatClock(nowSec) else null
             val boundaryColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
             val nowColor = MaterialTheme.colorScheme.primary
-            // Each half hour is a boundary line and its label; Now adds a stem and the clock pill last.
+            val pillStyle = MaterialTheme.typography.labelSmall
+            val textMeasurer = rememberTextMeasurer()
+            val nowX = guideTimePositionPx(nowSec, windowStartSec, windowEndSec, constraints.maxWidth.toFloat()).roundToInt()
+            // Where the pill will stand, known before layout, so the faded labels it touches can stay out.
+            val pillSpan = nowClock?.let { clock ->
+                val pillWidth = textMeasurer.measure(clock, pillStyle, maxLines = 1).size.width +
+                    with(density) { (RulerPillPadding * 2).roundToPx() }
+                val left = (nowX - pillWidth / 2).coerceIn(0, (constraints.maxWidth - pillWidth).coerceAtLeast(0))
+                left until left + pillWidth
+            }
+            // Each half hour is a boundary line and its label.
             Layout(
                 content = {
                     ticks.forEach { tick ->
                         Box(Modifier.background(boundaryColor).testTag("epg-ruler-boundary-$tick"))
                         Text(
                             text = formatHm(tick),
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(start = 6.dp, end = 6.dp),
                         )
-                    }
-                    if (nowClock != null) {
-                        Box(Modifier.background(nowColor))
-                        Box(
-                            Modifier
-                                .background(nowColor, CircleShape)
-                                .padding(horizontal = 6.dp, vertical = 1.dp)
-                                .testTag("epg-now-pill"),
-                        ) {
-                            Text(
-                                text = nowClock,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary,
-                                maxLines = 1,
-                            )
-                        }
                     }
                 },
                 modifier = Modifier.fillMaxSize().guideViewportFades(
@@ -238,24 +224,51 @@ internal fun TimelineTimeRuler(
                 val height = constraints.maxHeight
                 val lines = ticks.indices.map { measurables[2 * it].measure(Constraints.fixed(1.dp.roundToPx(), height)) }
                 val labels = ticks.indices.map { measurables[2 * it + 1].measure(Constraints(maxHeight = height)) }
-                val stem = measurables.getOrNull(2 * ticks.size)?.measure(Constraints.fixed(2.dp.roundToPx(), height))
-                val pill = measurables.getOrNull(2 * ticks.size + 1)?.measure(Constraints(maxWidth = width, maxHeight = height))
-                val nowX = guideTimePositionPx(nowSec, windowStartSec, windowEndSec, width.toFloat()).roundToInt()
-                val pillLeft = pill?.let { (nowX - it.width / 2).coerceIn(0, (width - it.width).coerceAtLeast(0)) } ?: 0
                 // Physical placement: chronology runs left to right in both layout directions.
                 layout(width, height) {
                     ticks.forEachIndexed { index, tick ->
                         val x = guideTimePositionPx(tick, windowStartSec, windowEndSec, width.toFloat()).roundToInt()
                         lines[index].place(x, 0)
-                        // The label starts at its half-hour's boundary line and shares the heading's
-                        // centre line. One the pill would touch stays out rather than half covered.
+                        // The label starts at its half-hour's boundary line. One the pill would touch
+                        // stays out rather than half covered.
                         val label = labels[index]
-                        if (pill == null || x >= pillLeft + pill.width || x + label.width <= pillLeft) {
+                        if (pillSpan == null || x > pillSpan.last || x + label.width <= pillSpan.first) {
                             label.place(x, (height - label.height) / 2)
                         }
                     }
-                    stem?.place(nowX - stem.width / 2, 0)
-                    pill?.place(pillLeft, (height - pill.height) / 2)
+                }
+            }
+            // Now stays solid over the inner fade: its pill sits a little above the labels and its
+            // line starts at the pill's bottom edge, continuing into the grid.
+            if (nowClock != null && pillSpan != null) {
+                Layout(
+                    content = {
+                        Box(Modifier.background(nowColor).testTag("epg-now-stem"))
+                        Box(
+                            Modifier
+                                .testTag("epg-now-pill")
+                                .background(nowColor, CircleShape)
+                                .padding(horizontal = RulerPillPadding, vertical = 1.dp),
+                        ) {
+                            Text(
+                                text = nowClock,
+                                style = pillStyle,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                maxLines = 1,
+                            )
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize(),
+                ) { measurables, constraints ->
+                    val height = constraints.maxHeight
+                    val pill = measurables[1].measure(Constraints(maxWidth = constraints.maxWidth, maxHeight = height))
+                    val pillTop = ((height - pill.height) / 2 - RulerPillLift.roundToPx()).coerceAtLeast(0)
+                    val stemTop = pillTop + pill.height
+                    val stem = measurables[0].measure(Constraints.fixed(2.dp.roundToPx(), (height - stemTop).coerceAtLeast(0)))
+                    layout(constraints.maxWidth, height) {
+                        stem.place(nowX - stem.width / 2, stemTop)
+                        pill.place(pillSpan.first, pillTop)
+                    }
                 }
             }
         }
@@ -332,6 +345,13 @@ internal fun TimelineChannelRow(
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
                 with(density) { guideChannelWidth(rows).roundToPx() + GuideChannelGap.roundToPx() },
             )
+            // The window keeps the programme on air even where it runs past an edge.
+            val onAirId by remember(events, nowSecProvider) {
+                derivedStateOf {
+                    val now = nowSecProvider()
+                    events.firstOrNull { now >= it.start.epochSeconds && now < it.stop.epochSeconds }?.id
+                }
+            }
             events.forEach { event ->
                 val span = timelineEventSpan(
                     eventStartSec = event.start.epochSeconds,
@@ -343,9 +363,9 @@ internal fun TimelineChannelRow(
                 val fullStart = maxWidth * span.startFraction
                 val fullEnd = maxWidth * span.endFraction
                 val readableWidth = (maxWidth - focusStartInset - focusEndInset).coerceAtLeast(0.dp)
-                val oversized = isFocusTarget && fullEnd - fullStart > readableWidth
-                // Only oversized programmes use a readable fragment. Normal cells retain
-                // their full time allocation; the shared terminal viewport reserves the edge.
+                val oversized = isFocusTarget && (fullEnd - fullStart > readableWidth || event.id == onAirId)
+                // Only oversized programmes and the programme on air use a readable fragment. Normal
+                // cells retain their full time allocation; the shared terminal viewport reserves the edge.
                 val start = if (oversized) maxOf(fullStart, focusStartInset) else fullStart
                 val end = if (oversized) minOf(fullEnd, maxWidth - focusEndInset) else fullEnd
                 val width = (end - start).coerceAtLeast(0.dp)
@@ -381,7 +401,6 @@ internal fun TimelineChannelRow(
                         onFocused = { onFocused(event) },
                         onOpenDetails = { onOpenDetails(event) },
                         onOpenContextMenu = onOpenContextMenu?.let { open -> { open(event) } },
-                        width = width,
                         rows = rows,
                         genre = genre,
                         genreColors = genreColors,
@@ -516,7 +535,6 @@ internal fun TimelineProgrammeCell(
     focusRequester: FocusRequester,
     onFocused: () -> Unit,
     onOpenDetails: () -> Unit,
-    width: Dp,
     modifier: Modifier,
     onOpenContextMenu: (() -> Unit)? = null,
     rows: GuideRows = GuideRows.DENSE,
@@ -541,9 +559,6 @@ internal fun TimelineProgrammeCell(
     val startDate = remember(startSec, locale, formattingZone, uses24Hour) { startSec.formatDateTime(locale) }
     val startTime = remember(startSec, locale, formattingZone, uses24Hour) { formatHm(startSec) }
     val stopTime = remember(stopSec, locale, formattingZone, uses24Hour) { formatHm(stopSec) }
-    val timeRange = remember(startSec, stopSec, locale, formattingZone, uses24Hour) {
-        formatTimeInterval(startSec, stopSec, locale = locale, uses24Hour = uses24Hour)
-    }
     var focused by remember { mutableStateOf(false) }
     val family = programmeCategory(event)
     // A chosen genre dims, never hides: other programmes stay plain and quiet until focused.
@@ -604,11 +619,7 @@ internal fun TimelineProgrammeCell(
                 }
             }
         }
-        val supporting: (@Composable () -> Unit)? = if (width >= 90.dp) {
-            { ProgrammeTimeText(range = timeRange, start = startTime, modifier = contentAlpha) }
-        } else {
-            null
-        }
+        val supporting: @Composable () -> Unit = { ProgrammeStartText(start = startTime, modifier = contentAlpha) }
         val cellModifier = Modifier
             .tabFocus()
             .fillMaxSize()
@@ -670,6 +681,10 @@ internal fun TimelineProgrammeCell(
     }
 }
 
+/** The now pill's side padding, and how far it sits above the labels' centre line. */
+private val RulerPillPadding = 6.dp
+private val RulerPillLift = 4.dp
+
 /** A focused programme cell's ring. It draws inside the cell, which keeps its size on focus. */
 private val GuideFocusRingWidth = 2.dp
 private val GuideCellScale = ListItemDefaults.scale(
@@ -679,19 +694,19 @@ private val GuideCellScale = ListItemDefaults.scale(
 /** Programmes outside the chosen genre draw their content at half strength. */
 private const val GuideOutsideGenreAlpha = 0.5f
 
-/** The programme's [range] when it fits the cell on one line, else its [start] alone: a 12-hour range runs wider. */
+/**
+ * The programme's [start] alone, since the next programme's start is its end. It is left out only where
+ * even that does not fit. Secondary, not tertiary, metadata: tertiary falls below 4.5:1 on the genre tints.
+ */
 @Composable
-private fun ProgrammeTimeText(range: String, start: String, modifier: Modifier = Modifier) {
-    val style = MaterialTheme.typography.bodySmall
+private fun ProgrammeStartText(start: String, modifier: Modifier = Modifier) {
     Layout(modifier = modifier, content = {
-        Text(text = range, maxLines = 1, softWrap = false, style = style)
-        // The cell's description already reads the full range.
-        Text(text = start, maxLines = 1, overflow = TextOverflow.Ellipsis, style = style,
-            modifier = Modifier.clearAndSetSemantics {})
+        // The cell's description reads the full range.
+        Text(text = start, maxLines = 1, softWrap = false, style = MaterialTheme.typography.labelSmall,
+            color = TvTextColors.secondary, modifier = Modifier.testTag("guide-cell-time"))
     }) { measurables, constraints ->
-        val full = measurables[0].measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
-        val shown = full.takeIf { it.width <= constraints.maxWidth } ?: measurables[1].measure(constraints.copy(minWidth = 0))
-        layout(shown.width, shown.height) { shown.placeRelative(0, 0) }
+        val time = measurables[0].measure(constraints.copy(minWidth = 0, maxWidth = Constraints.Infinity))
+        if (time.width > constraints.maxWidth) layout(0, 0) {} else layout(time.width, time.height) { time.placeRelative(0, 0) }
     }
 }
 
@@ -745,10 +760,7 @@ private fun TimelineRowSkeleton(
                         style = MaterialTheme.typography.titleSmall,
                         widthFraction = GuideSkeletonTitleFractions[index % GuideSkeletonTitleFractions.size],
                     )
-                    // As in programme cells, a narrow cell has no time line.
-                    if (width >= 90.dp) {
-                        SkeletonLine(style = MaterialTheme.typography.bodySmall, widthFraction = GuideSkeletonTimeFraction)
-                    }
+                    SkeletonLine(style = MaterialTheme.typography.labelSmall, widthFraction = GuideSkeletonTimeFraction)
                 }
             }
         }
@@ -779,6 +791,114 @@ private fun guideSkeletonSpans(windowStartSec: Long, windowEndSec: Long): List<T
 private const val GuideSkeletonBlockSec = 3_600L
 private val GuideSkeletonTitleFractions = floatArrayOf(0.7f, 0.5f, 0.6f)
 private const val GuideSkeletonTimeFraction = 0.4f
+
+/**
+ * The whole Guide while it prepares its first frame: the title where the header stands, the loading
+ * headline when shown, and [GuideSkeletonGrid] below, in the real screen's places.
+ */
+@Composable
+internal fun GuidePreparationSkeleton(
+    windowStartSec: Long,
+    windowEndSec: Long,
+    nowSecProvider: () -> Long,
+    headline: (@Composable () -> Unit)?,
+    contentPadding: PaddingValues,
+    timelineContentPadding: PaddingValues,
+    startPadding: Dp,
+    endPadding: Dp,
+    rows: GuideRows,
+) {
+    Column(Modifier.fillMaxSize()) {
+        TopLevelBrowseHeader(
+            title = stringResource(R.string.epg_title),
+            modifier = Modifier
+                .padding(
+                    start = startPadding + TvBrowseLeadingInset,
+                    top = contentPadding.calculateTopPadding(),
+                    end = maxOf(endPadding, TvBrowseTrailingInset),
+                )
+                .heightIn(min = with(LocalDensity.current) {
+                    maxOf(40.dp, MaterialTheme.typography.headlineMedium.lineHeight.toDp(),
+                        MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
+                }),
+        )
+        headline?.invoke()
+        Spacer(Modifier.height(4.dp))
+        GuideSkeletonGrid(
+            windowStartSec = windowStartSec,
+            windowEndSec = windowEndSec,
+            nowSecProvider = nowSecProvider,
+            contentPadding = timelineContentPadding,
+            rows = rows,
+            modifier = Modifier.weight(1f).fillMaxWidth(),
+        )
+    }
+}
+
+/**
+ * The Guide before it has channels to show: the time ruler over as many whole rows of channel and
+ * programme placeholders as fit, with the grid's [contentPadding]. It says once that it is loading
+ * and takes no focus.
+ */
+@Composable
+internal fun GuideSkeletonGrid(
+    windowStartSec: Long,
+    windowEndSec: Long,
+    nowSecProvider: () -> Long,
+    contentPadding: PaddingValues,
+    rows: GuideRows,
+    modifier: Modifier = Modifier,
+) {
+    val description = stringResource(R.string.epg_loading)
+    val layoutDirection = LocalLayoutDirection.current
+    val start = contentPadding.calculateStartPadding(layoutDirection)
+    val end = contentPadding.calculateEndPadding(layoutDirection)
+    val rowHeight = guideTimelineRowHeight(rows)
+    Column(
+        modifier
+            .testTag("guide-skeleton")
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        TimelineTimeRuler(
+            windowStartSec = windowStartSec,
+            windowEndSec = windowEndSec,
+            nowSecProvider = nowSecProvider,
+            modifier = Modifier.padding(start = start, end = end),
+            rows = rows,
+        )
+        BoxWithConstraints(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .padding(start = start, top = contentPadding.calculateTopPadding(), end = end),
+        ) {
+            val count = ((maxHeight + TvSpacing4) / (rowHeight + TvSpacing4)).toInt().coerceAtLeast(1)
+            Column(verticalArrangement = Arrangement.spacedBy(TvSpacing4)) {
+                repeat(count) {
+                    Row(Modifier.fillMaxWidth().height(rowHeight)) {
+                        Box(
+                            Modifier
+                                .width(guideChannelWidth(rows))
+                                .fillMaxHeight()
+                                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
+                        )
+                        Spacer(Modifier.width(GuideChannelGap))
+                        BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                            TimelineRowSkeleton(
+                                windowStartSec = windowStartSec,
+                                windowEndSec = windowEndSec,
+                                trackWidth = maxWidth,
+                                visibleTrackWidthPx = null,
+                                rows = rows,
+                                modifier = Modifier.matchParentSize(),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 /** A row's one-line reason for having no programmes, in a passive cell across the row. */
 @Composable

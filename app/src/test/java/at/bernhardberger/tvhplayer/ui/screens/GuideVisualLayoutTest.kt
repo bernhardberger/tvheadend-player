@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import org.koin.compose.KoinIsolatedContext
@@ -79,7 +80,6 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
-import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineSettleMs
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
@@ -198,8 +198,7 @@ class GuideVisualLayoutTest {
         assertEquals(168f, bounds("epg-channel-row-2").top, .1f)
         assertEquals(130f, bounds("epg-channel-header-1").left, .1f)
         assertEquals(234f, bounds("epg-channel-header-1").right, .1f)
-        assertEquals("Ruler heading shares the 12dp dense channel text inset", 142f,
-            compose.onNodeWithText(context().getString(R.string.epg_channels_heading)).fetchSemanticsNode().boundsInRoot.left, .1f)
+        compose.onNodeWithText("Channels", substring = false).assertDoesNotExist()
         key(Key.DirectionDown)
         focused(title(1, 0))
         val bitmap = capture("guide-normal", 1f, LayoutDirection.Ltr)
@@ -211,15 +210,13 @@ class GuideVisualLayoutTest {
         val boundary = bounds("epg-ruler-boundary-${hour}")
         assertEquals("The 20:00 boundary line is where its programmes start", cell.left, boundary.left, .5f)
         // Now (20:15) carries its clock pill over the 20:00 label, so the label checks use 21:00.
-        compose.onNodeWithText("20:00", useUnmergedTree = true).assertIsNotDisplayed()
-        val label = compose.onNodeWithText("21:00", useUnmergedTree = true).fetchSemanticsNode()
+        rulerLabel("20:00").assertIsNotDisplayed()
+        val label = rulerLabel("21:00").fetchSemanticsNode()
         val labelBoundary = bounds("epg-ruler-boundary-${hour + 3600}")
         assertEquals("The boundary spans the ruler band", ruler.top, boundary.top, .5f)
         assertEquals("The boundary spans the ruler band", ruler.bottom, boundary.bottom, .5f)
         assertEquals("The label starts at its boundary, after the label's 6dp inset", labelBoundary.left + 6f,
             label.boundsInRoot.left, .5f)
-        val heading = compose.onNodeWithText(context().getString(R.string.epg_channels_heading)).fetchSemanticsNode()
-        assertEquals("Channels and the time labels share one baseline", baseline(heading), baseline(label), 1f)
         assertEquals("The shared baseline line sits centred in the band", ruler.center.y,
             (label.boundsInRoot.top + label.boundsInRoot.bottom) / 2, 1f)
         val firstRow = bounds("epg-channel-row-1")
@@ -235,6 +232,103 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("programme-details-page").assertIsDisplayed()
         compose.onNodeWithText(context().getString(R.string.close)).assertDoesNotExist()
         assertNoPlayback()
+    }
+
+    @Test fun aCellShowsOnlyItsStartTimeAndSpeaksItsWholeRange() {
+        show(shortSecondMinutes = 3)
+        val cell = hasContentDescription(title(1, 0), substring = true)
+        compose.onNode(hasTestTag("guide-cell-time") and hasAnyAncestor(cell), useUnmergedTree = true)
+            .assertIsDisplayed().assertTextEquals(formatHm(hour))
+        compose.onNode(cell).assert(hasContentDescription(formatHm(hour + 3600), substring = true))
+        // A three-minute programme has no room even for its start; its title still shows.
+        val short = hasContentDescription(title(1, 1), substring = true)
+        compose.onNode(hasTestTag("guide-cell-time") and hasAnyAncestor(short), useUnmergedTree = true).assertIsNotDisplayed()
+        compose.onNode(short).assert(hasContentDescription(formatHm(hour + 3600 + 3 * 60), substring = true))
+        assertNoPlayback()
+    }
+
+    @Test fun theNowLineStaysSolidUnderTheTopFade() {
+        show()
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        repeat(7) { key(Key.DirectionDown) }
+        focused(title(9, 0))
+        val viewport = bounds("epg-timeline-content")
+        assertTrue("The first row has scrolled under the top fade",
+            compose.onAllNodesWithTag("epg-channel-row-1").fetchSemanticsNodes().singleOrNull()
+                ?.let { it.boundsInRoot.top < viewport.top } ?: true)
+        val bitmap = capture("guide-now-line-scrolled", 1f, LayoutDirection.Ltr)
+        val ruler = bounds("epg-time-ruler")
+        val start = checkNotNull(position.position.value).windowStartSec
+        val x = ruler.left + guideTimePositionPx(now, start, start + 3 * 3600, ruler.width)
+        // Cells fade to the backdrop at the top edge; the line beside them keeps its full color.
+        assertNearBackground(bitmap.getPixel(750, viewport.top.toInt()), 8)
+        assertEquals(lineColor, bitmap.getPixel(x.toInt(), viewport.top.toInt() + 1))
+        assertEquals(lineColor, bitmap.getPixel(x.toInt(), viewport.top.toInt() + 24))
+        bitmap.recycle()
+    }
+
+    @Test fun theNowPillSitsAboveTheLabelsAndItsLineStartsBelowIt() {
+        show()
+        val ruler = bounds("epg-time-ruler")
+        val pill = bounds("epg-now-pill")
+        val label = rulerLabel("21:00").fetchSemanticsNode().boundsInRoot
+        assertTrue("The pill sits above the labels: pill=$pill label=$label", pill.center.y < label.center.y)
+        assertTrue("The pill stays inside the ruler: pill=$pill ruler=$ruler", pill.top >= ruler.top - .5f)
+        val stem = bounds("epg-now-stem")
+        assertEquals("The line starts below the pill", pill.bottom, stem.top, .5f)
+        assertEquals("The line runs to the ruler's bottom", ruler.bottom, stem.bottom, .5f)
+        // The 20:00 label beside Now (20:15) would touch the pill, so it is left out.
+        rulerLabel("20:00").assertIsNotDisplayed()
+    }
+
+    @Test fun theDateButtonSaysNowWhileTheWindowHoldsItAndOtherwiseItsHalfHour() {
+        show()
+        assertDateButtonNow()
+        compose.onNodeWithTag("guide-date-button").assert(hasContentDescription(context().getString(
+            R.string.epg_date_button_description, context().getString(R.string.today), context().getString(R.string.now))))
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        // The fourth programme (23:00) moves the window past now, to a start off the half hour.
+        repeat(3) { key(Key.DirectionRight) }
+        focused(title(1, 3))
+        val start = checkNotNull(position.position.value).windowStartSec
+        assertTrue("The window starts at ${Instant.fromEpochSeconds(start)}", start % 1800 != 0L && start > now)
+        compose.waitUntil(5_000) { dateButtonShows("Today", start - start % 1800) }
+        assertNoPlayback()
+    }
+
+    @Test fun theGridOpensOnTheProgrammeOnAirHalfAnHourAfterTheWindowStarts() {
+        // Channel 1's programme runs 20:00 to 22:00, past the window's readable end.
+        show(longProgramme = true, longProgrammeHours = 2)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        val start = checkNotNull(position.position.value).windowStartSec
+        // Now (20:15) less half an hour is 19:45, down to the half hour 19:30.
+        assertEquals("Half an hour before now, down to the half hour", hour - 1800, start)
+        val share = (now - start).toFloat() / (3 * 3600)
+        assertTrue("Now sits in the window's first third: $share", share in .15f..0.34f)
+        // Up and Down keep now: the programmes on air, with no window jump.
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        key(Key.DirectionUp)
+        focused(title(1, 0))
+        assertEquals(start, checkNotNull(position.position.value).windowStartSec)
+        assertReadableFocus()
+        assertNoPlayback()
+    }
+
+    @Test fun aConnectingGuideShowsItsSkeletonAndNoLoadingText() {
+        show(connecting = true)
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("guide-skeleton", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("guide-skeleton", useUnmergedTree = true).assertIsDisplayed()
+            .assertContentDescriptionEquals(context().getString(R.string.epg_loading))
+        compose.onAllNodesWithText(context().getString(R.string.epg_loading)).assertCountEquals(0)
+        compose.onAllNodesWithText(context().getString(R.string.loading)).assertCountEquals(0)
+        compose.onNodeWithTag("guide-empty-state").assertDoesNotExist()
+        capture("guide-loading-skeleton", 1f, LayoutDirection.Ltr).recycle()
     }
 
     @Test fun middleRowFocusRingStaysInsideItsRow() {
@@ -541,7 +635,7 @@ class GuideVisualLayoutTest {
         val cell = compose.onNode(hasText(title(2, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("One hour occupies about half the two-hour track", cell.width > ruler.width * .45f)
         val textLayouts = mutableListOf<TextLayoutResult>()
-        compose.onNode(hasText(formatTimeInterval(hour, hour + 3600)) and hasAnyAncestor(isFocused()), useUnmergedTree = true)
+        compose.onNode(hasText(formatHm(hour)) and hasAnyAncestor(isFocused()), useUnmergedTree = true)
             .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(textLayouts) }
         assertFalse("The native time line must not be clipped", textLayouts.single().hasVisualOverflow)
         val x = ruler.left + guideTimePositionPx(now, start, start + 2 * 3600, ruler.width)
@@ -553,7 +647,8 @@ class GuideVisualLayoutTest {
     @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
     fun rtlKeepsPhysicalLeftEarlierAndRightLaterWithAlignedRuler() {
         Locale.setDefault(Locale.forLanguageTag("ar"))
-        show(direction = LayoutDirection.Rtl)
+        // History from 18:00 continues past the window's 18:30 start, so neither edge is terminal.
+        show(direction = LayoutDirection.Rtl, historyOffset = -2)
         val ruler = bounds("epg-time-ruler")
         assertEquals(0f, ruler.left, .1f)
         assertEquals(718f, ruler.right, .1f)
@@ -662,7 +757,10 @@ class GuideVisualLayoutTest {
         assertEquals(before, position.position.value)
         val bitmap = capture("guide-data-edge", 1f, LayoutDirection.Ltr)
         val focus = compose.onNode(hasText(title(1, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
-        assertTrue("Known first programme is not hidden under a speculative history fade", focus.left < bounds("epg-time-ruler").left + 48f)
+        val window = checkNotNull(position.position.value).windowStartSec
+        val ruler0 = bounds("epg-time-ruler")
+        assertEquals("Known first programme starts at its time, not under a speculative history fade",
+            ruler0.left + guideTimePositionPx(hour, window, window + 3 * 3600, ruler0.width), focus.left, 2f)
         // The focus ring's leading edge stays bright: no fade dims it.
         val nearLeft = bitmap.getPixel(focus.left.toInt() + 2, focus.bottom.toInt() - 10)
         assertTrue(android.graphics.Color.red(nearLeft) > 180)
@@ -806,7 +904,7 @@ class GuideVisualLayoutTest {
         val ruler = bounds("epg-time-ruler")
         assertEquals("A terminal hour keeps its complete time allocation", ruler.width / hours, focus.width, 1f)
         assertEquals("The seven-day endpoint remains aligned with the ruler", ruler.right, focus.right, 1f)
-        assertEquals(focus.left + 6f, compose.onNodeWithText("19:00", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.left, 1f)
+        assertEquals(focus.left + 6f, rulerLabel("19:00").fetchSemanticsNode().boundsInRoot.left, 1f)
         val bitmap = capture(name, scale, LayoutDirection.Ltr)
         assertTerminalNativeFocus(bitmap, LayoutDirection.Ltr)
         bitmap.recycle()
@@ -1024,7 +1122,8 @@ class GuideVisualLayoutTest {
         compose.runOnIdle {
             val (ids, through) = checkNotNull(request.get())
             assertEquals((1L..6L).map(::ChannelId), ids)
-            assertEquals(Instant.fromEpochSeconds(if (atHorizon) horizon else hour + 3 * 3600), through)
+            // Two hours opening half an hour before now (20:15) start at 19:30; three hours from there are acquired.
+            assertEquals(Instant.fromEpochSeconds(if (atHorizon) horizon else hour + 2 * 3600 + 1800), through)
             assertTrue(checkNotNull(session.observation.value.epgSnapshotForDisplay).coverages.isEmpty())
         }
         val ticks = compose.onAllNodes(hasText("", substring = true) and hasAnyAncestor(hasTestTag("epg-time-ruler")) and
@@ -1137,7 +1236,7 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("guide-time-preset-20").assertIsNotFocused().assertIsSelected()
             .assert(hasText("20:00") and hasText("Prime time"))
         compose.onNodeWithTag("guide-time-preset-22").assertIsEnabled().assertIsNotSelected()
-        assertDateButton("Today", hour)
+        assertDateButtonNow()
         assertEquals(0, playbackRequests)
     }
 
@@ -1245,7 +1344,7 @@ class GuideVisualLayoutTest {
         key(Key.Back)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
-        assertDateButton("Today", hour)
+        assertDateButtonNow()
         assertEquals(0, playbackRequests)
     }
 
@@ -1358,7 +1457,7 @@ class GuideVisualLayoutTest {
         key(Key.Enter)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
-        compose.waitUntil(5_000) { dateButtonShows("Today", hour) }
+        compose.waitUntil(5_000) { dateButtonShowsNow() }
         assertEquals(0, playbackRequests)
     }
 
@@ -1389,7 +1488,7 @@ class GuideVisualLayoutTest {
         key(Key.Back)
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
-        assertDateButton("Today", hour)
+        assertDateButtonNow()
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
@@ -1423,7 +1522,7 @@ class GuideVisualLayoutTest {
         }
     }
 
-    @Test fun headlineShowsTheSettledProgrammeAboveAboutFourAndAHalfRows() {
+    @Test fun headlineShowsTheSettledProgrammeAboveAboutFiveRows() {
         show(headline = true)
         // On the header, before the grid has focus: the programme the grid enters.
         headlineTitle(title(1, 0))
@@ -1434,7 +1533,7 @@ class GuideVisualLayoutTest {
         assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
         val first = bounds("epg-channel-row-1").top
         val rows = (540f - first) / (bounds("epg-channel-row-2").top - first)
-        assertEquals("About four and a half rows below the headline", 4.5f, rows, .3f)
+        assertEquals("About five rows below the headline", 5f, rows, .3f)
         compose.onNodeWithTag("channels-immersive-background").assertExists()
         compose.onNodeWithTag("guide-headline").assert(hasText(title(1, 0), substring = true))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
@@ -1449,7 +1548,8 @@ class GuideVisualLayoutTest {
                 compose.onRoot().performKeyInput { pressKey(Key.DirectionRight) }
                 compose.mainClock.advanceTimeBy(80)
             }
-            compose.onNode(hasText(title(1, 2)) and isFocused()).assertExists()
+            // Focus has left programme 0 while the headline still shows it.
+            compose.onNode(hasText(title(1, 0)) and isFocused()).assertDoesNotExist()
             compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
             compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
         } finally {
@@ -1458,6 +1558,7 @@ class GuideVisualLayoutTest {
         focused(title(1, 2))
         headlineTitle(title(1, 2))
         assertEquals(headline, bounds("guide-headline"))
+        // Programme 2 lies inside the window that opened just before now.
         assertNoPlayback()
     }
 
@@ -1506,7 +1607,7 @@ class GuideVisualLayoutTest {
             compose.mainClock.autoAdvance = false
             publishEvents(full.events, full, covered = true)
             release.complete(Unit)
-            val next = hasTestTag("guide-headline-title") and hasText(title(2, -1))
+            val next = hasTestTag("guide-headline-title") and hasText(title(2, 0))
             var framesAfterSwitch = 0
             for (frame in 0 until 600) {
                 compose.mainClock.advanceTimeByFrame()
@@ -1517,10 +1618,10 @@ class GuideVisualLayoutTest {
             }
             assertTrue("headline never moved to the new group", framesAfterSwitch > 60)
             compose.mainClock.autoAdvance = true
-            // The grid takes the new group's first programme at the window's start.
+            // The grid takes the new group's programme on air.
             key(Key.DirectionDown)
-            focused(title(2, -1))
-            headlineTitle(title(2, -1))
+            focused(title(2, 0))
+            headlineTitle(title(2, 0))
         } finally {
             compose.mainClock.autoAdvance = true
             armed.set(false)
@@ -1728,7 +1829,8 @@ class GuideVisualLayoutTest {
     @Test fun aCellTooNarrowForTheMarkLeavesItOutInsteadOfShrinkingIt() {
         fun scheduled(id: Long, eventId: Long) =
             DvrEntry.create(DvrEntryId(id), eventId = EventId(eventId), state = DvrEntryState.SCHEDULED)
-        show(shortSecondMinutes = 3, recordings = listOf(scheduled(1, 111), scheduled(2, 112)))
+        // An hour earlier, so the third programme lies inside the window around now.
+        show(eventHour = hour - 3600, shortSecondMinutes = 3, recordings = listOf(scheduled(1, 111), scheduled(2, 112)))
         fun mark(offset: Int) = compose.onNode(
             hasTestTag("guide-cell-recording-mark") and hasAnyAncestor(hasContentDescription(title(1, offset), substring = true)),
             useUnmergedTree = true,
@@ -1865,7 +1967,7 @@ class GuideVisualLayoutTest {
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
         groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
-        recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null) {
+        recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -1883,8 +1985,10 @@ class GuideVisualLayoutTest {
             contentGenre = if (genres) ContentGenre.fromContentType(when (channel.id.value) { 1L -> 0x40L; 2L -> null; else -> 0x50L }) else null,
         )
         session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels,
+            sessionState = if (connecting) SessionState.Connecting
+                else SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            // While connecting no channel has arrived yet.
+            channelState = if (connecting) ChannelRepositoryState.Empty else ChannelRepositoryState.Current(ChannelCatalog.create(channels,
                 if (!tags) emptyList() else listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })) +
                     if (groupWithoutFirst) listOf(ChannelTag.create(ChannelTagId(2), name = "News",
                         channelIds = channels.drop(1).map { it.id })) else emptyList())),
@@ -1958,8 +2062,10 @@ class GuideVisualLayoutTest {
             }
         }
         }
-        dateFocused()
-        assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
+        if (!connecting) {
+            dateFocused()
+            assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
+        }
         callsAtEntry = session.calls.size
     }
 
@@ -2067,6 +2173,10 @@ class GuideVisualLayoutTest {
         return bitmap
     }
 
+    /** A ruler label; cells show their start times too. */
+    private fun rulerLabel(text: String) =
+        compose.onNode(hasText(text) and hasAnyAncestor(hasTestTag("epg-time-ruler")), useUnmergedTree = true)
+
     private fun assertNoPlayback(additionalCoverageCalls: Int = 0) {
         assertEquals(0, playbackRequests)
         assertEquals(0, navigationRequests)
@@ -2118,7 +2228,7 @@ class GuideVisualLayoutTest {
         assertTrue("Long headlines use single-line ellipsis", programmeText.isLineEllipsized(0))
         assertTrue(programmeText.getLineBottom(0) <= programmeText.size.height)
         val programmeBounds = programme.fetchSemanticsNode().boundsInRoot
-        val timeBounds = compose.onNode(hasText(formatTimeInterval(hour, hour + 3600)) and hasAnyAncestor(hasTestTag("epg-channel-row-2")),
+        val timeBounds = compose.onNode(hasText(formatHm(hour)) and hasAnyAncestor(hasTestTag("epg-channel-row-2")),
             useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         assertTrue("Native headline does not overlap its supporting time", programmeBounds.bottom <= timeBounds.top)
         assertTrue("Native dense list item keeps its bottom content padding", timeBounds.bottom <= header.bottom - 10f)
@@ -2158,6 +2268,13 @@ class GuideVisualLayoutTest {
         compose.onAllNodes(hasTestTag("guide-date-button") and hasText(dateButtonText(day, startSec))).fetchSemanticsNodes().isNotEmpty()
     private fun assertDateButton(day: String, startSec: Long) =
         compose.onNodeWithTag("guide-date-button").assert(hasText(dateButtonText(day, startSec)))
+    // A window holding now names Today and Now instead of its start.
+    private fun dateButtonNowText() = context().getString(R.string.epg_date_button,
+        context().getString(R.string.today), context().getString(R.string.now))
+    private fun dateButtonShowsNow() =
+        compose.onAllNodes(hasTestTag("guide-date-button") and hasText(dateButtonNowText())).fetchSemanticsNodes().isNotEmpty()
+    private fun assertDateButtonNow() =
+        compose.onNodeWithTag("guide-date-button").assert(hasText(dateButtonNowText()))
     private fun dateFocused() = tagFocused("guide-date-button")
     private fun tagFocused(tag: String) = focused(hasTestTag(tag), tag)
     private fun focused(text: String) = focused(hasText(text), text)

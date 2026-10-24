@@ -73,6 +73,7 @@ import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.notifications.label
 import at.bernhardberger.tvhplayer.images.BackdropTransformation
 import at.bernhardberger.tvhplayer.images.CinematicScrimTransformation
+import at.bernhardberger.tvhplayer.images.GuideScrimTransformation
 import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
@@ -768,8 +769,9 @@ private const val DetailsReadingDimAlpha = .6f
 
 /**
  * The kit's immersive background: top-right 16:9 art with the kit's cinematic scrim baked in, to
- * draw over the page's colour, as wide as the kit's or as tall as [height]. [onSettled] reports
- * once the picture has loaded or failed, or at once when there is none.
+ * draw over the page's colour, as wide as the kit's or as tall as [height]. The Guide's picture,
+ * the one given a [height], takes the Guide's softer scrim instead. [onSettled] reports once the
+ * picture has loaded or failed, or at once when there is none.
  */
 @Composable
 internal fun DetailsHero(
@@ -784,9 +786,9 @@ internal fun DetailsHero(
         return
     }
     val context = LocalPlatformContext.current
-    val request = remember(session, image, context) {
+    val request = remember(session, image, context, height != null) {
         ImageRequest.Builder(context).data(AppArtworkSource(session, image))
-            .transformations(CinematicScrimTransformation).build()
+            .transformations(if (height != null) GuideScrimTransformation else CinematicScrimTransformation).build()
     }
     AsyncImage(request, null,
         contentScale = ContentScale.Crop,

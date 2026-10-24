@@ -22,6 +22,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
@@ -64,7 +65,10 @@ internal fun <I, T> rememberPreparedBrowseData(
     return result
 }
 
-/** A temporary, static focus anchor; the real screen takes over when ready. */
+/**
+ * A temporary, static focus anchor; the real screen takes over when ready. It says "Loading…"
+ * unless the screen gives a [skeleton] of itself to show instead, which then fills the screen.
+ */
 @Composable
 internal fun BrowsePreparationPending(
     contentPadding: PaddingValues,
@@ -73,6 +77,7 @@ internal fun BrowsePreparationPending(
     onPendingFocus: () -> Unit = {},
     onReadyFocus: () -> Boolean = { false },
     handoffKey: Any? = Unit,
+    skeleton: (@Composable () -> Unit)? = null,
 ) {
     val focus = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
@@ -91,6 +96,25 @@ internal fun BrowsePreparationPending(
     // Keep a focused anchor attached until the real screen has taken focus.
     // Disposing it first lets the native drawer reclaim focus during the vacancy.
     if (ready && !focused) return
+    if (skeleton != null) {
+        // The skeleton shows what is coming and speaks for the anchor, which draws nothing itself.
+        Box(
+            Modifier
+                .fillMaxSize()
+                .zIndex(1f)
+                .testTag("browse-preparing")
+                .semantics(mergeDescendants = true) {}
+                .focusRequester(focus)
+                .onFocusChanged {
+                    focused = it.isFocused
+                    if (it.isFocused && !ready) onPendingFocus()
+                }
+                .focusable(),
+        ) {
+            if (!ready) skeleton()
+        }
+        return
+    }
     Box(Modifier.fillMaxSize().padding(contentPadding).zIndex(1f), contentAlignment = Alignment.Center) {
         Text(
             stringResource(R.string.loading),

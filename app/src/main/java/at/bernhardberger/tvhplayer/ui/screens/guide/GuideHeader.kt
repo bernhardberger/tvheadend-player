@@ -51,6 +51,7 @@ internal fun GuideHeader(
     genre: String?,
     genreDot: Color?,
     windowStartSec: Long,
+    windowEndSec: Long,
     nowSecProvider: () -> Long,
     focus: ChannelsHeaderFocus,
     dateFocus: FocusRequester,
@@ -91,6 +92,7 @@ internal fun GuideHeader(
         leading = { startEdge ->
             GuideDateButton(
                 windowStartSec = windowStartSec,
+                windowEndSec = windowEndSec,
                 nowSecProvider = nowSecProvider,
                 onClick = onDateClick,
                 modifier = startEdge
@@ -102,25 +104,32 @@ internal fun GuideHeader(
 }
 
 /**
- * A pill on the header's resting fill naming the Guide's day and time, "Today · 19:30"; OK opens
- * the day and time panel.
+ * A pill on the header's resting fill naming the Guide's day and time: "Today · Now" while now is
+ * in the window, otherwise the window's start down to the half hour, "Sat · 20:00", as a long
+ * programme may shift the window to any minute. OK opens the day and time panel.
  */
 @Composable
 private fun GuideDateButton(
     windowStartSec: Long,
+    windowEndSec: Long,
     nowSecProvider: () -> Long,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val zone = remember { ZoneId.systemDefault() }
-    // The ticking clock is read through a derived day, so the button recomposes only at midnight.
+    // The ticking clock is read through derived values, so the button recomposes only at midnight
+    // or when now enters or leaves the window.
     val today by remember(nowSecProvider, zone) {
         derivedStateOf { Instant.ofEpochSecond(nowSecProvider()).atZone(zone).toLocalDate() }
     }
-    val start = Instant.ofEpochSecond(windowStartSec).atZone(zone)
-    val day = guideDayLabel(start.toLocalDate(), today, zone, locale)
-    val time = formatClock(start, locale)
+    val nowShown by remember(nowSecProvider, windowStartSec, windowEndSec) {
+        derivedStateOf { nowSecProvider() in windowStartSec until windowEndSec }
+    }
+    val windowStart = Instant.ofEpochSecond(windowStartSec).atZone(zone)
+    val start = windowStart.truncatedTo(ChronoUnit.HOURS).plusMinutes(windowStart.minute / 30 * 30L)
+    val day = if (nowShown) stringResource(R.string.today) else guideDayLabel(start.toLocalDate(), today, zone, locale)
+    val time = if (nowShown) stringResource(R.string.now) else formatClock(start, locale)
     val description = stringResource(R.string.epg_date_button_description, day, time)
     Button(
         onClick = onClick,
