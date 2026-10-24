@@ -174,6 +174,14 @@ class TimeIntervalFormatTest {
                     stop = Instant.fromEpochSeconds(sameDay.first + 30 * 60))))
             assertEquals("Tue, Sep 15, 18:58 – 19:28", recordingMetadataFacts(stoppedEarly, emptyList(), context, Locale.US, now)
                 .single { it.first == context.getString(R.string.details_recorded) }.second)
+            // Nothing was recorded, so the slot it was scheduled for is labelled as such.
+            for (state in listOf(DvrEntryState.MISSED, DvrEntryState.INVALID)) {
+                val facts = recordingMetadataFacts(DvrEntry.create(DvrEntryId(3), state = state,
+                    start = Instant.fromEpochSeconds(sameDay.first), stop = Instant.fromEpochSeconds(sameDay.second)),
+                    emptyList(), context, Locale.US, now)
+                assertEquals(recorded, facts.single { it.first == "Scheduled" }.second)
+                assertTrue(facts.none { it.first == context.getString(R.string.details_recorded) })
+            }
         } finally {
             AppClock.format = at.bernhardberger.tvhplayer.settings.ClockFormat.SYSTEM
         }

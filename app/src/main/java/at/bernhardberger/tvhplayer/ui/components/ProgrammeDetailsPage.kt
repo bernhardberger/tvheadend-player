@@ -875,11 +875,13 @@ internal fun recordingMetadataFacts(recording: DvrEntry, configurations: List<Dv
         fact(R.string.details_errors, if (errors == 0L) resources.getString(R.string.details_no_errors)
             else resources.getQuantityString(R.plurals.details_error_count, errors.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), errors))
     }
-    (recordingRecordedSpan(recording, nowSec) ?: recordingPaddedStart(recording)?.let { paddedStart ->
+    // A missed or invalid entry recorded nothing; its slot, padding included, is what explains why.
+    val neverRecorded = recording.state == DvrEntryState.MISSED || recording.state == DvrEntryState.INVALID
+    (recordingRecordedSpan(recording, nowSec)?.takeUnless { neverRecorded } ?: recordingPaddedStart(recording)?.let { paddedStart ->
         recordingPaddedStop(recording)?.let { paddedStart to it }
     })?.let { (start, stop) ->
-        fact(R.string.details_recorded, formatTimeInterval(start.epochSeconds, stop.epochSeconds,
-            withDate = true, locale = locale, nowSec = nowSec))
+        fact(if (neverRecorded) R.string.recording_state_scheduled else R.string.details_recorded,
+            formatTimeInterval(start.epochSeconds, stop.epochSeconds, withDate = true, locale = locale, nowSec = nowSec))
     }
     if (recording.removalDays == RECORDING_REMOVAL_WHEN_SPACE_NEEDED)
         fact(R.string.details_retention, resources.getString(R.string.details_kept_until_space_needed))
