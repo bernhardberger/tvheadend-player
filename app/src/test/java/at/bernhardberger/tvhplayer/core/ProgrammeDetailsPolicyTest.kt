@@ -66,6 +66,9 @@ class ProgrammeDetailsPolicyTest {
         // The length is what the files hold, not the schedule.
         assertEquals(DetailsFact(DetailsFactKind.LENGTH, 30), facts(recording(DvrEntryState.COMPLETED, files = listOf(
             DvrRecordingFile.create(start = Instant.fromEpochSeconds(100), stop = Instant.fromEpochSeconds(130))))).last())
+        // A missed recording never ran: when it was due, but no length.
+        assertEquals(listOf(DetailsFact(DetailsFactKind.RECORDED, 100)),
+            recordingDetailsFacts(recording(DvrEntryState.MISSED), null, nowSec = 300))
     }
 
     @Test fun progressIsShownOnlyWhereTheAdmissionOffersResume() {
