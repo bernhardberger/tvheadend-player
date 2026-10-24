@@ -24,6 +24,8 @@ if [[ -L "$INCOMING_DIR/SHA256SUMS" || -L "$INCOMING_DIR/release-manifest.json" 
     printf 'error: incoming checksum and manifest files must not be symbolic links\n' >&2
     exit 1
 fi
+# Refuse a bundle built against anything but the released SDK before touching the keystore.
+python3 "$ROOT_DIR/tools/release_metadata.py" validate-released-sdk --manifest "$INCOMING_DIR/release-manifest.json"
 if [[ ! -f "$KEYSTORE" ]]; then
     printf 'error: release keystore does not exist: %s\n' "$KEYSTORE" >&2
     exit 1

@@ -22,7 +22,7 @@ CANONICAL_CERTIFICATE_SHA256 = (
     "1E:18:48:62:F5:BB:A2:D1:C8:40:6D:6A:7A:79:65:7F:"
     "F3:A7:3D:25:8C:1E:1B:75:FA:25:02:58:75:E5:AB:C9"
 )
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 BUNDLETOOL_VERSION = "1.18.3"
 APPLICATION_IDS = {
     "play": "at.bernhardberger.tvhplayer",
@@ -30,6 +30,8 @@ APPLICATION_IDS = {
 }
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
 _COMMIT_PATTERN = re.compile(r"[0-9a-f]{40}")
+_RELEASED_SDK_VERSION_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+_PREPARE_RELEASE = Path(__file__).resolve().parent / "prepare-release"
 _CHECKSUM_LINE_PATTERN = re.compile(r"([0-9a-fA-F]{64}) [ *](.+)")
 
 
@@ -39,6 +41,38 @@ def sha256_file(path: Path) -> str:
         for chunk in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def released_sdk_pin() -> tuple[str, str]:
+    """The released SDK version and source commit that tools/prepare-release builds against."""
+    pins = dict(
+        re.findall(
+            r'^(SDK_VERSION|SDK_SOURCE_COMMIT)="([^"]*)"$',
+            _PREPARE_RELEASE.read_text(encoding="utf-8"),
+            re.MULTILINE,
+        )
+    )
+    if set(pins) != {"SDK_VERSION", "SDK_SOURCE_COMMIT"}:
+        raise ValueError("tools/prepare-release does not pin a released SDK")
+    return pins["SDK_VERSION"], pins["SDK_SOURCE_COMMIT"]
+
+
+def validate_released_sdk(manifest: dict[str, Any], label: str = "manifest") -> None:
+    """Refuse a bundle built against anything but the released SDK that tools/prepare-release pins."""
+    sdk_version = manifest.get("sdkVersion")
+    if not isinstance(sdk_version, str) or not _RELEASED_SDK_VERSION_PATTERN.fullmatch(sdk_version):
+        raise ValueError(
+            f"{label} SDK {sdk_version!r} is not a released version; a Player release needs a released SDK"
+        )
+    sdk_source_commit = manifest.get("sdkSourceCommit", "")
+    if not isinstance(sdk_source_commit, str) or not _COMMIT_PATTERN.fullmatch(sdk_source_commit):
+        raise ValueError(f"{label} SDK source commit is invalid")
+    pinned_version, pinned_commit = released_sdk_pin()
+    if (sdk_version, sdk_source_commit) != (pinned_version, pinned_commit):
+        raise ValueError(
+            f"{label} SDK {sdk_version} at {sdk_source_commit} is not the released SDK "
+            f"{pinned_version} at {pinned_commit} pinned in tools/prepare-release"
+        )
 
 
 def normalize_fingerprint(value: str) -> str:
@@ -116,6 +150,7 @@ def _build_manifest(
     version_code: int,
     version_name: str,
     source_commit: str,
+    sdk_version: str,
     sdk_source_commit: str,
     artifacts: dict[str, dict[str, str]],
 ) -> dict[str, Any]:
@@ -129,16 +164,19 @@ def _build_manifest(
         raise ValueError("source commit must be a full 40-digit Git object ID")
     if not _COMMIT_PATTERN.fullmatch(sdk_source_commit.lower()):
         raise ValueError("SDK source commit must be a full 40-digit Git object ID")
-    return {
+    manifest = {
         "schemaVersion": SCHEMA_VERSION,
         "stage": stage,
         "applicationId": application_id,
         "versionCode": version_code,
         "versionName": version_name,
         "sourceCommit": source_commit.lower(),
+        "sdkVersion": sdk_version,
         "sdkSourceCommit": sdk_source_commit.lower(),
         "artifacts": artifacts,
     }
+    validate_released_sdk(manifest, "release")
+    return manifest
 
 
 def build_unsigned_manifest(
@@ -147,6 +185,7 @@ def build_unsigned_manifest(
     version_code: int,
     version_name: str,
     source_commit: str,
+    sdk_version: str,
     sdk_source_commit: str,
     artifacts: dict[str, dict[str, str]],
 ) -> dict[str, Any]:
@@ -170,6 +209,7 @@ def build_unsigned_manifest(
         version_code=version_code,
         version_name=version_name,
         source_commit=source_commit,
+        sdk_version=sdk_version,
         sdk_source_commit=sdk_source_commit,
         artifacts=artifacts,
     )
@@ -199,11 +239,7 @@ def validate_unsigned_manifest(
     source_commit = manifest.get("sourceCommit", "")
     if not isinstance(source_commit, str) or not _COMMIT_PATTERN.fullmatch(source_commit):
         raise ValueError("manifest source commit is invalid")
-    sdk_source_commit = manifest.get("sdkSourceCommit", "")
-    if not isinstance(sdk_source_commit, str) or not _COMMIT_PATTERN.fullmatch(
-        sdk_source_commit
-    ):
-        raise ValueError("manifest SDK source commit is invalid")
+    validate_released_sdk(manifest)
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise ValueError("manifest artifacts are invalid")
@@ -235,11 +271,7 @@ def validate_signed_manifest(manifest: dict[str, Any]) -> None:
     source_commit = manifest.get("sourceCommit", "")
     if not isinstance(source_commit, str) or not _COMMIT_PATTERN.fullmatch(source_commit):
         raise ValueError("signed manifest source commit is invalid")
-    sdk_source_commit = manifest.get("sdkSourceCommit", "")
-    if not isinstance(sdk_source_commit, str) or not _COMMIT_PATTERN.fullmatch(
-        sdk_source_commit
-    ):
-        raise ValueError("signed manifest SDK source commit is invalid")
+    validate_released_sdk(manifest, "signed manifest")
     artifacts = manifest.get("artifacts")
     if not isinstance(artifacts, dict):
         raise ValueError("signed manifest artifacts are invalid")
@@ -321,6 +353,7 @@ def build_signed_manifest(
         version_code=unsigned_manifest["versionCode"],
         version_name=unsigned_manifest["versionName"],
         source_commit=unsigned_manifest["sourceCommit"],
+        sdk_version=unsigned_manifest["sdkVersion"],
         sdk_source_commit=unsigned_manifest["sdkSourceCommit"],
         artifacts=artifacts,
     )
@@ -335,7 +368,7 @@ def validate_source_lineage(
     unsigned_manifest: dict[str, Any],
     signed_manifest: dict[str, Any],
 ) -> None:
-    for field in ("sourceCommit", "sdkSourceCommit"):
+    for field in ("sourceCommit", "sdkVersion", "sdkSourceCommit"):
         if unsigned_manifest.get(field) != signed_manifest.get(field):
             raise ValueError(f"signed and unsigned manifests have different {field}")
     for name in (
@@ -568,6 +601,7 @@ def _create_unsigned(args: argparse.Namespace) -> None:
             version_code=args.version_code,
             version_name=args.version_name,
             source_commit=args.source_commit,
+            sdk_version=args.sdk_version,
             sdk_source_commit=args.sdk_source_commit,
             artifacts=artifacts,
         ),
@@ -596,6 +630,10 @@ def _validate_checksums(args: argparse.Namespace) -> None:
     expected = {artifact["file"] for artifact in manifest["artifacts"].values()}
     expected.add(args.manifest.name)
     validate_checksum_file(args.checksums, args.directory, expected)
+
+
+def _validate_released_sdk(args: argparse.Namespace) -> None:
+    validate_released_sdk(_load_manifest(args.manifest))
 
 
 def _create_signed(args: argparse.Namespace) -> None:
@@ -636,6 +674,7 @@ def _parser() -> argparse.ArgumentParser:
     create_unsigned = subparsers.add_parser("create-unsigned")
     add_identity_arguments(create_unsigned)
     create_unsigned.add_argument("--source-commit", required=True)
+    create_unsigned.add_argument("--sdk-version", required=True)
     create_unsigned.add_argument("--sdk-source-commit", required=True)
     create_unsigned.add_argument("--unsigned-play-apk", required=True, type=Path)
     create_unsigned.add_argument("--unsigned-appliance-apk", required=True, type=Path)
@@ -660,6 +699,10 @@ def _parser() -> argparse.ArgumentParser:
     validate_checksums.add_argument("--manifest", required=True, type=Path)
     validate_checksums.add_argument("--directory", required=True, type=Path)
     validate_checksums.set_defaults(handler=_validate_checksums)
+
+    validate_sdk = subparsers.add_parser("validate-released-sdk")
+    validate_sdk.add_argument("--manifest", required=True, type=Path)
+    validate_sdk.set_defaults(handler=_validate_released_sdk)
 
     create_signed = subparsers.add_parser("create-signed")
     add_identity_arguments(create_signed)

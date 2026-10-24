@@ -112,7 +112,7 @@ class NativePublicationEvidenceTest(unittest.TestCase):
         self.assertEqual(pin_errors("0.35.0", "0.35.0", release=False), [])
         mismatch = pin_errors("0.36.0-20261024.143000-1", "0.35.0", release=False)
         self.assertTrue(any("publication evidence must be updated" in e for e in mismatch))
-        for version in ("0.36.0-SNAPSHOT", "0.36.0-rc1"):
+        for version in ("0.36.0-SNAPSHOT", "0.36.0-rc1", "0.3٥.0", "0.36.0-2026102٤.143000-1"):
             with self.subTest(version=version):
                 malformed = pin_errors(version, version, release=False)
                 self.assertTrue(any("neither a release nor a development build" in e for e in malformed))

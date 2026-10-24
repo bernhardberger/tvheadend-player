@@ -11,9 +11,9 @@ pluginManagement {
 /**
  * SDK sources: released versions come from Maven Central. A development build, always the
  * timestamped `X.Y.Z-yyyyMMdd.HHmmss-N` (the gates reject a floating `-SNAPSHOT`), pinned in
- * `gradle/libs.versions.toml` resolves from Central's snapshot repository, which serves only SDK
- * snapshots. Such a pin builds and passes
- * `./tools/verify`, but `tools/prepare-release` refuses it: a Player release needs a released SDK.
+ * `gradle/libs.versions.toml` resolves from Central's snapshot repository, which serves only
+ * timestamped SDK versions. Such a pin builds and passes `./tools/verify`, but
+ * `tools/prepare-release` and `tools/sign-release` refuse it: a Player release needs a released SDK.
  *
  * Opt-in staged SDK checkout, for testing an SDK fix before it is published.
  *
@@ -54,10 +54,14 @@ dependencyResolutionManagement {
         maven {
             name = "centralSdkSnapshots"
             url = uri("https://central.sonatype.com/repository/maven-snapshots/")
-            // Only SDK development builds; every release and every other group stays on Central.
-            mavenContent {
-                snapshotsOnly()
-                includeGroup("at.bernhardberger.tvheadend")
+            // Only timestamped SDK development builds; every release, every floating -SNAPSHOT and
+            // every other group stays off this repository.
+            content {
+                includeVersionByRegex(
+                    "at\\.bernhardberger\\.tvheadend",
+                    ".*",
+                    "[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]{8}\\.[0-9]{6}-[0-9]+",
+                )
             }
         }
     }

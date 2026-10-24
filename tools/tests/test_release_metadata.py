@@ -18,13 +18,14 @@ if SPEC is None or SPEC.loader is None:
     raise RuntimeError(f"Cannot load {MODULE_PATH}")
 release_metadata = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(release_metadata)
+SDK_VERSION, SDK_SOURCE_COMMIT = release_metadata.released_sdk_pin()
 
 
 class ReleaseMetadataTest(unittest.TestCase):
     def unsigned_manifest(self):
         return release_metadata.build_unsigned_manifest(
             application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0",
-            source_commit="a" * 40, sdk_source_commit="b" * 40, artifacts=self._artifacts("unsigned"),
+            source_commit="a" * 40, sdk_version=SDK_VERSION, sdk_source_commit=SDK_SOURCE_COMMIT, artifacts=self._artifacts("unsigned"),
         )
 
     def test_binary_artifacts_require_exact_identity_flavor_and_file_type(self) -> None:
@@ -68,12 +69,12 @@ class ReleaseMetadataTest(unittest.TestCase):
             for missing in ("playR8Mapping", "applianceR8Mapping", "oldSchema"):
                 with self.subTest(stage=stage, missing=missing):
                     manifest = self.unsigned_manifest()
-                    self.assertEqual(manifest["schemaVersion"], 4)
+                    self.assertEqual(manifest["schemaVersion"], 5)
                     manifest["stage"] = stage
                     manifest["artifacts"] = self._artifacts(stage)
                     manifest["signing"] = {"keyAlias": release_metadata.CANONICAL_KEY_ALIAS, "certificateSha256": release_metadata.CANONICAL_CERTIFICATE_SHA256}
                     if missing == "oldSchema":
-                        manifest["schemaVersion"] = 3
+                        manifest["schemaVersion"] = 4
                     else:
                         del manifest["artifacts"][missing]
                     with self.assertRaisesRegex(ValueError, "supported|exactly"):
@@ -242,7 +243,8 @@ class ReleaseMetadataTest(unittest.TestCase):
             version_code=1,
             version_name="0.1.0",
             source_commit="a" * 40,
-            sdk_source_commit="b" * 40,
+            sdk_version=SDK_VERSION,
+            sdk_source_commit=SDK_SOURCE_COMMIT,
             artifacts=self._artifacts("unsigned"),
         )
 
@@ -264,7 +266,8 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
-                sdk_source_commit="b" * 40,
+                sdk_version=SDK_VERSION,
+                sdk_source_commit=SDK_SOURCE_COMMIT,
                 artifacts=artifacts,
             )
 
@@ -287,7 +290,8 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
-                sdk_source_commit="b" * 40,
+                sdk_version=SDK_VERSION,
+                sdk_source_commit=SDK_SOURCE_COMMIT,
                 artifacts=self._artifacts("unsigned"),
             )
 
@@ -316,7 +320,8 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
-                sdk_source_commit="b" * 40,
+                sdk_version=SDK_VERSION,
+                sdk_source_commit=SDK_SOURCE_COMMIT,
                 artifacts=artifacts,
             )
 
@@ -326,6 +331,7 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
+                sdk_version=SDK_VERSION,
                 sdk_source_commit="not-a-commit",
                 artifacts=self._artifacts("unsigned"),
             )
@@ -341,7 +347,8 @@ class ReleaseMetadataTest(unittest.TestCase):
                 version_code=1,
                 version_name="0.1.0",
                 source_commit="a" * 40,
-                sdk_source_commit="b" * 40,
+                sdk_version=SDK_VERSION,
+                sdk_source_commit=SDK_SOURCE_COMMIT,
                 artifacts=self._artifacts("unsigned"),
             )
 
@@ -362,7 +369,8 @@ class ReleaseMetadataTest(unittest.TestCase):
             )
             signed = release_metadata.build_signed_manifest(**arguments)
 
-            self.assertEqual(signed["sdkSourceCommit"], "b" * 40)
+            self.assertEqual(signed["sdkSourceCommit"], SDK_SOURCE_COMMIT)
+            self.assertEqual(signed["sdkVersion"], SDK_VERSION)
             self.assertEqual(
                 signed["artifacts"]["sdkSourceTarGz"]["sha256"],
                 release_metadata.sha256_file(files["sdk.tar.gz"]),
@@ -439,12 +447,45 @@ class ReleaseMetadataTest(unittest.TestCase):
         self.assertNotIn("sdk-media3-${SDK_VERSION}-ffmpeg-sources", prepare)
         self.assertIn('cp "$ROOT_DIR/decoder-ffmpeg/$NATIVE_SOURCE_NAME"', prepare)
         self.assertIn("--sdk-source-commit", prepare)
+        self.assertIn('--sdk-version "$SDK_VERSION"', prepare)
         self.assertIn("--sdk-source-tar-gz", prepare)
         self.assertIn('["artifacts"]["sdkSourceTarGz"]', sign)
         self.assertIn("--sdk-source-tar-gz", sign)
         self.assertIn("validate_source_lineage", release)
         self.assertIn('"sdkSourceTarGz"', metadata)
         self.assertIn('"sdkSourceCommit"', metadata)
+
+    def test_both_stages_refuse_anything_but_the_released_sdk(self) -> None:
+        self.assertRegex(SDK_VERSION, r"^[0-9]+\.[0-9]+\.[0-9]+$")
+        for change, error in (
+            ({"sdkVersion": "0.36.0-20261024.143000-1"}, "not a released version"),
+            ({"sdkVersion": "0.36.0-SNAPSHOT"}, "not a released version"),
+            ({"sdkVersion": "0.3\u0665.0"}, "not a released version"),
+            ({"sdkVersion": None}, "not a released version"),
+            ({"sdkVersion": "0.99.0"}, "not the released SDK"),
+            ({"sdkSourceCommit": "c" * 40}, "not the released SDK"),
+        ):
+            for stage in ("unsigned", "signed"):
+                with self.subTest(change=change, stage=stage):
+                    manifest = self.unsigned_manifest()
+                    manifest["stage"] = stage
+                    manifest["artifacts"] = self._artifacts(stage)
+                    manifest["signing"] = {"keyAlias": release_metadata.CANONICAL_KEY_ALIAS, "certificateSha256": release_metadata.CANONICAL_CERTIFICATE_SHA256}
+                    manifest.update(change)
+                    if manifest["sdkVersion"] is None:
+                        del manifest["sdkVersion"]
+                    with self.assertRaisesRegex(ValueError, error):
+                        if stage == "unsigned":
+                            release_metadata.validate_unsigned_manifest(manifest, application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0")
+                        else:
+                            release_metadata.validate_signed_manifest(manifest)
+            if "sdkVersion" in change and change["sdkVersion"] is not None:
+                with self.subTest(change=change, stage="create"), self.assertRaisesRegex(ValueError, error):
+                    release_metadata.build_unsigned_manifest(
+                        application_id="at.bernhardberger.tvhplayer", version_code=1, version_name="0.1.0",
+                        source_commit="a" * 40, sdk_version=change["sdkVersion"], sdk_source_commit=SDK_SOURCE_COMMIT,
+                        artifacts=self._artifacts("unsigned"),
+                    )
 
     def test_signed_lineage_rejects_sdk_source_substitution(self) -> None:
         unsigned = {

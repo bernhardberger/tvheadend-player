@@ -76,6 +76,33 @@ class ReleaseScriptsTest(unittest.TestCase):
                     self.assertIn(refusal, result.stderr)
                     self.assertIn(version, result.stderr)
 
+    def test_sign_refuses_a_development_sdk_bundle_before_any_signing(self):
+        sdk_version, sdk_source_commit = metadata.released_sdk_pin()
+        for change, refusal in (
+            ({"sdkVersion": "0.36.0-20261024.143000-1"}, "a Player release needs a released SDK"),
+            ({"sdkVersion": "0.36.0-SNAPSHOT"}, "a Player release needs a released SDK"),
+            ({"sdkSourceCommit": "c" * 40}, "is not the released SDK"),
+            ({}, "release keystore does not exist"),
+        ):
+            with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
+                incoming = Path(directory) / "incoming"
+                incoming.mkdir()
+                (incoming / "SHA256SUMS").write_text("")
+                metadata._write_manifest(incoming / "release-manifest.json", {
+                    "schemaVersion": metadata.SCHEMA_VERSION, "stage": "unsigned",
+                    "sdkVersion": sdk_version, "sdkSourceCommit": sdk_source_commit, **change,
+                })
+                # No keystore, password or build tool exists; the released pin only reaches the keystore check.
+                result = subprocess.run(
+                    [str(ROOT / "tools/sign-release"), str(incoming), str(Path(directory) / "missing.jks")],
+                    capture_output=True, text=True, timeout=30,
+                    env={"PATH": "/usr/bin:/bin", "ANDROID_HOME": str(Path(directory) / "android")},
+                )
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(refusal, result.stderr)
+                if change:
+                    self.assertNotIn("keystore", result.stderr)
+
     def test_prepare_and_signed_staging_preserve_artifacts_and_mappings(self):
         script = (ROOT / "tools/prepare-release").read_text()
         self.assertIn(":app:assemblePlayRelease :app:assembleApplianceRelease :app:bundlePlayRelease", script)
@@ -92,7 +119,8 @@ class ReleaseScriptsTest(unittest.TestCase):
                 "built_play_mapping": str(temporary / "play-mapping.txt"),
                 "built_appliance_mapping": str(temporary / "appliance-mapping.txt"),
                 "NATIVE_SOURCE_NAME": "native.tar.xz", "SDK_SOURCE_NAME": "sdk.tar.gz",
-                "SDK_SOURCE_COMMIT": "b" * 40, "application_id": "at.bernhardberger.tvhplayer",
+                "SDK_VERSION": metadata.released_sdk_pin()[0], "SDK_SOURCE_COMMIT": metadata.released_sdk_pin()[1],
+                "application_id": "at.bernhardberger.tvhplayer",
                 "version_code": "1", "version_name": "0.1.0",
             }
             preamble = "\n".join(f"{name}={shlex.quote(value)}" for name, value in variables.items())

@@ -34,8 +34,8 @@ EXPECTED_STANDARD_SOURCE_SHA256 = {
 # Same rule as app/build.gradle.kts and tools/prepare-release: a release is a plain X.Y.Z; a
 # development build is a timestamped X.Y.Z-yyyyMMdd.HHmmss-N snapshot. A floating -SNAPSHOT is
 # rejected: its pinned hashes would break on every new publication.
-RELEASE_SDK_VERSION = re.compile(r"\d+\.\d+\.\d+")
-DEVELOPMENT_SDK_VERSION = re.compile(r"\d+\.\d+\.\d+-\d{8}\.\d{6}-\d+")
+RELEASE_SDK_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+")
+DEVELOPMENT_SDK_VERSION = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+-[0-9]{8}\.[0-9]{6}-[0-9]+")
 EXPECTED_ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 # Android's 16 KiB page-size contract applies to the shipped 64-bit targets.
 ALIGNMENT_ABIS = ("arm64-v8a", "x86_64")

@@ -167,6 +167,7 @@ python3 tools/release_metadata.py create-unsigned \
     --version-code "$version_code" \
     --version-name "$version_name" \
     --source-commit "$(git rev-parse HEAD)" \
+    --sdk-version "$SDK_VERSION" \
     --sdk-source-commit "$SDK_SOURCE_COMMIT" \
     --unsigned-play-apk "$release_dir/$apk_name" \
     --unsigned-appliance-apk "$release_dir/$appliance_apk_name" \

@@ -74,9 +74,24 @@ change with every publication. Change the catalog and item 3 as for a release,
 using the hashes the SDK session gives for that publication, and leave items 4
 and 5 at the last released SDK. `./tools/verify` then passes,
 but `tools/prepare-release` and `tools/check-native-libs --release` refuse the
-pin: a Player release needs a released SDK. Central deletes snapshots after 90
+pin: a Player release needs a released SDK. The release manifest records the
+SDK version and source commit, and `tools/sign-release` and the signed
+verification in `tools/release` refuse a bundle whose SDK differs from the
+released pin in `tools/prepare-release`. Central deletes snapshots after 90
 days, so an old `main` commit that pins one may stop building. That is accepted;
 release commits always pin a released SDK.
+
+Resolving a timestamped pin from the snapshot repository stays unproven until
+the SDK publishes its first development build. Prove the first development pin
+on a branch before it lands on `main`: one real resolution of the pin, and the
+evidence files `tools/check-native-libs` expects, `sdk-media3-<version>.aar`
+and the four `sdk-*-<version>-sources.jar`, present under exactly those names
+in `app/build/released-sdk-evidence`.
+
+Only the `sdk-media3` AAR and those source jars are hash-pinned. The other SDK
+binaries resolve by version alone, and unlike a Central release, a snapshot is
+not immutable and does not pass Central's release validation. A development
+pin is therefore weaker evidence than a released SDK.
 
 ## Unsigned preparation on the build host
 

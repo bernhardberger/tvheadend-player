@@ -234,7 +234,7 @@ tasks.register("verifyExternalSdkConsumption") {
     val sdkVersion = libs.versions.tvheadend.sdk.get()
     // A release X.Y.Z or a development build; tools/check-native-libs and tools/prepare-release
     // use the same rule, and only a release version may be released.
-    val publicSdkVersion = Regex("""\d+\.\d+\.\d+(-\d{8}\.\d{6}-\d+)?""").matches(sdkVersion)
+    val publicSdkVersion = Regex("""[0-9]+\.[0-9]+\.[0-9]+(-[0-9]{8}\.[0-9]{6}-[0-9]+)?""").matches(sdkVersion)
     val stagedSdkSubstitution = providers.gradleProperty("tvheadend.sdk.local")
         .map(String::toBooleanStrict)
         .getOrElse(false)
