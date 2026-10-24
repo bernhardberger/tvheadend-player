@@ -188,6 +188,37 @@ class DetailsTintTest {
             .compositeOver(neutral))
     }
 
+    @Test fun aLogoChangedInPlaceHidesTheOldGlowWhileItsColourIsSampled() {
+        runBlocking { store.put("tint-test-2", 0x336699) }
+        val channel = ChannelId(1)
+        val settled = mutableListOf<ArtworkId>()
+        var logo by mutableStateOf(picon)
+        compose.setContent {
+            CompositionLocalProvider(LocalChannelAccents provides accents, LocalDensity provides Density(2f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    ProvideArtworkSession(session) {
+                        val shown = logo
+                        ChannelLogoGlow(shown, channel, Modifier.fillMaxSize(), onSettled = { settled += shown })
+                    }
+                }
+            }
+        }
+        compose.waitUntil(10_000) { picon in settled }
+        awaitGlow()
+        // The same glow, kept in place, while the new logo's colour is sampled: the old colour's
+        // glow is not the new logo's.
+        val replaced = ArtworkId(5)
+        compose.runOnIdle { logo = replaced }
+        compose.mainClock.advanceTimeBy(1000)
+        assertPixel(1919, 0, neutral.toArgb())
+        assertEquals(listOf(picon), settled)
+        releaseSample.complete(Unit)
+        compose.waitUntil(10_000) { replaced in settled }
+        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store["tint-test-5"])).copy(alpha = .55f)
+            .compositeOver(neutral))
+    }
+
     @Test fun failedArtFallsBackToTheStoredPiconAccent() {
         fail = true
         releaseSample.complete(Unit)

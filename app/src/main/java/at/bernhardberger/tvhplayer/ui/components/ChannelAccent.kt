@@ -104,11 +104,12 @@ internal fun ChannelLogoGlow(
     val key = LogoGlowKey(accent.toArgb() and 0xffffff, background.toArgb() and 0xffffff,
         (size.width / LogoGlowScale).coerceAtLeast(1), (size.height / LogoGlowScale).coerceAtLeast(1))
     // Kept with the key it was baked for: a glow of a colour not yet settled, or of an earlier
-    // colour or size, is neither shown nor reported.
+    // colour or size, is neither shown nor reported. A logo changed in place keeps its old colour
+    // until the new one is sampled, so the key alone would still match.
     val produced by produceState<Pair<LogoGlowKey, ImageBitmap>?>(null, key, accentSettled, size != IntSize.Zero) {
         if (accentSettled && size != IntSize.Zero) value = key to (LogoGlows[key] ?: LogoGlows.bake(key))
     }
-    val glow = produced?.takeIf { it.first == key }?.second
+    val glow = produced?.takeIf { accentSettled && it.first == key }?.second
     val currentOnSettled by rememberUpdatedState(onSettled)
     if (glow != null) LaunchedEffect(key) { currentOnSettled?.invoke() }
     val tint = lerp(background, accent, LogoTintShare)
