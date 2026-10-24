@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.ui.common.programmeEpisodeLine
 import at.bernhardberger.tvhplayer.ui.components.*
 
 /** One programme menu for the opening programme and every related airing. */
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 internal fun ProgrammeContextMenu(
     event: EpgEvent,
@@ -24,12 +25,16 @@ internal fun ProgrammeContextMenu(
     canModify: Boolean,
     currentSession: CurrentSessionObservation?,
     observation: SessionObservation,
+    canPlayRecording: Boolean,
     onAction: (EpgEvent, BrowseContextAction) -> Unit,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
     backEnabled: Boolean = true,
 ) {
-    val actions = channelContextActions(event, nowSec, recording, canModify)
+    // The recording plays only as details would play it: admitted, with a session and a player route.
+    val admission = recording?.takeIf { canPlayRecording && currentSession != null }
+        ?.let(observation::recordingPlaybackAdmission)
+    val actions = channelContextActions(event, nowSec, recording, admission, canModify)
     val showGuide = BrowseContextAction.SHOW_GUIDE in programmeDetailsActions(event, nowSec, recording, null,
         canModify, channel != null && currentSession != null, fromGuide, stacked = stacked)
     BrowseContextMenu(

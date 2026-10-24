@@ -997,7 +997,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   card 268dp left, 268dp WideButton column right, columns top-aligned, the
   container centred. Channel and programme menus share one order on every
   surface (Channels, Guide, airings): Watch, Details, the recording action,
-  Show in Guide, so a held OK always lands on the same action. An action that
+  Show in Guide, so a held OK always lands on the same action. An ended
+  programme whose recording the SDK admits for playback adds Play recording
+  right after Watch, as on its details page. An action that
   needs a confirmation closes the menu for good; Keep, Cancel and Back return focus to the originating card. Details
   opened from a menu return to the card on Back, never to the menu.
 - **Prompts and confirmations** (resume or start over; cancel, stop or delete a

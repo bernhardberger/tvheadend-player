@@ -240,6 +240,7 @@ internal fun ProgrammeDetailsHost(
         PlayerMotionFrame(leaving = closing || pendingAction != null) {
         ProgrammeContextMenu(
             event, channel, recording, fromGuide, stack.isNotEmpty(), nowSec, canModify, capability, observation,
+            canPlayRecording = onPlayRecording != null,
             modifier = Modifier.onPreviewKeyEvent(keyHandler),
             onAction = act, onClose = closeAnimated,
             backEnabled = !closing && menu == showContextMenu && pendingAction == null,
@@ -310,7 +311,7 @@ internal fun ProgrammeDetailsHost(
         ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(observation::channel),
             observation.dvrEntryForEvent(menuEvent), fromGuide = true, stacked = true,
             nowSec = nowSec, canModify = canModify, currentSession = capability, observation = observation,
-            onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
+            canPlayRecording = onPlayRecording != null, onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))
     }
     pendingAction?.takeIf { currentMutation != null }?.let { action ->

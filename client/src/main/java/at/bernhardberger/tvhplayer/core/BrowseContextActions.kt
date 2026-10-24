@@ -12,35 +12,34 @@ enum class BrowseContextAction {
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
 }
 
-/** One order for every channel and programme menu, so a held OK always lands on Watch. */
+/**
+ * One order for every channel and programme menu, so a held OK always lands on Watch.
+ * [recordingAdmission] is the SDK's admission of [recording]: an ended programme it admits plays
+ * its recording right after Watch, as on the details page.
+ */
 fun channelContextActions(
     event: EpgEvent?,
     nowSec: Long,
     recording: DvrEntry?,
+    recordingAdmission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
 ): List<BrowseContextAction> = buildList {
     add(BrowseContextAction.WATCH)
     if (event != null) {
+        val actions = programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings,
+            recordingAdmission = recordingAdmission)
+        if (recording != null && ProgrammeAction.WATCH_FROM_START in actions) add(BrowseContextAction.PLAY)
         add(BrowseContextAction.DETAILS)
-        addAll(programmeContextRecordingActions(event, nowSec, recording, canModifyRecordings))
+        actions.mapNotNullTo(this) {
+            when (it) {
+                ProgrammeAction.RECORD -> BrowseContextAction.RECORD
+                ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
+                ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL
+                ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START -> null
+            }
+        }
     }
     add(BrowseContextAction.SHOW_GUIDE)
-}
-
-private fun programmeContextRecordingActions(
-    event: EpgEvent,
-    nowSec: Long,
-    recording: DvrEntry?,
-    canModifyRecordings: Boolean,
-): List<BrowseContextAction> = programmeActions(
-    event, nowSec, recording, canModifyRecordings = canModifyRecordings,
-).mapNotNull {
-    when (it) {
-        ProgrammeAction.RECORD -> BrowseContextAction.RECORD
-        ProgrammeAction.STOP_RECORDING -> BrowseContextAction.STOP
-        ProgrammeAction.CANCEL_RECORDING -> BrowseContextAction.CANCEL
-        ProgrammeAction.WATCH, ProgrammeAction.WATCH_FROM_START -> null
-    }
 }
 
 /** [admission] is the SDK's admission of [entry] from the observation it was read from, null without a session. */

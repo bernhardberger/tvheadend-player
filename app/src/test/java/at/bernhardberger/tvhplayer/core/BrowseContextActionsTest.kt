@@ -31,18 +31,40 @@ class BrowseContextActionsTest {
         dataSizeBytes = dataSize, playCount = playCount)
 
     @Test fun channelsWithoutProgrammeOrPermissionDoNotOfferRecording() {
-        assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 100, null, true))
-        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 100, null, false))
+        assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 100, null, null, true))
+        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 100, null, null, false))
     }
 
     @Test fun programmeMenusReuseProgrammeRecordingPolicyInOneOrder() {
         listOf(null to RECORD, DvrEntryState.RECORDING to STOP, DvrEntryState.RECORDING_ERROR to STOP,
             DvrEntryState.SCHEDULED to CANCEL).forEach { (state, action) ->
             val recording = state?.let { recording(it) }
-            assertEquals(listOf(WATCH, DETAILS, action, SHOW_GUIDE), channelContextActions(event, 100, recording, true))
-            assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 100, recording, false))
+            assertEquals(listOf(WATCH, DETAILS, action, SHOW_GUIDE), channelContextActions(event, 100, recording, null, true))
+            assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 100, recording, null, false))
         }
-        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 200, null, true))
+        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 200, null, null, true))
+    }
+
+    @Test fun endedProgrammeMenuPlaysItsRecordingRightAfterWatchOnlyWhenAdmitted() {
+        val completed = recording(DvrEntryState.COMPLETED)
+        listOf(true, false).forEach { canModify ->
+            assertEquals("$canModify", listOf(WATCH, PLAY, DETAILS, SHOW_GUIDE),
+                channelContextActions(event, 200, completed, admission(completed), canModify))
+        }
+        // Not admitted: no session, or a failed recording without a playable file.
+        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 200, completed, null, true))
+        val missed = recording(DvrEntryState.MISSED, 20)
+        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 200, missed, admission(missed), true))
+        assertEquals(listOf(WATCH, DETAILS, SHOW_GUIDE), channelContextActions(event, 200, null, null, true))
+    }
+
+    @Test fun runningOrFutureProgrammeMenuNeverPlaysItsRecording() {
+        val growing = recording(DvrEntryState.RECORDING, 20, listOf(file()))
+        assertEquals(listOf(WATCH, DETAILS, STOP, SHOW_GUIDE),
+            channelContextActions(event, 150, growing, admission(growing), true))
+        val completed = recording(DvrEntryState.COMPLETED)
+        assertEquals(listOf(WATCH, DETAILS, RECORD, SHOW_GUIDE),
+            channelContextActions(event, 50, completed, admission(completed), true))
     }
 
     @Test fun completedRecordingsOfferResumeOnlyWithProgress() {
@@ -177,6 +199,10 @@ class BrowseContextActionsTest {
             folderContextActions(rewatching, observation::recordingPlaybackAdmission, true))
         assertEquals(0, rewatching.watchedCount { offeredResumePosition(observation.recordingPlaybackAdmission(it)) })
     }
+
+    private fun admission(entry: DvrEntry) =
+        SessionObservation.create(recordingProgressCapability = RecordingProgressCapability.SUPPORTED)
+            .recordingPlaybackAdmission(entry)
 
     private fun file(path: String = "/rec/a.ts") = TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path)
 

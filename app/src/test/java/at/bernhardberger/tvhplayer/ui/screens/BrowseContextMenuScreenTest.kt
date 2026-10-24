@@ -1024,6 +1024,28 @@ class BrowseContextMenuScreenTest {
         assertEquals(RecordingPlaybackStart.START_OVER, start)
     }
 
+    @Test fun channelsMenuPlaysTheRecordingOfAnEndedProgrammeRightAfterWatch() {
+        val session = show(recordings = false, channelRecording = true)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Play recording").assertDoesNotExist()
+        // As in channelsDetailsCanPlayItsCompletedRecording: the programme has ended, so its recording plays.
+        compose.runOnIdle {
+            val previous = session.observation.value
+            val event = requireNotNull(previous.event(EventId(1)))
+            session.publish(SessionObservation.create(previous.sessionState, previous.channelState,
+                EpgRepositoryState.Current(EpgSnapshot.create(listOf(EpgEvent.create(event.id, event.channelId,
+                    event.start, Instant.parse("2026-09-15T19:00:00Z") - 60.seconds,
+                    title = event.title)))), previous.dvrState,
+                recordingProgressCapability = previous.recordingProgressCapability))
+        }
+        compose.waitUntil(10_000) { compose.onAllNodesWithText("Play recording").fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText("Watch channel").requestFocus().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithText("Play recording").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        assertEquals(1, plays)
+        // Only the recording route sets a start; live playback would leave it unset.
+        assertEquals(RecordingPlaybackStart.START_OVER, start)
+    }
+
     @Test fun scheduledDetailsWatchChannelUsesLivePlayback() {
         show(recordings = true, recordingState = DvrEntryState.SCHEDULED)
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
