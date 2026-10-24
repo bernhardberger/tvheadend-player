@@ -141,6 +141,19 @@ class EpgColumnStatePolicyTest {
         assertEquals(false, epgWindowCoverageProven(null, windowEndSec = 101, nowSec = 100))
     }
 
+    @Test
+    fun anOnAirWindowNeedsCoverageToItsEndToBeEmpty() {
+        val channelId = ChannelId(1)
+        fun coverage(queriedTo: Long) = EpgCoverage.create(
+            channelId, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3_600),
+            queriedTo = Instant.fromEpochSeconds(queriedTo),
+        )
+
+        assertEquals(false, epgWindowCoverageProven(null, windowEndSec = 7_200, nowSec = 3_600))
+        assertEquals(false, epgWindowCoverageProven(coverage(7_199), windowEndSec = 7_200, nowSec = 3_600))
+        assertEquals(true, epgWindowCoverageProven(coverage(7_200), windowEndSec = 7_200, nowSec = 3_600))
+    }
+
     private fun event(start: Long, stop: Long) = EpgEvent.create(
         id = EventId(start),
         channelId = ChannelId(1),
