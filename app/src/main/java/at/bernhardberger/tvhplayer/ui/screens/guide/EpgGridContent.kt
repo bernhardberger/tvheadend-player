@@ -92,6 +92,7 @@ import at.bernhardberger.tvhplayer.core.timelineEventSpan
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
+import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
@@ -110,6 +111,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 
 private fun GuideRows.logoWidth(): Dp = if (this == GuideRows.DENSE) 48.dp else 60.dp
 private fun GuideRows.logoHeight(): Dp = if (this == GuideRows.DENSE) 28.dp else 36.dp
+private fun GuideRows.headerHorizontalPadding(): Dp = if (this == GuideRows.DENSE) TvSpacing12 else TvSpacing16
 private fun GuideRows.headerVerticalPadding(): Dp = if (this == GuideRows.DENSE) 4.dp else 6.dp
 
 /**
@@ -144,6 +146,7 @@ internal fun TimelineTimeRuler(
     modifier: Modifier = Modifier,
     earlierContent: Boolean = false,
     laterContent: Boolean = false,
+    rows: GuideRows = GuideRows.DENSE,
 ) {
     val nowSec = nowSecProvider()
     Row(
@@ -156,7 +159,7 @@ internal fun TimelineTimeRuler(
     ) {
         Surface(
             modifier = Modifier
-                .width(GuideChannelWidth)
+                .width(guideChannelWidth(rows))
                 .fillMaxHeight(),
             shape = MaterialTheme.shapes.small,
             colors = SurfaceDefaults.colors(
@@ -168,7 +171,7 @@ internal fun TimelineTimeRuler(
                 Text(
                     text = stringResource(R.string.epg_channels_heading),
                     style = MaterialTheme.typography.labelLarge,
-                    modifier = Modifier.padding(horizontal = TvSpacing16),
+                    modifier = Modifier.padding(horizontal = rows.headerHorizontalPadding()),
                 )
             }
         }
@@ -293,7 +296,7 @@ internal fun TimelineChannelRow(
             val density = LocalDensity.current
             val layoutDirection = LocalLayoutDirection.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
-                with(density) { GuideChannelWidth.roundToPx() + GuideChannelGap.roundToPx() },
+                with(density) { guideChannelWidth(rows).roundToPx() + GuideChannelGap.roundToPx() },
             )
             events.forEach { event ->
                 val span = timelineEventSpan(
@@ -391,7 +394,7 @@ internal fun TimelineChannelHeader(
     var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
     Surface(
         modifier = Modifier
-            .width(GuideChannelWidth)
+            .width(guideChannelWidth(rows))
             .fillMaxHeight()
             .semantics(mergeDescendants = true) {
                 contentDescription = channelTitleText(number, channel.name.orEmpty())
@@ -411,7 +414,7 @@ internal fun TimelineChannelHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = TvSpacing16, vertical = rows.headerVerticalPadding()),
+                .padding(horizontal = rows.headerHorizontalPadding(), vertical = rows.headerVerticalPadding()),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
         ) {

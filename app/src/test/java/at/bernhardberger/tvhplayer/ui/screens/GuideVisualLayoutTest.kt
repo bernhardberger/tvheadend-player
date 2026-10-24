@@ -183,8 +183,8 @@ class GuideVisualLayoutTest {
     @Test fun normalGeometryAndContinuousNowAboveNativeFocus() {
         show()
         val ruler = bounds("epg-time-ruler")
-        assertEquals(262f, ruler.left, .1f)
-        assertEquals(698f, ruler.width, .1f)
+        assertEquals(242f, ruler.left, .1f)
+        assertEquals(718f, ruler.width, .1f)
         assertEquals(72f, ruler.top, .1f)
         assertEquals(100f, ruler.bottom, .1f)
         val first = bounds("epg-channel-row-1")
@@ -194,8 +194,8 @@ class GuideVisualLayoutTest {
         assertEquals("Dense rows by default", 56f, first.height, .1f)
         assertEquals(168f, bounds("epg-channel-row-2").top, .1f)
         assertEquals(130f, bounds("epg-channel-header-1").left, .1f)
-        assertEquals(254f, bounds("epg-channel-header-1").right, .1f)
-        assertEquals("Ruler heading shares the 16dp channel text inset", 146f,
+        assertEquals(234f, bounds("epg-channel-header-1").right, .1f)
+        assertEquals("Ruler heading shares the 12dp dense channel text inset", 142f,
             compose.onNodeWithText(context().getString(R.string.epg_channels_heading)).fetchSemanticsNode().boundsInRoot.left, .1f)
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -271,7 +271,7 @@ class GuideVisualLayoutTest {
                 val header = compose.onNodeWithTag("epg-channel-header-$id")
                 header.assertContentDescriptionEquals(description)
                 assertFalse("Header is not a D-pad focus target", header.fetchSemanticsNode().config.contains(SemanticsProperties.Focused))
-                assertEquals(124f, header.fetchSemanticsNode().boundsInRoot.width, .1f)
+                assertEquals(104f, header.fetchSemanticsNode().boundsInRoot.width, .1f)
                 assertEquals("Row grows with font scale $fontScale", rowHeight, header.fetchSemanticsNode().boundsInRoot.height, .1f)
             }
             compose.onNodeWithText(logoName, useUnmergedTree = true).assertDoesNotExist()
@@ -286,9 +286,9 @@ class GuideVisualLayoutTest {
             assertFalse("Four-digit number must not truncate at $fontScale", numberText.hasVisualOverflow)
             assertFalse(numberText.isLineEllipsized(0))
             val logoNumberBounds = logoNumber.fetchSemanticsNode().boundsInRoot
-            assertEquals(bounds("epg-channel-header-1").left + 16f, logoNumberBounds.left, .1f)
+            assertEquals(bounds("epg-channel-header-1").left + 12f, logoNumberBounds.left, .1f)
             assertEquals(logoNumberBounds.right + 8f, logo.left, .1f)
-            assertEquals("Logo yields width to the complete channel number", minOf(48f, 92f - logoNumberBounds.width - 8f), logo.width, .1f)
+            assertEquals("Logo yields width to the complete channel number", minOf(48f, 80f - logoNumberBounds.width - 8f), logo.width, .1f)
             assertEquals(28f, logo.height, .1f)
             // Odd pixel row/text heights can centre an even-height logo half a pixel away.
             assertEquals(bounds("epg-channel-header-1").center.y, logo.center.y, .5f)
@@ -305,9 +305,9 @@ class GuideVisualLayoutTest {
             numberNode.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(noLogoNumberLayouts) }
             assertFalse("No-logo four-digit number must not truncate at $fontScale", noLogoNumberLayouts.single().hasVisualOverflow)
             assertFalse(noLogoNumberLayouts.single().isLineEllipsized(0))
-            assertEquals(bounds("epg-channel-header-2").left + 16f, number.left, .1f)
+            assertEquals(bounds("epg-channel-header-2").left + 12f, number.left, .1f)
             assertEquals(number.right + 8f, nameBounds.left, .1f)
-            assertEquals(bounds("epg-channel-header-2").right - 16f, nameBounds.right, .1f)
+            assertEquals(bounds("epg-channel-header-2").right - 12f, nameBounds.right, .1f)
             assertEquals(number.center.y, nameBounds.center.y, .5f)
             assertEquals(bounds("epg-channel-header-2").center.y, nameBounds.center.y, .5f)
             assertTrue("The complete name line fits at $fontScale", text.getLineBottom(0) <= nameBounds.height)
@@ -346,20 +346,20 @@ class GuideVisualLayoutTest {
         }
         val first = compose.onNodeWithText("First programme").fetchSemanticsNode().boundsInRoot
         val second = compose.onNodeWithText("Second programme").fetchSemanticsNode().boundsInRoot
-        assertEquals("Time allocations still start at the timeline edge", 132f, first.left, .1f)
-        assertEquals(300f, first.width, .1f)
+        assertEquals("Time allocations still start at the timeline edge", 112f, first.left, .1f)
+        assertEquals(310f, first.width, .1f)
         assertEquals(first.right, second.left, .1f)
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             val y = first.center.y.toInt()
-            val gapColor = bitmap.getPixel(432, y)
-            val cellColor = bitmap.getPixel(429, y)
+            val gapColor = bitmap.getPixel(422, y)
+            val cellColor = bitmap.getPixel(419, y)
             assertNotEquals("Surfaces and timeline gap must be visibly distinct", gapColor, cellColor)
-            for (x in 430 until 434) assertEquals("Exactly four gap pixels at x=$x", gapColor, bitmap.getPixel(x, y))
-            assertEquals(cellColor, bitmap.getPixel(434, y))
-            assertEquals("First surface has the same 2dp leading inset", gapColor, bitmap.getPixel(133, y))
-            assertEquals(cellColor, bitmap.getPixel(134, y))
+            for (x in 420 until 424) assertEquals("Exactly four gap pixels at x=$x", gapColor, bitmap.getPixel(x, y))
+            assertEquals(cellColor, bitmap.getPixel(424, y))
+            assertEquals("First surface has the same 2dp leading inset", gapColor, bitmap.getPixel(113, y))
+            assertEquals(cellColor, bitmap.getPixel(114, y))
             bitmap.recycle()
         }
     }
@@ -497,7 +497,7 @@ class GuideVisualLayoutTest {
         show(direction = LayoutDirection.Rtl)
         val ruler = bounds("epg-time-ruler")
         assertEquals(0f, ruler.left, .1f)
-        assertEquals(698f, ruler.right, .1f)
+        assertEquals(718f, ruler.right, .1f)
         key(Key.DirectionDown)
         focused(title(1, 0))
         val current = compose.onNodeWithText(title(1, 0)).fetchSemanticsNode().boundsInRoot
@@ -709,7 +709,7 @@ class GuideVisualLayoutTest {
         }
         val first = compose.onNodeWithText("Short 0").fetchSemanticsNode().boundsInRoot
         val second = compose.onNodeWithText("Short 1").fetchSemanticsNode().boundsInRoot
-        assertEquals(132f, first.left, .1f)
+        assertEquals(112f, first.left, .1f)
         assertEquals(652f / 36, first.width, 1f)
         assertTrue(first.right <= second.left)
         compose.runOnIdle { visibleWidth.value = 484 }
@@ -772,7 +772,7 @@ class GuideVisualLayoutTest {
         val ruler = bounds("epg-time-ruler")
         assertEquals("RTL terminal history retains a complete hour", ruler.width / hours, focus.width, 1f)
         assertEquals("RTL history begins at the padded physical left", ruler.left, focus.left, 1f)
-        assertEquals("RTL future stays adjacent to the gutter", 698f, ruler.right, .1f)
+        assertEquals("RTL future stays adjacent to the gutter", 718f, ruler.right, .1f)
         val bitmap = capture(name, scale, LayoutDirection.Rtl)
         assertTerminalNativeFocus(bitmap, LayoutDirection.Rtl)
         bitmap.recycle()
@@ -1776,7 +1776,7 @@ class GuideVisualLayoutTest {
                 "focus=${compose.onNode(isFocused()).fetchSemanticsNode().config.let { it.getOrElseNullable(SemanticsProperties.Text) { null } ?: it.getOrElseNullable(SemanticsProperties.ContentDescription) { null } }}; " +
                 "bounds=${compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot}; position=${position.position.value}\n" +
                 "ruler=${bounds("epg-time-ruler")}; nativeFocusPixels=${nativeFocusBounds(bitmap)}\n" +
-                "headerRefinement=inline number/logo or number/name; gutter=124dp; headerInset=16dp; numberGap=8dp; cellGap=4dp; nameType=titleSmall14/20 single line; picon=max48x28dp Fit (dense rows)\n" +
+                "headerRefinement=inline number/logo or number/name; gutter=104dp; headerInset=12dp; numberGap=8dp; cellGap=4dp; nameType=titleSmall14/20 single line; picon=max48x28dp Fit (dense rows)\n" +
                 "production=TVHeadendPlayerTheme + SideRail + EpgGridScreen; native D-pad focus; fake SDK; intercepted synthetic picons\n" +
                 "background=opaque theme background, not live video; static Robolectric SDK34 native graphics only\n" +
                 "playbackRequests=$playbackRequests; navigationRequests=$navigationRequests; sdkCalls=${session.calls.size}\n",
@@ -1801,11 +1801,11 @@ class GuideVisualLayoutTest {
         assertFalse("Header is not a D-pad focus target", compose.onNodeWithTag("epg-channel-header-2")
             .fetchSemanticsNode().config.contains(SemanticsProperties.Focused))
         val number = compose.onNodeWithText("2", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(124f, header.width, .1f)
+        assertEquals(104f, header.width, .1f)
         assertEquals(48f, logo.width, .1f)
         assertEquals(28f, logo.height, .1f)
         assertEquals(number.right + 8f, logo.left, .1f)
-        assertEquals(header.left + 16f, number.left, .1f)
+        assertEquals(header.left + 12f, number.left, .1f)
         assertEquals("Logo remains centred to native pixel precision", header.center.y, logo.center.y, .5f)
         assertEquals("Number remains centred to native pixel precision", header.center.y, number.center.y, .5f)
         val noLogoHeader = bounds("epg-channel-header-3")
@@ -1816,9 +1816,9 @@ class GuideVisualLayoutTest {
         val layouts = mutableListOf<TextLayoutResult>()
         name.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val text = layouts.single()
-        assertEquals(noLogoHeader.left + 16f, noLogoNumber.left, .1f)
+        assertEquals(noLogoHeader.left + 12f, noLogoNumber.left, .1f)
         assertEquals(noLogoNumber.right + 8f, nameBounds.left, .1f)
-        assertEquals(noLogoHeader.right - 16f, nameBounds.right, .1f)
+        assertEquals(noLogoHeader.right - 12f, nameBounds.right, .1f)
         assertEquals("No-logo number and name share the centred row", noLogoNumber.center.y, nameBounds.center.y, .5f)
         assertEquals(noLogoHeader.center.y, nameBounds.center.y, .5f)
         assertEquals(14.sp, text.layoutInput.style.fontSize)

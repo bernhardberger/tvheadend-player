@@ -199,9 +199,10 @@ internal fun GuideTimelineBody(
                 start = timelineContentPadding.calculateStartPadding(layoutDirection),
                 end = timelineContentPadding.calculateEndPadding(layoutDirection),
             ),
+            rows = rows,
         )
         val trackLeftPx = if (layoutDirection == LayoutDirection.Ltr) {
-            with(density) { (startPadding + TvBrowseLeadingInset + GuideChannelWidth + GuideChannelGap).toPx() }
+            with(density) { (startPadding + TvBrowseLeadingInset + guideChannelWidth(rows) + GuideChannelGap).toPx() }
         } else terminalReservePx
         Box(Modifier.weight(1f).fillMaxWidth()
             .guideViewportFades(trackLeftPx, trackWidthPx, frame.earlierContent, frame.laterContent,

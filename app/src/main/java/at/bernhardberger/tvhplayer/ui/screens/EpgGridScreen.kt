@@ -130,7 +130,7 @@ import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
@@ -277,7 +277,7 @@ fun EpgGridScreen(
     ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
-    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - GuideChannelWidth - GuideChannelGap)
+    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - guideChannelWidth(view.rows) - GuideChannelGap)
         .coerceAtLeast(1.dp)
     val timelineWidthPx = with(density) { timelineWidth.toPx() }
     // TV Material's native ListItem focus scale is 1.05; reserve its largest possible
