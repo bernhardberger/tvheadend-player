@@ -237,7 +237,7 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
-    @Test fun middleRowRetainsCompleteNativeFocusGrowth() {
+    @Test fun middleRowFocusRingStaysInsideItsRow() {
         show()
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -246,14 +246,13 @@ class GuideVisualLayoutTest {
         val bitmap = capture("guide-middle-focus", 1f, LayoutDirection.Ltr)
         val focus = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         val native = nativeFocusBounds(bitmap)
-        assertEquals("Middle row preserves the full native 1.05 height", focus.height * 1.05f, native.height, 2f)
-        assertTrue("Native focus grows above the row instead of clipping", native.top < focus.top)
-        assertTrue("Native focus grows below the row instead of clipping", native.bottom > focus.bottom)
-        assertEquals("Native focus remains vertically centred", focus.center.y, native.center.y, 1f)
+        assertEquals("The focused cell keeps its row height", focus.height, native.height, 1f)
+        assertEquals("The ring starts at the row's top", focus.top, native.top, 1f)
+        assertEquals("The ring ends at the row's bottom", focus.bottom, native.bottom, 1f)
         val edgeX = native.right.toInt() - 1
         val edgeY = focus.center.y.toInt()
         val edgePixel = bitmap.getPixel(edgeX, edgeY)
-        assertTrue("Adjacent programme must not cover the native focused edge at ($edgeX,$edgeY)",
+        assertTrue("Adjacent programme must not cover the focus ring at ($edgeX,$edgeY)",
             android.graphics.Color.red(edgePixel) > 180 && android.graphics.Color.green(edgePixel) > 180 &&
                 android.graphics.Color.blue(edgePixel) > 180)
         compose.onNodeWithText("Northline News", useUnmergedTree = true).assertIsDisplayed()
@@ -627,10 +626,11 @@ class GuideVisualLayoutTest {
         show()
         key(Key.DirectionDown)
         focused(title(1, 0))
-        repeat(2) { key(Key.DirectionRight) }
-        focused(title(1, 2))
+        // The fourth programme scrolls the window past now; the third still fits beside it.
+        repeat(3) { key(Key.DirectionRight) }
+        focused(title(1, 3))
         repeat(7) { key(Key.DirectionDown) }
-        focused(title(9, 2)) // The metadata-only third channel is not an invented programme.
+        focused(title(9, 3)) // The metadata-only third channel is not an invented programme.
         assertReadableFocus()
         val bitmap = capture("guide-scrolled", 1f, LayoutDirection.Ltr)
         val viewport = bounds("epg-timeline-content")
@@ -664,7 +664,8 @@ class GuideVisualLayoutTest {
         val bitmap = capture("guide-data-edge", 1f, LayoutDirection.Ltr)
         val focus = compose.onNode(hasText(title(1, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("Known first programme is not hidden under a speculative history fade", focus.left < bounds("epg-time-ruler").left + 48f)
-        val nearLeft = bitmap.getPixel(focus.left.toInt() + 12, focus.bottom.toInt() - 10)
+        // The focus ring's leading edge stays bright: no fade dims it.
+        val nearLeft = bitmap.getPixel(focus.left.toInt() + 2, focus.bottom.toInt() - 10)
         assertTrue(android.graphics.Color.red(nearLeft) > 180)
         val ruler = bounds("epg-time-ruler")
         val start = checkNotNull(position.position.value).windowStartSec
@@ -1998,15 +1999,15 @@ class GuideVisualLayoutTest {
     private fun assertTerminalNativeFocus(bitmap: Bitmap, direction: LayoutDirection) {
         val focus = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         val native = nativeFocusBounds(bitmap)
-        // Semantics omit the graphics-layer scale. Check the complete bright surface,
-        // including its native 1.05 growth, rather than accepting a clipped rectangle.
-        assertEquals("Complete native focus width", (focus.width - 4f) * 1.05f, native.width, 2f)
-        assertEquals("Complete native focus height", focus.height * 1.05f, native.height, 2f)
-        assertEquals("Native focus remains centred on its time allocation", focus.center.x, native.center.x, 1f)
+        // Check the complete ring rather than accepting a clipped rectangle: it spans the cell
+        // inside its 2dp gutter halves, at the cell's own size.
+        assertEquals("Complete focus ring width", focus.width - 4f, native.width, 1f)
+        assertEquals("Complete focus ring height", focus.height, native.height, 1f)
+        assertEquals("The ring remains centred on its time allocation", focus.center.x, native.center.x, 1f)
         if (direction == LayoutDirection.Ltr) {
-            assertTrue("Scaled focus must end inside the physical 48dp safe area: $native", native.right <= bitmap.width - 48f)
+            assertTrue("The ring must end inside the physical 48dp safe area: $native", native.right <= bitmap.width - 48f)
         } else {
-            assertTrue("Scaled focus must start inside the physical 48dp safe area: $native", native.left >= 48f)
+            assertTrue("The ring must start inside the physical 48dp safe area: $native", native.left >= 48f)
         }
         val safeArea = if (direction == LayoutDirection.Ltr) bitmap.width - 48 until bitmap.width else 0 until 48
         for (y in (focus.top.toInt() - 4)..(focus.bottom.toInt() + 4)) {

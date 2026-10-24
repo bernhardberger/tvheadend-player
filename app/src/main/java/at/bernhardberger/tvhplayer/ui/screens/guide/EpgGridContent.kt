@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.ProfileCompositionLifetime
 import at.bernhardberger.tvhplayer.profiling.profileViewportItem
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,8 +64,8 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
+import androidx.tv.material3.Border
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
@@ -313,8 +314,7 @@ internal fun TimelineChannelRow(
         )
         Spacer(Modifier.width(GuideChannelGap))
         // No track behind the cells: they sit on the page, one 4dp gutter apart, like the channel
-        // tiles. Clipped only at a faded edge: elsewhere a clip would cut the focused first or last
-        // cell's library scale.
+        // tiles. Clipped at a faded edge, so a cell never paints past its fade into the channel gap.
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
@@ -339,7 +339,7 @@ internal fun TimelineChannelRow(
                 val readableWidth = (maxWidth - focusStartInset - focusEndInset).coerceAtLeast(0.dp)
                 val oversized = isFocusTarget && fullEnd - fullStart > readableWidth
                 // Only oversized programmes use a readable fragment. Normal cells retain
-                // their full time allocation; the shared terminal viewport reserves scale.
+                // their full time allocation; the shared terminal viewport reserves the edge.
                 val start = if (oversized) maxOf(fullStart, focusStartInset) else fullStart
                 val end = if (oversized) minOf(fullEnd, maxWidth - focusEndInset) else fullEnd
                 val width = (end - start).coerceAtLeast(0.dp)
@@ -382,9 +382,6 @@ internal fun TimelineChannelRow(
                         outsideGenre = outsideGenre,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
-                            // The 4dp gap is narrower than the focus scale: the focused
-                            // cell draws above its later neighbour.
-                            .zIndex(if (isFocusTarget) 1f else 0f)
                             .absoluteOffset(x = start)
                             .width(width)
                             .fillMaxHeight()
@@ -583,11 +580,10 @@ internal fun TimelineProgrammeCell(
                     style = MaterialTheme.typography.titleSmall,
                     modifier = Modifier.weight(1f, fill = false),
                 )
+                // Focus keeps the cell's dark fill, so both marks keep their unfocused colors.
                 if (markState != null) {
-                    // The mark follows the cell's content colour, which inverts on focus.
                     RecordingStatusIndicator(
                         state = markState,
-                        focused = focused,
                         modifier = Modifier.markAtFullSizeOrNone().testTag("guide-cell-recording-mark"),
                     )
                 }
@@ -597,7 +593,7 @@ internal fun TimelineProgrammeCell(
                         // The dot of a running recording already names its errors.
                         contentDescription = stringResource(failed).takeIf { markState == null },
                         modifier = Modifier.markAtFullSizeOrNone().size(StatusIconSize).testTag("guide-cell-failed-mark"),
-                        tint = if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error,
+                        tint = MaterialTheme.colorScheme.error,
                     )
                 }
             }
@@ -611,8 +607,7 @@ internal fun TimelineProgrammeCell(
             .tabFocus()
             .fillMaxSize()
             .padding(horizontal = TvSpacing4 / 2)
-            // The panel shape is drawn, not clipped: a clip here would cancel the
-            // library focus scale the surface applies outside this modifier.
+            // The cell's own fill, which focus keeps: the focused container is transparent.
             .background((colors?.tint ?: TvSurfaceColors.containerHigh).copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
             .focusRequester(focusRequester)
             .then(contextMenu.modifier)
@@ -624,16 +619,22 @@ internal fun TimelineProgrammeCell(
                 contentDescription = cellDescription
                 if (outsideState != null) stateDescription = outsideState
             }
-        // The family's wash replaces the light focused container; the content keeps its focused colors.
-        val itemColors = colors?.let {
-            val onWash = MaterialTheme.colorScheme.inverseOnSurface
-            ListItemDefaults.colors(
-                focusedContainerColor = it.wash, focusedContentColor = onWash,
-                pressedContainerColor = it.wash, pressedContentColor = onWash,
-                focusedSelectedContainerColor = it.wash, focusedSelectedContentColor = onWash,
-                pressedSelectedContainerColor = it.wash, pressedSelectedContentColor = onWash,
-            )
-        } ?: ListItemDefaults.colors()
+        // Focus keeps the cell's fill and light content and adds a ring in the cell's shape. The cell
+        // does not scale, so it never grows over its neighbours.
+        val onCell = MaterialTheme.colorScheme.onSurface
+        val itemColors = ListItemDefaults.colors(
+            focusedContainerColor = Color.Transparent, focusedContentColor = onCell,
+            pressedContainerColor = Color.Transparent, pressedContentColor = onCell,
+            focusedSelectedContainerColor = Color.Transparent, focusedSelectedContentColor = onCell,
+            pressedSelectedContainerColor = Color.Transparent, pressedSelectedContentColor = onCell,
+        )
+        // The library centers the stroke on the outline; the negative inset moves it inside the cell.
+        val ring = Border(BorderStroke(GuideFocusRingWidth, onCell), inset = -GuideFocusRingWidth / 2,
+            shape = MaterialTheme.shapes.small)
+        val itemBorder = ListItemDefaults.border(
+            focusedBorder = ring, pressedBorder = ring, focusedSelectedBorder = ring, pressedSelectedBorder = ring,
+        )
+        val itemShape = ListItemDefaults.shape(MaterialTheme.shapes.small)
         when (rows) {
             GuideRows.DENSE -> DenseListItem(
                 selected = selected,
@@ -642,6 +643,9 @@ internal fun TimelineProgrammeCell(
                 headlineContent = headline,
                 supportingContent = supporting,
                 colors = itemColors,
+                scale = GuideCellScale,
+                border = itemBorder,
+                shape = itemShape,
                 modifier = cellModifier,
             )
             GuideRows.REGULAR -> ListItem(
@@ -651,11 +655,20 @@ internal fun TimelineProgrammeCell(
                 headlineContent = headline,
                 supportingContent = supporting,
                 colors = itemColors,
+                scale = GuideCellScale,
+                border = itemBorder,
+                shape = itemShape,
                 modifier = cellModifier,
             )
         }
     }
 }
+
+/** A focused programme cell's ring. It draws inside the cell, which keeps its size on focus. */
+private val GuideFocusRingWidth = 2.dp
+private val GuideCellScale = ListItemDefaults.scale(
+    focusedScale = 1f, pressedScale = 1f, focusedSelectedScale = 1f, pressedSelectedScale = 1f,
+)
 
 /** Programmes outside the chosen genre draw their content at half strength. */
 private const val GuideOutsideGenreAlpha = 0.5f

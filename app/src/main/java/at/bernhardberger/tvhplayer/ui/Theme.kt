@@ -33,22 +33,22 @@ object TvSurfaceColors {
 }
 
 /**
- * A Guide genre family's colors: [base] marks the family in the Genre panel, [tint] fills an
- * unfocused programme (12% of the base over containerHigh) and [wash] replaces the light focused
- * container. Programmes without a genre code stay plain.
+ * A Guide genre family's colors: [base] marks the family in the Genre panel and [tint] fills a
+ * programme (12% of the base over containerHigh), focused or not. Programmes without a genre code
+ * stay plain.
  */
-class TvGenreColors(val base: Color, val tint: Color, val wash: Color)
+class TvGenreColors(val base: Color, val tint: Color)
 
-private val GenreFilmDrama = TvGenreColors(Color(0xFFC8B7FF), Color(0xFF3B3B45), Color(0xFFDED9F2))
-private val GenreNews = TvGenreColors(Color(0xFF7699FB), Color(0xFF313745), Color(0xFFD2D9EC))
-private val GenreEntertainment = TvGenreColors(Color(0xFFFABECB), Color(0xFF413C3F), Color(0xFFF2D7DE))
-private val GenreSport = TvGenreColors(Color(0xFF73F094), Color(0xFF314238), Color(0xFFCEEBD8))
-private val GenreChildren = TvGenreColors(Color(0xFFFEE657), Color(0xFF424131), Color(0xFFF0EBCB))
-private val GenreMusic = TvGenreColors(Color(0xFFFD80C4), Color(0xFF42343E), Color(0xFFEBD4E2))
-private val GenreArtsCulture = TvGenreColors(Color(0xFFB872CD), Color(0xFF39333F), Color(0xFFDED4E4))
-private val GenreSocietyPolitics = TvGenreColors(Color(0xFFD9B88B), Color(0xFF3D3B37), Color(0xFFE2D9CA))
-private val GenreEducationFactual = TvGenreColors(Color(0xFF5EC6B6), Color(0xFF2E3D3D), Color(0xFFC7DFDD))
-private val GenreLifestyleLeisure = TvGenreColors(Color(0xFFA9BD40), Color(0xFF373C2E), Color(0xFFDBDFC9))
+private val GenreFilmDrama = TvGenreColors(Color(0xFFC8B7FF), Color(0xFF3B3B45))
+private val GenreNews = TvGenreColors(Color(0xFF7699FB), Color(0xFF313745))
+private val GenreEntertainment = TvGenreColors(Color(0xFFFABECB), Color(0xFF413C3F))
+private val GenreSport = TvGenreColors(Color(0xFF73F094), Color(0xFF314238))
+private val GenreChildren = TvGenreColors(Color(0xFFFEE657), Color(0xFF424131))
+private val GenreMusic = TvGenreColors(Color(0xFFFD80C4), Color(0xFF42343E))
+private val GenreArtsCulture = TvGenreColors(Color(0xFFB872CD), Color(0xFF39333F))
+private val GenreSocietyPolitics = TvGenreColors(Color(0xFFD9B88B), Color(0xFF3D3B37))
+private val GenreEducationFactual = TvGenreColors(Color(0xFF5EC6B6), Color(0xFF2E3D3D))
+private val GenreLifestyleLeisure = TvGenreColors(Color(0xFFA9BD40), Color(0xFF373C2E))
 
 /** The family's colors, or null for a programme without a genre code. */
 fun tvGenreColors(category: ProgrammeCategory?): TvGenreColors? = when (category) {

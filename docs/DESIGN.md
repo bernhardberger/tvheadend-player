@@ -685,7 +685,7 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   when more content exists there. Headers, controls and scopes remain clear.
   Settled focused cells remain inside the unfaded area; real data/history bounds
   must not imply unavailable overflow. Preserve physical Left earlier/Right later.
-- At a terminal physical edge, reserve 48dp plus native focus-growth allowance
+- At a terminal physical edge, reserve 48dp plus 8dp breathing room
   rather than letting focus touch the screen edge. This is blank spatial padding,
   not additional time availability. Ruler, cells and Now share its mapping;
   normal cells retain their full duration allocation. Apply it on physical right
@@ -701,7 +701,9 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   band's height where that time's programmes start; "Channels" and the times
   share one baseline centred in the band. Programme cells have no row track:
   they sit on the page like the channel tiles, one 4dp gutter apart across and
-  between rows, so a schedule gap shows as nothing on air. A channel row with
+  between rows, so a schedule gap shows as nothing on air. A focused cell does
+  not grow: it keeps its genre tint (or plain fill) and light text and gains a
+  2dp `onSurface` ring in the small shape. A channel row with
   nothing to draw says why in one line, in a passive cell across the row: no guide
   data for the channel, no programmes in the window, partial or stale data,
   reconnecting, permission denied, server failure or an empty filter

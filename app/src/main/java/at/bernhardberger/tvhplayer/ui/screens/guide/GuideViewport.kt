@@ -20,19 +20,17 @@ import kotlin.math.floor
 internal fun guideChannelWidth(rows: GuideRows): Dp = if (rows == GuideRows.DENSE) 104.dp else 124.dp
 internal val GuideChannelGap = 8.dp
 internal val GuideEdgeFade = 48.dp
+/** Breathing room between a focused cell and a fade or the edge; the focus ring draws inside the cell. */
 internal val GuideFocusReserve = 8.dp
-// TV Material 1.1 ListItem's default 1.05 focus scale grows each side by 2.5%.
-internal const val GuideFocusHalfGrowth = .025f
 
 /** Blank space, not extra time: only the physical outer edge needs a terminal reserve. */
 internal fun guideTerminalViewportReserve(
     earlierContent: Boolean,
     laterContent: Boolean,
     isRtl: Boolean,
-    focusReserve: Dp,
 ): Dp {
     val outerContinuation = if (isRtl) earlierContent else laterContent
-    return if (outerContinuation) 0.dp else GuideEdgeFade + focusReserve
+    return if (outerContinuation) 0.dp else GuideEdgeFade + GuideFocusReserve
 }
 
 /** Physical chronology is identical in LTR and RTL, including between ruler ticks. */
@@ -46,7 +44,7 @@ internal fun guideVisibleWindowSec(trackWidthPx: Float, timeLabelWidthPx: Int, d
     return hours * 3600L
 }
 
-/** Move the existing time window, not the cells, to leave room for native focus growth. */
+/** Move the existing time window, not the cells, to keep a focused cell clear of the insets. */
 internal fun guideFocusWindowStart(
     eventStartSec: Long,
     eventEndSec: Long,
@@ -92,8 +90,8 @@ internal fun Modifier.guideNowLine(
 }
 
 /**
- * A row's track ends where its fade reaches zero, so a focused cell's scale cannot paint past a faded
- * edge into the channel gap at full strength. Edges without a fade keep the growth unclipped.
+ * A row's track ends where its fade reaches zero, so a focused cell cannot paint past a faded edge
+ * into the channel gap at full strength. Edges without a fade stay unclipped.
  */
 internal fun Modifier.guideFadedEdgeClip(earlier: Boolean, later: Boolean): Modifier =
     if (!earlier && !later) this else drawWithContent {

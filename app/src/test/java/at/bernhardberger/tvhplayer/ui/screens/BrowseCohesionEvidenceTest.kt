@@ -303,8 +303,10 @@ class BrowseCohesionEvidenceTest {
             compose.waitForIdle()
             assertEquals(before, origin.positionInRoot())
             assertEquals(width, origin.size.width)
-            val page = compose.onNodeWithTag("programme-details-page").fetchSemanticsNode().layoutInfo.coordinates
-            assertEquals(0f, page.positionInRoot().x, .1f)
+            // The page arrives a frame after the click; from then on it never slides.
+            compose.onAllNodes(hasTestTag("programme-details-page")).fetchSemanticsNodes().singleOrNull()?.let {
+                assertEquals(0f, it.layoutInfo.coordinates.positionInRoot().x, .1f)
+            }
         }
         val page = compose.onNodeWithTag("programme-details-page").fetchSemanticsNode().layoutInfo.coordinates
         compose.runOnIdle { back.onBackPressed() }

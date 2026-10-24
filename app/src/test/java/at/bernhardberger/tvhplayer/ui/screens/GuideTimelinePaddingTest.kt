@@ -48,22 +48,22 @@ class GuideTimelinePaddingTest {
     @Test
     fun onlyThePhysicalOuterContinuationControlsTerminalReserve() {
         for (gutterContinuation in listOf(false, true)) {
-            assertEquals(64.dp, guideTerminalViewportReserve(gutterContinuation, false, false, 16.dp))
-            assertEquals(0.dp, guideTerminalViewportReserve(gutterContinuation, true, false, 16.dp))
-            assertEquals(64.dp, guideTerminalViewportReserve(false, gutterContinuation, true, 16.dp))
-            assertEquals(0.dp, guideTerminalViewportReserve(true, gutterContinuation, true, 16.dp))
+            assertEquals(56.dp, guideTerminalViewportReserve(gutterContinuation, false, false))
+            assertEquals(0.dp, guideTerminalViewportReserve(gutterContinuation, true, false))
+            assertEquals(56.dp, guideTerminalViewportReserve(false, gutterContinuation, true))
+            assertEquals(0.dp, guideTerminalViewportReserve(true, gutterContinuation, true))
         }
     }
 
     @Test
     fun terminalReservePadsTheTrackWithoutSubtractingTimeCapacityAgain() {
-        val reserve = guideTerminalViewportReserve(false, false, false, 16.dp)
+        val reserve = guideTerminalViewportReserve(false, false, false)
         for (direction in LayoutDirection.entries) {
             val padding = guideTimelineContentPadding(
                 PaddingValues(start = 24.dp, top = 32.dp, end = 48.dp, bottom = 32.dp), direction, reserve,
             )
             assertEquals(50.dp, padding.calculateStartPadding(direction))
-            assertEquals(64.dp, padding.calculateEndPadding(direction))
+            assertEquals(56.dp, padding.calculateEndPadding(direction))
             assertEquals(8.dp, padding.calculateTopPadding())
             assertEquals(56.dp, padding.calculateBottomPadding())
         }

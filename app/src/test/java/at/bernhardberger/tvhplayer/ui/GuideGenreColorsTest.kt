@@ -9,20 +9,15 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class GuideGenreColorsTest {
-    @Test fun everyFamilyHasItsOwnTintAndWashAndProgrammesWithoutACodeStayPlain() {
+    @Test fun everyFamilyHasItsOwnTintAndProgrammesWithoutACodeStayPlain() {
         val families = ProgrammeCategory.entries - ProgrammeCategory.ALL
         val colors = families.map { assertNotNull("$it has colors", tvGenreColors(it)); tvGenreColors(it)!! }
         assertEquals("Each family tints differently", families.size, colors.map { it.tint }.distinct().size)
-        assertEquals("Each family washes differently", families.size, colors.map { it.wash }.distinct().size)
-        colors.forEach {
-            assertNotEquals(TvSurfaceColors.containerHigh, it.tint)
-            assertNotEquals(it.tint, it.wash)
-        }
+        colors.forEach { assertNotEquals(TvSurfaceColors.containerHigh, it.tint) }
         assertNull(tvGenreColors(null))
         assertNull(tvGenreColors(ProgrammeCategory.ALL))
         val sport = tvGenreColors(ProgrammeCategory.SPORT)!!
         assertEquals(Color(0xFF73F094), sport.base)
         assertEquals(Color(0xFF314238), sport.tint)
-        assertEquals(Color(0xFFCEEBD8), sport.wash)
     }
 }

@@ -271,14 +271,10 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-earlier-fade-focus")
         val focusedRow = compose.onNodeWithTag("epg-channel-header-1").fetchSemanticsNode().boundsInRoot
         val otherRow = compose.onNodeWithTag("epg-channel-header-2").fetchSemanticsNode().boundsInRoot
-        lateinit var bitmap: Bitmap
-        compose.runOnIdle {
-            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
-        }
+        val bitmap = snapshot()
         // The 8dp gap between the channel column and the track shows the page, like every other row's.
         val x = (focusedRow.right + 6f).toInt()
-        assertEquals("The focused cell's scale paints unfaded left of the track",
+        assertEquals("The focused cell paints unfaded left of the track",
             Integer.toHexString(bitmap.getPixel(x, otherRow.center.y.toInt())),
             Integer.toHexString(bitmap.getPixel(x, focusedRow.center.y.toInt())))
         bitmap.recycle()
@@ -330,12 +326,51 @@ class GuideRealisticSceneTest {
     // Review captures of the reworked Guide (genre tints, filter, panels, view options); each scene
     // reaches its state through the D-pad path a remote takes.
 
-    @Test fun u5DefaultTintsEveryGenreFamilyAndFocusKeepsItsGenreWash() {
+    @Test fun u5DefaultTintsEveryGenreFamilyAndFocusRingsTheCell() {
         showAt("2026-09-15T19:40:00")
         moveToChannel(11)
         capture("u5-default")
         key(Key.DirectionRight)
         capture("u5-focus-genre")
+    }
+
+    @Test fun focusedTintedCellKeepsItsFillAndSizeAndGainsARing() {
+        showAt("2026-09-15T19:40:00")
+        moveToChannel(11)
+        val film = eventsByFixtureId.getValue("evt-ch-glass-drama-20260915T2015")
+        seekEvent(film)
+        capture("u5-focus-ring-film")
+        val cellNode = compose.onNode(hasText(checkNotNull(film.title)) and hasAnyAncestor(hasTestTag("epg-channel-row-11")))
+        val cell = cellNode.fetchSemanticsNode().boundsInRoot
+        val focusedBitmap = snapshot()
+        key(Key.DirectionLeft)
+        focusedChannel(11)
+        cellNode.assertIsNotFocused()
+        assertEquals("Focus does not move or resize the cell", cell, cellNode.fetchSemanticsNode().boundsInRoot)
+        val restingBitmap = snapshot()
+        // The cell's fill is the most common colour inside it, away from the ring.
+        fun fill(bitmap: Bitmap) = ((cell.left + 8).toInt() until (cell.right - 8).toInt()).flatMap { x ->
+            ((cell.top + 6).toInt() until (cell.bottom - 6).toInt()).map { y -> bitmap.getPixel(x, y) }
+        }.groupingBy { it }.eachCount().maxBy { it.value }.key
+        fun light(pixel: Int) = android.graphics.Color.red(pixel) > 180 && android.graphics.Color.green(pixel) > 180 &&
+            android.graphics.Color.blue(pixel) > 180
+        val fill = fill(restingBitmap)
+        assertEquals("Focus keeps the genre fill", Integer.toHexString(fill), Integer.toHexString(fill(focusedBitmap)))
+        assertNotEquals("The fill is the cell's, not the page's", Integer.toHexString(restingBitmap.getPixel(cell.left.toInt() + 1,
+            cell.center.y.toInt())), Integer.toHexString(fill))
+        assertFalse("The fill stays dark under light text", light(fill))
+        // The ring is the cell's first 2dp inside its 2dp gutter half.
+        val ringX = cell.left.toInt() + 2
+        val y = cell.center.y.toInt()
+        assertTrue("The focused cell shows its ring", light(focusedBitmap.getPixel(ringX, y)))
+        assertEquals("A resting cell has no ring", Integer.toHexString(fill), Integer.toHexString(restingBitmap.getPixel(ringX, y)))
+        // Nothing paints outside the cell: the gutter left of it and the row gutter above it stay unchanged.
+        for ((x, gutterY) in listOf(cell.left.toInt() to y, cell.center.x.toInt() to cell.top.toInt() - 2)) {
+            assertEquals("Focus paints nothing outside the cell at ($x,$gutterY)",
+                Integer.toHexString(restingBitmap.getPixel(x, gutterY)), Integer.toHexString(focusedBitmap.getPixel(x, gutterY)))
+        }
+        focusedBitmap.recycle()
+        restingBitmap.recycle()
     }
 
     @Test fun u5SportFilterDimsOtherGenresAndKeepsThemReachable() {
@@ -604,6 +639,10 @@ class GuideRealisticSceneTest {
             }
             val current = eventsByFixtureId.values.single { it.id == currentId }
             key(if (current.start > event.start) Key.DirectionLeft else Key.DirectionRight)
+            // Focus follows the selection a frame later, and the window scrolls it into view after that.
+            compose.waitUntil(10_000) { position.position.value?.eventId != currentId }
+            val selected = checkNotNull(position.position.value).eventId
+            focused(checkNotNull(eventsByFixtureId.values.single { it.id == selected }.title))
             focusedChannel(checkNotNull(event.channelId).value.toInt())
         }
         fail("Fixture event ${event.id} was not reached by D-pad navigation")
@@ -769,13 +808,26 @@ class GuideRealisticSceneTest {
         )
     }
 
+    private fun snapshot(): Bitmap {
+        lateinit var bitmap: Bitmap
+        compose.runOnIdle {
+            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+        }
+        return bitmap
+    }
+
     private fun key(key: Key) {
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
 
     private fun focused(title: String) {
-        compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        // Focus can reach a cell a frame before the window scrolls it into view.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() &&
+                compose.onNode(hasText(title) and isFocused()).isDisplayed()
+        }
         compose.onNode(hasText(title) and isFocused()).assertIsDisplayed().assertIsFocused()
     }
 

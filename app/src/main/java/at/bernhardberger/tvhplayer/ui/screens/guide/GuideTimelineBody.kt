@@ -105,7 +105,6 @@ internal fun GuideTimelineBody(
     startPadding: Dp,
     endPadding: Dp,
     timelineWidthPx: Float,
-    horizontalFocusReserve: Dp,
     guideBringIntoView: BringIntoViewSpec,
     gridFocus: FocusRequester,
     guideRetryFocus: FocusRequester,
@@ -151,7 +150,7 @@ internal fun GuideTimelineBody(
     val guideRecovering = frame.recovering
     val channelListState = rememberTabListState(channelListState)
     val terminalReserve = guideTerminalViewportReserve(
-        frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
+        frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl,
     )
     val timelineContentPadding = guideTimelineContentPadding(contentPadding, layoutDirection, terminalReserve)
     // Match layout's rounded padding so the continuous Now line and ruler coincide.
@@ -275,8 +274,8 @@ internal fun GuideTimelineBody(
                             timelineContentPadding.calculateStartPadding(layoutDirection).roundToPx()
                         },
                     ),
-                    focusStartInset = horizontalFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
-                    focusEndInset = horizontalFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
+                    focusStartInset = GuideFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
+                    focusEndInset = GuideFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
                     earlierContent = frame.earlierContent,
                     laterContent = frame.laterContent,
                     rows = rows,

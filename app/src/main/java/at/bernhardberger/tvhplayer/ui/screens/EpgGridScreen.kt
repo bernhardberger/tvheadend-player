@@ -151,7 +151,6 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusHalfGrowth
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -281,9 +280,6 @@ fun EpgGridScreen(
     val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - guideChannelWidth(view.rows) - GuideChannelGap)
         .coerceAtLeast(1.dp)
     val timelineWidthPx = with(density) { timelineWidth.toPx() }
-    // TV Material's native ListItem focus scale is 1.05; reserve its largest possible
-    // half-growth as well as the normal 8dp breathing room, including long programmes.
-    val horizontalFocusReserve = maxOf(GuideFocusReserve, (timelineWidth - 8.dp) * GuideFocusHalfGrowth)
     val timeLabelMeasurer = rememberTextMeasurer()
     val timeLabelWidth = clockWidthSamples(uses24Hour = AppClock.uses24Hour, digit = '0').maxOf {
         timeLabelMeasurer.measure(it, style = MaterialTheme.typography.labelMedium).size.width
@@ -584,11 +580,9 @@ fun EpgGridScreen(
     val laterContent = edgeEvents.any {
         it.stop.epochSeconds > windowEndSec && it.start.epochSeconds < windowBounds.latestStartSec + visibleWindowSec
     }
-    val focusStartInset = horizontalFocusReserve + if (earlierContent) GuideEdgeFade else 0.dp
-    val focusEndInset = horizontalFocusReserve + if (laterContent) GuideEdgeFade else 0.dp
-    val terminalReserve = guideTerminalViewportReserve(
-        earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl, horizontalFocusReserve,
-    )
+    val focusStartInset = GuideFocusReserve + if (earlierContent) GuideEdgeFade else 0.dp
+    val focusEndInset = GuideFocusReserve + if (laterContent) GuideEdgeFade else 0.dp
+    val terminalReserve = guideTerminalViewportReserve(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)
     val focusTrackWidthPx = timelineWidthPx - with(density) { terminalReserve.roundToPx() }
     fun focusWindowFor(event: EpgEventEntry): Long = guideFocusWindowStart(
         event.start.epochSeconds, event.stop.epochSeconds, windowStartSec, visibleWindowSec,
@@ -1834,7 +1828,6 @@ fun EpgGridScreen(
                 startPadding = startPadding,
                 endPadding = endPadding,
                 timelineWidthPx = timelineWidthPx,
-                horizontalFocusReserve = horizontalFocusReserve,
                 guideBringIntoView = guideBringIntoView,
                 gridFocus = gridFocus,
                 guideRetryFocus = guideRetryFocus,
