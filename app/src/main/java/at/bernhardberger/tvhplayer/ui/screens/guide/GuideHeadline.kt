@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
@@ -165,8 +166,9 @@ private val GuideHeadlineTitleStyle @Composable get() = MaterialTheme.typography
 
 /**
  * Room for the eyebrow, a one-line title, the facts, the time and one synopsis line, as the
- * Channels hero computes it, so about four and a half rows stay below. A second title line or a
- * subtitle takes the synopsis's place: HeadlineColumn gives way inside it, the grid stays.
+ * Channels hero computes it with the Guide's smaller synopsis, so about four and a half rows stay
+ * below. A second title line or a subtitle takes the synopsis's place: HeadlineColumn gives way
+ * inside it, the grid stays.
  */
 @Composable
 private fun guideHeadlineHeight(): Dp {
@@ -175,7 +177,7 @@ private fun guideHeadlineHeight(): Dp {
         maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + 8.dp +
             GuideHeadlineTitleStyle.lineHeight.toDp() + ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight +
             ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineSynopsisGap +
-            typography.bodyLarge.lineHeight.toDp()
+            typography.bodyMedium.lineHeight.toDp()
     }
 }
 
@@ -289,6 +291,9 @@ private fun GuideHeadlineContent(
         fitSynopsis = true,
         loading = event == null && loading,
         titleStyle = titleStyle,
+        // A step quieter than Channels: in the Guide the grid below carries the weight.
+        synopsisStyle = MaterialTheme.typography.bodyMedium,
+        synopsisColor = TvTextColors.tertiary,
     )
 }
 

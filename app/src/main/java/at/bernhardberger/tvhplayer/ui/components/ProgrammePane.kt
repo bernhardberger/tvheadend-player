@@ -121,6 +121,7 @@ internal fun ProgrammeHeadline(
     loading: Boolean = false,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    synopsisColor: Color = TvTextColors.secondary,
     status: (@Composable (Modifier) -> Unit)? = null,
     footer: (@Composable (Modifier) -> Unit)? = null,
 ) {
@@ -163,7 +164,7 @@ internal fun ProgrammeHeadline(
         status?.invoke(Modifier.padding(top = ProgrammeHeadlineLineGap))
         synopsis?.takeIf(String::isNotBlank)?.let { text ->
             val synopsisText = @Composable { lines: Int ->
-                Text(text, style = synopsisStyle, color = TvTextColors.secondary,
+                Text(text, style = synopsisStyle, color = synopsisColor,
                     maxLines = lines, overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.padding(top = ProgrammeHeadlineSynopsisGap).testTag("$tagPrefix-synopsis"))
             }
