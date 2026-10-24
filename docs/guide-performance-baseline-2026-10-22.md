@@ -160,3 +160,24 @@ the share of frames over 33 ms, with GPU p50.
 
 Traces and histograms are in `/root/projects/.worktrees/u5-guide/build/ab/`
 (`after-*`, `chan-u5`, `trace-u5*`; ignored build output).
+
+## Follow-up, 2026-10-24 afternoon: baked headline scrim on the G10
+
+Same TV, one session, optimized builds (minify, baseline profile, speed-profile),
+gfxinfo histogram deltas. "Today" is the headline picture with the scrim drawn
+as a gradient over it; "baked" applies the scrim to the bitmap once when it
+loads (commit c1db8535); "baked, no wash" also drops the full-screen tint
+behind the picture. Channels runs use Immersive (Right ×8 / Left ×8).
+
+| Build | Guide drawer p50 / p99 | Guide Up/Down p50 / p99 | Guide GPU p50 | Channels p50 / p99 | Channels GPU p50 |
+|---|---|---|---|---|---|
+| Today | 53 / 81–93 ms | 48 / 89–93 ms | 20–21 ms | 48 / 89–97 ms | 21 ms |
+| Baked | 44 / 65–81 ms | 44–48 / 85–93 ms | 17–18 ms | 48 / 73–77 ms | 19 ms |
+| Baked, no wash | 44 / 73–85 ms | 46–48 / 85–89 ms | 18–19 ms | 48 / 73–77 ms | 19–20 ms |
+
+- Baking removes about 3 ms of GPU work per frame and shortens the drawer and
+  Channels tails. Dropping the wash as well buys nothing more, so the wash stays.
+- Frames still sit near 44–48 ms with the picture shown (14–16 ms without it in
+  the morning run), so the picture's size on screen is the remaining lever.
+
+Histograms are in `/root/projects/.worktrees/u5-guide/build/ab/wd-*/`.
