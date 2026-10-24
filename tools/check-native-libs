@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import struct
 import sys
 import tarfile
@@ -30,6 +31,11 @@ EXPECTED_STANDARD_SOURCE_SHA256 = {
     f"sdk-media3-{SDK_VERSION}-sources.jar": "376e4ea722488fcb266717926c2b8559a909609a1411e216a5e6cdfdddf9d90d",
     f"sdk-playback-{SDK_VERSION}-sources.jar": "6e1bd6efd99f4b62b06c51fb806c3810312cb21756be4c3fd799fe9860211f11",
 }
+# Same rule as app/build.gradle.kts and tools/prepare-release: a release is a plain X.Y.Z; a
+# development build is a timestamped X.Y.Z-yyyyMMdd.HHmmss-N snapshot. A floating -SNAPSHOT is
+# rejected: its pinned hashes would break on every new publication.
+RELEASE_SDK_VERSION = re.compile(r"\d+\.\d+\.\d+")
+DEVELOPMENT_SDK_VERSION = re.compile(r"\d+\.\d+\.\d+-\d{8}\.\d{6}-\d+")
 EXPECTED_ABIS = ("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
 # Android's 16 KiB page-size contract applies to the shipped 64-bit targets.
 ALIGNMENT_ABIS = ("arm64-v8a", "x86_64")
@@ -303,6 +309,23 @@ def validate_native_module(directory: Path, errors: list[str]) -> dict[str, byte
     return libraries
 
 
+def sdk_pin_errors(catalog_version: str, pinned_version: str, release: bool) -> list[str]:
+    """Check the catalog SDK against the hash-pinned SDK for public SDK evidence."""
+    errors = []
+    if catalog_version != pinned_version:
+        errors.append("SDK catalog does not match pinned public release; publication evidence must be updated")
+    if release and not RELEASE_SDK_VERSION.fullmatch(catalog_version):
+        errors.append(
+            f"SDK {catalog_version} is not a released version; a Player release needs a released SDK"
+        )
+    elif not (
+        RELEASE_SDK_VERSION.fullmatch(catalog_version)
+        or DEVELOPMENT_SDK_VERSION.fullmatch(catalog_version)
+    ):
+        errors.append(f"SDK {catalog_version} is neither a release nor a development build version")
+    return errors
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -354,8 +377,7 @@ def main() -> int:
             f"{sorted(expected_evidence_names)}"
         )
     if not args.staged_sdk:
-        if catalog["tvheadend-sdk"] != SDK_VERSION:
-            errors.append("SDK catalog does not match pinned public release; publication evidence must be updated")
+        errors.extend(sdk_pin_errors(catalog["tvheadend-sdk"], SDK_VERSION, args.release))
         for name, expected_hash in EXPECTED_STANDARD_SOURCE_SHA256.items():
             require_hash(evidence_directory / name, expected_hash, f"released SDK source {name}", errors)
         validate_aar(aar, errors)
@@ -377,6 +399,8 @@ def main() -> int:
     )
     if args.staged_sdk:
         print("Staged SDK: public SDK provenance NOT verified; not release evidence")
+    elif DEVELOPMENT_SDK_VERSION.fullmatch(SDK_VERSION):
+        print(f"Development SDK {SDK_VERSION}: pinned snapshot hashes verified; not release evidence")
     return 0
 
 

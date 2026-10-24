@@ -9,6 +9,12 @@ pluginManagement {
 }
 
 /**
+ * SDK sources: released versions come from Maven Central. A development build, always the
+ * timestamped `X.Y.Z-yyyyMMdd.HHmmss-N` (the gates reject a floating `-SNAPSHOT`), pinned in
+ * `gradle/libs.versions.toml` resolves from Central's snapshot repository, which serves only SDK
+ * snapshots. Such a pin builds and passes
+ * `./tools/verify`, but `tools/prepare-release` refuses it: a Player release needs a released SDK.
+ *
  * Opt-in staged SDK checkout, for testing an SDK fix before it is published.
  *
  * Enable with `-Ptvheadend.sdk.local=true` after running `./gradlew stageLocalPublication` in the
@@ -45,6 +51,15 @@ dependencyResolutionManagement {
         }
         google()
         mavenCentral()
+        maven {
+            name = "centralSdkSnapshots"
+            url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            // Only SDK development builds; every release and every other group stays on Central.
+            mavenContent {
+                snapshotsOnly()
+                includeGroup("at.bernhardberger.tvheadend")
+            }
+        }
     }
 }
 

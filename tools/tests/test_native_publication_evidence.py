@@ -101,6 +101,24 @@ class NativePublicationEvidenceTest(unittest.TestCase):
             self.assertNotEqual(tampered.returncode, 0)
             self.assertIn("differs from the app-owned decoder", tampered.stderr)
 
+    def test_debug_gate_accepts_a_development_pin_and_release_gate_refuses_it(self) -> None:
+        pin_errors = CHECKER["sdk_pin_errors"]
+        development = "0.36.0-20261024.143000-1"
+        self.assertEqual(pin_errors(development, development, release=False), [])
+        release = pin_errors(development, development, release=True)
+        self.assertEqual(len(release), 1)
+        self.assertIn("a Player release needs a released SDK", release[0])
+        self.assertEqual(pin_errors("0.35.0", "0.35.0", release=True), [])
+        self.assertEqual(pin_errors("0.35.0", "0.35.0", release=False), [])
+        mismatch = pin_errors("0.36.0-20261024.143000-1", "0.35.0", release=False)
+        self.assertTrue(any("publication evidence must be updated" in e for e in mismatch))
+        for version in ("0.36.0-SNAPSHOT", "0.36.0-rc1"):
+            with self.subTest(version=version):
+                malformed = pin_errors(version, version, release=False)
+                self.assertTrue(any("neither a release nor a development build" in e for e in malformed))
+                refused = pin_errors(version, version, release=True)
+                self.assertTrue(any("a Player release needs a released SDK" in e for e in refused))
+
     def test_source_gate_rejects_every_missing_required_legal_or_build_entry(self) -> None:
         required = CHECKER["REQUIRED_SOURCE_ENTRIES"]
         members = []

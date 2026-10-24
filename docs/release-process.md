@@ -56,7 +56,7 @@ A release resolves byte-pinned SDK artifacts from the public repositories. The
 SDK version appears in these places, and a bump changes all of them together:
 
 1. `gradle/libs.versions.toml` (`tvheadend-sdk`).
-2. The SDK and HTSP version checks in the dependency-proof task in
+2. The HTSP version check in the dependency-proof task in
    `app/build.gradle.kts`.
 3. `SDK_VERSION`, the AAR hash and the source-classifier hashes in
    `tools/check-native-libs`.
@@ -64,6 +64,19 @@ SDK version appears in these places, and a bump changes all of them together:
 5. The pinned values asserted in `tools/tests/test_release_metadata.py`.
 
 Run `./tools/verify` afterwards; it fails when one of them lags.
+
+### SDK development builds
+
+`main` may pin an SDK development build from Maven Central's snapshot
+repository: a timestamped version such as `0.36.0-20261024.143000-1` instead of
+a plain `X.Y.Z`. A floating `X.Y.Z-SNAPSHOT` is rejected, because its hashes
+change with every publication. Change the catalog and item 3 as for a release,
+using the hashes the SDK session gives for that publication, and leave items 4
+and 5 at the last released SDK. `./tools/verify` then passes,
+but `tools/prepare-release` and `tools/check-native-libs --release` refuse the
+pin: a Player release needs a released SDK. Central deletes snapshots after 90
+days, so an old `main` commit that pins one may stop building. That is accepted;
+release commits always pin a released SDK.
 
 ## Unsigned preparation on the build host
 

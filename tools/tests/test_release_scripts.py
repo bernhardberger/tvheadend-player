@@ -40,6 +40,42 @@ class ReleaseScriptsTest(unittest.TestCase):
                     if kind != "present":
                         self.assertIn("release R8 mapping is missing, empty, or a symbolic link", result.stderr)
 
+    def test_prepare_refuses_a_development_sdk_before_building(self):
+        release_pin = next(
+            line.split('"')[1]
+            for line in (ROOT / "tools/prepare-release").read_text().splitlines()
+            if line.startswith('SDK_VERSION="')
+        )
+        for version, refusal in (
+            ("0.36.0-20261024.143000-1", "a Player release needs a released SDK"),
+            ("0.36.0-SNAPSHOT", "a Player release needs a released SDK"),
+            ("0.36.0-rc1", "a Player release needs a released SDK"),
+            ("0.99.0", "does not match the release pin"),
+            (release_pin, None),
+        ):
+            with self.subTest(version=version), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "tools").mkdir()
+                (root / "gradle").mkdir()
+                (root / "bin").mkdir()
+                (root / "android").mkdir()
+                script = root / "tools/prepare-release"
+                script.write_bytes((ROOT / "tools/prepare-release").read_bytes())
+                script.chmod(0o755)
+                (root / "gradle/libs.versions.toml").write_text(f'[versions]\ntvheadend-sdk = "{version}"\n')
+                # A clean fake worktree; with no build tools the script stops before any build.
+                git = root / "bin/git"
+                git.write_text("#!/bin/sh\nexit 0\n")
+                git.chmod(0o755)
+                environment = {"PATH": f"{root / 'bin'}:/usr/bin:/bin", "ANDROID_HOME": str(root / "android")}
+                result = subprocess.run([str(script)], capture_output=True, text=True, env=environment, timeout=30)
+                self.assertEqual(result.returncode, 1)
+                if refusal is None:
+                    self.assertIn("apksigner, aapt, and zipalign are required", result.stderr)
+                else:
+                    self.assertIn(refusal, result.stderr)
+                    self.assertIn(version, result.stderr)
+
     def test_prepare_and_signed_staging_preserve_artifacts_and_mappings(self):
         script = (ROOT / "tools/prepare-release").read_text()
         self.assertIn(":app:assemblePlayRelease :app:assembleApplianceRelease :app:bundlePlayRelease", script)

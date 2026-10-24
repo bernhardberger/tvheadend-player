@@ -227,11 +227,14 @@ val syncReleasedSdkEvidence = tasks.register<Sync>("syncReleasedSdkEvidence") {
 }
 tasks.register("verifyExternalSdkConsumption") {
     group = "verification"
-    description = "Proves app and client consume only the exact public TVHeadend SDK release."
+    description = "Proves app and client consume only the exact public TVHeadend SDK release or development build."
     dependsOn("assemblePlayDebug", syncReleasedSdkEvidence)
 
     val sdkGroup = "at.bernhardberger.tvheadend"
     val sdkVersion = libs.versions.tvheadend.sdk.get()
+    // A release X.Y.Z or a development build; tools/check-native-libs and tools/prepare-release
+    // use the same rule, and only a release version may be released.
+    val publicSdkVersion = Regex("""\d+\.\d+\.\d+(-\d{8}\.\d{6}-\d+)?""").matches(sdkVersion)
     val stagedSdkSubstitution = providers.gradleProperty("tvheadend.sdk.local")
         .map(String::toBooleanStrict)
         .getOrElse(false)
@@ -348,7 +351,10 @@ tasks.register("verifyExternalSdkConsumption") {
             "Staged SDK substitution is active (-Ptvheadend.sdk.local=true), so this build cannot " +
                 "prove public SDK consumption. Publish the SDK release and re-run without the flag."
         }
-        check(sdkVersion == "0.35.0") { "Expected public SDK 0.35.0 but found $sdkVersion" }
+        check(publicSdkVersion) {
+            "SDK version $sdkVersion is neither a release (X.Y.Z) nor a development build " +
+                "(X.Y.Z-yyyyMMdd.HHmmss-N)"
+        }
         val expectedDirectSdkDependencies = setOf(
             ":app:implementation:sdk-android:$sdkVersion",
             ":app:implementation:sdk-media3:$sdkVersion",
@@ -371,6 +377,7 @@ tasks.register("verifyExternalSdkConsumption") {
         val expectedPublicRepositoryUrls = setOf(
             "https://dl.google.com/dl/android/maven2",
             "https://repo.maven.apache.org/maven2",
+            "https://central.sonatype.com/repository/maven-snapshots",
         )
         check(publicRepositoryUrls == expectedPublicRepositoryUrls) {
             "App repositories $publicRepositoryUrls do not match $expectedPublicRepositoryUrls"

@@ -16,6 +16,17 @@ SDK_SOURCE_FILES=(
     "sdk-playback-${SDK_VERSION}-sources.jar"
 )
 
+# Main may pin an SDK development build (X.Y.Z-yyyyMMdd.HHmmss-N); a release may not.
+catalog_sdk_version="$(python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["versions"]["tvheadend-sdk"])' "$ROOT_DIR/gradle/libs.versions.toml")"
+if [[ ! "$catalog_sdk_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf 'error: SDK %s in gradle/libs.versions.toml is not a released version; a Player release needs a released SDK\n' "$catalog_sdk_version" >&2
+    exit 1
+fi
+if [[ "$catalog_sdk_version" != "$SDK_VERSION" ]]; then
+    printf 'error: SDK %s in gradle/libs.versions.toml does not match the release pin %s in tools/prepare-release\n' "$catalog_sdk_version" "$SDK_VERSION" >&2
+    exit 1
+fi
+
 if [[ -n "$(git -C "$ROOT_DIR" status --porcelain --untracked-files=normal)" ]]; then
     printf 'error: release preparation requires a clean worktree\n' >&2
     exit 1
