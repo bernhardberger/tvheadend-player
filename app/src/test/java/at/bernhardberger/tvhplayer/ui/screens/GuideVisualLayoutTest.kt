@@ -1133,6 +1133,27 @@ class GuideVisualLayoutTest {
         assertEquals(0, playbackRequests)
     }
 
+    @Test fun aFocusedTimeWhosePeriodEndsWhileThePanelIsOpenKeepsFocus() {
+        show()
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-preset-20")
+        // Prime time ends at 22:00 while it has focus; the open panel keeps it and its neighbours.
+        assertTrue(SystemClock.setCurrentTimeMillis((hour + 2 * 3600 + 30) * 1000))
+        compose.mainClock.advanceTimeBy(6_000)
+        compose.waitUntil(5_000) {
+            compose.onAllNodes(hasTestTag("guide-time-now") and hasText("22:00")).fetchSemanticsNodes().isNotEmpty()
+        }
+        tagFocused("guide-time-preset-20")
+        compose.onNodeWithTag("guide-time-preset-20").assertIsEnabled()
+        key(Key.DirectionDown)
+        tagFocused("guide-time-preset-22")
+        key(Key.DirectionUp)
+        tagFocused("guide-time-preset-20")
+        assertEquals(0, playbackRequests)
+    }
+
     @Test fun aDayJumpsAtTheSameTimeOfDayAndCloses() {
         show()
         key(Key.Enter)
@@ -1192,6 +1213,23 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         assertDateButton("Today", hour)
+        assertEquals(0, playbackRequests)
+    }
+
+    @Test fun inRightToLeftTheTimesAreEnteredWithLeftAndLeftWithRight() {
+        show(direction = LayoutDirection.Rtl)
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-day-0")
+        key(Key.DirectionDown)
+        tagFocused("guide-time-day-1")
+        key(Key.DirectionLeft)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionLeft)
+        tagFocused("guide-time-preset-20")
+        key(Key.DirectionRight)
+        tagFocused("guide-time-day-1")
         assertEquals(0, playbackRequests)
     }
 

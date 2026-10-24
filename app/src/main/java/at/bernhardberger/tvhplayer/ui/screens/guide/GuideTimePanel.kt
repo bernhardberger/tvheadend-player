@@ -29,11 +29,13 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -70,10 +72,14 @@ internal fun GuideTimePanel(
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val nowMinuteSec by remember(nowSecProvider) { derivedStateOf { nowSecProvider() / 60 * 60 } }
-    val today = Instant.ofEpochSecond(nowMinuteSec).atZone(zoneId).toLocalDate()
+    // The days and which times have ended stay as the panel opened, so a period ending, or
+    // midnight, never disables or moves the row that has focus. Only Now's clock runs on.
+    val openedSec = remember { nowSecProvider() / 60 * 60 }
+    val panelBounds = remember { bounds }
+    val today = Instant.ofEpochSecond(openedSec).atZone(zoneId).toLocalDate()
     val windowDay = Instant.ofEpochSecond(windowStartSec).atZone(zoneId).toLocalDate()
-    val firstDay = Instant.ofEpochSecond(bounds.earliestStartSec).atZone(zoneId).toLocalDate()
-    val lastDay = Instant.ofEpochSecond(bounds.latestStartSec).atZone(zoneId).toLocalDate()
+    val firstDay = Instant.ofEpochSecond(panelBounds.earliestStartSec).atZone(zoneId).toLocalDate()
+    val lastDay = Instant.ofEpochSecond(panelBounds.latestStartSec).atZone(zoneId).toLocalDate()
     val days = generateSequence(firstDay) { it.plusDays(1) }.takeWhile { !it.isAfter(lastDay) }.toList()
     val dayFocus = remember(days) { days.associateWith { FocusRequester() } }
     val presetFocus = remember { GuideTimePeriod.entries.associateWith { FocusRequester() } }
@@ -82,10 +88,10 @@ internal fun GuideTimePanel(
     var timesDay by remember { mutableStateOf(windowDay) }
     var nowFocused by remember { mutableStateOf(false) }
     var inTimes by remember { mutableStateOf(false) }
-    val presets = guideTimePresets(timesDay, windowStartSec, nowMinuteSec, bounds, zoneId)
+    val presets = guideTimePresets(timesDay, windowStartSec, openedSec, panelBounds, zoneId)
 
     fun enterTimes() {
-        val entered = guideTimePresets(timesDay, windowStartSec, nowMinuteSec, bounds, zoneId)
+        val entered = guideTimePresets(timesDay, windowStartSec, openedSec, panelBounds, zoneId)
         val index = guideTimePresetEntry(entered, windowStartSec, zoneId) ?: return
         runCatching { presetFocus.getValue(entered[index].period).requestFocus() }
     }
@@ -117,7 +123,7 @@ internal fun GuideTimePanel(
                 onClick = {
                     if (day == windowDay) onClose() else {
                         val delta = ChronoUnit.DAYS.between(windowDay, day).toInt()
-                        onJump(floorGuideWindowToHour(moveGuideWindowByDays(windowStartSec, delta, bounds, zoneId), zoneId))
+                        onJump(floorGuideWindowToHour(moveGuideWindowByDays(windowStartSec, delta, panelBounds, zoneId), zoneId))
                     }
                 },
                 modifier = Modifier.focusRequester(dayFocus.getValue(day))
@@ -143,14 +149,18 @@ internal fun GuideTimePanel(
         onClose = { if (inTimes) backToDay() else onClose() },
         width = GuideTimePanelWidth,
     ) {
+        // The Row mirrors in RTL, so the times sit toward the end edge in either direction.
+        val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
+        val towardTimes = if (ltr) Key.DirectionRight else Key.DirectionLeft
+        val towardDays = if (ltr) Key.DirectionLeft else Key.DirectionRight
         Row(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f).onPreviewKeyEvent { event ->
                 when (event.key) {
-                    Key.DirectionRight -> {
+                    towardTimes -> {
                         if (event.isFirstDown() && !nowFocused) enterTimes()
                         true
                     }
-                    Key.DirectionLeft -> true
+                    towardDays -> true
                     else -> false
                 }
             }) {
@@ -162,11 +172,11 @@ internal fun GuideTimePanel(
                 .onFocusChanged { inTimes = it.hasFocus }
                 .onPreviewKeyEvent { event ->
                     when (event.key) {
-                        Key.DirectionLeft -> {
+                        towardDays -> {
                             if (event.isFirstDown()) backToDay()
                             true
                         }
-                        Key.DirectionRight -> true
+                        towardTimes -> true
                         else -> false
                     }
                 }) {
