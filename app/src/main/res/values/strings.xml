@@ -488,11 +488,9 @@
         <item quantity="one">%1$d recording in progress</item>
         <item quantity="other">%1$d recordings in progress</item>
     </plurals>
-    <string name="recordings_continue">Continue watching</string>
     <string name="recordings_schedule">Schedule</string>
     <string name="recordings_problems">Problems</string>
     <string name="recordings_archive_empty">No playable recordings in this folder.</string>
-    <string name="recordings_continue_empty">No recordings to continue.</string>
     <string name="recordings_schedule_empty">Nothing is recording or scheduled.</string>
     <string name="recordings_problems_empty">No recording problems.</string>
     <plurals name="recordings_folder_recording_count">

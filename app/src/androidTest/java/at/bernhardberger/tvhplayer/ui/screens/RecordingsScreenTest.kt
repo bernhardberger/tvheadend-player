@@ -441,16 +441,16 @@ class RecordingsScreenTest {
     fun lastRecordingRemovalKeepsDeterministicLocalFocusInsideDrawer() = assertLastRemovalFocus(drawerOwnsFocus = false)
 
     @Test
-    fun retainedFolderBackInScheduleReturnsToDrawer() = assertFolderBackInOtherMode(2)
+    fun retainedFolderBackInScheduleReturnsToDrawer() = assertFolderBackInOtherMode(1)
 
     @Test
-    fun retainedFolderBackInProblemsReturnsToDrawer() = assertFolderBackInOtherMode(3)
+    fun retainedFolderBackInProblemsReturnsToDrawer() = assertFolderBackInOtherMode(2)
 
     @Test
-    fun queuedFolderBackIsCancelledOnScheduleEntry() = assertFolderBackInOtherMode(2, queueBack = true)
+    fun queuedFolderBackIsCancelledOnScheduleEntry() = assertFolderBackInOtherMode(1, queueBack = true)
 
     @Test
-    fun queuedFolderBackIsCancelledOnProblemsEntry() = assertFolderBackInOtherMode(3, queueBack = true)
+    fun queuedFolderBackIsCancelledOnProblemsEntry() = assertFolderBackInOtherMode(2, queueBack = true)
 
     private fun assertFolderBackInOtherMode(modeSteps: Int, queueBack: Boolean = false) {
         val state = RecordingsScreenState()
@@ -489,7 +489,7 @@ class RecordingsScreenTest {
         } finally {
             composeRule.mainClock.autoAdvance = true
         }
-        composeRule.onNodeWithText(if (modeSteps == 2) "Schedule" else "Problems").assertIsFocused()
+        composeRule.onNodeWithText(if (modeSteps == 1) "Schedule" else "Problems").assertIsFocused()
         composeRule.runOnIdle {
             assertFalse(drawerActive)
             assertEquals(listOf("Series", "Season"), state.archivePath)
@@ -500,10 +500,10 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun removedChildWhileScheduleActiveReturnsToSurvivingParent() = assertInactiveFolderRemoval(2)
+    fun removedChildWhileScheduleActiveReturnsToSurvivingParent() = assertInactiveFolderRemoval(1)
 
     @Test
-    fun removedChildWhileProblemsActiveReturnsToSurvivingParent() = assertInactiveFolderRemoval(3)
+    fun removedChildWhileProblemsActiveReturnsToSurvivingParent() = assertInactiveFolderRemoval(2)
 
     private fun assertInactiveFolderRemoval(modeSteps: Int) {
         val remaining = recording(id = 2, title = "Remaining", path = "Series/remaining.ts")
@@ -533,7 +533,7 @@ class RecordingsScreenTest {
             pressKey(Key.DirectionUp)
             repeat(modeSteps) { pressKey(Key.DirectionRight) }
         }
-        composeRule.onNodeWithText(if (modeSteps == 2) "Schedule" else "Problems").assertIsFocused()
+        composeRule.onNodeWithText(if (modeSteps == 1) "Schedule" else "Problems").assertIsFocused()
         composeRule.runOnIdle { entries.value = listOf(remaining) }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
@@ -1180,7 +1180,6 @@ class RecordingsScreenTest {
             .performKeyInput {
                 pressKey(Key.DirectionUp)
                 pressKey(Key.DirectionRight)
-                pressKey(Key.DirectionRight)
             }
         composeRule.onNodeWithText("Schedule").assertIsFocused()
         composeRule.onNodeWithTag("recordings-schedule-list").assertIsDisplayed()
@@ -1262,7 +1261,6 @@ class RecordingsScreenTest {
                 before.keys.intersect(during.keys).any { kotlin.math.abs(before.getValue(it) - during.getValue(it)) > 1f })
             composeRule.onNodeWithText("Archive").requestFocus()
             composeRule.onRoot().performKeyInput {
-                keyDown(Key.DirectionRight); keyUp(Key.DirectionRight)
                 keyDown(Key.DirectionRight); keyUp(Key.DirectionRight)
                 keyDown(Key.DirectionDown); keyUp(Key.DirectionDown)
             }

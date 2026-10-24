@@ -157,10 +157,10 @@ class BrowseErrorAlertTest {
         connection = ConnectionUiState.Connecting
         show(recordings = true)
         key(Key.DirectionRight)
-        compose.onNode(hasText("Continue watching") and isFocused()).assertExists()
+        compose.onNode(hasText("Schedule") and isFocused()).assertExists()
         compose.runOnIdle { connection = backoff() }
         compose.waitForIdle()
-        compose.onNode(hasText("Continue watching") and isFocused()).assertExists()
+        compose.onNode(hasText("Schedule") and isFocused()).assertExists()
         key(Key.DirectionDown)
         awaitFocus("tv-recovery-primary")
     }

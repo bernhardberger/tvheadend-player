@@ -374,11 +374,9 @@
         <item quantity="one">%1$d Aufnahme läuft</item>
         <item quantity="other">%1$d Aufnahmen laufen</item>
     </plurals>
-    <string name="recordings_continue">Weiterschauen</string>
     <string name="recordings_schedule">Zeitplan</string>
     <string name="recordings_problems">Probleme</string>
     <string name="recordings_archive_empty">Keine abspielbaren Aufnahmen in diesem Ordner.</string>
-    <string name="recordings_continue_empty">Keine Aufnahmen zum Weiterschauen.</string>
     <string name="recordings_schedule_empty">Keine laufenden oder geplanten Aufnahmen.</string>
     <string name="recordings_problems_empty">Keine Aufnahmeprobleme.</string>
     <plurals name="recordings_folder_recording_count">

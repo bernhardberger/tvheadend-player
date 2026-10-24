@@ -11,7 +11,6 @@ import kotlin.time.Duration
 
 enum class DvrLibraryMode {
     ARCHIVE,
-    CONTINUE,
     SCHEDULE,
     PROBLEMS,
 }
@@ -188,15 +187,6 @@ fun groupDvrProblems(entries: List<DvrEntry>): Map<DvrProblemBucket, List<DvrEnt
             }
         }.sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
     }
-
-/**
- * The recordings to continue: every one that offers a position to resume from, newest recording
- * first. Tvheadend keeps a play position and count but no time of viewing, so the recording's own
- * start orders them.
- */
-fun continueWatching(entries: List<DvrEntry>, resumePosition: (DvrEntry) -> Duration?): List<DvrEntry> =
-    entries.filter { resumePosition(it)?.isPositive() == true }
-        .sortedByDescending { it.start?.epochSeconds ?: Long.MIN_VALUE }
 
 fun recordingListPageTargetIndex(
     itemCount: Int,

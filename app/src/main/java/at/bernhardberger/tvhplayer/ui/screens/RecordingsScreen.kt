@@ -94,7 +94,6 @@ import androidx.tv.material3.OutlinedButton
 import androidx.tv.material3.Text
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.OutlinedButtonDefaults
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -122,7 +121,6 @@ import at.bernhardberger.tvhplayer.core.DvrArchiveFolder
 import at.bernhardberger.tvhplayer.core.DvrProblemBucket
 import at.bernhardberger.tvhplayer.core.DvrScheduleSection
 import at.bernhardberger.tvhplayer.core.buildDvrArchive
-import at.bernhardberger.tvhplayer.core.continueWatching
 import at.bernhardberger.tvhplayer.core.groupDvrProblems
 import at.bernhardberger.tvhplayer.core.groupDvrSchedule
 import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
@@ -154,7 +152,6 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingDetailsAction
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.core.recordingDetailsActions
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
-import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingContinue
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
@@ -169,7 +166,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
-import kotlin.time.Duration
 import org.koin.compose.koinInject
 
 private data class RecordingLibraryPresentation(
@@ -200,7 +196,6 @@ private data class RecordingsTabBody(
     val observation: SessionObservation,
     val channelsById: Map<ChannelId, Channel>,
     val archive: DvrArchiveFolder,
-    val continueEntries: List<DvrEntry>,
     val schedule: List<DvrScheduleSection>,
     val problems: Map<DvrProblemBucket, List<DvrEntry>>,
     val selectedKey: String?,
@@ -284,8 +279,6 @@ internal fun RecordingsScreenContent(
     var retainedPreparation by remember(preparationAuthority) {
         mutableStateOf<PreparedBrowseData<DvrSnapshot?, RecordingLibraryPresentation>?>(null)
     }
-    // Continue membership also follows admission, so its last shown list is retained apart from the snapshot.
-    var retainedContinue by remember(preparationAuthority) { mutableStateOf<List<DvrEntry>?>(null) }
     val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
     val channelsById = remember(channels) { channels.associateBy { it.id } }
     val scope = rememberCoroutineScope()
@@ -364,7 +357,6 @@ internal fun RecordingsScreenContent(
 
     val location = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveLevel
-        DvrLibraryMode.CONTINUE -> "continue"
         DvrLibraryMode.SCHEDULE -> "schedule"
         DvrLibraryMode.PROBLEMS -> "problems"
     }
@@ -403,20 +395,12 @@ internal fun RecordingsScreenContent(
     val reconciledArchiveStack = remember(observedArchive, archiveNavigation.stack) {
         reconcileArchiveStack(archiveNavigation.stack, observedArchive)
     }
-    val resumePositionFor: (DvrEntry) -> Duration? = {
-        at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
-    }
-    // Partly watched is what the session offers to resume, so the list follows the observation, not the snapshot alone.
-    val observedContinue = remember(observedEntries, observation) { continueWatching(observedEntries, resumePositionFor) }
-    val shownContinue = retainedContinue ?: observedContinue
     val observedKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> requireNotNull(archiveLevelItems(observedArchive, reconciledArchiveStack.active.levelId)).map { it.key }
-        DvrLibraryMode.CONTINUE -> observedContinue.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.SCHEDULE -> observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> observedLibrary.problems.map { "recording:${recordingItemKey(it.id)}" }
     }
-    val removalHandoff = contentFocusOwned &&
-        (retainedEntries != observedEntries || (mode == DvrLibraryMode.CONTINUE && shownContinue != observedContinue)) &&
+    val removalHandoff = contentFocusOwned && retainedEntries != observedEntries &&
         ((if (mode == DvrLibraryMode.ARCHIVE) archiveNavigation.stack.active.focusedItemId
             else selectedKeys[location])?.let { it !in observedKeys } == true ||
             (mode == DvrLibraryMode.ARCHIVE && reconciledArchiveStack.active.levelId != archiveLevel))
@@ -427,10 +411,8 @@ internal fun RecordingsScreenContent(
     val archiveItems = remember(archive, archiveLevel) { archiveLevelItems(archive, archiveLevel) ?: archive.listItems() }
     val scheduleGroups = presentation.schedule
     val problemGroups = presentation.problems
-    val continueEntries = if (removalHandoff) shownContinue else observedContinue
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
-        DvrLibraryMode.CONTINUE -> continueEntries.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.SCHEDULE -> scheduleGroups.flatMap { it.entries }
             .map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> DvrProblemBucket.entries
@@ -440,7 +422,7 @@ internal fun RecordingsScreenContent(
     val alertShown = recordingsAppError(entries.isEmpty(), connectionUiState, connectionFailure) != null
 
     val drawerState = at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState.current
-    LaunchedEffect(observedEntries, observedContinue) {
+    LaunchedEffect(observedEntries) {
         // Transfer locally before removing the actual focused node. Keeping only the
         // old key would recreate the node and leave the same focus vacancy.
         if (removalHandoff && initialFocusEnabled &&
@@ -452,7 +434,6 @@ internal fun RecordingsScreenContent(
             }
         }
         retainedPreparation = prepared
-        retainedContinue = observedContinue
         archiveNavigation.update(reconcileArchiveStack(archiveNavigation.stack, observedArchive))
     }
 
@@ -624,7 +605,7 @@ internal fun RecordingsScreenContent(
             state = {
                 RecordingsTabBody(
                     mode, location, entries.isEmpty(), connectionUiState, connectionFailure,
-                    observation, channelsById, archive, continueEntries,
+                    observation, channelsById, archive,
                     scheduleGroups, problemGroups, selectedKeys[location],
                     archiveScrollPositions[location] ?: 0,
                     screenState.archiveScrollOffsets[location] ?: 0,
@@ -728,9 +709,7 @@ internal fun RecordingsScreenContent(
                         }
                     },
                 )
-                DvrLibraryMode.CONTINUE,
-                DvrLibraryMode.SCHEDULE,
-                DvrLibraryMode.PROBLEMS -> Box(
+                DvrLibraryMode.SCHEDULE -> Box(
                     modifier = Modifier
                         // Full-width native focus growth needs extra trailing safe-area reserve.
                         .padding(start = startPadding + TvBrowseLeadingInset - 24.dp, end = maxOf(endPadding, TvBrowseTrailingInset) + 12.dp - 24.dp)
@@ -743,64 +722,82 @@ internal fun RecordingsScreenContent(
                 ) {
                     key(location, frame.recoveryGeneration) {
                         val generation = frame.recoveryGeneration
-                        val onFocused: (String) -> Unit = { if (owner.isCurrent) selectedKeys[location] = it }
-                        val onOpen: (DvrEntry) -> Unit = { if (owner.isCurrent) openRecording(it) }
-                        val onOpenContextMenu: (DvrEntry) -> Unit = {
-                            if (owner.isCurrent) {
-                                contentFocusOwned = false
-                                detailsInitialAction = null
-                                detailsEntry = it
-                                detailsObservation = observation
-                                showContextMenu = true
-                            }
-                        }
-                        val piconForEntry: (DvrEntry) -> ArtworkId? = { entry -> entry.channelId?.let(channelsById::get)?.icon }
-                        val resumePositionForEntry: (DvrEntry) -> Duration? = {
-                            at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
-                        }
-                        val onScrollChanged: (Int) -> Unit = {
-                            if (owner.isCurrent && generation == focusRecoveryGeneration) {
-                                archiveScrollPositions[location] = it
-                            }
-                        }
-                        when (mode) {
-                            DvrLibraryMode.CONTINUE -> RecordingContinue(
-                                entries = frame.continueEntries,
-                                selectedKey = frame.selectedKey,
-                                selectedFocus = contentFocus,
-                                onFocused = onFocused,
-                                onOpen = onOpen,
-                                onOpenContextMenu = onOpenContextMenu,
-                                piconForEntry = piconForEntry,
-                                resumePositionForEntry = resumePositionForEntry,
-                                initialScrollIndex = frame.scrollIndex,
-                                onScrollChanged = onScrollChanged,
-                            )
-                            DvrLibraryMode.SCHEDULE -> RecordingSchedule(
-                                groups = scheduleGroups,
-                                selectedKey = frame.selectedKey,
-                                selectedFocus = contentFocus,
-                                onFocused = onFocused,
-                                onOpen = onOpen,
-                                onOpenContextMenu = onOpenContextMenu,
-                                piconForEntry = piconForEntry,
-                                resumePositionForEntry = resumePositionForEntry,
-                                initialScrollIndex = frame.scrollIndex,
-                                onScrollChanged = onScrollChanged,
-                            )
-                            else -> RecordingProblems(
-                                groups = problemGroups,
-                                selectedKey = frame.selectedKey,
-                                selectedFocus = contentFocus,
-                                onFocused = onFocused,
-                                onOpen = onOpen,
-                                onOpenContextMenu = onOpenContextMenu,
-                                piconForEntry = piconForEntry,
-                                resumePositionForEntry = resumePositionForEntry,
-                                initialScrollIndex = frame.scrollIndex,
-                                onScrollChanged = onScrollChanged,
-                            )
-                        }
+                        RecordingSchedule(
+                            groups = scheduleGroups,
+                            selectedKey = frame.selectedKey,
+                            selectedFocus = contentFocus,
+                            onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
+                            onOpen = {
+                                if (!owner.isCurrent) return@RecordingSchedule
+                                openRecording(it)
+                            },
+                            onOpenContextMenu = {
+                                if (owner.isCurrent) {
+                                    contentFocusOwned = false
+                                    detailsInitialAction = null
+                                    detailsEntry = it
+                                    detailsObservation = observation
+                                    showContextMenu = true
+                                }
+                            },
+                            piconForEntry = { entry ->
+                                entry.channelId?.let(channelsById::get)?.icon
+                            },
+                            resumePositionForEntry = {
+                                at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
+                            },
+                            initialScrollIndex = frame.scrollIndex,
+                            onScrollChanged = {
+                                if (owner.isCurrent && generation == focusRecoveryGeneration) {
+                                    archiveScrollPositions[location] = it
+                                }
+                            },
+                        )
+                    }
+                }
+                DvrLibraryMode.PROBLEMS -> Box(
+                    modifier = Modifier
+                        .padding(start = startPadding + TvBrowseLeadingInset - 24.dp, end = maxOf(endPadding, TvBrowseTrailingInset) + 12.dp - 24.dp)
+                        .fillMaxSize()
+                        .onFocusChanged {
+                            if (!owner.isCurrent) return@onFocusChanged
+                            contentHasFocus = it.hasFocus
+                            if (it.hasFocus) contentFocusOwned = true
+                        },
+                ) {
+                    key(location, frame.recoveryGeneration) {
+                        val generation = frame.recoveryGeneration
+                        RecordingProblems(
+                            groups = problemGroups,
+                            selectedKey = frame.selectedKey,
+                            selectedFocus = contentFocus,
+                            onFocused = { if (owner.isCurrent) selectedKeys[location] = it },
+                            onOpen = {
+                                if (!owner.isCurrent) return@RecordingProblems
+                                openRecording(it)
+                            },
+                            onOpenContextMenu = {
+                                if (owner.isCurrent) {
+                                    contentFocusOwned = false
+                                    detailsInitialAction = null
+                                    detailsEntry = it
+                                    detailsObservation = observation
+                                    showContextMenu = true
+                                }
+                            },
+                            piconForEntry = { entry ->
+                                entry.channelId?.let(channelsById::get)?.icon
+                            },
+                            resumePositionForEntry = {
+                                at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
+                            },
+                            initialScrollIndex = frame.scrollIndex,
+                            onScrollChanged = {
+                                if (owner.isCurrent && generation == focusRecoveryGeneration) {
+                                    archiveScrollPositions[location] = it
+                                }
+                            },
+                        )
                     }
                 }
             }
