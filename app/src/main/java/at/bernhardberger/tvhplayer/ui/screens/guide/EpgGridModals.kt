@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,17 +60,12 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EpgSearchResult
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.GuideWindowBounds
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
-import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
-import at.bernhardberger.tvhplayer.core.moveGuideWindowByDays
 import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.player.*
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.notifications.label
-import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
-import java.time.ZoneId
 import androidx.compose.foundation.lazy.rememberLazyListState
 
 @Composable

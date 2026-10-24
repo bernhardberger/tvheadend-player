@@ -16,6 +16,7 @@ import at.bernhardberger.tvhplayer.ui.screens.BrowsePanelList
 import at.bernhardberger.tvhplayer.ui.screens.BrowseSidePanel
 import java.time.Instant
 import java.time.ZoneId
+import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 
 /**
@@ -39,16 +40,10 @@ internal fun GuideTimePanel(
         derivedStateOf { Instant.ofEpochSecond(nowSecProvider()).atZone(zoneId).toLocalDate() }
     }
     val windowDay = Instant.ofEpochSecond(windowStartSec).atZone(zoneId).toLocalDate()
-    val windowHourSec = floorGuideWindowToHour(windowStartSec, zoneId)
     val firstDay = Instant.ofEpochSecond(bounds.earliestStartSec).atZone(zoneId).toLocalDate()
     val lastDay = Instant.ofEpochSecond(bounds.latestStartSec).atZone(zoneId).toLocalDate()
     val days = generateSequence(firstDay) { it.plusDays(1) }.takeWhile { !it.isAfter(lastDay) }.toList()
-    // Hours of the checked day whose window can start; a repeated autumn hour is listed once.
-    val hours = generateSequence(windowDay.atStartOfDay(zoneId)) { it.plusHours(1) }
-        .takeWhile { it.toLocalDate() == windowDay }
-        .filter { it.toEpochSecond() in bounds.earliestStartSec..bounds.latestStartSec }
-        .distinctBy { it.hour }
-        .toList()
+    val hours = guideTimeHours(windowStartSec, bounds, zoneId)
     val entries = buildList {
         add(BrowsePanelEntry.Choice(
             key = "guide-time-now",
@@ -65,7 +60,8 @@ internal fun GuideTimePanel(
                 selected = day == windowDay,
                 onClick = {
                     if (day != windowDay) {
-                        onDay(moveGuideWindowByDays(windowStartSec, ChronoUnit.DAYS.between(windowDay, day).toInt(), bounds, zoneId))
+                        val delta = ChronoUnit.DAYS.between(windowDay, day).toInt()
+                        onDay(floorGuideWindowToHour(moveGuideWindowByDays(windowStartSec, delta, bounds, zoneId), zoneId))
                     }
                 },
             ))
@@ -73,14 +69,32 @@ internal fun GuideTimePanel(
         if (hours.isNotEmpty()) add(BrowsePanelEntry.Section(stringResource(R.string.guide_time_hour)))
         hours.forEach { hour ->
             add(BrowsePanelEntry.Choice(
-                key = "guide-time-hour-${hour.hour.toString().padStart(2, '0')}",
-                label = formatClock(hour, locale),
-                selected = hour.toEpochSecond() == windowHourSec,
-                onClick = { onHour(hour.toEpochSecond()) },
+                key = "guide-time-hour-${hour.start.hour.toString().padStart(2, '0')}",
+                label = formatClock(hour.start, locale),
+                selected = hour.selected,
+                onClick = { onHour(hour.start.toEpochSecond()) },
             ))
         }
     }
     BrowseSidePanel(stringResource(R.string.guide_time_title), "guide-time-panel", onClose) {
         BrowsePanelList(entries, radio = false)
+    }
+}
+
+internal data class GuideTimeHour(val start: ZonedDateTime, val selected: Boolean)
+
+/**
+ * The local hours of the window's day whose window can start, the window's own hour checked.
+ * An hour a clock change skips is left out, or starts where its remainder begins; a repeated
+ * autumn hour is listed once, in the occurrence the window is in.
+ */
+internal fun guideTimeHours(windowStartSec: Long, bounds: GuideWindowBounds, zoneId: ZoneId): List<GuideTimeHour> {
+    val window = Instant.ofEpochSecond(windowStartSec).atZone(zoneId)
+    return (0..23).mapNotNull { hour ->
+        val start = ZonedDateTime.ofLocal(window.toLocalDate().atTime(hour, 0), zoneId,
+            window.offset.takeIf { hour == window.hour })
+        GuideTimeHour(start, hour == window.hour).takeIf {
+            start.hour == hour && start.toEpochSecond() in bounds.earliestStartSec..bounds.latestStartSec
+        }
     }
 }

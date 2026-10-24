@@ -1100,7 +1100,8 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("guide-time-panel").assertDoesNotExist()
         dateFocused()
         compose.waitUntil(5_000) { dateButtonShows("Tomorrow", hour + 24 * 3600 - 17 * 3600) }
-        compose.mainClock.advanceTimeBy(1_000)
+        // Past the Guide's 10 s wait for coverage after a jump: a late window request still leaves focus here.
+        compose.mainClock.advanceTimeBy(11_000)
         compose.waitForIdle()
         dateFocused()
         assertEquals(0, playbackRequests)
@@ -1129,6 +1130,7 @@ class GuideVisualLayoutTest {
         // Earliest start is six hours before the opening hour, 14:00; the week ends on day 7.
         repeat(7 + 1) { key(Key.DirectionDown) }
         tagFocused("guide-time-hour-14")
+        compose.onNodeWithTag("guide-time-hour-13").assertDoesNotExist()
         key(Key.DirectionUp)
         tagFocused("guide-time-day-7")
         key(Key.Enter)
