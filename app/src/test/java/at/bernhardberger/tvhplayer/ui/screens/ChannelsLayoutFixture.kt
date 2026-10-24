@@ -4,7 +4,9 @@ import android.app.Application
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -14,6 +16,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
@@ -25,6 +28,9 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
+import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -55,6 +61,13 @@ import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.ui.AppDestination
+import at.bernhardberger.tvhplayer.ui.ChannelsKey
+import at.bernhardberger.tvhplayer.ui.GuideKey
+import at.bernhardberger.tvhplayer.ui.SIDEBAR_SCENE_DESTINATION
+import at.bernhardberger.tvhplayer.ui.appDestinationContentTransform
+import at.bernhardberger.tvhplayer.ui.navigateTopLevel
+import at.bernhardberger.tvhplayer.ui.rememberAppNavBackStack
+import at.bernhardberger.tvhplayer.ui.rememberSidebarGuideSceneStrategy
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
@@ -90,6 +103,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         video: android.graphics.Bitmap? = null,
         guidePending: Boolean = false,
         firstTitle: String? = null,
+        guide: Boolean = false,
     ) {
         val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle)
         // All channels is opt-in under Settings: hiding it shows the tags only.
@@ -111,38 +125,71 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                                 contentScale = androidx.compose.ui.layout.ContentScale.Crop)
                             at.bernhardberger.tvhplayer.ui.WarmPlaybackScrim()
                         }
+                        val backStack = rememberAppNavBackStack(ChannelsKey)
                         SideRail(
-                            currentRoute = AppDestination.CHANNELS,
+                            currentRoute = if (backStack.last() == GuideKey) AppDestination.GUIDE else AppDestination.CHANNELS,
                             showEpgMenu = true,
                             onRootBack = {},
-                            onNavigate = {},
+                            onNavigate = { route ->
+                                if (guide) backStack.navigateTopLevel(if (route == AppDestination.GUIDE) GuideKey else ChannelsKey)
+                            },
                         ) { padding, drawerActive ->
-                            var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
-                            ChannelsScreenContent(
-                                contentPadding = padding,
-                                initialFocusEnabled = !drawerActive,
-                                channelScopeState = resolveChannelScopeState(observation.channelState, activeTag, visibility),
-                                observation = observation,
-                                tagNotice = false,
-                                selectedId = { selected },
-                                playingChannelId = playerReturn?.playingChannelId,
-                                playerReturn = playerReturn,
-                                view = channelsView,
-                                onViewChange = { channelsView = it },
-                                connectionUiState = ConnectionUiState.Ready,
-                                onSelectChannel = { selected = it },
-                                onSelectTag = { activeTag = it },
-                                onDismissTagNotice = {},
-                                onRetryConnection = {},
-                                onOpenConnectionSettings = {},
-                                onPlay = { _, _ -> plays++ },
-                            )
+                            if (!guide) {
+                                Channels(padding, !drawerActive, observation, visibility, playerReturn)
+                            } else {
+                                // The app's browse scene: the drawer's focus moves between Channels and a bare Guide.
+                                NavDisplay(
+                                    backStack = backStack,
+                                    onBack = {},
+                                    sceneStrategies = listOf(rememberSidebarGuideSceneStrategy(drawerActive, backStack.last())),
+                                    entryDecorators = listOf(rememberSaveableStateHolderNavEntryDecorator()),
+                                    transitionSpec = { appDestinationContentTransform() },
+                                    entryProvider = entryProvider {
+                                        entry<ChannelsKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.CHANNELS)) {
+                                            Channels(padding, !drawerActive && backStack.last() == ChannelsKey, observation, visibility, playerReturn)
+                                        }
+                                        entry<GuideKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE)) {
+                                            Box(Modifier.fillMaxSize().testTag("guide-page"))
+                                        }
+                                    },
+                                )
+                            }
                         }
                     }
                 }
             }
         }
         compose.waitForIdle()
+    }
+
+    @Composable
+    private fun Channels(
+        padding: PaddingValues,
+        initialFocusEnabled: Boolean,
+        observation: SessionObservation,
+        visibility: ChannelScopeVisibility,
+        playerReturn: PlayerReturnFocus?,
+    ) {
+        var activeTag by remember { mutableStateOf<ChannelTagId?>(null) }
+        ChannelsScreenContent(
+            contentPadding = padding,
+            initialFocusEnabled = initialFocusEnabled,
+            channelScopeState = resolveChannelScopeState(observation.channelState, activeTag, visibility),
+            observation = observation,
+            tagNotice = false,
+            selectedId = { selected },
+            playingChannelId = playerReturn?.playingChannelId,
+            playerReturn = playerReturn,
+            view = channelsView,
+            onViewChange = { channelsView = it },
+            connectionUiState = ConnectionUiState.Ready,
+            onSelectChannel = { selected = it },
+            onSelectTag = { activeTag = it },
+            onDismissTagNotice = {},
+            onRetryConnection = {},
+            onOpenConnectionSettings = {},
+            onPlay = { _, _ -> plays++ },
+        )
     }
 
     /** The fictional fixture pack: picons by channel id, programme art from 101. */

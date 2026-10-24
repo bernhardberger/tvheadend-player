@@ -19,14 +19,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.offset
 import androidx.compose.ui.zIndex
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import at.bernhardberger.tvhplayer.ui.components.BrowseContentLayer
+import at.bernhardberger.tvhplayer.ui.components.browseDrawerUnderlap
 
 internal const val SIDEBAR_SCENE_DESTINATION = "sidebarSceneDestination"
 
@@ -114,6 +119,7 @@ private fun SidebarVisitDestination(
         label = "sidebarDestinationPosition",
     ) { target -> (index - target).coerceIn(-1, 1).toFloat() }
     val showing = remember(alpha) { derivedStateOf { alpha.value > 0f } }
+    val underlap = browseDrawerUnderlap()
     // Release an inactive destination when its exit motion finishes.
     // Intermediate destinations can still be fading after a rapid retarget, so
     // transition.currentState alone is not sufficient to retain their content.
@@ -128,7 +134,7 @@ private fun SidebarVisitDestination(
                 modifier = Modifier
                     .fillMaxSize()
                     .zIndex(if (visible) 1f else 0f)
-                    .graphicsLayer {
+                    .fadeLayerUnderDrawer(underlap) {
                         this.alpha = alpha.value
                         translationY = position.value * size.height * BrowseMotionPolicy.slideFraction
                     }
@@ -159,6 +165,7 @@ private fun SidebarEntryContent(entry: NavEntry<AppNavKey>) {
     val replacement = entries.indexOfFirst { it.contentKey == entry.contentKey }
     if (replacement < 0) entries.add(entry) else if (entries[replacement] != entry) entries[replacement] = entry
 
+    val underlap = browseDrawerUnderlap()
     Box(Modifier.fillMaxSize()) {
         entries.forEach { destinationEntry ->
             key(destinationEntry.contentKey) {
@@ -172,7 +179,7 @@ private fun SidebarEntryContent(entry: NavEntry<AppNavKey>) {
                         Modifier
                             .fillMaxSize()
                             .zIndex(if (current) 1f else 0f)
-                            .graphicsLayer { this.alpha = alpha.value }
+                            .fadeLayerUnderDrawer(underlap) { this.alpha = alpha.value }
                             .then(layer)
                             .then(if (current) Modifier else Modifier.clearAndSetSemantics { })
                             .focusProperties { onEnter = { if (!current) cancelFocusChange() } }
@@ -183,3 +190,21 @@ private fun SidebarEntryContent(entry: NavEntry<AppNavKey>) {
         }
     }
 }
+
+/**
+ * A fading graphics layer draws offscreen at its own bounds, so a page's backdrop, which runs on
+ * under the drawer to the screen edge, would stay cut off there until the fade ends and then pop
+ * in. The layer reaches [underlap] under the drawer instead; the page stays where it is.
+ */
+private fun Modifier.fadeLayerUnderDrawer(underlap: Dp, block: GraphicsLayerScope.() -> Unit): Modifier =
+    layout { measurable, constraints ->
+        val extra = underlap.roundToPx()
+        val layer = measurable.measure(constraints.offset(horizontal = extra))
+        layout(layer.width - extra, layer.height) { layer.placeRelative(-extra, 0) }
+    }
+        .graphicsLayer(block)
+        .layout { measurable, constraints ->
+            val extra = underlap.roundToPx()
+            val page = measurable.measure(constraints.offset(horizontal = -extra))
+            layout(page.width + extra, page.height) { page.placeRelative(extra, 0) }
+        }

@@ -71,11 +71,12 @@ internal fun BrowseContentLayer(
 /**
  * A screen's backdrop sits under the shell's gradient like the shell's own background, not over it.
  * Content already drawn [inOffscreenLayer] lets that layer keep the gradient off transparent pixels,
- * and darkens only as the drawer opens.
+ * and darkens only as the drawer opens. A departing page's layer already puts all its ink under the
+ * gradient, so the gradient is not laid on twice there.
  */
 @Composable
 internal fun Modifier.underBrowseShellScrim(inOffscreenLayer: Boolean = false): Modifier =
-    LocalBrowseContentLayering.current?.let {
+    LocalBrowseContentLayering.current?.takeUnless { LocalBrowseDeparture.current }?.let {
         then(BrowseDepartureElement(it, if (inOffscreenLayer) BrowseScrimMode.ATOP else BrowseScrimMode.LAYERED))
     } ?: this
 
