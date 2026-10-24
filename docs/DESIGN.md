@@ -552,15 +552,23 @@ options offer three layouts, in this order: **Immersive** (the default), **List*
 and **Grid**. Each layout keeps its own **Program art** switch; only List starts
 with it on. Off, cards and backdrops use channel logos instead of programme art.
 
-- The header names the destination as the Guide does: "Channels", or
-  "Channels • <group>" when a tag narrows it (accepted 2026-10-22; a long group
-  name is cut at the end). The group qualifies the destination, so " • <group>"
-  keeps the title's size and line but steps down to the secondary text tone, as
-  the Guide's category does. It sits on the browse
-  heading axis at x130, y32 on the 960×540 reference canvas, with the 40dp Group
-  and View options buttons at its end. Content begins at y80. At larger text the
-  header grows from its actual text measurements. Header actions appear only when
-  backed by working, authorized behavior.
+- The header names only the destination, "Channels", as the Guide's does; the
+  active tag shows on its button, never in the title (accepted 2026-10-24). It
+  sits on the browse heading axis at x130, y32 on the 960×540 reference canvas,
+  with the Tags and View options buttons 20dp apart at its end. Content begins
+  at y80. At larger text the header grows from its actual text measurements.
+  Header actions appear only when backed by working, authorized behavior.
+- Every browse header icon button rests on a 40dp disc of `surfaceVariant` at
+  40%; the Guide's date pill shares that fill. Focus keeps TV Material's focused
+  container, content and scale. A button whose choice is not its "All" entry
+  grows into a `secondaryContainer` pill showing its icon and value (cut at
+  160dp), and TalkBack reads its name with the value ("Tags, Entertainment").
+  The header has no scrim of its own.
+- Tags opens the channel sets: the app's sets, a divider, then the server's
+  tags. It shows only with a choice of sets, the same on Channels and Guide.
+  Panels open on the checked entry; OK applies and closes, Back closes, and
+  either returns focus to the button that opened the panel. A panel list fades
+  only at its top; its bottom edge cuts the next row at full contrast.
 - Live video remains behind the content under the shell-owned warm-playback
   scrim in §4. There is no duplicate screen-local video scrim or rail/list seam.
 - The list's leading axis includes the shell's 24dp inset and a further 26dp,
@@ -666,7 +674,11 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   Material rows/cards and indication with reserved focus-growth space. Text scale
   changes the available rows/columns, never the native font sizes.
 - Guide keeps date/Now/Search together using existing working actions, with
-  trailing focus clearance. A 124dp channel column and an 8dp gap lead into the
+  trailing focus clearance. Its header reads "Guide", then the date pill, Tags
+  and Filter 8dp apart, and View options, 20dp between the groups. Filter shows
+  once the guide carries genre codes (or while a genre is chosen) and opens
+  "Filter by genre": All genres and the genre families, each with its color dot
+  while View options' Genre colors is on. The active genre's pill adds that dot. A 124dp channel column and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
   programme rows (`ui/screens/guide/GuideViewport.kt:17-18`). Timeline and channel content may continue to the physical
   trailing/bottom edges beneath local 48dp fades. Leading/top fades appear only

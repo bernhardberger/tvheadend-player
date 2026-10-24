@@ -159,15 +159,15 @@ class ChannelsScreenshotTest(private val scenario: String) {
             composeRule.waitUntilExactlyOneExists(hasTestTag("channel-row-2") and isFocused(), 5_000)
             /** Opens the group picker and moves [steps] rows down from All channels. */
             fun openGroupPicker(steps: Int) {
-                composeRule.onNodeWithTag("channels-group-button").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
-                composeRule.waitUntilExactlyOneExists(hasTestTag("channels-group-all") and isFocused(), 5_000)
+                composeRule.onNodeWithTag("channels-tags-button").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                composeRule.waitUntilExactlyOneExists(hasTestTag("channels-tags-all") and isFocused(), 5_000)
                 repeat(steps) { composeRule.onNode(isFocused()).performKeyInput { pressKey(Key.DirectionDown) } }
             }
             val focus = when (scenario) {
                 // Group picker over many groups, on International.
                 "tags-overflow" -> {
                     openGroupPicker(steps = 5)
-                    composeRule.onNodeWithTag("channels-group-5")
+                    composeRule.onNodeWithTag("channels-tags-5")
                 }
                 "empty-filter" -> {
                     openGroupPicker(steps = 4)

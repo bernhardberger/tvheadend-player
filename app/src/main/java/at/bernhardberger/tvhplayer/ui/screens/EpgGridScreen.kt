@@ -127,6 +127,7 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
+import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
@@ -141,7 +142,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
-import at.bernhardberger.tvhplayer.ui.screens.guide.GuideGroupPanel
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFilterPanel
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
@@ -438,7 +439,7 @@ fun EpgGridScreen(
     )
 
     val displayEvents = remember(observation.epgSnapshotForDisplay) { guideDisplayEvents(observation.epgSnapshotForDisplay) }
-    // The Genre row offers itself once the guide carries a genre code, and stays while one is chosen.
+    // Filter offers itself once the guide carries a genre code, and stays while one is chosen.
     val genreCodes = remember(displayEvents) { displayEvents.any { programmeCategory(it) != null } }
     val showGenre = genreCodes || genre != ProgrammeCategory.ALL
     val indexInput = GuideIndexInput(
@@ -1641,7 +1642,11 @@ fun EpgGridScreen(
 
     /** Closes the open side panel and returns focus to the header button that opened it. */
     fun closePanel() {
-        val opener = if (openPanel == ChannelsPanel.GROUP) header.group else header.view
+        val opener = when (openPanel) {
+            ChannelsPanel.TAGS -> header.tags
+            ChannelsPanel.FILTER -> header.filter
+            else -> header.view
+        }
         runCatching { opener.requestFocus() }
         openPanel = null
     }
@@ -1766,13 +1771,15 @@ fun EpgGridScreen(
                 },
         ) {
             GuideHeader(
-                filter = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
+                tag = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 genre = genre.takeIf { it != ProgrammeCategory.ALL }?.let { programmeCategoryLabel(it) },
+                genreDot = if (view.genreColors) tvGenreColors(genre)?.base else null,
                 windowStartSec = windowStartSec,
                 nowSecProvider = nowSecProvider,
                 focus = header,
                 dateFocus = guideDateFocus,
-                showGroup = groups.size > 1 || showGenre,
+                showTags = groups.size > 1,
+                showFilter = showGenre,
                 navigationFocus = navigationFocus,
                 contentPadding = contentPadding,
                 startPadding = startPadding,
@@ -2012,20 +2019,24 @@ fun EpgGridScreen(
             )
         }
         when (openPanel) {
-            ChannelsPanel.GROUP -> GuideGroupPanel(
+            ChannelsPanel.TAGS -> ChannelsTagsPanel(
                 groups = groups,
                 currentTagId = channelScope.activeTagId,
-                genre = genre,
-                showGenre = showGenre,
-                genreColors = view.genreColors,
-                onSelectGroup = { tagId ->
+                onSelect = { tagId ->
                     closePanel()
                     releaseProgrammeFocus()
                     scopeMotion.select(tagId, groups.map { it.tagId })
                     channelViewModel.selectTag(tagId)
                 },
-                onSelectGenre = { category ->
+                onClose = ::closePanel,
+            )
+            ChannelsPanel.FILTER -> GuideFilterPanel(
+                genre = genre,
+                genreColors = view.genreColors,
+                onSelect = { category ->
                     closePanel()
+                    // Without genre codes, All genres takes Filter away; View options keeps focus.
+                    if (category == ProgrammeCategory.ALL && !genreCodes) runCatching { header.view.requestFocus() }
                     onGenreChange(category)
                 },
                 onClose = ::closePanel,

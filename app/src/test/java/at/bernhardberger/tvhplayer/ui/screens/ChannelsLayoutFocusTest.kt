@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -53,12 +54,12 @@ class ChannelsLayoutFocusTest {
     private val list = ChannelsView(ChannelsLayout.LIST)
     private val grid = ChannelsView(ChannelsLayout.GRID).toggledProgramArt()
     private val immersive = ChannelsView(ChannelsLayout.IMMERSIVE).toggledProgramArt()
-    private val groupButton = hasTestTag("channels-group-button")
+    private val tagsButton = hasTestTag("channels-tags-button")
     private val viewButton = hasTestTag("channels-view-button")
 
     private fun card(id: Int) = hasTestTag("channel-card-$id")
     private fun row(id: Int) = hasTestTag("channel-row-$id")
-    private fun group(id: Int?) = hasTestTag("channels-group-${id ?: "all"}")
+    private fun group(id: Int?) = hasTestTag("channels-tags-${id ?: "all"}")
     private fun option(key: String) = hasTestTag("channels-view-$key")
 
     private fun awaitRail() = compose.waitUntil(10_000) {
@@ -66,14 +67,16 @@ class ChannelsLayoutFocusTest {
             .fetchSemanticsNodes().isNotEmpty()
     }
 
-    /** The group button names the active group; "All channels" while none narrows the list. */
-    private fun assertGroup(name: String) =
-        compose.onNode(groupButton and hasText(name) and hasAnyAncestor(hasTestTag("channels-header"))).assertExists()
+    /** The Tags button names the active [tag], "All channels" while none narrows the list, and is read with it. */
+    private fun assertTag(tag: String) {
+        compose.onNode(tagsButton and hasText(tag) and hasAnyAncestor(hasTestTag("channels-header"))).assertExists()
+        compose.onNode(tagsButton).assertContentDescriptionEquals("Tags, $tag")
+    }
 
-    /** Opens the picker from the group button and moves [steps] rows from the checked group, Up when negative. */
+    /** Opens the picker from the Tags button and moves [steps] rows from the checked group, Up when negative. */
     private fun pickGroup(target: SemanticsMatcher, steps: Int) {
         fixture.key(Key.DirectionCenter)
-        fixture.awaitFocus(hasAnyAncestor(hasTestTag("channels-group-panel")))
+        fixture.awaitFocus(hasAnyAncestor(hasTestTag("channels-tags-panel")))
         repeat(kotlin.math.abs(steps)) { fixture.key(if (steps < 0) Key.DirectionUp else Key.DirectionDown) }
         fixture.awaitFocus(target)
         fixture.key(Key.DirectionCenter)
@@ -82,7 +85,7 @@ class ChannelsLayoutFocusTest {
     @Test fun gridEntersOnTheFirstCardAndStaysAtTheLastColumn() {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
-        assertGroup("All channels")
+        assertTag("All channels")
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionRight)
@@ -99,7 +102,7 @@ class ChannelsLayoutFocusTest {
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(viewButton)
         fixture.key(Key.DirectionRight)
@@ -114,7 +117,7 @@ class ChannelsLayoutFocusTest {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionLeft)
         awaitRail()
         // Right from the rail re-enters the content on its remembered card, not the header.
@@ -128,17 +131,17 @@ class ChannelsLayoutFocusTest {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         pickGroup(group(1), steps = 1)
-        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
+        compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
         fixture.awaitFocus(card(1))
-        assertGroup("Favorites")
+        assertTag("Favorites")
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionUp)
         pickGroup(group(2), steps = 1)
         fixture.awaitFocus(card(7))
-        assertGroup("Entertainment")
+        assertTag("Entertainment")
         fixture.key(Key.DirectionUp)
         pickGroup(group(1), steps = -1)
         fixture.awaitFocus(card(3))
@@ -149,17 +152,36 @@ class ChannelsLayoutFocusTest {
         fixture.show(list)
         fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(group(null))
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(group(1))
         fixture.key(Key.Back)
-        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
-        fixture.awaitFocus(groupButton)
-        assertGroup("All channels")
+        compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
+        fixture.awaitFocus(tagsButton)
+        assertTag("All channels")
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(row(1))
+    }
+
+    @Test fun tagsPanelOpensOnTheActiveTagAndBackReturnsToTheNamedButton() {
+        fixture.show(list)
+        fixture.awaitFocus(row(1))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(tagsButton)
+        compose.onNode(tagsButton).assertContentDescriptionEquals("Tags")
+        pickGroup(group(2), steps = 2)
+        fixture.awaitFocus(row(7))
+        assertTag("Entertainment")
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(tagsButton)
+        fixture.key(Key.DirectionCenter)
+        fixture.awaitFocus(group(2))
+        fixture.key(Key.Back)
+        compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
+        fixture.awaitFocus(tagsButton)
+        assertTag("Entertainment")
     }
 
     @Test fun rightFromAListRowReachesTheHeaderAndDownReturnsToTheRow() {
@@ -168,12 +190,12 @@ class ChannelsLayoutFocusTest {
         repeat(3) { fixture.key(Key.DirectionDown) }
         fixture.awaitFocus(row(4))
         fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(row(4))
         // Left undoes Right; the rail is the row's own start edge.
         fixture.key(Key.DirectionRight)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionLeft)
         fixture.awaitFocus(row(4))
         fixture.key(Key.DirectionLeft)
@@ -259,7 +281,7 @@ class ChannelsLayoutFocusTest {
     @Test fun singleGroupHidesTheGroupButtonAndUpReachesViewOptions() {
         fixture.show(list, tags = false)
         fixture.awaitFocus(row(1))
-        compose.onNode(groupButton).assertDoesNotExist()
+        compose.onNode(tagsButton).assertDoesNotExist()
         compose.onNodeWithTag("channels-list").assertExists()
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(viewButton)
@@ -278,21 +300,21 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(hasTestTag("channels-show-all"))
         compose.onNodeWithTag("channels-empty-group").assertExists()
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(hasTestTag("channels-show-all"))
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(card(1))
-        assertGroup("All channels")
+        assertTag("All channels")
     }
 
     @Test fun emptyGroupWithoutAllChannelsLeavesFocusOnTheGroupButton() {
         fixture.show(grid, emptyGroup = true, allChannels = false)
         fixture.awaitFocus(card(1))
-        assertGroup("Favorites")
+        assertTag("Favorites")
         fixture.key(Key.DirectionUp)
         pickGroup(group(9), steps = 2)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         compose.onNodeWithTag("channels-empty-group").assertExists()
         compose.onNodeWithTag("channels-show-all").assertDoesNotExist()
     }
@@ -302,7 +324,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
         pickGroup(group(9), steps = 2)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         // No row to go back to, so the start edge leads to the rail as on the other layouts.
         fixture.key(Key.DirectionLeft)
         awaitRail()
@@ -315,7 +337,7 @@ class ChannelsLayoutFocusTest {
         pickGroup(group(9), steps = 3)
         fixture.awaitFocus(hasTestTag("channels-show-all"))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionLeft)
         awaitRail()
     }
@@ -379,7 +401,7 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         compose.waitForIdle()
         assertEquals(headerTop, compose.onNode(header).fetchSemanticsNode().positionInRoot.y, 1f)
     }
@@ -387,13 +409,13 @@ class ChannelsLayoutFocusTest {
     @Test fun immersiveDownStaysAndUpReachesTheHeader() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
-        assertGroup("All channels")
+        assertTag("All channels")
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(2))
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(card(2))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(card(2))
         assertEquals("Focus alone never tunes", 0, fixture.plays)
@@ -409,27 +431,26 @@ class ChannelsLayoutFocusTest {
         // The buttons sit in the 40dp slot at the top content padding, as the list's header has them.
         val top = header.positionInRoot.y
         val slot = with(compose.density) { TvBrowseHeaderHeight.toPx() }
-        listOf(groupButton, viewButton).forEach {
+        listOf(tagsButton, viewButton).forEach {
             val bounds = compose.onNode(it).fetchSemanticsNode().boundsInRoot
             assertTrue("$it starts in the slot", bounds.top >= top - .5f)
             assertTrue("$it ends in the slot", bounds.bottom <= top + slot + .5f)
         }
         // The row below still reaches the buttons with Up.
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
     }
 
-    @Test fun headerNamesTheScreenAsItsPaneTitleAndTheGroupButtonShowsTheGroup() {
+    @Test fun headerNamesTheScreenAsItsPaneTitleAndTheTagsButtonShowsTheGroup() {
         fixture.show(list)
         fixture.awaitFocus(row(1))
         compose.onNodeWithTag("channels-header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
         compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
-        assertGroup("All channels")
-        compose.onNode(groupButton).assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Channel group")))
+        assertTag("All channels")
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         pickGroup(group(1), steps = 1)
-        assertGroup("Favorites")
+        assertTag("Favorites")
     }
 
     @Test fun immersiveRowRunsUnderTheRailAndKeepsItsKeyline() {
@@ -457,7 +478,7 @@ class ChannelsLayoutFocusTest {
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionLeft)
         awaitRail()
         compose.mainClock.advanceTimeBy(1_500)
@@ -475,10 +496,10 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(18))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         pickGroup(group(1), steps = 1)
         fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-immersive-cards")))
-        assertGroup("Favorites")
+        assertTag("Favorites")
         fixture.key(Key.DirectionLeft)
         awaitRail()
         // The header is nearer the rail than the bottom row; Right still returns to the card.
@@ -492,14 +513,14 @@ class ChannelsLayoutFocusTest {
         repeat(3) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(4))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         pickGroup(group(2), steps = 2)
         fixture.awaitFocus(card(7))
-        assertGroup("Entertainment")
+        assertTag("Entertainment")
         repeat(3) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(10))
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         pickGroup(group(null), steps = -2)
         fixture.awaitFocus(card(4))
     }

@@ -181,7 +181,8 @@ internal fun BrowsePanelList(entries: List<BrowsePanelEntry>, radio: Boolean, fo
             ),
             modifier = Modifier
                 .fillMaxWidth()
-                .playbackListFade(PlaybackListFade(top = listState.canScrollBackward, bottom = listState.canScrollForward))
+                // The panel's end cuts the next row at full contrast, so only the top fades.
+                .playbackListFade(PlaybackListFade(top = listState.canScrollBackward, bottom = false))
                 .focusGroup(),
         ) {
             items(entries, key = { entry ->

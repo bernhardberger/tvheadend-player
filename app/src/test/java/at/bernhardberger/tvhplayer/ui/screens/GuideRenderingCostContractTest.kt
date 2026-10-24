@@ -186,7 +186,7 @@ class GuideRenderingCostContractTest {
         val ownership = screenSource.section("val mayFocusProgramme", "fun focusGuideHeader()")
         assertTrue(ownership.contains("programmeFocusOwned"))
         assertFalse(ownership.contains("scopeRowFocused"))
-        assertTrue(screenSource.contains("onSelectGroup = { tagId ->\n                    closePanel()\n                    releaseProgrammeFocus()"))
+        assertTrue(screenSource.contains("onSelect = { tagId ->\n                    closePanel()\n                    releaseProgrammeFocus()"))
     }
 
     @Test

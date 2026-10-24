@@ -36,7 +36,7 @@ class ChannelsLayoutCaptureTest {
 
     private fun card(id: Int) = hasTestTag("channel-card-$id")
     private fun row(id: Int) = hasTestTag("channel-row-$id")
-    private val groupButton = hasTestTag("channels-group-button")
+    private val tagsButton = hasTestTag("channels-tags-button")
     private val viewButton = hasTestTag("channels-view-button")
 
     private fun Boolean.slug() = if (this) "programme" else "logo"
@@ -52,7 +52,7 @@ class ChannelsLayoutCaptureTest {
         capture("list-3-no-epg", row(8))
         repeat(7) { fixture.key(Key.DirectionUp) }
         fixture.key(Key.DirectionUp)
-        capture("list-4-header-group-button", groupButton)
+        capture("list-4-header-group-button", tagsButton)
     }
 
     @Test fun listSingleGroup() {
@@ -81,7 +81,7 @@ class ChannelsLayoutCaptureTest {
         fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)
         capture("$slug-playing-2-other-channel", item(2))
         fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionRight else Key.DirectionUp)
-        capture("$slug-playing-3-button", groupButton)
+        capture("$slug-playing-3-button", tagsButton)
     }
 
     /** Channel 1's next programme is scheduled; channel 2 records now. */
@@ -125,7 +125,7 @@ class ChannelsLayoutCaptureTest {
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionCenter)
         repeat(2) { fixture.key(Key.DirectionDown) }
-        fixture.awaitFocus(hasTestTag("channels-group-2"))
+        fixture.awaitFocus(hasTestTag("channels-tags-2"))
         fixture.key(Key.DirectionCenter)
         capture("$slug-${picture.slug()}-5-other-group", card(7))
     }
@@ -135,7 +135,7 @@ class ChannelsLayoutCaptureTest {
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionCenter)
-        capture("panel-1-group-picker", hasTestTag("channels-group-all"))
+        capture("panel-1-group-picker", hasTestTag("channels-tags-all"))
         repeat(3) { fixture.key(Key.DirectionDown) }
         fixture.key(Key.DirectionCenter)
         capture("panel-2-empty-group", hasTestTag("channels-show-all"))
@@ -156,18 +156,18 @@ class ChannelsLayoutCaptureTest {
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionCenter)
-        fixture.awaitFocus(hasTestTag("channels-group-all"))
+        fixture.awaitFocus(hasTestTag("channels-tags-all"))
         fixture.key(Key.DirectionDown)
         fixture.key(Key.DirectionDown)
         fixture.key(Key.DirectionCenter)
         // Nachrichten und Wetter: channels 1, 8 and 15.
         fixture.awaitFocus(card(1))
         fixture.key(Key.DirectionUp)
-        capture("de-1.3-1-header", groupButton, locale = "de", fontScale = 1.3f)
+        capture("de-1.3-1-header", tagsButton, locale = "de", fontScale = 1.3f)
         fixture.key(Key.DirectionCenter)
-        capture("de-1.3-2-group-picker", hasTestTag("channels-group-2"), locale = "de", fontScale = 1.3f)
+        capture("de-1.3-2-group-picker", hasTestTag("channels-tags-2"), locale = "de", fontScale = 1.3f)
         fixture.key(Key.Back)
-        fixture.awaitFocus(groupButton)
+        fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionRight)
         fixture.key(Key.DirectionCenter)
         capture("de-1.3-3-view-options", hasTestTag("channels-view-layout-grid"), locale = "de", fontScale = 1.3f)

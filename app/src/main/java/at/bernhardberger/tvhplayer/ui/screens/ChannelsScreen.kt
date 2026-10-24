@@ -289,7 +289,7 @@ internal fun ChannelsScreenContent(
     }
     val groups = remember(channelScope) { channelsGroups(channelScope) }
     val header = remember { ChannelsHeaderFocus() }
-    val headerEntryFocus = header.entry(hasGroupChoice = groups.size > 1)
+    val headerEntryFocus = header.entry(hasTagChoice = groups.size > 1)
     var openPanel by remember { mutableStateOf<ChannelsPanel?>(null) }
     val dvrEntries = observation.dvrSnapshotForDisplay?.entries.orEmpty()
     val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
@@ -462,7 +462,7 @@ internal fun ChannelsScreenContent(
         return runCatching { headerEntryFocus.requestFocus() }.getOrDefault(false)
     }
 
-    /** An empty group offers All channels when it is visible, otherwise the group button. */
+    /** An empty group offers All channels when it is visible, otherwise the Tags button. */
     fun focusEmptyGroup(): Boolean {
         coroutineScope.launch {
             // The empty message arrives with the group's content, a few layout passes later.
@@ -513,7 +513,7 @@ internal fun ChannelsScreenContent(
 
     /** Back and OK leave a panel with focus on the button that opened it. */
     fun closePanel() {
-        val opener = if (openPanel == ChannelsPanel.GROUP) header.group else header.view
+        val opener = if (openPanel == ChannelsPanel.TAGS) header.tags else header.view
         runCatching { opener.requestFocus() }
         openPanel = null
     }
@@ -690,11 +690,11 @@ internal fun ChannelsScreenContent(
                 .focusGroup()
         ) {
             ChannelsHeader(
-                // The destination is the header's pane title; the group button shows the active group.
+                // The destination is the header's pane title; the Tags button shows the active group.
                 title = stringResource(R.string.nav_channels),
-                groupName = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
+                tag = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 focus = header,
-                showGroup = groups.size > 1,
+                showTags = groups.size > 1,
                 navigationFocus = navigationFocus,
                 onFocused = {
                     didInitialRestore = true
@@ -1069,7 +1069,7 @@ internal fun ChannelsScreenContent(
         )
     }
     when (openPanel) {
-        ChannelsPanel.GROUP -> ChannelsGroupPanel(
+        ChannelsPanel.TAGS -> ChannelsTagsPanel(
             groups = groups,
             currentTagId = channelScope.activeTagId,
             onSelect = { tagId ->
@@ -1079,7 +1079,7 @@ internal fun ChannelsScreenContent(
             onClose = ::closePanel,
         )
         ChannelsPanel.VIEW_OPTIONS -> ChannelsViewOptionsPanel(view, onViewChange, onClose = ::closePanel)
-        null -> Unit
+        ChannelsPanel.FILTER, null -> Unit
     }
 }
 

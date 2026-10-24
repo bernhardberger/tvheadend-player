@@ -8,29 +8,32 @@ import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 
 /** Which Channels side panel is open. */
-internal enum class ChannelsPanel { GROUP, VIEW_OPTIONS }
+internal enum class ChannelsPanel { TAGS, FILTER, VIEW_OPTIONS }
 
 /**
- * The group picker: the visible groups as the kit's single-choice list, the current one checked
- * and focused. OK applies and closes.
+ * The Tags panel of Channels and the Guide: the app's channel sets, a divider, then the server's
+ * tags, the current one checked and focused. OK applies and closes.
  */
 @Composable
-internal fun ChannelsGroupPanel(
+internal fun ChannelsTagsPanel(
     groups: List<ChannelsGroup>,
     currentTagId: ChannelTagId?,
     onSelect: (ChannelTagId?) -> Unit,
     onClose: () -> Unit,
 ) {
     val allChannels = stringResource(R.string.all_channels)
-    val entries = groups.map { group ->
-        BrowsePanelEntry.Choice(
-            key = "channels-group-${group.tagId?.value ?: "all"}",
-            label = group.name ?: allChannels,
-            selected = group.tagId == currentTagId,
-            onClick = { onSelect(group.tagId) },
-        )
+    val entries = buildList<BrowsePanelEntry> {
+        groups.forEachIndexed { index, group ->
+            if (index > 0 && group.tagId != null && groups[index - 1].tagId == null) add(BrowsePanelEntry.Divider)
+            add(BrowsePanelEntry.Choice(
+                key = "channels-tags-${group.tagId?.value ?: "all"}",
+                label = group.name ?: allChannels,
+                selected = group.tagId == currentTagId,
+                onClick = { onSelect(group.tagId) },
+            ))
+        }
     }
-    BrowseSidePanel(stringResource(R.string.channels_group), "channels-group-panel", onClose) {
+    BrowseSidePanel(stringResource(R.string.browse_tags), "channels-tags-panel", onClose) {
         BrowsePanelList(entries, radio = false)
     }
 }

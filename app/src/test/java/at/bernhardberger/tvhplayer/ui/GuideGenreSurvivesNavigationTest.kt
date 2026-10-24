@@ -6,9 +6,9 @@ package at.bernhardberger.tvhplayer.ui
 import android.app.Application
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
-import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -94,8 +94,8 @@ import kotlin.time.Instant
 
 /**
  * The Guide's genre choice lasts while its entry stays in the back stack: choosing Sport, visiting
- * Channels through the navigation rail and returning shows the same filter, in the header and in
- * the Group panel's Genre row. The choice is not persisted across launches.
+ * Channels through the navigation rail and returning shows the same filter, on the Filter button
+ * and checked in its panel. The choice is not persisted across launches.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
@@ -114,15 +114,13 @@ class GuideGenreSurvivesNavigationTest {
 
     @Test fun aChosenGenreSurvivesAVisitToChannelsAndBack() {
         app()
-        val sportTitle = context.getString(R.string.browse_filtered_title, context.getString(R.string.epg_title), "Sport")
+        val sportFilter = context.getString(R.string.header_button_value_description, context.getString(R.string.guide_filter), "Sport")
 
         openDestination("nav-channels", Key.DirectionDown, "nav-epg")
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channels-group-button")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText(sportTitle).assertDoesNotExist()
+        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("guide-filter-button")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription(sportFilter).assertDoesNotExist()
 
-        focus("channels-group-button")
-        key(Key.Enter)
-        focus("guide-genre")
+        focus("guide-filter-button")
         key(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
         focus("guide-genre-all")
@@ -132,18 +130,22 @@ class GuideGenreSurvivesNavigationTest {
         }
         key(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertDoesNotExist()
-        compose.onNodeWithText(sportTitle).assertIsDisplayed()
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(sportFilter)
+        // The title names only the destination; the genre lives on its button.
+        compose.onNodeWithText(context.getString(R.string.epg_title)).assertIsDisplayed()
 
         openDestination("nav-epg", Key.DirectionUp, "nav-channels")
         compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText(sportTitle).assertDoesNotExist()
+        compose.onNodeWithContentDescription(sportFilter).assertDoesNotExist()
 
         openDestination("nav-channels", Key.DirectionDown, "nav-epg")
-        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("channels-group-button")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithText(sportTitle).assertIsDisplayed()
-        focus("channels-group-button")
+        compose.waitUntil(15_000) { compose.onAllNodes(hasTestTag("guide-filter-button")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(sportFilter)
+        focus("guide-filter-button")
         key(Key.Enter)
-        compose.onNodeWithTag("guide-genre").assert(hasText("Sport"))
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("guide-genre-sport") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
     }
 
     /** Moves focus to [tag] and settles; the rail's items are reached the way a remote lands on them. */

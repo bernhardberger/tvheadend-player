@@ -317,8 +317,8 @@ class GuideRealisticSceneTest {
     @Test fun u5SportFilterDimsOtherGenresAndKeepsThemReachable() {
         showAt("2026-09-15T19:40:00")
         chooseSport()
-        compose.onNodeWithText(context().getString(R.string.browse_filtered_title,
-            context().getString(R.string.epg_title), "Sport")).assertIsDisplayed()
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(context().getString(
+            R.string.header_button_value_description, context().getString(R.string.guide_filter), "Sport"))
         key(Key.DirectionDown)
         moveToChannel(5)
         compose.onNode(isFocused()).assert(hasContentDescription("not Sport", substring = true))
@@ -328,21 +328,44 @@ class GuideRealisticSceneTest {
         capture("u5-filter-sport-match-focus")
     }
 
-    @Test fun u5GroupPanelOffersTheGenreRowBelowTheGroups() {
+    @Test fun u5TagsPanelListsTheChannelSets() {
         showAt("2026-09-15T19:40:00")
-        openGroupPanel()
-        keyUntilTag(Key.DirectionDown, "guide-genre")
-        capture("u5-group-panel")
+        openTagsPanel()
+        tagFocused("channels-tags-all")
+        capture("u5-tags-panel")
     }
 
-    @Test fun u5GenreLevelListsAllGenresAndTheFamiliesWithTheirColors() {
+    @Test fun u5FilterPanelListsAllGenresAndTheFamiliesWithTheirColors() {
         showAt("2026-09-15T19:40:00")
-        openGroupPanel()
-        keyUntilTag(Key.DirectionDown, "guide-genre")
-        key(Key.Enter)
+        openFilterPanel()
         tagFocused("guide-genre-all")
-        compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
-        capture("u5-genre-level")
+        capture("u5-filter-panel")
+    }
+
+    @Test fun u5HeaderButtonsRestOnDiscsAndNameAnActiveTagAndGenre() {
+        showAt("2026-09-15T19:40:00")
+        tagFocused("guide-date-button")
+        key(Key.DirectionDown)
+        capture("u5-header-rest")
+        key(Key.DirectionUp)
+        tagFocused("guide-date-button")
+        openTagsPanel()
+        keyUntilTag(Key.DirectionDown, "channels-tags-1")
+        key(Key.Enter)
+        tagFocused("channels-tags-button")
+        compose.onNodeWithTag("channels-tags-button").assertContentDescriptionEquals(context().getString(
+            R.string.header_button_value_description, context().getString(R.string.browse_tags), "Favorites"))
+        capture("u5-header-tags-active-focus")
+        key(Key.DirectionRight)
+        tagFocused("guide-filter-button")
+        key(Key.Enter)
+        keyUntilTag(Key.DirectionDown, "guide-genre-sport")
+        key(Key.Enter)
+        tagFocused("guide-filter-button")
+        capture("u5-header-filter-active-focus")
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        capture("u5-header-both-active")
     }
 
     @Test fun u5ViewOptionsPanelListsRowsHeadlineAndGenreColors() {
@@ -452,11 +475,11 @@ class GuideRealisticSceneTest {
     @Test fun u5GroupWithoutGuideDataShowsNoDataRows() {
         showAt("2026-09-15T19:40:00", withoutGuideFor = channelIds.getValue("ch-harbor-sport-plus"))
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
+        tagFocused("channels-tags-button")
         key(Key.Enter)
-        keyUntilTag(Key.DirectionDown, "channels-group-2")
+        keyUntilTag(Key.DirectionDown, "channels-tags-2")
         key(Key.Enter)
-        tagFocused("channels-group-button")
+        tagFocused("channels-tags-button")
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasText(context().getString(R.string.epg_no_data))).fetchSemanticsNodes().isNotEmpty()
         }
@@ -757,29 +780,35 @@ class GuideRealisticSceneTest {
         assertTrue("$tag shown at least $atLeast times, was $count", count >= atLeast)
     }
 
-    /** From the date button through the real Group button to its panel, focused on the first entry. */
-    private fun openGroupPanel() {
+    /** From the date button through the real Tags button to its panel. */
+    private fun openTagsPanel() {
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
+        tagFocused("channels-tags-button")
         key(Key.Enter)
-        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+        compose.onNodeWithTag("channels-tags-panel").assertIsDisplayed()
+    }
+
+    /** From the date button past Tags to the real Filter button and its panel. */
+    private fun openFilterPanel() {
+        repeat(2) { key(Key.DirectionRight) }
+        tagFocused("guide-filter-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
     }
 
     private fun openViewOptions() {
-        repeat(2) { key(Key.DirectionRight) }
+        repeat(3) { key(Key.DirectionRight) }
         tagFocused("channels-view-button")
         key(Key.Enter)
         tagFocused("guide-view-rows-dense")
     }
 
-    /** Group button, Genre row, Sport; the panel closes onto the Group button. */
+    /** Filter button, Sport; the panel closes onto the Filter button. */
     private fun chooseSport() {
-        openGroupPanel()
-        keyUntilTag(Key.DirectionDown, "guide-genre")
-        key(Key.Enter)
+        openFilterPanel()
         keyUntilTag(Key.DirectionDown, "guide-genre-sport")
         key(Key.Enter)
-        tagFocused("channels-group-button")
+        tagFocused("guide-filter-button")
     }
 
     private fun focusedChannel(channel: Int) {

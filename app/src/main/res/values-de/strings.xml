@@ -149,7 +149,7 @@
     <string name="channels_layout_list">Liste</string>
     <string name="channels_layout_grid">Raster</string>
     <string name="channels_layout_immersive">Immersiv</string>
-    <string name="channels_group">Sendergruppe</string>
+    <string name="browse_tags">Tags</string>
     <string name="channels_view_options">Ansichtsoptionen</string>
     <string name="channels_view_layout">Darstellung</string>
     <string name="channels_view_program_art">Sendungsbilder</string>
@@ -158,7 +158,8 @@
     <string name="guide_view_rows_regular">Normal</string>
     <string name="guide_view_headline">Kopfzeile anzeigen</string>
     <string name="guide_view_genre_colors">Genrefarben</string>
-    <string name="guide_genre">Genre</string>
+    <string name="guide_filter">Filter</string>
+    <string name="guide_filter_title">Nach Genre filtern</string>
     <string name="channels_show_all">Alle Sender anzeigen</string>
     <string name="channels_empty_group">Keine Sender in dieser Gruppe</string>
     <string name="clock_format_12_hour">12 Stunden (8:15\u00A0PM)</string>
@@ -230,6 +231,7 @@
     <string name="display_mode_4_3">4:3 ausfüllen</string>
 
     <string name="epg_title">Programmführer</string>
+    <string name="header_button_value_description">%1$s, %2$s</string>
     <string name="epg_clear_filter">Filter löschen</string>
     <string name="epg_search">Suchen</string>
     <string name="epg_search_title">Programm durchsuchen</string>

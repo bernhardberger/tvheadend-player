@@ -203,7 +203,7 @@ class ChannelsScreenTest {
         waitForFocus(1)
         composeRule.runOnIdle { selections.clear() }
         val target = playingId?.value?.takeIf { it >= 61 } ?: 61L
-        pickGroup("channels-group-${international.id.value}", steps = 1)
+        pickGroup("channels-tags-${international.id.value}", steps = 1)
         waitForFocus(target)
         row(target).assertIsDisplayed()
         assertHeadlineChannel(target)
@@ -226,14 +226,14 @@ class ChannelsScreenTest {
             initialSelectedId = ChannelId(1),
         )
         waitForFocus(1)
-        pickGroup("channels-group-${news.id.value}", steps = 1)
+        pickGroup("channels-tags-${news.id.value}", steps = 1)
         waitForFocus(1)
         row(1).pressDown()
         waitForFocus(2)
 
-        pickGroup("channels-group-${sports.id.value}", steps = 1)
+        pickGroup("channels-tags-${sports.id.value}", steps = 1)
         waitForFocus(3)
-        pickGroup("channels-group-${news.id.value}", steps = -1)
+        pickGroup("channels-tags-${news.id.value}", steps = -1)
 
         waitForFocus(2)
         assertHeadlineChannel(2)
@@ -553,13 +553,13 @@ class ChannelsScreenTest {
 
     private fun row(id: Long) = composeRule.onNodeWithTag("channel-row-$id")
 
-    private val groupButton get() = composeRule.onNodeWithTag("channels-group-button")
+    private val groupButton get() = composeRule.onNodeWithTag("channels-tags-button")
 
     /** Opens the group picker from the header and applies the group [steps] rows from the current one, Up when negative. */
     private fun pickGroup(groupTag: String, steps: Int) {
         groupButton.requestFocus().assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.waitUntilExactlyOneExists(
-            isFocused() and hasAnyAncestor(hasTestTag("channels-group-panel")),
+            isFocused() and hasAnyAncestor(hasTestTag("channels-tags-panel")),
             timeoutMillis = 5_000,
         )
         repeat(abs(steps)) {

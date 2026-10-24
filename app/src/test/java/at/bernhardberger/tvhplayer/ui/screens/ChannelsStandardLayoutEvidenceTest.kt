@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsNodeInteraction
+import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.assertTextEquals
@@ -184,14 +185,14 @@ class ChannelsStandardLayoutEvidenceTest {
         headlineChannel().assertTextContains(title(1))
 
         key(Key.DirectionUp)
-        groupButton().assertIsFocused()
+        tagsButton().assertIsFocused()
         key(Key.DirectionDown)
         row(1).assertIsFocused()
 
         // A group change enters the playing channel of the new scope.
         pickGroup(steps = 1)
         row(PLAYING).assertIsFocused()
-        groupButton().assertTextContains("Favourites")
+        tagsButton().assertContentDescriptionEquals("Tags, Favourites")
         headlineChannel().assertTextContains(title(PLAYING))
 
         key(Key.DirectionLeft)
@@ -227,19 +228,19 @@ class ChannelsStandardLayoutEvidenceTest {
         // Focus rests on the header so every asserted row is at its unscaled layout
         // size; the library's focus scale is checked separately at the end.
         key(Key.DirectionUp)
-        groupButton().assertIsFocused()
+        tagsButton().assertIsFocused()
 
-        // No title is drawn; Group and View options end on the trailing inset.
+        // No title is drawn; Tags and View options end on the trailing inset.
         compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
         val header = header().bounds()
         assertEquals("header y", 28f, header.top, .5f)
-        val group = groupButton().bounds()
+        val group = tagsButton().bounds()
         val view = compose.onNodeWithTag("channels-view-button").bounds()
         assertEquals("buttons end on the trailing inset", 902f, view.right, .5f)
         assertEquals("kit medium icon button", 40f, view.width, .5f)
-        assertEquals("button gap", 12f, view.left - group.right, .5f)
+        assertEquals("button gap", 20f, view.left - group.right, .5f)
         assertEquals("buttons share the header's axis", header.center.y, view.center.y, 1f)
-        assertEquals("group button shares it too", header.center.y, group.center.y, 1f)
+        assertEquals("Tags shares it too", header.center.y, group.center.y, 1f)
         // The list column spans the focus reserve and runs to the screen bottom.
         val list = compose.onNodeWithTag("channels-list").bounds()
         assertEquals("list column x", 118f, list.left, .5f)
@@ -731,7 +732,7 @@ class ChannelsStandardLayoutEvidenceTest {
         row(1).assertIsFocused()
         captureBackgrounds("$prefix-entry-first-row-focused")
         key(Key.DirectionUp)
-        groupButton().assertIsFocused()
+        tagsButton().assertIsFocused()
         captureBackgrounds("$prefix-header-group-button-focused")
         key(Key.DirectionDown)
 
@@ -991,12 +992,12 @@ class ChannelsStandardLayoutEvidenceTest {
     }
 
     private fun header() = compose.onNodeWithTag("channels-header")
-    private fun groupButton() = compose.onNodeWithTag("channels-group-button")
+    private fun tagsButton() = compose.onNodeWithTag("channels-tags-button")
 
-    /** Up from the first row, OK on the group button, [steps] Downs in the picker and OK. */
+    /** Up from the first row, OK on the Tags button, [steps] Downs in the picker and OK. */
     private fun pickGroup(steps: Int, move: (Key) -> Unit = ::key) {
         move(Key.DirectionUp)
-        groupButton().assertIsFocused()
+        tagsButton().assertIsFocused()
         move(Key.DirectionCenter)
         repeat(steps) { move(Key.DirectionDown) }
         move(Key.DirectionCenter)

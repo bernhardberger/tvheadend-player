@@ -151,7 +151,7 @@
     <string name="channels_layout_list">List</string>
     <string name="channels_layout_grid">Grid</string>
     <string name="channels_layout_immersive">Immersive</string>
-    <string name="channels_group">Channel group</string>
+    <string name="browse_tags">Tags</string>
     <string name="channels_view_options">View options</string>
     <string name="channels_view_layout">Layout</string>
     <string name="channels_view_program_art">Program art</string>
@@ -160,7 +160,8 @@
     <string name="guide_view_rows_regular">Regular</string>
     <string name="guide_view_headline">Show headline</string>
     <string name="guide_view_genre_colors">Genre colors</string>
-    <string name="guide_genre">Genre</string>
+    <string name="guide_filter">Filter</string>
+    <string name="guide_filter_title">Filter by genre</string>
     <string name="channels_show_all">Show all channels</string>
     <string name="channels_empty_group">No channels in this group</string>
     <string name="clock_format_12_hour">12-hour (8:15\u00A0PM)</string>
@@ -344,6 +345,7 @@
 
     <!-- ===== EPG ===== -->
     <string name="epg_title">Guide</string>
+    <string name="header_button_value_description">%1$s, %2$s</string>
     <string name="epg_clear_filter">Clear filter</string>
     <string name="epg_search">Search</string>
     <string name="epg_search_title">Search guide</string>

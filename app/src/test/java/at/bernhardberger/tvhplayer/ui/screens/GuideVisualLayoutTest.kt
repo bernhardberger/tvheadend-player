@@ -555,9 +555,11 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
         compose.onNodeWithText(context().getString(R.string.epg_search)).assertDoesNotExist()
         compose.onNodeWithText(context().getString(R.string.now)).assertDoesNotExist()
+        // A guide without genre codes has nothing to filter by.
+        compose.onNodeWithTag("guide-filter-button").assertDoesNotExist()
         val date = compose.onNode(isFocused()).fetchSemanticsNode().id
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
+        tagFocused("channels-tags-button")
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.DirectionRight)
@@ -1020,28 +1022,30 @@ class GuideVisualLayoutTest {
         assertNoPlayback(additionalCoverageCalls = additionalCoverageCalls)
     }
 
-    @Test fun groupPanelSelectsTheGroupAndReturnsFocusToTheGroupButton() {
+    @Test fun tagsPanelSelectsTheTagAndReturnsFocusToTheTagsButton() {
         show()
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
+        tagFocused("channels-tags-button")
         key(Key.Enter)
-        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
-        tagFocused("channels-group-all")
+        compose.onNodeWithTag("channels-tags-panel").assertIsDisplayed()
+        tagFocused("channels-tags-all")
         key(Key.Back)
-        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
-        tagFocused("channels-group-button")
+        compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
+        tagFocused("channels-tags-button")
         assertEquals(null, model.scope.value.scope.activeTagId)
 
         key(Key.Enter)
-        tagFocused("channels-group-all")
+        tagFocused("channels-tags-all")
         key(Key.DirectionDown)
-        tagFocused("channels-group-1")
+        tagFocused("channels-tags-1")
         key(Key.Enter)
-        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
-        tagFocused("channels-group-button")
+        compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
+        tagFocused("channels-tags-button")
         assertEquals(ChannelTagId(1), model.scope.value.scope.activeTagId)
-        compose.onNodeWithText(context().getString(R.string.browse_filtered_title,
-            context().getString(R.string.epg_title), "Favourites")).assertIsDisplayed()
+        // The title names only the destination; the tag lives on its button.
+        compose.onNodeWithText(context().getString(R.string.epg_title)).assertIsDisplayed()
+        compose.onNodeWithTag("channels-tags-button").assertContentDescriptionEquals(context().getString(
+            R.string.header_button_value_description, context().getString(R.string.browse_tags), "Favourites"))
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertNoPlayback(additionalCoverageCalls = 1)
@@ -1294,14 +1298,14 @@ class GuideVisualLayoutTest {
             key(Key.DirectionUp)
             dateFocused()
             key(Key.DirectionRight)
-            tagFocused("channels-group-button")
+            tagFocused("channels-tags-button")
             key(Key.Enter)
-            tagFocused("channels-group-all")
+            tagFocused("channels-tags-all")
             key(Key.DirectionDown)
-            tagFocused("channels-group-1")
+            tagFocused("channels-tags-1")
             // A group without the focused programme's channel.
             key(Key.DirectionDown)
-            tagFocused("channels-group-2")
+            tagFocused("channels-tags-2")
             val full = checkNotNull(session.observation.value.epgSnapshotForDisplay)
             // Only the focused channel's programmes are loaded, so the new group's rows stay empty
             // until theirs arrive and the grid focuses nothing.
@@ -1426,18 +1430,16 @@ class GuideVisualLayoutTest {
         }
     }
 
-    @Test fun theGenreLevelOpensFromTheGroupPanelAndAGenreDimsTheOtherProgrammes() {
+    @Test fun filterOpensTheGenresAndAGenreDimsTheOtherProgrammes() {
         show(genres = true)
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
-        key(Key.Enter)
-        tagFocused("channels-group-all")
-        compose.onNodeWithTag("guide-genre").assert(hasText("All genres"))
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        tagFocused("guide-genre")
+        tagFocused("channels-tags-button")
+        key(Key.DirectionRight)
+        tagFocused("guide-filter-button")
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(context().getString(R.string.guide_filter))
         key(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
+        compose.onNodeWithText(context().getString(R.string.guide_filter_title)).assertIsDisplayed()
         tagFocused("guide-genre-all")
         // The list composes only the rows in view; each family row among them carries its color.
         val familyRows = compose.onAllNodes(SemanticsMatcher("genre family row") {
@@ -1449,21 +1451,26 @@ class GuideVisualLayoutTest {
         assertEquals("Each family carries its color", familyRows,
             compose.onAllNodesWithTag("option-dot", useUnmergedTree = true).fetchSemanticsNodes().size)
         key(Key.Back)
-        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
-        tagFocused("guide-genre")
+        compose.onNodeWithTag("guide-genre-panel").assertDoesNotExist()
+        tagFocused("guide-filter-button")
         key(Key.Enter)
+        tagFocused("guide-genre-all")
         repeat(4) { key(Key.DirectionDown) }
         tagFocused("guide-genre-sport")
         key(Key.Enter)
         compose.onNodeWithTag("guide-genre-panel").assertDoesNotExist()
-        tagFocused("channels-group-button")
-        compose.onNodeWithText(context().getString(R.string.browse_filtered_title,
-            context().getString(R.string.epg_title), "Sport")).assertIsDisplayed()
-        assertEquals("The group stays", null, model.scope.value.scope.activeTagId)
+        tagFocused("guide-filter-button")
+        // The button names the genre after its color dot; the title stays the destination's.
+        compose.onNodeWithTag("guide-filter-button").assertContentDescriptionEquals(context().getString(
+            R.string.header_button_value_description, context().getString(R.string.guide_filter), "Sport"))
+        compose.onNode(hasTestTag("header-button-dot") and hasAnyAncestor(hasTestTag("guide-filter-button")), useUnmergedTree = true)
+            .assertIsDisplayed()
+        compose.onNodeWithText(context().getString(R.string.epg_title)).assertIsDisplayed()
+        assertEquals("The tag stays", null, model.scope.value.scope.activeTagId)
         key(Key.Enter)
-        compose.onNodeWithTag("guide-genre").assert(hasText("Sport"))
+        tagFocused("guide-genre-sport")
         key(Key.Back)
-        tagFocused("channels-group-button")
+        tagFocused("guide-filter-button")
 
         // Programmes outside Sport stay in the grid, reachable and named as such.
         fun cell(channel: Int) = hasContentDescription(title(channel, 0), substring = true)
@@ -1544,8 +1551,9 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
-    @Test fun genreColorsTurnOffAndTheGenreLevelLosesItsDots() {
+    @Test fun genreColorsTurnOffAndTheGenresLoseTheirDots() {
         show(genres = true)
+        key(Key.DirectionRight)
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
@@ -1559,27 +1567,23 @@ class GuideVisualLayoutTest {
         key(Key.Back)
         tagFocused("channels-view-button")
         key(Key.DirectionLeft)
-        tagFocused("channels-group-button")
-        key(Key.Enter)
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        tagFocused("guide-genre")
+        tagFocused("guide-filter-button")
         key(Key.Enter)
         tagFocused("guide-genre-all")
         compose.onAllNodesWithTag("option-dot", useUnmergedTree = true).assertCountEquals(0)
         assertNoPlayback()
     }
 
-    @Test fun aServerWithoutGroupsStillOffersTheGenreThroughTheGroupButton() {
+    @Test fun aServerWithoutTagsStillOffersFilter() {
         show(genres = true, tags = false)
+        compose.onNodeWithTag("channels-tags-button").assertDoesNotExist()
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
+        tagFocused("guide-filter-button")
         key(Key.Enter)
-        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
-        tagFocused("guide-genre")
-        compose.onNodeWithTag("channels-group-all").assertDoesNotExist()
+        compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
+        tagFocused("guide-genre-all")
         key(Key.Back)
-        tagFocused("channels-group-button")
+        tagFocused("guide-filter-button")
         assertNoPlayback()
     }
 
@@ -1590,13 +1594,13 @@ class GuideVisualLayoutTest {
         show()
         assertEquals(0, gridHiddenCount())
         key(Key.DirectionRight)
-        tagFocused("channels-group-button")
+        tagFocused("channels-tags-button")
         key(Key.Enter)
-        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+        compose.onNodeWithTag("channels-tags-panel").assertIsDisplayed()
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.HideFromAccessibility))
         assertEquals(1, gridHiddenCount())
         key(Key.Back)
-        compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
+        compose.onNodeWithTag("channels-tags-panel").assertDoesNotExist()
         assertEquals(0, gridHiddenCount())
         key(Key.DirectionRight)
         tagFocused("channels-view-button")

@@ -27,6 +27,7 @@ import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
+import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingDate
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsHeader
@@ -39,19 +40,22 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
- * The Guide's title row in the Channels header pattern: the title with the active group and the
- * highlighted [genre], then the date button, Group (only with a choice of groups or genres) and View options. Down moves to the programmes,
- * the date button's start edge to the navigation rail.
+ * The Guide's title row in the Channels header pattern: the title, then the date button, Tags
+ * (only with a choice of channel sets) naming the active [tag], Filter (only with [showFilter])
+ * naming the highlighted [genre] after its [genreDot], and View options. Down moves to the
+ * programmes, the date button's start edge to the navigation rail.
  */
 @Composable
 internal fun GuideHeader(
-    filter: String?,
+    tag: String?,
     genre: String?,
+    genreDot: Color?,
     windowStartSec: Long,
     nowSecProvider: () -> Long,
     focus: ChannelsHeaderFocus,
     dateFocus: FocusRequester,
-    showGroup: Boolean,
+    showTags: Boolean,
+    showFilter: Boolean,
     navigationFocus: FocusRequester?,
     contentPadding: PaddingValues,
     startPadding: Dp,
@@ -64,10 +68,12 @@ internal fun GuideHeader(
 ) {
     ChannelsHeader(
         title = stringResource(R.string.epg_title),
-        groupName = filter,
-        genre = genre,
+        tag = tag,
         focus = focus,
-        showGroup = showGroup,
+        showTags = showTags,
+        showFilter = showFilter,
+        filter = genre,
+        filterDot = genreDot,
         navigationFocus = navigationFocus,
         onFocused = onFocused,
         onOpen = onOpen,
@@ -96,7 +102,8 @@ internal fun GuideHeader(
 }
 
 /**
- * A ghost button naming the Guide's day and time, "Today · 19:30"; OK opens the day and time panel.
+ * A pill on the header's resting fill naming the Guide's day and time, "Today · 19:30"; OK opens
+ * the day and time panel.
  */
 @Composable
 private fun GuideDateButton(
@@ -118,7 +125,7 @@ private fun GuideDateButton(
     Button(
         onClick = onClick,
         colors = ButtonDefaults.colors(
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha),
             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
         modifier = modifier
