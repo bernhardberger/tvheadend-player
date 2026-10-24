@@ -9,6 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
@@ -30,7 +35,11 @@ import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.settings.ClockFormat
+import at.bernhardberger.tvhplayer.settings.UiSettings
+import at.bernhardberger.tvhplayer.settings.GuideView
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
@@ -53,10 +62,12 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.After
 import org.junit.Assert.*
@@ -65,7 +76,8 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.json.JSONObject
-import org.koin.compose.KoinApplication
+import org.koin.compose.KoinIsolatedContext
+import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -93,6 +105,7 @@ class GuideRealisticSceneTest {
     private lateinit var player: ExoPlayer
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
+    private lateinit var uiSettings: UiSettingsStore
     private lateinit var layering: at.bernhardberger.tvhplayer.ui.components.BrowseContentLayering
     private lateinit var oldLocale: Locale
     private lateinit var oldZone: TimeZone
@@ -106,7 +119,8 @@ class GuideRealisticSceneTest {
     private val channelRecords = records("channels").sortedBy { it.getLong("number") }
     private val channels = channelRecords.mapIndexed { index, record ->
         Channel.create(ChannelId(record.getLong("number")), name = record.getString("name"), number = record.getLong("number"),
-            icon = if (record.isNull("picon")) null else ArtworkId(index + 1), tagIds = listOf(ChannelTagId(1)))
+            icon = if (record.isNull("picon")) null else ArtworkId(index + 1), tagIds = listOf(ChannelTagId(1)) +
+                listOfNotNull(ChannelTagId(2).takeIf { record.getString("channel_id") == "ch-harbor-sport-plus" }))
     }
     private val channelIds = channelRecords.mapIndexed { index, record -> record.getString("channel_id") to channels[index].id }.toMap()
     // Numeric SDK IDs are local mappings; no events, subtitles or declared gaps are rewritten.
@@ -114,6 +128,7 @@ class GuideRealisticSceneTest {
         val event = EpgEvent.create(EventId(index + 1L), channelId = channelIds.getValue(record.getString("channel_id")),
             start = Instant.parse(record.getString("start")), stop = Instant.parse(record.getString("stop")),
             title = record.getString("title"), summary = record.getString("synopsis"), genre = record.getString("genre"),
+            contentGenre = ContentGenre.fromContentType(contentType(record.getString("genre"))),
             subtitle = if (record.has("subtitle")) record.getString("subtitle") else null,
             episode = if (record.has("season")) EpgEpisode(
                 id = null, seriesLinkId = null, seasonNumber = record.getLong("season"), seasonCount = null,
@@ -288,6 +303,166 @@ class GuideRealisticSceneTest {
             useUnmergedTree = true).assertIsDisplayed()
     }
 
+    // Review captures of the reworked Guide (genre tints, filter, panels, view options); each scene
+    // reaches its state through the D-pad path a remote takes.
+
+    @Test fun u5DefaultTintsEveryGenreFamilyAndFocusKeepsItsGenreWash() {
+        showAt("2026-09-15T19:40:00")
+        moveToChannel(11)
+        capture("u5-default")
+        key(Key.DirectionRight)
+        capture("u5-focus-genre")
+    }
+
+    @Test fun u5SportFilterDimsOtherGenresAndKeepsThemReachable() {
+        showAt("2026-09-15T19:40:00")
+        chooseSport()
+        compose.onNodeWithText(context().getString(R.string.browse_filtered_title,
+            context().getString(R.string.epg_title), "Sport")).assertIsDisplayed()
+        key(Key.DirectionDown)
+        moveToChannel(5)
+        compose.onNode(isFocused()).assert(hasContentDescription("not Sport", substring = true))
+        capture("u5-filter-sport-dimmed-focus")
+        moveToChannel(1)
+        compose.onNode(isFocused()).assert(!hasContentDescription("not Sport", substring = true))
+        capture("u5-filter-sport-match-focus")
+    }
+
+    @Test fun u5GroupPanelOffersTheGenreRowBelowTheGroups() {
+        showAt("2026-09-15T19:40:00")
+        openGroupPanel()
+        keyUntilTag(Key.DirectionDown, "guide-genre")
+        capture("u5-group-panel")
+    }
+
+    @Test fun u5GenreLevelListsAllGenresAndTheFamiliesWithTheirColors() {
+        showAt("2026-09-15T19:40:00")
+        openGroupPanel()
+        keyUntilTag(Key.DirectionDown, "guide-genre")
+        key(Key.Enter)
+        tagFocused("guide-genre-all")
+        compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
+        capture("u5-genre-level")
+    }
+
+    @Test fun u5ViewOptionsPanelListsRowsHeadlineAndGenreColors() {
+        showAt("2026-09-15T19:40:00")
+        openViewOptions()
+        compose.onNodeWithTag("guide-view-headline").assertIsOn()
+        compose.onNodeWithTag("guide-view-genre-colors").assertIsOn()
+        capture("u5-view-options")
+    }
+
+    @Test fun u5DayAndTimePanelOpensFromTheDateButton() {
+        showAt("2026-09-15T19:40:00")
+        key(Key.Enter)
+        tagFocused("guide-time-day-0")
+        compose.onNodeWithTag("guide-time-panel").assertIsDisplayed()
+        capture("u5-time-panel")
+    }
+
+    @Test fun u5RegularRowsAreTallerThanDense() {
+        showAt("2026-09-15T19:40:00")
+        openViewOptions()
+        key(Key.DirectionDown)
+        tagFocused("guide-view-rows-regular")
+        key(Key.Enter)
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("epg-channel-row-1")).fetchSemanticsNodes().any {
+            it.boundsInRoot.height > 60f } }
+        key(Key.Back)
+        tagFocused("channels-view-button")
+        key(Key.DirectionDown)
+        moveToChannel(11)
+        capture("u5-regular-rows")
+    }
+
+    @Test fun u5HeadlineOffGivesTheGridTheHeadlinesRoom() {
+        showAt("2026-09-15T19:40:00")
+        openViewOptions()
+        keyUntilTag(Key.DirectionDown, "guide-view-headline")
+        key(Key.Enter)
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
+        key(Key.Back)
+        tagFocused("channels-view-button")
+        key(Key.DirectionDown)
+        moveToChannel(11)
+        capture("u5-headline-off")
+    }
+
+    @Test fun u5GenreColorsOffKeepsTheSportFilterDimming() {
+        showAt("2026-09-15T19:40:00")
+        chooseSport()
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        key(Key.Enter)
+        keyUntilTag(Key.DirectionDown, "guide-view-genre-colors")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-view-genre-colors").assertIsOff()
+        key(Key.Back)
+        tagFocused("channels-view-button")
+        key(Key.DirectionDown)
+        moveToChannel(5)
+        compose.onNode(isFocused()).assert(hasContentDescription("not Sport", substring = true))
+        capture("u5-genre-colors-off")
+    }
+
+    @Test fun u5RecordingNowAndScheduledMarksShowBesideTheirTitles() {
+        showAt("2026-09-15T19:40:00")
+        // Without the headline the grid shows Northline Tonight (recording now) and Amber Stage (scheduled twice) together.
+        runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
+        moveToChannel(9)
+        capture("u5-recording-marks-now-scheduled")
+        assertMarks("guide-cell-recording-mark", atLeast = 3)
+    }
+
+    @Test fun u5RecordedProgrammeShowsTheRecordingDot() {
+        // The film ended at 22:20 the previous evening; Left from the current programme reaches it.
+        showAt("2026-09-14T22:40:00")
+        moveToChannel(9)
+        seekEvent(eventsByFixtureId.getValue("evt-ch-amber-stage-20260914T2015"))
+        assertMarks("guide-cell-recording-mark", atLeast = 1)
+        capture("u5-recording-marks-recorded")
+    }
+
+    @Test fun u5FailedRecordingShowsTheErrorMark() {
+        showAt("2026-09-14T17:30:00")
+        moveToChannel(4)
+        seekEvent(eventsByFixtureId.getValue("evt-ch-ridge-cycle-20260914T1200"))
+        assertMarks("guide-cell-failed-mark", atLeast = 1)
+        capture("u5-recording-marks-failed")
+    }
+
+    @Test fun u5PendingCoverageShowsLoadingRows() {
+        val coverage = CompletableDeferred<Unit>()
+        try {
+            showAt("2026-09-15T19:40:00", holdCoverage = coverage)
+            // Only a row with nothing in the window says it is loading; Harbor Sport Plus's guide has ended.
+            val row = channelIds.getValue("ch-harbor-sport-plus").value
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasText(context().getString(R.string.epg_loading)) and
+                    hasAnyAncestor(hasTestTag("epg-channel-row-$row"))).fetchSemanticsNodes().isNotEmpty()
+            }
+            capture("u5-loading")
+        } finally {
+            coverage.complete(Unit)
+        }
+    }
+
+    @Test fun u5GroupWithoutGuideDataShowsNoDataRows() {
+        showAt("2026-09-15T19:40:00", withoutGuideFor = channelIds.getValue("ch-harbor-sport-plus"))
+        key(Key.DirectionRight)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        keyUntilTag(Key.DirectionDown, "channels-group-2")
+        key(Key.Enter)
+        tagFocused("channels-group-button")
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText(context().getString(R.string.epg_no_data))).fetchSemanticsNodes().isNotEmpty()
+        }
+        capture("u5-empty")
+    }
+
     @Test fun longGermanProgrammeKeepsItsFullAccessibleTitle() {
         showAt("2026-09-14T02:35:00")
         moveToChannel(20)
@@ -349,6 +524,20 @@ class GuideRealisticSceneTest {
         assertEquals(0, navigationRequests)
     }
 
+    /** The DVB content type a server would send for the fixture's free-text genre. */
+    private fun contentType(genre: String): Long = when {
+        genre.startsWith("children") || genre.startsWith("animation") -> 0x50L
+        genre.startsWith("news") || genre == "weather" -> 0x20L
+        genre.startsWith("sport") || genre in setOf("basketball", "football", "cycling") -> 0x40L
+        genre.startsWith("documentary") || genre.startsWith("nature") -> 0x90L
+        genre == "music" || genre == "concert" -> 0x60L
+        genre.endsWith("film") || genre.startsWith("drama") || genre.startsWith("comedy") -> 0x10L
+        genre.startsWith("quiz") || genre.startsWith("talk") || genre == "interview" -> 0x30L
+        genre.startsWith("cookery") || "travel" in genre || genre.startsWith("lifestyle") -> 0xA0L
+        genre.startsWith("magazine") -> 0x80L
+        else -> error("Unmapped fixture genre $genre")
+    }
+
     private fun records(key: String): List<JSONObject> {
         val array = fixture.getJSONArray(key)
         return List(array.length()) { array.getJSONObject(it) }
@@ -381,28 +570,48 @@ class GuideRealisticSceneTest {
         fail("Channel $number was not reached by D-pad navigation")
     }
 
-    private fun showAt(localClock: String, scale: Float = 1f) {
+    private fun showAt(localClock: String, scale: Float = 1f, holdCoverage: CompletableDeferred<Unit>? = null,
+        withoutGuideFor: ChannelId? = null) {
         fontScale = scale
         now = LocalDateTime.parse(localClock).atZone(ZoneId.of(fixture.getString("timezone"))).toEpochSecond()
         assertTrue(SystemClock.setCurrentTimeMillis(now * 1000))
-        show()
+        show(holdCoverage, withoutGuideFor)
     }
 
-    private fun show() {
-        val events = eventsByFixtureId.values.toList()
+    /**
+     * [holdCoverage] keeps the Guide's coverage request pending until it completes, with no coverage cached.
+     * [withoutGuideFor] leaves that channel without a single programme, as a server that never sent its guide.
+     */
+    private fun show(holdCoverage: CompletableDeferred<Unit>? = null, withoutGuideFor: ChannelId? = null) {
+        val events = eventsByFixtureId.values.filter { it.channelId != withoutGuideFor }
         session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels,
-                listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })))),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, listOf(
+                ChannelTag.create(ChannelTagId(1), name = "Favorites", channelIds = channels.map { it.id }),
+                // Harbor Sport Plus is the one channel the empty-guide scene leaves without programmes.
+                ChannelTag.create(ChannelTagId(2), name = "No guide data", channelIds = listOf(channelIds.getValue("ch-harbor-sport-plus")))))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(
                 events = events.filter { it.stop.epochSeconds > now },
                 historicalEvents = events.filter { it.stop.epochSeconds <= now },
-                coverages = channels.map { EpgCoverage.create(it.id, Instant.parse(fixture.getString("reference_start")),
-                    Instant.parse(fixture.getString("coverage_stop"))) },
+                coverages = if (holdCoverage != null) emptyList() else channels.map {
+                    EpgCoverage.create(it.id, Instant.parse(fixture.getString("reference_start")),
+                        Instant.parse(fixture.getString("coverage_stop")))
+                },
             )),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(emptyList()),
         ))
+        // Only the released fake's request boundary is held; its settlements still come from the SDK.
+        val guideSession = if (holdCoverage == null) session else object : TvheadendSession by session {
+            override val epgRepository = object : EpgRepository by session.epgRepository {
+                override suspend fun acquireCoverageBatch(currentSession: CurrentSessionObservation,
+                    channelIds: List<ChannelId>, through: Instant): EpgCoverageBatchResult {
+                    holdCoverage.await()
+                    return session.epgRepository.acquireCoverageBatch(currentSession, channelIds, through)
+                }
+            }
+        }
+        uiSettings = UiSettingsStore(preferences())
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
@@ -418,12 +627,12 @@ class GuideRealisticSceneTest {
         }
         val noticeModule = module {
             single { notices }
-            single { at.bernhardberger.tvhplayer.settings.UiSettingsStore(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>()) }
+            single { uiSettings }
             single { profiles }
             single<TvheadendSession> { session }
         }
         compose.setContent {
-            KoinApplication(application = { modules(noticeModule) }) {
+            KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
                 CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                     TVHeadendPlayerTheme {
                         view = LocalView.current
@@ -431,8 +640,11 @@ class GuideRealisticSceneTest {
                             SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
                                 onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                                 layering = requireNotNull(at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current)
-                                EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, channelViewModel = model,
-                                    session = session, playerSession = runtime, selection = selection, guidePositionStore = position,
+                                val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
+                                var genre by remember { mutableStateOf(ProgrammeCategory.ALL) }
+                                EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view,
+                                    genre = genre, onGenreChange = { genre = it }, channelViewModel = model,
+                                    session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
                                     lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
                                     onPlayRecording = { playbackRequests++ }, notices = notices)
                             }
@@ -496,7 +708,7 @@ class GuideRealisticSceneTest {
         File(directory, "$name.txt").writeText(
             "canvas=960x540dp; density=1; locale=en_US; direction=Ltr; fontScale=$fontScale; timezone=${fixture.getString("timezone")}\n" +
                 "sceneClock=${Instant.fromEpochSeconds(now)}; localClock=${java.time.Instant.ofEpochSecond(now).atZone(ZoneId.of(fixture.getString("timezone")))}; captureClockMillis=${SystemClock.uptimeMillis()}\n" +
-                "focus=${focus.fetchSemanticsNode().config[SemanticsProperties.Text]}; bounds=$bounds; position=${position.position.value}\n" +
+                "focus=${focus.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)}; bounds=$bounds; position=${position.position.value}\n" +
                 "windowStart=${position.position.value?.windowStartSec?.let { Instant.fromEpochSeconds(it) }} (null before grid entry)\n" +
                 "fixture=fixture-epg/epg.json; seed=${fixture.getInt("seed")}; sha256=$fixtureHash; noEventOverrides=true\n" +
                 headerGeometry.joinToString(separator = "\n", postfix = "\n") +
@@ -524,6 +736,50 @@ class GuideRealisticSceneTest {
         assertTrue("The mark follows the title: title=$text mark=$mark", mark.left >= text.right)
         assertTrue("The mark sits on the title line: title=$text mark=$mark",
             mark.top >= text.top - 1f && mark.bottom <= text.bottom + 1f)
+    }
+
+    private fun tagFocused(tag: String) {
+        val target = hasTestTag(tag) and isFocused()
+        compose.waitUntil(10_000) { compose.onAllNodes(target).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(target).assertIsDisplayed().assertIsFocused()
+    }
+
+    private fun keyUntilTag(direction: Key, tag: String) {
+        repeat(12) {
+            if (compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty()) return tagFocused(tag)
+            key(direction)
+        }
+        tagFocused(tag)
+    }
+
+    private fun assertMarks(tag: String, atLeast: Int) {
+        val count = compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().size
+        assertTrue("$tag shown at least $atLeast times, was $count", count >= atLeast)
+    }
+
+    /** From the date button through the real Group button to its panel, focused on the first entry. */
+    private fun openGroupPanel() {
+        key(Key.DirectionRight)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+    }
+
+    private fun openViewOptions() {
+        repeat(2) { key(Key.DirectionRight) }
+        tagFocused("channels-view-button")
+        key(Key.Enter)
+        tagFocused("guide-view-rows-dense")
+    }
+
+    /** Group button, Genre row, Sport; the panel closes onto the Group button. */
+    private fun chooseSport() {
+        openGroupPanel()
+        keyUntilTag(Key.DirectionDown, "guide-genre")
+        key(Key.Enter)
+        keyUntilTag(Key.DirectionDown, "guide-genre-sport")
+        key(Key.Enter)
+        tagFocused("channels-group-button")
     }
 
     private fun focusedChannel(channel: Int) {
