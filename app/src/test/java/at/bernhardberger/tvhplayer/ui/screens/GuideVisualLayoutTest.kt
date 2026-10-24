@@ -2127,7 +2127,13 @@ class GuideVisualLayoutTest {
             assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
             // The entry's coverage request reaches the session off the main thread; count from
             // after it, or a busy machine records it late as if navigation had asked.
-            if (entryCoverage && beforeCoverageBatch == null) compose.waitUntil(5_000) { FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH in session.calls }
+            if (entryCoverage && beforeCoverageBatch == null) {
+                compose.waitUntil(5_000) { FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH in session.calls }
+                val entryCalls = session.calls.toList()
+                assertEquals("Entry asks for coverage once", 1, entryCalls.count { it == FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH })
+                callsAtEntry = entryCalls.size
+                return
+            }
         }
         callsAtEntry = session.calls.size
     }
