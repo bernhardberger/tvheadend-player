@@ -2192,11 +2192,12 @@ class AppPlaybackRuntime(
      * An install cancelled after [stopForFreshDecoder] retired its predecessor leaves no source
      * behind that target. A viewer's zap or retry lets it go as [stopOtherKindBeforeInstall] does,
      * the install's presentation keeping its cover, and then settles as any cancelled start
-     * ([settleCancelledStartLocked]). A recovery leaves it to the newer recovery or command that
-     * cancelled it, with the viewer's [previousPlayWhenReady] back as a cancelled recovery over the
-     * old source has it, so the install's pause does not hold the next one as the viewer's Pause.
-     * A source the SDK installed for the cancelled install is not the app's: it stays paused and the
-     * target departs, as [canContinueRecoveryLocked] would withdraw it for the newer recovery.
+     * ([settleCancelledStartLocked]). A newer recovery no longer cancels a recovery install (it
+     * waits for the command lock), so a recovery install is cancelled here only when its scope
+     * ends without a detach. It then leaves the target with the viewer's [previousPlayWhenReady]
+     * back, so the install's pause does not hold a next attempt as the viewer's Pause. A source
+     * the SDK installed for the cancelled install is not the app's: it stays paused and the target
+     * departs, as [canContinueRecoveryLocked] would withdraw it.
      * An install that ran to its end published its own outcome.
      */
     private fun settleRetiredTargetLocked(

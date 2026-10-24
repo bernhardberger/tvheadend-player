@@ -13,6 +13,7 @@ import android.os.Looper
 import android.os.SystemClock
 import androidx.media3.common.C
 import androidx.media3.common.Format
+import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
 import androidx.media3.common.TrackGroup
@@ -314,13 +315,13 @@ class StallWatchdogRuntimeTest {
         assertEquals(AppPlaybackState.Idle, runtime.state.value)
     }
 
-    @Test fun aRecoveryRetuneCancelledAfterTheStopLeavesTheTargetToTheNewerRecovery() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+    @Test fun aRecoveryRetuneThatStoppedTheOldSourceFinishesBeforeTheNewerRecovery() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
         latchFreshDecoderPerZap()
         val stopped = stoppedBefore { false }
         val subscribes = connection.subscribeCount
         var escalated = false
-        // Retune A stopped the old source; the SDK escalates again before A binds, and that
-        // newer recovery cancels A.
+        // Retune A stopped the old source; the SDK escalates again before A binds. The newer
+        // recovery waits for A instead of cancelling an install the SDK may already run.
         beforeLiveBinding = {
             if (!escalated) {
                 escalated = true
@@ -330,29 +331,24 @@ class StallWatchdogRuntimeTest {
             }
         }
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
-        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
-        assertTrue(escalated)
-        assertEquals(subscribes, connection.subscribeCount)
-        scheduler.advanceTimeBy(2_001)
         await { connection.subscribeCount > subscribes }
+        assertTrue(escalated)
         connection.awaitCollectionRegistered()
         startSubscription()
-        await { runtime.activeTarget.value != null && player.playWhenReady }
+        await { runtime.state.value == AppPlaybackState.Starting }
+        // The newer report concerned the source A replaced, so A's committed retune drops it.
+        scheduler.advanceTimeBy(2_001)
+        settle()
 
         assertEquals(subscribes + 1, connection.subscribeCount)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(AppPlaybackState.Starting, runtime.state.value)
+        assertTrue(player.playWhenReady)
     }
 
-    @Test fun aRetuneCancelledAfterItsInstallReachedTheSdkDepartsAndLeavesTheSdksItemPaused() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+    @Test fun aRetuneWhoseInstallReachedTheSdkStaysTheAppsBeforeTheNewerRecovery() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
         latchFreshDecoderPerZap()
-        val owned = player.currentMediaItem
-        val playedUnowned = mutableListOf<Boolean>()
-        player.addListener(object : Player.Listener {
-            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                val item = player.currentMediaItem
-                if (playWhenReady && item != null && item !== owned) playedUnowned += true
-            }
-        })
+        val subscribes = connection.subscribeCount
         var requested = false
         // No runCurrent: the newer recovery runs only once the retune handed its install to the SDK.
         beforeLiveBinding = {
@@ -362,15 +358,56 @@ class StallWatchdogRuntimeTest {
             }
         }
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
-        await { player.currentMediaItem.let { it != null && it !== owned } }
-        settle()
-        assertEquals(AppPlaybackState.Idle, runtime.state.value)
-        assertNull(runtime.activeTarget.value)
-        assertFalse(player.playWhenReady)
+        await { connection.subscribeCount > subscribes }
+        assertTrue(requested)
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { runtime.state.value == AppPlaybackState.Starting }
         scheduler.advanceTimeBy(2_001)
         settle()
-        assertFalse(player.playWhenReady)
-        assertEquals(emptyList<Boolean>(), playedUnowned)
+
+        // The app owns the source the SDK installed instead of withdrawing it as departed.
+        assertEquals(subscribes + 1, connection.subscribeCount)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(AppPlaybackState.Starting, runtime.state.value)
+        assertTrue(player.playWhenReady)
+    }
+
+    @Test fun aNewerRecoveryLetsTheAttemptWhoseSourceTheSdkInstalledCommit() = exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+        live()
+        settle()
+        // The fake stream never shows a picture, so a tune that works stays here.
+        val tuned = runtime.state.value
+        var newerRequested = false
+        player.addListener(object : Player.Listener {
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                // The SDK installed the first attempt's source; its reply has not reached the attempt yet.
+                if (mediaItem == null || newerRequested) return
+                newerRequested = true
+                runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+            }
+        })
+        runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_ENDED)
+        // The first attempt retunes at once.
+        await { connection.subscribeCount == 2 }
+        assertTrue(newerRequested)
+        connection.awaitCollectionRegistered()
+        startSubscription()
+
+        // The first attempt committed that source; the newer request, reported for it, waits for its backoff.
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        scheduler.advanceTimeBy(2_001)
+        await { connection.subscribeCount == 3 }
+        connection.awaitCollectionRegistered()
+        startSubscription()
+        await { runtime.state.value == AppPlaybackState.Starting }
+        playerReady()
+        settle()
+
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertTrue(player.playWhenReady)
+        assertEquals(tuned, runtime.state.value)
     }
 
     @Test fun aBufferThatDrainsBeforeTheQueuedRecoveryRunsSupersedesIt() = supersededBeforeDispatch {

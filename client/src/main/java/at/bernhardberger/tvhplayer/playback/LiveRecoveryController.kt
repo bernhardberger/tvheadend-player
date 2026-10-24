@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 
@@ -28,6 +29,17 @@ internal class LiveRecoveryController(
 ) {
     private var recoveryJob: Job? = null
     private var admittedRecovery: LiveRecoveryFence? = null
+
+    /**
+     * The recovery job running under the command lock. A newer recovery never cancels it there:
+     * its retune may already have handed the SDK a source the app would then not own. It marks
+     * the job [supersededJob] instead, waits for the lock and is admitted against whatever
+     * target the job left.
+     */
+    private var serializedJob: Job? = null
+
+    /** A [serializedJob] a newer recovery replaced: it ends as soon as it leaves the lock. */
+    private var supersededJob: Job? = null
 
     /**
      * An admitted attempt an interruption pause stopped before it retuned: its target still owes
@@ -57,13 +69,15 @@ internal class LiveRecoveryController(
     ) {
         dispatchPlaybackRecovery(scope, reason) { dispatchedReason ->
             val currentJob = currentCoroutineContext().job
-            recoveryJob?.takeUnless { it === currentJob }?.cancel()
+            recoveryJob?.takeUnless { it === currentJob }?.let { previous ->
+                if (previous === serializedJob) supersededJob = previous else previous.cancel()
+            }
             recoveryJob = currentJob
             admittedRecovery = null
             try {
                 // Admit the attempt under the command lock, then wait for the backoff delay
                 // without holding it so a channel change or Stop stays responsive meanwhile.
-                val admitted = targetCommands.serialize(onClosed = { null }) {
+                val admitted = serialize(currentJob) {
                     admitLocked(dispatchedReason).also {
                         // Not admitted (dropped or deferred): it no longer owns the target, so a
                         // resume right after this admission must not take it for a running one.
@@ -71,12 +85,12 @@ internal class LiveRecoveryController(
                     }
                 }
                 if (admitted != null) {
+                    // Superseded during admission: the newer recovery owns the target now.
+                    currentJob.ensureActive()
                     val (fence, attempt) = admitted
                     recoveryAttempts.run(fence) {
                         delay(attempt.delay)
-                        targetCommands.serialize(onClosed = { null }) {
-                            retryLocked(fence)
-                        }
+                        serialize(currentJob) { retryLocked(fence) }
                     }
                 }
             } finally {
@@ -87,6 +101,21 @@ internal class LiveRecoveryController(
             }
         }
     }
+
+    private suspend fun <T> serialize(job: Job, command: suspend () -> T?): T? =
+        targetCommands.serialize(onClosed = { null }) {
+            serializedJob = job
+            try {
+                command()
+            } finally {
+                if (serializedJob === job) serializedJob = null
+                // Cancelled before the lock is released, so the newer recovery never runs beside it.
+                if (supersededJob === job) {
+                    supersededJob = null
+                    job.cancel()
+                }
+            }
+        }
 
     /**
      * Continues the [interruptedRecovery] once playback may continue: the caller has validated
@@ -107,9 +136,7 @@ internal class LiveRecoveryController(
             val currentJob = currentCoroutineContext().job
             try {
                 recoveryAttempts.run(fence) {
-                    targetCommands.serialize(onClosed = { null }) {
-                        retryLocked(fence)
-                    }
+                    serialize(currentJob) { retryLocked(fence) }
                 }
             } finally {
                 if (recoveryJob === currentJob) {
@@ -232,6 +259,8 @@ internal class LiveRecoveryController(
         admittedRecovery = null
         interruptedRecovery = null
         deferredRecovery = null
+        supersededJob?.cancel()
+        supersededJob = null
         pendingRecovery?.cancel()
         return pendingRecovery
     }
