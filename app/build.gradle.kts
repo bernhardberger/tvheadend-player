@@ -387,7 +387,7 @@ tasks.register("verifyExternalSdkConsumption") {
         }
 
         val expectedTvheadendModules = mapOf(
-            "htsp" to "1.0.0-beta.4",
+            "htsp" to "1.0.0-rc.1",
             "sdk-android" to sdkVersion,
             "sdk-core" to sdkVersion,
             "sdk-media3" to sdkVersion,
