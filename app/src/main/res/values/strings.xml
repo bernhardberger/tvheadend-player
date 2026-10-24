@@ -338,7 +338,6 @@
 
     <!-- ===== EPG ===== -->
     <string name="epg_title">Guide</string>
-    <string name="browse_filtered_title">%1$s • %2$s</string>
     <string name="epg_clear_filter">Clear filter</string>
     <string name="epg_search">Search</string>
     <string name="epg_search_title">Search guide</string>

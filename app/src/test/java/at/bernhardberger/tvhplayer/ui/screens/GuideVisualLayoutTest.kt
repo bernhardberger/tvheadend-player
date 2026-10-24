@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -173,7 +174,6 @@ class GuideVisualLayoutTest {
         assertEquals(152f, ruler.bottom, .1f)
         val first = bounds("epg-channel-row-1")
         assertEquals(130f, first.left, .1f)
-        assertEquals(130f, compose.onNodeWithText(context().getString(R.string.epg_title)).fetchSemanticsNode().boundsInRoot.left, .1f)
         assertEquals(130f, compose.onNodeWithText(context().getString(R.string.all_channels)).fetchSemanticsNode().boundsInRoot.left, .1f)
         assertEquals(160f, first.top, .1f)
         assertEquals(64f, first.height, .1f)
@@ -513,8 +513,8 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("epg-search-open").assertDoesNotExist()
         val now = compose.onNodeWithText(context().getString(R.string.now)).fetchSemanticsNode().boundsInRoot
         assertEquals(902f, now.right, .1f)
-        val heading = compose.onNodeWithText(context().getString(R.string.epg_title)).fetchSemanticsNode().boundsInRoot
-        assertEquals("Actions stay centred on the heading row", heading.center.y, now.center.y, .1f)
+        val header = compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title))).fetchSemanticsNode().boundsInRoot
+        assertEquals("Actions stay centred on the header row", header.center.y, now.center.y, .1f)
         val bitmap = capture("guide-header-focus-large-de", 1.3f, LayoutDirection.Ltr)
         assertTrue("Native focused button clears the 48dp physical safe area", nativeFocusBounds(bitmap).right <= 912f)
         bitmap.recycle()

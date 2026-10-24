@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.layout
 
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -689,9 +690,9 @@ internal fun ChannelsScreenContent(
                 .focusGroup()
         ) {
             ChannelsHeader(
-                // The destination, as the Guide's title, with the group when one narrows it.
+                // The destination is the header's pane title; the group button shows the active group.
                 title = stringResource(R.string.nav_channels),
-                filter = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
+                groupName = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
                 focus = header,
                 showGroup = groups.size > 1,
                 navigationFocus = navigationFocus,
@@ -709,8 +710,12 @@ internal fun ChannelsScreenContent(
                     { scopeEntryChannelId() != null && focusBrowseContent() }
                 } else null,
                 // The grid's header scrolls away with its first row, over the rows reaching up behind it.
+                // The immersive header takes no row: it overlays the body from the top.
                 modifier = Modifier.zIndex(1f).then(
-                    if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {
+                    if (layout == ChannelsLayout.IMMERSIVE) Modifier.layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, 0) { placeable.place(0, 0) }
+                    } else if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {
                         val scrolled = if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset else Int.MAX_VALUE
                         translationY = -minOf(scrolled.toFloat(), size.height + ChannelsHeaderGap.toPx() + contentPadding.calculateTopPadding().toPx())
                     } else Modifier,
@@ -719,7 +724,7 @@ internal fun ChannelsScreenContent(
                     end = maxOf(endPadding, TvBrowseTrailingInset),
                 ),
             )
-            Spacer(Modifier.height(ChannelsHeaderGap))
+            if (layout != ChannelsLayout.IMMERSIVE) Spacer(Modifier.height(ChannelsHeaderGap))
             Box(Modifier.weight(1f).fillMaxWidth()) {
             TabContent(
                 motion = scopeMotion,
@@ -823,7 +828,12 @@ internal fun ChannelsScreenContent(
                     UnavailableTagNotice(
                         visible = tagNotice,
                         onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
-                        modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, end = detailPanePadding.calculateEndPadding(layoutDirection)),
+                        // The header overlays the body's top, so the notice starts below it.
+                        modifier = Modifier.padding(
+                            start = startPadding + TvBrowseLeadingInset,
+                            top = TvBrowseHeaderHeight + ChannelsHeaderGap,
+                            end = detailPanePadding.calculateEndPadding(layoutDirection),
+                        ),
                     )
                     ChannelsImmersiveBody(
                         channels = channels,

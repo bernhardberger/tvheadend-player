@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.ui.screens
 import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -20,6 +22,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.components.ClosedDrawerWidth
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.OpenDrawerWidth
@@ -63,8 +66,9 @@ class ChannelsLayoutFocusTest {
             .fetchSemanticsNodes().isNotEmpty()
     }
 
-    private fun assertTitle(title: String) =
-        compose.onNode(hasText(title) and hasAnyAncestor(hasTestTag("channels-header"))).assertExists()
+    /** The group button names the active group; "All channels" while none narrows the list. */
+    private fun assertGroup(name: String) =
+        compose.onNode(groupButton and hasText(name) and hasAnyAncestor(hasTestTag("channels-header"))).assertExists()
 
     /** Opens the picker from the group button and moves [steps] rows from the checked group, Up when negative. */
     private fun pickGroup(target: SemanticsMatcher, steps: Int) {
@@ -78,7 +82,7 @@ class ChannelsLayoutFocusTest {
     @Test fun gridEntersOnTheFirstCardAndStaysAtTheLastColumn() {
         fixture.show(grid)
         fixture.awaitFocus(card(1))
-        assertTitle("Channels")
+        assertGroup("All channels")
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionRight)
@@ -128,13 +132,13 @@ class ChannelsLayoutFocusTest {
         pickGroup(group(1), steps = 1)
         compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
         fixture.awaitFocus(card(1))
-        assertTitle("Channels • Favorites")
+        assertGroup("Favorites")
         repeat(2) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(3))
         fixture.key(Key.DirectionUp)
         pickGroup(group(2), steps = 1)
         fixture.awaitFocus(card(7))
-        assertTitle("Channels • Entertainment")
+        assertGroup("Entertainment")
         fixture.key(Key.DirectionUp)
         pickGroup(group(1), steps = -1)
         fixture.awaitFocus(card(3))
@@ -153,7 +157,7 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.Back)
         compose.onNodeWithTag("channels-group-panel").assertDoesNotExist()
         fixture.awaitFocus(groupButton)
-        assertTitle("Channels")
+        assertGroup("All channels")
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(row(1))
     }
@@ -279,13 +283,13 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(hasTestTag("channels-show-all"))
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(card(1))
-        assertTitle("Channels")
+        assertGroup("All channels")
     }
 
     @Test fun emptyGroupWithoutAllChannelsLeavesFocusOnTheGroupButton() {
         fixture.show(grid, emptyGroup = true, allChannels = false)
         fixture.awaitFocus(card(1))
-        assertTitle("Channels • Favorites")
+        assertGroup("Favorites")
         fixture.key(Key.DirectionUp)
         pickGroup(group(9), steps = 2)
         fixture.awaitFocus(groupButton)
@@ -383,7 +387,7 @@ class ChannelsLayoutFocusTest {
     @Test fun immersiveDownStaysAndUpReachesTheHeader() {
         fixture.show(immersive)
         fixture.awaitFocus(card(1))
-        assertTitle("Channels")
+        assertGroup("All channels")
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(card(2))
         fixture.key(Key.DirectionDown)
@@ -393,6 +397,39 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(card(2))
         assertEquals("Focus alone never tunes", 0, fixture.plays)
+    }
+
+    @Test fun immersiveBodyStartsAtTheTopPaddingAndItsHeaderButtonsStayInTheTopSlot() {
+        fixture.show(immersive)
+        fixture.awaitFocus(card(1))
+        val header = compose.onNodeWithTag("channels-header").fetchSemanticsNode()
+        // The body starts at the top content padding, where the header sits, instead of below it.
+        val body = header.parent!!.children.first { it.id != header.id }
+        assertEquals("the immersive body starts at the top padding", header.positionInRoot.y, body.boundsInRoot.top, .5f)
+        // The buttons sit in the 40dp slot at the top content padding, as the list's header has them.
+        val top = header.positionInRoot.y
+        val slot = with(compose.density) { TvBrowseHeaderHeight.toPx() }
+        listOf(groupButton, viewButton).forEach {
+            val bounds = compose.onNode(it).fetchSemanticsNode().boundsInRoot
+            assertTrue("$it starts in the slot", bounds.top >= top - .5f)
+            assertTrue("$it ends in the slot", bounds.bottom <= top + slot + .5f)
+        }
+        // The row below still reaches the buttons with Up.
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(groupButton)
+    }
+
+    @Test fun headerNamesTheScreenAsItsPaneTitleAndTheGroupButtonShowsTheGroup() {
+        fixture.show(list)
+        fixture.awaitFocus(row(1))
+        compose.onNodeWithTag("channels-header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
+        compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
+        assertGroup("All channels")
+        compose.onNode(groupButton).assert(SemanticsMatcher.expectValue(SemanticsProperties.ContentDescription, listOf("Channel group")))
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(groupButton)
+        pickGroup(group(1), steps = 1)
+        assertGroup("Favorites")
     }
 
     @Test fun immersiveRowRunsUnderTheRailAndKeepsItsKeyline() {
@@ -441,7 +478,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(groupButton)
         pickGroup(group(1), steps = 1)
         fixture.awaitFocus(card(1) and hasAnyAncestor(hasTestTag("channels-immersive-cards")))
-        assertTitle("Channels • Favorites")
+        assertGroup("Favorites")
         fixture.key(Key.DirectionLeft)
         awaitRail()
         // The header is nearer the rail than the bottom row; Right still returns to the card.
@@ -458,7 +495,7 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(groupButton)
         pickGroup(group(2), steps = 2)
         fixture.awaitFocus(card(7))
-        assertTitle("Channels • Entertainment")
+        assertGroup("Entertainment")
         repeat(3) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(10))
         fixture.key(Key.DirectionUp)

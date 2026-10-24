@@ -224,7 +224,6 @@
     <string name="display_mode_4_3">4:3 ausfüllen</string>
 
     <string name="epg_title">Programmführer</string>
-    <string name="browse_filtered_title">%1$s • %2$s</string>
     <string name="epg_clear_filter">Filter löschen</string>
     <string name="epg_search">Suchen</string>
     <string name="epg_search_title">Programm durchsuchen</string>

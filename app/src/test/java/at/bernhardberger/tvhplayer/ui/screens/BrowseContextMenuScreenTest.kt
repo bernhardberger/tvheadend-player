@@ -180,7 +180,7 @@ class BrowseContextMenuScreenTest {
         show(recordings = false, realRail = true)
         val browse = resumeBitmap()
         var x = 0; var y = 0; var brightest = 0
-        for (px in 212 until 900) for (py in 20 until 100) {
+        for (px in 212 until 900) for (py in 20 until 220) {
             val light = android.graphics.Color.red(browse.getPixel(px, py))
             if (light > brightest) { brightest = light; x = px; y = py }
         }
@@ -756,10 +756,10 @@ class BrowseContextMenuScreenTest {
     private fun menuDetailsFrames(recordings: Boolean) {
         show(recordings = recordings, realRail = true, fixedNow = if (recordings) 1_789_480_800L else null)
         val browse = resumeBitmap()
-        // The browse heading, not the rail: opaque-layer registration can hide the rail
+        // The browse page's top left (tabs, first rows), not the rail: opaque-layer registration can hide the rail
         // even when neither the menu nor the details background is actually drawn.
         var x = 0; var y = 0; var brightest = 0
-        for (px in 212 until 900) for (py in 20 until 100) {
+        for (px in 212 until 900) for (py in 20 until 220) {
             val light = android.graphics.Color.red(browse.getPixel(px, py))
             if (light > brightest) { brightest = light; x = px; y = py }
         }
@@ -796,7 +796,8 @@ class BrowseContextMenuScreenTest {
                 bitmap.recycle()
                 compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
             }
-            assertTrue("Details starts opaque: $lights", lights.first() < brightest * .2f)
+            // The details page's blurred art is not black, so opaque means well below the browse probe.
+            assertTrue("Details starts opaque: $lights", lights.first() < brightest * .3f)
             assertTrue("Exit is a fade, not a flash: $lights", lights.any { it in (brightest / 4)..(brightest * 3 / 4) })
             assertTrue("Browse must not flash then darken: $lights", lights.zipWithNext().all { (a, b) -> b >= a - 2 })
             assertTrue("Browse is restored: $lights", lights.last() >= brightest - 2)
@@ -812,7 +813,7 @@ class BrowseContextMenuScreenTest {
         show(recordings = true, recordingState = DvrEntryState.SCHEDULED, realRail = true)
         val browse = resumeBitmap()
         var x = 0; var y = 0; var brightest = 0
-        for (px in 212 until 900) for (py in 20 until 100) {
+        for (px in 212 until 900) for (py in 20 until 220) {
             val light = android.graphics.Color.red(browse.getPixel(px, py))
             if (light > brightest) { brightest = light; x = px; y = py }
         }
@@ -832,7 +833,8 @@ class BrowseContextMenuScreenTest {
                 bitmap.recycle()
                 compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
             }
-            assertTrue("Details starts opaque: $lights", lights.first() < brightest * .2f)
+            // The details page's blurred art is not black, so opaque means well below the browse probe.
+            assertTrue("Details starts opaque: $lights", lights.first() < brightest * .3f)
             assertTrue("Exit is a fade, not a flash: $lights", lights.any { it in (brightest / 4)..(brightest * 3 / 4) })
             assertTrue("Browse must not flash then darken: $lights", lights.zipWithNext().all { (a, b) -> b >= a - 2 })
             assertTrue("Browse is restored: $lights", lights.last() >= brightest - 2)

@@ -8,6 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -32,41 +35,49 @@ import org.robolectric.annotation.GraphicsMode
 class TopLevelBrowseHeaderTest {
     @get:Rule val compose = createComposeRule()
 
-    @Test fun normalTitleKeepsTheMinimumSlot() = checkTitle(fontScale = 1f)
-    @Test fun largeTitleGrowsTheSlotWithoutClippingOrOverlappingTheNextRow() = checkTitle(fontScale = 2f)
+    @Test fun normalHeaderKeepsTheMinimumSlot() = checkSlot(fontScale = 1f)
+    @Test fun largeFilterGrowsTheSlotWithoutClippingOrOverlappingTheNextRow() = checkSlot(fontScale = 2f)
 
-    @Test fun filterFollowsTheTitleInTheSecondaryToneEvenWhenItRepeatsTheTitle() {
+    @Test fun titleIsThePaneTitleAndNeverDrawn() {
         compose.setContent {
-            TVHeadendPlayerTheme { TopLevelBrowseHeader("News", filter = "News") }
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("Channels", Modifier.testTag("header")) }
         }
-        val layouts = mutableListOf<TextLayoutResult>()
-        compose.onNodeWithText("News • News").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-        val span = layouts.single().layoutInput.text.spanStyles.single()
-        assertEquals("Only the bullet and the filter step down", 4 until 11, span.start until span.end)
-        assertEquals(TvTextColors.secondary, span.item.color)
+        compose.onNodeWithTag("header").assert(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, "Channels"))
+        compose.onNodeWithText("Channels").assertDoesNotExist()
     }
 
-    private fun checkTitle(fontScale: Float) {
+    @Test fun filterStaysVisibleAtTheLeadingEdgeInTheSecondaryTone() {
+        compose.setContent {
+            TVHeadendPlayerTheme { TopLevelBrowseHeader("News", Modifier.testTag("header"), filter = "Movies") }
+        }
+        compose.onNodeWithText("News").assertDoesNotExist()
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithText("Movies").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(TvTextColors.secondary, layouts.single().layoutInput.style.color)
+        assertEquals(0f, compose.onNodeWithText("Movies").fetchSemanticsNode().boundsInRoot.left, .1f)
+    }
+
+    private fun checkSlot(fontScale: Float) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     Column(Modifier.fillMaxSize()) {
-                        TopLevelBrowseHeader("Channels", Modifier.testTag("header"))
+                        TopLevelBrowseHeader("Channels", Modifier.testTag("header"), filter = "News")
                         Text("Next row")
                     }
                 }
             }
         }
         val header = compose.onNodeWithTag("header").fetchSemanticsNode().boundsInRoot
-        val title = compose.onNodeWithText("Channels")
+        val filter = compose.onNodeWithText("News")
         val layouts = mutableListOf<TextLayoutResult>()
-        title.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        filter.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
         val layout = layouts.single()
-        assertEquals("The requested font scale reaches the headline", fontScale, layout.layoutInput.density.fontScale, .001f)
-        val titleBounds = title.fetchSemanticsNode().boundsInRoot
-        assertFalse("The headline has no visual overflow", layout.hasVisualOverflow)
-        assertTrue("The full headline line fits in the slot", header.height >= layout.size.height)
-        assertTrue("Title stays within the header", titleBounds.top >= header.top && titleBounds.bottom <= header.bottom)
+        assertEquals("The requested font scale reaches the filter", fontScale, layout.layoutInput.density.fontScale, .001f)
+        val filterBounds = filter.fetchSemanticsNode().boundsInRoot
+        assertFalse("The filter has no visual overflow", layout.hasVisualOverflow)
+        assertTrue("The full line fits in the slot", header.height >= layout.size.height)
+        assertTrue("Filter stays within the header", filterBounds.top >= header.top && filterBounds.bottom <= header.bottom)
         assertTrue("The next row follows the grown header",
             compose.onNodeWithText("Next row").fetchSemanticsNode().boundsInRoot.top >= header.bottom)
         if (fontScale == 1f) assertEquals(40f, header.height, .1f)

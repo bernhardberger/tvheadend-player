@@ -191,7 +191,7 @@ class ChannelsStandardLayoutEvidenceTest {
         // A group change enters the playing channel of the new scope.
         pickGroup(steps = 1)
         row(PLAYING).assertIsFocused()
-        heading("Channels • Favourites").assertExists()
+        groupButton().assertTextContains("Favourites")
         headlineChannel().assertTextContains(title(PLAYING))
 
         key(Key.DirectionLeft)
@@ -229,10 +229,8 @@ class ChannelsStandardLayoutEvidenceTest {
         key(Key.DirectionUp)
         groupButton().assertIsFocused()
 
-        // The group's name heads the screen; Group and View options end on the trailing inset.
-        val heading = heading().bounds()
-        assertEquals("heading x", 130f, heading.left, .5f)
-        assertEquals("heading y", 32f, heading.top, .5f)
+        // No title is drawn; Group and View options end on the trailing inset.
+        compose.onNode(hasText("Channels") and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
         val header = header().bounds()
         assertEquals("header y", 28f, header.top, .5f)
         val group = groupButton().bounds()
@@ -240,7 +238,8 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("buttons end on the trailing inset", 902f, view.right, .5f)
         assertEquals("kit medium icon button", 40f, view.width, .5f)
         assertEquals("button gap", 12f, view.left - group.right, .5f)
-        assertEquals("buttons share the heading's axis", heading.center.y, view.center.y, 1f)
+        assertEquals("buttons share the header's axis", header.center.y, view.center.y, 1f)
+        assertEquals("group button shares it too", header.center.y, group.center.y, 1f)
         // The list column spans the focus reserve and runs to the screen bottom.
         val list = compose.onNodeWithTag("channels-list").bounds()
         assertEquals("list column x", 118f, list.left, .5f)
@@ -631,11 +630,10 @@ class ChannelsStandardLayoutEvidenceTest {
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun enlargedTextGrowsRowsWithoutOverlap() {
         channelsShell(1.3f)
-        val heading = heading().bounds()
-        val headingLayouts = mutableListOf<TextLayoutResult>()
-        heading().performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(headingLayouts) }
-        val headingLayout = headingLayouts.single()
-        assertTrue("headline keeps its whole measured line", headingLayout.getLineBottom(headingLayout.lineCount - 1) <= heading.height)
+        val group = groupButton().bounds()
+        val label = compose.onNode(hasText("All channels") and hasAnyAncestor(hasTestTag("channels-group-button")), useUnmergedTree = true).bounds()
+        assertTrue("group button keeps its whole label", label.left >= group.left && label.right <= group.right)
+        assertTrue("group button stays inside the header", group.top >= header().bounds().top - .5f && group.bottom <= header().bounds().bottom + .5f)
         assertTrue("rows stay below the enlarged header", row(1).bounds().top >= header().bounds().bottom + 8f - 1f)
         enterAndFocus(PLAYING)
 
@@ -994,8 +992,6 @@ class ChannelsStandardLayoutEvidenceTest {
 
     private fun header() = compose.onNodeWithTag("channels-header")
     private fun groupButton() = compose.onNodeWithTag("channels-group-button")
-    private fun heading(label: String = "Channels") =
-        compose.onNode(hasText(label) and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true)
 
     /** Up from the first row, OK on the group button, [steps] Downs in the picker and OK. */
     private fun pickGroup(steps: Int, move: (Key) -> Unit = ::key) {

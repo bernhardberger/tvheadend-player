@@ -1,10 +1,15 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -14,9 +19,17 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.Icon
 import androidx.tv.material3.IconButtonDefaults
+import androidx.tv.material3.OutlinedButton
+import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.RoundIconButton
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
@@ -31,8 +44,12 @@ internal class ChannelsHeaderFocus {
     fun entry(hasGroupChoice: Boolean): FocusRequester = if (hasGroupChoice) group else view
 }
 
+/** Longest the Group button grows before the active group's name ellipsizes. */
+private val ChannelsGroupButtonMaxWidth = 280.dp
+
 /**
- * The Channels title with the Group and View options buttons at its end. Down returns to the
+ * The Channels header: the Group button, which shows the active group's name ([groupName], or
+ * "All channels" without one), and View options at its end. Down returns to the
  * content's remembered item, the start edge leads to the navigation rail (or back to content
  * that reached it with its end edge, see [onReturnToContent]) and Up stays.
  * A single visible group has nothing to choose, so its button is not shown.
@@ -40,7 +57,7 @@ internal class ChannelsHeaderFocus {
 @Composable
 internal fun ChannelsHeader(
     title: String,
-    filter: String?,
+    groupName: String?,
     focus: ChannelsHeaderFocus,
     showGroup: Boolean,
     navigationFocus: FocusRequester?,
@@ -59,25 +76,38 @@ internal fun ChannelsHeader(
     }
     TopLevelBrowseHeader(
         title = title,
-        filter = filter,
         modifier = modifier
             .onPreviewKeyEvent { event ->
                 event.type == KeyEventType.KeyDown && event.key == Key.DirectionDown && onMoveToContent()
             }
             .testTag("channels-header"),
         actions = {
-            if (showGroup) RoundIconButton(
-                icon = { Icon(painterResource(R.drawable.ic_filter_list), stringResource(R.string.channels_group), Modifier.size(IconButtonDefaults.MediumIconSize)) },
-                onClick = { onOpen(ChannelsPanel.GROUP) },
-                focusRequester = focus.group,
-                onFocused = onFocused,
-                modifier = startToContent
-                    .focusProperties {
-                        up = FocusRequester.Cancel
-                        if (ltr) left = rail else right = rail
-                    }
-                    .testTag("channels-group-button"),
-            )
+            if (showGroup) {
+                val label = groupName ?: stringResource(R.string.all_channels)
+                val description = stringResource(R.string.channels_group)
+                OutlinedButton(
+                    onClick = { onOpen(ChannelsPanel.GROUP) },
+                    // Vertical padding would grow the 40dp header slot past the round button it replaces.
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    modifier = startToContent
+                        .widthIn(max = ChannelsGroupButtonMaxWidth)
+                        .focusRequester(focus.group)
+                        .onFocusChanged { if (it.isFocused) onFocused() }
+                        .focusProperties {
+                            up = FocusRequester.Cancel
+                            if (ltr) left = rail else right = rail
+                        }
+                        .semantics {
+                            contentDescription = description
+                            stateDescription = label
+                        }
+                        .testTag("channels-group-button"),
+                ) {
+                    Icon(painterResource(R.drawable.ic_filter_list), null, Modifier.size(ButtonDefaults.IconSize))
+                    Spacer(Modifier.size(ButtonDefaults.IconSpacing))
+                    Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
             RoundIconButton(
                 icon = { Icon(painterResource(R.drawable.ic_tune), stringResource(R.string.channels_view_options), Modifier.size(IconButtonDefaults.MediumIconSize)) },
                 onClick = { onOpen(ChannelsPanel.VIEW_OPTIONS) },

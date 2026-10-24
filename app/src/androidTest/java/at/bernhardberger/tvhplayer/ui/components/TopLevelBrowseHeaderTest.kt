@@ -19,16 +19,18 @@ class TopLevelBrowseHeaderTest {
     val composeRule = createComposeRule()
 
     @Test
-    fun titleAnchorDoesNotMoveWhenHeaderHasActions() {
+    fun filterAnchorDoesNotMoveWhenHeaderHasActions() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 Column {
                     TopLevelBrowseHeader(
                         title = "Channels",
+                        filter = "News",
                         modifier = Modifier.testTag("plain-header"),
                     )
                     TopLevelBrowseHeader(
                         title = "Guide",
+                        filter = "Movies",
                         modifier = Modifier.testTag("action-header"),
                         actions = {
                             Box(Modifier.size(40.dp))
@@ -42,9 +44,9 @@ class TopLevelBrowseHeaderTest {
             .fetchSemanticsNode().boundsInRoot
         val actionHeader = composeRule.onNodeWithTag("action-header")
             .fetchSemanticsNode().boundsInRoot
-        val plainTitle = composeRule.onNodeWithText("Channels")
+        val plainTitle = composeRule.onNodeWithText("News")
             .fetchSemanticsNode().boundsInRoot
-        val actionTitle = composeRule.onNodeWithText("Guide")
+        val actionTitle = composeRule.onNodeWithText("Movies")
             .fetchSemanticsNode().boundsInRoot
 
         assertEquals(plainHeader.height, actionHeader.height, 0.5f)
