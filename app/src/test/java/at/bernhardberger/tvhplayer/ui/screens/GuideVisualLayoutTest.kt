@@ -148,6 +148,7 @@ class GuideVisualLayoutTest {
     private var lineColor = 0
     private var backgroundColor = 0
     private var callsAtEntry = 0
+    private lateinit var readyObservation: SessionObservation
     private var playbackRequests = 0
     private var navigationRequests = 0
     private val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
@@ -351,6 +352,28 @@ class GuideVisualLayoutTest {
         compose.onAllNodesWithText(context().getString(R.string.loading)).assertCountEquals(0)
         compose.onNodeWithTag("guide-empty-state").assertDoesNotExist()
         capture("guide-loading-skeleton", 1f, LayoutDirection.Ltr).recycle()
+    }
+
+    @Test fun theSkeletonKeepsTheGridWhereTheReadyGuidePutsItAtLargeText() = skeletonHandsOverInPlace(1.3f)
+
+    @Test fun theSkeletonKeepsTheGridWhereTheReadyGuidePutsItAtLargestText() = skeletonHandsOverInPlace(1.6f)
+
+    private fun skeletonHandsOverInPlace(scale: Float) {
+        show(scale = scale, connecting = true)
+        compose.waitForIdle()
+        // A new session starts a new preparation, which shows the whole-screen skeleton, header
+        // row included, for at least the frame that sees the session.
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { session.publish(readyObservation) }
+        compose.mainClock.advanceTimeByFrame()
+        val preparing = hasTestTag("guide-skeleton") and hasAnyAncestor(hasTestTag("browse-preparing"))
+        val skeletonTop = compose.onNode(preparing, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.top
+        compose.mainClock.autoAdvance = true
+        compose.waitUntil(5_000) {
+            compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() &&
+                compose.onAllNodesWithTag("epg-time-ruler").fetchSemanticsNodes().isNotEmpty()
+        }
+        assertEquals("The ruler stays where the skeleton drew it at font $scale", skeletonTop, bounds("epg-time-ruler").top, .5f)
     }
 
     @Test fun middleRowFocusRingStaysInsideItsRow() {
@@ -946,7 +969,8 @@ class GuideVisualLayoutTest {
         Locale.setDefault(Locale.forLanguageTag("ar"))
         val firstHour = hour - 6 * 3600
         position.save(GuidePosition(ChannelId(1), EventId(110), firstHour, firstHour, 0))
-        show(scale = scale, direction = LayoutDirection.Rtl, history = false, eventHour = firstHour)
+        // A window wholly in the past asks for no coverage.
+        show(scale = scale, direction = LayoutDirection.Rtl, history = false, eventHour = firstHour, entryCoverage = false)
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals(firstHour, checkNotNull(position.position.value).windowStartSec)
@@ -1996,7 +2020,8 @@ class GuideVisualLayoutTest {
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
         groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
-        recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false) {
+        recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false,
+        entryCoverage: Boolean = true) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -2013,11 +2038,9 @@ class GuideVisualLayoutTest {
             // Sport on the first channel, no genre code on the second, children's programmes after.
             contentGenre = if (genres) ContentGenre.fromContentType(when (channel.id.value) { 1L -> 0x40L; 2L -> null; else -> 0x50L }) else null,
         )
-        session = FakeTvheadendSession(SessionObservation.create(
-            sessionState = if (connecting) SessionState.Connecting
-                else SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            // While connecting no channel has arrived yet.
-            channelState = if (connecting) ChannelRepositoryState.Empty else ChannelRepositoryState.Current(ChannelCatalog.create(channels,
+        readyObservation = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels,
                 if (!tags) emptyList() else listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })) +
                     if (groupWithoutFirst) listOf(ChannelTag.create(ChannelTagId(2), name = "News",
                         channelIds = channels.drop(1).map { it.id })) else emptyList())),
@@ -2034,6 +2057,14 @@ class GuideVisualLayoutTest {
             )),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
             dvrConfigurationsState = DvrConfigurationsState.Current.create(emptyList()),
+        )
+        // While connecting no channel has arrived yet.
+        session = FakeTvheadendSession(if (!connecting) readyObservation else SessionObservation.create(
+            sessionState = SessionState.Connecting,
+            channelState = ChannelRepositoryState.Empty,
+            epgState = readyObservation.epgState,
+            dvrState = readyObservation.dvrState,
+            dvrConfigurationsState = readyObservation.dvrConfigurationsState,
         ))
         // Observe and suspend only the released fake's request boundary; its settlements
         // and current-session checks still come from the SDK, with no production seam.
@@ -2094,6 +2125,9 @@ class GuideVisualLayoutTest {
         if (!connecting) {
             dateFocused()
             assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
+            // The entry's coverage request reaches the session off the main thread; count from
+            // after it, or a busy machine records it late as if navigation had asked.
+            if (entryCoverage && beforeCoverageBatch == null) compose.waitUntil(5_000) { FakeSessionCall.EPG_ACQUIRE_COVERAGE_BATCH in session.calls }
         }
         callsAtEntry = session.calls.size
     }

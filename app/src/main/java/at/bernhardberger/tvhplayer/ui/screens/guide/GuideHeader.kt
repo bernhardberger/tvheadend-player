@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -13,18 +14,18 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
@@ -40,7 +41,20 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
- * The Guide's title row in the Channels header pattern: the title, then the date button, Tags
+ * The Guide header's height, shared with the loading skeleton's empty header row so the grid does
+ * not move when the real screen replaces it: the icon buttons' 40dp, or the date button's label
+ * line with its padding once text grows.
+ */
+@Composable
+@ReadOnlyComposable
+internal fun guideHeaderMinHeight(): Dp = with(LocalDensity.current) {
+    maxOf(TvBrowseHeaderHeight, MaterialTheme.typography.labelLarge.lineHeight.toDp() +
+        ButtonDefaults.ContentPadding.calculateTopPadding() + ButtonDefaults.ContentPadding.calculateBottomPadding())
+}
+
+/**
+ * The Guide's header row in the Channels header pattern, with "Guide" as its pane title and nothing
+ * drawn for it: the date button, Tags
  * (only with a choice of channel sets) naming the active [tag], Filter (only with [showFilter])
  * naming the highlighted [genre] after its [genreDot], and View options. Down moves to the
  * programmes, the date button's start edge to the navigation rail.
@@ -61,7 +75,6 @@ internal fun GuideHeader(
     contentPadding: PaddingValues,
     startPadding: Dp,
     endPadding: Dp,
-    density: Density,
     onDateClick: () -> Unit,
     onFocused: () -> Unit,
     onOpen: (ChannelsPanel) -> Unit,
@@ -85,10 +98,7 @@ internal fun GuideHeader(
                 top = contentPadding.calculateTopPadding(),
                 end = maxOf(endPadding, TvBrowseTrailingInset),
             )
-            .heightIn(min = with(density) {
-                maxOf(40.dp, MaterialTheme.typography.headlineMedium.lineHeight.toDp(),
-                    MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
-            }),
+            .heightIn(min = guideHeaderMinHeight()),
         leading = { startEdge ->
             GuideDateButton(
                 windowStartSec = windowStartSec,

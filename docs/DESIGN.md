@@ -702,8 +702,8 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   the marker carries a fully rounded primary pill with the current clock time,
   and a time label the pill would touch is hidden rather than half covered. Each ruler time
   label starts at its half-hour's subtle boundary line, which runs the ruler
-  band's height where that time's programmes start; "Channels" and the times
-  share one baseline centred in the band. Programme cells have no row track:
+  band's height where that time's programmes start; the times share one
+  baseline centred in the band. Programme cells have no row track:
   they sit on the page like the channel tiles, one 4dp gutter apart across and
   between rows, so a schedule gap shows as nothing on air. A focused cell does
   not grow: it keeps its genre tint (or plain fill) and light text and gains a

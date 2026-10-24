@@ -1848,7 +1848,6 @@ fun EpgGridScreen(
                 contentPadding = contentPadding,
                 startPadding = startPadding,
                 endPadding = endPadding,
-                density = density,
                 onDateClick = {
                     releaseProgrammeFocus()
                     showTimePanel = true

@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.heightIn
-import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.Row
@@ -811,9 +810,7 @@ internal fun GuidePreparationSkeleton(
         Spacer(
             Modifier
                 .padding(top = contentPadding.calculateTopPadding())
-                .heightIn(min = with(LocalDensity.current) {
-                    maxOf(TvBrowseHeaderHeight, MaterialTheme.typography.labelLarge.lineHeight.toDp() + 16.dp)
-                }),
+                .heightIn(min = guideHeaderMinHeight()),
         )
         headline?.invoke()
         Spacer(Modifier.height(4.dp))
