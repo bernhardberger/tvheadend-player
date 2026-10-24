@@ -742,10 +742,10 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-card-2").assertContentDescriptionEquals("Heute 20:00, 101 Ridge Earth HD")
     }
 
-    @Test fun cornerArtRevealsTheBackgroundThenBlursFullScreen() = uniformScrim()
-    @Test @Config(sdk = [30]) fun pre31CornerArtRevealsTheBackgroundThenDarkensFullScreen() = uniformScrim()
+    @Test fun scrolledFullScreenArtTradesTheScrimForAnEvenDim() = fullScreenScrim()
+    @Test @Config(sdk = [30]) fun pre31ScrolledFullScreenArtTradesTheScrimForAnEvenDim() = fullScreenScrim()
 
-    private fun uniformScrim() {
+    private fun fullScreenScrim() {
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"),
             ArtworkId(2) to Bitmap.createBitmap(16, 9, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.WHITE) })))
@@ -754,30 +754,26 @@ class ProgrammeDetailsPageTest {
             at.bernhardberger.tvhplayer.images.DetailsArtColors.stored(AppArtworkSource(requireNotNull(session), ArtworkId(2))) != null
         }
         val sharp = snapshot()
-        // Kit cinematic scrim: ~10% at the top-right centre, opaque page background towards the bottom left.
-        Assert.assertEquals("top-right art stays bright", 205f, android.graphics.Color.red(sharp.getPixel(1800, 100)).toFloat(), 15f)
-        // Top-left is outside the corner art (the pulled-up airings may occupy the bottom).
-        Assert.assertEquals("outside the corner art the page background shows",
-            android.graphics.Color.rgb(19, 19, 19), sharp.getPixel(20, 20))
-        Assert.assertTrue("left edge fades to background", android.graphics.Color.red(sharp.getPixel(300, 20)) < 40)
-        // Behind the text column (450dp) the art dissolves into the background.
-        Assert.assertEquals("art behind the text is mostly scrimmed", 91f, android.graphics.Color.red(sharp.getPixel(900, 20)).toFloat(), 15f)
-        Assert.assertTrue("bottom of the frame is background", android.graphics.Color.red(sharp.getPixel(1800, 850)) < 40)
+        // As Google TV's: nearly clear at the top right, dark toward the text on the left.
+        Assert.assertTrue("the top-right art stays bright", android.graphics.Color.red(sharp.getPixel(1900, 20)) > 230)
+        Assert.assertTrue("the art reaches the top left, scrimmed", android.graphics.Color.red(sharp.getPixel(20, 20)) in 25..70)
+        Assert.assertTrue("the left edge is scrimmed", android.graphics.Color.red(sharp.getPixel(20, 540)) < 60)
+        val points = listOf(1900 to 60, 1500 to 60, 1000 to 60, 20 to 20)
+        val before = points.map { (x, y) -> android.graphics.Color.red(sharp.getPixel(x, y)) }
         sharp.recycle()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
-        val bitmap = snapshot()
-        // Scrolled away, the darkened blurred art covers the whole screen.
-        for ((x, y) in listOf(1000 to 60, 1800 to 100)) {
-            Assert.assertEquals("blurred art is darkened at $x,$y", 102f, android.graphics.Color.red(bitmap.getPixel(x, y)).toFloat(), 1f)
-        }
-        for ((x, y) in listOf(20 to 20, 1800 to 1070)) {
-            Assert.assertTrue("blurred art covers the corner $x,$y", android.graphics.Color.red(bitmap.getPixel(x, y)) > 40)
-        }
-        bitmap.recycle()
+        val blurred = snapshot()
+        // As Google TV's scrolled page: the scrim gives way to an even dim. Uniform art blurs to
+        // itself, so every point lands on the same level, darker at the top right and lighter on the left.
+        val after = (points + (20 to 540)).map { (x, y) -> android.graphics.Color.red(blurred.getPixel(x, y)) }
+        blurred.recycle()
+        after.forEach { Assert.assertEquals("an even dim", after.first().toFloat(), it.toFloat(), 2f) }
+        Assert.assertTrue("the top right dims to about 0.6", after.first() in 140..175)
+        Assert.assertTrue("the left lightens", after[3] > before[3] + 50)
     }
 
-    @Test fun heroFrameIsTopEndAndStaysStillWhileTheBlurFadesIn() {
+    @Test fun heroCoversThePageAndStaysStillWhileTheBlurFadesIn() {
         show()
         fun frame(tag: String): androidx.compose.ui.geometry.Rect {
             val coordinates = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
@@ -786,17 +782,15 @@ class ProgrammeDetailsPageTest {
                 coordinates.size.width.toFloat(), coordinates.size.height.toFloat()))
             return androidx.compose.ui.geometry.Rect(topLeft, bottomRight)
         }
-        val initial = frame("details-hero")
-        Assert.assertEquals(202f, initial.left / 2f, .5f)
-        Assert.assertEquals(0f, initial.top, .5f)
-        Assert.assertEquals(758f, initial.width / 2f, .5f)
-        Assert.assertEquals(426.375f, initial.height / 2f, .5f)
+        val screen = androidx.compose.ui.geometry.Rect(0f, 0f, 1920f, 1080f)
+        Assert.assertEquals(screen, frame("details-hero"))
+        capture("details-art-top", "u15-details-layout")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
-        // The corner frame stays still (no zoom) and the blurred backdrop is full-screen.
-        Assert.assertEquals(initial, frame("details-hero"))
-        val blurred = frame("details-hero-blurred")
-        Assert.assertEquals(androidx.compose.ui.geometry.Rect(0f, 0f, 1920f, 1080f), blurred)
+        // The picture stays still (no zoom) and the blurred copy lies exactly over it.
+        Assert.assertEquals(screen, frame("details-hero"))
+        Assert.assertEquals(screen, frame("details-hero-blurred"))
+        capture("details-art-scrolled", "u15-details-layout")
     }
 
     @Test fun warmPlaybackShowsNoArtSoTheVideoStaysTheBackground() {
@@ -804,20 +798,46 @@ class ProgrammeDetailsPageTest {
         capture("warm-playback", "u15-details-layout")
         compose.onNodeWithTag("details-hero").assertDoesNotExist()
         compose.onNodeWithTag("details-hero-logo").assertDoesNotExist()
+        compose.onNodeWithTag("details-logo-glow").assertDoesNotExist()
         compose.onNodeWithTag("details-hero-blurred").assertDoesNotExist()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
         compose.onNodeWithTag("details-hero-blurred").assertDoesNotExist()
-        compose.onNodeWithTag("details-hero-blurred-logo").assertDoesNotExist()
+        compose.onNodeWithTag("details-logo-glow").assertDoesNotExist()
     }
 
-    @Test fun withoutArtTheLogoStandsInForTheCornerArtAndTheBlur() {
+    @Test fun withoutArtTheLogosGlowTurnsIntoAnEvenTintWhileTheLogoScrollsAway() {
         show(future = true)
-        compose.onNodeWithTag("details-hero-logo", useUnmergedTree = true).assertExists()
+        fun logoTop() = compose.onNodeWithTag("details-hero-logo", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.top
+        val logoAtTop = logoTop()
+        compose.onNodeWithTag("details-logo-glow", useUnmergedTree = true).assertExists()
+        val background = android.graphics.Color.rgb(19, 19, 19)
+        // Baked off the main thread; the plain background shows until then.
+        compose.waitUntil(10_000) { snapshot().let { it.getPixel(1910, 5).also { _ -> it.recycle() } } != background }
+        val top = snapshot()
+        // Lit at the top right, the page's own background toward the left.
+        Assert.assertNotEquals(background, top.getPixel(1910, 5))
+        fun light(pixel: Int) = android.graphics.Color.red(pixel) + android.graphics.Color.green(pixel) + android.graphics.Color.blue(pixel)
+        Assert.assertTrue(light(top.getPixel(1910, 5)) > light(top.getPixel(5, 540)) + 30)
+        Assert.assertEquals(19f, android.graphics.Color.red(top.getPixel(5, 540)).toFloat(), 2f)
+        val glow = top.getPixel(1910, 5)
+        top.recycle()
+        capture("details-noart-top", "u15-details-layout")
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         compose.mainClock.advanceTimeBy(1000)
-        compose.onNodeWithTag("details-hero-blurred-logo", useUnmergedTree = true).assertExists()
-        capture("blurred-logo", "u15-details-layout")
+        // The logo leaves with the page, the glow gives way to an even tint of its colour, and
+        // nothing is blurred.
+        Assert.assertTrue(logoTop() < logoAtTop - 200f)
+        compose.onNodeWithTag("details-hero-blurred").assertDoesNotExist()
+        val scrolled = snapshot()
+        val corner = scrolled.getPixel(1910, 5)
+        val edge = scrolled.getPixel(5, 540)
+        scrolled.recycle()
+        Assert.assertTrue("dimmer than the glow", light(corner) < light(glow))
+        Assert.assertTrue("tinted, not the plain background", corner != background)
+        Assert.assertEquals("even", light(corner).toFloat(), light(edge).toFloat(), 3f)
+        capture("details-noart-scrolled", "u15-details-layout")
     }
 
     @Test fun longTitleUsesOneLineAcrossThePageWithinTheKeylines() {
@@ -831,6 +851,17 @@ class ProgrammeDetailsPageTest {
         title.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
         Assert.assertEquals(1, layouts.single().lineCount)
         capture("details-wide-one-line-title")
+    }
+
+    @Test fun longTitleBesideTheLogoStopsShortOfItOnTwoLines() {
+        show(longTitle = true, future = true)
+        val title = compose.onNodeWithTag("details-title")
+        val logo = compose.onNodeWithTag("details-hero-logo", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        Assert.assertTrue(title.getUnclippedBoundsInRoot().right.value <= logo.left.value - 32f + .5f)
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        title.performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        Assert.assertEquals(2, layouts.single().lineCount)
+        capture("details-noart-long-title", "u15-details-layout")
     }
 
     @Test fun shortHeaderHasOnlyTheNormalGapBeforeAirings() {
@@ -1121,8 +1152,9 @@ class ProgrammeDetailsPageTest {
                 subtitle = event.subtitle.takeIf { heroVariant == 2 }, genre = event.genre,
                 summary = event.summary.takeIf { heroVariant > 0 }, description = event.description.takeIf { heroVariant > 0 })
             longTitle -> EpgEvent.create(event.id, channel.id, start, event.stop,
-                title = "Ridge Light: Across the Frozen North", subtitle = event.subtitle,
-                summary = event.summary, description = event.description, genre = event.genre, image = event.image)
+                // Without art (future) the logo takes the corner, so the title needs a second line.
+                title = "Ridge Light: Across the Frozen North" + if (future) " and Back Again" else "", subtitle = event.subtitle,
+                summary = event.summary, description = event.description, genre = event.genre, image = event.image.takeIf { !future })
             factsOnly -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title, genre = event.genre)
              richFacts -> EpgEvent.create(event.id, channel.id, start, event.stop, title = event.title, genre = event.genre,
                  summary = event.summary.takeUnless { noDescription }, description = event.description.takeUnless { noDescription },

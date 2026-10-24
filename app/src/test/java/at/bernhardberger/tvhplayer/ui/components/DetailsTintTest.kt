@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -88,14 +90,13 @@ class DetailsTintTest {
 
     @After fun close() { releaseSample.complete(Unit) }
 
-    @Test fun artBackgroundAndOpaqueScrimMatchOutsideAndInsideTheHero() {
+    @Test fun theArtsColourScrimsTheFullScreenArt() {
         releaseSample.complete(Unit)
         showPage()
         compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
         compose.mainClock.advanceTimeBy(1000)
-        assertPixel(20, 20, 0xFF190C0C.toInt())
-        // Bottom of the hero is fully opaque, away from the title and action.
-        assertPixel(1800, 850, 0xFF190C0C.toInt())
+        // The bottom-left corner, beyond the scrim's reach from the top right, away from the text.
+        assertNear(20, 1060, Color(0xFF190C0C).copy(alpha = .92f).compositeOver(Color.Red))
     }
 
     @Test fun warmPlaybackKeepsTheThemeBehindTheTransparentPage() {
@@ -103,10 +104,12 @@ class DetailsTintTest {
         assertPixel(20, 20, 0xFF111416.toInt())
     }
 
-    @Test fun absentArtUsesTheStoredPiconAccentInTheFirstFrame() {
+    @Test fun absentArtGlowsWithTheStoredPiconAccent() {
         runBlocking { store.put("tint-test-2", 0x336699) }
         showPage(hasArt = false)
-        assertPixel(20, 20, 0xFF000000.toInt() or detailsTintRgb(0x336699))
+        // Without art the logo's colour glows from the top-right corner, once baked.
+        awaitGlow()
+        assertNear(1919, 0, Color(0xFF336699).copy(alpha = .55f).compositeOver(neutral))
     }
 
     @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
@@ -144,8 +147,9 @@ class DetailsTintTest {
         releaseSample.complete(Unit)
         showPage(hasArt = false)
         compose.waitUntil(10_000) { store["tint-test-2"] != null }
-        compose.mainClock.advanceTimeBy(1000)
-        assertPixel(20, 20, 0xFF000000.toInt() or detailsTintRgb(requireNotNull(store["tint-test-2"])))
+        awaitGlow()
+        assertNear(1919, 0, Color(0xFF000000.toInt() or requireNotNull(store["tint-test-2"])).copy(alpha = .55f)
+            .compositeOver(neutral))
         assertEquals(1, samples.get())
     }
 
@@ -156,7 +160,8 @@ class DetailsTintTest {
         showPage()
         compose.waitUntil(10_000) { samples.get() > 0 }
         compose.mainClock.advanceTimeBy(1000)
-        assertPixel(20, 20, 0xFF000000.toInt() or detailsTintRgb(0x336699))
+        // The scrim over the missing art is the page's own colour.
+        assertNear(20, 20, Color(0xFF000000.toInt() or detailsTintRgb(0x336699)), tolerance = 1)
     }
 
     @Test fun unknownArtStartsNeutralAndCrossfadesToTheSampledTint() {
@@ -242,6 +247,25 @@ class DetailsTintTest {
             }
         }
         compose.waitForIdle()
+    }
+
+    /** The glow is baked off the main thread; until then the page shows its plain background. */
+    private fun awaitGlow() = compose.waitUntil(10_000) { pixel(1919, 0) != neutral.toArgb() }
+
+    private fun pixel(x: Int, y: Int): Int {
+        compose.waitForIdle()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        return bitmap.getPixel(x, y).also { bitmap.recycle() }
+    }
+
+    private fun assertNear(x: Int, y: Int, expected: Color, tolerance: Int = 3) {
+        val pixel = pixel(x, y)
+        val argb = expected.toArgb()
+        for (shift in listOf(16, 8, 0)) {
+            assertEquals("pixel $x,$y ${Integer.toHexString(pixel)}", (argb shr shift and 0xff).toFloat(),
+                (pixel shr shift and 0xff).toFloat(), tolerance.toFloat())
+        }
     }
 
     private fun assertPixel(x: Int, y: Int, expected: Int) {

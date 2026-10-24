@@ -7,6 +7,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
@@ -174,7 +175,13 @@ class ChannelsLayoutCaptureTest {
 
     private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f) {
         fixture.awaitFocus(focus)
-        // The background follows focus after a pause and a fade.
+        // The background follows focus after a pause and a fade; a logo's glow is baked off the
+        // main thread first, and the logo comes with it.
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("channels-logo-glow").fetchSemanticsNodes().isEmpty() ||
+                compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty()
+        }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         val bitmap = draw()

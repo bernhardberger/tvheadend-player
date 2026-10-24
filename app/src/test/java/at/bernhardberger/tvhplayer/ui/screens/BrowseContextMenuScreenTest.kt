@@ -200,7 +200,9 @@ class BrowseContextMenuScreenTest {
                 val bitmap = resumeBitmap()
                 val light = android.graphics.Color.red(bitmap.getPixel(x, y))
                 bitmap.recycle()
-                assertTrue("Hosting details covers browse on frame $frame: $light/$brightest", light < brightest * .4f)
+                // Full-screen art under the scrim reaches about .45 of the heading here; the heading
+                // itself showing through would stay near it.
+                assertTrue("Hosting details covers browse on frame $frame: $light/$brightest", light < brightest * .6f)
             }
         }
         try {

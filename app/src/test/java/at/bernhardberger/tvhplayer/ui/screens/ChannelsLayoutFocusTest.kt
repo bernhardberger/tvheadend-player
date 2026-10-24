@@ -404,6 +404,8 @@ class ChannelsLayoutFocusTest {
     @Test fun openingTheDrawerMovesTheRowAndTheLogoWhileTheRowStillReachesTheScreenEdge() {
         fixture.show(immersive.toggledProgramArt())
         fixture.awaitFocus(card(1))
+        // The logo comes with its glow, which is baked off the main thread.
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         val logo = compose.onNodeWithTag("channels-immersive-picon").getUnclippedBoundsInRoot().left
@@ -471,14 +473,15 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(card(1))
         compose.onNodeWithTag("channels-immersive-art").assertExists()
         compose.onNodeWithTag("channels-immersive-subtitle").assertTextEquals("Winter on the ridge")
-        // The picture brings its colour; without one the logo brings its own.
+        // The picture brings its colour; without one the logo's colour glows instead.
         compose.onNodeWithTag("channels-backdrop").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
-        compose.onNodeWithTag("channels-backdrop").assertExists()
+        compose.onNodeWithTag("channels-logo-glow").assertExists()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
         compose.onNodeWithTag("channels-immersive-title").assertTextEquals("No program information")
         // Without programme lines the title still sits on the row instead of leaving a gap.
@@ -506,6 +509,7 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-immersive-art").assertExists()
         repeat(7) { fixture.key(Key.DirectionRight) }
         fixture.awaitFocus(card(8))
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty() }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
@@ -520,6 +524,23 @@ class ChannelsLayoutFocusTest {
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
+    }
+
+    @Test fun gridAndListDrawNoBackdrop() {
+        fixture.show(grid, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)))
+        fixture.awaitFocus(card(1))
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
+        fixture.channelsView = list
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
+        compose.onNodeWithTag("channels-backdrop").assertDoesNotExist()
+        fixture.channelsView = immersive
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        compose.onNodeWithTag("channels-immersive-background").assertExists()
     }
 
     @Test fun immersiveBackgroundDrawsNothingOverWarmPlayback() {

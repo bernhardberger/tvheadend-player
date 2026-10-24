@@ -660,21 +660,21 @@ internal fun ChannelsScreenContent(
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (showProgrammeDetails) 1f else 0f) },
     ) {
         // Behind the header from the screen's top: it follows focus across groups, while the
-        // group's content fades on its own. The grid and list sit on the details page's blurred
-        // backdrop, matching what the cards show.
-        if (channels.isNotEmpty()) ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
-            ChannelsImmersiveBackground(
-                corner = layout == ChannelsLayout.IMMERSIVE,
-                programArt = view.showsProgramArt,
-                // The shown channel follows focus after a delay; it may still be the previous group's.
-                channels = channelScope.allChannels,
-                channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
-                observation = observation,
-                nowSec = { nowSec },
-                logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
-                endInset = detailPanePadding.calculateEndPadding(layoutDirection),
-                modifier = Modifier.fillMaxSize(),
-            )
+        // group's content fades on its own. The grid and list sit on the plain page background.
+        if (channels.isNotEmpty() && layout == ChannelsLayout.IMMERSIVE) {
+            ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
+                ChannelsImmersiveBackground(
+                    programArt = view.showsProgramArt,
+                    // The shown channel follows focus after a delay; it may still be the previous group's.
+                    channels = channelScope.allChannels,
+                    channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
+                    observation = observation,
+                    nowSec = { nowSec },
+                    logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
+                    endInset = detailPanePadding.calculateEndPadding(layoutDirection),
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
         Column(
             Modifier

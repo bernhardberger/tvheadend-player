@@ -3,36 +3,29 @@ package at.bernhardberger.tvhplayer.images
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
-import android.graphics.PorterDuff
 import coil3.size.Size
 import coil3.size.pxOrElse
 import coil3.transform.Transformation
 import kotlin.math.roundToInt
 
 /**
- * A blurred, dimmed backdrop baked into a small picture once per decode: cropped to the request's
- * shape, [width] pixels wide, three box-blur passes of [radius] and black at [dimAlpha] on top.
- * Drawn stretched to the screen it reads like a live blur without the GPU repeating one on every
- * frame. With [fit], a logo is fitted into that share of the frame instead and keeps its
- * transparency, so the backdrop's colour shows around it. A picture darker than usual is dimmed
- * less, down to [minDimAlpha], so it ends about as bright as an ordinary one rather than black.
+ * A blurred backdrop baked into a small picture once per decode: cropped to the request's shape,
+ * [width] pixels wide, three box-blur passes of [radius]. Drawn stretched to the screen it reads
+ * like a live blur without the GPU repeating one on every frame. It keeps the picture's brightness,
+ * so it can stand in for the sharp picture under the same scrim.
  */
 internal class BackdropTransformation(
     private val width: Int,
     private val radius: Int,
-    private val dimAlpha: Float,
-    private val fit: Float? = null,
-    private val minDimAlpha: Float = dimAlpha,
 ) : Transformation() {
-    override val cacheKey: String = "backdrop($width;$radius;$dimAlpha;$fit;$minDimAlpha)"
+    override val cacheKey: String = "backdrop($width;$radius)"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val aspect = size.height.pxOrElse { input.height }.toFloat() / size.width.pxOrElse { input.width }
         val height = (width * aspect).roundToInt().coerceAtLeast(1)
         val output = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(output)
-        val scale = fit?.let { minOf(width / input.width.toFloat(), height / input.height.toFloat()) * it }
-            ?: maxOf(width / input.width.toFloat(), height / input.height.toFloat())
+        val scale = maxOf(width / input.width.toFloat(), height / input.height.toFloat())
         canvas.save()
         canvas.translate((width - input.width * scale) / 2f, (height - input.height * scale) / 2f)
         canvas.scale(scale, scale)
@@ -47,25 +40,11 @@ internal class BackdropTransformation(
         }
         premultiply(pixels, unpremultiply = true)
         output.setPixels(pixels, 0, width, 0, 0, width, height)
-        val dim = if (minDimAlpha >= dimAlpha) dimAlpha
-            else (1f - OrdinaryPictureLuma * (1f - dimAlpha) / meanLuma(pixels)).coerceIn(minDimAlpha, dimAlpha)
-        // Only over what was drawn: a logo's transparent surroundings stay clear.
-        canvas.drawColor(android.graphics.Color.argb((dim * 255).roundToInt(), 0, 0, 0), PorterDuff.Mode.SRC_ATOP)
         return output
     }
 }
 
-/** An ordinary picture's mean brightness: [dimAlpha] darkens it to the brightness a darker one is lifted towards. */
-private const val OrdinaryPictureLuma = 0.4f
-
-/** The mean of the pixels' encoded luma, 0 to 1. */
-private fun meanLuma(pixels: IntArray): Float {
-    var sum = 0L
-    for (p in pixels) sum += 299L * (p shr 16 and 0xff) + 587L * (p shr 8 and 0xff) + 114L * (p and 0xff)
-    return sum / (pixels.size * 255_000f)
-}
-
-/** Blurs colour weighted by coverage, so transparent pixels don't bleed black into a logo's edges. */
+/** Blurs colour weighted by coverage, so transparent pixels don't bleed black into a picture's edges. */
 private fun premultiply(pixels: IntArray, unpremultiply: Boolean) {
     for (i in pixels.indices) {
         val p = pixels[i]

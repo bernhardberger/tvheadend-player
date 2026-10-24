@@ -32,6 +32,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.key.*
@@ -261,12 +262,16 @@ internal fun ProgrammeDetailsPage(
     }
     val warmPlayback = LocalWarmPlayback.current
     val art = (event?.image ?: recording?.image).takeUnless { warmPlayback }
-    val background = rememberDetailsTint(art, channel?.icon.takeUnless { warmPlayback })
+    val picon = channel?.icon.takeUnless { warmPlayback }
+    // The picture's colour, or the logo's should the picture fail. Without a picture the logo's
+    // colour glows over the page instead, opaque in itself.
+    val background = rememberDetailsTint(art, picon.takeIf { art != null })
+    val glowChannel = channel?.id?.takeIf { art == null && picon != null }
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
         Box(Modifier.browseDetailsViewport().then(modifier).fillMaxSize()
              .graphicsLayer { this.alpha = alpha.value }
              // Warm playback remains transparent to the shell's video and scrim.
-             .drawBehind { if (!warmPlayback) drawRect(background.value) }
+             .drawBehind { if (!warmPlayback && glowChannel == null) drawRect(background.value) }
             .semantics { paneTitle = title }.testTag("programme-details-page")
             .focusProperties { onExit = { if (backEnabled) cancelFocusChange() } }
             .onSizeChanged { viewport = it.height }
@@ -312,16 +317,20 @@ internal fun ProgrammeDetailsPage(
             }.focusable() else Modifier.focusGroup())) {
             val backdrop: () -> Float = { maxOf(sectionPosition.value.coerceIn(0f, 1f), readingProgress.value) }
             // With warm playback the live video is the background, so the page draws no art.
-            // Scrolled away (or reading), the still corner art crossfades into the full-screen
-            // blurred backdrop, like Google TV; no zoom.
-            val picon = channel?.icon.takeUnless { warmPlayback }
-            if (art == null && picon != null) DetailsHeroLogo(picon,
-                Modifier.align(Alignment.TopEnd).padding(top = DetailsSafeEdge, end = DetailsKeyline)
-                    .graphicsLayer { this.alpha = 1f - backdrop() }.testTag("details-hero-logo"))
-            else DetailsHero(art,
-                Modifier.align(Alignment.TopEnd).graphicsLayer { this.alpha = 1f - backdrop() }, background = background)
-            DetailsHero(art,
-                Modifier.graphicsLayer { this.alpha = backdrop() }, blurred = true, picon = picon)
+            // Scrolled away (or reading), the picture blurs in place, like Google TV; no zoom.
+            // Without one the logo scrolls away with the page, like the photo on Google TV's actor
+            // page, and the glow gives way to an even tint of its colour; the reader replaces the
+            // page, so the logo fades with it.
+            if (art != null) DetailsBackdrop(art, background, backdrop)
+            else if (glowChannel != null) {
+                ChannelLogoGlow(picon, glowChannel, Modifier.testTag("details-logo-glow"), scrolled = backdrop)
+                DetailsHeroLogo(picon,
+                    Modifier.align(Alignment.TopEnd).padding(top = DetailsSafeEdge, end = DetailsKeyline)
+                        .graphicsLayer {
+                            translationY = -pageScroll.value.toFloat()
+                            this.alpha = 1f - readingProgress.value
+                        }.testTag("details-hero-logo"))
+            }
             readingTransition.AnimatedContent(transitionSpec = {
                 (fadeIn(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard)) togetherWith
                     fadeOut(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard))).using(null)
@@ -358,7 +367,7 @@ internal fun ProgrammeDetailsPage(
                         if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { emphasis(DetailsSection.ACTIONS) }) {
-                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec) {
+                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec, besideLogo = glowChannel != null) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
                                 Text(text, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
@@ -679,78 +688,90 @@ private fun AiringCard(
 
 // Native 1.1 focus scale on a 220dp card adds ~6dp below it, plus the outline.
 private val AiringTextGap = 16.dp
-private const val DetailsBlurredScrimAlpha = 0.6f
-// A dark picture is dimmed less, so its backdrop doesn't turn black.
-private const val DetailsBlurredMinScrimAlpha = 0.4f
-// The backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three passes of
-// radius 3 there match the former 32dp live blur on a 1080p screen.
+// The blurred backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three
+// passes of radius 3 there match the former 32dp live blur on a 1080p screen.
 private val DetailsBackdropDecodeSize = 320 to 180
 private const val DetailsBackdropWidth = 160
 private const val DetailsBackdropBlurRadius = 3
-// A logo standing in for the art fills this share of the backdrop, like the list preview's logo.
-// Its hard shapes would stretch into visible steps from the art's small blur, so it is baked at
-// the full decode width and spread far wider into a glow.
-private const val DetailsBackdropLogoFit = 0.8f
-private const val DetailsBackdropLogoScrimAlpha = 0.35f
-private const val DetailsBackdropLogoWidth = 320
-private const val DetailsBackdropLogoBlurRadius = 20
 private val DetailsHeroLogoSize = 240.dp to 135.dp
+private val DetailsTitleLogoGap = 32.dp
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f
 
 /**
- * The kit's immersive background: top-right 16:9 art under [KitCinematicScrim], or a blurred
- * full-screen copy. Without art the blurred copy is of the channel's [picon], centred on the
- * backdrop's colour beneath; the corner takes [DetailsHeroLogo] instead. [onSettled] reports
- * once the picture has loaded or failed, or at once when there is none.
+ * The programme picture over the whole page, as Google TV's details page has it: sharp at the
+ * top under [detailsScrim] in the page's [background] colour, and as the page scrolls or reads
+ * ([blur]) the same picture blurred under an even dim of that colour instead. The blur
+ * is baked into a small decode, which stretches smoothly, instead of blurred by the GPU on every
+ * frame. Until the picture loads the page's colour beneath shows through.
+ */
+@Composable
+private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -> Float) {
+    val session = LocalArtworkContext.current.currentSession ?: return
+    val context = LocalPlatformContext.current
+    val source = remember(session, art) { AppArtworkSource(session, art) }
+    val blurred = remember(source, context) {
+        ImageRequest.Builder(context).data(source)
+            .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
+            .transformations(BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius))
+            .build()
+    }
+    // Scrolled, Google TV trades the scrim for an even dim: the rows then run across the whole width.
+    Box(Modifier.fillMaxSize()
+        .drawWithContent {
+            drawContent()
+            drawRect(background.value, alpha = blur() * DetailsScrolledDimAlpha)
+        }
+        .unditheredGradient(over = true, alpha = { 1f - blur() }) { size -> detailsScrim(background.value, size) }) {
+        // The blur fades in over the sharp picture, which goes once it is covered.
+        AsyncImage(source, null, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = if (blur() < 1f) 1f else 0f }
+                .testTag("details-hero"))
+        AsyncImage(blurred, null, contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = blur() }.testTag("details-hero-blurred"))
+    }
+}
+
+/**
+ * The details backdrop's scrim, after Google TV's details page: the page's [color] reaching out
+ * from the top-right corner, nearly clear there and dark across the text on the left and the
+ * rows at the bottom.
+ */
+private fun detailsScrim(color: Color, size: androidx.compose.ui.geometry.Size): Shader {
+    val colors = IntArray(DetailsScrimAlphas.size) { color.copy(alpha = DetailsScrimAlphas[it]).toArgb() }
+    return android.graphics.RadialGradient(0f, 0f, 1f, colors, DetailsScrimStops,
+        android.graphics.Shader.TileMode.CLAMP).apply {
+        setLocalMatrix(android.graphics.Matrix().apply {
+            setScale(size.width * DetailsScrimReachX, size.height * DetailsScrimReachY)
+            postTranslate(size.width, 0f)
+        })
+    }
+}
+
+/** The scrim's reach from the top-right corner, as shares of the width and the height. */
+private const val DetailsScrimReachX = 1f
+private const val DetailsScrimReachY = 1.2f
+private val DetailsScrimStops = floatArrayOf(0f, .3f, .55f, .8f, 1f)
+private val DetailsScrimAlphas = floatArrayOf(.05f, .2f, .6f, .85f, .92f)
+/** Google TV's scrolled details page measured about 0.6 of the sharp art's brightness. */
+private const val DetailsScrolledDimAlpha = .4f
+
+/**
+ * The kit's immersive background: top-right 16:9 art under [KitCinematicScrim] in the
+ * [background] colour. [onSettled] reports once the picture has loaded or failed, or at once
+ * when there is none.
  */
 @Composable
 internal fun DetailsHero(
     image: ArtworkId?,
     modifier: Modifier,
-    blurred: Boolean = false,
     background: State<Color>? = null,
-    picon: ArtworkId? = null,
-    onLoaded: (() -> Unit)? = null,
     onSettled: (() -> Unit)? = null,
 ) {
-    val artwork = LocalArtworkContext.current
-    val session = artwork.currentSession
-    val logo by remember(artwork, picon) { derivedStateOf { picon?.let(artwork::logo) } }
-    // Art needs the session; the blurred logo shows its saved copy before one, as the logos do.
-    val source = when {
-        image != null -> session?.let { AppArtworkSource(it, image) }
-        blurred -> logo?.takeIf { it.currentSession != null || it.saved != null }
-        else -> null
-    }
+    val session = LocalArtworkContext.current.currentSession
+    val source = image?.let { session?.let { AppArtworkSource(it, image) } }
     if (source == null) {
         if (onSettled != null) LaunchedEffect(Unit) { onSettled() }
-        return
-    }
-    if (blurred) {
-        // Full screen: the blur only reads as a backdrop when it covers the page. It is baked into
-        // a small decode, which stretches smoothly, instead of blurred by the GPU on every frame.
-        val context = LocalPlatformContext.current
-        val request = remember(source, image == null, context) {
-            ImageRequest.Builder(context).data(source)
-                .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
-                .transformations(if (image != null) {
-                    BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius, DetailsBlurredScrimAlpha,
-                        minDimAlpha = DetailsBlurredMinScrimAlpha)
-                } else {
-                    BackdropTransformation(DetailsBackdropLogoWidth, DetailsBackdropLogoBlurRadius,
-                        DetailsBackdropLogoScrimAlpha, fit = DetailsBackdropLogoFit)
-                })
-                .build()
-        }
-        // A logo leaves the colour beneath showing, so only art counts as covering the page.
-        AsyncImage(request, null, contentScale = ContentScale.Crop,
-            modifier = modifier.fillMaxSize().testTag(if (image != null) "details-hero-blurred" else "details-hero-blurred-logo"),
-            onSuccess = {
-                if (image != null) onLoaded?.invoke()
-                onSettled?.invoke()
-            },
-            onError = { onSettled?.invoke() })
         return
     }
     val neutral = MaterialTheme.colorScheme.background
@@ -901,9 +922,11 @@ internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resource
 private fun DetailsInformation(
     event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?,
     channel: Channel?, nowSec: Long,
+    besideLogo: Boolean,
     synopsis: @Composable () -> Unit,
 ) {
     // Only the title spans the page; the remaining information keeps its narrow text column.
+    // Beside the corner logo the title stops short of it and takes a second line instead.
     Column(Modifier.fillMaxWidth().testTag("details-information")) {
         ProgrammeEyebrow(channel?.icon, channelTitleText(channel?.number, channel?.name.orEmpty()),
             Modifier.widthIn(max = 470.dp)) {
@@ -914,8 +937,12 @@ private fun DetailsInformation(
             } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusBadge(it) }
         }
         Spacer(Modifier.height(8.dp))
-        Text(event?.title ?: recording?.title.orEmpty(), Modifier.fillMaxWidth().testTag("details-title"),
-            style = MaterialTheme.typography.displaySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(event?.title ?: recording?.title.orEmpty(),
+            Modifier.fillMaxWidth()
+                .then(if (besideLogo) Modifier.padding(end = DetailsHeroLogoSize.first + DetailsTitleLogoGap) else Modifier)
+                .testTag("details-title"),
+            style = MaterialTheme.typography.displaySmall, maxLines = if (besideLogo) 2 else 1,
+            overflow = TextOverflow.Ellipsis)
         val subtitle = (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)
         subtitle?.let {
             Spacer(Modifier.height(4.dp))

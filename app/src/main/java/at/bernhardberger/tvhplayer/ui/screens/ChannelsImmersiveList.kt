@@ -93,6 +93,7 @@ import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.components.ChannelLogoGlow
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
@@ -143,13 +144,12 @@ private val ImmersiveFallbackLogoTop = 24.dp
 private val ImmersiveHeroWidth = 480.dp
 
 /**
- * Background of the Channels screen for the focused channel. In the [corner], as the kit's immersive
- * list has it: the programme picture at the screen's top end under the kit's cinematic scrim, on
- * the picture's colour, or else the logo below the header ([logoTop]) on the logo's colour.
- * Otherwise the details page's backdrop: the picture, or else the logo, blurred over the whole
- * screen on its colour. Without [programArt] the logo stands in either way, matching cards that
- * show logos. It reaches under the closed rail, beneath the shell's gradient. Warm playback keeps
- * the video as the background, so nothing is drawn.
+ * Background of the immersive Channels list for the focused channel, as the kit's immersive list
+ * has it: the programme picture at the screen's top end under the kit's cinematic scrim, on the
+ * picture's colour, or else the logo below the header ([logoTop]) on the glow of its colour.
+ * Without [programArt] the logo stands in, matching cards that show logos. It reaches under the
+ * closed rail, beneath the shell's gradient. Warm playback keeps the video as the background, so
+ * nothing is drawn.
  */
 @Composable
 internal fun ChannelsImmersiveBackground(
@@ -160,7 +160,6 @@ internal fun ChannelsImmersiveBackground(
     logoTop: Dp,
     endInset: Dp,
     modifier: Modifier = Modifier,
-    corner: Boolean = true,
     programArt: Boolean = true,
 ) {
     if (LocalWarmPlayback.current) return
@@ -176,51 +175,34 @@ internal fun ChannelsImmersiveBackground(
             val icon = channels.firstOrNull { it.id == id }?.icon
             ChannelBackdrop(id, art, logo = session || icon?.let { artwork.logo(it).saved } != null)
         },
-        // The art in the corner leaves the rest clear, so the gradient is kept off its holes;
-        // full-screen backdrops are opaque and take it directly.
-        modifier.browseScreenBackdrop()
-            .then(if (corner) Modifier.underBrowseShellScrim() else Modifier)
-            .testTag("channels-immersive-background"),
+        // The art in the corner leaves the rest clear, so the gradient is kept off its holes.
+        modifier.browseScreenBackdrop().underBrowseShellScrim().testTag("channels-immersive-background"),
         onReveal = { revealed = it },
     ) { shown, onReady ->
         val channel = channels.firstOrNull { it.id == shown.channel }
-        // Without a session or a saved logo neither colour nor blur can load; the plain background stays.
+        // Without a session or a saved logo neither colour nor picture can load; the plain background stays.
         if (channel == null || !shown.logo) {
             LaunchedEffect(Unit) { onReady() }
             return@FocusBackdrop
         }
         val art = shown.art
+        if (art == null) {
+            // The logo's colour glows from the top right, as on the details page, under the sharp logo.
+            ChannelLogoGlow(channel.icon, channel.id, Modifier.testTag("channels-logo-glow"), onSettled = onReady)
+            return@FocusBackdrop
+        }
         // Shown once both its colour and its picture are known, so no step of either is seen.
         var tintSettled by remember { mutableStateOf(false) }
         var pictureSettled by remember { mutableStateOf(false) }
         if (tintSettled && pictureSettled) LaunchedEffect(Unit) { onReady() }
-        if (!corner) {
-            val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })
-            // Once the opaque art shows, the tint beneath it would only cost another full-screen fill.
-            var artShown by remember(art) { mutableStateOf(false) }
-            Box(
-                Modifier.fillMaxSize().underBrowseShellScrim(opaque = true)
-                    .drawBehind { if (!artShown) drawRect(tint.value) }.testTag("channels-backdrop"),
-            ) {
-                DetailsHero(art, Modifier, blurred = true, picon = channel.icon, onLoaded = { artShown = true },
-                    onSettled = { pictureSettled = true })
-            }
-            return@FocusBackdrop
-        }
         Box(Modifier.fillMaxSize()) {
-            // The picture's colour, or else the logo's, fills the screen, as on the details page.
+            // The picture's colour fills the screen, as on the details page.
             val tint = rememberDetailsTint(art, channel.icon, onSettled = { tintSettled = true })
             Box(Modifier.fillMaxSize().drawBehind { drawRect(tint.value) }.testTag("channels-backdrop"))
-            if (art != null) {
-                DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"), background = tint,
-                    onSettled = { pictureSettled = true })
-            } else {
-                // The logo blurred over the screen, as the grid's backdrop has it, under the sharp one.
-                DetailsHero(null, Modifier, blurred = true, picon = channel.icon, onSettled = { pictureSettled = true })
-            }
+            DetailsHero(art, Modifier.align(Alignment.TopEnd).testTag("channels-immersive-art"), background = tint,
+                onSettled = { pictureSettled = true })
         }
     }
-    if (!corner) return
     // The sharp logo belongs to the content: it moves with it as the drawer opens, while the
     // backdrop beneath stays put. It comes and changes as the backdrop fades in, which also
     // waits for the logo to be there.
