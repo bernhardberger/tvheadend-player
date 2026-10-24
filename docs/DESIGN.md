@@ -531,7 +531,7 @@ tuner loss and interruption are failures, limit expiry is informational.
   coordinates or imply seekability that is not verified.
 - **Browse list edges** (accepted 2026-10-23, after the TV Design Kit's Cards
   example). The Channels list, Recordings Archive (active, preview and parent
-  columns), Schedule and Problems lists and Settings depth lists run to the
+  columns), Continue watching, Schedule and Problems lists and Settings depth lists run to the
   screen bottom. While rows continue below, the list fades out over its bottom
   140dp; while rows have scrolled away above, a 48dp top fade appears. Focus
   never settles in either fade: the TV pivot works inside the band between them,
@@ -695,8 +695,13 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   with enlarged text). This does not change the three-hour acquisition window
   or the existing history/future availability policy.
 - Recordings uses native growing rows, with date/duration/status below titles.
-  Archive, Schedule and Problems remain separate; Schedule and Problems are flat
-  lists with full-row native focus clearance. Reserve trailing layout space so
+  Archive, Continue watching, Schedule and Problems remain separate tabs in that
+  order; the last three are flat lists with full-row native focus clearance.
+  Continue watching (accepted 2026-10-24) lists every recording that offers a
+  position to resume, across folders, newest recording first: Tvheadend keeps a
+  play position and count but no time of viewing. The tab stays when the list is
+  empty and says so. It is activity, not storage, so it is a tab rather than a
+  folder in the Archive. Reserve trailing layout space so
   the complete focused shape remains at least 48dp from the physical screen edge;
   an unclipped shape alone is not sufficient. Preserve larger caller safe insets.
 - Archive shares Settings' depth owner, geometry, motion and parent restoration.

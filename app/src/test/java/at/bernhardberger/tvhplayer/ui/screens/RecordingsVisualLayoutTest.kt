@@ -47,6 +47,7 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import org.junit.After
@@ -271,6 +272,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionRight)
+        key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
@@ -316,6 +318,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionRight)
+        key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-40")
@@ -343,6 +346,7 @@ class RecordingsVisualLayoutTest {
         focused("recordings-folder-Documentaries")
         assertEquals(860f, bounds("recordings-header").right, .1f)
         key(Key.DirectionUp)
+        key(Key.DirectionRight)
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
@@ -443,6 +447,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         key(Key.DirectionRight)
+        key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-30")
@@ -538,6 +543,7 @@ class RecordingsVisualLayoutTest {
         compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
         key(Key.DirectionUp)
         key(Key.DirectionRight)
+        key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-30")
@@ -572,7 +578,7 @@ class RecordingsVisualLayoutTest {
             compose.onRoot().performKeyInput { pressKey(Key(android.view.KeyEvent.KEYCODE_CHANNEL_DOWN)) }
             compose.mainClock.advanceTimeBy(64)
             compose.onNodeWithText("Archive").requestFocus()
-            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionDown) }
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionRight); pressKey(Key.DirectionRight); pressKey(Key.DirectionDown) }
             compose.mainClock.advanceTimeBy(256)
             val saved = compose.runOnIdle { screenState.archiveNavigation.stack.active }
             compose.mainClock.advanceTimeBy(1_200)
@@ -592,6 +598,8 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("No recordings are available.").assertIsDisplayed()
         capture("empty-archive", 1f)
         key(Key.DirectionRight)
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        key(Key.DirectionRight)
         compose.onNodeWithText("Schedule").assertIsFocused()
         key(Key.DirectionDown)
         compose.onNodeWithText("Schedule").assertIsFocused()
@@ -607,7 +615,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionRight)
-        compose.onNodeWithText("Schedule").assertIsFocused()
+        compose.onNodeWithText("Continue watching").assertIsFocused()
         key(Key.DirectionLeft)
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionDown)
@@ -925,6 +933,46 @@ class RecordingsVisualLayoutTest {
         capture("archive-folder-delete", 1f)
     }
 
+    @Test fun continueWatchingListsOnlyPartlyWatchedRecordingsNewestFirst() {
+        show(entries = listOf(
+            recording(1, "Older half", "Series/older.ts", startEpochSeconds = 1_790_000_000),
+            recording(2, "Seen", "Series/seen.ts", playCount = 3),
+            recording(3, "New", "Series/new.ts"),
+            recording(4, "Newer half", "Films/newer.ts", startEpochSeconds = 1_790_500_000, playPosition = 600.seconds),
+        ))
+        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        key(Key.DirectionDown)
+        // One flat list across folders, the newest recording first, each with its partly watched mark.
+        focused("recording-list-entry-4")
+        assertWatchMark(4, "Partly watched")
+        assertFullWidthFocusInside("recordings-continue-list", 4L)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-1")
+        assertWatchMark(1, "Partly watched")
+        listOf(2, 3).forEach { compose.onNodeWithTag("recording-list-entry-$it").assertDoesNotExist() }
+        capture("continue", 1f)
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        assertNoCommands()
+    }
+
+    @Test fun continueWatchingSaysSoWhenNothingIsPartlyWatched() {
+        show(entries = listOf(recording(2, "Seen", "seen.ts", playCount = 3), recording(3, "New", "new.ts")))
+        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("No recordings to continue.").assertIsDisplayed()
+        // Without rows Down has nowhere to go, so the tab keeps focus.
+        key(Key.DirectionDown)
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        capture("continue-empty", 1f)
+        assertNoCommands()
+    }
+
     @Test fun watchMarksEndTheTitleLineAndThePaneSaysWatchedNotACount() {
         show(entries = listOf(
             recording(1, "Half seen", "half.ts"),
@@ -1036,7 +1084,8 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,
-        startEpochSeconds: Long = 1_791_000_000 - id * 86400, recordedMinutes: Long? = null, playCount: Long? = null) =
+        startEpochSeconds: Long = 1_791_000_000 - id * 86400, recordedMinutes: Long? = null, playCount: Long? = null,
+        playPosition: Duration? = if (id == 1L) 3723.seconds else null) =
         DvrEntry.create(
             id = DvrEntryId(id), title = title, state = state,
             folder = path?.split('/')?.filter(String::isNotEmpty)?.dropLast(1),
@@ -1051,7 +1100,7 @@ class RecordingsVisualLayoutTest {
             subtitle = if (id == 1L) "A winter expedition beyond the Arctic Circle" else null,
             description = "Follow a small team of naturalists through remote landscapes as they explore " +
                 "the changing seasons, meet local communities and discover wildlife at the edge of the world.",
-            playPosition = if (id == 1L) 3723.seconds else null,
+            playPosition = playPosition,
             playCount = playCount,
         )
 

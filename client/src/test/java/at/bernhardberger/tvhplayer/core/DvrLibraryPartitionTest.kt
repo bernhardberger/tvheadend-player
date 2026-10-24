@@ -4,6 +4,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import java.time.ZoneOffset
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
 import org.junit.Test
@@ -37,5 +39,17 @@ class DvrLibraryPartitionTest {
 
         assertEquals(listOf(missed, failed), groups[DvrProblemBucket.FAILED])
         assertEquals(listOf(invalid), groups[DvrProblemBucket.CANCELLED])
+    }
+
+    @Test fun continueWatchingListsWhatOffersAPositionNewestRecordingFirst() {
+        val older = entry(1, DvrEntryState.COMPLETED, 100)
+        val unwatched = entry(2, DvrEntryState.COMPLETED, 400)
+        val newer = entry(3, DvrEntryState.COMPLETED, 300)
+        val running = entry(4, DvrEntryState.RECORDING, 500)
+        val positions = mapOf<Long, Duration>(1L to 5.minutes, 2L to Duration.ZERO, 3L to 20.minutes, 4L to 1.minutes)
+
+        val list = continueWatching(listOf(older, unwatched, newer, running)) { positions[it.id.value] }
+
+        assertEquals(listOf(running, newer, older), list)
     }
 }
