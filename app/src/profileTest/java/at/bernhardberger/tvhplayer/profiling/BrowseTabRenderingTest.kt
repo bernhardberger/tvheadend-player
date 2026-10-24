@@ -76,7 +76,7 @@ class BrowseTabRenderingTest {
         compose.waitUntilAtLeastOneExists(hasText("All channels"), 15_000)
         var tag by mutableStateOf<ChannelTagId?>(null)
         var mode by mutableStateOf(DvrLibraryMode.ARCHIVE)
-        val labels = if (recordings) listOf("Archive", "Schedule", "Problems") else listOf("All channels", "News", "Sports")
+        val labels = if (recordings) listOf("Archive", "Continue watching", "Schedule", "Problems") else listOf("All channels", "News", "Sports")
         val prefix = if (recordings) "recordings" else "channels-guide"
         val initial = FocusRequester()
         compose.activityRule.scenario.onActivity { activity ->

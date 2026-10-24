@@ -973,6 +973,44 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun continueRowsThatStopOfferingAPositionHandFocusOnBeforeTheyGo() {
+        val older = recording(1, "Older half", "Series/older.ts", startEpochSeconds = 1_790_000_000)
+        val newer = recording(4, "Newer half", "Films/newer.ts", startEpochSeconds = 1_790_500_000, playPosition = 600.seconds)
+        show(entries = listOf(older, newer))
+        compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-4")
+        // Watched to the end elsewhere: the snapshot drops its position and focus moves on to the next row.
+        val watched = listOf(older, recording(4, "Newer half", "Films/newer.ts", startEpochSeconds = 1_790_500_000,
+            playCount = 1))
+        publish(watched)
+        focused("recording-list-entry-1")
+        // Same snapshot, but the session no longer offers positions: the last row leaves and the tab
+        // takes focus before it goes, so no frame is left without a focused node.
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle {
+                session.publish(session.observation.value.let {
+                    SessionObservation.create(it.sessionState, it.channelState, it.epgState, it.dvrState,
+                        recordingProgressCapability = RecordingProgressCapability.UNSUPPORTED)
+                })
+            }
+            repeat(20) { frame ->
+                compose.mainClock.advanceTimeByFrame()
+                assertTrue("Focus was vacant at frame $frame",
+                    compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty())
+            }
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitForIdle()
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        compose.onNodeWithText("No recordings to continue.").assertIsDisplayed()
+        assertNoCommands()
+    }
+
     @Test fun watchMarksEndTheTitleLineAndThePaneSaysWatchedNotACount() {
         show(entries = listOf(
             recording(1, "Half seen", "half.ts"),
@@ -1006,12 +1044,12 @@ class RecordingsVisualLayoutTest {
             useUnmergedTree = true).assertIsDisplayed()
     }
 
-    private fun publish(entries: List<DvrEntry>) {
+    private fun publish(entries: List<DvrEntry>, progress: RecordingProgressCapability? = null) {
         compose.runOnIdle {
             session.publish(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
                     DvrRepositoryState.Current(DvrSnapshot.create(entries)),
-                    recordingProgressCapability = it.recordingProgressCapability)
+                    recordingProgressCapability = progress ?: it.recordingProgressCapability)
             })
         }
         compose.waitForIdle()

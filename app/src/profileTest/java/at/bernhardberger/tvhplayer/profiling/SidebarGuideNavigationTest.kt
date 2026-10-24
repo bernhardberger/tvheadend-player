@@ -74,7 +74,7 @@ class SidebarGuideNavigationTest {
         assertTabBodyMoves(
             compose.onNodeWithText(compose.activity.getString(at.bernhardberger.tvhplayer.R.string.recordings_empty)),
             compose.onNodeWithTag("recordings-header"),
-            "Schedule",
+            "Continue watching",
         )
     }
 

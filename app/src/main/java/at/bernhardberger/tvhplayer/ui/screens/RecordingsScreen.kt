@@ -284,6 +284,8 @@ internal fun RecordingsScreenContent(
     var retainedPreparation by remember(preparationAuthority) {
         mutableStateOf<PreparedBrowseData<DvrSnapshot?, RecordingLibraryPresentation>?>(null)
     }
+    // Continue membership also follows admission, so its last shown list is retained apart from the snapshot.
+    var retainedContinue by remember(preparationAuthority) { mutableStateOf<List<DvrEntry>?>(null) }
     val channels = observation.channelCatalogForDisplay?.channels.orEmpty()
     val channelsById = remember(channels) { channels.associateBy { it.id } }
     val scope = rememberCoroutineScope()
@@ -404,13 +406,17 @@ internal fun RecordingsScreenContent(
     val resumePositionFor: (DvrEntry) -> Duration? = {
         at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
     }
+    // Partly watched is what the session offers to resume, so the list follows the observation, not the snapshot alone.
+    val observedContinue = remember(observedEntries, observation) { continueWatching(observedEntries, resumePositionFor) }
+    val shownContinue = retainedContinue ?: observedContinue
     val observedKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> requireNotNull(archiveLevelItems(observedArchive, reconciledArchiveStack.active.levelId)).map { it.key }
-        DvrLibraryMode.CONTINUE -> continueWatching(observedEntries, resumePositionFor).map { "recording:${recordingItemKey(it.id)}" }
+        DvrLibraryMode.CONTINUE -> observedContinue.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.SCHEDULE -> observedLibrary.schedule.map { "recording:${recordingItemKey(it.id)}" }
         DvrLibraryMode.PROBLEMS -> observedLibrary.problems.map { "recording:${recordingItemKey(it.id)}" }
     }
-    val removalHandoff = contentFocusOwned && retainedEntries != observedEntries &&
+    val removalHandoff = contentFocusOwned &&
+        (retainedEntries != observedEntries || (mode == DvrLibraryMode.CONTINUE && shownContinue != observedContinue)) &&
         ((if (mode == DvrLibraryMode.ARCHIVE) archiveNavigation.stack.active.focusedItemId
             else selectedKeys[location])?.let { it !in observedKeys } == true ||
             (mode == DvrLibraryMode.ARCHIVE && reconciledArchiveStack.active.levelId != archiveLevel))
@@ -421,8 +427,7 @@ internal fun RecordingsScreenContent(
     val archiveItems = remember(archive, archiveLevel) { archiveLevelItems(archive, archiveLevel) ?: archive.listItems() }
     val scheduleGroups = presentation.schedule
     val problemGroups = presentation.problems
-    // Partly watched is what the session offers to resume, so the list follows the observation, not the snapshot alone.
-    val continueEntries = remember(entries, observation) { continueWatching(entries, resumePositionFor) }
+    val continueEntries = if (removalHandoff) shownContinue else observedContinue
     val itemKeys = when (mode) {
         DvrLibraryMode.ARCHIVE -> archiveItems.map { it.key }
         DvrLibraryMode.CONTINUE -> continueEntries.map { "recording:${recordingItemKey(it.id)}" }
@@ -435,7 +440,7 @@ internal fun RecordingsScreenContent(
     val alertShown = recordingsAppError(entries.isEmpty(), connectionUiState, connectionFailure) != null
 
     val drawerState = at.bernhardberger.tvhplayer.ui.components.LocalBrowseDrawerState.current
-    LaunchedEffect(observedEntries) {
+    LaunchedEffect(observedEntries, observedContinue) {
         // Transfer locally before removing the actual focused node. Keeping only the
         // old key would recreate the node and leave the same focus vacancy.
         if (removalHandoff && initialFocusEnabled &&
@@ -447,6 +452,7 @@ internal fun RecordingsScreenContent(
             }
         }
         retainedPreparation = prepared
+        retainedContinue = observedContinue
         archiveNavigation.update(reconcileArchiveStack(archiveNavigation.stack, observedArchive))
     }
 
