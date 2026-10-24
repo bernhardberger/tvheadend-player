@@ -142,37 +142,33 @@ data class EpgFocusTarget(
 data class TimelineEpgEventIndex(
     val visibleEventsByChannel: Map<ChannelId, List<EpgEventEntry>>,
     val channelsWithEvents: Set<ChannelId>,
-    val channelsWithMatchingEvents: Set<ChannelId>,
 )
 
+/** [ensureActive] runs once per event so a superseded preparation can stop mid-loop. */
 fun indexTimelineEventsByChannel(
     events: List<EpgEventEntry>,
     windowStartSec: Long,
     windowEndSec: Long,
-    matches: (EpgEventEntry) -> Boolean = { true },
+    ensureActive: () -> Unit = {},
 ): TimelineEpgEventIndex {
     require(windowEndSec > windowStartSec)
     val visibleEvents = mutableMapOf<ChannelId, MutableList<EpgEventEntry>>()
     val channelsWithEvents = mutableSetOf<ChannelId>()
-    val channelsWithMatchingEvents = mutableSetOf<ChannelId>()
     events.forEach { event ->
+        ensureActive()
         event.channelId?.let { channelId ->
             channelsWithEvents += channelId
-            if (matches(event)) {
-                channelsWithMatchingEvents += channelId
-                if (
-                    event.stop.epochSeconds > windowStartSec &&
-                    event.start.epochSeconds < windowEndSec
-                ) {
-                    visibleEvents.getOrPut(channelId) { mutableListOf() }.add(event)
-                }
+            if (
+                event.stop.epochSeconds > windowStartSec &&
+                event.start.epochSeconds < windowEndSec
+            ) {
+                visibleEvents.getOrPut(channelId) { mutableListOf() }.add(event)
             }
         }
     }
     return TimelineEpgEventIndex(
         visibleEventsByChannel = visibleEvents,
         channelsWithEvents = channelsWithEvents,
-        channelsWithMatchingEvents = channelsWithMatchingEvents,
     )
 }
 
@@ -498,7 +494,6 @@ enum class EpgColumnDataState {
     PERMISSION_DENIED,
     RECONNECTING,
     SERVER_FAILURE,
-    FILTER_EMPTY,
 }
 
 fun epgColumnDataState(
@@ -506,10 +501,8 @@ fun epgColumnDataState(
     windowStartSec: Long,
     windowEndSec: Long,
     connectionState: ConnectionUiState,
-    filterActive: Boolean = false,
     coveragePending: Boolean = false,
     hasCachedEvents: Boolean = visibleEvents.isNotEmpty(),
-    hasMatchingCachedEvents: Boolean = hasCachedEvents,
 ): EpgColumnDataState = when {
     connectionState is ConnectionUiState.Error &&
         connectionState.kind == ConnectionFailureKind.PERMISSION_DENIED ->
@@ -523,8 +516,6 @@ fun epgColumnDataState(
         connectionState == ConnectionUiState.SyncingChannels ->
         if (!hasCachedEvents) EpgColumnDataState.LOADING else EpgColumnDataState.STALE
     coveragePending -> EpgColumnDataState.LOADING
-    filterActive && hasCachedEvents && !hasMatchingCachedEvents ->
-        EpgColumnDataState.FILTER_EMPTY
     visibleEvents.isEmpty() && !hasCachedEvents -> EpgColumnDataState.NO_DATA
     visibleEvents.isEmpty() -> EpgColumnDataState.EMPTY_DAY
     visibleEvents.minOf { it.start.epochSeconds } > windowStartSec ||

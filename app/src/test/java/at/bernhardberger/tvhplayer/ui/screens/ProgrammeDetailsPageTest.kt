@@ -665,6 +665,21 @@ class ProgrammeDetailsPageTest {
         Assert.assertEquals(emptyList<String>(), programmeAboutText(" ", null, synopsisShownInFull = false))
     }
 
+    @Test fun headlineLeadsWithTheGenreFamilyAndKeepsADifferentServerGenre() {
+        val resources = ApplicationProvider.getApplicationContext<Application>().resources
+        fun header(genre: String?, contentType: Long?, categories: List<String> = emptyList()): List<String> {
+            val coded = EpgEvent.create(event.id, event.channelId, event.start, event.stop, genre = genre,
+                contentGenre = ContentGenre.fromContentType(contentType), categories = categories)
+            return at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata(
+                programmeAboutFacts(coded, null, resources, Locale.US), resources, null, contentGenre = coded.contentGenre)
+        }
+        Assert.assertEquals(listOf("Sport", "Football"), header("Football", 0x43))
+        Assert.assertEquals("Same text shows once", listOf("Sport"), header(" sport", 0x40))
+        Assert.assertEquals(listOf("Sport"), header(null, 0x40, listOf("Football")))
+        Assert.assertEquals("Without a code the server text leads as before", listOf("Football"), header("Football", null))
+        Assert.assertEquals(listOf("Sitcom", "Comedy"), header(null, null, listOf("Sitcom", "Comedy", "Series")))
+    }
+
     @Test fun episodeHeaderUsesLocaleNumericPremiereInsteadOfCopyrightYear() {
         val resources = ApplicationProvider.getApplicationContext<Application>().resources
         val episode = EpgEpisode(null, null, 5, null, 10, null, null, null, null)

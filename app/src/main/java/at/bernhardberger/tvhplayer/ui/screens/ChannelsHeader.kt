@@ -70,6 +70,7 @@ internal fun ChannelsHeader(
     modifier: Modifier = Modifier,
     onReturnToContent: (() -> Boolean)? = null,
     leading: (@Composable RowScope.(startEdge: Modifier) -> Unit)? = null,
+    genre: String? = null,
 ) {
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val rail = navigationFocus ?: FocusRequester.Default

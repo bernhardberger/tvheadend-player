@@ -372,7 +372,7 @@ internal fun RecordingMetadataPane(
     val watchState = recordingWatchState(entry, offeredResumePosition(admission), nowSec)
     val timeLeft = remember(entry, admission) { recordingTimeLeft(entry, admission) }
     val facts = remember(entry, resources, locale) {
-        programmeHeaderMetadata(programmeAboutFacts(null, entry, resources, locale), resources, entry.episode, null, locale)
+        programmeHeaderMetadata(programmeAboutFacts(null, entry, resources, locale), resources, entry.episode, null, locale, entry.contentGenre)
     }
     val stoppedEarly = remember(entry) { recordingStoppedEarly(entry) != null }
     val failure = entry.subscriptionError?.label()

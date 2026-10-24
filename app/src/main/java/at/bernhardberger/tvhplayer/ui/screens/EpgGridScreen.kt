@@ -107,7 +107,7 @@ import at.bernhardberger.tvhplayer.core.guideWindowBounds
 import at.bernhardberger.tvhplayer.core.guideDisplayEvents
 import at.bernhardberger.tvhplayer.core.indexTimelineEventsByChannel
 import at.bernhardberger.tvhplayer.core.initialTimelineEpgFocus
-import at.bernhardberger.tvhplayer.core.matchesProgrammeCategory
+import at.bernhardberger.tvhplayer.core.programmeCategory
 import at.bernhardberger.tvhplayer.core.moveTimelineEpgFocus
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.core.reconcileTimelineEpgFocus
@@ -126,6 +126,7 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.clockWidthSamples
+import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
@@ -140,6 +141,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTabBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimelineBody
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideTimePanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideGroupPanel
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
@@ -223,7 +225,6 @@ private data class GuideIndexInput(
     val snapshot: EpgSnapshot?,
     val events: List<EpgEventEntry>,
     val state: EpgRepositoryState,
-    val category: ProgrammeCategory,
     val windowStartSec: Long,
     val windowEndSec: Long,
 )
@@ -234,7 +235,7 @@ private data class GuideIndexPresentation(
 )
 
 // Bookkeeping only: this is never rendered or accepted as completed positioning.
-private val emptyGuideIndex = TimelineEpgEventIndex(emptyMap(), emptySet(), emptySet())
+private val emptyGuideIndex = TimelineEpgEventIndex(emptyMap(), emptySet())
 
 internal fun guideTimelineContentPadding(
     contentPadding: PaddingValues,
@@ -253,7 +254,7 @@ fun EpgGridScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
     view: GuideView = GuideView(),
-    category: ProgrammeCategory = ProgrammeCategory.ALL,
+    genre: ProgrammeCategory = ProgrammeCategory.ALL,
     channelViewModel: ChannelsViewModel,
     selection: ChannelSelectionStore = koinInject(),
     session: TvheadendSession = koinInject(),
@@ -265,7 +266,7 @@ fun EpgGridScreen(
     playerReturn: PlayerReturnFocus? = null,
     onRetry: () -> Unit = {},
     onOpenConnectionSettings: () -> Unit = {},
-    onClearCategory: () -> Unit = {},
+    onGenreChange: (ProgrammeCategory) -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection) -> Unit = {},
     notices: NoticeCenter = koinInject(),
     onPlay: (channelId: ChannelId, channelName: String) -> Unit,
@@ -427,7 +428,6 @@ fun EpgGridScreen(
     }
     var coverageSession by remember { mutableStateOf(currentSession) }
     var coverageTagId by remember { mutableStateOf(channelScope.activeTagId) }
-    var coverageCategory by remember { mutableStateOf(category) }
     var lastPlayedId by remember { mutableStateOf<ChannelId?>(null) }
     var programmeFocusOwned by remember { mutableStateOf(true) }
     var preparationEntryToScope by remember { mutableStateOf(false) }
@@ -438,11 +438,14 @@ fun EpgGridScreen(
     )
 
     val displayEvents = remember(observation.epgSnapshotForDisplay) { guideDisplayEvents(observation.epgSnapshotForDisplay) }
+    // The Genre row offers itself once the guide carries a genre code, and stays while one is chosen.
+    val genreCodes = remember(displayEvents) { displayEvents.any { programmeCategory(it) != null } }
+    val showGenre = genreCodes || genre != ProgrammeCategory.ALL
     val indexInput = GuideIndexInput(
-        observation.epgSnapshotForDisplay, displayEvents, observation.epgState, category, windowStartSec, windowEndSec,
+        observation.epgSnapshotForDisplay, displayEvents, observation.epgState, windowStartSec, windowEndSec,
     )
     val preparationAuthority = currentSession ?: observation.epgSnapshotForDisplay
-    val indexAuthority = remember(preparationAuthority, category, windowStartSec) { Any() }
+    val indexAuthority = remember(preparationAuthority, windowStartSec) { Any() }
     val preparedIndex = rememberPreparedBrowseData(preparationAuthority, indexInput, requestKey = indexAuthority) { input ->
         val preparationContext = currentCoroutineContext()
         val index = profileTrace("P44:guideIndex") {
@@ -450,10 +453,7 @@ fun EpgGridScreen(
                 events = input.events,
                 windowStartSec = input.windowStartSec,
                 windowEndSec = input.windowEndSec,
-                matches = {
-                    preparationContext.ensureActive()
-                    it.matchesProgrammeCategory(input.category)
-                },
+                ensureActive = { preparationContext.ensureActive() },
             )
         }
         GuideIndexPresentation(index, index.visibleEventsByChannel.values
@@ -570,7 +570,7 @@ fun EpgGridScreen(
     val edgeEvents = remember(preparedIndex, orderedChannelIds) {
         val ids = orderedChannelIds.toSet()
         preparedIndex?.input?.let { input ->
-            input.events.filter { it.channelId in ids && it.matchesProgrammeCategory(input.category) }
+            input.events.filter { it.channelId in ids }
         }.orEmpty()
     }
     val earlierContent = edgeEvents.any {
@@ -643,7 +643,7 @@ fun EpgGridScreen(
 
     fun programmeAcrossGap(channelId: ChannelId, originEventId: EventId, boundarySec: Long, direction: Int) =
         timelineProgrammeAcrossGap(
-            events = displayEvents.filter { it.channelId == channelId && it.matchesProgrammeCategory(category) },
+            events = displayEvents.filter { it.channelId == channelId },
             originEventId = originEventId,
             boundarySec = boundarySec,
             direction = direction,
@@ -823,7 +823,6 @@ fun EpgGridScreen(
         playingChannelId,
         lastPlayedId,
         initialPositionDone,
-        category,
         indexCurrent,
         pendingPlayerReturn,
     ) {
@@ -960,18 +959,6 @@ fun EpgGridScreen(
             positionedPlayerReturn = request
             return@LaunchedEffect
         }
-        initialPositionDone = false
-        selectedTarget = null
-        pendingInitialChannelIndex = -1
-        frontierRequest = null
-        channelFocusRequest = null
-        windowFocusRequest = null
-    }
-
-    LaunchedEffect(category) {
-        if (coverageCategory == category) return@LaunchedEffect
-        coverageCategory = category
-        clearAllCoverage()
         initialPositionDone = false
         selectedTarget = null
         pendingInitialChannelIndex = -1
@@ -1128,7 +1115,6 @@ fun EpgGridScreen(
         epgState,
         focusRows,
         channels,
-        category,
         connectionUiState,
         frontierRequest,
         frontierAcquisitionPending,
@@ -1149,8 +1135,7 @@ fun EpgGridScreen(
             displayEvents.filter {
                 it.channelId == request.channelId &&
                     it.stop.epochSeconds > request.throughSec - visibleWindowSec &&
-                    it.start.epochSeconds < request.throughSec &&
-                    it.matchesProgrammeCategory(category)
+                    it.start.epochSeconds < request.throughSec
             }
         }
         // Later EPG beyond the acquired window stays unknown, so only Left crosses a gap here.
@@ -1513,8 +1498,7 @@ fun EpgGridScreen(
                     val channelId = channels[current.channelIndex].id
                     val pastEvents = displayEvents.filter { it.channelId == channelId &&
                         it.stop.epochSeconds > targetWindowStartSec &&
-                        it.start.epochSeconds < targetWindowStartSec + visibleWindowSec &&
-                        it.matchesProgrammeCategory(category) }
+                        it.start.epochSeconds < targetWindowStartSec + visibleWindowSec }
                     val target = timelineFrontierFocus(
                         rows = listOf(EpgFocusColumn(channelId, pastEvents)), channelId = channelId,
                         originEventId = current.eventId, boundarySec = boundarySec,
@@ -1779,11 +1763,12 @@ fun EpgGridScreen(
         ) {
             GuideHeader(
                 filter = channelScope.activeTagId?.let { id -> groups.firstOrNull { it.tagId == id }?.name },
+                genre = genre.takeIf { it != ProgrammeCategory.ALL }?.let { programmeCategoryLabel(it) },
                 windowStartSec = windowStartSec,
                 nowSecProvider = nowSecProvider,
                 focus = header,
                 dateFocus = guideDateFocus,
-                showGroup = groups.size > 1,
+                showGroup = groups.size > 1 || showGenre,
                 navigationFocus = navigationFocus,
                 contentPadding = contentPadding,
                 startPadding = startPadding,
@@ -1826,7 +1811,7 @@ fun EpgGridScreen(
                                 coverageRequests.isPending(channelId, preparedIndex.input.windowStartSec)
                             }
                         },
-                        earlierContent, laterContent, view.rows,
+                        earlierContent, laterContent, view.rows, genre, view.genreColors,
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),
@@ -1849,9 +1834,6 @@ fun EpgGridScreen(
                 // Runs only for the current visit; the body consumes other visits' keys.
                 onViewportKey = viewportKey@{ event ->
                     if (!initialFocusEnabled || !programmeFocusOwned) return@viewportKey false
-                    if (preparedIndex.input.category != category && event.key in listOf(
-                            Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
-                        )) return@viewportKey true
                     val unsettled = !indexCurrent || realizedTarget != selectedTarget || frontierRequest != null ||
                         channelFocusRequest != null || windowFocusRequest != null
                     if (event.key == Key.DirectionCenter || event.key == Key.Enter || event.key == Key.NumPadEnter) {
@@ -2025,14 +2007,21 @@ fun EpgGridScreen(
             )
         }
         when (openPanel) {
-            ChannelsPanel.GROUP -> ChannelsGroupPanel(
+            ChannelsPanel.GROUP -> GuideGroupPanel(
                 groups = groups,
                 currentTagId = channelScope.activeTagId,
-                onSelect = { tagId ->
+                genre = genre,
+                showGenre = showGenre,
+                genreColors = view.genreColors,
+                onSelectGroup = { tagId ->
                     closePanel()
                     releaseProgrammeFocus()
                     scopeMotion.select(tagId, groups.map { it.tagId })
                     channelViewModel.selectTag(tagId)
+                },
+                onSelectGenre = { category ->
+                    closePanel()
+                    onGenreChange(category)
                 },
                 onClose = ::closePanel,
             )

@@ -43,6 +43,7 @@ import at.bernhardberger.tvhplayer.core.shouldComposeTimelineCell
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.AbsoluteAlignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -61,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -72,6 +74,10 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
+import at.bernhardberger.tvhplayer.core.ProgrammeCategory
+import at.bernhardberger.tvhplayer.core.programmeCategory
+import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabel
+import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
@@ -234,7 +240,6 @@ internal fun TimelineChannelRow(
     nowSecProvider: () -> Long,
     events: List<EpgEventEntry>,
     hasCachedEvents: Boolean,
-    hasMatchingCachedEvents: Boolean,
     connectionUiState: ConnectionUiState,
     coveragePending: Boolean,
     recordingForEvent: (EpgEventEntry) -> DvrEntry?,
@@ -245,8 +250,13 @@ internal fun TimelineChannelRow(
     focusStartInset: Dp = 0.dp,
     focusEndInset: Dp = 0.dp,
     rows: GuideRows = GuideRows.DENSE,
+    genre: ProgrammeCategory = ProgrammeCategory.ALL,
+    genreColors: Boolean = true,
 ) {
     val nowSec = nowSecProvider()
+    // One label for the row's cells outside the chosen genre.
+    val outsideGenre = if (genre == ProgrammeCategory.ALL) null
+        else stringResource(R.string.epg_cell_outside_genre, programmeCategoryLabel(genre))
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
     val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
@@ -332,6 +342,9 @@ internal fun TimelineChannelRow(
                         onOpenContextMenu = onOpenContextMenu?.let { open -> { open(event) } },
                         width = width,
                         rows = rows,
+                        genre = genre,
+                        genreColors = genreColors,
+                        outsideGenre = outsideGenre,
                         modifier = Modifier
                             .align(AbsoluteAlignment.TopLeft)
                             // The 4dp gap is narrower than the focus scale: the focused
@@ -352,10 +365,8 @@ internal fun TimelineChannelRow(
                         windowStartSec = windowStartSec,
                         windowEndSec = windowEndSec,
                         connectionState = connectionUiState,
-                        filterActive = hasCachedEvents != hasMatchingCachedEvents,
                         coveragePending = coveragePending,
                         hasCachedEvents = hasCachedEvents,
-                        hasMatchingCachedEvents = hasMatchingCachedEvents,
                     ),
                     modifier = Modifier.align(Alignment.Center),
                 )
@@ -446,6 +457,9 @@ internal fun TimelineProgrammeCell(
     modifier: Modifier,
     onOpenContextMenu: (() -> Unit)? = null,
     rows: GuideRows = GuideRows.DENSE,
+    genre: ProgrammeCategory = ProgrammeCategory.ALL,
+    genreColors: Boolean = true,
+    outsideGenre: String? = null,
 ) {
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onOpenContextMenu)
     val stateText = when {
@@ -467,7 +481,12 @@ internal fun TimelineProgrammeCell(
         formatTimeInterval(startSec, stopSec, locale = locale, uses24Hour = uses24Hour)
     }
     var focused by remember { mutableStateOf(false) }
-    val description = stringResource(
+    val family = programmeCategory(event)
+    // A chosen genre dims, never hides: other programmes stay plain and quiet until focused.
+    val outside = genre != ProgrammeCategory.ALL && family != genre
+    val colors = if (genreColors && !outside) tvGenreColors(family) else null
+    val dimmed = outside && !focused
+    val cellDescription = stringResource(
         R.string.epg_cell_description,
         channel.name.orEmpty(),
         startDate,
@@ -475,13 +494,15 @@ internal fun TimelineProgrammeCell(
         event.title.orEmpty(),
         stateText,
     )
+    val description = if (outside && outsideGenre != null) "$cellDescription, $outsideGenre" else cellDescription
+    val contentAlpha = if (dimmed) Modifier.alpha(GuideOutsideGenreAlpha) else Modifier
 
     val markState = recording?.state?.takeIf { recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED }
     Box(modifier = modifier) {
         // Running and scheduled recordings carry their mark at the right end of the title line, as
         // channel and Recordings rows do: the title ellipsizes first and the time line keeps its width.
         val headline: @Composable () -> Unit = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = contentAlpha) {
                 Text(
                     // Always render a label so no focusable cell is visually blank.
                     text = event.title.orEmpty(),
@@ -498,7 +519,7 @@ internal fun TimelineProgrammeCell(
             }
         }
         val supporting: (@Composable () -> Unit)? = if (width >= 90.dp) {
-            { ProgrammeTimeText(range = timeRange, start = startTime) }
+            { ProgrammeTimeText(range = timeRange, start = startTime, modifier = contentAlpha) }
         } else {
             null
         }
@@ -508,7 +529,7 @@ internal fun TimelineProgrammeCell(
             .padding(horizontal = TvSpacing4 / 2)
             // The panel shape is drawn, not clipped: a clip here would cancel the
             // library focus scale the surface applies outside this modifier.
-            .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
+            .background((colors?.tint ?: TvSurfaceColors.containerHigh).copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
             .focusRequester(focusRequester)
             .then(contextMenu.modifier)
             .onFocusChanged {
@@ -516,6 +537,16 @@ internal fun TimelineProgrammeCell(
                 if (it.isFocused) onFocused()
             }
             .semantics { contentDescription = description }
+        // The family's wash replaces the light focused container; the content keeps its focused colors.
+        val itemColors = colors?.let {
+            val onWash = MaterialTheme.colorScheme.inverseOnSurface
+            ListItemDefaults.colors(
+                focusedContainerColor = it.wash, focusedContentColor = onWash,
+                pressedContainerColor = it.wash, pressedContentColor = onWash,
+                focusedSelectedContainerColor = it.wash, focusedSelectedContentColor = onWash,
+                pressedSelectedContainerColor = it.wash, pressedSelectedContentColor = onWash,
+            )
+        } ?: ListItemDefaults.colors()
         when (rows) {
             GuideRows.DENSE -> DenseListItem(
                 selected = selected,
@@ -523,6 +554,7 @@ internal fun TimelineProgrammeCell(
                 onLongClick = contextMenu.onLongClick,
                 headlineContent = headline,
                 supportingContent = supporting,
+                colors = itemColors,
                 modifier = cellModifier,
             )
             GuideRows.REGULAR -> ListItem(
@@ -531,17 +563,21 @@ internal fun TimelineProgrammeCell(
                 onLongClick = contextMenu.onLongClick,
                 headlineContent = headline,
                 supportingContent = supporting,
+                colors = itemColors,
                 modifier = cellModifier,
             )
         }
     }
 }
 
+/** Programmes outside the chosen genre draw their content at half strength. */
+private const val GuideOutsideGenreAlpha = 0.5f
+
 /** The programme's [range] when it fits the cell on one line, else its [start] alone: a 12-hour range runs wider. */
 @Composable
-private fun ProgrammeTimeText(range: String, start: String) {
+private fun ProgrammeTimeText(range: String, start: String, modifier: Modifier = Modifier) {
     val style = MaterialTheme.typography.bodySmall
-    Layout(content = {
+    Layout(modifier = modifier, content = {
         Text(text = range, maxLines = 1, softWrap = false, style = style)
         // The cell's description already reads the full range.
         Text(text = start, maxLines = 1, overflow = TextOverflow.Ellipsis, style = style,
@@ -569,7 +605,6 @@ private fun TimelineRowState(
             EpgColumnDataState.PERMISSION_DENIED -> R.string.epg_permission_denied
             EpgColumnDataState.RECONNECTING -> R.string.epg_reconnecting
             EpgColumnDataState.SERVER_FAILURE -> R.string.epg_server_failure
-            EpgColumnDataState.FILTER_EMPTY -> R.string.epg_filter_empty
         }
     )
     Row(

@@ -74,7 +74,7 @@ class GuideHistoryCompositionTest {
                             eventFocusRequesters = requesters, windowStartSec = 0, windowEndSec = 7200,
                             nowSecProvider = { 4000 },
                             events = events.filter { it.channelId == ChannelId(channel) }, hasCachedEvents = true,
-                            hasMatchingCachedEvents = true, connectionUiState = ConnectionUiState.Ready,
+                            connectionUiState = ConnectionUiState.Ready,
                             coveragePending = false, recordingForEvent = { null }, onFocused = {},
                             onOpenDetails = { details = true },
                         ) }

@@ -29,6 +29,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -65,7 +66,10 @@ internal sealed interface BrowsePanelEntry {
     data class Section(val title: String) : BrowsePanelEntry
     /** Sets a lone row apart from the section above it, where a heading would only repeat its label. */
     data object Divider : BrowsePanelEntry
-    /** A row; [checked] makes it a switch. */
+    /**
+     * A row; [checked] makes it a switch, [opensLevel] a row that opens a level and shows its
+     * current value as [supporting] text, and [dot] marks it with a small color dot before the label.
+     */
     class Choice(
         val key: String,
         val label: String,
@@ -73,6 +77,9 @@ internal sealed interface BrowsePanelEntry {
         val onClick: () -> Unit,
         val icon: Int? = null,
         val checked: Boolean? = null,
+        val supporting: String? = null,
+        val opensLevel: Boolean = false,
+        val dot: Color? = null,
     ) : BrowsePanelEntry
 }
 
@@ -125,19 +132,21 @@ internal fun BrowseSidePanel(
 }
 
 /**
- * One renderer for every panel list; the checked choice takes focus as the panel opens. [radio]
- * marks choices with radio buttons, otherwise the checked one carries a trailing check.
+ * One renderer for every panel list; the checked choice, or the [focusKey] choice when given,
+ * takes focus as the panel opens. [radio] marks choices with radio buttons, otherwise the checked
+ * one carries a trailing check.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun BrowsePanelList(entries: List<BrowsePanelEntry>, radio: Boolean) {
+internal fun BrowsePanelList(entries: List<BrowsePanelEntry>, radio: Boolean, focusKey: String? = null) {
     val choices = entries.filterIsInstance<BrowsePanelEntry.Choice>()
     val requesterStore = remember { mutableMapOf<String, FocusRequester>() }
     val choiceKeys = choices.map { it.key }
     val requesters = remember(choiceKeys) { choiceKeys.map { requesterStore.getOrPut(it) { FocusRequester() } } }
     val listState = rememberLazyListState()
     LaunchedEffect(Unit) {
-        val target = choices.indexOfFirst { it.selected }.coerceAtLeast(0)
+        val target = choices.indexOfFirst { it.key == focusKey }.takeIf { it >= 0 }
+            ?: choices.indexOfFirst { it.selected }.coerceAtLeast(0)
         val lazyIndex = entries.indexOf(choices.getOrNull(target) ?: return@LaunchedEffect)
         // Wait one frame so the row is ready to draw its focused state.
         withFrameNanos { }
@@ -203,6 +212,9 @@ internal fun BrowsePanelList(entries: List<BrowsePanelEntry>, radio: Boolean) {
                             onClick = entry.onClick,
                             leadingIcon = entry.icon,
                             checked = entry.checked,
+                            supportingLabel = entry.supporting,
+                            showChevron = entry.opensLevel,
+                            leadingDot = entry.dot,
                             modifier = Modifier
                                 .containedFocus(requesters[index], requesters, index, lazy = true)
                                 .testTag(entry.key),

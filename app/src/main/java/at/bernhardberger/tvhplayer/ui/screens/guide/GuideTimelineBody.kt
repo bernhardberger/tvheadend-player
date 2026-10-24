@@ -40,6 +40,7 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.GuideRows
+import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.core.AppError
 import at.bernhardberger.tvhplayer.core.AppErrorAction
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
@@ -79,6 +80,8 @@ internal data class GuideTabBody(
     val earlierContent: Boolean,
     val laterContent: Boolean,
     val rows: GuideRows,
+    val genre: ProgrammeCategory,
+    val genreColors: Boolean,
 )
 
 /**
@@ -139,6 +142,8 @@ internal fun GuideTimelineBody(
     val windowEndSec = frame.windowEnd
     val nowSecProvider = rememberTabReader(frame.nowSec)
     val rows = frame.rows
+    val genre = frame.genre
+    val genreColors = frame.genreColors
     val tagNotice = frame.tagNotice
     val guideRecovering = frame.recovering
     val channelListState = rememberTabListState(channelListState)
@@ -240,8 +245,6 @@ internal fun GuideTimelineBody(
                     nowSecProvider = nowSecProvider,
                     events = eventsByChannel[channel.id].orEmpty(),
                     hasCachedEvents = channel.id in timelineEventIndex.channelsWithEvents,
-                    hasMatchingCachedEvents =
-                        channel.id in timelineEventIndex.channelsWithMatchingEvents,
                     connectionUiState = connectionUiState,
                     coveragePending = coveragePending,
                     onFocused = { event ->
@@ -269,6 +272,8 @@ internal fun GuideTimelineBody(
                     focusStartInset = horizontalFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
                     focusEndInset = horizontalFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
                     rows = rows,
+                    genre = genre,
+                    genreColors = genreColors,
                 )
             }
         }

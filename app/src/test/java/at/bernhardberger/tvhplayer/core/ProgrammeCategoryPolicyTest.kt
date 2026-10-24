@@ -5,9 +5,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProgrammeCategoryPolicyTest {
@@ -61,25 +59,6 @@ class ProgrammeCategoryPolicyTest {
         assertNull(programmeCategory(event(0xb0)))
         assertNull(programmeCategory(event(0xc0)))
         assertNull(programmeCategory(event(0x100)))
-    }
-
-    @Test
-    fun allMatchesUncategorisedButSpecificCategoryDoesNot() {
-        val event = event(null)
-        assertTrue(event.matchesProgrammeCategory(ProgrammeCategory.ALL))
-        assertFalse(event.matchesProgrammeCategory(ProgrammeCategory.SPORT))
-    }
-
-    @Test
-    fun availableCategoriesAreStableAndAlwaysStartWithAll() {
-        val categories = availableProgrammeCategories(
-            listOf(event(0x40), event(0x20), event(0x4f), event(null)),
-        )
-
-        assertEquals(
-            listOf(ProgrammeCategory.ALL, ProgrammeCategory.NEWS, ProgrammeCategory.SPORT),
-            categories,
-        )
     }
 
     private fun event(contentType: Long?) = EpgEvent.create(

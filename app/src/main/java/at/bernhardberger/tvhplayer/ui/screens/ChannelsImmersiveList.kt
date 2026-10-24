@@ -474,7 +474,7 @@ private fun ChannelsHeadline(
     val locale = LocalConfiguration.current.locales[0]
     val metadata = remember(current, resources, locale) {
         current?.let {
-            programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale)
+            programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale, it.contentGenre)
         }.orEmpty()
     }
     ProgrammeHeadline(

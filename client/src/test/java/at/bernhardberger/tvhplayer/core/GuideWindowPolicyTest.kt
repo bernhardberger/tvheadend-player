@@ -511,27 +511,28 @@ class GuideWindowPolicyTest {
     }
 
     @Test
-    fun timelineIndexRetainsOnlyVisibleMatchingEventsAndBoundedMetadata() {
+    fun timelineIndexRetainsOnlyVisibleEventsAndBoundedMetadata() {
         val visible = event(id = 2, channelId = 1, start = 60, stop = 120, title = "News")
-        val filtered = event(id = 3, channelId = 1, start = 120, stop = 180, title = "Film")
+        val alsoVisible = event(id = 3, channelId = 1, start = 120, stop = 180, title = "Film")
         val later = event(id = 4, channelId = 2, start = 10_000, stop = 11_000, title = "News")
+        var checks = 0
 
         val index = indexTimelineEventsByChannel(
             events = listOf(
                 event(id = 1, channelId = 1, start = 0, stop = 60, title = "News"),
                 visible,
-                filtered,
+                alsoVisible,
                 later,
             ),
             windowStartSec = 60,
             windowEndSec = 180,
-            matches = { it.title == "News" },
+            ensureActive = { checks++ },
         )
 
-        assertEquals(listOf(visible), index.visibleEventsByChannel[ChannelId(1)])
+        assertEquals(listOf(visible, alsoVisible), index.visibleEventsByChannel[ChannelId(1)])
         assertFalse(index.visibleEventsByChannel.containsKey(ChannelId(2)))
         assertTrue(index.channelsWithEvents.containsAll(listOf(ChannelId(1), ChannelId(2))))
-        assertTrue(index.channelsWithMatchingEvents.containsAll(listOf(ChannelId(1), ChannelId(2))))
+        assertEquals(4, checks)
     }
 
     private fun event(

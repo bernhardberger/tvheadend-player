@@ -5,6 +5,10 @@ import at.bernhardberger.tvhplayer.settings.GuideView
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -103,6 +107,8 @@ internal fun GuideRouteContent(
     onPlayRecording: (RecordingPlaybackSelection) -> Unit,
     onPlay: (ChannelId, String) -> Unit,
 ) {
+    // The highlighted genre lasts while the Guide entry stays in the back stack, not across launches.
+    var genre by rememberSaveable { mutableStateOf(ProgrammeCategory.ALL) }
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("guide")) {
             BrowsingScopeContent(channelsVm, initialFocusEnabled) { EpgGridScreen(
@@ -115,7 +121,8 @@ internal fun GuideRouteContent(
                 playerReturn = playerReturn,
                 onRetry = onRetry,
                 onOpenConnectionSettings = onOpenConnectionSettings,
-                onClearCategory = {},
+                genre = genre,
+                onGenreChange = { genre = it },
                 onPlayRecording = onPlayRecording,
                 onPlay = onPlay,
             ) }

@@ -36,6 +36,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -1120,13 +1122,23 @@ internal fun PlaybackOptionRow(
     radio: Boolean = false,
     leadingIcon: Int? = null,
     checked: Boolean? = null,
+    leadingDot: Color? = null,
 ) {
     ListItem(
         enabled = enabled,
         selected = selected,
         onClick = onClick,
         headlineContent = {
-            Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (leadingDot == null) {
+                Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            } else {
+                // Inline rather than leading content, which would raise the row above the panel's 48dp.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(12.dp).background(leadingDot, CircleShape).testTag("option-dot"))
+                    Spacer(Modifier.width(TvSpacing12))
+                    Text(text = label, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
         },
         leadingContent = leadingIcon?.let { icon ->
             { Icon(painterResource(icon), contentDescription = null, Modifier.size(ListItemDefaults.IconSize)) }

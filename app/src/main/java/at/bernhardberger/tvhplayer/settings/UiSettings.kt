@@ -33,6 +33,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
         val GUIDE_ROWS = stringPreferencesKey("guideRows")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
+        val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
     }
 
     val settings: Flow<UiSettings> = dataStore.data.map { preferences ->
@@ -42,7 +43,9 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
             channelsView = resolveChannelsView(preferences[Keys.CHANNELS_LAYOUT]) { preferences[Keys.channelsProgramArt(it)] },
-            guideView = resolveGuideView(preferences[Keys.GUIDE_ROWS], preferences[Keys.GUIDE_HEADLINE]),
+            guideView = resolveGuideView(
+                preferences[Keys.GUIDE_ROWS], preferences[Keys.GUIDE_HEADLINE], preferences[Keys.GUIDE_GENRE_COLORS],
+            ),
         )
     }
 
@@ -63,6 +66,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             preferences[Keys.GUIDE_ROWS] = view.rows.name
             preferences[Keys.GUIDE_HEADLINE] = view.headline
+            preferences[Keys.GUIDE_GENRE_COLORS] = view.genreColors
         }
     }
 

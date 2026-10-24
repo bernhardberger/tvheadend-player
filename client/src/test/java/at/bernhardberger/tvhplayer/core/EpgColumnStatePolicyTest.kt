@@ -82,18 +82,6 @@ class EpgColumnStatePolicyTest {
             ),
         )
         assertEquals(
-            EpgColumnDataState.FILTER_EMPTY,
-            epgColumnDataState(
-                visibleEvents = emptyList(),
-                windowStartSec = 0,
-                windowEndSec = 100,
-                connectionState = ConnectionUiState.Ready,
-                filterActive = true,
-                hasCachedEvents = true,
-                hasMatchingCachedEvents = false,
-            ),
-        )
-        assertEquals(
             EpgColumnDataState.PARTIAL,
             epgColumnDataState(
                 listOf(event(20, 80)),

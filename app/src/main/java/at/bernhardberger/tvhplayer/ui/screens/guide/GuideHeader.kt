@@ -39,13 +39,14 @@ import java.time.temporal.ChronoUnit
 import java.util.Locale
 
 /**
- * The Guide's title row in the Channels header pattern: the title with the active group, then the
- * date button, Group (only with a choice of groups) and View options. Down moves to the programmes,
+ * The Guide's title row in the Channels header pattern: the title with the active group and the
+ * highlighted [genre], then the date button, Group (only with a choice of groups or genres) and View options. Down moves to the programmes,
  * the date button's start edge to the navigation rail.
  */
 @Composable
 internal fun GuideHeader(
     filter: String?,
+    genre: String?,
     windowStartSec: Long,
     nowSecProvider: () -> Long,
     focus: ChannelsHeaderFocus,
@@ -64,6 +65,7 @@ internal fun GuideHeader(
     ChannelsHeader(
         title = stringResource(R.string.epg_title),
         groupName = filter,
+        genre = genre,
         focus = focus,
         showGroup = showGroup,
         navigationFocus = navigationFocus,

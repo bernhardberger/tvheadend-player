@@ -936,18 +936,25 @@ internal fun programmeAboutFacts(event: EpgEvent?, recording: DvrEntry?, resourc
 /**
  * Metadata order is shared by live and recorded details; absent fields reserve no separator.
  * XMLTV guides mostly send category text without a genre code, so the first two categories
- * stand in for a missing genre.
+ * stand in for a missing genre. A genre code's family name leads, so the headline names the
+ * same genre the Guide's colors and filter use; the server's own genre text follows when it differs.
  */
 internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resources: Resources,
     episode: at.bernhardberger.tvheadend.sdk.core.EpgEpisode?, firstAired: kotlin.time.Instant? = null,
-    locale: Locale = resources.configuration.locales[0]): List<String> {
-    val genre = resources.getString(R.string.details_genre)
+    locale: Locale = resources.configuration.locales[0], contentGenre: ContentGenre? = null): List<String> {
+    val genre = facts.firstOrNull { it.first == resources.getString(R.string.details_genre) }?.second
     val categories = facts.firstOrNull { it.first == resources.getString(R.string.details_categories) }
         ?.second?.split(" • ")?.take(2).orEmpty()
     val year = facts.firstOrNull { it.first == resources.getString(R.string.details_year) }?.second
     val date = programmeDateLabel(episode, firstAired, year, locale)
     val label = episodeLabel(episode, resources)
-    return (facts.firstOrNull { it.first == genre }?.second?.let(::listOf) ?: categories) +
+    val family = programmeCategory(contentGenre)?.let { resources.getString(programmeCategoryLabelRes(it)) }
+    val lead = when {
+        family != null -> listOfNotNull(family, genre?.takeUnless { it.equals(family, ignoreCase = true) })
+        genre != null -> listOf(genre)
+        else -> categories
+    }
+    return lead +
         if (date == year) listOfNotNull(year, label) else listOfNotNull(label, date)
 }
 
@@ -987,7 +994,7 @@ private fun DetailsInformation(
         val resources = LocalContext.current.resources
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
-            event?.firstAired, LocalConfiguration.current.locales[0])
+            event?.firstAired, LocalConfiguration.current.locales[0], event?.contentGenre ?: recording?.contentGenre)
         val timelineVisible = event != null && nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
         // The timeline already labels start/end; its remaining time is not the total runtime.
         val segments = facts.filter { it.kind != DetailsFactKind.LEFT &&

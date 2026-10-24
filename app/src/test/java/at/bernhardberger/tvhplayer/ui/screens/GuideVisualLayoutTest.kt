@@ -20,6 +20,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
@@ -55,6 +58,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.ProgrammeCategory
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
@@ -334,7 +338,7 @@ class GuideVisualLayoutTest {
                 view = LocalView.current
                 Box(Modifier.width(732.dp)) {
                     TimelineChannelRow(channel, 0, 1, null, requesters, 0, 7200,
-                        { 0 }, events, true, true, ConnectionUiState.Ready, false,
+                        { 0 }, events, true, ConnectionUiState.Ready, false,
                         { null }, {}, {})
                 }
             }
@@ -436,7 +440,7 @@ class GuideVisualLayoutTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 TimelineChannelRow(channel, 0, 1, null, requesters, 0, 10800,
-                    { 0 }, emptyList(), false, false, state.value, false,
+                    { 0 }, emptyList(), false, state.value, false,
                     { null }, {}, {})
             }
         }
@@ -696,7 +700,7 @@ class GuideVisualLayoutTest {
                 TVHeadendPlayerTheme {
                     Box(Modifier.width(784.dp)) {
                         TimelineChannelRow(channel, 0, 1, selected.value, requesters, 0, 10800,
-                            { 0 }, events, true, true, ConnectionUiState.Ready, false,
+                            { 0 }, events, true, ConnectionUiState.Ready, false,
                             { null }, {}, {}, visibleRowWidthPx = visibleWidth.value)
                     }
                 }
@@ -1352,6 +1356,96 @@ class GuideVisualLayoutTest {
         }
     }
 
+    @Test fun theGenreLevelOpensFromTheGroupPanelAndAGenreDimsTheOtherProgrammes() {
+        show(genres = true)
+        key(Key.DirectionRight)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        tagFocused("channels-group-all")
+        compose.onNodeWithTag("guide-genre").assert(hasText("All genres"))
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        tagFocused("guide-genre")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-genre-panel").assertIsDisplayed()
+        tagFocused("guide-genre-all")
+        // The list composes only the rows in view; each family row among them carries its color.
+        val familyRows = compose.onAllNodes(SemanticsMatcher("genre family row") {
+            it.config.getOrElseNullable(SemanticsProperties.TestTag) { null }.let { tag ->
+                tag != null && tag.startsWith("guide-genre-") && tag != "guide-genre-panel" && tag != "guide-genre-all"
+            }
+        }).fetchSemanticsNodes().size
+        assertTrue("Family rows are in view", familyRows >= 4)
+        assertEquals("Each family carries its color", familyRows,
+            compose.onAllNodesWithTag("option-dot", useUnmergedTree = true).fetchSemanticsNodes().size)
+        key(Key.Back)
+        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+        tagFocused("guide-genre")
+        key(Key.Enter)
+        repeat(4) { key(Key.DirectionDown) }
+        tagFocused("guide-genre-sport")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-genre-panel").assertDoesNotExist()
+        tagFocused("channels-group-button")
+        compose.onNodeWithText(context().getString(R.string.browse_filtered_title,
+            context().getString(R.string.epg_title), "Sport")).assertIsDisplayed()
+        assertEquals("The group stays", null, model.scope.value.scope.activeTagId)
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-genre").assert(hasText("Sport"))
+        key(Key.Back)
+        tagFocused("channels-group-button")
+
+        // Programmes outside Sport stay in the grid, reachable and named as such.
+        fun cell(channel: Int) = hasContentDescription(title(channel, 0), substring = true)
+        val outside = hasContentDescription("not Sport", substring = true)
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        compose.onNode(cell(1) and outside).assertDoesNotExist()
+        key(Key.DirectionDown)
+        compose.onNode(cell(2) and outside).assertIsFocused()
+        compose.onNode(cell(4) and outside).assertExists()
+        assertNoPlayback()
+    }
+
+    @Test fun genreColorsTurnOffAndTheGenreLevelLosesItsDots() {
+        show(genres = true)
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        key(Key.Enter)
+        repeat(3) { key(Key.DirectionDown) }
+        tagFocused("guide-view-genre-colors")
+        compose.onNodeWithTag("guide-view-genre-colors").assertIsOn()
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-view-genre-colors").assertIsOff()
+        assertFalse("The choice is kept", runBlocking { uiSettings.settings.first() }.guideView.genreColors)
+        key(Key.Back)
+        tagFocused("channels-view-button")
+        key(Key.DirectionLeft)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        tagFocused("guide-genre")
+        key(Key.Enter)
+        tagFocused("guide-genre-all")
+        compose.onAllNodesWithTag("option-dot", useUnmergedTree = true).assertCountEquals(0)
+        assertNoPlayback()
+    }
+
+    @Test fun aServerWithoutGroupsStillOffersTheGenreThroughTheGroupButton() {
+        show(genres = true, tags = false)
+        key(Key.DirectionRight)
+        tagFocused("channels-group-button")
+        key(Key.Enter)
+        compose.onNodeWithTag("channels-group-panel").assertIsDisplayed()
+        tagFocused("guide-genre")
+        compose.onNodeWithTag("channels-group-all").assertDoesNotExist()
+        key(Key.Back)
+        tagFocused("channels-group-button")
+        assertNoPlayback()
+    }
+
     @Test fun anOpenPanelHidesTheGridFromAccessibilityAndItsEntriesStayReadable() {
         val gridHidden = SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility) and
             hasAnyDescendant(hasTestTag("epg-channel-row-1"))
@@ -1422,23 +1516,25 @@ class GuideVisualLayoutTest {
         lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
-        groupWithoutFirst: Boolean = false) {
+        groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
                 number = id, icon = if (id == 3L) null else ArtworkId(id.toInt()),
-                tagIds = if (groupWithoutFirst && id > 1L) listOf(ChannelTagId(1), ChannelTagId(2)) else listOf(ChannelTagId(1)))
+                tagIds = if (!tags) emptyList() else if (groupWithoutFirst && id > 1L) listOf(ChannelTagId(1), ChannelTagId(2)) else listOf(ChannelTagId(1)))
         }
         fun event(channel: Channel, offset: Int) = EpgEvent.create(
             EventId(channel.id.value * 100 + offset + 10), channelId = channel.id,
             start = Instant.fromEpochSeconds(eventHour + offset * 3600),
             stop = Instant.fromEpochSeconds(eventHour + (offset + if (longProgramme && channel.id == ChannelId(1) && offset == 0) longProgrammeHours else 1) * 3600),
             title = title(channel.id.value.toInt(), offset), summary = "Synthetic offline programme metadata.",
+            // Sport on the first channel, no genre code on the second, children's programmes after.
+            contentGenre = if (genres) ContentGenre.fromContentType(when (channel.id.value) { 1L -> 0x40L; 2L -> null; else -> 0x50L }) else null,
         )
         session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels,
-                listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })) +
+                if (!tags) emptyList() else listOf(ChannelTag.create(ChannelTagId(1), name = "Favourites", channelIds = channels.map { it.id })) +
                     if (groupWithoutFirst) listOf(ChannelTag.create(ChannelTagId(2), name = "News",
                         channelIds = channels.drop(1).map { it.id })) else emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(
@@ -1499,7 +1595,9 @@ class GuideVisualLayoutTest {
                         SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
+                            var genre by remember { mutableStateOf(ProgrammeCategory.ALL) }
                             EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view, channelViewModel = model,
+                                genre = genre, onGenreChange = { genre = it },
                                 session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
                                 lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
                                 onPlayRecording = { playbackRequests++ }, notices = notices)

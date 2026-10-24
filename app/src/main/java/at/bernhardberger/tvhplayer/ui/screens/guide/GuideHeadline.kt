@@ -226,7 +226,7 @@ private fun GuideHeadlineContent(
     val event = programme?.event
     val metadata = remember(event, resources, locale) {
         event?.let {
-            programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale)
+            programmeHeaderMetadata(programmeAboutFacts(it, null, resources, locale), resources, it.episode, it.firstAired, locale, it.contentGenre)
         }.orEmpty()
     }
     val now = nowSec()

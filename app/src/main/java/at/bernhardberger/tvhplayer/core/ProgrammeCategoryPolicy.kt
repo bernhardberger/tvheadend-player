@@ -38,14 +38,3 @@ fun programmeCategory(genre: ContentGenre?): ProgrammeCategory? =
         ContentCategory.USER_DEFINED,
         null -> null
     }
-
-fun EpgEventEntry.matchesProgrammeCategory(category: ProgrammeCategory): Boolean =
-    category == ProgrammeCategory.ALL || programmeCategory(this) == category
-
-fun availableProgrammeCategories(events: Iterable<EpgEventEntry>): List<ProgrammeCategory> {
-    val available = events.mapNotNull(::programmeCategory).toSet()
-    return buildList {
-        add(ProgrammeCategory.ALL)
-        ProgrammeCategory.entries.drop(1).filterTo(this) { it in available }
-    }
-}

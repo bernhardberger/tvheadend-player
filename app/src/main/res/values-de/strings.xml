@@ -157,6 +157,8 @@
     <string name="guide_view_rows_dense">Kompakt</string>
     <string name="guide_view_rows_regular">Normal</string>
     <string name="guide_view_headline">Kopfzeile anzeigen</string>
+    <string name="guide_view_genre_colors">Genrefarben</string>
+    <string name="guide_genre">Genre</string>
     <string name="channels_show_all">Alle Sender anzeigen</string>
     <string name="channels_empty_group">Keine Sender in dieser Gruppe</string>
     <string name="clock_format_12_hour">12 Stunden (8:15\u00A0PM)</string>
@@ -246,7 +248,7 @@
     <string name="epg_search_unknown_channel">Unbekannter Sender</string>
     <string name="epg_search_result_schedule">%1$s • %2$s</string>
     <string name="epg_search_result_description">%1$s, %2$s. Sendungsdetails öffnen.</string>
-    <string name="programme_category_all">Alle</string>
+    <string name="programme_category_all">Alle Genres</string>
     <string name="programme_category_film_drama">Film &amp; Drama</string>
     <string name="programme_category_news">Nachrichten</string>
     <string name="programme_category_entertainment">Unterhaltung</string>
@@ -278,11 +280,11 @@
     <string name="epg_permission_denied">Dieses Konto darf keine Programmdaten lesen</string>
     <string name="epg_reconnecting">Verbindung mit deinem Tvheadend-Server wird wiederhergestellt…</string>
     <string name="epg_server_failure">Programm nicht verfügbar</string>
-    <string name="epg_filter_empty">Keine Sendungen entsprechen diesem Filter.</string>
     <string name="epg_state_now">läuft jetzt</string>
     <string name="epg_state_future">folgt</string>
     <string name="epg_state_past">beendet</string>
     <string name="epg_cell_description">%1$s, %2$s bis %3$s, %4$s, %5$s</string>
+    <string name="epg_cell_outside_genre">nicht %1$s</string>
     <string name="epg_details_action_hint">Sendungsaktionen erscheinen in diesem Bereich. Die Wiedergabe startet nie direkt aus dem Programm.</string>
     <string name="epg_no_actions">Für diese Sendung sind keine Aktionen verfügbar.</string>
     <string name="epg_already_aired">Diese Sendung ist bereits ausgestrahlt. Die Details bleiben zur Information verfügbar.</string>
