@@ -4,10 +4,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
@@ -72,9 +77,15 @@ internal fun ChannelsHeader(
             event.type == KeyEventType.KeyDown && event.key == towardStart && onReturnToContent?.invoke() == true
         }
         .focusProperties { if (ltr) left = rail else right = rail }
+    // A focused button outlives the data that offered it, so a reload never drops the focus;
+    // it goes once focus moves on.
+    var tagsFocused by remember { mutableStateOf(false) }
+    var filterFocused by remember { mutableStateOf(false) }
+    val tagsShown = showTags || tagsFocused
+    val filterShown = showFilter || filterFocused
     val tagsIsFirst = leading == null
-    val filterIsFirst = leading == null && !showTags
-    val viewIsFirst = leading == null && !showTags && !showFilter
+    val filterIsFirst = leading == null && !tagsShown
+    val viewIsFirst = leading == null && !tagsShown && !filterShown
     TopLevelBrowseHeader(
         title = title,
         modifier = modifier
@@ -88,11 +99,11 @@ internal fun ChannelsHeader(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 leading?.invoke(this, startEdge.focusProperties { up = FocusRequester.Cancel })
-                if (showTags || showFilter) Row(
+                if (tagsShown || filterShown) Row(
                     horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    if (showTags) RoundIconButton(
+                    if (tagsShown) RoundIconButton(
                         icon = painterResource(R.drawable.ic_sell),
                         label = stringResource(R.string.browse_tags),
                         value = tag ?: stringResource(R.string.all_channels),
@@ -102,9 +113,10 @@ internal fun ChannelsHeader(
                         onFocused = onFocused,
                         modifier = (if (tagsIsFirst) startEdge else Modifier)
                             .focusProperties { up = FocusRequester.Cancel }
+                            .onFocusChanged { tagsFocused = it.hasFocus }
                             .testTag("channels-tags-button"),
                     )
-                    if (showFilter) RoundIconButton(
+                    if (filterShown) RoundIconButton(
                         icon = painterResource(R.drawable.ic_filter_list),
                         label = stringResource(R.string.guide_filter),
                         value = filter,
@@ -114,6 +126,7 @@ internal fun ChannelsHeader(
                         onFocused = onFocused,
                         modifier = (if (filterIsFirst) startEdge else Modifier)
                             .focusProperties { up = FocusRequester.Cancel }
+                            .onFocusChanged { filterFocused = it.hasFocus }
                             .testTag("guide-filter-button"),
                     )
                 }

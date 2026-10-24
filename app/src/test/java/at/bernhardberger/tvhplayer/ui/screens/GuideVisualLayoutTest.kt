@@ -1703,6 +1703,26 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun aFocusedFilterOutlivesAReloadWithoutGenresUntilFocusMovesOn() {
+        show(genres = true, tags = false)
+        key(Key.DirectionRight)
+        tagFocused("guide-filter-button")
+        val full = compose.runOnIdle { checkNotNull(session.observation.value.epgSnapshotForDisplay) }
+        fun List<EpgEvent>.plain() = map {
+            EpgEvent.create(it.id, channelId = it.channelId, start = it.start, stop = it.stop,
+                title = it.title, summary = it.summary)
+        }
+        val plain = full.events.plain()
+        publishEvents(plain, EpgSnapshot.create(events = plain, historicalEvents = full.historicalEvents.plain(),
+            coverages = full.coverages), covered = true)
+        compose.waitForIdle()
+        tagFocused("guide-filter-button")
+        key(Key.DirectionRight)
+        tagFocused("channels-view-button")
+        compose.onNodeWithTag("guide-filter-button").assertDoesNotExist()
+        assertNoPlayback()
+    }
+
     @Test fun anOpenPanelHidesTheGridFromAccessibilityAndItsEntriesStayReadable() {
         val gridHidden = SemanticsMatcher.keyIsDefined(SemanticsProperties.HideFromAccessibility) and
             hasAnyDescendant(hasTestTag("epg-channel-row-1"))
