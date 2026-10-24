@@ -205,8 +205,21 @@ class GuideVisualLayoutTest {
         val x = ruler.left + guideTimePositionPx(now, start, start + 3 * 3600, ruler.width)
         assertLine(bitmap, x, 162, 166, 222, 226, 282, 286, 342)
         val cell = compose.onNodeWithText(title(1, 0)).fetchSemanticsNode().boundsInRoot
-        val tick = compose.onNodeWithText("20:00", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals("Ruler tick and cell start align, with the label's 6dp inset", cell.left + 6f, tick.left, 1f)
+        val label = compose.onNodeWithText("20:00", useUnmergedTree = true).fetchSemanticsNode()
+        val boundary = bounds("epg-ruler-boundary-${hour}")
+        assertEquals("The 20:00 boundary line is where its programmes start", cell.left, boundary.left, .5f)
+        assertEquals("The boundary spans the ruler band", ruler.top, boundary.top, .5f)
+        assertEquals("The boundary spans the ruler band", ruler.bottom, boundary.bottom, .5f)
+        assertEquals("The label starts at its boundary, after the label's 6dp inset", boundary.left + 6f,
+            label.boundsInRoot.left, .5f)
+        val heading = compose.onNodeWithText(context().getString(R.string.epg_channels_heading)).fetchSemanticsNode()
+        assertEquals("Channels and the time labels share one baseline", baseline(heading), baseline(label), 1f)
+        assertEquals("The shared baseline line sits centred in the band", ruler.center.y,
+            (label.boundsInRoot.top + label.boundsInRoot.bottom) / 2, 1f)
+        val firstRow = bounds("epg-channel-row-1")
+        val secondRow = bounds("epg-channel-row-2")
+        assertEquals("One 4dp gutter between rows", 4f, secondRow.top - firstRow.bottom, .1f)
+        assertEquals("Cells fill their row", firstRow.height, cell.height, .1f)
         val dotY = ruler.bottom.toInt() - 4
         assertEquals("Ruler dot and the continuous line share one mapping", lineColor, bitmap.getPixel(x.toInt(), dotY))
         assertEquals("No line above the ruler", backgroundColor, bitmap.getPixel(x.toInt(), 66))
@@ -337,7 +350,7 @@ class GuideVisualLayoutTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 view = LocalView.current
-                Box(Modifier.width(732.dp)) {
+                Box(Modifier.width(732.dp).background(androidx.compose.ui.graphics.Color.Black)) {
                     TimelineChannelRow(channel, 0, 1, null, requesters, 0, 7200,
                         { 0 }, events, true, ConnectionUiState.Ready, false,
                         { null }, {}, {})
@@ -356,6 +369,7 @@ class GuideVisualLayoutTest {
             val gapColor = bitmap.getPixel(422, y)
             val cellColor = bitmap.getPixel(419, y)
             assertNotEquals("Surfaces and timeline gap must be visibly distinct", gapColor, cellColor)
+            assertEquals("No row track: the gutter shows the page", android.graphics.Color.BLACK, gapColor)
             for (x in 420 until 424) assertEquals("Exactly four gap pixels at x=$x", gapColor, bitmap.getPixel(x, y))
             assertEquals(cellColor, bitmap.getPixel(424, y))
             assertEquals("First surface has the same 2dp leading inset", gapColor, bitmap.getPixel(113, y))
@@ -1474,13 +1488,19 @@ class GuideVisualLayoutTest {
 
         // Programmes outside Sport stay in the grid, reachable and named as such.
         fun cell(channel: Int) = hasContentDescription(title(channel, 0), substring = true)
-        val outside = hasContentDescription("not Sport", substring = true)
+        val outside = hasStateDescription("Not Sport")
         key(Key.DirectionDown)
         focused(title(1, 0))
         compose.onNode(cell(1) and outside).assertDoesNotExist()
         key(Key.DirectionDown)
         compose.onNode(cell(2) and outside).assertIsFocused()
         compose.onNode(cell(4) and outside).assertExists()
+        // The label stays the plain cell description; the state says the genre, never "disabled".
+        val label = compose.onNode(cell(2) and outside).fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString()
+        assertTrue(label, label.endsWith(context().getString(R.string.epg_state_now)) || label.endsWith(context().getString(R.string.epg_state_past)) ||
+            label.endsWith(context().getString(R.string.epg_state_future)))
+        compose.onNode(hasContentDescription("not Sport", substring = true, ignoreCase = true)).assertDoesNotExist()
+        compose.onNode(cell(2) and outside).assertIsEnabled()
         assertNoPlayback()
     }
 
@@ -1935,6 +1955,11 @@ class GuideVisualLayoutTest {
     )).captureCurrentSession())
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+    private fun baseline(text: androidx.compose.ui.semantics.SemanticsNode): Float {
+        val layouts = mutableListOf<TextLayoutResult>()
+        checkNotNull(text.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
+        return text.boundsInRoot.top + layouts.single().firstBaseline
+    }
     private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
     private fun dateButtonText(day: String, startSec: Long) = context().getString(R.string.epg_date_button, day,
         at.bernhardberger.tvhplayer.ui.common.formatClock(

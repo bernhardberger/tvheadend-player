@@ -55,6 +55,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -197,27 +198,29 @@ internal fun TimelineTimeRuler(
                 val markerOffset = with(density) {
                     guideTimePositionPx(tick, windowStartSec, windowEndSec, trackWidthPx).toDp()
                 }
-                Column(
+                // The label starts at its half-hour's boundary line, which runs the band's height
+                // where that time's programmes start; centred, it shares the heading's baseline.
+                Box(
                     modifier = Modifier
                         .align(AbsoluteAlignment.TopLeft)
                         .absoluteOffset(x = markerOffset)
                         .fillMaxHeight(),
-                    horizontalAlignment = AbsoluteAlignment.Left,
+                    contentAlignment = AbsoluteAlignment.CenterLeft,
                 ) {
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
+                            )
+                            .testTag("epg-ruler-boundary-$tick")
+                    )
                     Text(
                         text = formatHm(tick),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
-                    Spacer(Modifier.height(3.dp))
-                    Box(
-                        Modifier
-                            .width(1.dp)
-                            .weight(1f)
-                            .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
-                            )
+                        modifier = Modifier.padding(start = 6.dp, end = 6.dp),
                     )
                 }
             }
@@ -269,8 +272,10 @@ internal fun TimelineChannelRow(
     coverage: EpgCoverage? = null,
 ) {
     val nowSec = nowSecProvider()
-    // One genre label for the row's cells outside the chosen genre.
-    val outsideGenre = if (genre == ProgrammeCategory.ALL) null else programmeCategoryLabel(genre)
+    // One state for the row's cells outside the chosen genre.
+    val outsideGenre = if (genre == ProgrammeCategory.ALL) null else {
+        stringResource(R.string.epg_cell_not_genre, programmeCategoryLabel(genre))
+    }
     // Share one zone lookup across the row's cells, refreshed on the existing clock.
     val owner = LocalTabOwner.current
     val active = owner?.isCurrent != false
@@ -292,13 +297,12 @@ internal fun TimelineChannelRow(
             rows = rows,
         )
         Spacer(Modifier.width(GuideChannelGap))
+        // No track behind the cells: they sit on the page, one 4dp gutter apart, like the channel
+        // tiles. Not clipped either: a clip would cut the focused first or last cell's library scale.
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight()
-                // Drawn, not clipped: a clip at the track edge would cut the focused
-                // cell's library scale for the first and last programme of the row.
-                .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
+                .fillMaxHeight(),
         ) {
             val density = LocalDensity.current
             val layoutDirection = LocalLayoutDirection.current
@@ -392,7 +396,7 @@ internal fun TimelineChannelRow(
                         modifier = Modifier.matchParentSize(),
                     )
                 } else {
-                    TimelineRowState(state = state, modifier = Modifier.align(Alignment.Center))
+                    TimelineRowState(state = state, modifier = Modifier.matchParentSize())
                 }
             }
 
@@ -498,6 +502,7 @@ internal fun TimelineProgrammeCell(
     rows: GuideRows = GuideRows.DENSE,
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
+    /** The state a cell outside the chosen [genre] reads, such as "Not Sport". */
     outsideGenre: String? = null,
 ) {
     val contextMenu = at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger(onOpenContextMenu)
@@ -533,7 +538,8 @@ internal fun TimelineProgrammeCell(
         event.title.orEmpty(),
         stateText,
     )
-    val description = if (outside && outsideGenre != null) stringResource(R.string.epg_cell_outside_genre, cellDescription, outsideGenre) else cellDescription
+    // A dimmed cell keeps its label and says why in its state; it stays enabled and reachable.
+    val outsideState = outsideGenre?.takeIf { outside }
     val contentAlpha = if (dimmed) Modifier.alpha(GuideOutsideGenreAlpha) else Modifier
 
     val markState = recording?.state?.takeIf {
@@ -597,7 +603,10 @@ internal fun TimelineProgrammeCell(
                 focused = it.isFocused
                 if (it.isFocused) onFocused()
             }
-            .semantics { contentDescription = description }
+            .semantics {
+                contentDescription = cellDescription
+                if (outsideState != null) stateDescription = outsideState
+            }
         // The family's wash replaces the light focused container; the content keeps its focused colors.
         val itemColors = colors?.let {
             val onWash = MaterialTheme.colorScheme.inverseOnSurface
@@ -735,6 +744,7 @@ private const val GuideSkeletonBlockSec = 3_600L
 private val GuideSkeletonTitleFractions = floatArrayOf(0.7f, 0.5f, 0.6f)
 private const val GuideSkeletonTimeFraction = 0.4f
 
+/** A row's one-line reason for having no programmes, in a passive cell across the row. */
 @Composable
 private fun TimelineRowState(
     state: EpgColumnDataState,
@@ -754,16 +764,18 @@ private fun TimelineRowState(
             EpgColumnDataState.SERVER_FAILURE -> R.string.epg_server_failure
         }
     )
-    Row(
-        modifier = modifier.padding(horizontal = TvSpacing16),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
+    Box(
+        modifier = modifier
+            .padding(horizontal = TvSpacing4 / 2)
+            .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
+        contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = TvSpacing16),
         )
     }
 }

@@ -694,8 +694,13 @@ activation, DVR eligibility, confirmations and current-session guards remain.
 - Guide's continuous 2dp current-time marker paints above cells and their focus
   treatment using the same time mapping as event widths and the ruler. Its ruler
   marker stays visible during vertical scrolling; the line follows the local
-  content fade (`ui/screens/guide/GuideViewport.kt:78-88`). A channel row with
-  nothing to draw says why in one line instead of leaving empty space: no guide
+  content fade (`ui/screens/guide/GuideViewport.kt:78-88`). Each ruler time
+  label starts at its half-hour's subtle boundary line, which runs the ruler
+  band's height where that time's programmes start; "Channels" and the times
+  share one baseline centred in the band. Programme cells have no row track:
+  they sit on the page like the channel tiles, one 4dp gutter apart across and
+  between rows, so a schedule gap shows as nothing on air. A channel row with
+  nothing to draw says why in one line, in a passive cell across the row: no guide
   data for the channel, no programmes in the window, partial or stale data,
   reconnecting, permission denied, server failure or an empty filter
   (`ui/screens/guide/EpgGridContent.kt:538-552`).

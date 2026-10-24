@@ -321,10 +321,10 @@ class GuideRealisticSceneTest {
             R.string.header_button_value_description, context().getString(R.string.guide_filter), "Sport"))
         key(Key.DirectionDown)
         moveToChannel(5)
-        compose.onNode(isFocused()).assert(hasContentDescription("not Sport", substring = true))
+        compose.onNode(isFocused()).assert(hasStateDescription("Not Sport"))
         capture("u5-filter-sport-dimmed-focus")
         moveToChannel(1)
-        compose.onNode(isFocused()).assert(!hasContentDescription("not Sport", substring = true))
+        compose.onNode(isFocused()).assert(!hasStateDescription("Not Sport"))
         capture("u5-filter-sport-match-focus")
     }
 
@@ -425,7 +425,7 @@ class GuideRealisticSceneTest {
         tagFocused("channels-view-button")
         key(Key.DirectionDown)
         moveToChannel(5)
-        compose.onNode(isFocused()).assert(hasContentDescription("not Sport", substring = true))
+        compose.onNode(isFocused()).assert(hasStateDescription("Not Sport"))
         capture("u5-genre-colors-off")
     }
 
