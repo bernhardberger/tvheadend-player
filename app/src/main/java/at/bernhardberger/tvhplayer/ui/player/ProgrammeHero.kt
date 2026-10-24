@@ -56,7 +56,8 @@ fun ProgrammeHero(
             ))).padding(bottom = bottomRoom, end = endRoom), contentAlignment = Alignment.Center) {
                 Box(Modifier.size(markWidth, markHeight).testTag("programme-fallback-mark"), contentAlignment = Alignment.Center) {
                     if (picon != null && currentSession != null) {
-                        PiconBox(picon, Modifier.fillMaxSize())
+                        // On its own colour's gradient, so no ground to ink it for.
+                        PiconBox(picon, Modifier.fillMaxSize(), ground = null)
                     } else Text(channelNumber.ifBlank { stringResource(R.string.player_channel) },
                         style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.headlineSmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,

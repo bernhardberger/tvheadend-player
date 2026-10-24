@@ -23,6 +23,7 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
@@ -80,13 +81,49 @@ class PiconBoxInkTest {
         assertEquals("columns the shrunk line skips, of ${lit.first()}..${lit.last()}", 0, gaps)
     }
 
+    @Test fun aPaneLogoOnItsOwnColourKeepsItsPixels() {
+        showPanePicture(ChannelId(1))
+        compose.waitUntil(5_000) { pixels("pane-logo").dimBlue > 0 }
+        val shown = pixels("pane-logo")
+        assertTrue("the logo's own strokes expected: $shown", shown.dimBlue >= 200)
+        assertEquals("the logo on its own colour must stay as drawn: $shown", 0, shown.light)
+    }
+
+    @Test fun aPaneLogoWithoutItsColourIsInkedForThePlainGround() {
+        showPanePicture(accent = null)
+        compose.waitUntil(5_000) { pixels("pane-logo").light > 0 }
+        val shown = pixels("pane-logo")
+        assertTrue("the dim logo should be lightened: $shown", shown.light >= 200)
+    }
+
+    private fun showPanePicture(accent: ChannelId?) {
+        val session = readySession()
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(ArtworkId(1) to wordmark(DIM_BLUE))))
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize().background(DARK_FILL).padding(40.dp)) {
+                        ProvideArtworkSession(session) {
+                            ProgrammePanePicture(art = null, logo = ArtworkId(1), accent = accent, logoTag = "pane-logo",
+                                modifier = Modifier.size(268.dp, 151.dp))
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    private fun readySession() = FakeSessionObservation(SessionObservation.create(
+        sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
+        epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+        dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+    )).captureCurrentSession()
+
     private fun show(ground: Color?, fill: Color = LIGHT_FILL, width: Int = 200, height: Int = 120, logo: Bitmap = wordmark()) {
-        val session = FakeSessionObservation(SessionObservation.create(
-            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
-            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).captureCurrentSession()
+        val session = readySession()
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(ArtworkId(1) to logo)))
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
@@ -104,8 +141,8 @@ class PiconBoxInkTest {
     }
 
     /** Three thick white bars, like the letters of a light wordmark. */
-    private fun wordmark(): Bitmap = Bitmap.createBitmap(400, 240, Bitmap.Config.ARGB_8888).apply {
-        for (bar in 0 until 3) for (y in 60 until 180) for (x in 60 + bar * 110 until 120 + bar * 110) setPixel(x, y, 0xFFFFFFFF.toInt())
+    private fun wordmark(colour: Int = 0xFFFFFFFF.toInt()): Bitmap = Bitmap.createBitmap(400, 240, Bitmap.Config.ARGB_8888).apply {
+        for (bar in 0 until 3) for (y in 60 until 180) for (x in 60 + bar * 110 until 120 + bar * 110) setPixel(x, y, colour)
     }
 
     /** A white line two pixels thick, rising across the picon like ServusTV's swoosh. */
@@ -133,26 +170,32 @@ class PiconBoxInkTest {
         return lit
     }
 
-    private data class Shown(val dark: Int, val white: Int)
+    /** Near-black and white pixels, the dim blue as drawn, and light ones it would be inked to. */
+    private data class Shown(val dark: Int, val white: Int, val dimBlue: Int = 0, val light: Int = 0)
 
-    private fun pixels(): Shown {
-        val bounds = compose.onNodeWithTag("picon").fetchSemanticsNode().boundsInRoot
+    private fun pixels(tag: String = "picon"): Shown {
+        val bounds = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         var shown = Shown(0, 0)
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             var dark = 0
             var white = 0
+            var dimBlue = 0
+            var light = 0
             for (y in floor(bounds.top).toInt() until ceil(bounds.bottom).toInt()) {
                 for (x in floor(bounds.left).toInt() until ceil(bounds.right).toInt()) {
                     val pixel = bitmap.getPixel(x, y)
                     val channels = listOf(16, 8, 0).map { (pixel shr it) and 255 }
                     if (channels.all { it < 80 }) dark++
                     if (channels.all { it > 245 }) white++
+                    val (r, g, b) = channels
+                    if (b in 60..100 && r < 30 && g in 10..45) dimBlue++
+                    if (b > 200 && r > 100 && g > 120) light++
                 }
             }
             bitmap.recycle()
-            shown = Shown(dark, white)
+            shown = Shown(dark, white, dimBlue, light)
         }
         return shown
     }
@@ -160,5 +203,7 @@ class PiconBoxInkTest {
     private companion object {
         val LIGHT_FILL = Color(0xFFE1E2E5)
         val DARK_FILL = Color(0xFF111416)
+        /** Well under 1.6:1 on the dark grounds, so it is lightened there. */
+        const val DIM_BLUE = 0xFF0A1A50.toInt()
     }
 }

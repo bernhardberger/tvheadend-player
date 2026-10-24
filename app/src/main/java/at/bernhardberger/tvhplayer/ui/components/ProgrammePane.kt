@@ -86,9 +86,10 @@ internal fun ProgrammePanePicture(
         // The logo cards' ambient colour; with no text on it, it keeps its strength to the bottom.
         Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
             if (accent != null) ChannelAccentFill(logo, accent, Modifier.fillMaxSize(), bottomShare = 1f)
+            // On its own colour there is no one ground to ink it for.
             PiconBox(logo,
                 Modifier.align(Alignment.Center).fillMaxWidth(PictureLogoWidthFraction).fillMaxHeight(PictureLogoHeightFraction)
-                    .testTag(logoTag))
+                    .testTag(logoTag), ground = if (accent != null) null else TvSurfaceColors.containerLowest)
         }
     }
 }

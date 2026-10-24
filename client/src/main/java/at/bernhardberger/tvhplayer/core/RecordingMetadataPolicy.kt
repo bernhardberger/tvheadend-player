@@ -34,12 +34,12 @@ fun recordingPlannedSeconds(recording: DvrEntry): Long? =
  * What was actually recorded: the union of file intervals, extending open running files to [nowSec].
  * Only a finished recording without any file times falls back to the planned length; a running one
  * has recorded only part of it, so that and incomplete evidence stay unknown. A missed or invalid
- * entry never recorded anything, so it has no length at all.
+ * entry counts as never recorded, so it has no length at all, even when a file was left behind.
  */
 fun recordingLengthSeconds(recording: DvrEntry, nowSec: Long): Long? = when {
+    recording.state == DvrEntryState.MISSED || recording.state == DvrEntryState.INVALID -> null
     recording.files.orEmpty().any { it.start != null || it.stop != null } -> recordedFileSeconds(recording, nowSec)
     recordingIsRunning(recording) -> null
-    recording.state == DvrEntryState.MISSED || recording.state == DvrEntryState.INVALID -> null
     else -> recordingPlannedSeconds(recording)
 }
 

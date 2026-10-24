@@ -82,6 +82,8 @@ class RecordingMetadataPolicyTest {
     @Test fun anEntryThatNeverRecordedHasNoLength() {
         for (state in listOf(DvrEntryState.MISSED, DvrEntryState.INVALID)) {
             assertNull(recordingLengthSeconds(timed(state), nowSec = 99_999))
+            val leftBehind = timed(state, DvrRecordingFile.create(start = at(1_000), stop = at(1_030)))
+            assertNull(recordingLengthSeconds(leftBehind, nowSec = 99_999))
         }
     }
 
