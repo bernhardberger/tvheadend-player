@@ -44,6 +44,8 @@ directly. `:client` mirrors the app build types (`debug`, `release`, `profile`,
 - `stores/`: `LastPlayedChannelStore` (owns `tvhplayer_appliance`), `ChannelSelectionStore`.
 - `profiling/`: `ProfileTrace`, `ProfilePlayback`, `ProfilePlaybackTrace`.
 - `data/FrontendModels`.
+- `images/LogoInk`: darkens or lightens the logo parts that would vanish on a
+  known solid ground, on plain ARGB pixels without Android graphics.
 - `notices/`: typed `Notice`, the FIFO `NoticeCenter` and generation-fenced
   `NoticeContext`, plus SDK DVR-change and connection notice sources. These own
   transient-feedback policy without Android resources or presentation.

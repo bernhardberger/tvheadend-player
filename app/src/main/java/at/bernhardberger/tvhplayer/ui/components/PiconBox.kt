@@ -9,8 +9,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
@@ -19,6 +21,7 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
@@ -28,6 +31,7 @@ import coil3.request.ImageRequest
 import coil3.request.transformations
 import coil3.transform.Transformation
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
@@ -43,7 +47,13 @@ fun PiconBox(
     transformation: Transformation? = null,
     /** Without, only the logo itself shows: nothing while it loads or when there is none. */
     placeholders: Boolean = true,
+    /**
+     * The solid colour the logo sits on right now, such as a focused row's fill. Logo parts that
+     * would vanish on it change lightness; the plain logo shows until that version is ready.
+     */
+    ground: Color? = null,
 ) = profileTrace("P1:compose:picon") {
+    require(ground == null || transformation == null) { "a logo is either inked for its ground or transformed" }
     val artwork = LocalArtworkContext.current
     val currentSession = artwork.currentSession
     // Before a current session the saved copy is tried, so logos show at startup and offline.
@@ -72,17 +82,37 @@ fun PiconBox(
                 if (transformation == null) piconUrl
                 else ImageRequest.Builder(context).data(piconUrl).transformations(transformation).build()
             }
+            val groundArgb = ground?.toArgb()
+            val inkModel = remember(piconUrl, groundArgb) {
+                groundArgb?.let {
+                    // The ink rule is tuned on the server's 400×240 picons, so it reads that size, not the view's.
+                    ImageRequest.Builder(context).data(piconUrl).size(LOGO_INK_WIDTH, LOGO_INK_HEIGHT)
+                        .transformations(LogoInkTransformation(it)).build()
+                }
+            }
+            var inkShown by remember(inkModel) { mutableStateOf(false) }
             AsyncImage(
                 model = model,
                 contentDescription = null,
                 contentScale = contentScale,
                 alignment = alignment,
+                alpha = if (inkShown) 0f else 1f,
                 modifier = Modifier.fillMaxSize(),
                 // Painter slots preserve loading/error appearance without image subcomposition.
                 placeholder = loading.takeIf { placeholders },
                 error = (if (waitingForSession) loading else failed).takeIf { placeholders },
                 onError = { if (!waitingForSession) onError?.invoke() },
             )
+            if (inkModel != null) {
+                AsyncImage(
+                    model = inkModel,
+                    contentDescription = null,
+                    contentScale = contentScale,
+                    alignment = alignment,
+                    modifier = Modifier.fillMaxSize(),
+                    onSuccess = { inkShown = true },
+                )
+            }
         }
     }
 }
@@ -127,3 +157,5 @@ fun PiconPlaceholder(
 }
 
 private const val PICON_LOADING_ALPHA = 0.35f
+private const val LOGO_INK_WIDTH = 400
+private const val LOGO_INK_HEIGHT = 240

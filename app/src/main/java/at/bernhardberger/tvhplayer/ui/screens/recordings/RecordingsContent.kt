@@ -842,6 +842,8 @@ internal fun RecordingListRow(
             PiconBox(
                 piconPath = piconPath,
                 placeholderTint = androidx.tv.material3.LocalContentColor.current,
+                // The logo sits on the row's own fill, which turns light with focus.
+                ground = MaterialTheme.colorScheme.inverseSurface.takeIf { focused },
                 modifier = Modifier.size(32.dp).testTag("recording-list-leading-${recordingItemKey(entry.id)}"),
             )
         },

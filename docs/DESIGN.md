@@ -109,6 +109,13 @@ Meaning of colour:
 Typography is the TV Material scale with Roboto; no custom scale. Logos are
 drawn artwork and do not follow font scale.
 
+Logos without their own plate that sit straight on a light focused fill (the
+Recordings rows) are inked for it (trial, accepted 2026-10-24): only the pale
+parts drawn on the logo's transparent ground and that would vanish on the fill
+flip their lightness, keeping hue; plates, brand colours and dark parts stay.
+The plain logo shows until the inked copy is ready. Use it only on known solid
+grounds, never over pictures or video.
+
 Passive text steps down in three tones (accepted 2026-10-21), as the kit's
 immersive list and dialog do: the title and its subtitle, which names the
 episode, in `onSurface`; descriptions in `onSurfaceVariant` at 80%; metadata (channel, times, facts,
