@@ -24,11 +24,14 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,7 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -348,6 +356,9 @@ internal fun SideRail(
         modifier = modifier.fillMaxSize(),
     ) {
         val browseWidth = (maxWidth - ClosedDrawerWidth).coerceAtLeast(0.dp)
+        val fullWidth = maxWidth
+        // What the drawer sheet leaves the browse content, as the content is measured each frame.
+        val visibleWidthPx = remember { mutableIntStateOf(Int.MAX_VALUE) }
         // Clip at the screen edge, not at the moving content's leading edge.
         NavigationDrawer(
             modifier = Modifier
@@ -438,6 +449,7 @@ internal fun SideRail(
                                 leadingContent = { PinnedRailIcon(item.icon) },
                                 colors = drawerColors,
                                 modifier = Modifier
+                                    .withinDrawerSheet(fullWidth, visibleWidthPx)
                                     .focusProperties { canFocus = !detailsOpen && !modalOpen }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
@@ -506,6 +518,7 @@ internal fun SideRail(
                                 } else null,
                                 colors = drawerColors,
                                 modifier = Modifier
+                                    .withinDrawerSheet(fullWidth, visibleWidthPx)
                                     .focusProperties { canFocus = !detailsOpen && !modalOpen }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics {
@@ -529,7 +542,7 @@ internal fun SideRail(
                 }
             },
             content = {
-                BrowseViewport(width = browseWidth, layering = layering) {
+                BrowseViewport(width = browseWidth, layering = layering, visibleWidthPx = visibleWidthPx) {
                     CompositionLocalProvider(
                         LocalBrowseDrawerState provides drawerState,
                         LocalBrowseNavigationFocus provides activeItemFocus.takeUnless { detailsOpen || modalOpen },
@@ -615,10 +628,31 @@ private val AppDestination.testTag: String
         AppDestination.RECORDING_PLAYER -> "nav-recording-player"
     }
 
+/**
+ * tv-material's drawer sheet clips to its `animateContentSize` spring, which is slower than the
+ * width spring of its items. Opening, an item outgrows the sheet and its pill ends flat at the
+ * clip; closing, it shrinks inside it. Ending the item round, inset from the sheet's edge like the
+ * open drawer's items, makes the pill grow with the drawer. Content within the sheet is unchanged.
+ */
+private fun Modifier.withinDrawerSheet(fullWidth: Dp, visibleWidthPx: IntState): Modifier = drawWithContent {
+    val sheet = fullWidth.toPx() - visibleWidthPx.intValue
+    val visible = sheet - (DrawerStartPadding + DrawerEndPadding).toPx()
+    if (visible >= size.width) {
+        drawContent()
+        return@drawWithContent
+    }
+    val start = if (layoutDirection == LayoutDirection.Rtl) size.width - visible else 0f
+    val radius = CornerRadius(size.height / 2)
+    clipPath(Path().apply { addRoundRect(RoundRect(start, 0f, start + visible, size.height, radius)) }) {
+        this@drawWithContent.drawContent()
+    }
+}
+
 @Composable
 private fun BrowseViewport(
     width: Dp,
     layering: BrowseContentLayering,
+    visibleWidthPx: MutableIntState,
     content: @Composable () -> Unit,
 ) {
     SubcomposeLayout(
@@ -627,6 +661,8 @@ private fun BrowseViewport(
             .zIndex(-1f)
             .browseShellLayer(layering, width + ClosedDrawerWidth),
     ) { constraints ->
+        // Read only while the drawer items draw, after this frame's layout.
+        visibleWidthPx.intValue = constraints.maxWidth
         val fixedWidth = width.roundToPx()
         val cullStep = BrowseCullStep.roundToPx()
         val cullWidth = (constraints.maxWidth + cullStep - 1) / cullStep * cullStep
