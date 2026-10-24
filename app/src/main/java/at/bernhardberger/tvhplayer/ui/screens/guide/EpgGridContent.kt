@@ -64,6 +64,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.Icon
 import androidx.tv.material3.ListItem
@@ -104,6 +105,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing16
 import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppClock
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
@@ -192,54 +194,65 @@ internal fun TimelineTimeRuler(
         ) {
             val density = LocalDensity.current
             val trackWidthPx = with(density) { maxWidth.toPx() }
-            Box(Modifier.fillMaxSize().guideViewportFades(0f, trackWidthPx, earlierContent, laterContent)) {
             val firstTick = Math.floorDiv(windowStartSec + 1799L, 1800L) * 1800L
-            for (tick in firstTick until windowEndSec step 1800L) {
-                val markerOffset = with(density) {
-                    guideTimePositionPx(tick, windowStartSec, windowEndSec, trackWidthPx).toDp()
-                }
-                // The label starts at its half-hour's boundary line, which runs the band's height
-                // where that time's programmes start; centred, it shares the heading's baseline.
-                Box(
-                    modifier = Modifier
-                        .align(AbsoluteAlignment.TopLeft)
-                        .absoluteOffset(x = markerOffset)
-                        .fillMaxHeight(),
-                    contentAlignment = AbsoluteAlignment.CenterLeft,
-                ) {
-                    Box(
-                        Modifier
-                            .width(1.dp)
-                            .fillMaxHeight()
-                            .background(
-                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
+            val ticks = (firstTick until windowEndSec step 1800L).toList()
+            val nowClock = if (nowSec in windowStartSec until windowEndSec) formatClock(nowSec) else null
+            val boundaryColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)
+            val nowColor = MaterialTheme.colorScheme.primary
+            // Each half hour is a boundary line and its label; Now adds a stem and the clock pill last.
+            Layout(
+                content = {
+                    ticks.forEach { tick ->
+                        Box(Modifier.background(boundaryColor).testTag("epg-ruler-boundary-$tick"))
+                        Text(
+                            text = formatHm(tick),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 6.dp, end = 6.dp),
+                        )
+                    }
+                    if (nowClock != null) {
+                        Box(Modifier.background(nowColor))
+                        Box(
+                            Modifier
+                                .background(nowColor, CircleShape)
+                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                                .testTag("epg-now-pill"),
+                        ) {
+                            Text(
+                                text = nowClock,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimary,
+                                maxLines = 1,
                             )
-                            .testTag("epg-ruler-boundary-$tick")
-                    )
-                    Text(
-                        text = formatHm(tick),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 6.dp, end = 6.dp),
-                    )
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxSize().guideViewportFades(0f, trackWidthPx, earlierContent, laterContent),
+            ) { measurables, constraints ->
+                val width = constraints.maxWidth
+                val height = constraints.maxHeight
+                val lines = ticks.indices.map { measurables[2 * it].measure(Constraints.fixed(1.dp.roundToPx(), height)) }
+                val labels = ticks.indices.map { measurables[2 * it + 1].measure(Constraints(maxHeight = height)) }
+                val stem = measurables.getOrNull(2 * ticks.size)?.measure(Constraints.fixed(2.dp.roundToPx(), height))
+                val pill = measurables.getOrNull(2 * ticks.size + 1)?.measure(Constraints(maxWidth = width, maxHeight = height))
+                val nowX = guideTimePositionPx(nowSec, windowStartSec, windowEndSec, width.toFloat()).roundToInt()
+                val pillLeft = pill?.let { (nowX - it.width / 2).coerceIn(0, (width - it.width).coerceAtLeast(0)) } ?: 0
+                // Physical placement: chronology runs left to right in both layout directions.
+                layout(width, height) {
+                    ticks.forEachIndexed { index, tick ->
+                        val x = guideTimePositionPx(tick, windowStartSec, windowEndSec, width.toFloat()).roundToInt()
+                        lines[index].place(x, 0)
+                        // The label starts at its half-hour's boundary line and shares the heading's
+                        // centre line. One the pill would touch stays out rather than half covered.
+                        val label = labels[index]
+                        if (pill == null || x >= pillLeft + pill.width || x + label.width <= pillLeft) {
+                            label.place(x, (height - label.height) / 2)
+                        }
+                    }
+                    stem?.place(nowX - stem.width / 2, 0)
+                    pill?.place(pillLeft, (height - pill.height) / 2)
                 }
-            }
-            if (nowSec in windowStartSec until windowEndSec) {
-                val nowOffset = with(density) {
-                    guideTimePositionPx(nowSec, windowStartSec, windowEndSec, trackWidthPx).toDp()
-                }
-                Box(
-                    modifier = Modifier
-                        .align(AbsoluteAlignment.BottomLeft)
-                        .absoluteOffset(x = nowOffset - 4.dp)
-                        .width(8.dp)
-                        .height(8.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.primary,
-                            shape = CircleShape,
-                        ),
-                )
-            }
             }
         }
     }

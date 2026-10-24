@@ -77,7 +77,10 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.common.formatClock
+import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineTimeRuler
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineSettleMs
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimePositionPx
@@ -205,12 +208,15 @@ class GuideVisualLayoutTest {
         val x = ruler.left + guideTimePositionPx(now, start, start + 3 * 3600, ruler.width)
         assertLine(bitmap, x, 162, 166, 222, 226, 282, 286, 342)
         val cell = compose.onNodeWithText(title(1, 0)).fetchSemanticsNode().boundsInRoot
-        val label = compose.onNodeWithText("20:00", useUnmergedTree = true).fetchSemanticsNode()
         val boundary = bounds("epg-ruler-boundary-${hour}")
         assertEquals("The 20:00 boundary line is where its programmes start", cell.left, boundary.left, .5f)
+        // Now (20:15) carries its clock pill over the 20:00 label, so the label checks use 21:00.
+        compose.onNodeWithText("20:00", useUnmergedTree = true).assertIsNotDisplayed()
+        val label = compose.onNodeWithText("21:00", useUnmergedTree = true).fetchSemanticsNode()
+        val labelBoundary = bounds("epg-ruler-boundary-${hour + 3600}")
         assertEquals("The boundary spans the ruler band", ruler.top, boundary.top, .5f)
         assertEquals("The boundary spans the ruler band", ruler.bottom, boundary.bottom, .5f)
-        assertEquals("The label starts at its boundary, after the label's 6dp inset", boundary.left + 6f,
+        assertEquals("The label starts at its boundary, after the label's 6dp inset", labelBoundary.left + 6f,
             label.boundsInRoot.left, .5f)
         val heading = compose.onNodeWithText(context().getString(R.string.epg_channels_heading)).fetchSemanticsNode()
         assertEquals("Channels and the time labels share one baseline", baseline(heading), baseline(label), 1f)
@@ -376,6 +382,32 @@ class GuideVisualLayoutTest {
             assertEquals(cellColor, bitmap.getPixel(114, y))
             bitmap.recycle()
         }
+    }
+
+    @Test fun nowPillShowsTheClockAtNowAndHidesTheLabelItWouldCover() {
+        val nowSec = androidx.compose.runtime.mutableLongStateOf(1750L)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.width(732.dp)) {
+                    TimelineTimeRuler(0, 7200, { nowSec.longValue })
+                }
+            }
+        }
+        val ruler = bounds("epg-time-ruler")
+        val pill = bounds("epg-now-pill")
+        compose.onNode(hasText(formatClock(1750L)) and hasAnyAncestor(hasTestTag("epg-now-pill")), useUnmergedTree = true)
+            .assertIsDisplayed()
+        assertEquals("The pill is centred on now", ruler.left + guideTimePositionPx(1750L, 0, 7200, ruler.width),
+            pill.center.x, 1f)
+        assertTrue("The pill stays within the ruler band", pill.top >= ruler.top && pill.bottom <= ruler.bottom)
+        assertTrue("The covered label starts under the pill",
+            ruler.left + guideTimePositionPx(1800L, 0, 7200, ruler.width) < pill.right)
+        compose.onNodeWithText(formatHm(1800L), useUnmergedTree = true).assertIsNotDisplayed()
+        compose.onNodeWithText(formatHm(0L), useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText(formatHm(3600L), useUnmergedTree = true).assertIsDisplayed()
+        compose.runOnIdle { nowSec.longValue = 7300L }
+        compose.onNodeWithTag("epg-now-pill", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithText(formatHm(1800L), useUnmergedTree = true).assertIsDisplayed()
     }
 
     @Test fun unavailableLogoShowsNameAndRetriesWhenIconOrSessionChanges() {
@@ -995,7 +1027,8 @@ class GuideVisualLayoutTest {
             assertEquals(Instant.fromEpochSeconds(if (atHorizon) horizon else hour + 3 * 3600), through)
             assertTrue(checkNotNull(session.observation.value.epgSnapshotForDisplay).coverages.isEmpty())
         }
-        val ticks = compose.onAllNodes(hasText("", substring = true) and hasAnyAncestor(hasTestTag("epg-time-ruler")),
+        val ticks = compose.onAllNodes(hasText("", substring = true) and hasAnyAncestor(hasTestTag("epg-time-ruler")) and
+            !hasAnyAncestor(hasTestTag("epg-now-pill")),
             useUnmergedTree = true).fetchSemanticsNodes()
         assertEquals("The displayed two-hour window has four half-hour ticks", 4, ticks.size)
         assertEquals(bounds("epg-time-ruler").width / 4, ticks[1].boundsInRoot.left - ticks[0].boundsInRoot.left, 1f)
