@@ -90,7 +90,8 @@ Meaning of colour:
     and cards, the zap rail cards, the player's programme info and schedule
     tiles, programme details, the context menu header and the Recordings pane.
     Scheduled is a neutral badge with a clock and "Scheduled", failed an `error`
-    badge with "Failed" (or "Missed" for a recording that never ran), errors
+    badge with "Failed" (or "Missed" for a recording that never ran), canceled
+    (an invalid entry) a neutral badge with the cancel mark and "Canceled", errors
     while recording a red `● REC` plus an `error` "Errors" badge. "On now"
     and "Available until" are neutral badges.
   - In Recordings overlines a failure, missed recordings included, is an

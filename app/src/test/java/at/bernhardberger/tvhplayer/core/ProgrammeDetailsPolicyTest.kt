@@ -104,8 +104,9 @@ class ProgrammeDetailsPolicyTest {
         assertEquals(DetailsStatus.SCHEDULED, detailsStatus(event, recording(DvrEntryState.SCHEDULED), 50))
         assertEquals(DetailsStatus.RECORDING_ERRORS, detailsStatus(event, recording(DvrEntryState.RECORDING_ERROR), 150))
         assertEquals(DetailsStatus.MISSED, detailsStatus(null, recording(DvrEntryState.MISSED), 150))
-        listOf(DvrEntryState.INVALID,
-            DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
+        // Canceled is neutral, as in the list, the pane and Problems; only real failures are red.
+        assertEquals(DetailsStatus.CANCELLED, detailsStatus(null, recording(DvrEntryState.INVALID), 150))
+        listOf(DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING).forEach {
             assertEquals(DetailsStatus.FAILED, detailsStatus(null, recording(it), 150))
         }
         assertNull(detailsStatus(null, recording(DvrEntryState.COMPLETED), 150))

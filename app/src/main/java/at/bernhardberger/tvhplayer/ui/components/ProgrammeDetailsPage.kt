@@ -1128,6 +1128,7 @@ private fun DetailsStatusBadge(status: DetailsStatus?, label: String? = null) {
         DetailsStatus.RECORDING_ERRORS -> RecordingBadge(DvrEntryState.RECORDING_ERROR)
         DetailsStatus.SCHEDULED -> RecordingBadge(DvrEntryState.SCHEDULED)
         DetailsStatus.MISSED -> RecordingBadge(DvrEntryState.MISSED)
+        DetailsStatus.CANCELLED -> RecordingBadge(DvrEntryState.INVALID)
         DetailsStatus.FAILED -> RecordingBadge(DvrEntryState.COMPLETED_ERROR)
         DetailsStatus.ON_NOW -> StatusBadge(stringResource(R.string.details_status_on_now), StatusBadgeTone.NEUTRAL)
         null -> StatusBadge(checkNotNull(label) { "A status-less badge requires a label" }, StatusBadgeTone.NEUTRAL)

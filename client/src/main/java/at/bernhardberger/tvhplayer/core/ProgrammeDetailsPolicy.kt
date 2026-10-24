@@ -6,7 +6,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 
-enum class DetailsStatus { ON_NOW, RECORDING, RECORDING_ERRORS, SCHEDULED, MISSED, FAILED }
+enum class DetailsStatus { ON_NOW, RECORDING, RECORDING_ERRORS, SCHEDULED, MISSED, CANCELLED, FAILED }
 
 fun detailsStatus(event: EpgEvent?, recording: DvrEntry?, nowSec: Long): DetailsStatus? =
     when (recording?.state) {
@@ -15,7 +15,7 @@ fun detailsStatus(event: EpgEvent?, recording: DvrEntry?, nowSec: Long): Details
         // Tvheadend is still recording; the errors so far do not make it a failure yet.
         DvrEntryState.RECORDING_ERROR -> DetailsStatus.RECORDING_ERRORS
         DvrEntryState.MISSED -> DetailsStatus.MISSED
-        DvrEntryState.INVALID,
+        DvrEntryState.INVALID -> DetailsStatus.CANCELLED
         DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> DetailsStatus.FAILED
         else -> DetailsStatus.ON_NOW.takeIf {
             event != null && nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds

@@ -2,6 +2,7 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
@@ -104,10 +105,10 @@ fun PiconBox(
                         .placeholderMemoryCacheKey(shown[0]).apply { if (shown[0] != null) crossfade(false) }.build()
                 }
             }
-            // Until the box has its size the logo looks as if it is loading, as it would anyway.
-            if (model == null) {
-                if (placeholders) Image(loading, null, Modifier.fillMaxSize())
-            } else AsyncImage(
+            // Until the box has its size, one frame, nothing shows, so a logo already in memory
+            // appears without the loading icon flashing before it. The box keeps the space it is given.
+            if (model == null) Spacer(Modifier.fillMaxSize())
+            else AsyncImage(
                 model = model,
                 contentDescription = null,
                 contentScale = contentScale,

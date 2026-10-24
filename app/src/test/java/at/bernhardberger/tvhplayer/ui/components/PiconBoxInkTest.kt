@@ -10,6 +10,19 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import coil3.ImageLoader
+import coil3.asImage
+import coil3.decode.DataSource
+import coil3.fetch.Fetcher
+import coil3.fetch.ImageFetchResult
+import coil3.key.Keyer
+import coil3.memory.MemoryCache
+import coil3.request.crossfade
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
@@ -80,6 +93,58 @@ class PiconBoxInkTest {
         assertTrue("the line spans ${lit.size} columns: $lit", lit.size >= 50)
         assertEquals("columns the shrunk line skips, of ${lit.first()}..${lit.last()}", 0, gaps)
     }
+
+    @Test fun reinkingForANewGroundSwapsTheShownLogoWithoutTheLoadingIconBetween() {
+        var ground by mutableStateOf(DARK_FILL)
+        images.install(cachingLoader(mapOf(ArtworkId(1) to wordmark())))
+        val session = readySession()
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize().background(LIGHT_FILL).padding(40.dp)) {
+                        ProvideArtworkSession(session) {
+                            PiconBox(ArtworkId(1), Modifier.size(200.dp, 120.dp).testTag("picon"), ground = ground)
+                        }
+                    }
+                }
+            }
+        }
+        // The first load fades in over the loading icon; then the white logo stands whole.
+        compose.waitUntil(5_000) { pixels().white >= WHOLE_LOGO }
+
+        compose.mainClock.autoAdvance = false
+        ground = LIGHT_FILL
+        val frames = mutableListOf<Shown>()
+        val frameColours = mutableListOf<String>()
+        val deadline = System.currentTimeMillis() + 5_000
+        do {
+            compose.mainClock.advanceTimeByFrame()
+            frames += pixels()
+            frameColours += colours()
+            if (frames.last().let { it.dark >= WHOLE_LOGO && it.white == 0 }) break
+            Thread.sleep(10)
+        } while (System.currentTimeMillis() < deadline)
+        compose.mainClock.autoAdvance = true
+
+        assertTrue("the logo should end inked dark: ${frames.last()}", frames.last().dark >= WHOLE_LOGO)
+        assertTrue("every frame shows one whole logo, never the icon or a blend; most common colours per frame:\n" +
+            frameColours.joinToString("\n"), frames.all { it.white >= WHOLE_LOGO || it.dark >= WHOLE_LOGO })
+    }
+
+    /** Loads [images] through Coil's own decode path, so transformations, the memory cache and the fade are real. */
+    private fun cachingLoader(images: Map<ArtworkId, Bitmap>): ImageLoader =
+        ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).components {
+            add(Fetcher.Factory<AppArtworkSource> { data, _, _ ->
+                Fetcher {
+                    val image = images[data.id] ?: error("no fixture art for ${data.id}")
+                    ImageFetchResult(image.copy(Bitmap.Config.ARGB_8888, false).asImage(), isSampled = false, DataSource.MEMORY)
+                }
+            }, AppArtworkSource::class)
+            // As the SDK's artwork keyer does in the app: without a key nothing is memory-cached.
+            add(Keyer<AppArtworkSource> { data, _ -> "fixture-art:${data.id}" }, AppArtworkSource::class)
+        }.memoryCache { MemoryCache.Builder().maxSizeBytes(16L * 1024 * 1024).build() }
+            .crossfade(PlayerMotion.MediumMs).build()
 
     @Test fun aPaneLogoOnItsOwnColourKeepsItsPixels() {
         showPanePicture(ChannelId(1))
@@ -171,6 +236,22 @@ class PiconBoxInkTest {
     }
 
     /** Near-black and white pixels, the dim blue as drawn, and light ones it would be inked to. */
+    /** The picon's four most common colours with their counts, to tell a failed frame's icon from a blend. */
+    private fun colours(): String {
+        val bounds = compose.onNodeWithTag("picon", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        var out = ""
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val counts = HashMap<Int, Int>()
+            for (y in floor(bounds.top).toInt() until ceil(bounds.bottom).toInt())
+                for (x in floor(bounds.left).toInt() until ceil(bounds.right).toInt()) counts.merge(bitmap.getPixel(x, y), 1, Int::plus)
+            out = counts.entries.sortedByDescending { it.value }.take(4).joinToString { "%06X×%d".format(it.key and 0xFFFFFF, it.value) }
+            bitmap.recycle()
+        }
+        return out
+    }
+
     private data class Shown(val dark: Int, val white: Int, val dimBlue: Int = 0, val light: Int = 0)
 
     private fun pixels(tag: String = "picon"): Shown {
@@ -204,6 +285,8 @@ class PiconBoxInkTest {
         val LIGHT_FILL = Color(0xFFE1E2E5)
         val DARK_FILL = Color(0xFF111416)
         /** Well under 1.6:1 on the dark grounds, so it is lightened there. */
+        /** The three bars at 200×120 hold 5,400 pixels; edges may blend. */
+        const val WHOLE_LOGO = 4_500
         const val DIM_BLUE = 0xFF0A1A50.toInt()
     }
 }

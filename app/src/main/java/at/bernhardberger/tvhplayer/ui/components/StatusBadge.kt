@@ -105,6 +105,9 @@ fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: 
             StatusBadge(stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
                 modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
                 contentDescription = stringResource(R.string.recording_notice_missed))
+        DvrEntryState.INVALID ->
+            StatusBadge(stringResource(R.string.recording_state_cancelled), StatusBadgeTone.NEUTRAL,
+                modifier.testTag("recording-badge-cancelled"), icon = R.drawable.ic_cancel_outlined)
         else -> Unit
     }
 }

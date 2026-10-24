@@ -474,6 +474,18 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Canceled", useUnmergedTree = true).assertDoesNotExist()
     }
 
+    @Test fun invalidRecordingPaneBadgeSaysCanceledInTheNeutralTone() {
+        val entry = recording(31, "Dropped entry", null, DvrEntryState.INVALID)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingMetadataPane(entry, null, null)
+            }
+        }
+        compose.onNodeWithTag("recording-badge-cancelled", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Canceled", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithText("Failed", useUnmergedTree = true).assertDoesNotExist()
+    }
+
     @Test fun crowdedPaneShortensItsTitleAndKeepsSubtitleAndStatus() {
         val start = 1_791_000_000L - 86_400L
         val entry = DvrEntry.create(DvrEntryId(1), title = LONG_TITLE, state = DvrEntryState.COMPLETED, folder = emptyList(),

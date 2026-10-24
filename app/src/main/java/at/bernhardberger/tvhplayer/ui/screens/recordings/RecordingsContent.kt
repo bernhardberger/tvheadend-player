@@ -120,8 +120,6 @@ import at.bernhardberger.tvhplayer.ui.components.LocalTabOwner
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
-import at.bernhardberger.tvhplayer.ui.components.StatusBadge
-import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
 import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
@@ -391,11 +389,7 @@ internal fun RecordingMetadataPane(
                     entry.start?.epochSeconds?.let { formatRecordingDate(it, dateOnly = true, locale = locale) },
                 ).joinToString(" • "), Modifier.testTag("recording-metadata-eyebrow")) {
                     // The pane's eyebrow badge, as on the details page; a completed recording needs none.
-                    when (entry.state) {
-                        DvrEntryState.INVALID ->
-                            StatusBadge(dvrStateLabel(entry.state), StatusBadgeTone.NEUTRAL, icon = R.drawable.ic_cancel_outlined)
-                        else -> RecordingBadge(entry.state)
-                    }
+                    RecordingBadge(entry.state)
                 }
             },
             title = entry.title.orEmpty(),
