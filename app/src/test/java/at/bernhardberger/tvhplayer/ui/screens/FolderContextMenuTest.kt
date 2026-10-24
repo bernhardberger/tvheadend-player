@@ -133,12 +133,16 @@ class FolderContextMenuTest {
         }
     }
 
-    @Test fun aSecondFolderActionWaitsForTheFirst() {
+    @Test fun aSecondFolderActionWaitsForTheFirstEvenFromAScreenOpenedAgain() {
         val gate = CompletableDeferred<Unit>().also { watchGate = it }
         show(seriesFolder())
         openFolderMenu()
         compose.onNodeWithText("Mark all as watched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.waitUntil(10_000) { watchCalls.size == 1 }
+        screenShown.value = false
+        compose.onNodeWithTag("recordings-folder-Series").assertDoesNotExist()
+        screenShown.value = true
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("recordings-folder-Series").fetchSemanticsNodes().isNotEmpty() }
         openFolderMenu()
         compose.onNodeWithText("Mark all as unwatched").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(DvrEntryId(1) to true), watchCalls) }
@@ -205,10 +209,12 @@ class FolderContextMenuTest {
             deleteEntry = { _, id -> deleteCalls += id; onDeleteCall(id) },
         )
         notices = NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) }
+        // As in the app, the screen state outlives the screen.
+        val state = RecordingsScreenState()
         compose.setContent {
             TVHeadendPlayerTheme {
                 if (screenShown.value) RecordingsScreenContent(observation = session.observation.collectAsState().value,
-                    currentObservation = { session.observation.value }, state = RecordingsScreenState(),
+                    currentObservation = { session.observation.value }, state = state,
                     dvrMutationActions = actions, notices = notices)
             }
         }

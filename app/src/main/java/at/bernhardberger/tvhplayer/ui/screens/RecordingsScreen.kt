@@ -182,6 +182,9 @@ class RecordingsScreenState {
     val mode = mutableStateOf(DvrLibraryMode.ARCHIVE)
     val archiveNavigation = DepthNavigationState(DepthStack(listOf(DepthFrame("archive:"))))
     val archivePath: List<String> get() = archiveLevelPath(archiveNavigation.stack.active.levelId)
+
+    /** Folder actions run one at a time, also when one still finishes after the screen was left and opened again. */
+    internal val folderActionLock = Mutex()
 }
 
 private data class RecordingsTabBody(
@@ -320,14 +323,13 @@ internal fun RecordingsScreenContent(
         folderMenu = null
     }
 
-    val folderActionLock = remember { Mutex() }
     fun runFolderAction(action: BrowseContextAction, session: CurrentSessionObservation, recordingIds: List<DvrEntryId>) {
         scope.launch {
             val noticeContext = notices.context()
             // A folder action finishes and reports even when the screen leaves halfway, and a second
             // one waits for the first so both never send the same recording.
             withContext(NonCancellable) {
-                folderActionLock.withLock {
+                screenState.folderActionLock.withLock {
                     dvrMutationActions.runFolderAction(action, session, recordingIds) { latestObservationProvider() }
                 }?.let { notices.post(it, noticeContext) }
             }
