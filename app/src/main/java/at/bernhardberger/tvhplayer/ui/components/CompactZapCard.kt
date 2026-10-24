@@ -143,6 +143,8 @@ internal fun CompactZapCard(
                         modifier = Modifier.fillMaxWidth(CompactZapLogoWidthFraction).fillMaxHeight().outset(halo)
                             .testTag("$tag-picon"),
                         transformation = haloTransformation,
+                        // Over the picture there is no one colour to ink the logo for; its halo keeps it readable.
+                        ground = null,
                     )
                 }
                 // The kit's embed corner holds the recording badge, as on the player's schedule tiles.

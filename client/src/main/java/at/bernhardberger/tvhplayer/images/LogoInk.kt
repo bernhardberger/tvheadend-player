@@ -20,6 +20,7 @@ fun inkFadingLogoParts(pixels: IntArray, width: Int, height: Int, background: In
     require(pixels.size == width * height) { "pixels must hold width × height values" }
     val size = pixels.size
     val ground = luminance(background)
+    val colouredLimit = if (ground < DARK_GROUND_LUMINANCE) PALE_COLOURED_CONTRAST_ON_DARK else PALE_COLOURED_CONTRAST
     val luma = FloatArray(size)
     val pale = BooleanArray(size)
     val solid = BooleanArray(size)
@@ -30,7 +31,7 @@ fun inkFadingLogoParts(pixels: IntArray, width: Int, height: Int, background: In
         if (p ushr 24 > 127) {
             solid[i] = true
             solidCount++
-            val limit = if (chroma(p) < NEUTRAL_CHROMA) PALE_NEUTRAL_CONTRAST else PALE_COLOURED_CONTRAST
+            val limit = if (chroma(p) < NEUTRAL_CHROMA) PALE_NEUTRAL_CONTRAST else colouredLimit
             pale[i] = contrast(luma[i], ground) < limit
         }
     }
@@ -172,6 +173,15 @@ private const val PALE_NEUTRAL_CONTRAST = 1.8f
 
 /** ...colours only under this one, so a mid-tone brand colour that still reads keeps its colour. */
 private const val PALE_COLOURED_CONTRAST = 1.5f
+
+/**
+ * On a dark ground a dim colour gets a little more room: dark blues like PULS 24's sit just above
+ * 1.5 and still vanish, while on a light ground 1.6 already browns a mid orange like teleSUR's.
+ */
+private const val PALE_COLOURED_CONTRAST_ON_DARK = 1.6f
+
+/** A background darker than this counts as a dark ground. */
+private const val DARK_GROUND_LUMINANCE = 0.18f
 
 /** A part sits on the ground when under this share of its border touches the logo's own ink. */
 private const val MAX_INK_BORDER_SHARE = 0.25f

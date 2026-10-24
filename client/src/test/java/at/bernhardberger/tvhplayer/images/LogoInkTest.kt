@@ -4,6 +4,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class LogoInkTest {
@@ -34,6 +35,15 @@ class LogoInkTest {
         assertEquals(PALE_GOLD and 0xFF000000.toInt(), inked[beside.at(225, 120)] and 0xFF000000.toInt())
     }
 
+    @Test fun aDimBlueWordmarkLightensOnTheDarkScreen() {
+        // 1.55:1 on the screen, like PULS 24's blue: above the light-ground limit, under the dark one.
+        val logo = Logo().bars(DIM_BLUE, 40, 60)
+        val lightened = checkNotNull(inkFadingLogoParts(logo.pixels, W, H, DARK_SCREEN))
+        val stroke = lightened[logo.at(45, 120)]
+        assertEquals(0xFF, stroke ushr 24)
+        assertTrue("stroke must turn light, got ${Integer.toHexString(stroke)}", (stroke and 0xFF) > 0xC0)
+    }
+
     @Test fun aLogoWithoutPalePartsIsLeftAlone() {
         val dark = Logo().bars(DARK, 40, 60)
         assertNull(inkFadingLogoParts(dark.pixels, W, H, FOCUSED_ROW))
@@ -60,6 +70,8 @@ class LogoInkTest {
         const val W = 400
         const val H = 240
         const val FOCUSED_ROW = 0xFFE1E2E5.toInt()
+        const val DARK_SCREEN = 0xFF111416.toInt()
+        const val DIM_BLUE = 0xFF103080.toInt()
         const val WHITE = 0xFFFFFFFF.toInt()
         const val DARK = 0xFF202020.toInt()
         const val RED = 0xFFC8102E.toInt()

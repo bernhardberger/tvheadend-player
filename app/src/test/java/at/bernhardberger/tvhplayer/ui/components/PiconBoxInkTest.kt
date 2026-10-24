@@ -71,21 +71,30 @@ class PiconBoxInkTest {
         assertEquals("nothing may be darkened: $shown", 0, shown.dark)
     }
 
-    private fun show(ground: Color?) {
+    @Test fun aThinLineDrawnFarSmallerStaysALineRatherThanDots() {
+        show(ground = DARK_FILL, fill = DARK_FILL, width = 72, height = 40, logo = slopedLine())
+        compose.waitUntil(5_000) { litColumns().isNotEmpty() }
+        val lit = litColumns()
+        val gaps = (lit.first()..lit.last()).count { it !in lit }
+        assertTrue("the line spans ${lit.size} columns: $lit", lit.size >= 50)
+        assertEquals("columns the shrunk line skips, of ${lit.first()}..${lit.last()}", 0, gaps)
+    }
+
+    private fun show(ground: Color?, fill: Color = LIGHT_FILL, width: Int = 200, height: Int = 120, logo: Bitmap = wordmark()) {
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
         )).captureCurrentSession()
-        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(ArtworkId(1) to wordmark())))
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(ArtworkId(1) to logo)))
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
-                    Box(Modifier.fillMaxSize().background(LIGHT_FILL).padding(40.dp)) {
+                    Box(Modifier.fillMaxSize().background(fill).padding(40.dp)) {
                         ProvideArtworkSession(session) {
-                            PiconBox(ArtworkId(1), Modifier.size(200.dp, 120.dp).testTag("picon"), ground = ground)
+                            PiconBox(ArtworkId(1), Modifier.size(width.dp, height.dp).testTag("picon"), ground = ground)
                         }
                     }
                 }
@@ -97,6 +106,31 @@ class PiconBoxInkTest {
     /** Three thick white bars, like the letters of a light wordmark. */
     private fun wordmark(): Bitmap = Bitmap.createBitmap(400, 240, Bitmap.Config.ARGB_8888).apply {
         for (bar in 0 until 3) for (y in 60 until 180) for (x in 60 + bar * 110 until 120 + bar * 110) setPixel(x, y, 0xFFFFFFFF.toInt())
+    }
+
+    /** A white line two pixels thick, rising across the picon like ServusTV's swoosh. */
+    private fun slopedLine(): Bitmap = Bitmap.createBitmap(400, 240, Bitmap.Config.ARGB_8888).apply {
+        for (x in 20 until 380) {
+            val top = 60 + x * 3 / 10
+            for (y in top until top + 2) setPixel(x, y, 0xFFFFFFFF.toInt())
+        }
+    }
+
+    /** The picon's columns where the line shows clearly brighter than the dark fill. */
+    private fun litColumns(): List<Int> {
+        val bounds = compose.onNodeWithTag("picon").fetchSemanticsNode().boundsInRoot
+        val lit = mutableListOf<Int>()
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            for (x in floor(bounds.left).toInt() until ceil(bounds.right).toInt()) {
+                val brightest = (floor(bounds.top).toInt() until ceil(bounds.bottom).toInt())
+                    .maxOf { y -> (bitmap.getPixel(x, y) shr 8) and 255 }
+                if (brightest > 40) lit += x
+            }
+            bitmap.recycle()
+        }
+        return lit
     }
 
     private data class Shown(val dark: Int, val white: Int)
@@ -125,5 +159,6 @@ class PiconBoxInkTest {
 
     private companion object {
         val LIGHT_FILL = Color(0xFFE1E2E5)
+        val DARK_FILL = Color(0xFF111416)
     }
 }

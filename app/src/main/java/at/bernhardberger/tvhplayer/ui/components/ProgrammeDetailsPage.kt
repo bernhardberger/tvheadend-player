@@ -794,11 +794,13 @@ internal fun DetailsHero(
  * The channel's logo for a programme without art: in the immersive Channels list in the corner
  * below the header, and on the details page in the corner over the glow, scrolling away with the
  * page. At this size a placeholder would be the loudest thing on the page, so only the logo itself
- * shows.
+ * shows. It sits on its own colour's glow rather than the dark screen, so it is drawn as it is, the
+ * same request [LoadDetailsHeroLogo] made ahead.
  */
 @Composable
 internal fun DetailsHeroLogo(picon: ArtworkId?, modifier: Modifier) {
-    PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second), placeholders = false)
+    PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second), placeholders = false,
+        ground = null)
 }
 
 /**

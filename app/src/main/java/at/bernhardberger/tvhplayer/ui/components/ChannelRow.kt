@@ -185,6 +185,7 @@ fun ChannelRow(
             ) {
                 PiconBox(
                     piconPath = piconPath,
+                    ground = TvSurfaceColors.containerLowest,
                     modifier = Modifier
                         .testTag("channel-picon")
                         .fillMaxSize()

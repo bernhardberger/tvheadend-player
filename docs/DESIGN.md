@@ -112,12 +112,16 @@ Meaning of colour:
 Typography is the TV Material scale with Roboto; no custom scale. Logos are
 drawn artwork and do not follow font scale.
 
-Logos without their own plate that sit straight on a light focused fill (the
-Recordings rows) are inked for it (trial, accepted 2026-10-24): only the pale
-parts drawn on the logo's transparent ground and that would vanish on the fill
-flip their lightness, keeping hue; plates, brand colours and dark parts stay.
-The plain logo shows until the inked copy is ready. Use it only on known solid
-grounds, never over pictures or video.
+Every logo is inked for the colour behind it (accepted 2026-10-24): only
+the parts drawn on the logo's transparent ground that would vanish there flip
+their lightness, keeping hue; plates, brand colours and readable parts stay.
+`PiconBox` assumes the dark screen background, which also holds under the
+app's scrims; a caller on another solid colour names it (a focused row's light
+fill, the Channels logo plate). On dark grounds a colour counts as vanishing
+below 1.6:1, on light ones below 1.5:1, where 1.6 would turn mid oranges brown.
+A logo with its own treatment or ground (zap card halo, the details hero logo on
+its own colour's glow) is left alone.
+When the ground changes, the logo shown last stays until the new copy is ready.
 
 Passive text steps down in three tones (accepted 2026-10-21), as the kit's
 immersive list and dialog do: the title and its subtitle, which names the
