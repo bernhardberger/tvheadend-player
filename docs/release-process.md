@@ -81,6 +81,12 @@ released pin in `tools/prepare-release`. Central deletes snapshots after 90
 days, so an old `main` commit that pins one may stop building. That is accepted;
 release commits always pin a released SDK.
 
+All five SDK modules resolve to the one catalog version: a rule in the root
+`build.gradle.kts` rewrites every `sdk-*` request, because a development
+build's POM and module metadata point at the floating `-SNAPSHOT` of its
+sibling modules. If the build numbers of one SDK run drifted between modules,
+re-run the SDK publication rather than pinning modules separately.
+
 Resolving a timestamped pin from the snapshot repository stays unproven until
 the SDK publishes its first development build. Prove the first development pin
 on a branch before it lands on `main`: one real resolution of the pin, and the

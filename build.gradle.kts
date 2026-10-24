@@ -16,7 +16,23 @@ plugins {
     alias(libs.plugins.kotlin.serialization) apply false
 }
 
+// Every TVHeadend SDK module (sdk-*) resolves to the catalog version, before its metadata is
+// fetched. An SDK development build's POM and module metadata point at the floating X.Y.Z-SNAPSHOT
+// of its sibling modules, which no repository here serves. A no-op for a released SDK. The HTSP
+// library shares the group but keeps its own version.
+val tvheadendSdkVersion = libs.versions.tvheadend.sdk.get()
+
 subprojects {
+    configurations.configureEach {
+        resolutionStrategy.eachDependency {
+            if (requested.group == "at.bernhardberger.tvheadend" && requested.name.startsWith("sdk-") &&
+                requested.version != tvheadendSdkVersion
+            ) {
+                useVersion(tvheadendSdkVersion)
+                because("all TVHeadend SDK modules share the catalog version")
+            }
+        }
+    }
     tasks.withType<Test>().configureEach {
         // Client tests use declared Gradle inputs and test-owned temporary files. App tests also
         // read source/evidence through user.dir and write undeclared evidence under ../artifacts.
