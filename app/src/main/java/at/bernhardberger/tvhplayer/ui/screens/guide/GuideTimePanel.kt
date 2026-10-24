@@ -91,10 +91,12 @@ internal data class GuideTimeHour(val start: ZonedDateTime, val selected: Boolea
 internal fun guideTimeHours(windowStartSec: Long, bounds: GuideWindowBounds, zoneId: ZoneId): List<GuideTimeHour> {
     val window = Instant.ofEpochSecond(windowStartSec).atZone(zoneId)
     return (0..23).mapNotNull { hour ->
-        val start = ZonedDateTime.ofLocal(window.toLocalDate().atTime(hour, 0), zoneId,
-            window.offset.takeIf { hour == window.hour })
-        GuideTimeHour(start, hour == window.hour).takeIf {
-            start.hour == hour && start.toEpochSecond() in bounds.earliestStartSec..bounds.latestStartSec
-        }
+        val local = window.toLocalDate().atTime(hour, 0)
+        val occurrences = zoneId.rules.getValidOffsets(local).map { ZonedDateTime.ofLocal(local, zoneId, it) }
+            .ifEmpty { listOf(ZonedDateTime.ofLocal(local, zoneId, null)).filter { it.hour == hour } }
+            .filter { it.toEpochSecond() in bounds.earliestStartSec..bounds.latestStartSec }
+        val start = occurrences.firstOrNull { hour == window.hour && it.offset == window.offset }
+            ?: occurrences.firstOrNull()
+        start?.let { GuideTimeHour(it, hour == window.hour) }
     }
 }

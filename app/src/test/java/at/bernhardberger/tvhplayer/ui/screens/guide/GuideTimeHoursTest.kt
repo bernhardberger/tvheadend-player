@@ -47,6 +47,15 @@ class GuideTimeHoursTest {
         assertEquals(first, guideTimeHours(evening, anyStart, zone).single { it.start.hour == 2 }.start.toEpochSecond())
     }
 
+    @Test fun anEarliestBoundInTheSecondAutumnOccurrenceKeepsThatHour() {
+        val zone = ZoneId.of("Europe/Berlin")
+        val second = zoned(LocalDateTime.of(2026, 10, 25, 2, 0), zone, ZoneOffset.ofHours(1))
+        val evening = LocalDateTime.of(2026, 10, 25, 8, 0).atZone(zone).toEpochSecond()
+        val hours = guideTimeHours(evening, GuideWindowBounds(second, Long.MAX_VALUE / 2), zone)
+        assertEquals((2..23).toList(), hours.map { it.start.hour })
+        assertEquals(second, hours.first().start.toEpochSecond())
+    }
+
     @Test fun onlyHoursWithinTheBoundsAreOffered() {
         val zone = ZoneId.of("Europe/Berlin")
         val day = LocalDateTime.of(2026, 10, 5, 0, 0)
