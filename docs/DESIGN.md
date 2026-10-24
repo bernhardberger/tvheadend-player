@@ -82,8 +82,8 @@ Meaning of colour:
     it as a number. The
     trailing slot belongs to where OK leads, such as a folder's chevron.
     A running recording with errors adds the `error` "!" beside the dot. Guide
-    cells also mark a finished recording with the dot and a failed one with the
-    `error` "!". No dot
+    cells also mark a finished recording with the dot and a failed or missed one
+    with the `error` "!". No dot
     on section headings or titles; the "Recording now" folder carries its dot
     as a badge on the folder icon.
   - **Badge** (one size: 20dp, 4dp corners, `labelMedium`) in eyebrows, info
@@ -95,7 +95,8 @@ Meaning of colour:
     badge with "Failed" (or "Missed" for a recording that never ran), canceled
     (an invalid entry) a neutral badge with the cancel mark and "Canceled", errors
     while recording a red `● REC` plus an `error` "Errors" badge. "On now"
-    and "Available until" are neutral badges.
+    and "Available until" are neutral badges. The Guide headline badges what
+    its cells mark: also a neutral "Recorded" with a dot.
   - In Recordings overlines a failure, missed recordings included, is an
     `error` "!" symbol; cancelled and stopped early are muted symbols. Problems
     lists missed recordings under "Failed"; only invalid entries are "Canceled"

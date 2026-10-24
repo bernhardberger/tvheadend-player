@@ -1407,11 +1407,11 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
-    @Test fun aFinishedRecordingIsTheDotAndAFailedOneTheErrorMarkWhileMissedHasNone() {
+    @Test fun aFinishedRecordingIsTheDotAndAFailedOrMissedOneTheErrorMarkAndTheHeadlineBadgesThem() {
         // Past programmes come from the history fixture: channel 1 recorded, 2 failed, 4 missed.
         fun recording(id: Long, channel: Int, state: DvrEntryState) =
             DvrEntry.create(DvrEntryId(id), eventId = EventId(channel * 100L + 9), state = state)
-        show(recordings = listOf(
+        show(headline = true, recordings = listOf(
             recording(1, 1, DvrEntryState.COMPLETED),
             recording(2, 2, DvrEntryState.COMPLETED_ERROR),
             recording(3, 4, DvrEntryState.MISSED),
@@ -1424,6 +1424,12 @@ class GuideVisualLayoutTest {
         ).fetchSemanticsNodes().size
         fun description(channel: Int, offset: Int) = compose.onNode(hasContentDescription(title(channel, offset), substring = true))
             .fetchSemanticsNode().config.getOrElseNullable(SemanticsProperties.ContentDescription) { null }.orEmpty().joinToString()
+        fun headlineBadge(tag: String) {
+            compose.mainClock.advanceTimeBy(GuideHeadlineSettleMs + 300)
+            compose.waitForIdle()
+            compose.onNode(hasTestTag(tag) and hasAnyAncestor(hasTestTag("guide-headline")), useUnmergedTree = true)
+                .assertIsDisplayed()
+        }
 
         key(Key.DirectionDown)
         focused(title(1, 0))
@@ -1437,15 +1443,21 @@ class GuideVisualLayoutTest {
         assertEquals(1, mark("guide-cell-recording-mark", 1, -1))
         assertEquals(0, mark("guide-cell-failed-mark", 1, -1))
         assertTrue(description(1, -1), description(1, -1).contains(context().getString(R.string.details_recorded)))
+        headlineBadge("recording-badge-recorded")
         key(Key.DirectionDown)
         focused(title(2, -1))
         assertEquals(0, mark("guide-cell-recording-mark", 2, -1))
         assertEquals(1, mark("guide-cell-failed-mark", 2, -1))
         assertTrue(description(2, -1), description(2, -1).contains(context().getString(R.string.recording_state_failed)))
-        // The history window is open, so the missed programme's cell is in the grid without focus.
-        compose.onNode(hasContentDescription(title(4, -1), substring = true)).assertExists()
+        headlineBadge("recording-badge-failed")
+        // Channel 3 has no guide data, so Down passes it.
+        key(Key.DirectionDown)
+        focused(title(4, -1))
         assertEquals(0, mark("guide-cell-recording-mark", 4, -1))
-        assertEquals(0, mark("guide-cell-failed-mark", 4, -1))
+        assertEquals(1, mark("guide-cell-failed-mark", 4, -1))
+        assertTrue(description(4, -1), description(4, -1).contains(context().getString(R.string.recording_notice_missed)))
+        assertFalse(description(4, -1), description(4, -1).contains(context().getString(R.string.recording_state_failed)))
+        headlineBadge("recording-badge-missed")
         assertNoPlayback()
     }
 

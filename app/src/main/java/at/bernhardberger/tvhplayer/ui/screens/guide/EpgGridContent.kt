@@ -503,14 +503,16 @@ internal fun TimelineProgrammeCell(
     val markState = recording?.state?.takeIf {
         recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED
     }
-    // A failed recording is the `error` "!" alone; one still running with errors adds it beside its dot.
+    // A failed or missed recording is the `error` "!" alone; one still running with errors adds it
+    // beside its dot.
     val failed = when (recording?.state) {
-        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> true
-        else -> false
+        DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED_ERROR, DvrEntryState.FILE_MISSING -> R.string.recording_state_failed
+        DvrEntryState.MISSED -> R.string.recording_notice_missed
+        else -> null
     }
     Box(modifier = modifier) {
         // Recordings carry their mark at the right end of the title line, as channel and Recordings
-        // rows do: the title ellipsizes first and the time line keeps its width. Missed and invalid
+        // rows do: the title ellipsizes first and the time line keeps its width. Cancelled and invalid
         // ones carry none, which keeps the grid quiet.
         val headline: @Composable () -> Unit = {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = contentAlpha) {
@@ -531,13 +533,12 @@ internal fun TimelineProgrammeCell(
                         modifier = Modifier.testTag("guide-cell-recording-mark"),
                     )
                 }
-                if (failed) {
+                if (failed != null) {
                     Spacer(Modifier.width(TvSpacing4))
                     Icon(
                         painter = painterResource(R.drawable.ic_error_outlined),
                         // The dot of a running recording already names its errors.
-                        contentDescription = stringResource(R.string.recording_state_failed)
-                            .takeIf { markState == null },
+                        contentDescription = stringResource(failed).takeIf { markState == null },
                         modifier = Modifier.size(StatusIconSize).testTag("guide-cell-failed-mark"),
                         tint = if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error,
                     )

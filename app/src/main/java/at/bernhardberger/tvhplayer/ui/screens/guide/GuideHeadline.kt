@@ -53,6 +53,8 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineSynopsisGap
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadge
+import at.bernhardberger.tvhplayer.ui.components.StatusBadgeTone
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
@@ -212,6 +214,7 @@ internal fun GuideHeadline(
  * on another day names its day, and only one on air has progress. Without a programme the
  * channel's missing guide data takes the title.
  */
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 @Composable
 private fun GuideHeadlineContent(
     programme: GuideHeadlineProgramme?,
@@ -230,11 +233,13 @@ private fun GuideHeadlineContent(
         }.orEmpty()
     }
     val now = nowSec()
-    // The rows' marks, a running recording or a scheduled one, and a failed one as details names it.
-    val recording = event?.let { observation.dvrEntryForEvent(it.id) }
+    // The rows' marks as badges: a running recording or a scheduled one, a failed one as details
+    // names it, and, beyond details, a finished one and a missed one.
+    // The held event, as the cells pass it: the ID lookup only knows the current snapshot, not history.
+    val recording = event?.let { observation.dvrEntryForEvent(it) }
     val mark = recording?.state?.takeIf {
-        recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED ||
-            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.FILE_MISSING
+        recordingIsRunning(recording) || it == DvrEntryState.SCHEDULED || it == DvrEntryState.COMPLETED ||
+            it == DvrEntryState.COMPLETED_ERROR || it == DvrEntryState.FILE_MISSING || it == DvrEntryState.MISSED
     }
     ProgrammeHeadline(
         eyebrow = {
@@ -242,7 +247,14 @@ private fun GuideHeadlineContent(
                 val channel = programme.channel
                 ProgrammeEyebrow(channel.icon, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.semantics(mergeDescendants = true) {}.testTag("guide-headline-channel")) {
-                    RecordingBadge(mark)
+                    when (mark) {
+                        DvrEntryState.COMPLETED -> StatusBadge(stringResource(R.string.details_recorded), StatusBadgeTone.NEUTRAL,
+                            Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_fiber_manual_record)
+                        DvrEntryState.MISSED -> StatusBadge(stringResource(R.string.recording_state_missed), StatusBadgeTone.ERROR,
+                            Modifier.testTag("recording-badge-missed"), icon = R.drawable.ic_error_outlined,
+                            contentDescription = stringResource(R.string.recording_notice_missed))
+                        else -> RecordingBadge(mark)
+                    }
                 }
             }
         },
