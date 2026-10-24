@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import at.bernhardberger.tvhplayer.settings.GuideRows
@@ -89,6 +90,21 @@ internal fun Modifier.guideNowLine(
         drawRect(color, Offset(x - 1.dp.toPx(), 0f), Size(2.dp.toPx(), size.height))
     }
 }
+
+/**
+ * A row's track ends where its fade reaches zero, so a focused cell's scale cannot paint past a faded
+ * edge into the channel gap at full strength. Edges without a fade keep the growth unclipped.
+ */
+internal fun Modifier.guideFadedEdgeClip(earlier: Boolean, later: Boolean): Modifier =
+    if (!earlier && !later) this else drawWithContent {
+        // Physical sides, like the fades: earlier is always left.
+        clipRect(
+            left = if (earlier) 0f else -size.width,
+            top = -size.height,
+            right = if (later) size.width else size.width * 2,
+            bottom = size.height * 2,
+        ) { this@drawWithContent.drawContent() }
+    }
 
 /** Local alpha masks: no scrim is added to headings, scopes, controls or live video. */
 internal fun Modifier.guideViewportFades(

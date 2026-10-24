@@ -277,6 +277,8 @@ internal fun GuideTimelineBody(
                     ),
                     focusStartInset = horizontalFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
                     focusEndInset = horizontalFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
+                    earlierContent = frame.earlierContent,
+                    laterContent = frame.laterContent,
                     rows = rows,
                     genre = genre,
                     genreColors = genreColors,

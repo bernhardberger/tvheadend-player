@@ -266,6 +266,8 @@ internal fun TimelineChannelRow(
     visibleRowWidthPx: Int? = null,
     focusStartInset: Dp = 0.dp,
     focusEndInset: Dp = 0.dp,
+    earlierContent: Boolean = false,
+    laterContent: Boolean = false,
     rows: GuideRows = GuideRows.DENSE,
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
@@ -298,11 +300,13 @@ internal fun TimelineChannelRow(
         )
         Spacer(Modifier.width(GuideChannelGap))
         // No track behind the cells: they sit on the page, one 4dp gutter apart, like the channel
-        // tiles. Not clipped either: a clip would cut the focused first or last cell's library scale.
+        // tiles. Clipped only at a faded edge: elsewhere a clip would cut the focused first or last
+        // cell's library scale.
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxHeight(),
+                .fillMaxHeight()
+                .guideFadedEdgeClip(earlierContent, laterContent),
         ) {
             val density = LocalDensity.current
             val layoutDirection = LocalLayoutDirection.current

@@ -260,6 +260,30 @@ class GuideRealisticSceneTest {
         capture("guide-fixture-coastal-seven-hour")
     }
 
+    @Test fun focusedCellUnderTheEarlierFadeDoesNotPaintIntoTheChannelGap() {
+        showAt("2026-09-15T14:10:00")
+        key(Key.DirectionDown)
+        focusedChannel(1)
+        // The earliest window cannot move back far enough to clear the earlier fade.
+        val event = eventsByFixtureId.getValue("evt-ch-harbor-sport-20260915T0700")
+        seekEvent(event)
+        assertTrue(event.start.epochSeconds < checkNotNull(position.position.value).windowStartSec)
+        capture("guide-fixture-earlier-fade-focus")
+        val focusedRow = compose.onNodeWithTag("epg-channel-header-1").fetchSemanticsNode().boundsInRoot
+        val otherRow = compose.onNodeWithTag("epg-channel-header-2").fetchSemanticsNode().boundsInRoot
+        lateinit var bitmap: Bitmap
+        compose.runOnIdle {
+            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+        }
+        // The 8dp gap between the channel column and the track shows the page, like every other row's.
+        val x = (focusedRow.right + 6f).toInt()
+        assertEquals("The focused cell's scale paints unfaded left of the track",
+            Integer.toHexString(bitmap.getPixel(x, otherRow.center.y.toInt())),
+            Integer.toHexString(bitmap.getPixel(x, focusedRow.center.y.toInt())))
+        bitmap.recycle()
+    }
+
     @Test fun declaredGapsStayEmptyWithoutBlockingDpadNavigation() {
         showAt("2026-09-15T15:00:00")
         key(Key.DirectionDown)
