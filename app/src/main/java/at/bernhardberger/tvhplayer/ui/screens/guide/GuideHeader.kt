@@ -53,7 +53,7 @@ internal fun guideHeaderMinHeight(): Dp = with(LocalDensity.current) {
 }
 
 /**
- * The Guide's header row in the Channels header pattern, with "Guide" as its pane title and nothing
+ * The Guide's buttons-only row above the headline, with "Guide" as its pane title and nothing
  * drawn for it: the date button, Tags
  * (only with a choice of channel sets) naming the active [tag], Filter (only with [showFilter])
  * naming the highlighted [genre] after its [genreDot], and View options. Down moves to the

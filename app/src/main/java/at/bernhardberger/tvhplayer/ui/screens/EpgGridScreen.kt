@@ -135,6 +135,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderMinHeight
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
@@ -148,7 +149,6 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFilterPanel
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
-import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
@@ -1777,7 +1777,7 @@ fun EpgGridScreen(
                 observation = observation,
                 scopeObservation = channelScopeState.observation,
                 nowSec = nowSecProvider,
-                logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
+                logoTop = contentPadding.calculateTopPadding() + guideHeaderMinHeight(),
                 endInset = max(endPadding, TvBrowseTrailingInset),
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = browseAlpha() },
             )

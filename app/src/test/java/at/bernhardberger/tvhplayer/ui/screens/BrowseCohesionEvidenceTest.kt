@@ -284,6 +284,12 @@ class BrowseCohesionEvidenceTest {
         assertEquals(0f, art.top.value, .5f)
         assertEquals(116f, (art.bottom - headline.bottom).value, .5f)
         assertEquals(16f / 9f, (art.right - art.left) / (art.bottom - art.top), .01f)
+        // The headline sits below the buttons, anchored to the ruler gap.
+        val header = compose.onNodeWithTag("channels-header", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(header.bottom.value, headline.top.value, .5f)
+        assertEquals(header.left.value, headline.left.value, .5f)
+        val timing = compose.onNodeWithTag("guide-headline-metadata", useUnmergedTree = true).getUnclippedBoundsInRoot()
+        assertEquals(headline.bottom.value, timing.bottom.value, .5f)
         key(Key.DirectionCenter)
         compose.onNodeWithText("Watch").assertIsDisplayed()
         capture("guide-details", 1f, "Guide current programme details; first action", hasText("Watch"), fullscreenDetails = true)

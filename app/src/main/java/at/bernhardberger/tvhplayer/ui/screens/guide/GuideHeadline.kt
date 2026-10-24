@@ -165,22 +165,29 @@ internal fun GuideHeadlineBackground(
 private val GuideHeadlineTitleStyle @Composable get() = MaterialTheme.typography.headlineSmall
 
 /**
- * Room for the eyebrow, a one-line title, the facts and the time, as the Channels hero computes
- * it without a synopsis, so about five rows stay below. A second title line or a subtitle has no
- * room of its own: HeadlineColumn gives way inside it, the grid stays.
+ * Room for the eyebrow, a one-line title, a subtitle, the facts and the time, without a synopsis.
+ * The subtitle adds its text line height and top padding; beyond that HeadlineColumn gives way
+ * inside the fixed height, so the grid stays put.
  */
 @Composable
-private fun guideHeadlineHeight(): Dp {
+internal fun guideHeadlineHeight(): Dp {
     val typography = MaterialTheme.typography
     return with(LocalDensity.current) {
-        maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + ProgrammeHeadlineTitleGap +
-            GuideHeadlineTitleStyle.lineHeight.toDp() + ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight +
+        guideHeadlineEyebrowHeight() + ProgrammeHeadlineTitleGap +
+            GuideHeadlineTitleStyle.lineHeight.toDp() + typography.bodyLarge.lineHeight.toDp() + 4.dp +
+            ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight +
             ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp()
     }
 }
 
+/** The eyebrow's line: its picon, or its text once that is taller. */
+@Composable
+internal fun guideHeadlineEyebrowHeight(): Dp = with(LocalDensity.current) {
+    maxOf(GuideHeadlinePiconHeight, MaterialTheme.typography.labelMedium.lineHeight.toDp())
+}
+
 /** The room between the headline and the time ruler below it. */
-private val GuideHeadlineRulerGap = 12.dp
+internal val GuideHeadlineRulerGap = 12.dp
 
 /**
  * How far the headline's picture reaches below the headline and its gap: over the time ruler and
@@ -191,8 +198,9 @@ private val GuideHeadlinePictureReach = 104.dp
 
 /**
  * The Guide's headline: who and what the settled [programme] is ([rememberSettledGuideHeadline]),
- * passive, at a fixed height so the grid below stays put; shorter text sits on its bottom edge.
- * Before anything is focused it shows the programme the grid enters.
+ * passive, below the header row at a fixed height with room for a subtitle, so the grid stays put.
+ * Shorter text sits on its bottom edge, anchored to the ruler gap. Before anything is focused it
+ * shows the programme the grid enters.
  */
 @Composable
 internal fun GuideHeadline(

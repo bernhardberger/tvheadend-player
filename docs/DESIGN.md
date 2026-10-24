@@ -682,7 +682,13 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   and Filter 8dp apart, and View options, 20dp between the groups. Filter shows
   once the guide carries genre codes (or while a genre is chosen) and opens
   "Filter by genre": All genres and the genre families, each with its color dot
-  while View options' Genre colors is on. The active genre's pill adds that dot. A 104dp channel column (124dp with
+  while View options' Genre colors is on. The active genre's pill adds that dot.
+  The passive headline of the settled programme (View options' Headline) sits
+  below the buttons-only header row, bottom-aligned to the ruler gap and at most
+  480dp wide. Its fixed height includes room for a subtitle under a one-line title
+  without displacing the facts; that extra line scales with the subtitle's text
+  style and top padding. There is no synopsis, and accessibility reads the
+  headline after the buttons. A 104dp channel column (124dp with
   Regular rows) and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
   programme rows (`ui/screens/guide/GuideViewport.kt:17-18`). Timeline content continues to the physical

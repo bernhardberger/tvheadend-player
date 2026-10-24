@@ -791,7 +791,7 @@ private const val GuideSkeletonTimeFraction = 0.4f
 
 /**
  * The whole Guide while it prepares its first frame: the header's empty row, the loading
- * headline when shown, and [GuideSkeletonGrid] below, in the real screen's places.
+ * headline below when shown, and [GuideSkeletonGrid] below, in the real screen's places.
  */
 @Composable
 internal fun GuidePreparationSkeleton(
