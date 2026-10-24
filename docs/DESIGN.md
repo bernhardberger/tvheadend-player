@@ -680,17 +680,18 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   "Filter by genre": All genres and the genre families, each with its color dot
   while View options' Genre colors is on. The active genre's pill adds that dot. A 124dp channel column and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
-  programme rows (`ui/screens/guide/GuideViewport.kt:17-18`). Timeline and channel content may continue to the physical
-  trailing/bottom edges beneath local 48dp fades. Leading/top fades appear only
-  when more content exists there. Headers, controls and scopes remain clear.
+  programme rows (`ui/screens/guide/GuideViewport.kt:17-18`). Timeline content continues to the physical
+  trailing/bottom edges and is simply cut there; only the edge beside the channel
+  column (left in LTR, right in RTL) and the top edge under the ruler fade, over a
+  local 48dp and only when more content exists there. Headers, controls and scopes remain clear.
   Settled focused cells remain inside the unfaded area; real data/history bounds
   must not imply unavailable overflow. Preserve physical Left earlier/Right later.
-- At a terminal physical edge, reserve 48dp plus 8dp breathing room
+- At a terminal physical edge, reserve 8dp breathing room
   rather than letting focus touch the screen edge. This is blank spatial padding,
   not additional time availability. Ruler, cells and Now share its mapping;
   normal cells retain their full duration allocation. Apply it on physical right
   for LTR future bounds and physical left for RTL history bounds. Continuing
-  edges retain overflow and fades, and time capacity is not reduced a second time.
+  edges retain overflow and the inner fade, and time capacity is not reduced a second time.
 - Guide's continuous 2dp current-time marker paints above cells and their focus
   treatment using the same time mapping as event widths and the ruler. Its ruler
   marker stays visible during vertical scrolling; the line follows the local

@@ -195,6 +195,7 @@ internal fun TimelineTimeRuler(
         ) {
             val density = LocalDensity.current
             val trackWidthPx = with(density) { maxWidth.toPx() }
+            val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
             val firstTick = Math.floorDiv(windowStartSec + 1799L, 1800L) * 1800L
             val ticks = (firstTick until windowEndSec step 1800L).toList()
             val nowClock = if (nowSec in windowStartSec until windowEndSec) formatClock(nowSec) else null
@@ -229,7 +230,9 @@ internal fun TimelineTimeRuler(
                         }
                     }
                 },
-                modifier = Modifier.fillMaxSize().guideViewportFades(0f, trackWidthPx, earlierContent, laterContent),
+                modifier = Modifier.fillMaxSize().guideViewportFades(
+                    0f, trackWidthPx, guideInnerContinuation(earlierContent, laterContent, isRtl), isRtl,
+                ),
             ) { measurables, constraints ->
                 val width = constraints.maxWidth
                 val height = constraints.maxHeight
@@ -314,15 +317,18 @@ internal fun TimelineChannelRow(
         )
         Spacer(Modifier.width(GuideChannelGap))
         // No track behind the cells: they sit on the page, one 4dp gutter apart, like the channel
-        // tiles. Clipped at a faded edge, so a cell never paints past its fade into the channel gap.
+        // tiles. Clipped at the faded inner edge, so a cell never paints past its fade into the channel gap.
+        val layoutDirection = LocalLayoutDirection.current
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .guideFadedEdgeClip(earlierContent, laterContent),
+                .guideFadedEdgeClip(
+                    guideInnerContinuation(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl),
+                    layoutDirection == LayoutDirection.Rtl,
+                ),
         ) {
             val density = LocalDensity.current
-            val layoutDirection = LocalLayoutDirection.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
                 with(density) { guideChannelWidth(rows).roundToPx() + GuideChannelGap.roundToPx() },
             )

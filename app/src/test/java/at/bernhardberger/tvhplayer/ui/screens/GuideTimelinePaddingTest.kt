@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusInsets
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideInnerContinuation
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import org.junit.Assert.assertEquals
@@ -26,7 +28,7 @@ class GuideTimelinePaddingTest {
         assertEquals(50.dp, padding.calculateStartPadding(LayoutDirection.Ltr))
         assertEquals(0.dp, padding.calculateEndPadding(LayoutDirection.Ltr))
         assertEquals(8.dp, padding.calculateTopPadding())
-        assertEquals(56.dp, padding.calculateBottomPadding())
+        assertEquals(32.dp, padding.calculateBottomPadding())
     }
 
     @Test
@@ -48,11 +50,24 @@ class GuideTimelinePaddingTest {
     @Test
     fun onlyThePhysicalOuterContinuationControlsTerminalReserve() {
         for (gutterContinuation in listOf(false, true)) {
-            assertEquals(56.dp, guideTerminalViewportReserve(gutterContinuation, false, false))
+            assertEquals(8.dp, guideTerminalViewportReserve(gutterContinuation, false, false))
             assertEquals(0.dp, guideTerminalViewportReserve(gutterContinuation, true, false))
-            assertEquals(56.dp, guideTerminalViewportReserve(false, gutterContinuation, true))
+            assertEquals(8.dp, guideTerminalViewportReserve(false, gutterContinuation, true))
             assertEquals(0.dp, guideTerminalViewportReserve(true, gutterContinuation, true))
         }
+    }
+
+    @Test
+    fun onlyTheEdgeNextToTheChannelColumnFadesAndNeedsTheFadeInFocusInsets() {
+        // LTR: the column is on the left, so earlier content is the inner edge; RTL mirrors it.
+        assertEquals(true, guideInnerContinuation(true, false, false))
+        assertEquals(false, guideInnerContinuation(false, true, false))
+        assertEquals(true, guideInnerContinuation(false, true, true))
+        assertEquals(false, guideInnerContinuation(true, false, true))
+        assertEquals(56.dp to 8.dp, guideFocusInsets(true, true, false))
+        assertEquals(8.dp to 8.dp, guideFocusInsets(false, true, false))
+        assertEquals(8.dp to 56.dp, guideFocusInsets(true, true, true))
+        assertEquals(8.dp to 8.dp, guideFocusInsets(true, false, true))
     }
 
     @Test
@@ -63,9 +78,9 @@ class GuideTimelinePaddingTest {
                 PaddingValues(start = 24.dp, top = 32.dp, end = 48.dp, bottom = 32.dp), direction, reserve,
             )
             assertEquals(50.dp, padding.calculateStartPadding(direction))
-            assertEquals(56.dp, padding.calculateEndPadding(direction))
+            assertEquals(8.dp, padding.calculateEndPadding(direction))
             assertEquals(8.dp, padding.calculateTopPadding())
-            assertEquals(56.dp, padding.calculateBottomPadding())
+            assertEquals(32.dp, padding.calculateBottomPadding())
         }
         assertEquals(10800L, guideVisibleWindowSec(650f, 32, 1f))
         assertEquals(7200L, guideVisibleWindowSec(650f, 43, 1f))

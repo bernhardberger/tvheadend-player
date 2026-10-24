@@ -571,7 +571,7 @@ class GuideVisualLayoutTest {
         val x = guideTimePositionPx(now, start, start + 3 * 3600, ruler.width)
         assertLine(bitmap, x, 222, 226, 290, 294)
         assertEquals(lineColor, bitmap.getPixel(x.toInt(), ruler.bottom.toInt() - 4))
-        assertReadableFocus()
+        assertReadableFocus(LayoutDirection.Rtl)
         bitmap.recycle()
     }
 
@@ -634,10 +634,9 @@ class GuideVisualLayoutTest {
         assertReadableFocus()
         val bitmap = capture("guide-scrolled", 1f, LayoutDirection.Ltr)
         val viewport = bounds("epg-timeline-content")
-        // Alpha reaches the backdrop, including at the top after real rows have scrolled out.
+        // Alpha reaches the backdrop at the top after real rows have scrolled out; the bottom and
+        // right edges are hard cuts and do not fade.
         assertNearBackground(bitmap.getPixel(750, viewport.top.toInt()), 8)
-        assertNearBackground(bitmap.getPixel(750, 539), 8)
-        assertNearBackground(bitmap.getPixel(959, 300), 8)
         bitmap.recycle()
         val window = checkNotNull(position.position.value).windowStartSec
         key(Key.Back)
@@ -859,7 +858,7 @@ class GuideVisualLayoutTest {
             android.graphics.Color.red(bitmap.getPixel(it, y)) > 180
         }
         assertTrue("Native scaled leading edge stays clear of the fade", nativeFocusPixels.first() >= ruler.left + 48)
-        assertTrue("Native scaled trailing edge stays clear of the fade", nativeFocusPixels.last() < ruler.right - 48)
+        assertTrue("Native scaled trailing edge stays inside the 8dp reserve", nativeFocusPixels.last() < ruler.right - 8)
         bitmap.recycle()
     }
 
@@ -1964,12 +1963,15 @@ class GuideVisualLayoutTest {
         callsAtEntry = session.calls.size
     }
 
-    private fun assertReadableFocus() {
+    private fun assertReadableFocus(direction: LayoutDirection = LayoutDirection.Ltr) {
         val focus = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
         val ruler = bounds("epg-time-ruler")
-        assertTrue("Focus left $focus", focus.left >= ruler.left + 48f)
-        assertTrue("Focus right $focus", focus.right <= ruler.right - 48f)
-        assertTrue("Focus bottom $focus", focus.bottom <= 492f)
+        // Only the edge beside the channel column and the top edge fade; the others keep 8dp.
+        val leftInset = if (direction == LayoutDirection.Ltr) 48f else 8f
+        val rightInset = if (direction == LayoutDirection.Ltr) 8f else 48f
+        assertTrue("Focus left $focus", focus.left >= ruler.left + leftInset)
+        assertTrue("Focus right $focus", focus.right <= ruler.right - rightInset)
+        assertTrue("Focus bottom $focus", focus.bottom <= bounds("epg-timeline-content").bottom - 8f)
         val first = compose.onAllNodesWithTag("epg-channel-row-1").fetchSemanticsNodes().singleOrNull()
         if (first == null || first.boundsInRoot.top < bounds("epg-timeline-content").top) {
             assertTrue("Focus top $focus", focus.top >= bounds("epg-timeline-content").top + 48f)
@@ -2005,11 +2007,11 @@ class GuideVisualLayoutTest {
         assertEquals("Complete focus ring height", focus.height, native.height, 1f)
         assertEquals("The ring remains centred on its time allocation", focus.center.x, native.center.x, 1f)
         if (direction == LayoutDirection.Ltr) {
-            assertTrue("The ring must end inside the physical 48dp safe area: $native", native.right <= bitmap.width - 48f)
+            assertTrue("The ring must end inside the physical 8dp safe area: $native", native.right <= bitmap.width - 8f)
         } else {
-            assertTrue("The ring must start inside the physical 48dp safe area: $native", native.left >= 48f)
+            assertTrue("The ring must start inside the physical 8dp safe area: $native", native.left >= 8f)
         }
-        val safeArea = if (direction == LayoutDirection.Ltr) bitmap.width - 48 until bitmap.width else 0 until 48
+        val safeArea = if (direction == LayoutDirection.Ltr) bitmap.width - 8 until bitmap.width else 0 until 8
         for (y in (focus.top.toInt() - 4)..(focus.bottom.toInt() + 4)) {
             for (x in safeArea) {
                 assertEquals("Terminal safe area also excludes antialiased focus pixels at ($x,$y)", backgroundColor, bitmap.getPixel(x, y))

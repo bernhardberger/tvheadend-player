@@ -280,6 +280,53 @@ class GuideRealisticSceneTest {
         bitmap.recycle()
     }
 
+    @Test fun onlyTheInnerEdgesFadeWhileTheOuterEdgesCutAtFullStrength() {
+        showAt("2026-09-15T19:40:00")
+        moveToChannel(14)
+        val viewport = compose.onNodeWithTag("epg-timeline-content").fetchSemanticsNode().boundsInRoot
+        fun rowBounds(channel: Long) = compose.onAllNodesWithTag("epg-channel-row-$channel")
+            .fetchSemanticsNodes().singleOrNull()?.boundsInRoot
+        fun cells(channel: Long) = compose.onAllNodes(isFocusable() and hasAnyAncestor(hasTestTag("epg-channel-row-$channel")))
+            .fetchSemanticsNodes().map { it.boundsInRoot }
+        val rows = channels.mapNotNull { channel -> rowBounds(channel.id.value)?.let { channel.id.value to it } }
+        val focusedRow = checkNotNull(rowBounds(14))
+        val rowCells = cells(14)
+        val bitmap = snapshot()
+        fun hex(x: Float, y: Float) = Integer.toHexString(bitmap.getPixel(x.toInt(), y.toInt()))
+        val y = focusedRow.top + 4f
+        // Later edge: the last cell reaches the screen edge and is drawn at full strength up to it.
+        val last = rowCells.maxBy { it.right }
+        assertTrue("The last cell reaches the outer edge", last.right > viewport.right - 4f && last.width > 60f)
+        assertEquals("No later fade: the outer end of the cell is as strong as its inside",
+            hex(last.left + 30f, y), hex(last.right - 4f, y))
+        // Earlier edge: the first cell fades in from the channel column.
+        val trackLeft = compose.onNodeWithTag("epg-channel-header-14").fetchSemanticsNode().boundsInRoot.right + 8f
+        assertTrue("A cell spans the earlier fade", rowCells.any { it.left < trackLeft + 4f && it.right > trackLeft + 60f })
+        assertNotEquals("The earlier fade is still there", hex(trackLeft + 44f, y), hex(trackLeft + 4f, y))
+        // Below: the row cut by the viewport's bottom edge shows its fill unfaded. Above: the row cut by the
+        // top edge still fades in under the ruler.
+        fun cellX(channel: Long) = checkNotNull(cells(channel).firstOrNull { it.left > viewport.left + 60f && it.width > 60f }) {
+            "channel $channel cells ${cells(channel)} viewport $viewport"
+        }.left + 6f
+        val (bottomChannel, bottomRow) = checkNotNull(rows.singleOrNull { (_, row) ->
+            row.bottom >= viewport.bottom - .5f && row.height < 52f
+        }) { "no bottom cut row: viewport $viewport rows $rows" }
+        val bottomX = cellX(bottomChannel)
+        val inside = bitmap.getPixel(bottomX.toInt(), (bottomRow.top + 1f).toInt())
+        val edge = bitmap.getPixel(bottomX.toInt(), (viewport.bottom - 1f).toInt())
+        // A 48dp fade would move the last pixel rows by several levels; the fill itself varies by one.
+        assertTrue("No lower fade: the cut row is as strong at the edge as inside it: ${Integer.toHexString(inside)} ${Integer.toHexString(edge)}",
+            listOf(android.graphics.Color::red, android.graphics.Color::green, android.graphics.Color::blue)
+                .all { kotlin.math.abs(it(inside) - it(edge)) <= 1 })
+        val (topChannel, _) = checkNotNull(rows.singleOrNull { (_, row) -> row.top <= viewport.top + .5f && row.height < 52f }) {
+            "no top cut row: viewport $viewport rows $rows"
+        }
+        val topX = cellX(topChannel)
+        assertNotEquals("The upper fade is still there", hex(topX, viewport.top + 4f), hex(topX, viewport.top + 20f))
+        capture("guide-fixture-inner-edges-fade")
+        bitmap.recycle()
+    }
+
     @Test fun declaredGapsStayEmptyWithoutBlockingDpadNavigation() {
         showAt("2026-09-15T15:00:00")
         key(Key.DirectionDown)

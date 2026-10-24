@@ -30,7 +30,21 @@ internal fun guideTerminalViewportReserve(
     isRtl: Boolean,
 ): Dp {
     val outerContinuation = if (isRtl) earlierContent else laterContent
-    return if (outerContinuation) 0.dp else GuideEdgeFade + GuideFocusReserve
+    return if (outerContinuation) 0.dp else GuideFocusReserve
+}
+
+/** The edge next to the channel column: earlier in LTR, later in RTL, where the column sits on the right. */
+internal fun guideInnerContinuation(earlierContent: Boolean, laterContent: Boolean, isRtl: Boolean): Boolean =
+    if (isRtl) laterContent else earlierContent
+
+/** The physical left and right insets that keep a focused cell clear of the inner fade and the outer edge. */
+internal fun guideFocusInsets(
+    earlierContent: Boolean,
+    laterContent: Boolean,
+    isRtl: Boolean,
+): Pair<Dp, Dp> {
+    val fade = if (guideInnerContinuation(earlierContent, laterContent, isRtl)) GuideEdgeFade else 0.dp
+    return if (isRtl) GuideFocusReserve to GuideFocusReserve + fade else GuideFocusReserve + fade to GuideFocusReserve
 }
 
 /** Physical chronology is identical in LTR and RTL, including between ruler ticks. */
@@ -90,40 +104,42 @@ internal fun Modifier.guideNowLine(
 }
 
 /**
- * A row's track ends where its fade reaches zero, so a focused cell cannot paint past a faded edge
- * into the channel gap at full strength. Edges without a fade stay unclipped.
+ * A row's track ends where its inner fade reaches zero, so a focused cell cannot paint past the fade
+ * into the channel gap at full strength. The outer edge has no fade and is not clipped.
  */
-internal fun Modifier.guideFadedEdgeClip(earlier: Boolean, later: Boolean): Modifier =
-    if (!earlier && !later) this else drawWithContent {
-        // Physical sides, like the fades: earlier is always left.
+internal fun Modifier.guideFadedEdgeClip(innerContinues: Boolean, isRtl: Boolean): Modifier =
+    if (!innerContinues) this else drawWithContent {
+        // Physical sides, like the fades: the inner edge is left in LTR and right in RTL.
         clipRect(
-            left = if (earlier) 0f else -size.width,
+            left = if (isRtl) -size.width else 0f,
             top = -size.height,
-            right = if (later) size.width else size.width * 2,
+            right = if (isRtl) size.width else size.width * 2,
             bottom = size.height * 2,
         ) { this@drawWithContent.drawContent() }
     }
 
-/** Local alpha masks: no scrim is added to headings, scopes, controls or live video. */
+/**
+ * Local alpha masks: no scrim is added to headings, scopes, controls or live video. Only the edge
+ * next to the channel column (left in LTR, right in RTL) and the top edge fade; the outer edges cut.
+ */
 internal fun Modifier.guideViewportFades(
     trackLeftPx: Float,
     trackWidthPx: Float,
-    earlier: Boolean,
-    later: Boolean,
+    innerContinues: Boolean,
+    isRtl: Boolean,
     above: () -> Boolean = { false },
-    below: () -> Boolean = { false },
 ): Modifier = graphicsLayer {
     compositingStrategy = CompositingStrategy.Offscreen
 }.drawWithContent {
     drawContent()
     val fade = GuideEdgeFade.toPx()
-    if (earlier) {
+    if (innerContinues && !isRtl) {
         drawRect(
             Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), trackLeftPx, trackLeftPx + fade),
             Offset(trackLeftPx, 0f), Size(fade, size.height), blendMode = BlendMode.DstIn,
         )
     }
-    if (later) {
+    if (innerContinues && isRtl) {
         val right = trackLeftPx + trackWidthPx
         drawRect(
             Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), right - fade, right),
@@ -134,12 +150,6 @@ internal fun Modifier.guideViewportFades(
         drawRect(
             Brush.verticalGradient(listOf(Color.Transparent, Color.Black), 0f, fade),
             Offset.Zero, Size(size.width, fade), blendMode = BlendMode.DstIn,
-        )
-    }
-    if (below()) {
-        drawRect(
-            Brush.verticalGradient(listOf(Color.Black, Color.Transparent), size.height - fade, size.height),
-            Offset(0f, size.height - fade), Size(size.width, fade), blendMode = BlendMode.DstIn,
         )
     }
 }

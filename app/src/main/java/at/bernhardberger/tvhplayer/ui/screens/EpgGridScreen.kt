@@ -152,6 +152,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusInsets
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -245,7 +246,7 @@ internal fun guideTimelineContentPadding(
     start = contentPadding.calculateStartPadding(layoutDirection) + TvBrowseLeadingInset,
     top = 8.dp,
     end = terminalReserve,
-    bottom = maxOf(contentPadding.calculateBottomPadding(), GuideEdgeFade + GuideFocusReserve),
+    bottom = maxOf(contentPadding.calculateBottomPadding(), GuideFocusReserve),
 )
 
 @OptIn(ExperimentalFoundationApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
@@ -287,9 +288,11 @@ fun EpgGridScreen(
     // Capacity already budgets the outer safe area. Do not subtract terminal padding again.
     val visibleWindowSec = guideVisibleWindowSec(timelineWidthPx, timeLabelWidth, density.density)
     val platformBringIntoView = LocalBringIntoViewSpec.current
-    val verticalFocusInset = with(density) { (GuideEdgeFade + GuideFocusReserve).toPx() }
-    val guideBringIntoView = remember(platformBringIntoView, verticalFocusInset) {
-        InsetBringIntoViewSpec(platformBringIntoView, verticalFocusInset, verticalFocusInset)
+    // Only the top edge fades; the bottom cuts, so it needs just the focus reserve.
+    val topFocusInset = with(density) { (GuideEdgeFade + GuideFocusReserve).toPx() }
+    val bottomFocusInset = with(density) { GuideFocusReserve.toPx() }
+    val guideBringIntoView = remember(platformBringIntoView, topFocusInset, bottomFocusInset) {
+        InsetBringIntoViewSpec(platformBringIntoView, topFocusInset, bottomFocusInset)
     }
     val coroutineScope = rememberCoroutineScope()
     val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
@@ -580,8 +583,7 @@ fun EpgGridScreen(
     val laterContent = edgeEvents.any {
         it.stop.epochSeconds > windowEndSec && it.start.epochSeconds < windowBounds.latestStartSec + visibleWindowSec
     }
-    val focusStartInset = GuideFocusReserve + if (earlierContent) GuideEdgeFade else 0.dp
-    val focusEndInset = GuideFocusReserve + if (laterContent) GuideEdgeFade else 0.dp
+    val (focusStartInset, focusEndInset) = guideFocusInsets(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)
     val terminalReserve = guideTerminalViewportReserve(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)
     val focusTrackWidthPx = timelineWidthPx - with(density) { terminalReserve.roundToPx() }
     fun focusWindowFor(event: EpgEventEntry): Long = guideFocusWindowStart(

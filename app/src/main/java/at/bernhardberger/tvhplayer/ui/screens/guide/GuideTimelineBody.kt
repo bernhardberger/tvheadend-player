@@ -152,6 +152,7 @@ internal fun GuideTimelineBody(
     val terminalReserve = guideTerminalViewportReserve(
         frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl,
     )
+    val focusInsets = guideFocusInsets(frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl)
     val timelineContentPadding = guideTimelineContentPadding(contentPadding, layoutDirection, terminalReserve)
     // Match layout's rounded padding so the continuous Now line and ruler coincide.
     val terminalReservePx = with(density) { terminalReserve.roundToPx().toFloat() }
@@ -207,8 +208,10 @@ internal fun GuideTimelineBody(
             with(density) { (startPadding + TvBrowseLeadingInset + guideChannelWidth(rows) + GuideChannelGap).toPx() }
         } else terminalReservePx
         Box(Modifier.weight(1f).fillMaxWidth()
-            .guideViewportFades(trackLeftPx, trackWidthPx, frame.earlierContent, frame.laterContent,
-                above = { channelListState.canScrollBackward }, below = { channelListState.canScrollForward })
+            .guideViewportFades(trackLeftPx, trackWidthPx,
+                guideInnerContinuation(frame.earlierContent, frame.laterContent, layoutDirection == LayoutDirection.Rtl),
+                layoutDirection == LayoutDirection.Rtl,
+                above = { channelListState.canScrollBackward })
             .guideNowLine(renderedWindowStartSec, windowEndSec, nowSecProvider, trackLeftPx, trackWidthPx,
                 MaterialTheme.colorScheme.primary)
             .testTag("epg-timeline-content")) {
@@ -274,8 +277,8 @@ internal fun GuideTimelineBody(
                             timelineContentPadding.calculateStartPadding(layoutDirection).roundToPx()
                         },
                     ),
-                    focusStartInset = GuideFocusReserve + if (frame.earlierContent) GuideEdgeFade else 0.dp,
-                    focusEndInset = GuideFocusReserve + if (frame.laterContent) GuideEdgeFade else 0.dp,
+                    focusStartInset = focusInsets.first,
+                    focusEndInset = focusInsets.second,
                     earlierContent = frame.earlierContent,
                     laterContent = frame.laterContent,
                     rows = rows,
