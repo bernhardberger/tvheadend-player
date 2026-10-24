@@ -116,3 +116,47 @@ The earlier "GPU near 9 ms, so CPU-bound" reading above is therefore wrong for
 the frame rate. E is kept: it removes the per-frame recomposition and the
 recording lookups (31 per frame) while keeping the culling. Traces are in
 `/root/projects/.worktrees/u5-guide/build/ab/` (ignored build output).
+
+## Follow-up, 2026-10-24: U5 after-numbers on the G10
+
+Same method (optimized `profileServer` with `-Ptvhplayer.profileMinify=true`,
+baseline profile and `speed-profile`, gfxinfo histogram deltas, 3 runs unless
+noted), all builds measured back to back in one session between 06:45 and
+08:05. The new Guide is entered with Right into the grid; its drawer journey
+is Back and Right four times, the old one Left and Right from the tag row.
+"Held" is 20 Down presses 50 ms apart. Values are frame time p50 / p90 and
+the share of frames over 33 ms, with GPU p50.
+
+| Build | Drawer | Up/Down | Held Down | GPU p50 |
+|---|---|---|---|---|
+| Old Guide (main b2d3dcb2) | 29–32 / 97–150 ms, 30–46% | 24 / 32–34 ms, 8–13% | 26–30 / 69–73 ms, 27–39% | 7–8 ms |
+| U5, headline on (default) | 53 / 69 ms, 87–96% | 48–53 / 65–69 ms, 86–92% | 48–53 / 69–77 ms, 85–98% | 19–23 ms |
+| U5, headline off | 28–30 / 36–42 ms, 23–34% | 16–24 / 27–34 ms, 4–12% | 27–29 / 48–53 ms, 25–33% | 8–9 ms |
+| U5, headline text without its picture | 22–25 / 32–34 ms, 9–10% | 14–16 / 26–28 ms, 4–5% | 17–26 / 38–44 ms, 12–17% | 7–8 ms |
+| U5, full-screen tint, no picture (2 runs) | 34 / 44 ms, 55–57% | 28 / 38 ms, 16–18% | – | 11–14 ms |
+| U5, background in an offscreen layer (2 runs) | 36 / 48 ms, 65–68% | 34 / 57 ms, 51–53% | – | 14–16 ms |
+| Channels list, U5 build (Up/Down only) | – | 26–27 / 36–38 ms, 15–25% | – | 9 ms |
+
+- The old Guide's Up/Down p50 of 24 ms matches the original 16–24 ms
+  figures and not the 42–48 ms of 2026-10-23. The same APK measured twice as
+  fast today, so the display-path cap seen on 2026-10-23 depends on the TV's
+  state. Compare builds only within one session.
+- The Guide's headline background is the cost. It stacks a full-screen tint,
+  the picture and its cinematic scrim (`ChannelsImmersiveBackground` corner
+  mode, `DetailsHero` with `unditheredGradient`) under the grid. On this GPU
+  each extra full-screen pass costs about 4–6 ms; the three together add
+  about 14 ms of GPU work per frame and halve the frame rate of every Guide
+  motion. The Channels list keeps one pass because it drops the tint once its
+  opaque picture shows.
+- Without the picture, the U5 Guide is faster than the old one, and its drawer
+  tail is far shorter (p99 44–48 ms against 250–300 ms), from the 64 dp cull
+  step.
+- Perfetto (drawer, one run each): main-thread `draw` p50 12.5 ms with the
+  picture against 2.7 ms without, so the main thread waits on rendering.
+  Holding Down: `Recomposer:recompose` p50 1.5 ms / p90 13 ms,
+  `measureAndLayout` p90 16 ms; the settled headline does not redo work on
+  every repeat.
+- No crash and no `VerifyError` on the minified build (API 31) in any run.
+
+Traces and histograms are in `/root/projects/.worktrees/u5-guide/build/ab/`
+(`after-*`, `chan-u5`, `trace-u5*`; ignored build output).
