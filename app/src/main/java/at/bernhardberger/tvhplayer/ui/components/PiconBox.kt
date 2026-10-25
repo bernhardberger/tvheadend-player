@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.res.painterResource
@@ -58,6 +59,8 @@ fun PiconBox(
     ground: Color? = MaterialTheme.colorScheme.background,
     /** The other focus state's fill. Only measured, composed rows warm this variant. */
     prefetchGround: Color? = null,
+    /** Drop the picon's transparent margin, so [contentScale] fits the logo's own shape. Inked logos only. */
+    trim: Boolean = false,
 ) = profileTrace("P1:compose:picon") {
     require(ground == null || transformation == null) { "a logo is either inked for its ground or transformed" }
     val artwork = LocalArtworkContext.current
@@ -94,14 +97,14 @@ fun PiconBox(
             // Rounded up, so a box a pixel larger or smaller reuses the logo already inked.
             val inkSize = drawn.takeIf { it.width > 0 && it.height > 0 }
                 ?.let { IntSize(it.width.roundUpTo(INK_SIZE_STEP), it.height.roundUpTo(INK_SIZE_STEP)) }
-            val model = remember(piconUrl, transformation, groundArgb, inkSize) {
+            val model = remember(piconUrl, transformation, groundArgb, inkSize, trim) {
                 when {
                     transformation != null ->
                         ImageRequest.Builder(context).data(piconUrl).transformations(transformation).build()
                     groundArgb == null -> piconUrl
                     inkSize == null -> null
                     // The ink rule is tuned on the server's 400×240 picons, so it reads that size, not the view's.
-                    else -> inkedPiconRequest(context, source, groundArgb, inkSize, shown[0])
+                    else -> inkedPiconRequest(context, source, groundArgb, inkSize, shown[0], trim)
                 }
             }
             if (loaded && transformation == null && groundArgb != null && inkSize != null && prefetchGround != null) {
@@ -169,6 +172,18 @@ fun PiconPlaceholder(
 }
 
 private const val PICON_LOADING_ALPHA = 0.35f
+/** A logo beside text stays this share of its box's height: 14dp of a 20dp line, whatever its shape. */
+private const val INLINE_LOGO_HEIGHT_SHARE = 0.7f
+
+/**
+ * Fits a trimmed logo beside a line of text: as wide as its box allows, but no taller than
+ * [INLINE_LOGO_HEIGHT_SHARE] of it, so square and portrait logos stay inside the line while wide
+ * ones keep their width. The box keeps its height, so nothing around it moves.
+ */
+internal val InlineLogoScale: ContentScale = object : ContentScale {
+    override fun computeScaleFactor(srcSize: Size, dstSize: Size): ScaleFactor =
+        ContentScale.Fit.computeScaleFactor(srcSize, Size(dstSize.width, dstSize.height * INLINE_LOGO_HEIGHT_SHARE))
+}
 private const val INK_SIZE_STEP = 8
 
 private fun Int.roundUpTo(step: Int) = (this + step - 1) / step * step

@@ -12,10 +12,12 @@ import kotlin.math.roundToInt
  * would vanish there change lightness, then shrinks it to fit the [width] × [height] pixels it is
  * drawn in. The rule reads the 400×240 picon; drawn straight from that size, a logo several times
  * smaller turns thin lines into dots, so it is halved step by step, each step averaging pixels.
+ * With [trim], the picon's transparent margin goes first, so the logo's own shape is what fits.
  */
-internal class LogoInkTransformation(private val ground: Int, private val width: Int, private val height: Int) :
-    Transformation() {
-    override val cacheKey: String = "logoInk(${Integer.toHexString(ground)},${width}x$height)"
+internal class LogoInkTransformation(
+    private val ground: Int, private val width: Int, private val height: Int, private val trim: Boolean = false,
+) : Transformation() {
+    override val cacheKey: String = "logoInk(${Integer.toHexString(ground)},${width}x$height${if (trim) ",trim" else ""})"
 
     override suspend fun transform(input: Bitmap, size: Size): Bitmap {
         val source = if (input.config == Bitmap.Config.ARGB_8888) input else input.copy(Bitmap.Config.ARGB_8888, false)
@@ -23,8 +25,26 @@ internal class LogoInkTransformation(private val ground: Int, private val width:
         source.getPixels(pixels, 0, source.width, 0, 0, source.width, source.height)
         val inked = inkFadingLogoParts(pixels, source.width, source.height, ground)
         val logo = if (inked == null) source else Bitmap.createBitmap(inked, source.width, source.height, Bitmap.Config.ARGB_8888)
-        return logo.shrunkToFit(width, height)
+        val bounds = if (trim) visibleBounds(inked ?: pixels, source.width, source.height) else null
+        val shape = if (bounds == null || bounds.width == source.width && bounds.height == source.height) logo
+            else Bitmap.createBitmap(logo, bounds.left, bounds.top, bounds.width, bounds.height)
+        return shape.shrunkToFit(width, height)
     }
+}
+
+internal data class LogoBounds(val left: Int, val top: Int, val width: Int, val height: Int)
+
+/** The smallest rectangle holding every pixel at least [minAlpha] opaque; null when there is none. */
+internal fun visibleBounds(pixels: IntArray, width: Int, height: Int, minAlpha: Int = 16): LogoBounds? {
+    var left = width; var top = height; var right = -1; var bottom = -1
+    for (y in 0 until height) for (x in 0 until width) {
+        if (pixels[y * width + x] ushr 24 < minAlpha) continue
+        if (x < left) left = x
+        if (x > right) right = x
+        if (y < top) top = y
+        if (y > bottom) bottom = y
+    }
+    return if (right < 0) null else LogoBounds(left, top, right - left + 1, bottom - top + 1)
 }
 
 private fun Bitmap.shrunkToFit(boxWidth: Int, boxHeight: Int): Bitmap {

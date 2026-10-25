@@ -154,6 +154,7 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.InlineLogoScale
 
 /**
  * The row's cards: four and their gaps span the content from the keyline to the header's end
@@ -540,7 +541,8 @@ internal fun ChannelsRowCard(
             // Start-aligned like the kit's content block.
             Row(Modifier.fillMaxWidth().padding(top = ImmersiveCardLabelGap), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PiconBox(channel.icon, Modifier.size(36.dp, 20.dp).testTag("$tag-identity-picon"))
+                PiconBox(channel.icon, Modifier.size(36.dp, 20.dp).testTag("$tag-identity-picon"),
+                    contentScale = InlineLogoScale, trim = true)
                 // The card's content colour: muted, and white on the focused card, so the eye goes there.
                 Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.weight(1f).testTag("$tag-identity"),

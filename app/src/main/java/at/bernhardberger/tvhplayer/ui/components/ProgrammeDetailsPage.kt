@@ -1063,7 +1063,7 @@ internal fun ProgrammeEyebrow(
     trailing: @Composable () -> Unit = {},
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        picon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp)) }
+        picon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp), contentScale = InlineLogoScale, trim = true) }
         Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
             color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing()
