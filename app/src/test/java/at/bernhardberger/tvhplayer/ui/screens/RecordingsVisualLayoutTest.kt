@@ -39,6 +39,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
@@ -78,6 +79,7 @@ class RecordingsVisualLayoutTest {
     // The app keeps this state while the player route replaces the Recordings entry.
     private val screenShown = mutableStateOf(true)
     private val endPaddingState = mutableStateOf<Dp?>(null)
+    private val connectionState = mutableStateOf<ConnectionUiState>(ConnectionUiState.Ready)
 
     @Before fun prepare() {
         oldLocale = Locale.getDefault()
@@ -662,6 +664,39 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun loadingShowsTheArchiveSkeletonUnderTheHeaderItKeepsWhenRecordingsArrive() {
+        val space = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L))
+        connectionState.value = ConnectionUiState.SyncingChannels
+        show(empty = true, diskSpace = space)
+        // The loading handoff still parks focus on the tabs; the skeleton takes none.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        compose.onNodeWithTag("recordings-skeleton").assertIsDisplayed()
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
+        compose.onNodeWithText("Loading recordings…").assertDoesNotExist()
+        compose.onNodeWithContentDescription("Loading recordings…").assertIsDisplayed()
+        val header = bounds("recordings-header")
+        val tabs = bounds("recordings-mode-tabs")
+        val spaceLine = bounds("recordings-space")
+        val skeleton = bounds("recordings-skeleton")
+        capture("loading-skeleton", 1f)
+        key(Key.DirectionDown)
+        compose.onNodeWithText("Archive").assertIsFocused()
+
+        compose.runOnIdle { connectionState.value = ConnectionUiState.Ready }
+        publish(listOf(recording(1, LONG_TITLE, "Documentaries/northern.ts"), recording(5, "Harbor Lights Live", "concert.ts")))
+        compose.onNodeWithTag("recordings-skeleton").assertDoesNotExist()
+        assertEquals(header, bounds("recordings-header"))
+        assertEquals(tabs, bounds("recordings-mode-tabs"))
+        assertEquals(spaceLine, bounds("recordings-space"))
+        // The skeleton stood in the Archive column's place, under the root's blank heading.
+        assertEquals(bounds("recordings-archive-list").top, skeleton.top, .1f)
+        assertEquals(bounds("recordings-folder-Documentaries").left, skeleton.left, .1f)
+        assertEquals(540f, skeleton.bottom, .1f)
+        assertNoCommands()
+    }
+
     @Test fun nestedUpReturnsToTabsAndModeChangesRetainArchiveLocation() {
         show()
         focused("recordings-folder-Documentaries")
@@ -1026,7 +1061,8 @@ class RecordingsVisualLayoutTest {
             session.publish(session.observation.value.let {
                 SessionObservation.create(it.sessionState, it.channelState, it.epgState,
                     DvrRepositoryState.Current(DvrSnapshot.create(entries)),
-                    recordingProgressCapability = it.recordingProgressCapability)
+                    recordingProgressCapability = it.recordingProgressCapability,
+                    dvrDiskSpaceState = it.dvrDiskSpaceState)
             })
         }
         compose.waitForIdle()
@@ -1086,6 +1122,7 @@ class RecordingsVisualLayoutTest {
                                 } ?: padding,
                                 initialFocusEnabled = !drawer,
                                 backEnabled = !drawer,
+                                connectionUiState = connectionState.value,
                                 dvrMutationActions = actions,
                                 notices = notices,
                                 onRetry = { error("Unexpected retry") },

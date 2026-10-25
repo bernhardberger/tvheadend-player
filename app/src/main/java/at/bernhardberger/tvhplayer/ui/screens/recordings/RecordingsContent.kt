@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
@@ -64,6 +66,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -110,6 +113,7 @@ import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.core.runningRecordings
+import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -122,6 +126,8 @@ import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.components.ListBottomReserve
+import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthListTopReserve
 import at.bernhardberger.tvhplayer.ui.components.listEdgeFades
 import at.bernhardberger.tvhplayer.ui.components.rememberListEdgeBringIntoView
 import at.bernhardberger.tvhplayer.ui.components.recordingMarkColor
@@ -293,15 +299,15 @@ internal fun FolderListRow(
     )
 }
 
+private val RecordingNowDotRadius = 5.dp
+private val RecordingNowDotGap = 1.5.dp
+
 @Composable
 internal fun RecordingNowFolderRow(
     recordingCount: Int,
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
-private val RecordingNowDotRadius = 5.dp
-private val RecordingNowDotGap = 1.5.dp
-
     val owner = LocalTabOwner.current
     var focused by remember { mutableStateOf(false) }
     ListItem(
@@ -948,13 +954,70 @@ internal fun recordingsAppError(
     connectionFailure: ConnectionUiState? = connectionUiState,
 ): AppError? = if (empty) connectionFailure?.browseAppError() else null
 
-/** The passive text of an empty Recordings list without an alert. */
+/** The passive text of an empty Recordings list without an alert; the skeleton speaks the loading one. */
 internal fun recordingsEmptyMessageRes(connectionUiState: ConnectionUiState): Int = when (connectionUiState) {
     ConnectionUiState.Connecting,
     ConnectionUiState.SyncingChannels -> R.string.recordings_loading
     ConnectionUiState.Reconnecting -> R.string.recordings_reconnecting
     else -> R.string.recordings_empty
 }
+
+/** An empty library still on its way shows [RecordingsSkeleton] rather than a message. */
+internal fun recordingsLoading(
+    connectionUiState: ConnectionUiState,
+    connectionFailure: ConnectionUiState? = connectionUiState,
+): Boolean = recordingsAppError(empty = true, connectionUiState, connectionFailure) == null &&
+    recordingsEmptyMessageRes(connectionUiState) == R.string.recordings_loading
+
+/**
+ * The Archive while the recordings are on their way: the root's blank heading band, then passive
+ * rows in the shape of recording rows in the active column's place, fading out at the bottom as
+ * the list does. It takes no focus and says once that recordings are loading.
+ */
+@Composable
+internal fun RecordingsSkeleton(modifier: Modifier = Modifier) {
+    val description = stringResource(R.string.recordings_loading)
+    val list = rememberLazyListState()
+    Column(
+        modifier
+            .width(TvBrowseColumnWidth)
+            .fillMaxHeight()
+            .testTag("recordings-skeleton")
+            .clearAndSetSemantics { contentDescription = description },
+    ) {
+        Spacer(Modifier.height(recordingsHeadingBandHeight()))
+        LazyColumn(
+            state = list,
+            userScrollEnabled = false,
+            contentPadding = PaddingValues(top = DepthListTopReserve, bottom = ListBottomReserve),
+            modifier = Modifier.fillMaxSize().listEdgeFades(list),
+        ) {
+            items(RecordingsSkeletonRows) { RecordingSkeletonRow(it) }
+        }
+    }
+}
+
+/** A recording row's native shape with its overline, title and supporting lines still loading. */
+@Composable
+private fun RecordingSkeletonRow(index: Int) {
+    ListItem(
+        selected = false,
+        onClick = {},
+        overlineContent = { SkeletonLine(widthFraction = RecordingSkeletonOverlineFraction) },
+        headlineContent = {
+            SkeletonLine(widthFraction = RecordingSkeletonTitleFractions[index % RecordingSkeletonTitleFractions.size])
+        },
+        supportingContent = { SkeletonLine(widthFraction = RecordingSkeletonSupportingFraction) },
+        // The picon's place stays empty, so the lines start where the titles will.
+        leadingContent = { Spacer(Modifier.size(32.dp)) },
+        modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false },
+    )
+}
+
+private const val RecordingsSkeletonRows = 12
+private val RecordingSkeletonTitleFractions = floatArrayOf(0.8f, 0.6f, 0.7f)
+private const val RecordingSkeletonOverlineFraction = 0.5f
+private const val RecordingSkeletonSupportingFraction = 0.4f
 
 @Composable
 internal fun RecordingsEmptyState(

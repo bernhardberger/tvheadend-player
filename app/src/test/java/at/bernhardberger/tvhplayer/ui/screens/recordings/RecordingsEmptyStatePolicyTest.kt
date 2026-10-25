@@ -8,7 +8,9 @@ import at.bernhardberger.tvhplayer.core.AppErrorCondition
 import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.data.ConnectionFailureKind
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RecordingsEmptyStatePolicyTest {
@@ -38,7 +40,12 @@ class RecordingsEmptyStatePolicyTest {
         for (loading in listOf(ConnectionUiState.Connecting, ConnectionUiState.SyncingChannels)) {
             assertNull(recordingsAppError(empty = true, loading))
             assertEquals(R.string.recordings_loading, recordingsEmptyMessageRes(loading))
+            assertTrue(recordingsLoading(loading))
         }
+        assertFalse(recordingsLoading(ConnectionUiState.Ready))
+        assertFalse(recordingsLoading(ConnectionUiState.Reconnecting))
+        // A failure carried while syncing again is the alert, not the skeleton.
+        assertFalse(recordingsLoading(ConnectionUiState.SyncingChannels, ConnectionUiState.CredentialUnavailable))
         assertNull(recordingsAppError(empty = true, ConnectionUiState.Reconnecting))
         assertEquals(R.string.recordings_reconnecting, recordingsEmptyMessageRes(ConnectionUiState.Reconnecting))
     }

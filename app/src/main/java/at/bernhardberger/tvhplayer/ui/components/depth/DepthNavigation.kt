@@ -111,7 +111,7 @@ internal const val DepthAlphaMillis = 200
 internal const val DepthParentAlpha = 0.25f
 
 /** Top content reserve inside a depth list so the first focused row's scale is not clipped. */
-private val DepthListTopReserve = 4.dp
+internal val DepthListTopReserve = 4.dp
 private val DepthBrowseEasing = CubicBezierEasing(0.18f, 1f, 0.22f, 1f)
 private fun depthStripSpec() = tween<Float>(DepthSlideMillis, easing = DepthBrowseEasing)
 

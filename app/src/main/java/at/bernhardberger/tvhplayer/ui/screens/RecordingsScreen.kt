@@ -155,6 +155,8 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
+import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsSkeleton
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsLoading
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsAppError
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingItemKey
@@ -621,7 +623,10 @@ internal fun RecordingsScreenContent(
         // Every tab's content starts at y80, as the channel list's first row does.
         Spacer(Modifier.height(TvSpacing12))
 
-        if (frame.empty) {
+        if (frame.empty && recordingsLoading(frame.connection, frame.failure)) {
+            // In the Archive column's place, running to the bottom edge as its list does.
+            RecordingsSkeleton(Modifier.padding(start = startPadding + TvBrowseLeadingInset))
+        } else if (frame.empty) {
             RecordingsEmptyState(
                 connectionUiState = frame.connection,
                 connectionFailure = frame.failure,
