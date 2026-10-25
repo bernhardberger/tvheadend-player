@@ -371,6 +371,9 @@ fun EpgGridScreen(
     val rememberedChannelId = remember { guidePositionStore.position.value?.channelId }
     // Recording-player Back restores the exact spot; live-player return can reposition it below.
     val restoredPosition = remember { guidePositionStore.position.value.takeIf { playerReturn != null || browseReturn } }
+    // Only the positioning effect consumes this; later group changes use the live Guide memory.
+    var pendingRestoredPosition by remember { mutableStateOf(restoredPosition) }
+    val currentBrowseReturn by rememberUpdatedState(browseReturn)
     val restoredTimelinePosition = remember(restoredPosition, windowBounds) {
         restoredPosition?.takeIf { it.windowStartSec in
             windowBounds.earliestStartSec..windowBounds.latestStartSec
@@ -763,6 +766,11 @@ fun EpgGridScreen(
             clearAllCoverage()
             initialPositionDone = false
             destinationEntryPending = true
+            pendingRestoredPosition = null
+        } else if (currentBrowseReturn) {
+            // Back can reverse the shell transition before this composition is disposed.
+            destinationEntryPending = false
+            pendingRestoredPosition = guidePositionStore.position.value
         }
     }
 
@@ -860,6 +868,17 @@ fun EpgGridScreen(
         if (!guideActive || !indexCurrent || initialPositionDone || channels.isEmpty() || focusRows.size != channels.size) {
             return@LaunchedEffect
         }
+        val restoredChannelPosition = pendingRestoredPosition?.takeIf { position ->
+            !destinationEntryPending && playerReturnChannelId == null && channels.any { it.id == position.channelId }
+        }
+        val restored = restoredChannelPosition?.takeIf {
+            it.windowStartSec in windowBounds.earliestStartSec..windowBounds.latestStartSec
+        }
+        if (restored != null && windowStartSec != restored.windowStartSec) {
+            selectedTarget = null
+            windowStartSec = restored.windowStartSec
+            return@LaunchedEffect
+        }
         if (playerReturnChannelId != null || destinationEntryPending && pendingPlayerReturn == null) {
             val nowSec = nowSecProvider()
             // A programme played from its start shows from its hour; one on air, as live, opens just before now.
@@ -877,12 +896,6 @@ fun EpgGridScreen(
             orderedChannelIds, playingChannelId, guidePositionStore.position.value?.channelId,
             lastPlayedId, selectedChannelId,
         )
-        val restoredChannelPosition = restoredPosition?.takeIf { position ->
-            !destinationEntryPending && playerReturnChannelId == null && channels.any { it.id == position.channelId }
-        }
-        val restored = restoredTimelinePosition?.takeIf { position ->
-            !destinationEntryPending && playerReturnChannelId == null && channels.any { it.id == position.channelId }
-        }
         val channelId = browsingFocusChannelId(
             channels,
             restoredChannelPosition?.channelId ?: preferredId,
@@ -904,9 +917,11 @@ fun EpgGridScreen(
                 coverages = preparedIndex?.input?.snapshot?.coverages.orEmpty(),
                 requestedThrough = KotlinInstant.fromEpochSeconds(windowEndSec),
             )
-        val targetChannelIndex = if (waitForEntryProgramme) channelIndex else target?.channelIndex ?: channelIndex
+        val coverageChannelIndex = if (waitForEntryProgramme) channelIndex else target?.channelIndex ?: channelIndex
+        val coverageRequest = requestVisibleWindow(windowStartSec, coverageChannelIndex)
+        val targetChannelIndex = if (waitForEntryProgramme && coverageRequest != null) channelIndex
+            else target?.channelIndex ?: channelIndex
         pendingInitialChannelIndex = targetChannelIndex
-        val coverageRequest = requestVisibleWindow(windowStartSec, targetChannelIndex)
         if (destinationEntryPending && pendingPlayerReturn == null &&
             (target == null || waitForEntryProgramme) && coverageRequest != null
         ) {
@@ -930,6 +945,7 @@ fun EpgGridScreen(
         // A return that waited for rows reclaims entry from the empty-state fallback.
         if (playerReturnChannelId != null) programmeFocusOwned = true
         positionedPlayerReturn = pendingPlayerReturn
+        pendingRestoredPosition = null
         destinationEntryPending = false
         initialPositionDone = true
     }

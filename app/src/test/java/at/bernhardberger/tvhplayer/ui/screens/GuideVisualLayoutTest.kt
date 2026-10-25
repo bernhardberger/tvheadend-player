@@ -168,6 +168,7 @@ class GuideVisualLayoutTest {
     private var playbackRequests = 0
     private var navigationRequests = 0
     private var guideActive by mutableStateOf(true)
+    private var browseReturn by mutableStateOf(false)
 
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
         val coverageRelease = CompletableDeferred<Unit>()
@@ -257,6 +258,82 @@ class GuideVisualLayoutTest {
         key(Key.DirectionDown)
         focused(title(2, 0))
         assertNoPlayback(additionalCoverageCalls = 1)
+    }
+
+    @Test fun groupChangeAfterPlayerReturnUsesTheMostRecentlyFocusedChannel() {
+        position.save(GuidePosition(ChannelId(1), EventId(110), hour, hour - 1800, 0))
+        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1), playerReturn = savedTimelineReturn())
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        compose.onNodeWithTag("channels-tags-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        key(Key.Enter)
+        tagFocused("channels-tags-all")
+        key(Key.DirectionDown)
+        tagFocused("channels-tags-1")
+        key(Key.Enter)
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        assertEquals(ChannelId(2), position.position.value?.channelId)
+        assertNoPlayback(additionalCoverageCalls = 1)
+    }
+
+    @Test fun retainedRecordingPlayerReturnRestoresTheCurrentStoredSpot() {
+        show(headline = true)
+        repeat(11) { key(Key.DirectionDown) }
+        focused(title(12, 0))
+        repeat(4) { key(Key.DirectionRight) }
+        focused(title(12, 4))
+        val left = checkNotNull(position.position.value)
+        assertNotEquals(hour - 1800, left.windowStartSec)
+        assertTrue("The return also exercises a scrolled channel viewport", left.firstVisibleColumn > 0)
+        compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        // Keep EpgGridScreen composed, as when Back reverses the shell's outgoing animation.
+        compose.runOnIdle { guideActive = false }
+        compose.runOnIdle {
+            browseReturn = true
+            guideActive = true
+        }
+        key(Key.DirectionDown)
+        focused(title(12, 4))
+        assertEquals(left, position.position.value)
+        assertEquals(0, playbackRequests)
+        assertEquals(0, navigationRequests)
+    }
+
+    @Test fun offlineRetainedEntryScrollsToTheFallbackChannelsPage() {
+        val release = CompletableDeferred<Unit>()
+        try {
+            show(headline = true, initialCoverage = false, beforeCoverageBatch = { _, _ -> release.await() })
+            key(Key.DirectionDown)
+            focused(title(1, 0))
+            compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            compose.runOnIdle { guideActive = false }
+            compose.runOnIdle {
+                val observation = session.observation.value
+                val snapshot = checkNotNull(observation.epgSnapshotForDisplay)
+                session.publish(SessionObservation.create(sessionState = SessionState.Disconnected,
+                    channelState = observation.channelState,
+                    epgState = EpgRepositoryState.Current(EpgSnapshot.create(
+                        events = snapshot.events.filter { it.channelId == ChannelId(7) })),
+                    dvrState = observation.dvrState))
+            }
+            // Wait for the reduced rows, not just the newer disconnected observation.
+            compose.waitUntil(10_000) {
+                compose.onAllNodes(hasText(title(1, 0)) and isFocusable()).fetchSemanticsNodes().isEmpty()
+            }
+            compose.runOnIdle {
+                position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
+                guideActive = true
+            }
+            dateFocused()
+            compose.waitUntil(10_000) { compose.onNodeWithTag("epg-channel-row-7").isDisplayed() }
+            compose.onNodeWithTag("epg-channel-row-7").assertIsDisplayed()
+            key(Key.DirectionDown)
+            focused(title(7, 0))
+            assertNoPlayback()
+        } finally { release.complete(Unit) }
     }
     private val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
     private val now = hour + 15 * 60
@@ -2493,6 +2570,7 @@ class GuideVisualLayoutTest {
                             var genre by remember { mutableStateOf(initialGenre) }
                             EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view, channelViewModel = model,
                                 guideActive = guideActive,
+                                browseReturn = browseReturn,
                                 playerReturn = playerReturn,
                                 genre = genre, onGenreChange = { genre = it },
                                 session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
