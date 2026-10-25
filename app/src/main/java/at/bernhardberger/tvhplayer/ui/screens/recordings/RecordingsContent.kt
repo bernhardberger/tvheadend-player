@@ -299,6 +299,9 @@ internal fun RecordingNowFolderRow(
     modifier: Modifier,
     onClick: () -> Unit,
 ) {
+private val RecordingNowDotRadius = 5.dp
+private val RecordingNowDotGap = 1.5.dp
+
     val owner = LocalTabOwner.current
     var focused by remember { mutableStateOf(false) }
     ListItem(
@@ -312,7 +315,8 @@ internal fun RecordingNowFolderRow(
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         leadingContent = {
-            // The red dot sits on the folder's top-right corner, cut out of the folder by a thin gap.
+            // The red dot sits on the folder's top-right corner, cut out of the folder by a thin gap. It
+            // is the channel rows' 10dp recording dot.
             val dotCenter = { size: Size -> Offset(size.width * 0.915f, size.height * 0.25f) }
             Icon(
                 painterResource(R.drawable.ic_folder),
@@ -322,12 +326,12 @@ internal fun RecordingNowFolderRow(
                     .size(32.dp)
                     .drawWithContent {
                         drawContent()
-                        drawCircle(recordingMarkColor(focused), radius = 7.dp.toPx(), center = dotCenter(size))
+                        drawCircle(recordingMarkColor(focused), radius = RecordingNowDotRadius.toPx(), center = dotCenter(size))
                     }
                     .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
                     .drawWithContent {
                         drawContent()
-                        drawCircle(Color.Black, radius = 9.dp.toPx(), center = dotCenter(size), blendMode = BlendMode.Clear)
+                        drawCircle(Color.Black, radius = (RecordingNowDotRadius + RecordingNowDotGap).toPx(), center = dotCenter(size), blendMode = BlendMode.Clear)
                     },
             )
         },
