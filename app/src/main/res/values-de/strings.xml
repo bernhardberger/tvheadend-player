@@ -14,6 +14,7 @@
     <string name="context_watch">Ansehen</string>
     <string name="context_channel_now">%1$s • Jetzt: %2$s</string>
     <string name="context_watch_channel">Sender ansehen</string>
+    <string name="context_watch_live">Live ansehen</string>
     <string name="context_details">Details</string>
     <string name="details_program">Sendungsdetails</string>
     <string name="details_about">Über diese Sendung</string>

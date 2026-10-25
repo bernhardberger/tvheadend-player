@@ -95,6 +95,24 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("details-continue_watching").assertDoesNotExist()
     }
 
+    @Test fun behindLiveDetailsOfferWatchLiveWhichReturnsToLiveAndCloses() {
+        var goLive = 0
+        show(recording = false, behindLiveAt = 1_500L, onGoLive = { goLive++ })
+        open()
+        compose.onNodeWithTag("details-watch_live").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        settle()
+        assertEquals(1, goLive)
+        compose.onNodeWithTag("details-watch_live").assertDoesNotExist()
+        compose.onNodeWithTag("player-info").assertIsFocused()
+    }
+
+    @Test fun atLiveDetailsOfferOnlyContinueWatching() {
+        show(recording = false, onGoLive = { error("Unexpected go live") })
+        open()
+        compose.onNodeWithTag("details-watch_live").assertDoesNotExist()
+    }
+
     @Test fun recordingContinueWatchingRestoresInfoWithoutAPlaybackCommand() {
         show(recording = true)
         open()
@@ -133,7 +151,8 @@ class PlayerProgrammeDetailsTest {
     }
 
     private fun show(recording: Boolean, browse: Boolean = false, warm: Boolean = true, withRecording: Boolean = false,
-        onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> }) {
+        onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> }, behindLiveAt: Long? = null,
+        onGoLive: (suspend () -> Unit)? = null) {
         val entry = DvrEntry.create(DvrEntryId(1), title = "Recorded program", description = "Recording synopsis",
             eventId = watched.id.takeIf { withRecording },
             state = DvrEntryState.COMPLETED.takeIf { withRecording })
@@ -165,6 +184,12 @@ class PlayerProgrammeDetailsTest {
                 at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel provides channel.id.takeIf { warm && !recording },
                 at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides
                     (if (warm) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE),
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingGoLive provides onGoLive,
+                at.bernhardberger.tvhplayer.ui.components.LocalLivePosition provides remember {
+                    mutableStateOf(behindLiveAt?.let {
+                        at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition(channel.id, it, behindLive = true)
+                    })
+                },
                 at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
                     at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(
                         checkNotNull(observation.currentSession), entry.id).takeIf { recording && warm }) {

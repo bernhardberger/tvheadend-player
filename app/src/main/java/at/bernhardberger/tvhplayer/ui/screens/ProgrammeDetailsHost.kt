@@ -100,11 +100,18 @@ internal fun ProgrammeDetailsHost(
         (displayObservation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
     // Playing is the programme at the viewer's position on the watched channel, as its marks show it.
+    // Behind live, the programme on air there also returns to the viewer, and live is offered beside it.
+    val watchingChannel = LocalWatchingChannel.current
+    val goLive = LocalWatchingGoLive.current
     @Composable
-    fun isPlaying(event: EpgEvent) = capability != null && watchingIndicator(event, nowSec) != ChannelPlaybackIndicator.NONE
+    fun isBehindLive(event: EpgEvent) = capability != null && goLive != null && event.channelId != null &&
+        event.channelId == watchingChannel && watchingBehindLive(event.channelId)
+    @Composable
+    fun isPlaying(event: EpgEvent) = capability != null && watchingIndicator(event, nowSec) != ChannelPlaybackIndicator.NONE ||
+        isBehindLive(event) && event.isRunning(nowSec)
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(displayObservation::recordingPlaybackAdmission), canModify,
-        channel != null, liveProgramme = live != null, playing = isPlaying(event))
+        channel != null, liveProgramme = live != null, playing = isPlaying(event), behindLive = isBehindLive(event))
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
@@ -168,7 +175,11 @@ internal fun ProgrammeDetailsHost(
         }
     }
     val act: (EpgEvent, BrowseContextAction) -> Unit = action@{ programme, action ->
-        if (action == BrowseContextAction.CONTINUE_WATCHING) {
+        if (action == BrowseContextAction.WATCH_LIVE) {
+            // The jump outlives this page; the player's own command queue orders it.
+            goLive?.let { mutationScope.launch { it() } }
+        }
+        if (action == BrowseContextAction.CONTINUE_WATCHING || action == BrowseContextAction.WATCH_LIVE) {
             if (retainPlayerSnapshot) closeAnimated() else programme.channelId?.let(currentObservation()::channel)?.let {
                 closeBehindPlayer(close)
                 onPlay(it.id, it.name.orEmpty())
@@ -291,7 +302,8 @@ internal fun ProgrammeDetailsHost(
             }
             val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording,
                 pageRecording?.let(displayObservation::recordingPlaybackAdmission), canModify,
-                pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent))
+                pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent),
+                behindLive = isBehindLive(pageEvent))
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             // The page shows its pictures with the session it was opened with.

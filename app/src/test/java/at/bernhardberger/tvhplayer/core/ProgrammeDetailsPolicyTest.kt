@@ -45,6 +45,13 @@ class ProgrammeDetailsPolicyTest {
                 true, true, playing = true))
     }
 
+    @Test fun behindLiveOffersLiveBesideContinueWatchingOnlyForThePlayingProgramme() {
+        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, RECORD, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, null, null, true, true, playing = true, behindLive = true))
+        assertEquals(listOf(WATCH, RECORD, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, null, null, true, true, behindLive = true))
+    }
+
     @Test fun warmProgrammeOnlyReplacesWatchAndNeverHidesOtherActions() {
         for (entry in listOf(null, recording(DvrEntryState.SCHEDULED), recording(DvrEntryState.RECORDING),
             recording(DvrEntryState.RECORDING_ERROR))) {

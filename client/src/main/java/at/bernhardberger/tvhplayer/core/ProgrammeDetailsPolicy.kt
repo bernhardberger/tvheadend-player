@@ -31,9 +31,13 @@ fun programmeDetailsActions(
     canWatchChannel: Boolean,
     liveProgramme: Boolean = true,
     playing: Boolean = false,
+    behindLive: Boolean = false,
 ): List<BrowseContextAction> = buildList {
-    if (playing) add(BrowseContextAction.CONTINUE_WATCHING)
-    else if (canWatchChannel) add(BrowseContextAction.WATCH)
+    if (playing) {
+        add(BrowseContextAction.CONTINUE_WATCHING)
+        // Continue watching returns to where the viewer is; behind live, live is its own choice.
+        if (behindLive) add(BrowseContextAction.WATCH_LIVE)
+    } else if (canWatchChannel) add(BrowseContextAction.WATCH)
     programmeActions(event, nowSec, recording,
         canModifyRecordings = canModifyRecordings,
         recordingAdmission = recordingAdmission).forEach {

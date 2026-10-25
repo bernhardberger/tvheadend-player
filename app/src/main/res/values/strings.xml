@@ -14,6 +14,7 @@
     <string name="context_watch">Watch</string>
     <string name="context_channel_now">%1$s • Now: %2$s</string>
     <string name="context_watch_channel">Watch channel</string>
+    <string name="context_watch_live">Watch live</string>
     <string name="context_details">Details</string>
     <string name="details_program">Program details</string>
     <string name="details_about">About this program</string>

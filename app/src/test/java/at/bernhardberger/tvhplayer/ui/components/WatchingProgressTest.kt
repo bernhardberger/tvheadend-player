@@ -363,6 +363,10 @@ class WatchingProgressTest {
         val sample = fixture.state.value.toAppPresentation(fixture.playbackPosition(900.seconds))
         assertEquals(LiveViewerPosition(channel.id, start.epochSeconds + 900), liveViewerPosition(channel.id, sample))
         assertEquals(LiveViewerPosition(channel.id, null), liveViewerPosition(channel.id, sample.copy(timingKnown = false)))
+        assertEquals(true, liveViewerPosition(channel.id, sample)?.behindLive)
+        val atLive = fixture.state.value.toAppPresentation(fixture.playbackPosition(1800.seconds))
+        assertEquals(false, liveViewerPosition(channel.id, atLive)?.behindLive)
+        assertEquals(true, liveViewerPosition(channel.id, atLive.copy(paused = true))?.behindLive)
         assertEquals(LiveViewerPosition(channel.id, null), liveViewerPosition(channel.id, sample.copy(playbackTarget = null)))
         assertEquals(null, liveViewerPosition(channel.id, AppTimeshiftState()))
         assertEquals(null, liveViewerPosition(channel.id, AppTimeshiftState(available = true,

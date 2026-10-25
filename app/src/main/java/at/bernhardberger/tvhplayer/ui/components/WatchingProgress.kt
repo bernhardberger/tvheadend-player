@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -28,6 +29,7 @@ import at.bernhardberger.tvheadend.sdk.media3.TimeshiftWallClockMapping
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
+import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import kotlinx.coroutines.delay
 
 internal val LocalWatchingChannel = compositionLocalOf<ChannelId?> { null }
@@ -36,9 +38,14 @@ internal val LocalWatchingTarget = compositionLocalOf<AppPlaybackTarget?> { null
 internal val LocalWatchingIndicator = compositionLocalOf { ChannelPlaybackIndicator.NONE }
 internal val LocalRecordingPosition = compositionLocalOf<State<RecordingViewerPosition?>?> { null }
 internal val LocalLivePosition = compositionLocalOf<State<LiveViewerPosition?>?> { null }
+/** Returns the watched channel to live and plays; absent where no player runtime is provided. */
+internal val LocalWatchingGoLive = staticCompositionLocalOf<(suspend () -> Unit)?> { null }
 
-/** A sample with no epoch is time-shifted but unlocated; no sample means live-edge fallback. */
-internal data class LiveViewerPosition(val channelId: ChannelId, val epochSec: Long?)
+/**
+ * A sample with no epoch is time-shifted but unlocated; no sample means live-edge fallback.
+ * [behindLive]: paused, or further behind live than the player's live-edge tolerance.
+ */
+internal data class LiveViewerPosition(val channelId: ChannelId, val epochSec: Long?, val behindLive: Boolean = true)
 
 /** Only the SDK's correlated content-to-clock mapping can locate a time-shifted viewer. */
 internal fun liveViewerPosition(channelId: ChannelId, sample: AppTimeshiftState): LiveViewerPosition? {
@@ -47,7 +54,8 @@ internal fun liveViewerPosition(channelId: ChannelId, sample: AppTimeshiftState)
     val mapping = sample.timeline?.wallClockMapping as? TimeshiftWallClockMapping.Estimate
     val epochSec = if (sample.timingKnown && target != null) mapping?.estimate(target)?.epochSeconds else null
     if (epochSec == null && !sample.paused && sample.serverBehindLiveMs?.let { it <= 0L } == true) return null
-    return LiveViewerPosition(channelId, epochSec)
+    return LiveViewerPosition(channelId, epochSec,
+        behindLive = sample.paused || !timeshiftPositionPresentation(sample).atLiveEdge)
 }
 
 @Composable
@@ -56,6 +64,10 @@ internal fun liveViewerPosition(channelId: ChannelId?): LiveViewerPosition? {
         !LocalWatchingIndicator.current.isPlayingItem) return null
     return LocalLivePosition.current?.value?.takeIf { it.channelId == channelId }
 }
+
+/** Whether the viewer of [channelId] is paused or behind live, so going live is a different place. */
+@Composable
+internal fun watchingBehindLive(channelId: ChannelId?): Boolean = liveViewerPosition(channelId)?.behindLive == true
 
 /** Until the first sample, or without time-shift, the viewer can only be at live. */
 @Composable
@@ -127,7 +139,9 @@ internal fun ProvideWatchingProgress(runtime: AppPlaybackRuntime, content: @Comp
             }
         }
     }
+    val goLive: suspend () -> Unit = remember(runtime) { { runtime.goLive(); runtime.play() } }
     CompositionLocalProvider(LocalWatchingChannel provides channel, LocalWatchingTarget provides target,
+        LocalWatchingGoLive provides goLive,
         LocalRecordingPlaybackSelection provides recordingSelection,
         LocalWatchingIndicator provides indicator, LocalRecordingPosition provides position,
         LocalLivePosition provides livePosition) {

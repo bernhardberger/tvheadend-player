@@ -7,7 +7,7 @@ import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 
 enum class BrowseContextAction {
-    CONTINUE_WATCHING,
+    CONTINUE_WATCHING, WATCH_LIVE,
     WATCH, DETAILS, RECORD, STOP, CANCEL, SHOW_GUIDE,
     RESUME, START_OVER, PLAY, MARK_WATCHED, MARK_UNWATCHED, DELETE,
     MARK_ALL_WATCHED, MARK_ALL_UNWATCHED, DELETE_WATCHED, DELETE_ALL,
