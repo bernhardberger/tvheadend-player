@@ -4,20 +4,28 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text as FieldText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -26,31 +34,42 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
 import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing80
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepBadge
@@ -64,6 +83,9 @@ import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 /** The welcome's choices start level with its title, under the 48dp mark. */
 private val WelcomeChoiceTop = 64.dp
 
+/** About four found servers; more scroll, so the address entry stays on screen below them. */
+private val FoundServersMaxHeight = 272.dp
+
 private const val HOST_FIELD = "setup-host"
 private const val PORT_FIELD = "setup-port"
 private const val USERNAME_FIELD = "setup-username"
@@ -75,9 +97,10 @@ private const val PASSWORD_FIELD = "setup-password"
  */
 @Composable
 internal fun ConnectionSetupFlow(state: ConnectionSetupState) {
-    BackHandler(enabled = state.step.previous() != null) { state.back() }
+    BackHandler(enabled = state.step.previous(state.serverChoice) != null) { state.back() }
     when (state.step) {
-        SetupStep.WELCOME -> WelcomeStep(onEnterAddress = state::enterAddress)
+        SetupStep.WELCOME -> WelcomeStep(state)
+        SetupStep.FIND -> FindStep(state)
         SetupStep.ADDRESS -> AddressStep(state)
         // One branch, so the test runs in place on the sign-in it started from.
         SetupStep.SIGN_IN, SetupStep.CONNECTING -> SignInStep(state)
@@ -100,9 +123,15 @@ private fun SetupStepper(current: Int, failed: Boolean = false) {
 }
 
 @Composable
-private fun WelcomeStep(onEnterAddress: () -> Unit) {
-    val choice = remember { FocusRequester() }
-    LaunchedEffect(Unit) { choice.requestFocus() }
+private fun WelcomeStep(state: ConnectionSetupState) {
+    val find = remember { FocusRequester() }
+    val type = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        when (state.welcomeFocus) {
+            WelcomeFocus.FIND -> find
+            WelcomeFocus.TYPE -> type
+        }.requestFocus()
+    }
     GuidedStepLayout(
         guidance = {
             GuidedStepGuidance(
@@ -116,13 +145,159 @@ private fun WelcomeStep(onEnterAddress: () -> Unit) {
         actionsTop = WelcomeChoiceTop,
     ) {
         GuidedStepAction(
-            title = stringResource(R.string.onboarding_enter_address),
-            subtitle = stringResource(R.string.onboarding_enter_address_detail),
-            icon = R.drawable.ic_keyboard,
-            onClick = onEnterAddress,
-            modifier = Modifier.focusRequester(choice),
+            title = stringResource(R.string.onboarding_find_server),
+            subtitle = stringResource(R.string.onboarding_find_server_detail),
+            icon = R.drawable.ic_search,
+            onClick = state::findServer,
+            modifier = Modifier.focusRequester(find).testTag("setup-find-server"),
+        )
+        EnterAddressAction(onClick = state::enterAddress, modifier = Modifier.focusRequester(type))
+    }
+}
+
+@Composable
+private fun EnterAddressAction(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    GuidedStepAction(
+        title = stringResource(R.string.onboarding_enter_address),
+        subtitle = stringResource(R.string.onboarding_enter_address_detail),
+        icon = R.drawable.ic_keyboard,
+        onClick = onClick,
+        modifier = modifier.testTag("setup-enter-address"),
+    )
+}
+
+/**
+ * The network search. While nothing answered it says so beside "Enter address manually"; found
+ * servers list above it; a search that ended empty, or could not run, offers the address entry
+ * first and "Search again". Leaving the step stops the search.
+ */
+@Composable
+private fun FindStep(state: ConnectionSetupState) {
+    LaunchedEffect(state.searchRequest) { if (state.searching) state.search() }
+    val found = state.servers.isNotEmpty()
+    val title = if (found || state.searching) R.string.onboarding_find_title else R.string.onboarding_find_none_title
+    val body = when {
+        found -> R.string.onboarding_find_results_body
+        state.searching -> R.string.onboarding_find_searching_body
+        else -> R.string.onboarding_find_none_body
+    }
+    GuidedStepLayout(
+        guidance = {
+            GuidedStepGuidance(
+                title = stringResource(title),
+                body = stringResource(body),
+                stepper = { SetupStepper(SetupStage.SERVER.ordinal) },
+            )
+        },
+    ) {
+        when {
+            found -> FoundServers(state)
+            state.searching -> {
+                SearchingNote()
+                FindEnterAddressAction(state)
+            }
+            else -> {
+                FindEnterAddressAction(state)
+                GuidedStepAction(
+                    title = stringResource(R.string.onboarding_search_again),
+                    icon = R.drawable.ic_refresh,
+                    onClick = state::findServer,
+                    modifier = Modifier.testTag("setup-search-again"),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SearchingNote() {
+    Row(
+        modifier = Modifier.height(36.dp).padding(start = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        SearchSpinner(18.dp)
+        Text(
+            text = stringResource(R.string.onboarding_find_searching),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
         )
     }
+}
+
+@Composable
+private fun SearchSpinner(size: Dp, modifier: Modifier = Modifier) {
+    CircularProgressIndicator(
+        modifier = modifier.size(size),
+        strokeWidth = 2.dp,
+        color = MaterialTheme.colorScheme.primary,
+    )
+}
+
+/** "Enter address manually" on the search; it holds focus while nothing else is chosen. */
+@Composable
+private fun FindEnterAddressAction(state: ConnectionSetupState) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(state.focusRequest) { if (state.findFocus == null) requester.requestFocus() }
+    EnterAddressAction(
+        onClick = state::enterAddress,
+        modifier = Modifier
+            .focusRequester(requester)
+            .onFocusChanged { if (it.isFocused) state.onFindFocused(null) },
+    )
+}
+
+@Composable
+private fun FoundServers(state: ConnectionSetupState) {
+    val searching = stringResource(R.string.onboarding_find_searching)
+    Row(Modifier.width(TvBrowseColumnWidth), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = stringResource(R.string.onboarding_find_on_network),
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextTertiaryAlpha),
+            modifier = Modifier.weight(1f).semantics { heading() },
+        )
+        if (state.searching) {
+            SearchSpinner(14.dp, Modifier.semantics { contentDescription = searching })
+        }
+    }
+    // Room for the focused row's scale inside the list's clip.
+    Column(
+        modifier = Modifier
+            .heightIn(max = FoundServersMaxHeight)
+            .verticalScroll(rememberScrollState())
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        state.servers.forEachIndexed { index, server ->
+            key(server) { FoundServerRow(state, server, index) }
+        }
+    }
+    Box(
+        Modifier
+            .width(TvBrowseColumnWidth)
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)),
+    )
+    FindEnterAddressAction(state)
+}
+
+@Composable
+private fun FoundServerRow(state: ConnectionSetupState, server: DiscoveredTvheadendServer, index: Int) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(state.focusRequest) { if (state.findFocus == server) requester.requestFocus() }
+    GuidedStepAction(
+        title = server.name,
+        subtitle = stringResource(R.string.onboarding_found_server_detail, server.host, server.port),
+        icon = R.drawable.ic_dns,
+        containerColor = Color.Transparent,
+        onClick = { state.chooseServer(server) },
+        modifier = Modifier
+            .focusRequester(requester)
+            .onFocusChanged { if (it.isFocused) state.onFindFocused(server) }
+            .testTag("setup-server-$index"),
+    )
 }
 
 @Composable
@@ -202,8 +377,8 @@ private fun AddressFields(
 }
 
 /**
- * A setup field: its help below it, replaced by [error] while that applies. The help uses the
- * field's own (mobile) text, so it takes the field's error and disabled colours.
+ * A setup field under its [label]: its help below it, replaced by [error] while that applies.
+ * The help uses the field's own (mobile) text, so it takes the field's error and disabled colours.
  */
 @Composable
 private fun SetupTextField(
@@ -213,30 +388,66 @@ private fun SetupTextField(
     value: String,
     onValueChange: (String) -> Unit,
     @StringRes label: Int,
-    support: String,
+    support: String?,
     error: String?,
     keyboardOptions: KeyboardOptions,
     onImeAction: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    TvOutlinedTextField(
-        id = id,
-        editingId = editingId,
-        setEditingId = setEditingId,
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(stringResource(label)) },
-        keyboardOptions = keyboardOptions,
-        enabled = enabled,
-        isError = error != null,
-        supportingText = { FieldText(error ?: support) },
-        onImeAction = onImeAction,
-        modifier = modifier
-            .width(TvBrowseColumnWidth)
-            .testTag(id)
-            .semantics { if (error != null) error(error) },
-    )
+    val name = stringResource(label)
+    val help = error ?: support
+    LabelledField(label = name, enabled = enabled, isError = error != null) {
+        TvOutlinedTextField(
+            id = id,
+            editingId = editingId,
+            setEditingId = setEditingId,
+            value = value,
+            onValueChange = onValueChange,
+            label = null,
+            keyboardOptions = keyboardOptions,
+            enabled = enabled,
+            isError = error != null,
+            supportingText = help?.let { { FieldText(it) } },
+            onImeAction = onImeAction,
+            modifier = modifier
+                .width(TvBrowseColumnWidth)
+                .testTag(id)
+                .semantics {
+                    contentDescription = name
+                    if (error != null) error(error)
+                },
+        )
+    }
+}
+
+/**
+ * A field with its label above the outline, so an empty field shows nothing where a value would
+ * go. The label follows the field's focus, error and disabled colours; accessibility services
+ * get it as the field's description instead.
+ */
+@Composable
+private fun LabelledField(label: String, enabled: Boolean, isError: Boolean, field: @Composable () -> Unit) {
+    var focused by remember { mutableStateOf(false) }
+    val colors = MaterialTheme.colorScheme
+    val color = when {
+        isError -> colors.error
+        focused -> colors.primary
+        else -> colors.onSurfaceVariant
+    }
+    Column(
+        modifier = Modifier.onFocusChanged { focused = it.hasFocus },
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (focused) FontWeight.Medium else FontWeight.Normal,
+            color = color.copy(alpha = if (enabled) 1f else TvTextDisabledAlpha),
+            modifier = Modifier.clearAndSetSemantics {},
+        )
+        field()
+    }
 }
 
 @Composable
@@ -295,13 +506,15 @@ private fun SignInFields(
 ) {
     var editingId by rememberSaveable { mutableStateOf<String?>(null) }
     val form = state.form
-    TvOutlinedTextField(
+    SetupTextField(
         id = USERNAME_FIELD,
         editingId = editingId,
         setEditingId = { editingId = it },
         value = form.username,
         onValueChange = form::updateUsername,
-        label = { Text(stringResource(R.string.username)) },
+        label = R.string.username,
+        support = null,
+        error = null,
         keyboardOptions = KeyboardOptions(
             capitalization = KeyboardCapitalization.None,
             autoCorrectEnabled = false,
@@ -309,28 +522,35 @@ private fun SignInFields(
         ),
         enabled = enabled,
         onImeAction = { editingId = PASSWORD_FIELD },
-        modifier = Modifier.width(TvBrowseColumnWidth).focusRequester(usernameFocus).testTag(USERNAME_FIELD),
+        modifier = Modifier.focusRequester(usernameFocus),
     )
     val pair = stringResource(R.string.onboarding_sign_in_pair)
-    TvPasswordField(
-        id = PASSWORD_FIELD,
-        editingId = editingId,
-        setEditingId = { editingId = it },
-        value = form.password,
-        onValueChange = form::updatePassword,
-        enabled = enabled,
-        isError = state.signInError,
-        supportingText = { FieldText(pair) },
-        onImeAction = {
-            editingId = null
-            onPasswordDone()
-        },
-        modifier = Modifier
-            .width(TvBrowseColumnWidth)
-            .focusRequester(passwordFocus)
-            .testTag(PASSWORD_FIELD)
-            .semantics { if (state.signInError) error(pair) },
-    )
+    val name = stringResource(R.string.password)
+    LabelledField(label = name, enabled = enabled, isError = state.signInError) {
+        TvPasswordField(
+            id = PASSWORD_FIELD,
+            editingId = editingId,
+            setEditingId = { editingId = it },
+            value = form.password,
+            onValueChange = form::updatePassword,
+            label = null,
+            enabled = enabled,
+            isError = state.signInError,
+            supportingText = { FieldText(pair) },
+            onImeAction = {
+                editingId = null
+                onPasswordDone()
+            },
+            modifier = Modifier
+                .width(TvBrowseColumnWidth)
+                .focusRequester(passwordFocus)
+                .testTag(PASSWORD_FIELD)
+                .semantics {
+                    contentDescription = name
+                    if (state.signInError) error(pair)
+                },
+        )
+    }
 }
 
 /** Connect; while the test runs it stays focused as a busy "Connecting" that Back cancels. */

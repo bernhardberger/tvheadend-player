@@ -42,6 +42,8 @@ fun TvPasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Inside the outline, as in [TvOutlinedTextField]; null where the caller shows it above. */
+    label: (@Composable () -> Unit)? = { Text(stringResource(R.string.password)) },
     presentationValue: String? = null,
     enabled: Boolean = true,
     isError: Boolean = false,
@@ -79,7 +81,7 @@ fun TvPasswordField(
     OutlinedTextField(
         value = displayedValue,
         onValueChange = onValueChange,
-        label = { Text(stringResource(R.string.password)) },
+        label = label,
         singleLine = true,
         readOnly = !isEditing,
         enabled = enabled,

@@ -40,7 +40,8 @@ fun TvOutlinedTextField(
     setEditingId: (String?) -> Unit,
     value: String,
     onValueChange: (String) -> Unit,
-    label: @Composable () -> Unit,
+    /** Inside the outline; null where the caller shows its label above the field. */
+    label: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
     presentationValue: String? = null,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,

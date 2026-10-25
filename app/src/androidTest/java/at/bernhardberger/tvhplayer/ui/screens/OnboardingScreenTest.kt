@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupState
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -40,9 +41,22 @@ class OnboardingScreenTest {
     fun welcomeChoiceOpensTheAddressOnTheServerField() {
         show(SetupStep.WELCOME, ConnectionFormState())
 
-        composeRule.onNodeWithText("Enter address manually").assertIsFocused()
+        composeRule.onNodeWithTag("setup-find-server").assertIsFocused()
+        press(Key.DirectionDown)
+        composeRule.onNodeWithTag("setup-enter-address").assertIsFocused()
         press(Key.DirectionCenter)
         composeRule.onNodeWithTag("setup-host").assertIsFocused()
+    }
+
+    @Test
+    fun aSearchWithoutServersOffersTheAddressFirst() {
+        show(SetupStep.WELCOME, ConnectionFormState())
+
+        press(Key.DirectionCenter)
+        composeRule.onNodeWithText("No servers found").assertExists()
+        composeRule.onNodeWithTag("setup-enter-address").assertIsFocused()
+        press(Key.DirectionDown)
+        composeRule.onNodeWithTag("setup-search-again").assertIsFocused()
     }
 
     @Test
@@ -91,7 +105,8 @@ class OnboardingScreenTest {
         composeRule.setContent {
             val scope = rememberCoroutineScope()
             TVHeadendPlayerTheme {
-                ConnectionSetupFlow(remember { ConnectionSetupState(form, session, editor, scope, step) })
+                // A search that ends at once with nothing, as on a network where no server announces itself.
+                ConnectionSetupFlow(remember { ConnectionSetupState(form, session, editor, { emptyFlow() }, scope, step) })
             }
         }
         composeRule.waitForIdle()

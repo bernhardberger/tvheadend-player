@@ -4,13 +4,15 @@ import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.core.SessionFailureKind
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.core.AppErrorCondition
+import kotlin.time.Duration.Companion.seconds
 
 /**
- * The screens of the guided connection setup. [CONNECTING] is the sign-in screen with its test
- * running in place; [FAILED] shows the test's outcome.
+ * The screens of the guided connection setup. [FIND] searches the network; [CONNECTING] is the
+ * sign-in screen with its test running in place; [FAILED] shows the test's outcome.
  */
 internal enum class SetupStep {
     WELCOME,
+    FIND,
     ADDRESS,
     SIGN_IN,
     CONNECTING,
@@ -18,13 +20,32 @@ internal enum class SetupStep {
     DONE,
 }
 
+/** How the server was chosen, which decides where Back goes from the address and the sign-in. */
+internal enum class ServerChoice {
+    /** "Enter address manually" on the welcome. */
+    TYPED,
+
+    /** "Enter address manually" on the search, or "Change address" after a found server failed. */
+    TYPED_AFTER_SEARCH,
+
+    /** A server the search found. */
+    FOUND,
+}
+
 /** Where Back goes; null leaves the flow, so the activity's own Back reaches the TV home. */
-internal fun SetupStep.previous(): SetupStep? = when (this) {
+internal fun SetupStep.previous(choice: ServerChoice): SetupStep? = when (this) {
     SetupStep.WELCOME -> null
-    SetupStep.ADDRESS -> SetupStep.WELCOME
-    SetupStep.SIGN_IN -> SetupStep.ADDRESS
+    SetupStep.FIND -> SetupStep.WELCOME
+    SetupStep.ADDRESS -> if (choice == ServerChoice.TYPED) SetupStep.WELCOME else SetupStep.FIND
+    SetupStep.SIGN_IN -> if (choice == ServerChoice.FOUND) SetupStep.FIND else SetupStep.ADDRESS
     SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
 }
+
+/**
+ * How long a search looks for announcing servers. Discovery itself never ends, and most servers
+ * that announce themselves answer within a few seconds, so "No servers found" follows this.
+ */
+internal val DiscoveryWindow = 10.seconds
 
 /**
  * The step a recreated flow resumes on. The test and its result belong to a session the saved
@@ -40,7 +61,7 @@ internal enum class SetupStage { SERVER, SIGN_IN, CONNECT }
 
 internal val SetupStep.stage: SetupStage
     get() = when (this) {
-        SetupStep.WELCOME, SetupStep.ADDRESS -> SetupStage.SERVER
+        SetupStep.WELCOME, SetupStep.FIND, SetupStep.ADDRESS -> SetupStage.SERVER
         SetupStep.SIGN_IN -> SetupStage.SIGN_IN
         SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStage.CONNECT
     }
@@ -104,6 +125,8 @@ internal fun SessionFailure.toSetupFailure(): SetupFailure = when (kind) {
     }
     else -> SetupFailure.OTHER
 }
+
+internal enum class WelcomeFocus { FIND, TYPE }
 
 internal enum class AddressFocus { HOST, PORT, CONTINUE }
 

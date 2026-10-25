@@ -229,6 +229,8 @@ fun GuidedStepAction(
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     @DrawableRes icon: Int? = null,
+    /** The unfocused fill; list rows such as found servers pass [Color.Transparent]. */
+    containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
@@ -236,7 +238,7 @@ fun GuidedStepAction(
         modifier = modifier.width(TvBrowseColumnWidth).semantics { role = Role.Button },
         shape = ClickableSurfaceDefaults.shape(GuidedStepActionShape),
         colors = ClickableSurfaceDefaults.colors(
-            containerColor = colors.surfaceVariant.copy(alpha = 0.4f),
+            containerColor = containerColor,
             contentColor = colors.onSurface,
             focusedContainerColor = colors.onSurface,
             focusedContentColor = colors.inverseOnSurface,

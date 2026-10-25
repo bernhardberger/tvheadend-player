@@ -9,13 +9,24 @@ import org.junit.Test
 class ConnectionSetupPolicyTest {
     @Test
     fun backWalksTheStepsAndLeavesTheFlowOnlyFromWelcome() {
-        assertNull(SetupStep.WELCOME.previous())
-        assertEquals(SetupStep.WELCOME, SetupStep.ADDRESS.previous())
-        assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous())
-        for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
-            assertEquals(SetupStep.SIGN_IN, step.previous())
-            assertEquals(SetupStep.SIGN_IN, step.resumable())
+        for (choice in ServerChoice.entries) {
+            assertNull(SetupStep.WELCOME.previous(choice))
+            assertEquals(SetupStep.WELCOME, SetupStep.FIND.previous(choice))
+            for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
+                assertEquals(SetupStep.SIGN_IN, step.previous(choice))
+                assertEquals(SetupStep.SIGN_IN, step.resumable())
+            }
         }
+    }
+
+    @Test
+    fun backReturnsToWhereTheServerWasChosen() {
+        assertEquals(SetupStep.WELCOME, SetupStep.ADDRESS.previous(ServerChoice.TYPED))
+        assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous(ServerChoice.TYPED))
+        assertEquals(SetupStep.FIND, SetupStep.ADDRESS.previous(ServerChoice.TYPED_AFTER_SEARCH))
+        assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous(ServerChoice.TYPED_AFTER_SEARCH))
+        assertEquals("A found server skips the address", SetupStep.FIND, SetupStep.SIGN_IN.previous(ServerChoice.FOUND))
+        assertEquals(SetupStep.FIND, SetupStep.FIND.resumable())
     }
 
     @Test

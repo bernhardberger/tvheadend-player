@@ -20,6 +20,9 @@ import androidx.compose.ui.unit.Density
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
+import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
+import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryFailure
+import at.bernhardberger.tvheadend.sdk.android.TvheadendDiscoveryState
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
@@ -36,7 +39,10 @@ import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupState
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.DiscoveryWindow
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.discovering
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -59,22 +65,33 @@ class OnboardingLayoutEvidenceTest {
     private lateinit var view: View
     private lateinit var state: ConnectionSetupState
     private val session = FakeTvheadendSession()
+    private val discovery = MutableStateFlow(discovering())
 
     @Test
     fun welcomeKeepsItsKeylineAndLeavesBackToTheActivity() {
         show()
         assertEquals(94f, textBounds(R.string.onboarding_title).left, .1f)
-        compose.onNodeWithText(label(R.string.onboarding_enter_address)).assertIsFocused()
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
         assertFalse("Back on the welcome leaves for the TV home", backHandled())
     }
 
     @Test
     fun addressWalksFieldsWithTheDpadAndBackReturnsToTheWelcomeChoice() {
         show()
+        press(Key.DirectionDown)
         press(Key.DirectionCenter)
         assertEquals(SetupStep.ADDRESS, state.step)
         compose.onNodeWithTag("setup-host").assertIsFocused()
-        assertEquals(TOP_FIELD_LABEL, textBounds(R.string.onboarding_server_address).top, 12f)
+        // The label sits above the outline, so the empty field shows no text where a value goes.
+        compose.onAllNodesWithText(label(R.string.onboarding_server_address), useUnmergedTree = true)
+            .assertCountEquals(0)
+        compose.onNodeWithContentDescription(label(R.string.onboarding_server_address)).assertIsFocused()
+        val host = compose.onNodeWithTag("setup-host").fetchSemanticsNode().boundsInRoot
+        assertEquals(TOP_FIELD_LABEL + LABEL_HEIGHT, host.top, 6f)
 
         press(Key.DirectionDown)
         compose.onNodeWithTag("setup-port").assertIsFocused()
@@ -86,7 +103,63 @@ class OnboardingLayoutEvidenceTest {
 
         back()
         assertEquals(SetupStep.WELCOME, state.step)
-        compose.onNodeWithText(label(R.string.onboarding_enter_address)).assertIsFocused()
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
+    }
+
+    @Test
+    fun foundServersTakeFocusAndAChosenOneSkipsTheAddress() {
+        show()
+        press(Key.DirectionCenter)
+        assertEquals(SetupStep.FIND, state.step)
+        compose.onNodeWithText(label(R.string.onboarding_find_searching)).assertExists()
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
+
+        discovery.value = discovering(LIVING_ROOM, OFFICE)
+        compose.waitForIdle()
+        compose.onNodeWithTag("setup-server-0").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-server-1").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
+        press(Key.DirectionUp)
+        press(Key.DirectionCenter)
+        assertEquals(SetupStep.SIGN_IN, state.step)
+        assertEquals(OFFICE.host, state.form.host)
+        compose.onNodeWithTag("setup-username").assertIsFocused()
+
+        back()
+        assertEquals(SetupStep.FIND, state.step)
+        compose.onNodeWithTag("setup-server-1").assertIsFocused()
+        back()
+        assertEquals(SetupStep.WELCOME, state.step)
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+    }
+
+    @Test
+    fun anUnavailableSearchOffersTheAddressFirstAndSearchAgain() {
+        discovery.value = TvheadendDiscoveryState.Unavailable(TvheadendDiscoveryFailure.START_FAILED)
+        show()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText(label(R.string.onboarding_find_none_title)).assertExists()
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-search-again").assertIsFocused()
+
+        discovery.value = discovering()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText(label(R.string.onboarding_find_searching)).assertExists()
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
+    }
+
+    @Test
+    fun aSearchWithoutAnswersEndsAfterItsWindow() {
+        show()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText(label(R.string.onboarding_find_searching)).assertExists()
+        compose.mainClock.advanceTimeBy(DiscoveryWindow.inWholeMilliseconds + 100)
+        compose.waitForIdle()
+        compose.onNodeWithText(label(R.string.onboarding_find_none_title)).assertExists()
+        compose.onNodeWithTag("setup-enter-address").assertIsFocused()
     }
 
     @Test
@@ -150,14 +223,52 @@ class OnboardingLayoutEvidenceTest {
     @Category(VisualCapture::class)
     fun captureWelcome() {
         show()
-        capture("en-font1.0-welcome", textBounds(R.string.onboarding_title), "Enter address manually")
+        wakeFocus()
+        capture("en-font1.0-welcome", textBounds(R.string.onboarding_title), "Find my server")
+    }
+
+    @Test
+    @Category(VisualCapture::class)
+    fun captureFindSearching() {
+        show()
+        press(Key.DirectionCenter)
+        capture("en-font1.0-find-searching", textBounds(R.string.onboarding_find_title), "Enter address manually")
+    }
+
+    @Test
+    @Category(VisualCapture::class)
+    fun captureFindResults() {
+        show()
+        press(Key.DirectionCenter)
+        discovery.value = discovering(LIVING_ROOM, OFFICE)
+        compose.waitForIdle()
+        capture("en-font1.0-find-results", textBounds(R.string.onboarding_find_title), "Living room")
+    }
+
+    @Test
+    @Category(VisualCapture::class)
+    fun captureFindNone() {
+        discovery.value = TvheadendDiscoveryState.Unavailable(TvheadendDiscoveryFailure.START_FAILED)
+        show()
+        press(Key.DirectionCenter)
+        capture("en-font1.0-find-none", textBounds(R.string.onboarding_find_none_title), "Enter address manually")
     }
 
     @Test
     @Category(VisualCapture::class)
     fun captureAddress() {
         show(SetupStep.ADDRESS)
+        wakeFocus()
         capture("en-font1.0-address", textBounds(R.string.onboarding_address_title), "blank server address")
+    }
+
+    @Test
+    @Category(VisualCapture::class)
+    fun captureSignIn() {
+        show(SetupStep.SIGN_IN, ConnectionFormState(host = HOST, username = USERNAME))
+        press(Key.DirectionUp)
+        press(Key.DirectionDown)
+        capture("en-font1.0-sign-in", textBounds(R.string.onboarding_sign_in_body), "blank password")
     }
 
     @Test
@@ -200,7 +311,7 @@ class OnboardingLayoutEvidenceTest {
                         ),
                     ) {
                         state = remember {
-                            ConnectionSetupState(form, session, NoProfiles, scope, step)
+                            ConnectionSetupState(form, session, NoProfiles, { discovery }, scope, step)
                         }
                         ConnectionSetupFlow(state)
                     }
@@ -208,6 +319,12 @@ class OnboardingLayoutEvidenceTest {
             }
         }
         compose.waitForIdle()
+    }
+
+    /** A key press leaves touch mode, so a capture shows the focused element as a remote user sees it. */
+    private fun wakeFocus() {
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
     }
 
     private fun press(key: Key) {
@@ -265,8 +382,11 @@ private object NoProfiles : ConnectionProfileEditor {
     override suspend fun clearProfile() = error("No profile access in layout evidence")
 }
 
-/** The first field's label sits just under the 80dp top keyline. */
+/** The first field's label sits just under the 80dp top keyline; the outline follows it. */
 private const val TOP_FIELD_LABEL = 86f
+private const val LABEL_HEIGHT = 24f
+private val LIVING_ROOM = DiscoveredTvheadendServer("Living room", "192.0.2.10", 9982)
+private val OFFICE = DiscoveredTvheadendServer("tvheadend", "192.0.2.20", 9982)
 private const val HOST = "tvheadend.local"
 private const val USERNAME = "alex"
 private const val PASSWORD = "fake password"

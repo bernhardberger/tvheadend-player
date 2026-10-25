@@ -135,6 +135,17 @@
     <string name="onboarding_welcome_body">Watch live TV and recordings from your own Tvheadend server.</string>
     <string name="onboarding_enter_address">Enter address manually</string>
     <string name="onboarding_enter_address_detail">Type the server’s name or IP address</string>
+    <string name="onboarding_find_server">Find my server</string>
+    <string name="onboarding_find_server_detail">Search this network</string>
+    <string name="onboarding_find_title">Find your server</string>
+    <string name="onboarding_find_searching_body">Looking for Tvheadend servers on this network. Many servers don’t announce themselves, so you can always enter the address yourself.</string>
+    <string name="onboarding_find_searching">Searching</string>
+    <string name="onboarding_find_results_body">Choose your server. If it isn’t listed, enter its address.</string>
+    <string name="onboarding_find_on_network">On this network</string>
+    <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
+    <string name="onboarding_find_none_title">No servers found</string>
+    <string name="onboarding_find_none_body">Many Tvheadend servers don’t announce themselves on the network. Enter the address you use for Tvheadend’s web interface instead.</string>
+    <string name="onboarding_search_again">Search again</string>
     <string name="onboarding_step_server">Server</string>
     <string name="onboarding_step_sign_in">Sign in</string>
     <string name="onboarding_connect">Connect</string>

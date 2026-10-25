@@ -133,6 +133,17 @@
     <string name="onboarding_welcome_body">Schau Live-TV und Aufnahmen von deinem eigenen Tvheadend-Server.</string>
     <string name="onboarding_enter_address">Adresse manuell eingeben</string>
     <string name="onboarding_enter_address_detail">Gib den Namen oder die IP-Adresse des Servers ein</string>
+    <string name="onboarding_find_server">Meinen Server finden</string>
+    <string name="onboarding_find_server_detail">Dieses Netzwerk durchsuchen</string>
+    <string name="onboarding_find_title">Finde deinen Server</string>
+    <string name="onboarding_find_searching_body">Suche nach Tvheadend-Servern in diesem Netzwerk. Viele Server machen sich nicht bekannt, du kannst die Adresse also jederzeit selbst eingeben.</string>
+    <string name="onboarding_find_searching">Suche läuft</string>
+    <string name="onboarding_find_results_body">Wähle deinen Server. Fehlt er in der Liste, gib seine Adresse ein.</string>
+    <string name="onboarding_find_on_network">In diesem Netzwerk</string>
+    <string name="onboarding_found_server_detail">%1$s · Port %2$d</string>
+    <string name="onboarding_find_none_title">Keine Server gefunden</string>
+    <string name="onboarding_find_none_body">Viele Tvheadend-Server machen sich im Netzwerk nicht bekannt. Gib stattdessen die Adresse ein, die du für die Weboberfläche von Tvheadend verwendest.</string>
+    <string name="onboarding_search_again">Erneut suchen</string>
     <string name="onboarding_step_server">Server</string>
     <string name="onboarding_step_sign_in">Anmeldung</string>
     <string name="onboarding_connect">Verbinden</string>
