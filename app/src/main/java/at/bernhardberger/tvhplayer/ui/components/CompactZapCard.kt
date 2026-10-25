@@ -201,7 +201,7 @@ internal fun CompactZapCard(
                 ProgressStrip(
                     progress = ((nowSec - currentEvent.start.epochSeconds).toDouble() /
                         (currentEvent.stop.epochSeconds - currentEvent.start.epochSeconds)).toFloat(),
-                    color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING || playbackIndicator == ChannelPlaybackIndicator.PAUSED),
+                    color = progressColor(playbackIndicator.isPlayingItem),
                     height = 2.dp,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )

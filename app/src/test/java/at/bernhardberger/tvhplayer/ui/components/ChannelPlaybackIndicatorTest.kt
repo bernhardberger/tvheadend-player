@@ -12,6 +12,17 @@ class ChannelPlaybackIndicatorTest {
     private val channel = ChannelId(1)
     private val target = AppPlaybackTarget.Live(channel)
 
+    @Test fun onlyPlayAndPauseArePlayingItemIdentity() {
+        ChannelPlaybackIndicator.entries.forEach {
+            assertEquals(it == ChannelPlaybackIndicator.PLAYING || it == ChannelPlaybackIndicator.PAUSED, it.isPlayingItem)
+        }
+        listOf(AppPlaybackState.Starting,
+            AppPlaybackState.Recovering(at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason.LIVE_ENDED, 0L), AppPlaybackState.Idle,
+            AppPlaybackState.Finished, AppPlaybackState.Failed(AppPlaybackFailureReason.OTHER)).forEach {
+            assertEquals(false, channelPlaybackIndicator(channel, target, it, true).isPlayingItem)
+        }
+    }
+
     @Test fun playPauseTuneConfirmationAndFailureFollowCurrentOwner() {
         fun indicator(state: AppPlaybackState, intent: Boolean = true) =
             channelPlaybackIndicator(channel, target, state, intent)

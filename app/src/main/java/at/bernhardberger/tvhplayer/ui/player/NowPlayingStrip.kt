@@ -30,6 +30,9 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.programmeProgress
+import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
 
 /** Passive identity of the playing channel, independent of the programme being browsed. */
 @Composable
@@ -49,12 +52,11 @@ internal fun NowPlayingStrip(
             if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-            if (current != null) ProgressStrip(
-                progress = ((nowSec - current.start.epochSeconds).toDouble() /
-                    (current.stop.epochSeconds - current.start.epochSeconds)).toFloat(),
+            val progress = programmeProgress(programme, nowSec)
+            if (progress != null) ProgressStrip(
+                progress = progress,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = 2.dp,
-                color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING ||
-                    playbackIndicator == ChannelPlaybackIndicator.PAUSED),
+                color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem),
             )
         }
         Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max)) {

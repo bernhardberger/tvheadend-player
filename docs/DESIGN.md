@@ -69,11 +69,18 @@ Meaning of colour:
   every surface showing it: Channels List, Grid, Immersive, Quick Zap (including
   its now-playing strip), the Guide headline, context menus, programme and recording
   details, and the recording browser. A playing recording's progress follows the
-  viewer's current position, not its saved resume point. At the live edge the channel's
-  length stays the same. Other channels remain cyan.
+  viewer's current position, not its saved resume point. Live viewer progress uses
+  the runtime's correlated time-shift wall-clock estimate, including when paused
+  or rewound. Without time-shift, at a confirmed live edge, or before the first sample
+  for a new target, viewer progress follows now in orange. Active time-shift with
+  unknown viewer timing has no progress bar. Other programmes keep broadcast-time
+  progress in cyan.
   Paused or rewound items retain orange and the playing identity (the pause mark
   replaces the animated bars when paused). Guide grid cells stay unchanged;
-  focus/selection styling and buttons remain neutral.
+  focus/selection styling and buttons remain neutral. Only Playing/Buffering
+  (including paused intent) identifies a playing item. Starting's tuning spinner
+  is loading feedback, not playing identity or orange progress; Recovering, Failed,
+  Idle and Finished have neither playing identity nor viewer progress.
 - **Recording red** means "a recording exists or runs". **`error`** means "a
   failure the user must act on". No component declares its own red: marks come
   from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), and a

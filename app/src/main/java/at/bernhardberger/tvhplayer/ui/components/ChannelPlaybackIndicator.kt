@@ -38,6 +38,10 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 /** Presentation only: a stall retains pause intent; only the owned tune spins. */
 enum class ChannelPlaybackIndicator { NONE, PLAYING, PAUSED, TUNING }
 
+/** Tuning is a loading indication, not evidence of a playing item or a viewer position. */
+internal val ChannelPlaybackIndicator.isPlayingItem: Boolean
+    get() = this == ChannelPlaybackIndicator.PLAYING || this == ChannelPlaybackIndicator.PAUSED
+
 fun channelPlaybackIndicator(
     channelId: ChannelId,
     target: AppPlaybackTarget?,

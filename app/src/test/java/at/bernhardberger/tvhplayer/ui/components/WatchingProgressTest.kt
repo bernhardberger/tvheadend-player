@@ -22,11 +22,40 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.MaterialTheme
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.PlaybackException
+import androidx.media3.datasource.BaseDataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import at.bernhardberger.tvheadend.sdk.core.*
+import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
+import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.*
+import at.bernhardberger.tvhplayer.settings.AppProfileOwner
+import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import java.util.concurrent.CountDownLatch
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -56,7 +85,8 @@ import org.robolectric.annotation.GraphicsMode
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-xhdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
-@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
+@OptIn(at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class, TvheadendTestingApi::class,
+    at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
 class WatchingProgressTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
@@ -64,6 +94,7 @@ class WatchingProgressTest {
     private val zone = TimeZone.getDefault()
     private lateinit var view: View
     private var viewerColor = 0
+    private var ambientColor = 0
     private var backgroundColor = 0
     private val start = Instant.parse("2026-09-15T19:00:00Z")
     private val now = start.epochSeconds + 1800
@@ -81,6 +112,7 @@ class WatchingProgressTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
     )).observation.value
     private val position = mutableStateOf<RecordingViewerPosition?>(RecordingViewerPosition(recording.id, 1800000, 7200000))
+    private val livePosition = mutableStateOf<LiveViewerPosition?>(LiveViewerPosition(channel.id, now))
     private val indicator = mutableStateOf(ChannelPlaybackIndicator.PLAYING)
     private val target = mutableStateOf<AppPlaybackTarget?>(AppPlaybackTarget.Live(channel.id))
 
@@ -132,6 +164,263 @@ class WatchingProgressTest {
         assertOrangeProgress()
     }
     @Test fun contextMenuMarksThePlayingProgramme() { show("menu"); marker().assertExists() }
+    @Test fun detailsMarkBelongsToTheActionTarget() {
+        show("mixed")
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
+        marker().assert(hasAnyAncestor(hasTestTag("details-watch")))
+        compose.runOnIdle { target.value = AppPlaybackTarget.Recording(recording.id) }
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
+        marker().assert(hasAnyAncestor(hasTestTag("details-play")))
+    }
+    @Test fun inactiveLiveDetailsAreAmbientEvenWithAWarmTarget() {
+        indicator.value = ChannelPlaybackIndicator.NONE
+        show("programme")
+        marker().assertDoesNotExist()
+        assertProgressColor(ambientColor)
+    }
+    @Test fun tuningGuideIsNotViewerProgress() {
+        indicator.value = ChannelPlaybackIndicator.TUNING
+        show("guide")
+        assertProgressColor(ambientColor)
+    }
+    @Test fun unrelatedRecordingDoesNotReadSample() {
+        var reads = 0
+        val sample = object : State<RecordingViewerPosition?> {
+            override val value: RecordingViewerPosition? get() { reads++; return position.value }
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalRecordingPosition provides sample,
+                LocalWatchingTarget provides AppPlaybackTarget.Recording(recording.id),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+                recordingViewerPosition(null)
+                recordingViewerPosition(DvrEntryId(99))
+            }
+        }
+        compose.runOnIdle { assertEquals(0, reads) }
+    }
+    @Test fun contextSynopsisDoesNotMoveWhenMarkChanges() {
+        show("menu")
+        val description = compose.onNodeWithText("${event.subtitle}\n${event.summary}", useUnmergedTree = true)
+        val top = description.fetchSemanticsNode().boundsInRoot.top
+        compose.runOnIdle { indicator.value = ChannelPlaybackIndicator.NONE }
+        assertEquals(top, description.fetchSemanticsNode().boundsInRoot.top)
+    }
+    @Test fun guideUsesPausedAndRewoundViewerFraction() = liveFractions("guide")
+    @Test fun contextUsesPausedAndRewoundViewerFraction() = liveFractions("menu")
+    @Test fun detailsUsePausedAndRewoundViewerFraction() = liveFractions("programme")
+    @Test fun zapUsesPausedAndRewoundViewerFraction() = liveFractions("zap")
+    @Test fun unknownLivePositionDoesNotInventViewerProgress() {
+        livePosition.value = liveViewerPosition(channel.id, AppTimeshiftState(available = true, paused = true,
+            timingKnown = false))
+        show("programme")
+        progressBar().assertDoesNotExist()
+        marker().assertExists()
+    }
+    @Test fun guideAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("guide")
+    @Test fun contextAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("menu")
+    @Test fun detailsAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("programme")
+    @Test fun zapAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("zap")
+
+    private fun liveEdgeFractions(surface: String) {
+        livePosition.value = null // New target: the first sample has not arrived yet.
+        show(surface)
+        progressBar().assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(0.25f, 0f..1f)))
+        assertOrangeProgress()
+        compose.runOnIdle {
+            livePosition.value = liveViewerPosition(channel.id, AppTimeshiftState())
+        }
+        progressBar().assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(0.25f, 0f..1f)))
+        assertOrangeProgress()
+        compose.runOnIdle {
+            livePosition.value = liveViewerPosition(channel.id,
+                AppTimeshiftState(available = true, paused = true, serverBehindLiveMs = 60_000, timingKnown = false))
+        }
+        progressBar().assertDoesNotExist()
+        // A zap resets the sample, rather than carrying the prior target's unknown timing.
+        compose.runOnIdle {
+            target.value = AppPlaybackTarget.Live(ChannelId(2))
+        }
+        compose.runOnIdle {
+            livePosition.value = null
+            target.value = AppPlaybackTarget.Live(channel.id)
+        }
+        progressBar().assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo,
+            ProgressBarRangeInfo(0.25f, 0f..1f)))
+        assertOrangeProgress()
+    }
+    @Test fun liveSampleRequiresCorrelatedWallClockEvidence() {
+        val fixture = TimeshiftTestFixture(7200.seconds)
+        fixture.updateHistory(0.seconds, 1800.seconds, estimatedLiveEdgeTime = Instant.fromEpochSeconds(now))
+        val sample = fixture.state.value.toAppPresentation(fixture.playbackPosition(900.seconds))
+        assertEquals(LiveViewerPosition(channel.id, start.epochSeconds + 900), liveViewerPosition(channel.id, sample))
+        assertEquals(LiveViewerPosition(channel.id, null), liveViewerPosition(channel.id, sample.copy(timingKnown = false)))
+        assertEquals(LiveViewerPosition(channel.id, null), liveViewerPosition(channel.id, sample.copy(playbackTarget = null)))
+        assertEquals(null, liveViewerPosition(channel.id, AppTimeshiftState()))
+        assertEquals(null, liveViewerPosition(channel.id, AppTimeshiftState(available = true,
+            serverBehindLiveMs = 0L, timingKnown = false)))
+        fixture.replaceSubscription()
+        fixture.updateHistory(0.seconds, 1800.seconds, estimatedLiveEdgeTime = Instant.fromEpochSeconds(now))
+        assertEquals(LiveViewerPosition(channel.id, null), liveViewerPosition(channel.id,
+            sample.copy(timeline = fixture.state.value.toAppPresentation().timeline)))
+    }
+
+    @Test fun providerResetsRecordingSamplesOnTargetChange() = providerScenario(liveFailure = false)
+    @Test fun providerKeepsFailedLiveAmbient() = providerScenario(liveFailure = true)
+
+    private fun providerScenario(liveFailure: Boolean) {
+        val context = ApplicationProvider.getApplicationContext<Application>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        val owner = object : LifecycleOwner { override val lifecycle = LifecycleRegistry.createUnsafe(this) }
+        val base = ExoPlayer.Builder(context).build()
+        val gate = CountDownLatch(1)
+        val listeners = mutableListOf<Player.Listener>()
+        var ready = false
+        var positionMs = 900_000L
+        val player = object : ExoPlayer by base {
+            override fun getPlaybackState() = if (ready) Player.STATE_READY else base.playbackState
+            override fun isPlaying() = ready && base.playWhenReady
+            override fun getCurrentPosition() = positionMs
+            override fun getDuration() = 7_200_000L
+            override fun addListener(listener: Player.Listener) { listeners += listener; base.addListener(listener) }
+            override fun removeListener(listener: Player.Listener) { listeners -= listener; base.removeListener(listener) }
+        }
+        fun loading(item: MediaItem): MediaSource = ProgressiveMediaSource.Factory {
+            object : BaseDataSource(false) {
+                override fun open(dataSpec: DataSpec): Long { gate.await(); throw java.io.IOException("closed") }
+                override fun read(buffer: ByteArray, offset: Int, length: Int) = C.RESULT_END_OF_INPUT
+                override fun getUri(): android.net.Uri? = null
+                override fun close() = Unit
+            }
+        }.createMediaSource(item)
+        val second = DvrEntry.create(DvrEntryId(2), state = DvrEntryState.COMPLETED, title = "Second recording")
+        val session = FakeTvheadendSession(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = listOf(event))),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording, second))),
+        )).apply { scriptRecordingPlaybackSuccess(); scriptLivePlaybackSuccess(); scriptStreamProfiles(emptyList()) }
+        val settings = PlayerSettingsStore(object : DataStore<Preferences> {
+            private val state = MutableStateFlow(emptyPreferences())
+            override val data: Flow<Preferences> get() = state
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
+                transform(state.value).also { state.value = it }
+        })
+        val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
+            readProfileForEditing = { ServerProfileEditReadResult.Missing })
+        val coordinator = createTvheadendPlaybackCoordinator(object : ExoPlayer by player {
+            override fun setMediaSource(mediaSource: MediaSource) = base.setMediaSource(if (liveFailure) mediaSource else loading(mediaSource.mediaItem))
+            override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) =
+                base.setMediaSource(if (liveFailure) mediaSource else loading(mediaSource.mediaItem), startPositionMs)
+            override fun setMediaSource(mediaSource: MediaSource, resetPosition: Boolean) =
+                base.setMediaSource(if (liveFailure) mediaSource else loading(mediaSource.mediaItem), resetPosition)
+        }).also { it.launchIn(scope) }
+        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+            TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None,
+            PlaybackRuntimePolicy.fromPlayerSettings(object : PlaybackTrace {}))
+        val seen = mutableListOf<Pair<AppPlaybackTarget?, RecordingViewerPosition?>>()
+        var publishedIndicator = ChannelPlaybackIndicator.NONE
+        var publishedColor: Color? = null
+        fun install(id: DvrEntryId) {
+            val job = scope.async { runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, id)),
+                RecordingPlaybackStart.START_OVER) }
+            compose.waitUntil(10_000) { job.isCompleted }
+            compose.runOnIdle {
+                ready = true
+                listeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY); it.onIsPlayingChanged(true) }
+            }
+            compose.waitUntil(5_000) { runtime.state.value == AppPlaybackState.Playing }
+        }
+        try {
+            scope.launch { profiles.run() }
+            owner.lifecycle.currentState = Lifecycle.State.RESUMED
+            compose.setContent {
+                CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+                    TVHeadendPlayerTheme {
+                        ProvideWatchingProgress(runtime) {
+                            val active = LocalWatchingTarget.current
+                            val sample = LocalRecordingPosition.current?.value
+                            val current = LocalWatchingIndicator.current
+                            val color = progressColor(watchingIndicator(event, now).isPlayingItem)
+                            val ambient = MaterialTheme.colorScheme.primary
+                            SideEffect {
+                                seen += active to sample
+                                publishedIndicator = current
+                                publishedColor = color
+                                ambientColor = ambient.toArgb()
+                            }
+                        }
+                    }
+                }
+            }
+            if (!liveFailure) {
+                install(recording.id)
+                compose.waitUntil(5_000) { seen.any { it.second?.recordingId == recording.id } }
+                compose.runOnIdle { positionMs = 120_000L; ready = false }
+                install(second.id)
+                compose.waitUntil(5_000) { seen.any { it.second?.recordingId == second.id } }
+                compose.runOnIdle {
+                    val next = seen.filter { it.first == AppPlaybackTarget.Recording(second.id) }
+                    assertTrue(next.isNotEmpty())
+                    assertEquals(null, next.first().second)
+                    assertTrue(next.all { it.second == null || it.second == RecordingViewerPosition(second.id, 120_000L, 7_200_000L) })
+                    base.pause()
+                }
+                compose.waitUntil(5_000) { publishedIndicator == ChannelPlaybackIndicator.PAUSED }
+                compose.runOnIdle { positionMs = 60_000L }
+                compose.mainClock.advanceTimeBy(1100)
+                compose.waitUntil(5_000) { seen.last().second?.positionMs == 60_000L }
+                compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.CREATED }
+                compose.runOnIdle { positionMs = 30_000L }
+                compose.mainClock.advanceTimeBy(2100)
+                compose.runOnIdle { assertEquals(60_000L, seen.last().second?.positionMs) }
+                compose.runOnIdle { owner.lifecycle.currentState = Lifecycle.State.RESUMED }
+                compose.waitUntil(5_000) { seen.last().second?.positionMs == 30_000L }
+                return
+            }
+            val live = scope.async { runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, channel.id))) }
+            compose.waitUntil(10_000) {
+                // Profile resolution resumes on the Android looper, not Compose's frame clock.
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                live.isCompleted
+            }
+            assertEquals("Live install", at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult.STARTED,
+                runBlocking { live.await() })
+            compose.runOnIdle {
+                listeners.toList().forEach { it.onPlayerError(PlaybackException("scripted failure", null, PlaybackException.ERROR_CODE_DECODING_FAILED)) }
+            }
+            compose.waitUntil(5_000) { runtime.state.value is AppPlaybackState.Failed }
+            compose.waitForIdle()
+            compose.runOnIdle {
+                assertEquals(AppPlaybackTarget.Live(channel.id), runtime.activeTarget.value)
+                assertEquals(ChannelPlaybackIndicator.NONE, publishedIndicator)
+                assertEquals(ambientColor, publishedColor?.toArgb())
+            }
+            live.cancel()
+        } finally {
+            gate.countDown()
+            scope.cancel()
+            base.release()
+        }
+    }
+
+    private fun liveFractions(surface: String) {
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds + 1200)
+        show(surface)
+        assertFraction(1f / 6f)
+        if (surface != "menu") assertOrangeProgress()
+        compose.runOnIdle { livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds + 600) }
+        assertFraction(1f / 12f)
+        if (surface != "menu") assertOrangeProgress()
+        compose.runOnIdle { target.value = AppPlaybackTarget.Live(ChannelId(99)) }
+        assertFraction(.25f)
+        if (surface != "menu") assertProgressColor(ambientColor)
+    }
+
+    private fun assertFraction(value: Float) = progressBar().assert(
+        SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(value, 0f..1f)))
     @Test fun nowPlayingStripKeepsTheSharedMark() { show("zap"); marker().assertExists() }
     @Test fun pausedZapKeepsOrangeProgressWithoutALogoPlate() {
         indicator.value = ChannelPlaybackIndicator.PAUSED
@@ -203,10 +492,17 @@ class WatchingProgressTest {
         bitmap.recycle()
     }
     private fun assertOrangeProgress() {
-        val bounds = progressBar().fetchSemanticsNode().boundsInRoot
+        assertProgressColor(viewerColor)
+    }
+    private fun assertProgressColor(expected: Int) {
+        val node = progressBar().fetchSemanticsNode()
+        val bounds = node.boundsInRoot
+        val fraction = node.config[SemanticsProperties.ProgressBarRangeInfo].current
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        assertEquals(viewerColor, bitmap.getPixel(bounds.left.toInt() + 5, bounds.center.y.toInt()))
+        // Rounded artwork/strip corners can antialias an individual pixel in a short fill.
+        assertTrue("Expected progress color $expected", (bounds.left.toInt() until
+            (bounds.left + bounds.width * fraction).toInt()).any { bitmap.getPixel(it, bounds.center.y.toInt()) == expected })
         bitmap.recycle()
     }
 
@@ -216,14 +512,18 @@ class WatchingProgressTest {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f),
                 LocalWatchingTarget provides target.value,
                 LocalWatchingChannel provides (target.value as? AppPlaybackTarget.Live)?.channelId,
-                LocalWatchingIndicator provides indicator.value, LocalRecordingPosition provides position) {
+                LocalWatchingIndicator provides indicator.value, LocalRecordingPosition provides position,
+                LocalLivePosition provides livePosition) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     viewerColor = MaterialTheme.colorScheme.tertiary.toArgb()
+                    ambientColor = MaterialTheme.colorScheme.primary.toArgb()
                     backgroundColor = MaterialTheme.colorScheme.background.toArgb()
                     ProvideArtworkSession(observation.currentSession) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             when (surface) {
+                                "mixed" -> ProgrammeDetailsPage(event, recording, channel, now,
+                                    listOf(BrowseContextAction.WATCH, BrowseContextAction.PLAY), {}, {})
                                 "guide" -> GuideHeadline({ GuideHeadlineProgramme(channel, event) }, observation, null, false,
                                     { now }, Modifier.padding(48.dp))
                                 "programme", "recording" -> ProgrammeDetailsPage(event.takeIf { surface == "programme" },

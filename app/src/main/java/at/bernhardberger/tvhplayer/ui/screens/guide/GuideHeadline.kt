@@ -53,6 +53,8 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.programmeProgress
+import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineGroupGap
@@ -305,8 +307,8 @@ private fun GuideHeadlineContent(
         facts = metadata,
         rating = event?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = event?.let { guideHeadlineTiming(it, now) },
-        progress = event?.takeIf { it.isRunning(now) }?.progress(now),
-        progressColor = progressColor(indicator != ChannelPlaybackIndicator.NONE),
+        progress = programmeProgress(event, now),
+        progressColor = progressColor(indicator.isPlayingItem),
         // No synopsis: in the Guide the grid below carries the weight.
         loading = event == null && loading,
         titleStyle = titleStyle,

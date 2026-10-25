@@ -105,6 +105,7 @@ import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
 import at.bernhardberger.tvhplayer.ui.components.LoadDetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
@@ -450,8 +451,7 @@ internal fun ChannelsImmersiveHero(
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
         // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
-            watching = channel.id == frame.playbackChannelId && frame.playbackIndicator in
-                listOf(ChannelPlaybackIndicator.PLAYING, ChannelPlaybackIndicator.PAUSED),
+            watching = channel.id == frame.playbackChannelId && frame.playbackIndicator.isPlayingItem,
             synopsisLines = if (besideList) ImmersiveListSynopsisLines else ImmersiveSynopsisLines,
             loading = frame.guideLoading, fitSynopsis = besideList,
             // Beside the list the title steps down one size, so it doesn't compete with the rows.
