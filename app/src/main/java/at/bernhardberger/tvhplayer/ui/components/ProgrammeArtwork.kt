@@ -32,16 +32,21 @@ internal fun ProgrammeArtwork(
         if (image != null && session != null) {
             AsyncImage(AppArtworkSource(session, image), null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            if (channelIcon != null) PiconBox(channelIcon,
-                Modifier.align(Alignment.BottomStart).padding(8.dp).then(plateModifier)
-                    .size(56.dp, 32.dp)
-                    .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
-                    .padding(horizontal = 4.dp, vertical = 3.dp))
+            if (channelIcon != null) ArtworkLogoPlate(channelIcon,
+                Modifier.align(Alignment.BottomStart).padding(8.dp).then(plateModifier))
         } else PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
             progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = 3.dp, color = progressColor)
     }
+}
+
+/** A channel's logo embedded in a programme picture's bottom-start corner, on a dark plate. */
+@Composable
+internal fun ArtworkLogoPlate(channelIcon: ArtworkId?, modifier: Modifier = Modifier) {
+    PiconBox(channelIcon, modifier.size(56.dp, 32.dp)
+        .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
+        .padding(horizontal = 4.dp, vertical = 3.dp))
 }
 
 @Composable

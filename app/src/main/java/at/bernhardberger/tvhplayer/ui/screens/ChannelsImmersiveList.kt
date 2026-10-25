@@ -154,7 +154,7 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
-import at.bernhardberger.tvhplayer.ui.components.InlineLogoScale
+import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
 
 /**
  * The row's cards: four and their gaps span the content from the keyline to the header's end
@@ -447,7 +447,7 @@ private fun ChannelsCardRow(
 /**
  * A card of the immersive row and the grid, the details page's standard card: the current programme inside
  * its picture, always, as a browse card names what it shows. With [programmePicture] the channel's
- * logo and name go below; without a picture the logo stands on its ambient colour above the
+ * logo sits in the picture's corner and its name goes below; without a picture the logo stands on its ambient colour above the
  * programme, and without [programmePicture] that logo names the channel, so nothing goes below. While the guide is [programmeLoading], a missing
  * programme line is a [SkeletonLine] rather than "No program information".
  */
@@ -524,6 +524,9 @@ internal fun ChannelsRowCard(
                     }
                 }
             }
+            // The picture carries the channel's logo in its embed corner, like the airing cards.
+            if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
+                Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"))
             // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
             if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
                 compact = true)
@@ -541,8 +544,6 @@ internal fun ChannelsRowCard(
             // Start-aligned like the kit's content block.
             Row(Modifier.fillMaxWidth().padding(top = ImmersiveCardLabelGap), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                PiconBox(channel.icon, Modifier.size(36.dp, 20.dp).testTag("$tag-identity-picon"),
-                    contentScale = InlineLogoScale, trim = true)
                 // The card's content colour: muted, and white on the focused card, so the eye goes there.
                 Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.weight(1f).testTag("$tag-identity"),

@@ -268,10 +268,14 @@ class ChannelsLayoutFocusTest {
         fixture.show(grid, imageLoader = fixture.fixtureArt())
         fixture.awaitFocus(card(1))
         compose.onNodeWithTag("channels-grid-1-art", useUnmergedTree = true).assertExists()
+        // The picture carries the channel's logo in its corner; the name line below has none.
+        compose.onNodeWithTag("channels-grid-1-art-picon", useUnmergedTree = true).assertExists()
         // The Kettle Hour has no programme picture, so its card shows the logo.
         compose.onNodeWithTag("channels-grid-6-picon", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("channels-grid-6-art-picon", useUnmergedTree = true).assertDoesNotExist()
         compose.runOnIdle { fixture.channelsView = grid.toggledProgramArt() }
         compose.onNodeWithTag("channels-grid-1-art", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("channels-grid-1-art-picon", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("channels-grid-1-picon", useUnmergedTree = true).assertExists()
     }
 
