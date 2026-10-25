@@ -10,6 +10,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -144,8 +145,8 @@ private class WatchingPresentation(
 
 /**
  * While [held], [content] keeps what was playing when it was last shown, so a page fading into
- * the player doesn't gain the new target's mark or progress mid-fade. Positions keep their state
- * holders: a replaced target's sampler stops, so its last position stays.
+ * the player doesn't gain the new target's mark or progress mid-fade. Positions are copied when the
+ * hold begins: a request can wait while the old target still plays and its sampler still ticks.
  */
 @Composable
 internal fun HoldWatching(held: Boolean, content: @Composable () -> Unit) {
@@ -155,9 +156,15 @@ internal fun HoldWatching(held: Boolean, content: @Composable () -> Unit) {
     var last by remember { mutableStateOf(current) }
     SideEffect { if (!held) last = current }
     val shown = if (held) last else current
+    val recordingPosition = remember(held, shown.recordingPosition) {
+        shown.recordingPosition?.takeIf { held }?.let { mutableStateOf(Snapshot.withoutReadObservation { it.value }) }
+    } ?: shown.recordingPosition
+    val livePosition = remember(held, shown.livePosition) {
+        shown.livePosition?.takeIf { held }?.let { mutableStateOf(Snapshot.withoutReadObservation { it.value }) }
+    } ?: shown.livePosition
     CompositionLocalProvider(LocalWatchingChannel provides shown.channel, LocalWatchingTarget provides shown.target,
         LocalRecordingPlaybackSelection provides shown.selection, LocalWatchingIndicator provides shown.indicator,
-        LocalRecordingPosition provides shown.recordingPosition, LocalLivePosition provides shown.livePosition,
+        LocalRecordingPosition provides recordingPosition, LocalLivePosition provides livePosition,
         content = content)
 }
 

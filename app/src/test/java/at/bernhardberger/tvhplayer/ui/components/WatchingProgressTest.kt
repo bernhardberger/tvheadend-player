@@ -240,6 +240,30 @@ class WatchingProgressTest {
         }
         compose.runOnIdle { assertEquals(false, visible); assertEquals(0, reads) }
     }
+    @Test fun heldBrowseKeepsThePositionsItHadWhenTheHoldBegan() {
+        var held by mutableStateOf(false)
+        var shownLive: LiveViewerPosition? = null
+        var shownRecording: RecordingViewerPosition? = null
+        compose.setContent {
+            CompositionLocalProvider(LocalLivePosition provides livePosition, LocalRecordingPosition provides position) {
+                HoldWatching(held) {
+                    shownLive = LocalLivePosition.current?.value
+                    shownRecording = LocalRecordingPosition.current?.value
+                }
+            }
+        }
+        val before = livePosition.value to position.value
+        compose.runOnIdle { held = true }
+        // The old target still plays while the request waits, so its sampler keeps ticking.
+        compose.runOnIdle {
+            livePosition.value = LiveViewerPosition(channel.id, now + 60)
+            position.value = RecordingViewerPosition(recording.id, 1860000, 7200000)
+        }
+        compose.runOnIdle { assertEquals(before, shownLive to shownRecording) }
+        compose.runOnIdle { held = false }
+        compose.runOnIdle { assertEquals(LiveViewerPosition(channel.id, now + 60), shownLive)
+            assertEquals(1860000L, shownRecording?.positionMs) }
+    }
     @Test fun futureProgrammeOnPausedChannelKeepsStartsFactWithoutTimeline() {
         indicator.value = ChannelPlaybackIndicator.PAUSED
         show("future")
