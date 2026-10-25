@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.semantics.SemanticsProperties
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
-import at.bernhardberger.tvhplayer.ui.components.RowHeaderQuietScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
@@ -477,30 +476,53 @@ class ProgrammeDetailsPageTest {
         compose.mainClock.autoAdvance = true
     }
 
-    @Test fun airingsHeadingEmphasisFollowsThePageScrollMidAnimation() {
+    // Google TV: entering the row grows its heading and shows the text under its cards, and the
+    // row grows by that text; the facts below move with it. Leaving reverses both.
+    @Test fun airingsRowGrowsWithItsTextOnlyWhileFocused() {
         show(longText = true)
-        fun scrollValue() = compose.onNodeWithTag("details-page-scroll", useUnmergedTree = true)
-            .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
         fun headingWidth() = compose.onNodeWithText("Other airings of Ridge Light").fetchSemanticsNode().boundsInRoot.width
-        val startScroll = scrollValue()
+        fun times() = compose.onAllNodesWithTag("details-card-time", useUnmergedTree = true).fetchSemanticsNodes().size
+        fun gap() = compose.onNodeWithTag("details-facts-panel").getUnclippedBoundsInRoot().top -
+            compose.onNodeWithText("Other airings of Ridge Light").getUnclippedBoundsInRoot().top
         val quietWidth = headingWidth()
+        val restingGap = gap()
+        Assert.assertEquals(0, times())
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.mainClock.advanceTimeBy(150)
-        val midScroll = scrollValue()
+        compose.mainClock.advanceTimeBy(RowChangeMs / 2L)
         val midWidth = headingWidth()
-        compose.mainClock.advanceTimeBy(RowChangeMs.toLong())
-        val endScroll = scrollValue()
-        val fullWidth = headingWidth()
-        Assert.assertTrue("scroll $startScroll < $midScroll < $endScroll", midScroll > startScroll && midScroll < endScroll)
-        Assert.assertTrue("heading width $quietWidth < $midWidth < $fullWidth", midWidth > quietWidth && midWidth < fullWidth)
-        val scale = midWidth / fullWidth
-        val quietScale = 18f / 28f
-        Assert.assertTrue("heading scale $scale", scale > quietScale && scale < 1f)
-        val progress = (midScroll - startScroll) / (endScroll - startScroll)
-        Assert.assertEquals("heading reads scroll, not a separate focus animation",
-            quietScale + (1f - quietScale) * progress, scale, .01f)
         compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        val fullWidth = headingWidth()
+        Assert.assertTrue("heading width $quietWidth < $midWidth < $fullWidth", midWidth > quietWidth && midWidth < fullWidth)
+        Assert.assertEquals(18f / 28f, quietWidth / fullWidth, .02f)
+        Assert.assertTrue("every shown card has its text", times() > 1)
+        Assert.assertTrue("facts move below the grown row: $restingGap < ${gap()}", gap() > restingGap + 20.dp)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        Assert.assertEquals(0, times())
+        Assert.assertEquals(restingGap.value, gap().value, 1f)
+        Assert.assertEquals(quietWidth, headingWidth(), 1f)
+    }
+
+    @Test fun standardScrollCaptures() {
+        show(cast = true)
+        capture("top", "details-standard-scroll")
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        capture("other-airings-focused", "details-standard-scroll")
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+        // The credits are part of the facts; there is no separate Cast & crew row.
+        capture("facts-with-cast-focused", "details-standard-scroll")
+    }
+    @Test fun standardScrollFactsCapture() {
+        show(richFacts = true)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+        capture("facts-focused", "details-standard-scroll")
     }
 
     @Test fun panelAndActionsShareTheTopWithoutScrolling() {

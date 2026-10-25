@@ -12,8 +12,6 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.TvPassiveAlpha
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import kotlin.math.abs
-import kotlin.math.ceil
-import kotlin.math.floor
 
 internal const val RowChangeMs = 300
 internal val RowChangeMotion = tween<Float>(RowChangeMs, easing = PlayerMotion.Standard)
@@ -33,7 +31,7 @@ internal fun Modifier.rowHeaderEmphasis(
     val heading = measurable.measure(constraints)
     layout(heading.width, heading.height) {
         // Placement, not translation inside Text's layer: ellipsized Text clips that layer.
-        // Keep the reserved section height fixed so the scroll anchors don't change mid-motion.
+        // Keep the reserved section height fixed so the heading's motion never moves the page.
         heading.placeRelative(0, ((1f - emphasis()) * focusOverflow.toPx()).toInt())
     }
 }.graphicsLayer {
@@ -51,13 +49,4 @@ internal fun Modifier.rowContentEmphasis(emphasis: () -> Float): Modifier = grap
     // At full emphasis no offscreen buffer is needed and overflow remains unrestricted.
     compositingStrategy = if (value < 1f) CompositingStrategy.Offscreen else CompositingStrategy.ModulateAlpha
     alpha = lerp(RowDimAlpha, 1f, value)
-}
-
-/** The scroll at fractional section [position], moving linearly between the sections' scroll anchors. */
-internal fun scrollAtSectionPosition(position: Float, anchors: List<Float>): Float {
-    if (anchors.isEmpty()) return 0f
-    val clamped = position.coerceIn(0f, anchors.lastIndex.toFloat())
-    val below = floor(clamped).toInt()
-    val above = ceil(clamped).toInt()
-    return lerp(anchors[below], anchors[above], clamped - below)
 }

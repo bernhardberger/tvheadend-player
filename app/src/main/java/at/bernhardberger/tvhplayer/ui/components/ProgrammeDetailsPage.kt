@@ -2,12 +2,16 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import android.content.res.Resources
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Transition
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.updateTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -39,6 +43,8 @@ import androidx.compose.ui.input.key.*
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -151,25 +157,25 @@ internal fun ProgrammeDetailsPage(
     var lastAction by remember { mutableStateOf(initialAction ?: actions.firstOrNull()) }
     var lastCard by remember { mutableStateOf(returnToCard ?: ids.firstOrNull()) }
     var openingRelease by remember { mutableStateOf(true) }
-    var transitionKey by remember { mutableStateOf<Key?>(null) }
     var reading by remember { mutableStateOf(false) }
-    // Natural section measurements define the fixed lower-section scroll anchors.
     var viewport by remember { mutableIntStateOf(0) }
     var heroHeight by remember { mutableIntStateOf(0) }
-    var airingsHeight by remember { mutableIntStateOf(0) }
     var factsHeadingHeight by remember { mutableIntStateOf(0) }
+    var factsTop by remember { mutableIntStateOf(Int.MAX_VALUE) }
     val density = LocalDensity.current
     val headingKeyline = with(density) { DetailsSectionKeyline.roundToPx() }
     val scope = rememberCoroutineScope()
-    fun restoreAction() {
-        section = DetailsSection.ACTIONS
-        (lastAction?.takeIf { it in actions }?.let(requesters::get)
+    // The action last focused, or its replacement after an action changed the row.
+    fun actionFocus() = (lastAction?.takeIf { it in actions }?.let(requesters::get)
             ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) &&
                 it in listOf(BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED) }?.let(requesters::get)
             ?: actions.firstOrNull { lastAction in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) &&
                 it in listOf(BrowseContextAction.RECORD, BrowseContextAction.CANCEL, BrowseContextAction.STOP) }?.let(requesters::get)
             ?: initialAction?.takeIf { it in actions }?.let(requesters::get)
-            ?: actions.firstOrNull()?.let(requesters::get) ?: panelFocus).requestFocus()
+            ?: actions.firstOrNull()?.let(requesters::get) ?: panelFocus)
+    fun restoreAction() {
+        section = DetailsSection.ACTIONS
+        actionFocus().requestFocus()
     }
     suspend fun showCard(target: EventId) {
         if (listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) listState.scrollToItem(ids.indexOf(target))
@@ -177,8 +183,6 @@ internal fun ProgrammeDetailsPage(
         withFrameNanos { }
         cardFocus.getValue(target).requestFocus()
     }
-    fun enterAirings() { scope.launch { showCard(lastCard?.takeIf { it in ids } ?: ids.first()) } }
-    fun enterFacts() { factsScroll.dispatchRawDelta(-factsScroll.value.toFloat()); factsFocus.requestFocus() }
     // Back first returns to the actions, with the page at its top; then it closes.
     fun close() {
         if (reading) reading = false
@@ -197,67 +201,33 @@ internal fun ProgrammeDetailsPage(
         val card = returnToCard?.takeIf { it in ids }
         if (card != null) {
             lastCard = card
+            // A page returned to at its airings row opens there instead of scrolling to it.
+            pageScroll.scrollTo(heroHeight - headingKeyline)
             showCard(card)
             onReturnToCardConsumed()
         } else if (section == DetailsSection.ACTIONS) restoreAction()
     }
-    // The section the page has finished scrolling to. A page returned to at its airings row starts
-    // there, so its first layouts only place it; section changes animate.
-    val scrollSection = if (section == DetailsSection.ABOUT) DetailsSection.ACTIONS else section
-    var shownSection by remember { mutableStateOf(scrollSection) }
-    val sections = remember(ids.isNotEmpty(), importantFacts.isNotEmpty()) {
-        buildList {
-            add(DetailsSection.ACTIONS)
-            if (ids.isNotEmpty()) add(DetailsSection.AIRINGS)
-            if (importantFacts.isNotEmpty()) add(DetailsSection.FACTS)
-        }
-    }
-    val anchors = sections.map {
-            when (it) {
-                DetailsSection.ACTIONS, DetailsSection.ABOUT -> 0
-                DetailsSection.AIRINGS -> heroHeight - headingKeyline
-                DetailsSection.FACTS -> heroHeight + airingsHeight - headingKeyline
-            }.coerceAtLeast(0).toFloat()
-    }
-    // One clock, as in the channel rows: the section position drives the page scroll, the headings
-    // and the dimming. Sections that share a scroll target still change emphasis on it.
-    // A changed set of airings starts a new position at the focused section.
-    val sectionPosition = remember(sections) { Animatable(sections.indexOf(scrollSection).toFloat()) }
-    fun emphasis(target: DetailsSection): Float = rowEmphasis(sections.indexOf(target) - sectionPosition.value)
-    fun scrollTarget(position: Float) = scrollAtSectionPosition(position, anchors)
-    // Focus never scrolls the page by itself: the page follows the section position between the
-    // sections' scroll anchors, frame by frame on the position's clock.
-    LaunchedEffect(scrollSection, anchors, sectionPosition) {
-        val target = sections.indexOf(scrollSection).toFloat()
-        if (scrollSection == shownSection) {
-            sectionPosition.snapTo(target)
-            pageScroll.scrollTo(scrollTarget(target).roundToInt())
-        } else {
-            sectionPosition.animateTo(target, RowChangeMotion) {
-                pageScroll.dispatchRawDelta(scrollTarget(value) - pageScroll.value)
-            }
-            shownSection = scrollSection
-        }
-    }
-    fun vertical(down: Boolean): Boolean {
-        when (section) {
-            DetailsSection.ACTIONS -> when {
-                down && ids.isNotEmpty() -> enterAirings()
-                down && importantFacts.isNotEmpty() -> enterFacts()
-                !down && hasAbout -> aboutFocus.requestFocus()
-                else -> return true
-            }
-            DetailsSection.ABOUT -> if (down) restoreAction() else return true
-            DetailsSection.AIRINGS -> if (down) {
-                if (importantFacts.isNotEmpty()) enterFacts()
-            } else restoreAction()
-            DetailsSection.FACTS -> if (down) {
-                scope.launch { factsScroll.animateScrollTo(factsScroll.value + with(density) { 60.dp.roundToPx() }, RowChangeMotion) }
-            } else {
-                if (ids.isNotEmpty()) enterAirings() else restoreAction()
+    // The section holding focus is at full emphasis, the others dimmed; the hero holds the About
+    // panel and the actions.
+    val focusedSection = if (section == DetailsSection.ABOUT) DetailsSection.ACTIONS else section
+    val heroEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.ACTIONS) 1f else 0f, RowChangeMotion, label = "details-hero")
+    val airingsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.AIRINGS) 1f else 0f, RowChangeMotion, label = "details-airings")
+    val factsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.FACTS) 1f else 0f, RowChangeMotion, label = "details-facts")
+    // Focus search moves between the sections. The focused item's section comes to the heading
+    // keyline, the hero to the page's top. Where the item sits names its section: the focus
+    // callbacks have not yet run when the page brings it into view.
+    val pageSpec = remember(pageScroll, headingKeyline) {
+        object : BringIntoViewSpec {
+            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
+                val top = offset + pageScroll.value
+                val sectionTop = when {
+                    top < heroHeight -> return -pageScroll.value.toFloat()
+                    top < factsTop -> heroHeight
+                    else -> factsTop
+                }
+                return (sectionTop - headingKeyline - pageScroll.value).toFloat()
             }
         }
-        return true
     }
     val readingTransition = updateTransition(reading, label = "details-reading")
     val readingProgress = readingTransition.animateFloat(
@@ -283,10 +253,6 @@ internal fun ProgrammeDetailsPage(
                 val activation = key.key in listOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
                 when {
                     !backEnabled -> true
-                    key.key == transitionKey -> {
-                        if (key.type == KeyEventType.KeyUp) transitionKey = null
-                        true
-                    }
                     activation && openingRelease -> {
                         if (key.type == KeyEventType.KeyDown && key.nativeKeyEvent.repeatCount == 0) {
                             openingRelease = false; false
@@ -300,16 +266,17 @@ internal fun ProgrammeDetailsPage(
                          if (key.type == KeyEventType.KeyUp) reading = true
                          true
                      }
+                     // The panel has nothing to focus inside: Down reads on through its facts.
+                     section == DetailsSection.FACTS && key.key == Key.DirectionDown -> {
+                         if (key.type == KeyEventType.KeyDown) scope.launch {
+                             factsScroll.animateScrollTo(factsScroll.value + with(density) { 60.dp.roundToPx() }, RowChangeMotion)
+                         }
+                         true
+                     }
                      section == DetailsSection.FACTS && (key.key == Key.DirectionLeft || key.key == Key.DirectionRight) -> true
                     key.key == Key.DirectionLeft && (section == DetailsSection.ABOUT ||
                         section == DetailsSection.ACTIONS && lastAction == actions.firstOrNull() ||
                         section == DetailsSection.AIRINGS && lastCard == ids.firstOrNull()) -> true
-                    key.key == Key.DirectionDown || key.key == Key.DirectionUp -> {
-                        if (key.type != KeyEventType.KeyDown) true else {
-                            val before = section
-                            vertical(key.key == Key.DirectionDown).also { if (it && before != section) transitionKey = key.key }
-                        }
-                    }
                     else -> false
                 }
             }.then(if (actions.isEmpty()) Modifier.focusRequester(panelFocus).onFocusChanged {
@@ -319,7 +286,11 @@ internal fun ProgrammeDetailsPage(
                 up = FocusRequester.Cancel; down = FocusRequester.Cancel
                 left = FocusRequester.Cancel; right = FocusRequester.Cancel
             }.focusable() else Modifier.focusGroup())) {
-            val backdrop: () -> Float = { maxOf(sectionPosition.value.coerceIn(0f, 1f), readingProgress.value) }
+            // Blurred and dimmed in full once the page has scrolled as far as the airings' heading.
+            val backdrop: () -> Float = {
+                val full = minOf(heroHeight - headingKeyline, pageScroll.maxValue).coerceAtLeast(1)
+                maxOf((pageScroll.value.toFloat() / full).coerceIn(0f, 1f), readingProgress.value)
+            }
             // With warm playback the live video is the background, so the page draws no art.
             // Scrolled away (or reading), the picture blurs in place, like Google TV; no zoom.
             // Without one the logo scrolls away with the page, like the photo on Google TV's actor
@@ -361,16 +332,16 @@ internal fun ProgrammeDetailsPage(
                     Modifier.testTag("details-reading-text"), style = MaterialTheme.typography.bodyLarge.copy(fontSize = 20.sp, lineHeight = 30.sp))
             }
             else {
-            val pageSpec = LocalBringIntoViewSpec.current
-            CompositionLocalProvider(LocalBringIntoViewSpec provides NoPageScroll) {
+            val rowSpec = LocalBringIntoViewSpec.current
+            CompositionLocalProvider(LocalBringIntoViewSpec provides pageSpec) {
               BoxWithConstraints {
                 val screen = constraints.maxHeight
                 Column(Modifier.fillMaxSize().testTag("details-page-scroll").verticalScroll(pageScroll)
                     .then(if (!backEnabled) Modifier.clearAndSetSemantics { } else Modifier)) {
-                    DetailsFirstScreen(screen, sections.size > 1,
+                    DetailsFirstScreen(screen, ids.isNotEmpty() || importantFacts.isNotEmpty(),
                         if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
                         else stringResource(R.string.details_important_information),
-                        Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { emphasis(DetailsSection.ACTIONS) }) {
+                        Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }) {
                         DetailsInformation(event, recording, recordingAdmission, channel, nowSec, besideLogo = glowChannel != null) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
@@ -385,46 +356,57 @@ internal fun ProgrammeDetailsPage(
                             DetailsAbout(synopsis, { reading = true },
                                 Modifier.focusRequester(aboutFocus).onFocusChanged {
                                     if (it.isFocused) section = DetailsSection.ABOUT
-                                }.focusProperties { canFocus = backEnabled; up = FocusRequester.Cancel; down = FocusRequester.Cancel })
+                                }.focusProperties { canFocus = backEnabled })
                         }
                          // With the action row's 8dp inset, 28dp before the buttons.
                          Spacer(Modifier.height(20.dp))
-                        CompositionLocalProvider(LocalBringIntoViewSpec provides pageSpec) {
-                            DetailsActions(actions, event, recording, nowSec, requesters, { if (backEnabled) onAction(it) }) {
-                                lastAction = it; section = DetailsSection.ACTIONS; onActionFocused(it)
+                        // Entering the row returns to the action last focused there.
+                        CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
+                            Box(Modifier.focusProperties { onEnter = { actionFocus().requestFocus() } }.focusGroup()) {
+                                DetailsActions(actions, event, recording, nowSec, requesters, { if (backEnabled) onAction(it) }) {
+                                    lastAction = it; section = DetailsSection.ACTIONS; onActionFocused(it)
+                                }
                             }
                         }
                     }
                     if (ids.isNotEmpty()) DetailsAirings(related, title, event?.let { detailsSubtitle(it, resources) } ?: recording?.subtitle,
-                        nowSec, channelOf, listState, cardFocus, { emphasis(DetailsSection.AIRINGS) },
-                         Modifier.onSizeChanged { airingsHeight = it.height }
-                            .onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS },
+                        nowSec, channelOf, listState, cardFocus, lastCard, section == DetailsSection.AIRINGS, { airingsEmphasis.value },
+                         Modifier.onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS },
                         onFocused = { lastCard = it }, onClick = { if (backEnabled) onRelated(it) },
                         onOpenContextMenu = onRelatedContextMenu?.let { open -> { if (backEnabled) open(it) } },
                         bottomSpace = if (importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge)
                      if (importantFacts.isNotEmpty()) Column(Modifier.fillMaxWidth()
-                         .padding(horizontal = DetailsKeyline)
-                         .focusRequester(factsFocus).onFocusChanged { if (it.isFocused) section = DetailsSection.FACTS }
+                         .onPlaced { factsTop = it.positionInParent().y.roundToInt() }
+                         .padding(start = DetailsKeyline, end = DetailsKeyline, bottom = DetailsSafeEdge)
+                         .focusRequester(factsFocus).onFocusChanged {
+                             if (it.isFocused && section != DetailsSection.FACTS) {
+                                 // Entered again, the panel reads from its first facts.
+                                 if (!reading) scope.launch { factsScroll.scrollTo(0) }
+                                 section = DetailsSection.FACTS
+                             }
+                         }
                          .focusProperties {
                              canFocus = backEnabled
-                             up = FocusRequester.Cancel; down = FocusRequester.Cancel
+                             down = FocusRequester.Cancel
                              left = FocusRequester.Cancel; right = FocusRequester.Cancel
                           }.semantics(mergeDescendants = true) {
                               onClick { if (backEnabled) reading = true; true }
                           }.focusable().testTag("details-facts-panel")) {
                           DetailsSectionHeading(stringResource(R.string.details_important_information),
                               // Plain labels have their own ink inset, unlike image cards.
-                              { emphasis(DetailsSection.FACTS) }, focusOverflow = (-2).dp,
+                              { factsEmphasis.value }, focusOverflow = (-2).dp,
                               bottomSpace = DetailsHeadingContentGap - 9.dp,
                               modifier = Modifier.onSizeChanged { factsHeadingHeight = it.height })
                            Box(Modifier.heightIn(max = with(density) {
                                (viewport - headingKeyline - factsHeadingHeight).coerceAtLeast(1).toDp() - DetailsSafeEdge
                            }.coerceAtLeast(1.dp)).verticalScroll(factsScroll)
-                               .rowContentEmphasis { emphasis(DetailsSection.FACTS) }) {
+                               .rowContentEmphasis { factsEmphasis.value }) {
                               DetailsAboutFacts(importantFacts, credits.map { it.first }.toSet())
                           }
                      } else if (ids.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
-                     if (sections.size > 1) Spacer(Modifier.height(with(density) { (viewport - headingKeyline).coerceAtLeast(0).toDp() }))
+                     // Room after the last section, so that it reaches the same keyline as the others.
+                     if (ids.isNotEmpty() || importantFacts.isNotEmpty())
+                         Spacer(Modifier.height(with(density) { (viewport - headingKeyline).coerceAtLeast(0).toDp() }))
                 }
               }
             }
@@ -433,12 +415,6 @@ internal fun ProgrammeDetailsPage(
             }
         }
     }
-}
-
-/** The page scrolls only where [ProgrammeDetailsPage] says; focus alone never moves it. */
-@OptIn(ExperimentalFoundationApi::class)
-private val NoPageScroll = object : BringIntoViewSpec {
-    override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = 0f
 }
 
 private val DetailsKeyline = 58.dp
@@ -604,7 +580,7 @@ private fun DetailsAboutFacts(facts: List<Pair<String, String>>, abbreviatedLabe
 private fun DetailsAirings(
     airings: List<EpgEvent>, pageTitle: String, pageEpisode: String?, nowSec: Long,
     channelOf: (ChannelId) -> Channel?, listState: LazyListState, requesters: Map<EventId, FocusRequester>,
-    emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit, onClick: (EpgEvent) -> Unit,
+    lastCard: EventId?, rowFocused: Boolean, emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit, onClick: (EpgEvent) -> Unit,
     bottomSpace: androidx.compose.ui.unit.Dp,
     onOpenContextMenu: ((EpgEvent) -> Unit)?,
 ) {
@@ -613,19 +589,27 @@ private fun DetailsAirings(
     val bringIntoView = remember(keyline) { object : BringIntoViewSpec {
         override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = offset - keyline
     } }
+    // Like Google TV, only the focused row shows the text under its cards, and grows by it.
+    val textShown = updateTransition(rowFocused, label = "details-airings-text")
     Column(modifier.fillMaxWidth().padding(bottom = bottomSpace - AiringCardRoom)) {
         DetailsSectionHeading(stringResource(R.string.details_other_airings, pageTitle), emphasis, Modifier.padding(start = DetailsKeyline))
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
-            LazyRow(Modifier.fillMaxWidth().rowContentEmphasis(emphasis).testTag("details-airings"),
+            // Entering the row returns to the card last focused there, at first its first card.
+            LazyRow(Modifier.fillMaxWidth().focusProperties {
+                onEnter = {
+                    if (listState.layoutInfo.visibleItemsInfo.any { it.key == lastCard?.value })
+                        lastCard?.let(requesters::get)?.requestFocus()
+                }
+            }.focusGroup().rowContentEmphasis(emphasis).testTag("details-airings"),
                 state = listState,
                 contentPadding = PaddingValues(horizontal = DetailsKeyline, vertical = AiringCardRoom),
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 itemsIndexed(airings, key = { _, it -> it.id.value }) { index, item ->
                     AiringCard(item, airingEpisode(item, pageTitle, pageEpisode, LocalContext.current.resources), item.channelId?.let(channelOf), nowSec,
+                        textShown,
                         Modifier.focusRequester(requesters.getValue(item.id))
                             .onFocusChanged { if (it.isFocused) onFocused(item.id) }
                             .focusProperties {
-                                up = FocusRequester.Cancel; down = FocusRequester.Cancel
                                 if (index == 0) left = FocusRequester.Cancel
                                 if (index == airings.lastIndex) right = FocusRequester.Cancel
                             }.testTag("details-card-${item.id.value}"),
@@ -643,7 +627,7 @@ internal fun airingEpisode(item: EpgEvent, pageTitle: String, pageEpisode: Strin
 
 @Composable
 private fun AiringCard(
-    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long,
+    item: EpgEvent, episode: String?, channel: Channel?, nowSec: Long, textShown: Transition<Boolean>,
     modifier: Modifier, onOpenContextMenu: (() -> Unit)?, onClick: () -> Unit,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onOpenContextMenu)
@@ -668,24 +652,33 @@ private fun AiringCard(
                 progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
         },
         title = {
-            Text(time, Modifier.fillMaxWidth().padding(top = StandardCardTextGap).clearAndSetSemantics { testTag = "details-card-time" },
-                style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            textShown.AnimatedVisibility({ it }, enter = AiringTextEnter, exit = AiringTextExit) {
+                Text(time, Modifier.fillMaxWidth().padding(top = StandardCardTextGap).clearAndSetSemantics { testTag = "details-card-time" },
+                    style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         },
         subtitle = {
-            Column(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics { testTag = "details-card-subtitle-${item.id.value}" },
-                verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                episode?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                channelName?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+            textShown.AnimatedVisibility({ it }, enter = AiringTextEnter, exit = AiringTextExit) {
+                Column(Modifier.fillMaxWidth().padding(top = 4.dp).clearAndSetSemantics { testTag = "details-card-subtitle-${item.id.value}" },
+                    verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    episode?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    channelName?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         },
     )
 }
+
+private val AiringTextEnter = expandVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
+    fadeIn(RowChangeMotion)
+private val AiringTextExit = shrinkVertically(tween(RowChangeMs, easing = PlayerMotion.Standard), Alignment.Top) +
+    fadeOut(RowChangeMotion)
 
 // The blurred backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three
 // passes of radius 3 there match the former 32dp live blur on a 1080p screen.
@@ -1111,7 +1104,6 @@ private fun DetailsActions(
                     .focusProperties {
                         left = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
                         right = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
-                        up = FocusRequester.Cancel; down = FocusRequester.Cancel
                     }.testTag("details-${action.name.lowercase()}")
                 val content: @Composable RowScope.() -> Unit = {
                     val indicator = when (action) {
