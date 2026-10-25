@@ -940,6 +940,7 @@ internal fun RecordingListRow(
                 placeholderTint = androidx.tv.material3.LocalContentColor.current,
                 // The logo sits on the row's own fill: the screen's background, light with focus.
                 ground = if (focused) MaterialTheme.colorScheme.inverseSurface else MaterialTheme.colorScheme.background,
+                prefetchGround = if (focused) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.inverseSurface,
                 modifier = Modifier.size(32.dp).testTag("recording-list-leading-${recordingItemKey(entry.id)}"),
             )
         },

@@ -32,11 +32,9 @@ import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.memory.MemoryCache
 import coil3.request.ImageRequest
-import coil3.request.crossfade
 import coil3.request.transformations
 import coil3.transform.Transformation
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.images.LogoInkTransformation
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 
@@ -58,6 +56,8 @@ fun PiconBox(
      * keeps the logo as it is.
      */
     ground: Color? = MaterialTheme.colorScheme.background,
+    /** The other focus state's fill. Only measured, composed rows warm this variant. */
+    prefetchGround: Color? = null,
 ) = profileTrace("P1:compose:picon") {
     require(ground == null || transformation == null) { "a logo is either inked for its ground or transformed" }
     val artwork = LocalArtworkContext.current
@@ -81,6 +81,7 @@ fun PiconBox(
         if (piconUrl == null) {
             if (placeholders) Image(failed, null, Modifier.fillMaxSize())
         } else {
+            val source = requireNotNull(piconUrl)
             // One icon, one size: a logo without a saved copy keeps looking like it is loading
             // until the session can fetch it, so it only ever changes once, when the logo fades
             // in. Only a failure with a current session is final; no logo keeps the full icon.
@@ -89,6 +90,7 @@ fun PiconBox(
             val groundArgb = ground?.toArgb()
             // The logo last shown stands in while it is inked for a new ground, as when a row takes focus.
             val shown = remember(piconUrl) { arrayOfNulls<MemoryCache.Key>(1) }
+            var loaded by remember(piconUrl) { mutableStateOf(false) }
             // Rounded up, so a box a pixel larger or smaller reuses the logo already inked.
             val inkSize = drawn.takeIf { it.width > 0 && it.height > 0 }
                 ?.let { IntSize(it.width.roundUpTo(INK_SIZE_STEP), it.height.roundUpTo(INK_SIZE_STEP)) }
@@ -99,11 +101,11 @@ fun PiconBox(
                     groundArgb == null -> piconUrl
                     inkSize == null -> null
                     // The ink rule is tuned on the server's 400×240 picons, so it reads that size, not the view's.
-                    else -> ImageRequest.Builder(context).data(piconUrl).size(LOGO_INK_WIDTH, LOGO_INK_HEIGHT)
-                        .transformations(LogoInkTransformation(groundArgb, inkSize.width, inkSize.height))
-                        // A logo inked again swaps in at once over the one shown, with no icon or fade between.
-                        .placeholderMemoryCacheKey(shown[0]).apply { if (shown[0] != null) crossfade(false) }.build()
+                    else -> inkedPiconRequest(context, source, groundArgb, inkSize, shown[0])
                 }
+            }
+            if (loaded && transformation == null && groundArgb != null && inkSize != null && prefetchGround != null) {
+                PrefetchPicon(source, prefetchGround.toArgb(), inkSize)
             }
             // Until the box has its size, one frame, nothing shows, so a logo already in memory
             // appears without the loading icon flashing before it. The box keeps the space it is given.
@@ -117,7 +119,10 @@ fun PiconBox(
                 // Painter slots preserve loading/error appearance without image subcomposition.
                 placeholder = loading.takeIf { placeholders && shown[0] == null },
                 error = (if (waitingForSession) loading else failed).takeIf { placeholders },
-                onSuccess = { shown[0] = it.result.memoryCacheKey },
+                onSuccess = {
+                    shown[0] = it.result.memoryCacheKey
+                    if (prefetchGround != null) loaded = true
+                },
                 onError = { if (!waitingForSession) onError?.invoke() },
             )
         }
@@ -164,8 +169,6 @@ fun PiconPlaceholder(
 }
 
 private const val PICON_LOADING_ALPHA = 0.35f
-private const val LOGO_INK_WIDTH = 400
-private const val LOGO_INK_HEIGHT = 240
 private const val INK_SIZE_STEP = 8
 
 private fun Int.roundUpTo(step: Int) = (this + step - 1) / step * step

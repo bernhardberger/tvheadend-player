@@ -185,6 +185,12 @@ fun ChannelRow(
                 piconPath = piconPath,
                 placeholderTint = LocalContentColor.current,
                 ground = fill,
+                prefetchGround = when {
+                    !focused && playingNow -> colors.focusedSelectedContainerColor
+                    !focused -> colors.focusedContainerColor
+                    playingNow -> colors.selectedContainerColor
+                    else -> colors.containerColor
+                }.compositeOver(MaterialTheme.colorScheme.background),
                 modifier = Modifier
                     .testTag("channel-picon")
                     .size(width = ChannelPiconWidth, height = ChannelPiconHeight)

@@ -59,6 +59,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.math.ceil
 import kotlin.math.floor
+import java.util.concurrent.atomic.AtomicInteger
 
 /** A white wordmark on a transparent ground, drawn on the light fill of a focused row. */
 @RunWith(RobolectricTestRunner::class)
@@ -132,11 +133,44 @@ class PiconBoxInkTest {
             frameColours.joinToString("\n"), frames.all { it.white >= WHOLE_LOGO || it.dark >= WHOLE_LOGO })
     }
 
+    @Test fun aPrefetchedFocusGroundShowsWithoutAnotherLoad() {
+        var focused by mutableStateOf(false)
+        val fetches = AtomicInteger()
+        val loader = cachingLoader(mapOf(ArtworkId(1) to wordmark())) { fetches.incrementAndGet() }
+        images.install(loader)
+        val session = readySession()
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize().background(LIGHT_FILL).padding(40.dp)) {
+                        ProvideArtworkSession(session) {
+                            PiconBox(ArtworkId(1), Modifier.size(200.dp, 120.dp).testTag("picon"),
+                                ground = if (focused) LIGHT_FILL else DARK_FILL,
+                                prefetchGround = if (focused) DARK_FILL else LIGHT_FILL)
+                        }
+                    }
+                }
+            }
+        }
+        // Completion conditions, not latency budgets: both variants must actually be cached.
+        compose.waitUntil(5_000) { pixels().white >= WHOLE_LOGO }
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            loader.memoryCache!!.keys.size == 2
+        }
+        assertEquals(2, fetches.get())
+        compose.runOnIdle { focused = true }
+        compose.waitUntil(5_000) { pixels().dark >= WHOLE_LOGO && pixels().white == 0 }
+        assertEquals("focus must reuse the warmed bitmap", 2, fetches.get())
+    }
+
     /** Loads [images] through Coil's own decode path, so transformations, the memory cache and the fade are real. */
-    private fun cachingLoader(images: Map<ArtworkId, Bitmap>): ImageLoader =
+    private fun cachingLoader(images: Map<ArtworkId, Bitmap>, onFetch: () -> Unit = {}): ImageLoader =
         ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>()).components {
             add(Fetcher.Factory<AppArtworkSource> { data, _, _ ->
                 Fetcher {
+                    onFetch()
                     val image = images[data.id] ?: error("no fixture art for ${data.id}")
                     ImageFetchResult(image.copy(Bitmap.Config.ARGB_8888, false).asImage(), isSampled = false, DataSource.MEMORY)
                 }

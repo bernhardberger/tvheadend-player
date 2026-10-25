@@ -211,7 +211,12 @@ class PiconBoxTest {
             }
         }
         compose.waitForIdle()
-        assertEquals(if (state == ArtworkState.MISSING) 0 else 1, requests)
+        // Successful rows also warm the other focus fill; failed/loading logos do not prefetch.
+        assertEquals(when {
+            state == ArtworkState.MISSING -> 0
+            state == ArtworkState.SUCCESS && inRow -> 2
+            else -> 1
+        }, requests)
     }
 
     private fun focus(tag: String) {
