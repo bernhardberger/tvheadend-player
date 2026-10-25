@@ -17,6 +17,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.geometry.isUnspecified
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -61,6 +62,8 @@ fun PiconBox(
     prefetchGround: Color? = null,
     /** Drop the picon's transparent margin, so [contentScale] fits the logo's own shape. Inked logos only. */
     trim: Boolean = false,
+    /** The loaded logo's own size, before [contentScale]; a trimmed logo's is its visible shape. */
+    onLogoSize: ((Size) -> Unit)? = null,
 ) = profileTrace("P1:compose:picon") {
     require(ground == null || transformation == null) { "a logo is either inked for its ground or transformed" }
     val artwork = LocalArtworkContext.current
@@ -124,6 +127,7 @@ fun PiconBox(
                 error = (if (waitingForSession) loading else failed).takeIf { placeholders },
                 onSuccess = {
                     shown[0] = it.result.memoryCacheKey
+                    onLogoSize?.invoke(it.painter.intrinsicSize)
                     if (prefetchGround != null) loaded = true
                 },
                 onError = { if (!waitingForSession) onError?.invoke() },
@@ -187,3 +191,9 @@ internal val InlineLogoScale: ContentScale = object : ContentScale {
 private const val INK_SIZE_STEP = 8
 
 private fun Int.roundUpTo(step: Int) = (this + step - 1) / step * step
+
+/** The width a logo of [logo]'s size is drawn in by [InlineLogoScale] in a [box]; the whole box when its size is unknown. */
+internal fun inlineLogoDrawnWidth(logo: Size, box: Size): Float {
+    if (logo.isUnspecified || logo.width <= 0f || logo.height <= 0f) return box.width
+    return kotlin.math.ceil(logo.width * InlineLogoScale.computeScaleFactor(logo, box).scaleX).coerceAtMost(box.width)
+}

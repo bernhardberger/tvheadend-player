@@ -49,6 +49,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -1056,12 +1057,33 @@ internal fun ProgrammeEyebrow(
     trailing: @Composable () -> Unit = {},
 ) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        picon?.let { PiconBox(it, piconModifier.size(36.dp, 20.dp), contentScale = InlineLogoScale, trim = true) }
+        picon?.let { InlineLogo(it, piconModifier) }
         Text(text, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.labelMedium,
             color = TvTextColors.tertiary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         trailing()
     }
 }
+
+/**
+ * A trimmed logo at the start of a line. Once it has loaded the line keeps only the width it is
+ * drawn in, so the text follows a square logo as closely as a wide one; until then, and for the
+ * placeholder, the whole box stands.
+ */
+@Composable
+private fun InlineLogo(picon: ArtworkId, modifier: Modifier) {
+    val density = LocalDensity.current
+    var drawnWidth by remember(picon) { mutableStateOf<Dp?>(null) }
+    Box(Modifier.size(drawnWidth ?: InlineLogoWidth, InlineLogoHeight)) {
+        PiconBox(picon, modifier.wrapContentWidth(Alignment.Start, unbounded = true).size(InlineLogoWidth, InlineLogoHeight),
+            contentScale = InlineLogoScale, alignment = Alignment.CenterStart, trim = true,
+            onLogoSize = { logo ->
+                drawnWidth = with(density) { inlineLogoDrawnWidth(logo, Size(InlineLogoWidth.toPx(), InlineLogoHeight.toPx())).toDp() }
+            })
+    }
+}
+
+private val InlineLogoWidth = 36.dp
+private val InlineLogoHeight = 20.dp
 
 /** The outlined age rating that ends a programme's metadata line. */
 @Composable

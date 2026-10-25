@@ -24,6 +24,13 @@ class InlineLogoScaleTest {
         assertEquals(36f, drawn(Size(500f, 100f)).width, 0.01f)
     }
 
+    @Test fun theLineKeepsOnlyTheWidthTheLogoIsDrawnIn() {
+        // A square logo is 14 wide, so the text follows it instead of the 36 the widest logo takes.
+        assertEquals(14f, inlineLogoDrawnWidth(Size(100f, 100f), box), 0.01f)
+        assertEquals(36f, inlineLogoDrawnWidth(Size(500f, 100f), box), 0.01f)
+        assertEquals(36f, inlineLogoDrawnWidth(Size.Unspecified, box), 0.01f)
+    }
+
     @Test fun trimmingFindsTheLogoInsideItsTransparentCanvas() {
         val width = 10
         val pixels = IntArray(width * 6)
