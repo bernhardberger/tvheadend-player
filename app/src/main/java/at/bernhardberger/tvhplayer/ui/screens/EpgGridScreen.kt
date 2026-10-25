@@ -102,6 +102,7 @@ import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
 import at.bernhardberger.tvhplayer.core.firstUnsettledGuidePageIndex
 import at.bernhardberger.tvhplayer.core.floorGuideWindowToHour
 import at.bernhardberger.tvhplayer.core.guideChannelPageCoverageSettled
+import at.bernhardberger.tvhplayer.core.guideEntryChannelId
 import at.bernhardberger.tvhplayer.core.guideEntryFocusTarget
 import at.bernhardberger.tvhplayer.core.guideNowWindowStart
 import at.bernhardberger.tvhplayer.core.guideScopeExitFocusTarget
@@ -259,6 +260,7 @@ internal fun guideTimelineContentPadding(
 fun EpgGridScreen(
     contentPadding: PaddingValues = PaddingValues(),
     initialFocusEnabled: Boolean = true,
+    guideActive: Boolean = true,
     view: GuideView = GuideView(),
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     channelViewModel: ChannelsViewModel,
@@ -365,7 +367,9 @@ fun EpgGridScreen(
         it.channelId == playerReturnChannelId && it.start.epochSeconds == pendingPlayerReturn.programmeStartSec &&
             it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
     }
-    val restoredPosition = remember { guidePositionStore.position.value }
+    val rememberedChannelId = remember { guidePositionStore.position.value?.channelId }
+    // Only full-screen player return retains the old timeline when its channel is outside the group.
+    val restoredPosition = remember { guidePositionStore.position.value.takeIf { playerReturn != null } }
     val restoredTimelinePosition = remember(restoredPosition, windowBounds) {
         restoredPosition?.takeIf { it.windowStartSec in
             windowBounds.earliestStartSec..windowBounds.latestStartSec
@@ -374,9 +378,9 @@ fun EpgGridScreen(
     // Start with the available restored/browse viewport instead of constructing page zero
     // and discarding it in the initial-position effect. That effect still resolves the
     // asynchronous last-played identity and current coverage using its existing policy.
-    val initialChannelId = playerReturnChannelId ?: restoredPosition?.channelId?.takeIf { id ->
-        channels.any { it.id == id }
-    } ?: playingChannelId ?: selectedChannelId
+    val initialChannelId = playerReturnChannelId ?: guideEntryChannelId(
+        orderedChannelIds, playingChannelId, rememberedChannelId, null, selectedChannelId,
+    )
     val initialChannelIndex = channels.indexOfFirst { it.id == initialChannelId }.coerceAtLeast(0)
     val initialViewportIndex = restoredTimelinePosition
         ?.takeIf { position -> playerReturnChannelId == null && channels.any { it.id == position.channelId } }
@@ -402,6 +406,7 @@ fun EpgGridScreen(
     var railOnBackRelease by remember { mutableStateOf(false) }
     var pendingInitialChannelIndex by remember { mutableIntStateOf(-1) }
     var initialPositionDone by remember { mutableStateOf(false) }
+    var destinationEntryPending by remember { mutableStateOf(true) }
     var detailsEvent by remember { mutableStateOf<EpgEventEntry?>(null) }
     var showContextMenu by remember { mutableStateOf(false) }
     var detailsObservation by remember { mutableStateOf<SessionObservation?>(null) }
@@ -751,6 +756,16 @@ fun EpgGridScreen(
         }
     }
 
+    // The sidebar scene can retain Guide while Channels is selected. Rail focus alone is not entry.
+    LaunchedEffect(guideActive) {
+        if (!guideActive) {
+            clearAllCoverage()
+            initialPositionDone = false
+        } else {
+            destinationEntryPending = true
+        }
+    }
+
     fun coveragePending(token: GuideCoverageRequestToken): Boolean =
         coverageRequestVersion.let {
             coverageRequests.isPending(token)
@@ -835,16 +850,17 @@ fun EpgGridScreen(
     LaunchedEffect(
         channels,
         focusRows,
+        guideActive,
         playingChannelId,
         lastPlayedId,
         initialPositionDone,
         indexCurrent,
         pendingPlayerReturn,
     ) {
-        if (!indexCurrent || initialPositionDone || channels.isEmpty() || focusRows.size != channels.size) {
+        if (!guideActive || !indexCurrent || initialPositionDone || channels.isEmpty() || focusRows.size != channels.size) {
             return@LaunchedEffect
         }
-        if (playerReturnChannelId != null) {
+        if (playerReturnChannelId != null || destinationEntryPending && pendingPlayerReturn == null) {
             val nowSec = nowSecProvider()
             // A programme played from its start shows from its hour; one on air, as live, opens just before now.
             val nowWindow = requestedProgramme?.takeUnless { nowSec in it.start.epochSeconds until it.stop.epochSeconds }
@@ -852,16 +868,20 @@ fun EpgGridScreen(
                 ?: guideNowWindowStart(nowSec, windowBounds, guideZoneId)
             // Re-enters once the index for the current-hour window is prepared.
             if (windowStartSec != nowWindow) {
+                selectedTarget = null
                 windowStartSec = nowWindow
                 return@LaunchedEffect
             }
         }
-        val preferredId = playerReturnChannelId ?: playingChannelId ?: lastPlayedId ?: selectedChannelId
+        val preferredId = playerReturnChannelId ?: guideEntryChannelId(
+            orderedChannelIds, playingChannelId, guidePositionStore.position.value?.channelId,
+            lastPlayedId, selectedChannelId,
+        )
         val restoredChannelPosition = restoredPosition?.takeIf { position ->
-            playerReturnChannelId == null && channels.any { it.id == position.channelId }
+            pendingPlayerReturn != null && playerReturnChannelId == null && channels.any { it.id == position.channelId }
         }
         val restored = restoredTimelinePosition?.takeIf { position ->
-            playerReturnChannelId == null && channels.any { it.id == position.channelId }
+            pendingPlayerReturn != null && playerReturnChannelId == null && channels.any { it.id == position.channelId }
         }
         val channelId = browsingFocusChannelId(
             channels,
@@ -877,19 +897,36 @@ fun EpgGridScreen(
             targetSec = requestedProgramme?.start?.epochSeconds ?: restored?.eventStartSec ?: nowSecProvider(),
         )
 
-        val targetChannelIndex = target?.channelIndex ?: channelIndex
+        val waitForEntryProgramme = destinationEntryPending && pendingPlayerReturn == null &&
+            focusRows[channelIndex].events.none { nowSecProvider() in it.start.epochSeconds until it.stop.epochSeconds } &&
+            !pageCoverageSettled(channelIndex)
+        val targetChannelIndex = if (waitForEntryProgramme) channelIndex else target?.channelIndex ?: channelIndex
         pendingInitialChannelIndex = targetChannelIndex
-        requestVisibleWindow(windowStartSec, targetChannelIndex)
-        if (target != null) {
-            selectAtNow(target)
-            channelListState.scrollToItem(
-                restored?.firstVisibleColumn?.coerceIn(channels.indices)
-                    ?: (targetChannelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
+        val coverageRequest = requestVisibleWindow(windowStartSec, targetChannelIndex)
+        if (destinationEntryPending && pendingPlayerReturn == null &&
+            (target == null || waitForEntryProgramme) && coverageRequest != null
+        ) {
+            selectedTarget = null
+            windowFocusRequest = WindowFocusRequest(
+                preferredChannelId = channelId,
+                windowStartSec = windowStartSec,
+                coverageRequest = coverageRequest,
+                throughSec = windowEndSec,
+                programmeStartSec = nowSecProvider(),
+                atNow = true,
             )
+        }
+        channelListState.scrollToItem(
+            restored?.firstVisibleColumn?.coerceIn(channels.indices)
+                ?: (targetChannelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
+        )
+        if (target != null && !waitForEntryProgramme) {
+            selectAtNow(target)
         }
         // A return that waited for rows reclaims entry from the empty-state fallback.
         if (playerReturnChannelId != null) programmeFocusOwned = true
         positionedPlayerReturn = pendingPlayerReturn
+        destinationEntryPending = false
         initialPositionDone = true
     }
 
@@ -1317,7 +1354,8 @@ fun EpgGridScreen(
                 requestedThrough = KotlinInstant.fromEpochSeconds(request.throughSec),
                 connectionReady = connectionUiState == ConnectionUiState.Ready,
                 hasCurrentSnapshot = snapshot != null,
-                acquisitionPending = windowAcquisitionPending,
+                // Entry can start the request in an earlier effect of this same composition.
+                acquisitionPending = coveragePending(request.coverageRequest),
             )
         ) {
             GuideCoverageFocusResolution.Wait -> return@LaunchedEffect

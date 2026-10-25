@@ -112,6 +112,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.*
@@ -164,6 +165,65 @@ class GuideVisualLayoutTest {
     private var navigationRequests = 0
     private val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
     private val now = hour + 15 * 60
+
+    @Test fun openingWithoutPlaybackUsesRememberedChannelAtNow() {
+        rememberTomorrow()
+        show(lastOffset = 26)
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        assertEquals(hour - 1800, position.position.value?.windowStartSec)
+    }
+
+    @Test fun openingWithWarmPlaybackOverridesRememberedChannelAndTime() {
+        rememberTomorrow()
+        show(lastOffset = 26, playingChannel = ChannelId(5))
+        key(Key.DirectionDown)
+        focused(title(5, 0))
+        assertEquals(hour - 1800, position.position.value?.windowStartSec)
+    }
+
+    @Test fun openingWithPlayingChannelOutsideGroupUsesRememberedChannelAtNow() {
+        rememberTomorrow()
+        show(lastOffset = 26, playingChannel = ChannelId(1), groupWithoutFirst = true, activeGroup = ChannelTagId(2))
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        assertEquals(hour - 1800, position.position.value?.windowStartSec)
+        assertEquals(ChannelTagId(2), model.scope.value.scope.activeTagId)
+    }
+
+    private fun rememberTomorrow() {
+        position.save(GuidePosition(ChannelId(2), EventId(234), hour + 86400, hour + 86400, 0))
+    }
+
+    @Test fun openingWaitsForTheRememberedChannelsProgrammeWithoutTakingHeaderFocus() {
+        position.save(GuidePosition(ChannelId(3), EventId(334), hour + 86400, hour + 86400, 0))
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            show(history = false, initialCoverage = false, beforeCoverageBatch = { _, _ ->
+                entered.complete(Unit)
+                release.await()
+            })
+            compose.waitUntil(5_000) { entered.isCompleted }
+            dateFocused()
+            val event = EpgEvent.create(EventId(310), ChannelId(3), Instant.fromEpochSeconds(hour),
+                Instant.fromEpochSeconds(hour + 3600), title = title(3, 0))
+            val snapshot = EpgSnapshot.create(events = checkNotNull(session.observation.value.epgSnapshotForDisplay).events + event, coverages = (1L..12L).map {
+                EpgCoverage.create(ChannelId(it), Instant.fromEpochSeconds(hour - 3600), Instant.fromEpochSeconds(hour + 4 * 3600))
+            })
+            publishEvents(snapshot.events, snapshot, covered = true)
+            compose.runOnIdle { release.complete(Unit) }
+            dateFocused()
+            key(Key.DirectionDown)
+            focused(title(3, 0))
+            assertEquals(hour - 1800, position.position.value?.windowStartSec)
+        } finally {
+            release.complete(Unit)
+        }
+    }
+
+    // Geometry fixtures enter their saved edge through the unchanged out-of-group player return.
+    private fun savedTimelineReturn() = PlayerReturnFocus(ChannelId(99), ChannelId(1))
 
     @Before fun prepare() {
         oldZone = TimeZone.getDefault()
@@ -965,7 +1025,7 @@ class GuideVisualLayoutTest {
         val finalHour = hour + 7 * 86400 - 3600
         val start = finalHour - (hours - 1) * 3600
         position.save(GuidePosition(ChannelId(1), EventId(110), finalHour, start, 0))
-        show(scale = scale, history = false, lastOffset = 0, eventHour = finalHour)
+        show(scale = scale, history = false, lastOffset = 0, eventHour = finalHour, playerReturn = savedTimelineReturn())
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals(start, checkNotNull(position.position.value).windowStartSec)
@@ -994,7 +1054,8 @@ class GuideVisualLayoutTest {
         val firstHour = hour - 6 * 3600
         position.save(GuidePosition(ChannelId(1), EventId(110), firstHour, firstHour, 0))
         // A window wholly in the past asks for no coverage.
-        show(scale = scale, direction = LayoutDirection.Rtl, history = false, eventHour = firstHour, entryCoverage = false)
+        show(scale = scale, direction = LayoutDirection.Rtl, history = false, eventHour = firstHour, entryCoverage = false,
+            playerReturn = savedTimelineReturn())
         key(Key.DirectionDown)
         focused(title(1, 0))
         assertEquals(firstHour, checkNotNull(position.position.value).windowStartSec)
@@ -1184,6 +1245,7 @@ class GuideVisualLayoutTest {
         val request = AtomicReference<Pair<List<ChannelId>, Instant>>()
         val settle = CompletableDeferred<Unit>()
         show(scale = 1.3f, history = false, lastOffset = 0, eventHour = eventHour, initialCoverage = false,
+            playerReturn = if (atHorizon) savedTimelineReturn() else null,
             beforeCoverageBatch = { ids, through ->
                 request.set(ids to through)
                 settle.await()
@@ -1220,7 +1282,8 @@ class GuideVisualLayoutTest {
 
     private fun longProgrammeNavigation(scale: Float, hours: Int, reverse: Boolean) {
         if (reverse) position.save(GuidePosition(ChannelId(1), EventId(110), hour, hour + (hours - 1) * 3600, 0))
-        show(scale = scale, longProgramme = true, longProgrammeHours = hours, longProgrammeSuccessor = true)
+        show(scale = scale, longProgramme = true, longProgrammeHours = hours, longProgrammeSuccessor = true,
+            playerReturn = if (reverse) savedTimelineReturn() else null)
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(if (reverse) Key.DirectionLeft else Key.DirectionRight)
@@ -2187,7 +2250,8 @@ class GuideVisualLayoutTest {
         groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
         recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false,
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
-        initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null) {
+        initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
+        playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -2247,13 +2311,25 @@ class GuideVisualLayoutTest {
         val settings = PlayerSettingsStore(preferences())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(), settings, Dispatchers.IO,
             readProfileForEditing = { ServerProfileEditReadResult.Missing })
+        if (playingChannel != null) runtimeScope.launch { profiles.run() }
         val tagSettings = ChannelTagSettingsStore(preferences())
         if (activeTag) runBlocking { tagSettings.save(ChannelTagPreferences(activeTagId = ChannelTagId(1))) }
+        if (activeGroup != null) runBlocking { tagSettings.save(ChannelTagPreferences(activeTagId = activeGroup)) }
         model = ChannelsViewModel(session, tagSettings)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
-        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player), settings, profiles,
+        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player).also { it.launchIn(runtimeScope) }, settings, profiles,
             runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
+        if (playingChannel != null) {
+            @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+            session.scriptLivePlaybackSuccess()
+            runtimeScope.launch { runtime.playLive(checkNotNull(at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection(
+                session.observation.value, playingChannel))) }
+            compose.waitUntil(5_000) {
+                org.robolectric.Shadows.shadowOf(android.os.Looper.getMainLooper()).idle()
+                runtime.activeTarget.value == at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(playingChannel)
+            }
+        }
         val selection = ChannelSelectionStore()
         val lastPlayed = LastPlayedChannelStore(context())
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
@@ -2291,6 +2367,7 @@ class GuideVisualLayoutTest {
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
                             var genre by remember { mutableStateOf(initialGenre) }
                             EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view, channelViewModel = model,
+                                playerReturn = playerReturn,
                                 genre = genre, onGenreChange = { genre = it },
                                 session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
                                 lastPlayedStore = lastPlayed, onPlay = { _, _ -> playbackRequests++ },
@@ -2302,6 +2379,10 @@ class GuideVisualLayoutTest {
         }
         }
         if (!connecting) {
+            if (playerReturn != null) {
+                compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-date-button").fetchSemanticsNodes().isNotEmpty() }
+                compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            }
             dateFocused()
             assertNotNull("The fixture must exercise a current SDK capability, not cached-only rows", model.observation.value.currentSession)
             // The entry's coverage request reaches the session off the main thread; count from

@@ -874,6 +874,7 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE),
                     ) {
                         GuideRouteContent(
+                            guideActive = currentDestination == GuideKey,
                             channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,

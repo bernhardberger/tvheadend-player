@@ -22,6 +22,16 @@ import kotlin.time.Instant
 const val GUIDE_VISIBLE_WINDOW_SEC = 3 * 3600L
 val GUIDE_EPG_COVERAGE_POLICY = EpgCoveragePolicy.create(7.days)
 
+/** Destination entry keeps the active group and remembers only the channel, not its old time. */
+fun guideEntryChannelId(
+    channelIds: List<ChannelId>,
+    playingChannelId: ChannelId?,
+    rememberedChannelId: ChannelId?,
+    lastPlayedChannelId: ChannelId?,
+    selectedChannelId: ChannelId?,
+): ChannelId? = listOf(playingChannelId, rememberedChannelId, lastPlayedChannelId, selectedChannelId)
+    .firstOrNull { it != null && it in channelIds } ?: channelIds.firstOrNull()
+
 /** Display-only archive is merged once by the Guide snapshot owner. Live identity wins. */
 fun guideDisplayEvents(snapshot: EpgSnapshot?): List<EpgEventEntry> =
     if (snapshot == null) emptyList() else (snapshot.events + snapshot.historicalEvents).distinctBy { it.id }

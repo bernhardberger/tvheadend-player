@@ -94,6 +94,7 @@ internal fun ChannelsRouteContent(
 
 @Composable
 internal fun GuideRouteContent(
+    guideActive: Boolean,
     channelsVm: ChannelsViewModel,
     contentAllowed: Boolean,
     contentPadding: PaddingValues,
@@ -112,6 +113,7 @@ internal fun GuideRouteContent(
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("guide")) {
             BrowsingScopeContent(channelsVm, initialFocusEnabled) { EpgGridScreen(
+                guideActive = guideActive,
                 channelViewModel = channelsVm,
                 contentPadding = contentPadding,
                 initialFocusEnabled = initialFocusEnabled,

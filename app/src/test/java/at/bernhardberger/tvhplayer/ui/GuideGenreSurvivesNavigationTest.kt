@@ -108,6 +108,26 @@ class GuideGenreSurvivesNavigationTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val catalog = ChannelCatalog.create((1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) })
     private lateinit var player: ExoPlayer
+    private val guidePosition = GuidePositionStore()
+
+    @Test fun leavingForChannelsWithTheRailOpenReentersGuideAtNow() {
+        app()
+        openDestination("nav-channels", Key.DirectionDown, "nav-epg")
+        focus("guide-date-button")
+        key(Key.DirectionDown)
+        val nowWindow = checkNotNull(guidePosition.position.value).windowStartSec
+        focus("guide-date-button")
+        key(Key.Enter)
+        focus("guide-time-day-1")
+        key(Key.Enter)
+        key(Key.DirectionDown)
+        org.junit.Assert.assertTrue(checkNotNull(guidePosition.position.value).windowStartSec > nowWindow)
+        openDestination("nav-epg", Key.DirectionUp, "nav-channels")
+        openDestination("nav-channels", Key.DirectionDown, "nav-epg")
+        focus("guide-date-button")
+        key(Key.DirectionDown)
+        org.junit.Assert.assertEquals(nowWindow, checkNotNull(guidePosition.position.value).windowStartSec)
+    }
 
     @After fun after() {
         scope.cancel()
@@ -200,7 +220,7 @@ class GuideGenreSurvivesNavigationTest {
             single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
             single { LastPlayedChannelStore(context) }
             single { ChannelSelectionStore() }
-            single { GuidePositionStore() }
+            single { guidePosition }
             single { notices }
             single { ConnectionNoticeSource(session.observation, profiles.configurationGeneration, notices) }
             viewModel { AppConnectionViewModel(get(), get(), get()) }
