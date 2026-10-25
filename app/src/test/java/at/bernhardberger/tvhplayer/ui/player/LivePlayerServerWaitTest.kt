@@ -247,7 +247,11 @@ class LivePlayerServerWaitTest {
         settle()
         val retunes = mutableListOf<PlaybackTargetResult?>()
         compose.runOnIdle { scope.launch { retunes += runtime.retuneAfterReconnect() } }
-        settle()
+        // Compose's clock does not complete the runtime's asynchronous retune.
+        compose.waitUntil(10_000) {
+            compose.waitForIdle()
+            retunes.isNotEmpty()
+        }
         assertEquals(listOf(PlaybackTargetResult.STARTED), retunes)
         compose.waitUntil(10_000) { binds() > before }
         compose.runOnIdle { visible.value = true }

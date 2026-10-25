@@ -147,6 +147,8 @@ class SettingsDepthNavigationTest {
         assertEquals("removed", runBlocking { store.settings.first().recordingProfileId?.value })
         press(Key.DirectionCenter)
         compose.waitUntil { runBlocking { store.settings.first().recordingProfileId == archive } }
+        // Persistence can publish before the selecting coroutine pops the picker and restores focus.
+        compose.waitUntilExactlyOneExists(hasText("Recording profile") and isFocused())
         compose.onNodeWithText("Recording profile").assertIsFocused()
         assertEquals(archive, runBlocking { UiSettingsStore(RuntimeEnvironment.getApplication()).settings.first().recordingProfileId })
         press(Key.DirectionCenter)
