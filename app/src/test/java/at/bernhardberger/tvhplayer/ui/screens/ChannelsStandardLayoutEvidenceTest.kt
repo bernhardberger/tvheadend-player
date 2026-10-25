@@ -242,10 +242,11 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("buttons share the header's axis", header.center.y, view.center.y, 1f)
         assertEquals("Tags shares it too", header.center.y, group.center.y, 1f)
         // The list column spans the focus reserve, starts level with the header beside its buttons,
-        // and runs to the screen bottom.
+        // and runs to the screen bottom. Its viewport reaches on to the screen's top for scrolled rows.
         val list = compose.onNodeWithTag("channels-list").bounds()
         assertEquals("list column x", 118f, list.left, .5f)
-        assertEquals("list column level with the header", header.top, list.top, .5f)
+        assertEquals("list column level with the header", header.top, detail("channels-list-column").bounds().top, .5f)
+        assertEquals("list viewport reaches the screen's top", 0f, list.top, .5f)
         assertTrue("rows pass beside the header's buttons, not under them", list.right <= group.left)
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
@@ -478,6 +479,14 @@ class ChannelsStandardLayoutEvidenceTest {
         repeat(downTarget - 1) { key(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
+        // Earlier rows are not cut at the list's band beside the header: they run on beneath the
+        // fade into the screen's top.
+        val bandTop = detail("channels-list-column").bounds().top
+        assertTrue(
+            "an earlier row peeks above the list's band",
+            (1 until downTarget).flatMap { compose.onAllNodesWithTag("channel-row-$it").fetchSemanticsNodes() }
+                .any { it.boundsInRoot.top < bandTop && it.boundsInRoot.bottom > 0f },
+        )
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
         repeat(CHANNEL_COUNT - downTarget) { key(Key.DirectionDown) }
@@ -495,11 +504,12 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("top return restores the original first-row position", firstPosition, row(1).bounds())
         val returned = drawShell()
         val list = detail("channels-list").bounds()
-        assertSamePixels(initial, returned, Rect(list.left, list.top, list.right, list.top + 48f))
+        val band = Rect(list.left, list.top, list.right, detail("channels-list-column").bounds().top + 48f)
+        assertSamePixels(initial, returned, band)
         compose.mainClock.advanceTimeBy(500)
         compose.waitForIdle()
         assertEquals("the boundary does not oscillate", firstPosition, row(1).bounds())
-        assertSamePixels(returned, drawShell(), Rect(list.left, list.top, list.right, list.top + 48f))
+        assertSamePixels(returned, drawShell(), band)
         assertEquals("header never moves", header, header().bounds())
         assertEquals("details viewport never moves", details, detail("channels-details").bounds())
         capture("en-font$fontScale-top-fade-top-return-bright-video")
@@ -551,7 +561,7 @@ class ChannelsStandardLayoutEvidenceTest {
         compose.waitForIdle()
         row(7).assertIsFocused()
         assertFocusedShapePixels(7, rowHeight, scrolled = false)
-        assertEquals("new scope's first row keeps the original top reserve", detail("channels-list").bounds().top + 4f, row(7).bounds().top, .5f)
+        assertEquals("new scope's first row keeps the original top reserve", detail("channels-list-column").bounds().top + 4f, row(7).bounds().top, .5f)
         // A change while the rail has focus only previews the group's anchor.
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
@@ -561,7 +571,7 @@ class ChannelsStandardLayoutEvidenceTest {
         // A short scope may clamp at its bottom before the anchor reaches the inset.
         assertTrue(
             "scope preview clears the destination's fade even when leaving the top boundary",
-            previewTop >= detail("channels-list").bounds().top + 56f,
+            previewTop >= detail("channels-list-column").bounds().top + 56f,
         )
         key(Key.DirectionRight)
         row(PLAYING).assertIsFocused()

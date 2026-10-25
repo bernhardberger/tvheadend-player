@@ -330,7 +330,10 @@ internal fun ChannelsScreenContent(
     val listState = rememberLazyListState()
     // Native focus scrolling and the explicit preview anchor share one viewport policy:
     // the readable band between the fades, with the original reserve at the top boundary.
-    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, ChannelsListTopReserve)
+    // Without a notice above it the list reaches the screen's top under the shell's inset, so
+    // a scrolled list's earlier rows fade into the screen edge rather than end at the band.
+    val listTopOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
+    val bringIntoViewSpec = rememberListEdgeBringIntoView(listState, ChannelsListTopReserve, listTopOverflow)
     val density = LocalDensity.current
     val gridState = rememberLazyGridState()
     val rowState = rememberLazyListState()
@@ -904,7 +907,8 @@ internal fun ChannelsScreenContent(
                         .fillMaxSize(),
                 ) {
                     // Standard list column: 12dp focus-scale reserve, 340dp rows, run-out to the
-                    // screen bottom under a 48dp fade, with a matching top fade after scrolling.
+                    // screen bottom under its fade; after scrolling, rows run on to the screen's top
+                    // under the top fade.
                     // Focus stays between the fades; scrolled-out rows may pass beneath them.
                     Column(
                         Modifier
@@ -918,6 +922,7 @@ internal fun ChannelsScreenContent(
                             modifier = Modifier.padding(horizontal = ChannelRowEdgeInset),
                         )
                         if (tagNotice) Spacer(Modifier.height(8.dp))
+                        val topOverflow = if (tagNotice) 0.dp else contentPadding.calculateTopPadding()
 
                         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
                             LazyColumn(
@@ -927,11 +932,12 @@ internal fun ChannelsScreenContent(
                                 contentPadding = PaddingValues(
                                     start = ChannelRowEdgeInset,
                                     end = ChannelRowEdgeInset,
-                                    top = ChannelsListTopReserve,
+                                    top = topOverflow + ChannelsListTopReserve,
                                     bottom = ListBottomReserve,
                                 ),
                                 modifier = Modifier
                                     .weight(1f)
+                                    .overflowTop(topOverflow)
                                     .listEdgeFades(listState)
                                     .testTag("channels-list")
                                     .then(contentEntry)

@@ -85,19 +85,24 @@ internal class InsetBringIntoViewSpec(
 /**
  * Focus scrolling for a list drawn with [listEdgeFades]: [topReserve] is the list's own top
  * content padding, kept until earlier rows exist; its bottom content padding is
- * [ListBottomReserve].
+ * [ListBottomReserve]. A viewport reaching [topOverflow] above the list's band, padded by that
+ * much more at the top, keeps both top reserves measured from the band.
  */
 @Composable
 @OptIn(ExperimentalFoundationApi::class)
-internal fun rememberListEdgeBringIntoView(listState: LazyListState, topReserve: Dp): InsetBringIntoViewSpec {
+internal fun rememberListEdgeBringIntoView(
+    listState: LazyListState,
+    topReserve: Dp,
+    topOverflow: Dp = 0.dp,
+): InsetBringIntoViewSpec {
     val platform = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
-    return remember(platform, density, listState, topReserve) {
+    return remember(platform, density, listState, topReserve, topOverflow) {
         with(density) {
             InsetBringIntoViewSpec(
                 delegate = platform,
-                topInsetPx = topReserve.toPx(),
-                scrolledTopInsetPx = ListScrolledTopReserve.toPx(),
+                topInsetPx = (topOverflow + topReserve).toPx(),
+                scrolledTopInsetPx = (topOverflow + ListScrolledTopReserve).toPx(),
                 bottomInsetPx = ListBottomReserve.toPx(),
                 scrollBackAvailablePx = {
                     if (listState.firstVisibleItemIndex == 0) {

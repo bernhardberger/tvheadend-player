@@ -195,8 +195,8 @@ internal fun ChannelsGrid(
     }
 }
 
-/** Lays the grid out [overflow] taller, reaching up by that much from its own top. */
-private fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable, constraints ->
+/** Lays the content out [overflow] taller, reaching up by that much from its own top. */
+internal fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable, constraints ->
     val extra = overflow.roundToPx()
     val placeable = measurable.measure(
         constraints.copy(
