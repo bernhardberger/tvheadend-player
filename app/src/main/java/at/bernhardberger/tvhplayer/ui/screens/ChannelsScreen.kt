@@ -710,21 +710,24 @@ internal fun ChannelsScreenContent(
                     { scopeEntryChannelId() != null && focusBrowseContent() }
                 } else null,
                 // The grid's header scrolls away with its first row, over the rows reaching up behind it.
-                // The immersive header takes no row: it overlays the body from the top.
+                // The immersive header takes no row: it overlays the body from the top. Neither does
+                // the list's: its buttons sit above the details, and the list column starts level with them.
                 modifier = Modifier.zIndex(1f).then(
-                    if (layout == ChannelsLayout.IMMERSIVE) Modifier.layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
-                        layout(placeable.width, 0) { placeable.place(0, 0) }
-                    } else if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {
+                    if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {
                         val scrolled = if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset else Int.MAX_VALUE
                         translationY = -minOf(scrolled.toFloat(), size.height + ChannelsHeaderGap.toPx() + contentPadding.calculateTopPadding().toPx())
-                    } else Modifier,
+                    } else Modifier.layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        layout(placeable.width, 0) { placeable.place(0, 0) }
+                    },
                 ).padding(
                     start = startPadding + TvBrowseLeadingInset,
                     end = maxOf(endPadding, TvBrowseTrailingInset),
                 ),
             )
-            if (layout != ChannelsLayout.IMMERSIVE) Spacer(Modifier.height(ChannelsHeaderGap))
+            if (layout == ChannelsLayout.GRID) Spacer(Modifier.height(ChannelsHeaderGap))
+            // What the list layout shows below the header instead of beside it keeps the header's band.
+            val listHeaderBand = if (layout == ChannelsLayout.LIST) TvBrowseHeaderHeight + ChannelsHeaderGap else 0.dp
             Box(Modifier.weight(1f).fillMaxWidth()) {
             TabContent(
                 motion = scopeMotion,
@@ -775,6 +778,7 @@ internal fun ChannelsScreenContent(
                         modifier = Modifier
                             .padding(browseViewportPadding)
                             .padding(detailPanePadding)
+                            .padding(top = listHeaderBand)
                             .fillMaxSize(),
                     )
                 } else {
@@ -810,6 +814,7 @@ internal fun ChannelsScreenContent(
                         modifier = Modifier
                             .padding(browseViewportPadding)
                             .padding(detailPanePadding)
+                            .padding(top = listHeaderBand)
                             .fillMaxSize(),
                     )
                 }
@@ -1026,10 +1031,11 @@ internal fun ChannelsScreenContent(
                             .weight(1f)
                             .profileLayout("channels:details")
                             .padding(detailPanePadding)
+                            .padding(top = listHeaderBand)
                             .fillMaxHeight()
                             .testTag("channels-details"),
                     ) {
-                        // Level with the first row.
+                        // Below the header buttons, with the list's top reserve.
                         ChannelsListArt(channels, frame, nowSecProvider, view.showsProgramArt,
                             Modifier.padding(top = ChannelsListTopReserve))
                         ChannelsImmersiveHero(channels, frame, nowSecProvider,

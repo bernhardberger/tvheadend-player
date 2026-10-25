@@ -196,6 +196,13 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(tagsButton)
         fixture.key(Key.DirectionDown)
         fixture.awaitFocus(row(4))
+        // View options lead down to the row too, not to the details beneath them.
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(tagsButton)
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(viewButton)
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(row(4))
         // Left undoes Right; the rail is the row's own start edge.
         fixture.key(Key.DirectionRight)
         fixture.awaitFocus(tagsButton)

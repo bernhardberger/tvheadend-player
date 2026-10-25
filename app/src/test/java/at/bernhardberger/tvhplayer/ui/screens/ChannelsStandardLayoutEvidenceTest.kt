@@ -241,18 +241,22 @@ class ChannelsStandardLayoutEvidenceTest {
         assertEquals("button gap", 20f, view.left - group.right, .5f)
         assertEquals("buttons share the header's axis", header.center.y, view.center.y, 1f)
         assertEquals("Tags shares it too", header.center.y, group.center.y, 1f)
-        // The list column spans the focus reserve and runs to the screen bottom.
+        // The list column spans the focus reserve, starts level with the header beside its buttons,
+        // and runs to the screen bottom.
         val list = compose.onNodeWithTag("channels-list").bounds()
         assertEquals("list column x", 118f, list.left, .5f)
+        assertEquals("list column level with the header", header.top, list.top, .5f)
+        assertTrue("rows pass beside the header's buttons, not under them", list.right <= group.left)
         assertEquals("list column width", 364f, list.width, .5f)
         assertEquals("list runs to the screen bottom", 540f, list.bottom, .5f)
 
-        // Rows: 340dp wide at x130, first at y80 below the header, 4dp gaps. Height is the library's
-        // standard two-line minimum and grows with text scale rather than clipping.
+        // Rows: 340dp wide at x130, first at y32 after the list's top reserve, 4dp gaps. Height is the
+        // library's standard two-line minimum and grows with text scale rather than clipping.
         val first = row(1).bounds()
         val second = row(2).bounds()
         assertEquals("row x", 130f, first.left, .5f)
-        assertEquals("row y", 80f, first.top, .5f)
+        assertEquals("row y", 32f, first.top, .5f)
+        assertTrue("seven rows show in full", row(7).bounds().bottom <= list.bottom)
         assertEquals("row width", 340f, first.width, .5f)
         assertTrue("row respects the library standard minimum (${first.height})", first.height >= 64f)
         assertEquals("row stride", first.height + 4f, second.top - first.top, .5f)
@@ -298,10 +302,13 @@ class ChannelsStandardLayoutEvidenceTest {
         val listColumn = compose.onNodeWithTag("channels-list").bounds()
         val scaleOverflow = (focusedPicon.width / 72f - 1f) * first.width / 2f
         assertTrue("focus scale fits the list column", first.left - scaleOverflow >= listColumn.left)
+        val focusedTop = first.top - (focusedPicon.width / 72f - 1f) * first.height / 2f
+        assertTrue("the focused first row stays inside the 27dp top safe line ($focusedTop)", focusedTop >= 27f)
 
         // The preview pane runs beside the rows, 92dp after them, and its headline rests on the safe inset.
         val details = compose.onNodeWithTag("channels-details").bounds()
         assertEquals("details x", 562f, details.left, .5f)
+        assertEquals("details stay below the header", 76f, details.top, .5f)
         assertEquals("details width", 340f, details.width, .5f)
         assertEquals("visual gap", 92f, details.left - first.right, .5f)
         assertEquals("details bottom inset", 512f, details.bottom, .5f)
@@ -465,14 +472,12 @@ class ChannelsStandardLayoutEvidenceTest {
         assertFocusedShapePixels(1, rowHeight, scrolled = false)
         capture("en-font$fontScale-top-fade-initial-bright-video")
 
-        // At font scale 1.0 this anchor leaves a real, generated 5:3 picon crossing the top edge.
-        // Enlarged rows settle with the topmost logo just above the list, so the Up walk below
-        // proves their fade instead.
+        // The list column reaching up beside the header settles the down walk with the topmost
+        // logos just clear of the fade at both scales, so the Up walk below proves it.
         val downTarget = if (fontScale == 1f) 8 else 12
         repeat(downTarget - 1) { key(Key.DirectionDown) }
         row(downTarget).assertIsFocused()
         assertFocusedShapePixels(downTarget, rowHeight, scrolled = true)
-        if (fontScale == 1f) assertTopFadePixels(4)
         capture("en-font$fontScale-top-fade-down-scrolled-bright-video")
 
         repeat(CHANNEL_COUNT - downTarget) { key(Key.DirectionDown) }
@@ -635,7 +640,7 @@ class ChannelsStandardLayoutEvidenceTest {
         val label = compose.onNode(hasText("All channels") and hasAnyAncestor(hasTestTag("channels-tags-button")), useUnmergedTree = true).bounds()
         assertTrue("Tags keeps its whole label", label.left >= group.left && label.right <= group.right)
         assertTrue("Tags stays inside the header", group.top >= header().bounds().top - .5f && group.bottom <= header().bounds().bottom + .5f)
-        assertTrue("rows stay below the enlarged header", row(1).bounds().top >= header().bounds().bottom + 8f - 1f)
+        assertTrue("rows stay beside the enlarged header's buttons", row(1).bounds().right <= group.left)
         enterAndFocus(PLAYING)
 
         val first = row(1).bounds()

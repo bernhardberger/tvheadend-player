@@ -77,6 +77,7 @@ class RecordingsVisualLayoutTest {
     private val screenState = RecordingsScreenState()
     // The app keeps this state while the player route replaces the Recordings entry.
     private val screenShown = mutableStateOf(true)
+    private val endPaddingState = mutableStateOf<Dp?>(null)
 
     @Before fun prepare() {
         oldLocale = Locale.getDefault()
@@ -104,8 +105,10 @@ class RecordingsVisualLayoutTest {
         assertEquals(28f, bounds("recordings-header").top, .1f)
         assertEquals(902f, bounds("recordings-header").right, .1f)
         assertEquals(540f, bounds("recordings-archive-list").bottom, .1f)
+        // The tabs are the header row's leading content, centred in it, with the list area below.
         assertEquals(130f, bounds("recordings-mode-tabs").left, .1f)
-        assertEquals(76f, bounds("recordings-mode-tabs").top, .1f)
+        assertEquals(bounds("recordings-header").center.y, bounds("recordings-mode-tabs").center.y, .5f)
+        assertEquals("content starts at y80, as the channel list does", 80f, bounds("recordings-archive-list").top, .1f)
         val grown = bounds("recordings-folder-Documentaries")
         compose.onNodeWithTag("depth-preview", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("recording-list-entry-2").assertDoesNotExist()
@@ -138,7 +141,10 @@ class RecordingsVisualLayoutTest {
         val expected = "${formatFileSize(412_000_000_000L, context)} free of ${formatFileSize(2_000_000_000_000L, context)}"
         compose.onNodeWithTag("recordings-space").assertTextEquals(expected)
         compose.onNodeWithTag("recordings-space").assert(SemanticsMatcher.keyNotDefined(SemanticsActions.RequestFocus))
-        assertTrue(bounds("recordings-space").bottom <= bounds("recordings-mode-tabs").top)
+        // It ends the tabs' row, level with them and clear of them.
+        assertEquals(bounds("recordings-mode-tabs").center.y, bounds("recordings-space").center.y, .5f)
+        assertTrue(bounds("recordings-space").left >= bounds("recordings-mode-tabs").right)
+        assertEquals(902f, bounds("recordings-space").right, .5f)
         assertEquals(130f, bounds("recordings-header").left, .1f)
         assertEquals(902f, bounds("recordings-header").right, .1f)
         focused("recordings-folder-Documentaries")
@@ -153,6 +159,60 @@ class RecordingsVisualLayoutTest {
         show(diskSpace = DvrDiskSpaceState.Synchronizing(null))
         compose.onNodeWithTag("recordings-space").assertDoesNotExist()
         focused("recordings-folder-Documentaries")
+        capture("header-no-space", 1f)
+    }
+
+    @Test fun recordingSpaceLineGivesWayToTheTabs() {
+        show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
+        focused("recordings-folder-Documentaries")
+        val tabs = bounds("recordings-mode-tabs")
+        val full = bounds("recordings-space").width
+        assertTrue("the fixture's text must be wider than the hiding threshold ($full)", full > 120f)
+        // The header row runs from x130 to the trailing inset; its actions start 12dp after the tabs.
+        fun leaveForSpace(width: Float) = compose.runOnIdle {
+            endPaddingState.value = (960f - tabs.right - 12f - width).dp
+        }
+        leaveForSpace((full + 96f) / 2f)
+        compose.waitForIdle()
+        assertTrue("narrower than its text, it ellipsizes", textLayout("recordings-space").hasVisualOverflow)
+        assertTrue(bounds("recordings-space").left >= tabs.right)
+        assertEquals("the tabs keep their width", tabs, bounds("recordings-mode-tabs"))
+        leaveForSpace(80f)
+        compose.waitForIdle()
+        compose.onNodeWithTag("recordings-space").assertDoesNotExist()
+        assertEquals("the tabs keep their width", tabs, bounds("recordings-mode-tabs"))
+        listOf("Archive", "Continue watching", "Schedule", "Problems").forEach {
+            val label = mutableListOf<TextLayoutResult>()
+            compose.onNodeWithText(it, useUnmergedTree = true)
+                .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout -> layout(label) }
+            assertTrue("$it is not shortened", !label.single().hasVisualOverflow)
+        }
+        focused("recordings-folder-Documentaries")
+    }
+
+    @Test fun upFromEachTabsFirstItemReachesThatTabAndDownReturnsToTheList() {
+        show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
+        focused("recordings-folder-Documentaries")
+        capture("header-archive", 1f)
+        key(Key.DirectionUp)
+        compose.onNodeWithText("Archive").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionUp)
+        listOf("Continue watching" to 1, "Schedule" to 20, "Problems" to 21).forEach { (tab, first) ->
+            key(Key.DirectionRight)
+            compose.onNodeWithText(tab).assertIsFocused()
+            key(Key.DirectionDown)
+            focused("recording-list-entry-$first")
+            capture("header-${tab.lowercase().replace(' ', '-')}", 1f)
+            // The active tab, not the one above the item.
+            key(Key.DirectionUp)
+            compose.onNodeWithText(tab).assertIsFocused()
+        }
+        // The disk-space text takes no focus: the row ends at Problems.
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        assertNoCommands()
     }
 
     /**
@@ -170,7 +230,7 @@ class RecordingsVisualLayoutTest {
             view.draw(Canvas(bitmap))
             fun brightest(xs: IntRange, ys: IntRange) =
                 xs.maxOf { x -> ys.maxOf { y -> android.graphics.Color.valueOf(bitmap.getPixel(x, y)).run { maxOf(red(), green(), blue()) } } }
-            Triple(brightest(0..30, 160..290), brightest(562..900, 160..230), brightest(0..30, 420..460))
+            Triple(brightest(0..30, 116..246), brightest(562..900, 116..186), brightest(0..30, 420..460))
                 .also { bitmap.recycle() }
         }
         assertTrue("the parent's arrows still show ($parent over $background)", parent > background + .05f)
@@ -493,6 +553,7 @@ class RecordingsVisualLayoutTest {
             files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
                 stop = Instant.fromEpochSeconds(start + 151 * 60), sizeBytes = 2_400_000_000L)),
             channelName = "Ridge Earth Mountain Channel HD Extra", subtitle = "A winter expedition beyond the Arctic Circle",
+            subscriptionError = DvrSubscriptionError.NO_DISK_SPACE,
             episode = EpgEpisode(null, null, 2, 5, 7, 10, null, null, "S2 E7"), copyrightYear = 2018,
             rating = EpgRating(0, null, null, null, null, null),
             description = "Follow a small team of naturalists through remote landscapes.")
@@ -971,6 +1032,7 @@ class RecordingsVisualLayoutTest {
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
         diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown) {
+        endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
             recording(2, "Tide Watch", "Documentaries/Expeditions/blue.ts"),
@@ -1015,7 +1077,7 @@ class RecordingsVisualLayoutTest {
                                 observation = liveObservation,
                                 currentObservation = { session.observation.value },
                                 state = screenState,
-                                contentPadding = endPadding?.let {
+                                contentPadding = endPaddingState.value?.let {
                                     PaddingValues(start = padding.calculateStartPadding(direction),
                                         top = padding.calculateTopPadding(), end = it,
                                         bottom = padding.calculateBottomPadding())
@@ -1154,7 +1216,7 @@ class RecordingsVisualLayoutTest {
 
     private fun assertDenseListGeometry(firstRowTop: Float) {
         val rows = visibleListRows().filter { it.height > 63.5f }
-        assertEquals(5, rows.size)
+        assertEquals(6, rows.size)
         rows.forEachIndexed { index, row ->
             assertEquals(firstRowTop + index * 68f, row.top, .5f)
             assertEquals(64f, row.height, .5f)

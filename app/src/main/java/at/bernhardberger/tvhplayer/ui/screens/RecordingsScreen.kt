@@ -41,6 +41,7 @@ import androidx.compose.foundation.layout.width
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -51,7 +52,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.LaunchedEffect
@@ -127,9 +127,8 @@ import at.bernhardberger.tvhplayer.core.partitionDvrLibrary
 import at.bernhardberger.tvhplayer.core.recordingIsRunning
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
+import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.components.TopLevelBrowseHeader
 import at.bernhardberger.tvhplayer.ui.components.TabContent
 import at.bernhardberger.tvhplayer.ui.components.BrowsePreparationPending
@@ -544,61 +543,58 @@ internal fun RecordingsScreenContent(
             modifier = Modifier
                 .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
                 .testTag("recordings-header"),
-            // Quiet information in the header's trailing slot: no focus stop, and the tab row
-            // sits below it, so long text can only shorten the title or ellipsize itself.
+            leading = {
+                RecordingModeTabs(
+                    selected = mode,
+                    selectedFocus = modeFocus,
+                    onFocused = {
+                        modeMotion.select(it, DvrLibraryMode.entries)
+                        if (mode != it) {
+                            contentFocusOwned = false
+                            requestContentFocus = false
+                        }
+                        mode = it
+                    },
+                    onClick = {
+                        modeMotion.select(it, DvrLibraryMode.entries)
+                        mode = it
+                        requestContentFocus = true
+                    },
+                    onMoveToContent = {
+                        requestContentFocus = true
+                    },
+                    modifier = Modifier
+                        .onFocusChanged { if (!it.hasFocus) loadingFocusParked = false }
+                        .onPreviewKeyEvent {
+                            // A deliberate header move gives the viewer ownership, not the loading handoff.
+                            loadingFocusParked = false
+                            contentFocusOwned = false
+                            false
+                        }
+                        .testTag("recordings-mode-tabs"),
+                )
+            },
+            // Quiet information at the row's end: no focus stop. The tabs measure first, so the
+            // text only gets the width they leave; it ellipsizes there and hides when too narrow.
             actions = spaceValue?.let { value ->
                 {
-                    Text(
-                        text = value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .testTag("recordings-space")
-                            .semantics { contentDescription = spaceDescription.orEmpty() },
-                    )
+                    BoxWithConstraints(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                        if (maxWidth >= RecordingSpaceMinWidth) {
+                            Text(
+                                text = value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .testTag("recordings-space")
+                                    .semantics { contentDescription = spaceDescription.orEmpty() },
+                            )
+                        }
+                    }
                 }
             },
         )
-        Spacer(Modifier.height(TvSpacing8))
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(start = startPadding + TvBrowseLeadingInset)
-                .testTag("recordings-mode-tabs-row"),
-        ) {
-            RecordingModeTabs(
-                selected = mode,
-                selectedFocus = modeFocus,
-                onFocused = {
-                    modeMotion.select(it, DvrLibraryMode.entries)
-                    if (mode != it) {
-                        contentFocusOwned = false
-                        requestContentFocus = false
-                    }
-                    mode = it
-                },
-                onClick = {
-                    modeMotion.select(it, DvrLibraryMode.entries)
-                    mode = it
-                    requestContentFocus = true
-                },
-                onMoveToContent = {
-                    requestContentFocus = true
-                },
-                modifier = Modifier
-                    .wrapContentWidth(align = Alignment.Start)
-                    .onFocusChanged { if (!it.hasFocus) loadingFocusParked = false }
-                    .onPreviewKeyEvent {
-                        // A deliberate header move gives the viewer ownership, not the loading handoff.
-                        loadingFocusParked = false
-                        contentFocusOwned = false
-                        false
-                    }
-                    .testTag("recordings-mode-tabs"),
-            )
-        }
         TabContent(
             motion = modeMotion,
             selectedKey = mode,
@@ -621,7 +617,8 @@ internal fun RecordingsScreenContent(
         val channelsById = frame.channelsById
         val scheduleGroups = frame.schedule
         val problemGroups = frame.problems
-        Spacer(Modifier.height(TvSpacing16))
+        // Every tab's content starts at y80, as the channel list's first row does.
+        Spacer(Modifier.height(TvSpacing12))
 
         if (frame.empty) {
             RecordingsEmptyState(
@@ -1257,3 +1254,6 @@ internal fun RecordingsScreenContent(
     }
     }
 }
+
+/** Below this width the disk-space text would show little more than an ellipsis, so it hides. */
+private val RecordingSpaceMinWidth = 96.dp

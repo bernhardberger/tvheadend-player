@@ -22,12 +22,15 @@ import at.bernhardberger.tvhplayer.ui.TvTextColors
  * The header row of a top-level destination. The drawer says where you are, so nothing draws the
  * [title]; it is the row's pane title for accessibility. The [filter] narrowing the destination, if
  * any, stays visible at the leading edge in the secondary text tone, and [actions] end the row.
+ * [leading] content takes the leading edge instead of the filter; the actions then fill the rest of
+ * the row themselves.
  */
 @Composable
 fun TopLevelBrowseHeader(
     title: String,
     modifier: Modifier = Modifier,
     filter: String? = null,
+    leading: (@Composable RowScope.() -> Unit)? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
 ) {
     Row(
@@ -38,7 +41,9 @@ fun TopLevelBrowseHeader(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
     ) {
-        if (filter != null) {
+        if (leading != null) {
+            leading()
+        } else if (filter != null) {
             Text(
                 text = filter,
                 style = MaterialTheme.typography.headlineMedium,

@@ -248,7 +248,7 @@ class RecordingsScreenTest {
     }
 
     @Test
-    fun modeTabsUseTheTitleLeadingAnchorOnTheirOwnRow() {
+    fun modeTabsLeadTheHeaderRow() {
         composeRule.setContent {
             TVHeadendPlayerTheme {
                 TestRecordingsScreen(
@@ -257,18 +257,14 @@ class RecordingsScreenTest {
             }
         }
 
-        val title = composeRule.onNodeWithTag("recordings-header")
+        val header = composeRule.onNodeWithTag("recordings-header")
             .fetchSemanticsNode().boundsInRoot
         val tabs = composeRule.onNodeWithTag("recordings-mode-tabs")
             .fetchSemanticsNode().boundsInRoot
-        val tabsRow = composeRule.onNodeWithTag("recordings-mode-tabs-row")
-            .fetchSemanticsNode().boundsInRoot
 
-        assertEquals(title.left, tabs.left, 0.5f)
-        assertTrue(tabs.right < title.right)
-        assertTrue(tabsRow.width > tabs.width)
-        assertTrue(tabsRow.right > title.right)
-        assertTrue(tabs.top >= title.bottom)
+        assertEquals(header.left, tabs.left, 0.5f)
+        assertTrue(tabs.right < header.right)
+        assertEquals(header.center.y, tabs.center.y, 0.5f)
     }
 
     @Test

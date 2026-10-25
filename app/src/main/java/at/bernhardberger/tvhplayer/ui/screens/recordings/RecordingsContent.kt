@@ -204,6 +204,8 @@ internal fun RecordingModeTabs(
                 ),
                 onFocus = { onFocused(mode) },
                 onClick = { onClick(mode) },
+                // Nothing focusable follows the tabs in the header row.
+                last = mode == DvrLibraryMode.entries.last(),
             )
         }
     }

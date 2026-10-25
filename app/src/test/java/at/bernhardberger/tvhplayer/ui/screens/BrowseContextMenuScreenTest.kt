@@ -760,7 +760,9 @@ class BrowseContextMenuScreenTest {
         // The browse page's top left (tabs, first rows), not the rail: opaque-layer registration can hide the rail
         // even when neither the menu nor the details background is actually drawn.
         var x = 0; var y = 0; var brightest = 0
-        for (px in 212 until 900) for (py in 20 until 220) {
+        // Above Recordings' focused row: its focus growth restarts after Back, so it is no stable probe.
+        val probeBottom = if (recordings) compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.top.toInt() - 8 else 220
+        for (px in 212 until 900) for (py in 20 until minOf(220, probeBottom)) {
             val light = android.graphics.Color.red(browse.getPixel(px, py))
             if (light > brightest) { brightest = light; x = px; y = py }
         }
@@ -814,7 +816,9 @@ class BrowseContextMenuScreenTest {
         show(recordings = true, recordingState = DvrEntryState.SCHEDULED, realRail = true)
         val browse = resumeBitmap()
         var x = 0; var y = 0; var brightest = 0
-        for (px in 212 until 900) for (py in 20 until 220) {
+        // Above the focused row: its focus growth restarts after Back, so it is no stable probe.
+        val rowTop = compose.onNodeWithTag("recording-list-entry-1").fetchSemanticsNode().boundsInRoot.top.toInt()
+        for (px in 212 until 900) for (py in 20 until minOf(220, rowTop - 8)) {
             val light = android.graphics.Color.red(browse.getPixel(px, py))
             if (light > brightest) { brightest = light; x = px; y = py }
         }
