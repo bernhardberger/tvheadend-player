@@ -199,6 +199,29 @@ screenshot-first UX review.
 | U17 | Locale-aware dates and numbers everywhere (owner 2026-10-14), the same way U13 did the clock: one shared formatter set, used by every screen, following the app's selected language, so new translations need no formatting work. Today dates use fixed patterns: "EEE d MMM" in the Guide and Recordings (`ui/screens/EpgGridScreen.kt:2286`, `ui/screens/recordings/RecordingsContent.kt:863`), "EEEE d MMMM" for Recordings headers (`RecordingsContent.kt:842`), and a German/English switch in `ui/common/TimeConverter.kt:90`; only "First aired" uses the locale's medium date. Numbers: file sizes are hand-built "%.1f GB" (`RecordingsContent.kt:893-908`), cache size in `core/CacheStatisticsFormatting.kt`; the player statistics overlay uses `Locale.ROOT` on purpose (diagnostics) and timecodes stay "h:mm:ss". Formats come from Android for the locale (`DateFormat.getBestDateTimePattern` skeletons, `NumberFormat`, `Formatter.formatShortFileSize`), named by use (short day label, day header, short numeric date, file size). Do it before the screen packages so they use it | No fixed date pattern or hand-built number format left in UI code outside the shared set; JVM tests for each format in en-US and de; captures re-checked for width |
 | U18 | App-wide option to hide channel numbers (owner 2026-10-22): for remotes without number keys there is nothing to enter, so the number is noise. Channel titles are built by one helper, `channelTitleText` (`ui/components/ChannelTitle.kt`, 14 callers), so the setting applies there; spoken descriptions and any later number entry follow it. Not a quieter number tone: the owner judged that noisy | Setting in Settings (with U7); every channel title follows it; JVM test for the helper |
 | U19 | Replace the "·" separators (owner 2026-10-22: they read as sloppy). Google TV's immersive row and the kit's wide-card example separate metadata with "•"; the glyph and spacing are decided in this item and applied through shared strings. About 19 string resources and 26 code sites use " · " today | Done 2026-10-22 with U4 (f31b4acd): " • " everywhere, the owner preferring the larger bullet |
+| U20 | Player polish list (owner, 2026-10-25), part of U8, taken up once the browse screens have settled; only the (i) button is wanted for 0.3.0. Items listed below the table | Each item decided or built and accepted on the G10 |
+
+U20 items, as the owner noticed them in use:
+
+1. **Recording date in the recording player.** A playing recording never says
+   when it was recorded, so a live recording and a replay of the same event
+   (seen with MotoGP) can't be told apart. Show the recording's date and start
+   time in the player's information.
+2. **Channel identity without the logo box.** The player's channel identity
+   draws the logo on a box; drop it, as the browse screens may (light/flipped
+   logos make it unnecessary on dark backgrounds).
+3. **(i) button for 0.3.0.** Replace the hidden "info" on the artwork card with
+   an (i) button in the player's action row, the more traditional layout.
+4. **Info in the live player.** It opens an old details and schedule overlay.
+   Decide whether it goes (the details page and the Guide cover it) or is
+   reworked; ties in with the U8 programme-details redesign.
+5. **Channel rail.** Needs a second look (with the U1 rail trials).
+6. **Scrubbing in steps, not to absolute times.** The timeline preview shows
+   the absolute position ("1:03:20"). For sports especially, steps relative to
+   the current position read better ("+3 min"). Decide the preview label and
+   the step sizes.
+7. **Channel number entry in place.** The number entry overlay feels detached;
+   it should sit where the chrome's channel identity is and morph from it.
 
 ### E — Performance and benchmarks
 
