@@ -196,6 +196,7 @@ class RecordingsVisualLayoutTest {
         capture("header-archive", 1f)
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
+        capture("header-archive-tab-focused", 1f)
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
         key(Key.DirectionUp)
@@ -553,6 +554,7 @@ class RecordingsVisualLayoutTest {
             files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
                 stop = Instant.fromEpochSeconds(start + 151 * 60), sizeBytes = 2_400_000_000L)),
             channelName = "Ridge Earth Mountain Channel HD Extra", subtitle = "A winter expedition beyond the Arctic Circle",
+            // The error's reason line fills the pane, which now starts higher, so the title must shorten.
             subscriptionError = DvrSubscriptionError.NO_DISK_SPACE,
             episode = EpgEpisode(null, null, 2, 5, 7, 10, null, null, "S2 E7"), copyrightYear = 2018,
             rating = EpgRating(0, null, null, null, null, null),

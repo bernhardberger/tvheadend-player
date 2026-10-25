@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.CentredDialog
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.draw.clip
@@ -583,7 +584,7 @@ internal fun RecordingsScreenContent(
                             Text(
                                 text = value,
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                color = TvTextColors.tertiary,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 modifier = Modifier
