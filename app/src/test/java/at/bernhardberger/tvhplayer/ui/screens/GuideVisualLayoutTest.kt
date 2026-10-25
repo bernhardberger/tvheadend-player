@@ -2052,6 +2052,10 @@ class GuideVisualLayoutTest {
             rating.left >= headline.left && rating.right <= headline.right &&
                 rating.top >= headline.top && rating.bottom <= headline.bottom)
         assertTrue("The rating stays above the timing line: $rating / $timing", rating.bottom <= timing.top)
+        // Bottom-aligned, a short reservation would push the channel line out of the top, not the rating.
+        val channel = compose.onNodeWithTag("guide-headline-channel", useUnmergedTree = true)
+            .getUnclippedBoundsInRoot()
+        assertTrue("The channel line starts inside the headline: $channel / $headline", channel.top.value >= headline.top - .5f)
         assertEquals("The headline retains its reservation below the header",
             bounds("channels-header").bottom + headlineHeight, headline.bottom, .5f)
     }
