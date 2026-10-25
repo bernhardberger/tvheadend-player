@@ -6,12 +6,9 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -24,9 +21,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ListItem
@@ -39,7 +36,6 @@ import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
-import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 
@@ -54,7 +50,7 @@ internal val ChannelRowWidth = TvBrowseColumnWidth
 internal val ChannelRowGap = 4.dp
 internal val ChannelRowEdgeInset = 12.dp
 
-/** The logo's plate: 16:9 and as tall as the two-line item's content. */
+/** The logo's slot: 16:9 and as tall as the two-line item's content. */
 internal val ChannelPiconWidth = 72.dp
 internal val ChannelPiconHeight = 40.dp
 private val ChannelPiconInset = 4.dp
@@ -174,24 +170,25 @@ fun ChannelRow(
             }
         },
         leadingContent = {
-            // The logo on a charcoal plate, as the player's channel chip shows it: a steady column
-            // down the list, while the item itself keeps the library's bare rest state. The plate
-            // is the icon's ground, so a missing logo keeps its light tint when the row is focused.
-            Box(
-                Modifier
+            // The logo sits on the row's own fill, as on the recording rows: the screen's
+            // background at rest, the item's light pill with focus. That fill is the ink's ground,
+            // and a missing logo takes the row's content color.
+            val colors = ListItemDefaults.colors()
+            val fill = when {
+                focused && playingNow -> colors.focusedSelectedContainerColor
+                focused -> colors.focusedContainerColor
+                playingNow -> colors.selectedContainerColor
+                else -> colors.containerColor
+            }.compositeOver(MaterialTheme.colorScheme.background)
+            PiconBox(
+                piconPath = piconPath,
+                placeholderTint = LocalContentColor.current,
+                ground = fill,
+                modifier = Modifier
+                    .testTag("channel-picon")
                     .size(width = ChannelPiconWidth, height = ChannelPiconHeight)
-                    .clip(MaterialTheme.shapes.extraSmall)
-                    .background(TvSurfaceColors.containerLowest),
-            ) {
-                PiconBox(
-                    piconPath = piconPath,
-                    ground = TvSurfaceColors.containerLowest,
-                    modifier = Modifier
-                        .testTag("channel-picon")
-                        .fillMaxSize()
-                        .padding(ChannelPiconInset),
-                )
-            }
+                    .padding(ChannelPiconInset),
+            )
         },
         modifier = modifier.then(contextMenu.modifier)
             .profileLayout("channels:row")

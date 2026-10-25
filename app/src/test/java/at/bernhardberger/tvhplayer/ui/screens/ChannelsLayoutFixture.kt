@@ -192,9 +192,11 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         )
     }
 
-    /** The fictional fixture pack: picons by channel id, programme art from 101. */
-    fun fixtureArt(): ImageLoader = FixtureArt.imageLoader(context, buildMap {
-        PICONS.forEachIndexed { index, name -> put(ArtworkId(index + 1), FixtureArt.picon(name)) }
+    /** The fictional fixture pack: picons by channel id, programme art from 101. A channel in [withoutPicon] fails like a missing server image. */
+    fun fixtureArt(withoutPicon: Set<Int> = emptySet()): ImageLoader = FixtureArt.imageLoader(context, buildMap {
+        PICONS.forEachIndexed { index, name ->
+            if (index + 1 !in withoutPicon) put(ArtworkId(index + 1), FixtureArt.picon(name))
+        }
         ART.forEachIndexed { index, name -> put(ArtworkId(101 + index), FixtureArt.art(name)) }
     })
 

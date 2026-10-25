@@ -11,6 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.compositeOver
@@ -27,6 +32,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -65,7 +71,6 @@ import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
-import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
 /** Real native ListItem drawing; all Coil requests are intercepted before any I/O. */
 @RunWith(RobolectricTestRunner::class)
@@ -79,12 +84,15 @@ class PiconBoxTest {
     private val loadingGate = CompletableDeferred<Unit>()
     private var background = Color.Unspecified
     private var passiveTint = Color.Unspecified
+    /** The library's leading-slot content color by focus, read from the plain item. */
+    private val leadingTint = HashMap<Boolean, Color>()
+    private var rowFocusFill = Color.Unspecified
 
-    @Test fun missingPiconKeepsItsTintOnTheRowsPlate() = assertRowFallback(ArtworkState.MISSING)
+    @Test fun missingPiconTakesTheRowsContentColor() = assertRowFallback(ArtworkState.MISSING)
 
-    @Test fun loadingPiconKeepsItsTintOnTheRowsPlate() = assertRowFallback(ArtworkState.LOADING)
+    @Test fun loadingPiconTakesTheRowsContentColor() = assertRowFallback(ArtworkState.LOADING)
 
-    @Test fun failedPiconKeepsItsTintOnTheRowsPlate() = assertRowFallback(ArtworkState.ERROR)
+    @Test fun failedPiconTakesTheRowsContentColor() = assertRowFallback(ArtworkState.ERROR)
 
     @Test fun successfulPiconKeepsItsOwnPixelsWhenRowFocusChanges() {
         show(ArtworkState.SUCCESS, inRow = true)
@@ -102,16 +110,19 @@ class PiconBoxTest {
 
     private fun assertRowFallback(state: ArtworkState) {
         show(state, inRow = true)
-        // The charcoal plate is the icon's ground, so the light tint holds when the row's focus fill turns light.
+        // No plate: the icon takes the item's leading content color, dark on the light focus pill.
         val alpha = if (state == ArtworkState.LOADING) .35f else 1f
-        val expected = passiveTint.copy(alpha = alpha).compositeOver(TvSurfaceColors.containerLowest)
         focus("other-row")
-        assertPiconColor(expected)
+        val rest = leadingTint.getValue(false).let { it.copy(alpha = it.alpha * alpha) }.compositeOver(background)
+        val focused = leadingTint.getValue(true).let { it.copy(alpha = it.alpha * alpha) }
+            .compositeOver(rowFocusFill.compositeOver(background))
+        assertPiconColor(rest)
         focus("row")
-        assertPiconColor(expected)
+        assertPiconColor(focused)
         focus("other-row")
-        assertPiconColor(expected)
-        assertEquals(if (state == ArtworkState.MISSING) 0 else 1, requests)
+        assertPiconColor(rest)
+        // The logo is inked for each ground the row shows: rest, focus, rest again.
+        assertEquals(if (state == ArtworkState.MISSING) 0 else 3, requests)
     }
 
     private fun assertPassiveFallback(state: ArtworkState) {
@@ -159,6 +170,7 @@ class PiconBoxTest {
                     view = LocalView.current
                     background = MaterialTheme.colorScheme.background
                     passiveTint = MaterialTheme.colorScheme.onSurfaceVariant
+                    rowFocusFill = ListItemDefaults.colors().focusedContainerColor
                     Column(Modifier.fillMaxSize().background(background).padding(40.dp)) {
                         val picon = if (state == ArtworkState.MISSING) null else ArtworkId(1)
                         if (inRow) {
@@ -174,11 +186,14 @@ class PiconBoxTest {
                                     onConfirm = {},
                                 )
                             }
+                            var otherFocused by remember { mutableStateOf(false) }
                             ListItem(
                                 selected = false,
                                 onClick = {},
                                 headlineContent = { Text("Other row") },
-                                modifier = Modifier.width(396.dp).testTag("other-row"),
+                                leadingContent = { leadingTint[otherFocused] = LocalContentColor.current },
+                                modifier = Modifier.width(396.dp).testTag("other-row")
+                                    .onFocusChanged { otherFocused = it.isFocused },
                             )
                         } else {
                             // Passive/player callers must not start inheriting an arbitrary ambient tint.

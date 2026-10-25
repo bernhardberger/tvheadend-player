@@ -55,6 +55,17 @@ class ChannelsLayoutCaptureTest {
         capture("list-4-header-group-button", tagsButton)
     }
 
+    /** Logos on the rows' own fill: light marks (15), the missing-logo icon (16) and dark marks (17, 18), each with and without focus. */
+    @Test fun listLogoInk() {
+        fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(withoutPicon = setOf(16)))
+        repeat(14) { fixture.key(Key.DirectionDown) }
+        capture("list-7-light-logo", row(15))
+        fixture.key(Key.DirectionDown)
+        capture("list-8-missing-logo", row(16))
+        fixture.key(Key.DirectionDown)
+        capture("list-9-dark-logo", row(17))
+    }
+
     @Test fun listSingleGroup() {
         fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(), tags = false)
         capture("list-5-single-group", row(1))
