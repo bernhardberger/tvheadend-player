@@ -4,9 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +19,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon as FieldIcon
 import androidx.compose.material3.Text as FieldText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,7 +34,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -52,9 +50,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
+import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -69,11 +67,11 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing80
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
-import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepBadge
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepChoiceTop
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepDivider
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepper
@@ -82,6 +80,9 @@ import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
 
 /** The welcome's choices start level with its title, under the 48dp mark. */
 private val WelcomeChoiceTop = 64.dp
+
+/** The search's spinner, the same size and place while searching and beside the found list. */
+private val SearchIndicatorSize = 22.dp
 
 /** About four found servers; more scroll, so the address entry stays on screen below them. */
 private val FoundServersMaxHeight = 272.dp
@@ -199,7 +200,7 @@ private fun FindStep(state: ConnectionSetupState) {
         when {
             found -> FoundServers(state)
             state.searching -> {
-                SearchingNote()
+                FindStatus(searching = true, found = false)
                 FindEnterAddressAction(state)
             }
             else -> {
@@ -215,29 +216,43 @@ private fun FindStep(state: ConnectionSetupState) {
     }
 }
 
+/**
+ * The search's one status line at the column edge: the spinner while it looks, in the same place
+ * before and after servers answered, then the found list's label, with "Still searching…" while
+ * the search goes on.
+ */
 @Composable
-private fun SearchingNote() {
+private fun FindStatus(searching: Boolean, found: Boolean) {
+    val colors = MaterialTheme.colorScheme
     Row(
-        modifier = Modifier.height(36.dp).padding(start = 4.dp),
+        modifier = Modifier.width(TvBrowseColumnWidth).height(SearchIndicatorSize),
         horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        SearchSpinner(18.dp)
-        Text(
-            text = stringResource(R.string.onboarding_find_searching),
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
-        )
+        if (searching) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(SearchIndicatorSize),
+                strokeWidth = 3.dp,
+                color = colors.primary,
+            )
+        }
+        if (found) {
+            Text(
+                text = stringResource(R.string.onboarding_find_on_network),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = colors.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
+                modifier = Modifier.semantics { heading() },
+            )
+        }
+        if (searching) {
+            Text(
+                text = stringResource(if (found) R.string.onboarding_find_still_searching else R.string.onboarding_find_searching),
+                style = MaterialTheme.typography.bodyMedium,
+                color = colors.onSurfaceVariant.copy(alpha = if (found) TvTextTertiaryAlpha else TvTextSecondaryAlpha),
+            )
+        }
     }
-}
-
-@Composable
-private fun SearchSpinner(size: Dp, modifier: Modifier = Modifier) {
-    CircularProgressIndicator(
-        modifier = modifier.size(size),
-        strokeWidth = 2.dp,
-        color = MaterialTheme.colorScheme.primary,
-    )
 }
 
 /** "Enter address manually" on the search; it holds focus while nothing else is chosen. */
@@ -255,19 +270,7 @@ private fun FindEnterAddressAction(state: ConnectionSetupState) {
 
 @Composable
 private fun FoundServers(state: ConnectionSetupState) {
-    val searching = stringResource(R.string.onboarding_find_searching)
-    Row(Modifier.width(TvBrowseColumnWidth), verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = stringResource(R.string.onboarding_find_on_network),
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextTertiaryAlpha),
-            modifier = Modifier.weight(1f).semantics { heading() },
-        )
-        if (state.searching) {
-            SearchSpinner(14.dp, Modifier.semantics { contentDescription = searching })
-        }
-    }
+    FindStatus(searching = state.searching, found = true)
     // Room for the focused row's scale inside the list's clip.
     Column(
         modifier = Modifier
@@ -280,12 +283,7 @@ private fun FoundServers(state: ConnectionSetupState) {
             key(server) { FoundServerRow(state, server, index) }
         }
     }
-    Box(
-        Modifier
-            .width(TvBrowseColumnWidth)
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)),
-    )
+    GuidedStepDivider()
     FindEnterAddressAction(state)
 }
 
@@ -297,7 +295,6 @@ private fun FoundServerRow(state: ConnectionSetupState, server: DiscoveredTvhead
         title = server.name,
         subtitle = stringResource(R.string.onboarding_found_server_detail, server.host, server.port),
         icon = R.drawable.ic_dns,
-        containerColor = Color.Transparent,
         onClick = { state.chooseServer(server) },
         modifier = Modifier
             .focusRequester(requester)
@@ -328,12 +325,11 @@ private fun AddressStep(state: ConnectionSetupState) {
         },
     ) {
         AddressFields(state, host, port, onPortDone = { state.focusAddress(AddressFocus.CONTINUE) })
-        Button(
+        MainActionButton(
+            label = R.string.onboarding_continue,
             onClick = state::continueFromAddress,
             modifier = Modifier.focusRequester(next).testTag("setup-continue"),
-        ) {
-            Text(stringResource(R.string.onboarding_continue))
-        }
+        )
     }
 }
 
@@ -414,7 +410,7 @@ private fun SetupTextField(
             keyboardOptions = keyboardOptions,
             enabled = enabled,
             isError = error != null,
-            supportingText = help?.let { { FieldText(it) } },
+            supportingText = help?.let { { FieldHelp(it, isError = error != null) } },
             onImeAction = onImeAction,
             modifier = modifier
                 .width(TvBrowseColumnWidth)
@@ -424,6 +420,22 @@ private fun SetupTextField(
                     if (error != null) error(error)
                 },
         )
+    }
+}
+
+/**
+ * A field's help under it. As an error it takes the field's error colour (the help is the field's
+ * own mobile text) and an error mark, so it does not rely on colour alone.
+ */
+@Composable
+private fun FieldHelp(text: String, isError: Boolean) {
+    if (!isError) {
+        FieldText(text)
+        return
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        FieldIcon(painterResource(R.drawable.ic_error_outlined), contentDescription = null, Modifier.size(16.dp))
+        FieldText(text)
     }
 }
 
@@ -479,17 +491,16 @@ private fun SignInStep(state: ConnectionSetupState) {
         )
         if (state.mode == SetupMode.EDIT) {
             // The editor tests from its summary, which this returns to.
-            Button(
+            MainActionButton(
+                label = R.string.onboarding_continue,
                 onClick = state::continueFromSignIn,
                 modifier = Modifier.focusRequester(connect).testTag("setup-continue"),
-            ) {
-                Text(stringResource(R.string.onboarding_continue))
-            }
+            )
         } else {
-            BusyButton(
-                busy = connecting,
+            MainActionButton(
                 label = R.string.onboarding_connect,
                 onClick = state::connect,
+                busy = connecting,
                 modifier = Modifier.focusRequester(connect).testTag("setup-connect"),
             )
         }
@@ -553,7 +564,7 @@ private fun SignInFields(
             label = null,
             enabled = enabled,
             isError = state.signInError,
-            supportingText = { FieldText(pair) },
+            supportingText = { FieldHelp(pair, isError = state.signInError) },
             onImeAction = {
                 editingId = null
                 onPasswordDone()
@@ -570,12 +581,26 @@ private fun SignInFields(
     }
 }
 
-/** Starts the test; while it runs it stays focused as a busy "Connecting" that Back cancels. */
+/**
+ * A step's main action (Continue, Connect, Test and save). It is never disabled and keeps a tonal
+ * fill when unfocused, so it never reads as unavailable: pressed with something missing, the step
+ * shows why under the field and focuses it. While [busy] it stays focused as a "Connecting" that
+ * Back cancels.
+ */
 @Composable
-internal fun BusyButton(busy: Boolean, @StringRes label: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun MainActionButton(
+    @StringRes label: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    busy: Boolean = false,
+) {
     Button(
         onClick = { if (!busy) onClick() },
         modifier = modifier,
+        colors = ButtonDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        ),
     ) {
         if (busy) {
             CircularProgressIndicator(

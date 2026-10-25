@@ -68,6 +68,7 @@ internal fun AppErrorCondition.titleRes(): Int = when (this) {
     AppErrorCondition.LOAD_FAILED -> R.string.error_109_title
     AppErrorCondition.RECONNECTING -> R.string.error_110_title
     AppErrorCondition.NOT_TVHEADEND -> R.string.error_111_title
+    AppErrorCondition.NO_NETWORK -> R.string.error_112_title
     AppErrorCondition.NO_FREE_ADAPTER -> R.string.error_201_title
     AppErrorCondition.NO_SIGNAL -> R.string.error_202_title
     AppErrorCondition.MUX_NOT_ENABLED -> R.string.error_203_title
@@ -102,6 +103,7 @@ private fun AppErrorCondition.reasonRes(): Int = when (this) {
     AppErrorCondition.LOAD_FAILED -> R.string.error_109_reason
     AppErrorCondition.RECONNECTING -> R.string.error_110_reason
     AppErrorCondition.NOT_TVHEADEND -> R.string.error_111_reason
+    AppErrorCondition.NO_NETWORK -> R.string.error_112_reason
     AppErrorCondition.NO_FREE_ADAPTER -> R.string.error_201_reason
     AppErrorCondition.NO_SIGNAL -> R.string.error_202_reason
     AppErrorCondition.MUX_NOT_ENABLED -> R.string.error_203_reason
@@ -133,6 +135,7 @@ internal fun AppErrorCondition.hintRes(): Int? = when (this) {
     AppErrorCondition.LOAD_FAILED -> R.string.error_hint_try_again_or_check_settings
     AppErrorCondition.RECONNECTING -> null
     AppErrorCondition.NOT_TVHEADEND -> R.string.error_hint_check_address
+    AppErrorCondition.NO_NETWORK -> R.string.error_hint_check_tv_network
     AppErrorCondition.NO_FREE_ADAPTER -> R.string.error_hint_try_later_or_other_channel
     AppErrorCondition.NO_SIGNAL -> R.string.error_hint_try_later_or_other_channel
     AppErrorCondition.MUX_NOT_ENABLED -> R.string.error_hint_turn_on_mux_or_other_channel

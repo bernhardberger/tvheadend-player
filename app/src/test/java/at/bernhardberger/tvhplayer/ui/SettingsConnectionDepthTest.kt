@@ -8,6 +8,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
@@ -233,6 +234,8 @@ class SettingsConnectionDepthTest {
         assertEquals("An unsaved test gives the current connection back", 1, restores)
         editor.failSave = false
         press(Key.DirectionCenter)
+        // A fresh attempt shows it started before its own Ready counts.
+        compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Connecting)) }
         compose.runOnIdle { session.publish(ready()) }
         compose.onNodeWithText("Edit connection").assertIsFocused()
         assertEquals(2, editor.saves)
@@ -240,6 +243,32 @@ class SettingsConnectionDepthTest {
         assertEquals(parent, navigation.stack.active)
         assertFalse(secure())
         assertEquals("", form.password)
+    }
+
+    @Test fun aTypedAddressSurvivesRecreationAndOnlyTheSignInLoadsAgain() {
+        val editor = Editor()
+        val restoration = StateRestorationTester(compose)
+        lateinit var form: ConnectionFormState
+        restoration.setContent {
+            TVHeadendPlayerTheme {
+                form = rememberConnectionFormState()
+                SettingsConnection(remember { FocusRequester() }, editor, session, { restores++ }, form)
+            }
+        }
+        compose.waitForIdle()
+        assertEquals(1, editor.loads)
+        compose.runOnIdle {
+            form.updateHost("typed.invalid")
+            form.updatePort("9983")
+        }
+
+        restoration.emulateSavedInstanceStateRestore()
+        compose.waitForIdle()
+        assertEquals("The sign-in the saved state leaves out loads again", 2, editor.loads)
+        assertEquals("typed.invalid", form.host)
+        assertEquals("9983", form.port)
+        assertEquals("fixture", form.username)
+        assertEquals("test-only password", form.password)
     }
 
     /** Down from the address row to "Test and save" (past "Clear saved password") and starts the test. */

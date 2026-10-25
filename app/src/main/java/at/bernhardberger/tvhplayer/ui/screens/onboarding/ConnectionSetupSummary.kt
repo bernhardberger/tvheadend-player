@@ -14,6 +14,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepDivider
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
 
@@ -66,6 +67,8 @@ internal fun SummaryStep(state: ConnectionSetupState) {
             subtitle = form.username.ifBlank { stringResource(R.string.onboarding_change_sign_in_anonymous) },
             icon = R.drawable.ic_person,
         )
+        // Finding a server replaces the settings above; it is not a fourth one.
+        GuidedStepDivider()
         SummaryRow(
             state, requesters, SummaryFocus.FIND,
             title = stringResource(R.string.onboarding_edit_find_server),
@@ -81,10 +84,10 @@ internal fun SummaryStep(state: ConnectionSetupState) {
                 opensStep = false,
             )
         }
-        BusyButton(
-            busy = connecting || state.saving,
+        MainActionButton(
             label = R.string.onboarding_test_and_save,
             onClick = { state.openFromSummary(SummaryFocus.TEST) },
+            busy = state.testing,
             modifier = Modifier
                 .padding(top = 8.dp)
                 .focusRequester(requesters.getValue(SummaryFocus.TEST))

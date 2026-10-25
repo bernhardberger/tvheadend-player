@@ -103,6 +103,14 @@ internal class ConnectionFormState(
         }
     }
 
+    /** Only the saved sign-in, which [ConnectionFormStateSaver] leaves out; a restored address stays. */
+    suspend fun loadSignInFrom(settingsStore: ConnectionProfileEditor) {
+        settingsStore.loadServerForEditing { _, _, username, password ->
+            this.username = username
+            this.password = password
+        }
+    }
+
     suspend fun submit(
         settingsStore: ConnectionProfileEditor,
         acquireCredentialLease: () -> CredentialEditLease,

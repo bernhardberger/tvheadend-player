@@ -120,6 +120,8 @@ internal enum class SetupFailure(
         AppErrorCondition.UNREACHABLE,
         listOf(SetupAction.TRY_AGAIN, SetupAction.CHANGE_ADDRESS, SetupAction.CONTINUE_ANYWAY),
     ),
+    /** This TV has no network: nothing about the server can be fixed or saved from here. */
+    NETWORK(AppErrorCondition.NO_NETWORK, listOf(SetupAction.TRY_AGAIN)),
     TIMEOUT(AppErrorCondition.TIMEOUT, listOf(SetupAction.TRY_AGAIN, SetupAction.CHANGE_ADDRESS)),
     NOT_TVHEADEND(
         AppErrorCondition.NOT_TVHEADEND,
@@ -152,8 +154,8 @@ internal fun SetupFailure.actionsFor(mode: SetupMode): List<SetupAction> =
 
 internal fun SessionFailure.toSetupFailure(): SetupFailure = when (kind) {
     SessionFailureKind.SERVER_UNREACHABLE,
-    SessionFailureKind.NETWORK_UNAVAILABLE,
     SessionFailureKind.TRANSPORT_UNAVAILABLE -> SetupFailure.UNREACHABLE
+    SessionFailureKind.NETWORK_UNAVAILABLE -> SetupFailure.NETWORK
     SessionFailureKind.AUTHENTICATION_REJECTED -> SetupFailure.SIGN_IN_REJECTED
     SessionFailureKind.INCOMPATIBLE_SERVER -> SetupFailure.NOT_TVHEADEND
     SessionFailureKind.SERVER_UPGRADE_REQUIRED -> SetupFailure.VERSION

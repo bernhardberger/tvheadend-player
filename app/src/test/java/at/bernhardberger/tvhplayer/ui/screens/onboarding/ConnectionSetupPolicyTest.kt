@@ -34,7 +34,7 @@ class ConnectionSetupPolicyTest {
     fun eachSessionFailureGetsItsOwnOutcome() {
         val outcomes = mapOf(
             SessionFailure.SERVER_UNREACHABLE to SetupFailure.UNREACHABLE,
-            SessionFailure.NETWORK_UNAVAILABLE to SetupFailure.UNREACHABLE,
+            SessionFailure.NETWORK_UNAVAILABLE to SetupFailure.NETWORK,
             SessionFailure.TRANSPORT_UNAVAILABLE to SetupFailure.UNREACHABLE,
             SessionFailure.AUTHENTICATION_REJECTED to SetupFailure.SIGN_IN_REJECTED,
             SessionFailure.INCOMPATIBLE_SERVER to SetupFailure.NOT_TVHEADEND,
@@ -55,6 +55,7 @@ class ConnectionSetupPolicyTest {
         assertEquals(SetupAction.CHANGE_SIGN_IN, first[SetupFailure.SIGN_IN_REJECTED])
         assertEquals(SetupAction.CHANGE_SIGN_IN, first[SetupFailure.NO_PERMISSION])
         assertEquals(SetupAction.TRY_AGAIN, first[SetupFailure.VERSION])
+        assertEquals("No network has nothing to change", listOf(SetupAction.TRY_AGAIN), SetupFailure.NETWORK.actions)
         assertEquals(
             listOf(SetupFailure.UNREACHABLE),
             SetupFailure.entries.filter { SetupAction.CONTINUE_ANYWAY in it.actions },

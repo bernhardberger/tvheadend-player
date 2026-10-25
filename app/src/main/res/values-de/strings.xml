@@ -135,7 +135,8 @@
     <string name="onboarding_find_server_detail">Dieses Netzwerk durchsuchen</string>
     <string name="onboarding_find_title">Finde deinen Server</string>
     <string name="onboarding_find_searching_body">Suche nach Tvheadend-Servern in diesem Netzwerk. Viele Server machen sich nicht bekannt, du kannst die Adresse also jederzeit selbst eingeben.</string>
-    <string name="onboarding_find_searching">Suche läuft</string>
+    <string name="onboarding_find_searching">Suche läuft…</string>
+    <string name="onboarding_find_still_searching">Suche läuft noch…</string>
     <string name="onboarding_find_results_body">Wähle deinen Server. Fehlt er in der Liste, gib seine Adresse ein.</string>
     <string name="onboarding_find_on_network">In diesem Netzwerk</string>
     <string name="onboarding_found_server_detail">%1$s · Port %2$d</string>
@@ -163,9 +164,9 @@
     <string name="onboarding_failure_meta">%1$s · Port %2$s · Benutzer %3$s</string>
     <string name="onboarding_failure_meta_anonymous">%1$s · Port %2$s</string>
     <string name="onboarding_change_address">Adresse ändern</string>
-    <string name="onboarding_change_address_detail">%1$s, Port %2$s</string>
+    <string name="onboarding_change_address_detail">%1$s · Port %2$s</string>
     <string name="onboarding_change_sign_in">Anmeldung ändern</string>
-    <string name="onboarding_change_sign_in_detail">Angemeldet als %1$s</string>
+    <string name="onboarding_change_sign_in_detail">Benutzer: %1$s</string>
     <string name="onboarding_change_sign_in_anonymous">Ohne Anmeldung</string>
     <string name="onboarding_continue_anyway">Trotzdem fortfahren</string>
     <string name="onboarding_continue_anyway_detail">Speichern und offline starten. Die App verbindet sich, sobald der Server antwortet.</string>
@@ -663,6 +664,9 @@
     <string name="error_111_title">Kein Tvheadend-Server unter dieser Adresse</string>
     <string name="error_111_reason">Dort antwortet etwas, aber nicht der HTSP-Dienst von Tvheadend.</string>
     <string name="error_hint_check_address">Prüfe Adresse und Port.</string>
+    <string name="error_112_title">Dieser Fernseher ist mit keinem Netzwerk verbunden</string>
+    <string name="error_112_reason">Ohne Netzwerk erreicht er den Server nicht.</string>
+    <string name="error_hint_check_tv_network">Prüfe die Netzwerkeinstellungen des Fernsehers.</string>
     <string name="error_reconnect_next_attempt">Nächster Versuch in %1$d s</string>
     <string name="error_201_title">Kein freier Tuner</string>
     <string name="error_201_reason">Gerade ist jeder Tuner belegt.</string>

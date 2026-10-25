@@ -28,13 +28,15 @@ import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -63,6 +65,8 @@ internal class ConnectionSetupState(
     private val credentialLease: () -> CredentialEditLease = { CredentialEditLease {} },
     /** Runs once the connection is saved; the editor leaves with it. */
     private val onSaved: () -> Unit = {},
+    /** True when recreated from saved state, which keeps the address but not the sign-in. */
+    private val restored: Boolean = false,
 ) {
     private val editing get() = mode == SetupMode.EDIT
 
@@ -74,6 +78,14 @@ internal class ConnectionSetupState(
         private set
     var saving by mutableStateOf(false)
         private set
+
+    /** True while "Clear saved password" stores the connection without its sign-in. */
+    var clearingPassword by mutableStateOf(false)
+        private set
+
+    /** True while a test runs or a passed one is being saved: what "Test and save" shows as busy. */
+    val testing: Boolean get() = step == SetupStep.CONNECTING || saving
+
     var welcomeFocus by mutableStateOf(WelcomeFocus.FIND)
         private set
 
@@ -114,6 +126,7 @@ internal class ConnectionSetupState(
     private var addressErrorsShown by mutableStateOf(false)
     private var signInErrorShown by mutableStateOf(false)
     private var sessionWork: Job? = null
+    private val sessionLock = Mutex()
 
     val hostError: Boolean get() = addressErrorsShown && form.hostMissing
     val portError: Boolean get() = addressErrorsShown && form.portInvalid
@@ -123,9 +136,12 @@ internal class ConnectionSetupState(
         if (step == SetupStep.SIGN_IN) signInFocus = firstEmptySignInField() ?: SignInFocus.CONNECT
     }
 
-    /** Fills the form with the saved connection, as editing starts. */
+    /**
+     * Fills the form with the saved connection as editing starts. A recreated editor keeps the
+     * restored address and port, which may have been changed, and loads only the sign-in.
+     */
     suspend fun loadSaved() {
-        form.loadFrom(profiles)
+        if (restored) form.loadSignInFrom(profiles) else form.loadFrom(profiles)
         savedSignIn = form.username.isNotBlank()
     }
 
@@ -146,7 +162,7 @@ internal class ConnectionSetupState(
 
     /** A summary row: opens its step, clears the saved password, or tests and saves. */
     fun openFromSummary(row: SummaryFocus) {
-        if (step != SetupStep.SUMMARY || saving) return
+        if (step != SetupStep.SUMMARY || saving || clearingPassword) return
         summaryFocus = row
         when (row) {
             SummaryFocus.ADDRESS -> openAddress(AddressFocus.HOST)
@@ -354,7 +370,7 @@ internal class ConnectionSetupState(
 
     /** Stores the saved connection without its sign-in; the summary then shows it signs in without one. */
     private fun clearSavedPassword() {
-        saving = true
+        clearingPassword = true
         scope.launch {
             try {
                 if (form.clearSavedPassword(profiles) == ConnectionFormFeedback.SAVED) {
@@ -362,14 +378,14 @@ internal class ConnectionSetupState(
                     returnToSummary(SummaryFocus.SIGN_IN)
                 }
             } finally {
-                saving = false
+                clearingPassword = false
             }
         }
     }
 
     /** One step back, keeping what was entered. False on the first step, where the flow lets Back go. */
     fun back(): Boolean {
-        if (saving) return true
+        if (saving || clearingPassword) return true
         val previous = step.previous(serverChoice, mode) ?: return false
         when (step) {
             // An edit's cancelled test reconnects the saved connection as it ends.
@@ -420,13 +436,15 @@ internal class ConnectionSetupState(
         focusRequest += 1
     }
 
-    /** Session commands run one after another, so a cancelled test's disconnect never lands after the next connect. */
+    /**
+     * Cancels the session work before and queues [work] behind it. Each piece holds [sessionLock]
+     * through its cleanup, so a cancelled test's disconnect and reconnect of the saved connection
+     * finish before the next test connects, also when a test queued in between was cancelled
+     * while it waited.
+     */
     private fun replaceSessionWork(work: suspend () -> Unit) {
-        val previous = sessionWork
-        sessionWork = scope.launch {
-            previous?.cancelAndJoin()
-            work()
-        }
+        sessionWork?.cancel()
+        sessionWork = scope.launch { sessionLock.withLock { work() } }
     }
 
     companion object {
@@ -450,6 +468,7 @@ internal class ConnectionSetupState(
                     restoreSaved = restoreSaved,
                     credentialLease = credentialLease,
                     onSaved = onSaved,
+                    restored = true,
                 )
             },
         )
@@ -464,24 +483,43 @@ internal fun discoverServers(context: Context): Flow<TvheadendDiscoveryState> = 
 }
 
 /**
- * Connects [profile] and waits for its first outcome: null when the session is ready, else why
- * it failed. A failed or cancelled test disconnects, so the SDK does not keep retrying a profile
- * nobody saved; a passed one stays connected for the save to adopt.
+ * Connects [profile] and waits for this attempt's first outcome: null when the session is ready,
+ * else why it failed. A failed or cancelled test disconnects, so the SDK does not keep retrying a
+ * profile nobody saved; a passed one stays connected for the save to adopt.
+ *
+ * `connect` returns once the SDK admitted the attempt and runs it asynchronously. The disconnect
+ * before it leaves the session [SessionState.Disconnected]; should it still show an earlier Ready
+ * or Unavailable, that outcome is not this attempt's, and only one after the attempt showed it
+ * started ([SessionState.Connecting] or [SessionState.Synchronizing]) counts.
+ * [SessionCommandResult.NO_CHANGE] means someone else selected this configuration between the
+ * disconnect and the connect, whose outcome may already be past; the test starts over once.
  */
 internal suspend fun TvheadendSession.testConnection(profile: ServerProfile): SetupFailure? {
     var passed = false
     try {
-        disconnect()
-        if (connect(profile) == SessionCommandResult.SHUT_DOWN) return SetupFailure.OTHER
-        val outcome = observation
-            .map { it.sessionState }
-            .first { it is SessionState.Ready || it is SessionState.Unavailable }
-        passed = outcome is SessionState.Ready
-        return (outcome as? SessionState.Unavailable)?.reason?.toSetupFailure()
+        repeat(2) {
+            disconnect()
+            val stale = observation.value.sessionState.isOutcome
+            when (connect(profile)) {
+                SessionCommandResult.STARTED -> Unit
+                SessionCommandResult.NO_CHANGE -> return@repeat
+                else -> return SetupFailure.OTHER
+            }
+            val outcome = observation
+                .map { it.sessionState }
+                .dropWhile { stale && it.isOutcome }
+                .first { it.isOutcome }
+            passed = outcome is SessionState.Ready
+            return (outcome as? SessionState.Unavailable)?.reason?.toSetupFailure()
+        }
+        return SetupFailure.OTHER
     } finally {
         if (!passed) withContext(NonCancellable) { disconnect() }
     }
 }
+
+private val SessionState.isOutcome: Boolean
+    get() = this is SessionState.Ready || this is SessionState.Unavailable
 
 @Composable
 internal fun rememberConnectionSetupState(

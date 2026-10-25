@@ -46,6 +46,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing80
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 
 /** The first field or button of a field step lines up with the step line's text. */
 val GuidedStepFieldTop = 6.dp
@@ -113,12 +114,22 @@ fun GuidedStepGuidance(
     if (meta != null) {
         Text(
             text = meta,
-            style = MaterialTheme.typography.bodySmall,
-            fontWeight = FontWeight.Medium,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextTertiaryAlpha),
             modifier = Modifier.padding(top = TvSpacing12),
         )
     }
+}
+
+/** A line between groups in the actions column, such as found servers and the address entry. */
+@Composable
+fun GuidedStepDivider() {
+    Box(
+        Modifier
+            .width(TvBrowseColumnWidth)
+            .height(1.dp)
+            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)),
+    )
 }
 
 /**
