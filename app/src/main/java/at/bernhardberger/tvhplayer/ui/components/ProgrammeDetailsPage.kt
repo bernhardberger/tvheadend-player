@@ -990,7 +990,7 @@ private fun DetailsInformation(
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
             event?.firstAired, LocalConfiguration.current.locales[0], event?.contentGenre ?: recording?.contentGenre)
-        val timelineVisible = detailsTimelineVisible(event, nowSec)
+        val timelineVisible = detailsFactsUseTimeline(event, nowSec)
         // The timeline already labels start/end; its remaining time is not the total runtime.
         val segments = facts.filter { it.kind != DetailsFactKind.LEFT &&
             (!timelineVisible || it.kind == DetailsFactKind.LENGTH) }.map { detailsFactValue(it, nowSec) } + metadata
@@ -1015,7 +1015,7 @@ private fun DetailsInformation(
             if (ratingText != null) ProgrammeAgeRatingBox(ratingText, "details-rating")
             }
         }
-        DetailsProgress(event, recording, facts, nowSec)
+        DetailsProgress(event, recording, recordingAdmission, nowSec)
         // The same warning as the recording's row and pane.
         if (recording != null && remember(recording) { recordingStoppedEarly(recording) != null }) {
             Spacer(Modifier.height(8.dp))
@@ -1025,17 +1025,14 @@ private fun DetailsInformation(
     }
 }
 
-@Composable
-internal fun detailsTimelineVisible(event: EpgEvent?, nowSec: Long): Boolean =
-    event != null && (event.isRunning(nowSec) ||
-        (LocalWatchingChannel.current == event.channelId && LocalWatchingIndicator.current.isPlayingItem))
+internal fun detailsFactsUseTimeline(event: EpgEvent?, nowSec: Long): Boolean = event?.isRunning(nowSec) == true
 
 @Composable
-private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, facts: List<DetailsFact>, nowSec: Long) {
+private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?, nowSec: Long) {
     val resources = LocalContext.current.resources
     val indicator = watchingIndicator(event, nowSec)
     val progress = programmeProgress(event, nowSec)
-    if (event != null && detailsTimelineVisible(event, nowSec)) {
+    if (event != null && (event.isRunning(nowSec) || progress != null)) {
         Spacer(Modifier.height(8.dp))
         val at = if (indicator.isPlayingItem) liveViewerEpochSec(event.channelId, nowSec) else nowSec
         val start = formatClock(event.start.epochSeconds)
@@ -1046,6 +1043,7 @@ private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, facts: List<
             if (minutesLeft != null) "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}" else spokenRange,
             Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(indicator.isPlayingItem))
     } else if (recording != null && (event == null || !event.isRunning(nowSec))) {
+        val facts = recordingDetailsFacts(recording, recordingAdmission, nowSec)
         val viewer = recordingViewerPosition(recording.id)?.takeIf { it.fraction != null }
         if (viewer == null && facts.none { it.kind == DetailsFactKind.LEFT }) return
         Spacer(Modifier.height(8.dp))

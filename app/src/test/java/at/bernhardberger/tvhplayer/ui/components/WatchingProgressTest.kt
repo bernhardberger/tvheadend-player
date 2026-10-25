@@ -104,6 +104,10 @@ class WatchingProgressTest {
         summary = "A winter expedition follows the changing light across the ridge.")
     private val previousEvent = EpgEvent.create(EventId(2), channel.id, start - 3600.seconds, start,
         title = "Before the Ridge")
+    private val futureEvent = EpgEvent.create(EventId(3), channel.id, start + 86400.seconds, start + 90000.seconds,
+        title = "Tomorrow on the Ridge")
+    private val previousRecording = DvrEntry.create(DvrEntryId(3), channelId = channel.id, title = previousEvent.title,
+        start = previousEvent.start, stop = previousEvent.stop, state = DvrEntryState.COMPLETED, playPosition = 60.seconds)
     private val recording = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = event.title,
         channelName = channel.name, start = start, stop = event.stop, state = DvrEntryState.COMPLETED,
         image = event.image, playPosition = 60.seconds)
@@ -220,7 +224,7 @@ class WatchingProgressTest {
         compose.onNodeWithText("19:00", useUnmergedTree = true).assertExists()
         compose.onNodeWithText("21:00", useUnmergedTree = true).assertExists()
     }
-    @Test fun detailsTimelineVisibilityDoesNotReadLiveSample() {
+    @Test fun detailsFactFilterDoesNotReadLiveSample() {
         var reads = 0
         var visible = false
         val sample = object : State<LiveViewerPosition?> {
@@ -231,10 +235,30 @@ class WatchingProgressTest {
                 LocalWatchingChannel provides channel.id,
                 LocalWatchingTarget provides AppPlaybackTarget.Live(channel.id),
                 LocalWatchingIndicator provides ChannelPlaybackIndicator.PAUSED) {
-                visible = detailsTimelineVisible(event, event.stop.epochSeconds + 1)
+                visible = detailsFactsUseTimeline(event, event.stop.epochSeconds + 1)
             }
         }
-        compose.runOnIdle { assertTrue(visible); assertEquals(0, reads) }
+        compose.runOnIdle { assertEquals(false, visible); assertEquals(0, reads) }
+    }
+    @Test fun futureProgrammeOnPausedChannelKeepsStartsFactWithoutTimeline() {
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("future")
+        compose.onNodeWithTag("details-metadata", useUnmergedTree = true).assertTextContains("Tomorrow", substring = true)
+        compose.onNodeWithTag("details-timeline").assertDoesNotExist()
+    }
+    @Test fun pastProgrammeOnPausedChannelKeepsRecordingProgress() {
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("past-recording")
+        assertFraction(60f / 3600f)
+        compose.onNodeWithTag("details-metadata", useUnmergedTree = true).assertTextContains("Today", substring = true)
+    }
+    @Test fun pastProgrammeAtViewerPositionKeepsLiveProgressAndDayFact() {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("past-recording")
+        assertFraction(.5f)
+        assertOrangeProgress()
+        compose.onNodeWithTag("details-metadata", useUnmergedTree = true).assertTextContains("Today", substring = true)
     }
     @Test fun unrelatedLiveProgrammeDoesNotReadSample() {
         var reads = 0
@@ -267,6 +291,14 @@ class WatchingProgressTest {
         livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
         show("zap-no-history")
         compose.onNodeWithText(event.title!!, useUnmergedTree = true).assertExists()
+    }
+    @Test fun zapShowsRewoundProgrammeDuringAnEpgGap() {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("zap-gap")
+        compose.onNodeWithText(previousEvent.title!!, useUnmergedTree = true).assertExists()
+        assertFraction(.5f)
+        assertOrangeProgress()
     }
     @Test fun guideAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("guide")
     @Test fun contextAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("menu")
@@ -516,6 +548,22 @@ class WatchingProgressTest {
         show("programme")
         save("details-unknown-position")
     }
+    @Test @Category(VisualCapture::class) fun futureProgrammePausedChannelCapture() {
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("future")
+        save("details-future-paused-channel")
+    }
+    @Test @Category(VisualCapture::class) fun pastProgrammeRecordingProgressCapture() {
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("past-recording")
+        save("details-past-recording-progress")
+    }
+    @Test @Category(VisualCapture::class) fun rewoundProgrammeEpgGapCapture() {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("zap-gap")
+        save("zap-epg-gap")
+    }
     @Test @Category(VisualCapture::class) fun pausedCompactCardCapture() = pausedChannelCapture("card")
     @Test @Category(VisualCapture::class) fun pausedChannelRowCapture() = pausedChannelCapture("channel-row")
     @Test @Category(VisualCapture::class) fun pausedChannelsHeadlineCapture() = pausedChannelCapture("channels-headline")
@@ -603,6 +651,11 @@ class WatchingProgressTest {
                     ProvideArtworkSession(observation.currentSession) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             when (surface) {
+                                "future" -> ProgrammeDetailsPage(futureEvent, null, channel, now,
+                                    listOf(BrowseContextAction.SHOW_GUIDE), {}, {})
+                                "past-recording" -> ProgrammeDetailsPage(previousEvent, previousRecording, channel, now,
+                                    listOf(BrowseContextAction.RESUME), {}, {}, recordingAdmission = SessionObservation.create(
+                                        recordingProgressCapability = RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(previousRecording))
                                 "mixed" -> ProgrammeDetailsPage(event, recording, channel, now,
                                     listOf(BrowseContextAction.WATCH, BrowseContextAction.PLAY), {}, {})
                                 "guide" -> GuideHeadline({ GuideHeadlineProgramme(channel, event) }, observation, null, false,
@@ -613,7 +666,8 @@ class WatchingProgressTest {
                                         BrowseContextAction.SHOW_GUIDE), {}, {})
                                 "menu" -> ProgrammeContextMenu(event, channel, null, true, false, now, false,
                                     observation.currentSession, observation, false, { _, _ -> }, {})
-                                "zap", "zap-no-history" -> NowPlayingStrip("101", channel.name.orEmpty(), picon, event, now,
+                                "zap", "zap-no-history", "zap-gap" -> NowPlayingStrip(channel.id, "101", channel.name.orEmpty(), picon,
+                                    event.takeUnless { surface == "zap-gap" }, now,
                                     Modifier.padding(48.dp), indicator.value,
                                     programmeAt = { at -> previousEvent.takeIf {
                                         surface != "zap-no-history" && at >= it.start.epochSeconds && at < it.stop.epochSeconds } })

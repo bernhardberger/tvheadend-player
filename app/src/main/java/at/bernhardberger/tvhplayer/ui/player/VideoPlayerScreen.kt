@@ -1551,7 +1551,7 @@ fun VideoPlayerScreen(
         PlayerPage(
             railExpanded = layerState.channelRailPresented,
             nowPlaying = {
-                NowPlayingStrip(currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
+                NowPlayingStrip(currentChannelId, currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
                     channelsVm.nowEvent(currentChannelId, nowSec), nowSec,
                     playbackIndicator = channelIndicator,
                     programmeAt = { at -> channelsVm.nowEvent(currentChannelId, at) })

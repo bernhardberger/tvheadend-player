@@ -35,10 +35,12 @@ import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
 import at.bernhardberger.tvhplayer.ui.components.liveViewerEpochSec
 import at.bernhardberger.tvhplayer.ui.common.isRunning
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 
 /** Passive identity of the playing channel, independent of the programme being browsed. */
 @Composable
 internal fun NowPlayingStrip(
+    channelId: ChannelId,
     channelNumber: String?,
     channelName: String,
     picon: ArtworkId?,
@@ -48,8 +50,8 @@ internal fun NowPlayingStrip(
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
     programmeAt: (Long) -> EpgEvent? = { null },
 ) {
-    val at = liveViewerEpochSec(programme?.channelId, nowSec)
-    val displayed = if (programme != null && at != null && at < programme.start.epochSeconds)
+    val at = liveViewerEpochSec(channelId, nowSec)
+    val displayed = if (at != null && at < (programme?.start?.epochSeconds ?: nowSec))
         programmeAt(at) ?: programme else programme
     val current = displayed?.takeIf { it.isRunning(nowSec) || (at != null && it.isRunning(at)) }
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
