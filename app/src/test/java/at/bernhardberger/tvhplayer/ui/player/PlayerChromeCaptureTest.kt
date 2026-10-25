@@ -68,7 +68,6 @@ import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFormatDiagnostics
 import at.bernhardberger.tvhplayer.playback.AppPlaybackSource
@@ -167,6 +166,9 @@ class PlayerChromeCaptureTest {
     }
 
     @Test fun english() = captures("en", 1f)
+    @Test fun detailsButtonsEnglish() = captures("en", 1f, detailsOnly = true)
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
+    fun detailsButtonsGermanLargeText() = captures("de", 1.3f, detailsOnly = true)
     @Test fun numberEntry() = numberEntryCaptures("en", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun numberEntryLargeText() = numberEntryCaptures("de", 1.3f)
@@ -275,8 +277,8 @@ class PlayerChromeCaptureTest {
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
         CONTROLS_STEP, RECORDING_CONTROLS_STEP, BANNER_NO_EPG_LIVE, CONTROLS_NO_EPG, BANNER_NO_EPG_NO_TIMESHIFT, CONTROLS_REVEAL_MID,
         BANNER_STEP_OVER_DISTANCE, CONTROLS_STEP_OVER_DISTANCE,
-        // Trial top identity: focused and its Recent row open.
-        IDENTITY_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
+        // Player (i) focus and the channel rail's Recent row.
+        INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -295,8 +297,9 @@ class PlayerChromeCaptureTest {
         programmeOnly: Boolean = false,
         trialOnly: Boolean = false,
         clockSuffix: String = "",
+        detailsOnly: Boolean = false,
     ) {
-        if (trialOnly) brightStill = FixtureArt.art("still-ridge-light")
+        if (trialOnly || detailsOnly) brightStill = FixtureArt.art("still-ridge-light")
         lateinit var view: View
         var scene by mutableStateOf(Scene.CONTROLS_LIVE)
         compose.mainClock.autoAdvance = false
@@ -313,7 +316,8 @@ class PlayerChromeCaptureTest {
         }
         // Recording and state scenes are captured in English at font scale 1.0 only.
         for (next in Scene.entries.filter {
-            if (trialOnly) it in setOf(Scene.CONTROLS_LIVE, Scene.IDENTITY_FOCUSED, Scene.BROWSER_NOW,
+            if (detailsOnly) it in setOf(Scene.INFO_FOCUSED, Scene.RECORDING_INFO_FOCUSED)
+            else if (trialOnly) it in setOf(Scene.CONTROLS_LIVE, Scene.INFO_FOCUSED, Scene.BROWSER_NOW,
                 Scene.RECENT_OPEN, Scene.BROWSER_EMPTY, Scene.RAIL_PROGRAMME_OPENED, Scene.RECORDING_CONTROLS)
             else if (programmeOnly) it in Scene.PROGRAMME_INFO..Scene.PROGRAMME_RECORDING_SCHEDULED
             else it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f
@@ -334,19 +338,19 @@ class PlayerChromeCaptureTest {
                 compose.waitForIdle()
                 compose.onNodeWithTag("player-pause").assertIsFocused()
             }
-            if (next == Scene.IDENTITY_FOCUSED) compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
+            if (next == Scene.INFO_FOCUSED || next == Scene.RECORDING_INFO_FOCUSED) compose.onNodeWithTag("player-info").assertIsFocused()
             if (next == Scene.RECENT_OPEN) compose.onNodeWithTag("player-channel-card-2").assertIsFocused()
             if (next == Scene.BROWSER_NOW) compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
             if (next == Scene.BROWSER_EMPTY) {
                 compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
                 compose.onNodeWithTag("player-channel-row-RECENT").assertDoesNotExist()
             }
-            if (next == Scene.IDENTITY_FOCUSED && fontScale == 1f) {
+            if (next == Scene.INFO_FOCUSED && fontScale == 1f) {
                 // The artwork card stands on the programme text's top and Next sits on its bottom edge.
                 // At xhdpi the text lines round up to whole pixels, so Next may end up to 3px lower.
                 fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val tile = bounds("player-info-artwork-tile")
-                // Native TV focus grows the artwork around its unchanged 196 × 110dp layout box.
+                // Passive artwork keeps its 196 × 110dp layout box; it has no focus overhang.
                 val focusOverhang = (tile.height - 220f) / 2f
                 assertEquals("the layout tile stands on the text's top", bounds("player-info-bar").top, tile.top + focusOverhang, 1f)
                 val next = bounds("player-info-last-row")
@@ -415,7 +419,7 @@ class PlayerChromeCaptureTest {
                 val canvas = Canvas(bitmap)
                 view.draw(canvas)
             }
-            val directory = File(if (trialOnly) "/tmp/opencode/rail-round2/captures" else "../artifacts/player-chrome").apply { mkdirs() }
+            val directory = File(if (detailsOnly) "../build/review/player-info" else if (trialOnly) "/tmp/opencode/rail-round2/captures" else "../artifacts/player-chrome").apply { mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT).replace('_', '-')}-$locale-font$fontScale$clockSuffix.png"
             File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
@@ -511,7 +515,7 @@ class PlayerChromeCaptureTest {
         when (scene) {
             Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
-            Scene.IDENTITY_FOCUSED -> Controls(timeshift, false, false, content, focus = PlayerIdentityCardTag)
+            Scene.INFO_FOCUSED -> Controls(timeshift, false, false, content, focus = "player-info")
             Scene.BROWSER_NOW, Scene.RECENT_OPEN, Scene.BROWSER_EMPTY -> {
                 val state = remember(scene) { PlayerChannelBrowserState().apply {
                     if (scene == Scene.RECENT_OPEN) row = PlayerChannelRow.RECENT
@@ -585,49 +589,11 @@ class PlayerChromeCaptureTest {
                 } else listOf(shown) + schedule.drop(1)
                 val channel = if (rail) channels[1] else channels[0]
                 val identity = "${channel.number} • ${channel.name}"
-                val details = remember(scene) {
-                    ProgramDetailsState().apply {
-                        if (scene == Scene.PROGRAMME_SCHEDULE) tab = 1
-                        // A held OK on a rail card opens the programme's details as a dialog.
-                        if (scene == Scene.RAIL_SCHEDULE) reset(startOnSchedule = true)
-                        if (scene == Scene.PROGRAMME_OPENED) { tab = 1; open(schedule[2]) }
-                        if (scene == Scene.PROGRAMME_MORE_INFO) readMore = true
-                        if (scene == Scene.PROGRAMME_RECORDING_SCHEDULED) open(schedule[1])
-                    }
+                PlayerDetailsSurface {
+                    at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(
+                        shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG }, null, channel, NOW,
+                        listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
                 }
-                val panel: @Composable () -> Unit = { LiveProgrammeInfoOverlay(
-                    event = shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG },
-                    channelIdentity = identity,
-                    channelName = channel.name.orEmpty(),
-                    recordingScheduled = false,
-                    canRecord = true,
-                    recordingState = LiveInfoRecordingState.Idle,
-                    confirmationVisible = false,
-                    restoreRecordFocus = false,
-                    onRecord = {},
-                    onRecordingActivate = {},
-                    onRecordingDismiss = {},
-                    onClose = {},
-                    details = { recordFocus, firstFocus ->
-                        ProgramDetails(details, shown, entries, NOW, identity,
-                            tile = { event, modifier -> ProvideArtworkSession(session) { ProgrammeHero(event.image, channel.id, channel.number.toString(), channel.icon, modifier,
-                                recordingBadge = scene == Scene.PROGRAMME_SCHEDULE && event.id == shown.id) } },
-                            recordingFor = { event ->
-                                val state = when {
-                                    (scene == Scene.PROGRAMME_INFO_NO_ART_RECORDING || scene == Scene.PROGRAMME_SCHEDULE) && event.id == shown.id -> at.bernhardberger.tvheadend.sdk.core.DvrEntryState.RECORDING
-                                    event.id == entries[3].id || scene == Scene.PROGRAMME_RECORDING_SCHEDULED && event.id == entries[1].id -> at.bernhardberger.tvheadend.sdk.core.DvrEntryState.SCHEDULED
-                                    else -> null
-                                }
-                                state?.let { at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), eventId = event.id, state = it) }
-                            }, canModifyRecordings = true,
-                            recordFocus = recordFocus, firstFocus = firstFocus, onAction = {},
-                            showWatch = rail, busy = scene == Scene.PROGRAMME_RECORDING_BUSY)
-                    },
-                ) }
-                if (rail) PlayerPage(details = Unit, railExpanded = true, dialog = scene == Scene.RAIL_PROGRAMME_OPENED,
-                    nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW,
-                        playbackIndicator = ChannelPlaybackIndicator.PLAYING) } },
-                    player = {}, programme = { panel() }) else panel()
                 if (scene == Scene.PROGRAMME_CONFIRM_STOP) ConfirmProgrammeActionDialog(
                     action = ProgrammeAction.STOP_RECORDING, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
                 )
@@ -646,12 +612,12 @@ class PlayerChromeCaptureTest {
             Scene.RECORDING_HIDDEN_PAUSED -> PlayerHiddenStatusChip(PlayerStateCell.PAUSED,
                 recordingBarEnd(positionMs = 1_045_000, durationMs = 4_350_000, growing = false),
                 Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()))
-            Scene.RECORDING_BANNER, Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS, Scene.RECORDING_GROWING, Scene.RECORDING_CONTROLS_STEP -> {
+            Scene.RECORDING_BANNER, Scene.RECORDING_STEP, Scene.RECORDING_CONTROLS, Scene.RECORDING_GROWING, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_INFO_FOCUSED -> {
                 val growing = scene == Scene.RECORDING_GROWING
                 ProvideArtworkSession(session) { RecordingChromeFixture(
                     mode = when (scene) {
                         Scene.RECORDING_STEP -> PlayerChromeMode.BANNER_STEP
-                        Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP -> PlayerChromeMode.CONTROLS
+                        Scene.RECORDING_CONTROLS, Scene.RECORDING_CONTROLS_STEP, Scene.RECORDING_INFO_FOCUSED -> PlayerChromeMode.CONTROLS
                         else -> PlayerChromeMode.BANNER
                     },
                     // 0:17:25 of 1:12:30; a quick step back 30 s previews 0:16:55.
@@ -660,7 +626,7 @@ class PlayerChromeCaptureTest {
                     targetMs = 1_015_000L.takeIf { scene == Scene.RECORDING_STEP || scene == Scene.RECORDING_CONTROLS_STEP },
                     originMs = 1_045_000L.takeIf { scene == Scene.RECORDING_STEP || scene == Scene.RECORDING_CONTROLS_STEP },
                     // Stepping in the full controls: the focused timeline.
-                    restoreFocus = "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP },
+                    restoreFocus = if (scene == Scene.RECORDING_INFO_FOCUSED) "player-info" else "player-seekbar".takeIf { scene == Scene.RECORDING_CONTROLS_STEP },
                     growing = growing,
                     info = fixtureRecordingInfo(programme.title.orEmpty(), growing, subtitle = programme.subtitle,
                          positionMs = 1_045_000, durationMs = 4_350_000, nowSec = NOW)

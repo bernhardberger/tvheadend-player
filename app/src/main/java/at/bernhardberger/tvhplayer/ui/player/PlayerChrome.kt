@@ -32,15 +32,9 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import androidx.tv.material3.Card
-import androidx.tv.material3.CardDefaults
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.stateDescription
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
-import at.bernhardberger.tvhplayer.ui.components.embeddedProgressCardBorder
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -142,27 +136,8 @@ internal fun PlayerChrome(
                     contentAlpha = contentAlpha,
                     lastLineEndReserve = lastLineEndReserve,
                 ) { faded ->
-                    if (shown == PlayerChromeMode.CONTROLS) {
-                        val infoHint = stringResource(R.string.player_identity_info_hint)
-                        val unavailable = stringResource(R.string.player_info_unavailable_title)
-                        val spoken = listOfNotNull(content.info.title, content.info.subtitle,
-                            content.info.spokenTimeRange, content.info.metadata).filter { it.isNotBlank() }.joinToString(". ")
-                            .ifBlank { listOf(channelTitleText(content.info.channelNumber.toLongOrNull(), content.info.channelName), unavailable)
-                                .filter { it.isNotBlank() }.joinToString(". ") }
-                        // Focused like the rail's cards: the native outline and scale, nothing over the artwork.
-                        Card(onClick = { onInteraction(); onInfo() },
-                             modifier = faded.then(programmeFocus).size(ArtworkTileWidth, ArtworkTileHeight)
-                                 .testTag(PlayerIdentityCardTag).semantics {
-                                     contentDescription = spoken
-                                     stateDescription = infoHint
-                                 },
-                             shape = CardDefaults.shape(ArtworkTileShape),
-                             border = embeddedProgressCardBorder()) {
-                            ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                                Modifier)
-                        }
-                    } else ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                        faded)
+                    ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
+                         faded)
                 }
                 timelineRow()
             }
@@ -181,6 +156,7 @@ internal fun PlayerChrome(
                 onTogglePause = onTogglePause,
                 onSeek = onSeek,
                 onStop = onStop,
+                onInfo = onInfo,
                 onOptions = onOptions,
                 onInteraction = onInteraction,
                 onCommitSeek = onCommitSeek,

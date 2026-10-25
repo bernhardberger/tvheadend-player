@@ -47,12 +47,10 @@ class PlayerIdentityCardTest {
     @get:Rule val compose = createComposeRule()
     private var infos = 0
 
-    @Test fun missingEpgStillNamesTheChannelAndInfoAction() {
+    @Test fun missingEpgStillOffersLabelledDetails() {
         recording(info = PlayerInfoBarData("101", "Ridge Earth", "", ""))
-        key(Key.DirectionUp); key(Key.DirectionUp)
-        assertTrue(description().orEmpty().joinToString().contains("Ridge Earth"))
-        val semantics = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true).fetchSemanticsNode().config
-        assertEquals("OK shows the program info.", semantics[SemanticsProperties.StateDescription])
+        key(Key.DirectionRight); key(Key.DirectionRight)
+        assertEquals(listOf("Program details"), description())
         key(Key.DirectionCenter)
         assertEquals(1, infos)
     }
@@ -82,16 +80,16 @@ class PlayerIdentityCardTest {
         }
         compose.mainClock.autoAdvance = false
         settle()
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-stop"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-info"), focused())
         assertFalse("focused Info is not overpainted by recording seek status", exists("recording-seek-preview"))
         compose.onNodeWithText("Persistent seek feedback", useUnmergedTree = true).assertDoesNotExist()
         fun pixels(): IntArray {
             val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
             compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
-            val rect = bounds(PlayerIdentityCardTag)
+            val rect = bounds("player-info")
             val width = rect.width.toInt(); val height = rect.height.toInt()
             return IntArray(width * height).also {
                 bitmap.getPixels(it, 0, width, rect.left.toInt(), rect.top.toInt(), width, height)
@@ -106,24 +104,26 @@ class PlayerIdentityCardTest {
         assertEquals("OK reaches programme details", 1, infos)
     }
 
-    @Test fun upFromTheSeekbarFocusesTheIdentityWhichOpensInfoAndDownReturnsToTheActions() {
+    @Test fun theDetailsButtonIsBetweenStopAndSettingsAndOpensOnce() {
         recording()
         assertEquals(listOf("player-pause"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("player-seekbar"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        assertTrue("the target names the programme", !description().isNullOrEmpty())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-stop"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-info"), focused())
+        assertEquals(listOf("Program details"), description())
         assertFalse("no channel to change: no arrows", exists("player-top-identity-previous"))
-        listOf(Key.DirectionUp, Key.DirectionLeft, Key.DirectionRight).forEach {
-            key(it)
-            assertEquals("$it leads nowhere from the programme", listOf(PlayerIdentityCardTag), focused())
-        }
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-settings"), focused())
+        key(Key.DirectionLeft)
+        assertEquals(listOf("player-info"), focused())
         assertEquals(0, infos)
         key(Key.DirectionCenter)
         assertEquals("OK opens Info once", 1, infos)
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionDown)
-        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to details", listOf("player-info"), focused())
     }
 
     @Test fun theBannersIdentityIsAPictureWithoutFocus() {
@@ -240,62 +240,60 @@ class PlayerIdentityCardTest {
         assertEquals("the artwork and the text share the bar's top", bounds("player-info-bar").top, bounds("player-info-artwork-tile").top, 1f)
     }
 
-    @Test fun withoutASeekableTimelineUpFromTheActionRowFocusesTheIdentityAndDownReturnsToThatAction() {
+    @Test fun withoutASeekableTimelineUpStaysInTheActionRow() {
         recording(canSeek = false)
         assertEquals(listOf("player-pause"), focused())
         key(Key.DirectionRight)
         assertEquals(listOf("player-stop"), focused())
         key(Key.DirectionUp)
-        assertEquals("Up from any action reaches the programme", listOf(PlayerIdentityCardTag), focused())
-        key(Key.DirectionDown)
-        assertEquals("Down leads back to that action", listOf("player-stop"), focused())
+        assertEquals("Up stays on the action", listOf("player-stop"), focused())
         assertEquals(0, infos)
     }
 
-    @Test fun theKeyThatMovesFocusToOrFromTheIdentityDoesNotActOnItsNewTarget() {
+    @Test fun theKeyThatMovesFocusToOrFromTheTimelineDoesNotActOnItsNewTarget() {
         recording()
         key(Key.DirectionUp)
-        // Held Up reaches the identity once; its repeats and release change nothing there.
+        // Held Up stays on the timeline; passive artwork is not a focus target.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionUp) { advanceEventTime(1_200) } }
         settle()
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        // Held Down returns to the seekbar and goes no further.
+        assertEquals(listOf("player-seekbar"), focused())
+        // Held Down returns to Pause and goes no further.
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionDown) { advanceEventTime(1_200) } }
         settle()
-        assertEquals(listOf("player-seekbar"), focused())
+        assertEquals(listOf("player-pause"), focused())
         assertEquals(0, infos)
     }
 
-    @Test fun closingInfoReturnsFocusToTheIdentityHoweverInfoWasOpened() {
-        // Info opened by the remote's INFO key: focus was on Pause, not on the identity.
+    @Test fun closingInfoReturnsFocusToDetailsHoweverInfoWasOpened() {
+        // Info opened by the remote's INFO key: focus was on Pause, not on the (i) button.
         recording()
         assertEquals(listOf("player-pause"), focused())
         compose.runOnIdle { panelOpen = true }
         settle()
         assertEquals("the covered controls hold no focus", emptyList<String>(), focused())
-        compose.runOnIdle { panelOpen = false; restoreFocus = PlayerIdentityCardTag }
+        compose.runOnIdle { panelOpen = false; restoreFocus = "player-info" }
         settle()
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals(listOf("player-info"), focused())
         assertEquals("the restore is acknowledged once", 1, restores)
-        // And opened from the identity itself.
+        // And opened from the (i) button itself.
         key(Key.DirectionCenter)
         assertEquals(1, infos)
         compose.runOnIdle { panelOpen = true }
         settle()
-        compose.runOnIdle { panelOpen = false; restoreFocus = PlayerIdentityCardTag }
+        compose.runOnIdle { panelOpen = false; restoreFocus = "player-info" }
         settle()
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals(listOf("player-info"), focused())
         assertEquals(2, restores)
     }
 
-    @Test fun theIdentityReportsItsFocusAsAControlSoAPanelCanReturnToIt() {
+    @Test fun detailsReportsItsFocusAsAControlSoAPanelCanReturnToIt() {
         recording()
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
-        assertEquals(PlayerIdentityCardTag, reported.last())
+        key(Key.DirectionRight)
+        key(Key.DirectionRight)
+        assertEquals("player-info", reported.last())
     }
 
-    @Test fun aboveARecordingsMarkersUpReachesTheIdentityAndDownReturnsToTheActions() {
+    @Test fun aboveARecordingsMarkersUpReturnsToTheTimeline() {
         val navigation = RecordingMarkerNavigation()
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -311,9 +309,7 @@ class PlayerIdentityCardTest {
         assertTrue("Up from the seekbar opens the markers", navigation.open)
         key(Key.DirectionUp)
         assertFalse("Up above the markers closes them", navigation.open)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        key(Key.DirectionDown)
-        assertEquals("Down returns to the seekbar, not into the markers", listOf("player-seekbar"), focused())
+        assertEquals(listOf("player-seekbar"), focused())
         assertFalse(navigation.open)
         key(Key.DirectionUp)
         key(Key.DirectionDown)
@@ -353,7 +349,7 @@ class PlayerIdentityCardTest {
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
-    private fun description(): List<String>? = compose.onNodeWithTag(PlayerIdentityCardTag, useUnmergedTree = true)
+    private fun description(): List<String>? = compose.onNodeWithTag("player-info")
         .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
 
     private fun stateDescription(): String? = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)

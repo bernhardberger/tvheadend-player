@@ -56,6 +56,8 @@ internal fun PlayerActionRow(
     onActionFocused: (String) -> Unit = {},
     /** Dims the pause control, which stays focusable and clickable, and announces why it cannot pause. */
     pauseUnavailableReason: String? = null,
+    onInfo: () -> Unit = {},
+    infoFocus: FocusRequester? = null,
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
@@ -64,9 +66,10 @@ internal fun PlayerActionRow(
         PlayerAction("player-pause", playPause,
             if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
         PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
+        PlayerAction("player-info", stringResource(R.string.details_program), R.drawable.ic_info, onInfo, infoFocus),
         PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
-    // Play/Pause and Stop stand at the start; Settings at the end.
+    // Playback actions stand at the start; details and Settings at the end.
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -76,7 +79,7 @@ internal fun PlayerActionRow(
     ) {
         actions.forEach { (tag, label, icon, action, focus) ->
             key(tag) {
-                if (tag == "player-settings") Spacer(Modifier.weight(1f))
+                if (tag == "player-info") Spacer(Modifier.weight(1f))
                 if (action != null) {
                     val actionModifier = Modifier
                         .testTag(tag)

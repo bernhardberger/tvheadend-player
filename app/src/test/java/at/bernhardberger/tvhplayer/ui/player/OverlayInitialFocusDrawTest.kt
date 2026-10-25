@@ -56,7 +56,6 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.R
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.programmeRecordingTarget
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
@@ -190,26 +189,6 @@ class OverlayInitialFocusDrawTest {
         hasTestTag("playback-options-subtitles-off"),
         subtitleTracks = listOf(PlaybackOptionTrack("s1", "English")),
     )
-
-    /** Mirrors the recording player's info effect, which focuses the reading pane as it opens. */
-    @Test fun recordingInfoReadingPane() = assertInitialFocusDrawn(hasTestTag("player-info-reading")) {
-        val readingFocus = remember { FocusRequester() }
-        LaunchedEffect(Unit) { runCatching { readingFocus.requestFocus() } }
-        PlaybackOptionsOverlayFrame(
-            paneTitle = "Info",
-            panelTag = "recording-info-panel",
-            panelWidth = PlaybackInfoPanelWidth,
-        ) {
-            PlayerInfoReadingContent(
-                title = "Title",
-                subtitle = "Channel",
-                body = "Synopsis",
-                readingFocus = readingFocus,
-                modifier = Modifier.padding(PlaybackInfoPanelPadding),
-                footer = {},
-            )
-        }
-    }
 
     /** A failed channel settings load shows Retry, which takes the screen's initial focus. */
     @Test fun channelSettingsRetry() = assertInitialFocusDrawn(hasText(string(R.string.retry))) {

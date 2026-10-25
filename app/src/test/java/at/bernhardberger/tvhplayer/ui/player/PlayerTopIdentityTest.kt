@@ -72,74 +72,65 @@ class PlayerTopIdentityTest {
         assertEquals(emptyList<String>(), focused())
     }
 
-    @Test fun upFromTheSeekbarReachesTheProgrammeAndTheHeaderStaysPassive() {
+    @Test fun upFromTheSeekbarStaysThereAndTheHeaderStaysPassive() {
         chrome(PlayerChromeMode.CONTROLS)
         assertEquals(listOf("player-pause"), focused())
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals(listOf("player-seekbar"), focused())
         val node = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config
         assertEquals(listOf("Channel 1 One"), node.getOrNull(SemanticsProperties.ContentDescription))
         assertEquals(null, node.getOrNull(SemanticsProperties.Focused))
         assertFalse("no channel-zap arrows", exists("player-top-identity-previous") || exists("player-top-identity-next"))
         key(Key.DirectionUp)
-        assertEquals("Up has nowhere to go", listOf(PlayerIdentityCardTag), focused())
-        key(Key.DirectionRight)
-        key(Key.DirectionLeft)
-        assertEquals("Left and Right never change channel", emptyList<Int>(), zaps)
-        assertEquals("and keep the focus", listOf(PlayerIdentityCardTag), focused())
-        key(Key.DirectionCenter)
-        assertFalse("without recent channels OK opens nothing", exists("player-identity-recent-row"))
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals("Up has nowhere to go", listOf("player-seekbar"), focused())
         key(Key.DirectionDown)
-        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the actions", listOf("player-pause"), focused())
         assertEquals(0, toggles)
         assertEquals(0, downs)
     }
 
-    @Test fun heldLeftOrRightOnProgrammeNeverZapsOrMovesFocus() {
-        chrome(PlayerChromeMode.CONTROLS, restore = PlayerIdentityCardTag)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+    @Test fun rightFromDetailsReachesSettingsWithoutZapping() {
+        chrome(PlayerChromeMode.CONTROLS, restore = "player-info")
+        assertEquals(listOf("player-info"), focused())
         compose.onRoot().performKeyInput { withKeyDown(Key.DirectionRight) { advanceEventTime(1_200) } }
         settle()
         assertTrue("the press and its repeats never zap: $zaps", zaps.isEmpty())
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals(listOf("player-settings"), focused())
         assertEquals("nothing opens", 0, downs)
     }
 
-    @Test fun withoutAFocusableTimelineUpFromAnyActionReachesTheIdentityAndDownReturnsToThatAction() {
+    @Test fun withoutAFocusableTimelineUpStaysInTheActionRow() {
         chrome(PlayerChromeMode.CONTROLS, timeshift = AppTimeshiftState(), livePause = LivePauseAvailability.UNAVAILABLE)
         assertEquals(listOf("player-pause"), focused())
         assertFalse("the passive timeline takes no focus", exists("player-seekbar"))
         key(Key.DirectionRight)
         assertEquals(listOf("player-stop"), focused())
         key(Key.DirectionUp)
-        assertEquals("Up from an action reaches the programme", listOf(PlayerIdentityCardTag), focused())
-        // Held Down returns once and goes no further, to the channel rows.
-        compose.onRoot().performKeyInput { withKeyDown(Key.DirectionDown) { advanceEventTime(1_200) } }
-        settle()
-        assertEquals("Down returns to the action it came from", listOf("player-stop"), focused())
+        assertEquals("Up stays on the action", listOf("player-stop"), focused())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-info"), focused())
         assertEquals(0, downs)
         assertEquals(0, toggles)
     }
 
-    @Test fun theIdentityReportsItsFocusAndTheRestoreTokenReturnsToIt() {
-        chrome(PlayerChromeMode.CONTROLS, restore = PlayerIdentityCardTag)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        assertEquals(PlayerIdentityCardTag, reported.last())
+    @Test fun detailsReportsItsFocusAndTheRestoreTokenReturnsToIt() {
+        chrome(PlayerChromeMode.CONTROLS, restore = "player-info")
+        assertEquals(listOf("player-info"), focused())
+        assertEquals("player-info", reported.last())
         assertEquals("the restore is acknowledged once", 1, restores)
     }
 
     @Test fun oldRecentInputsCannotMakeTheHeaderInteractive() {
-        chrome(PlayerChromeMode.CONTROLS, restore = PlayerIdentityCardTag, recents = recentChannels)
+        chrome(PlayerChromeMode.CONTROLS, restore = "player-info", recents = recentChannels)
         val node = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config
         assertEquals(null, node.getOrNull(SemanticsProperties.Focused))
         key(Key.DirectionCenter)
         assertFalse(recentOpen)
         assertFalse(exists("player-identity-recent-row"))
         assertEquals(emptyList<Int>(), picks)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
+        assertEquals(listOf("player-info"), focused())
         assertEquals(emptyList<Int>(), zaps)
     }
 
@@ -147,7 +138,7 @@ class PlayerTopIdentityTest {
         chrome(PlayerChromeMode.CONTROLS)
         assertTrue("without artwork the tile shows the channel", exists("player-info-artwork-fallback"))
         assertFalse(exists("player-info-artwork"))
-        assertTrue("the artwork is the programme details target", exists("player-identity-card"))
+        assertFalse("the artwork no longer opens details", exists("player-identity-card"))
         assertFalse("the channel line moved to the top", exists("player-info-eyebrow"))
         assertEquals(0, compose.onAllNodes(hasTestTag("player-info-artwork-tile") and isFocusable(), useUnmergedTree = true)
             .fetchSemanticsNodes().size)
@@ -163,7 +154,7 @@ class PlayerTopIdentityTest {
         assertEquals("the timeline row runs from the start margin", 58f, row.left, 0.5f)
         assertEquals("to the end margin", 902f, row.right, 0.5f)
         assertTrue("below the artwork", row.top >= tile.bottom)
-        for (tag in listOf("player-pause", "player-stop", "player-settings")) {
+        for (tag in listOf("player-pause", "player-stop", "player-info", "player-settings")) {
             assertEquals("$tag: a medium icon button", 40f, bounds(tag).height, 0.5f)
             assertEquals("$tag: a medium icon button", 40f, bounds(tag).width, 0.5f)
         }
@@ -236,7 +227,7 @@ class PlayerTopIdentityTest {
         settle()
         assertFalse("the timeline takes no focus without timeshift", exists("player-seekbar"))
         assertEquals("Play/Pause stays in the row and keeps the focus", listOf("player-pause"), focused())
-        assertFalse("the action row has no Info", exists("player-info"))
+        assertTrue("details remains reachable", exists("player-info"))
     }
 
     private var timeshift by mutableStateOf(

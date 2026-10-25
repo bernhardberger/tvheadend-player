@@ -54,7 +54,6 @@ import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
 import at.bernhardberger.tvhplayer.playback.toAppPresentation
@@ -132,23 +131,16 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             onAspectRatioChange = {}, onStatsVisibleChange = {},
                         )
                     } else if (scenario.startsWith("info") || infoOpen) {
-                        LiveProgrammeInfoOverlay(
-                            details = { _, _ -> },
-                            event = if (scenario == "info-missing") null else programme(long = scenario.startsWith("info-long")), channelIdentity = "1 Documentary HD", channelName = "Documentary HD",
-                            recordingScheduled = false, canRecord = true, recordingState = LiveInfoRecordingState.Idle,
-                            confirmationVisible = false, restoreRecordFocus = false, onRecord = {},
-                            onRecordingActivate = {}, onRecordingDismiss = {}, onClose = { infoOpen = false; restoreInfo = true },
-                        )
-                    } else if (scenario == "recording-info") {
-                        val readingFocus = remember { FocusRequester() }
-                        LaunchedEffect(Unit) { readingFocus.requestFocus() }
-                        PlaybackOptionsOverlayFrame(paneTitle = "Info", panelTag = "recording-info-panel") {
-                            PlayerInfoReadingContent(title = programme(true).title.orEmpty(), subtitle = "Documentary HD / The high mountains",
-                                body = programme(true).description, readingFocus = readingFocus,
-                                modifier = Modifier.padding(horizontal = 32.dp, vertical = 16.dp)) {
-                                androidx.tv.material3.OutlinedButton(onClick = {}, modifier = Modifier.align(Alignment.End)) { androidx.tv.material3.Text("Close info") }
-                            }
+                        PlayerDetailsSurface {
+                            at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(
+                                if (scenario == "info-missing") null else programme(long = scenario.startsWith("info-long")),
+                                null, null, 0L, listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING),
+                                { infoOpen = false; restoreInfo = true }, { infoOpen = false; restoreInfo = true })
                         }
+                    } else if (scenario == "recording-info") {
+                        RecordingPlayerDetails(at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
+                            at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), title = programme(true).title,
+                            description = programme(true).description), null, 0L, {})
                     } else if (scenario.startsWith("seek")) {
                         val history = if (scenario == "seek-shallow") 60_000L else 5_400_000L
                         QuickStepBanner(

@@ -975,7 +975,7 @@ private fun DetailsInformation(
         Text(event?.title ?: recording?.title.orEmpty(),
             Modifier.fillMaxWidth()
                 .then(if (besideLogo) Modifier.padding(end = DetailsHeroLogoSize.first + DetailsTitleLogoGap) else Modifier)
-                .testTag("details-title"),
+                .testTag("details-title").semantics { heading() },
             style = MaterialTheme.typography.displaySmall, maxLines = if (besideLogo) 2 else 1,
             overflow = TextOverflow.Ellipsis)
         val subtitle = (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)

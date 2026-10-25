@@ -39,7 +39,6 @@ class SemanticColorUsageTest {
             "ui/components/ProgrammeDetailsLayout.kt",
             "ui/components/ProgrammeDetailsPage.kt",
             "ui/screens/ChannelsScreen.kt",
-            "ui/player/LiveProgrammeInfoOverlay.kt",
             "ui/player/PlayerChromeControls.kt",
         ).joinToString("\n") { source(it) }
 

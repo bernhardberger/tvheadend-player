@@ -135,7 +135,7 @@ class RecordingPlayerChromeScreenTest {
         assertFalse("recordings have no Record", exists("player-record"))
         assertFalse("recordings have no Go live", exists("player-go-live"))
         assertTrue(exists("player-stop") && exists("player-settings") && exists(PlayerTopIdentityTag))
-        assertFalse("the action row has no Info", exists("player-info"))
+        assertTrue("the action row exposes Info", exists("player-info"))
     }
 
     @Test fun backHidesTheBannerAndASecondBackCloses() {
@@ -288,7 +288,7 @@ class RecordingPlayerChromeScreenTest {
             description("recording-seek-preview"))
     }
 
-    @Test fun upFromTheSeekbarReachesOnlyTheIdentityAndTheBarRowHasNoStatusSlot() {
+    @Test fun upFromTheSeekbarStaysAtTheTopEdgeAndTheBarRowHasNoStatusSlot() {
         compose.setContent { TVHeadendPlayerTheme { RecordingChromeFixture() } }
         compose.mainClock.autoAdvance = false
         settle()
@@ -296,9 +296,9 @@ class RecordingPlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
+        assertEquals("the artwork is passive", listOf("player-seekbar"), focused())
         key(Key.DirectionDown)
-        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
         assertFalse(exists("player-go-live"))
         assertFalse(exists("player-status-slot"))
         assertFalse("the controls have no state cell", exists("player-state"))
@@ -334,11 +334,11 @@ class RecordingPlayerChromeScreenTest {
         assertFalse("a recording draws no remaining time", exists("player-distance"))
     }
 
-    @Test fun infoAndOptionsReturnFocusToTheIdentityAndTheSettingsAction() {
+    @Test fun infoAndOptionsReturnFocusToTheirAction() {
         screen()
         playing()
         key(Key.DirectionDown)
-        for (action in listOf(PlayerIdentityCardTag, "player-settings")) {
+        for (action in listOf("player-info", "player-settings")) {
             compose.onNodeWithTag(action).performSemanticsAction(SemanticsActions.RequestFocus)
             settle()
             key(Key.DirectionCenter)

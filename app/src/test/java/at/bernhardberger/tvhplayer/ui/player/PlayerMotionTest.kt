@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -134,16 +133,16 @@ class PlayerMotionTest {
         )
     }
 
-    @Test fun closingRecordingInfoHandsFocusAndKeysToTheIdentityWhileThePanelFades() {
+    @Test fun closingRecordingInfoHandsFocusAndKeysToTheInfoActionWhileThePanelFades() {
         var infoPresses = 0
         checkPanelCloseHandsFocusBack(
             panelTag = "recording-info-panel",
-            actionTag = PlayerIdentityCardTag,
+            actionTag = "player-info",
             activations = { infoPresses },
             controls = { open, restore, restored ->
                 RecordingChromeFixture(
                     positionMs = 600_000, panelOpen = open, onInfo = { infoPresses++ },
-                    restoreFocus = PlayerIdentityCardTag.takeIf { restore },
+                    restoreFocus = "player-info".takeIf { restore },
                     onFocusRestored = { if (restore) restored() },
                 )
             },
@@ -685,7 +684,7 @@ class PlayerMotionTest {
             actions = PlayerChromeActions(
                 active = !optionsOpen,
                 restoreFocus = when {
-                    restoreInfoFocus -> "player-identity-card"
+                    restoreInfoFocus -> "player-info"
                     restoreOptionsFocus -> "player-settings"
                     else -> null
                 },

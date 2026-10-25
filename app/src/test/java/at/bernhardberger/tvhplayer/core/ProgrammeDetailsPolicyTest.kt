@@ -35,6 +35,59 @@ class ProgrammeDetailsPolicyTest {
         assertFalse(programmeDetailsActions(event, 150, null, null, true, true, true, liveProgramme = false).contains(RECORD))
     }
 
+    @Test fun livePlayerReplacesWatchWithContinueAndKeepsGuardedRecordingAndGuide() {
+        assertEquals(listOf(CONTINUE_WATCHING, RECORD, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, null, null, true, true, false, fromPlayer = true))
+        assertEquals(listOf(CONTINUE_WATCHING, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, null, null, false, true, false, fromPlayer = true))
+        assertEquals(listOf(CONTINUE_WATCHING, CANCEL, SHOW_GUIDE),
+            programmeDetailsActions(event, 150, recording(DvrEntryState.SCHEDULED), null,
+                true, true, false, fromPlayer = true))
+    }
+
+    @Test fun endedPlayerProgrammeDropsRecordStopAndCancelButKeepsContinueWatching() {
+        for (entry in listOf(null, recording(DvrEntryState.SCHEDULED), recording(DvrEntryState.RECORDING),
+            recording(DvrEntryState.RECORDING_ERROR))) {
+            for (observed in listOf(true, false)) {
+                assertEquals(listOf(CONTINUE_WATCHING, SHOW_GUIDE),
+                    programmeDetailsActions(event, event.stop.epochSeconds, entry, null, true, true, false,
+                        liveProgramme = observed, fromPlayer = true))
+            }
+        }
+    }
+
+    @Test fun recordingPlayerNeverOffersPlaybackOrMutationActions() {
+        for (state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
+            DvrEntryState.COMPLETED, DvrEntryState.MISSED, DvrEntryState.COMPLETED_ERROR)) {
+            val entry = recording(state)
+            assertEquals("$state", listOf(CONTINUE_WATCHING),
+                recordingDetailsActions(entry, admission(entry), true, true, fromPlayer = true))
+        }
+    }
+
+    @Test fun browseDetailsAndContextMenusNeverOfferContinueWatching() {
+        for (canModify in listOf(false, true)) {
+            assertFalse(CONTINUE_WATCHING in channelContextActions(null, 150, null, null, canModify))
+            val entries = listOf<DvrEntry?>(null) + listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
+                DvrEntryState.RECORDING_ERROR, DvrEntryState.COMPLETED, DvrEntryState.COMPLETED_ERROR,
+                DvrEntryState.MISSED, DvrEntryState.INVALID, DvrEntryState.FILE_MISSING).map { recording(it) }
+            for (entry in entries) {
+                val playback = entry?.let { admission(it) }
+                for (now in listOf(50L, 150L, 250L)) {
+                    assertFalse(CONTINUE_WATCHING in channelContextActions(event, now, entry, playback, canModify))
+                    for (fromGuide in listOf(false, true)) for (stacked in listOf(false, true)) {
+                        assertFalse(CONTINUE_WATCHING in programmeDetailsActions(event, now, entry, playback,
+                            canModify, true, fromGuide, stacked = stacked))
+                    }
+                }
+                if (entry != null) {
+                    assertFalse(CONTINUE_WATCHING in recordingContextActions(entry, playback, canModify))
+                    assertFalse(CONTINUE_WATCHING in recordingDetailsActions(entry, playback, canModify, true))
+                }
+            }
+        }
+    }
+
     @Test fun recordingActionsFollowLifecycleAndPlaybackAuthority() {
         assertEquals(listOf(PLAY, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED)))
         assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))

@@ -49,6 +49,8 @@ internal fun ProgrammeDetailsHost(
     onClose: () -> Unit,
     returnFocusRequester: FocusRequester? = null,
     settingsStore: UiSettingsStore = koinInject(),
+    fromPlayer: Boolean = false,
+    retainPlayerSnapshot: Boolean = false,
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()
@@ -83,7 +85,9 @@ internal fun ProgrammeDetailsHost(
     // Opened before Ready it stays: Watch needs only the channel. A session it opened with is gone.
     val sessionLost = openingObservation.currentSession != null && capability == null
     val live = observation.event(selected.id)
-    val event = live ?: selected
+    var lastKnown by remember(selected.id) { mutableStateOf(selected) }
+    SideEffect { if (live != null) lastKnown = live }
+    val event = live ?: lastKnown
     val channel = event.channelId?.let(observation::channel)
     val recording = observation.dvrEntryForEvent(event)
     val canModify = capability != null && observation.dvrState is DvrRepositoryState.Current &&
@@ -91,10 +95,14 @@ internal fun ProgrammeDetailsHost(
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(observation::recordingPlaybackAdmission), canModify,
-        channel != null, fromGuide, liveProgramme = live != null, stacked = stack.isNotEmpty())
+        channel != null, fromGuide, liveProgramme = live != null, stacked = stack.isNotEmpty(),
+        fromPlayer = fromPlayer && stack.isEmpty())
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
+    var attached by remember { mutableStateOf(true) }
+    DisposableEffect(Unit) { onDispose { attached = false } }
+    val currentSelection by rememberUpdatedState(selected.id)
     val closeAnimated = { visibility.targetState = false }
     BackHandler(enabled = closing) { }
     LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
@@ -110,8 +118,9 @@ internal fun ProgrammeDetailsHost(
             false
         }
     }
-    LaunchedEffect(capability, live, currentMutation) {
-        if (sessionLost || (openingObservation.event(selected.id) != null && live == null)) {
+    LaunchedEffect(capability, live, channel, currentMutation) {
+        if (if (retainPlayerSnapshot) channel == null else
+            sessionLost || (openingObservation.event(selected.id) != null && live == null)) {
             close()
             return@LaunchedEffect
         }
@@ -132,6 +141,7 @@ internal fun ProgrammeDetailsHost(
     fun executeDirect(mutation: DvrMutationAction) {
         if (inFlight != null) return
         inFlight = mutation
+        val requestSelection = selected.id
         // Queue after this input dispatch so even an immediate result cannot admit a second click.
         mutationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
             try {
@@ -145,13 +155,22 @@ internal fun ProgrammeDetailsHost(
                 val configured = if (request is DvrMutationAction.CreateProgramme)
                     request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred)) else request
                 val context = notices.context()
-                notices.postDvrFailure(configured, mutations.execute(configured), context)
+                val result = mutations.execute(configured)
+                // Browse menus intentionally close when sending Record. Player details instead
+                // own the result only while the same programme page remains open.
+                if (!retainPlayerSnapshot || attached && visibility.targetState && currentSelection == requestSelection) {
+                    notices.postDvrFailure(configured, result, context)
+                }
             } finally {
                 inFlight = null
             }
         }
     }
     val act: (EpgEvent, BrowseContextAction) -> Unit = action@{ programme, action ->
+        if (action == BrowseContextAction.CONTINUE_WATCHING) {
+            closeAnimated()
+            return@action
+        }
         if (inFlight != null && action in listOf(BrowseContextAction.RECORD,
                 BrowseContextAction.STOP, BrowseContextAction.CANCEL)) return@action
         val current = currentObservation()
@@ -161,7 +180,7 @@ internal fun ProgrammeDetailsHost(
             val event = current.event(programme.id) ?: programme
             event.channelId?.let(current::channel)?.let {
                 if (action == BrowseContextAction.WATCH) {
-                    closeBehindPlayer(close)
+                    if (fromPlayer) close() else closeBehindPlayer(close)
                     onPlay(it.id, it.name.orEmpty())
                 } else {
                     close()
@@ -257,7 +276,7 @@ internal fun ProgrammeDetailsHost(
                 fadeOut(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard))).using(null)
         }, label = "programme-details-stack") { page ->
             val pageLive = observation.event(page.id)
-            val pageEvent = pageLive ?: page
+            val pageEvent = pageLive ?: if (page.id == selected.id) event else page
             val pageChannel = pageEvent.channelId?.let(observation::channel)
             val pageRecording = observation.dvrEntryForEvent(pageEvent)
             // Once per programme, EPG publication and details minute, not per grid tick.
@@ -269,7 +288,8 @@ internal fun ProgrammeDetailsHost(
             val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording,
                 pageRecording?.let(observation::recordingPlaybackAdmission), canModify,
                 pageChannel != null, fromGuide, liveProgramme = pageLive != null,
-                stacked = page.id != openingEvent.id || stack.isNotEmpty())
+                stacked = page.id != openingEvent.id || stack.isNotEmpty(),
+                fromPlayer = fromPlayer && page.id == openingEvent.id && stack.isEmpty())
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             // The page shows its pictures with the session it was opened with.

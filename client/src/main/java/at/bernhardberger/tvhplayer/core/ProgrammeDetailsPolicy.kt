@@ -32,16 +32,19 @@ fun programmeDetailsActions(
     fromGuide: Boolean,
     liveProgramme: Boolean = true,
     stacked: Boolean = false,
+    fromPlayer: Boolean = false,
 ): List<BrowseContextAction> = buildList {
-    if (canWatchChannel) add(BrowseContextAction.WATCH)
-    programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings,
+    if (fromPlayer) add(BrowseContextAction.CONTINUE_WATCHING)
+    else if (canWatchChannel) add(BrowseContextAction.WATCH)
+    programmeActions(event, nowSec, recording,
+        canModifyRecordings = canModifyRecordings && (!fromPlayer || nowSec < event.stop.epochSeconds),
         recordingAdmission = recordingAdmission).forEach {
         when (it) {
             ProgrammeAction.WATCH -> Unit
             ProgrammeAction.RECORD -> if (liveProgramme) add(BrowseContextAction.RECORD)
             ProgrammeAction.STOP_RECORDING -> add(BrowseContextAction.STOP)
             ProgrammeAction.CANCEL_RECORDING -> add(BrowseContextAction.CANCEL)
-            ProgrammeAction.WATCH_FROM_START -> if (recording != null) add(BrowseContextAction.PLAY)
+            ProgrammeAction.WATCH_FROM_START -> if (recording != null && !fromPlayer) add(BrowseContextAction.PLAY)
         }
     }
     if ((!fromGuide || stacked) && canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
@@ -52,7 +55,12 @@ fun recordingDetailsActions(
     admission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
     canWatchChannel: Boolean,
+    fromPlayer: Boolean = false,
 ): List<BrowseContextAction> = buildList {
+    if (fromPlayer) {
+        add(BrowseContextAction.CONTINUE_WATCHING)
+        return@buildList
+    }
     if (recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
     addAll(recordingContextActions(recording, admission, canModifyRecordings).filter {
         it != BrowseContextAction.DETAILS

@@ -1,4 +1,5 @@
 <resources>
+    <string name="player_continue_watching">Continue watching</string>
     <string name="episode_season_compact">S%1$d</string>
     <string name="episode_number_compact">E%1$d</string>
     <string name="episode_part">Part %1$d</string>
@@ -120,10 +121,7 @@
     <string name="player_channel_number_none">No channel</string>
     <string name="player_shelf_playing">Playing</string>
     <string name="player_shelf_recording">Recording now</string>
-    <string name="player_info_close">Close info</string>
-    <string name="player_info_pane_title">Program information</string>
     <string name="player_info_unavailable_title">Program information unavailable</string>
-    <string name="player_info_unavailable_message">No program information is available for %1$s right now.</string>
     <string name="show_epg_menu_enabled">Show Guide menu: On</string>
     <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
     <string name="host">Host</string>
@@ -413,7 +411,6 @@
     <string name="record">Record</string>
     <string name="cancel_recording">Cancel recording</string>
     <string name="stop_recording">Stop recording</string>
-    <string name="recording_request_busy_action">Scheduling…</string>
     <string name="cancel_recording_confirm_title">Cancel this recording?</string>
     <string name="cancel_recording_confirm_message">%1$s on %2$s, %3$s, won\'t be recorded.</string>
     <string name="stop_recording_confirm_title">Stop this recording?</string>
@@ -641,11 +638,6 @@
     <string name="player_channel_card_hint_no_recents">Left or right changes channel.</string>
     <string name="player_rail_watching">Watching</string>
     <!-- Trial: program details -->
-    <string name="details_tab_details">Details</string>
-    <string name="details_tab_schedule">Schedule</string>
-    <string name="details_action_record_series">Record series</string>
-    <string name="details_action_remind">Remind me</string>
-    <string name="details_action_other_airings">Other airings</string>
     <string name="details_read_more">More info</string>
     <string name="details_important_information">Details</string>
     <string name="details_available_until">Available until %1$s</string>
@@ -682,29 +674,16 @@
         <item quantity="other">Writers</item>
     </plurals>
     <string name="details_on_now">Now</string>
-    <string name="details_watch">Watch</string>
     <string name="details_back_to_tv">Back to TV</string>
-    <string name="details_description">Description</string>
-    <string name="details_summary">Summary</string>
     <string name="details_genre">Genre</string>
     <string name="details_categories">Categories</string>
     <string name="details_keywords">Keywords</string>
     <string name="details_episode">Episode</string>
     <string name="details_season">Season</string>
-    <string name="details_seasons">Seasons</string>
-    <string name="details_episode_number">Episode number</string>
-    <string name="details_episodes">Episodes</string>
     <string name="details_part">Part</string>
-    <string name="details_parts">Parts</string>
     <string name="details_age_rating">Age rating</string>
-    <string name="details_rating">Rating</string>
-    <string name="details_rating_authority">Rating authority</string>
-    <string name="details_rating_country">Rating country</string>
     <string name="details_stars">Star rating</string>
-    <string name="details_copyright_year">Copyright year</string>
     <string name="details_first_aired">First aired</string>
-    <string name="details_new_yes">New program: Yes</string>
-    <string name="details_new_no">New program: No</string>
     <string name="keep_recording">Keep recording</string>
     <string name="keep">Keep</string>
     <string name="duration_unknown">unknown duration</string>

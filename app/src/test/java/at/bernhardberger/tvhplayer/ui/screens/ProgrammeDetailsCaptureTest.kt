@@ -202,10 +202,9 @@ class ProgrammeDetailsCaptureTest {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-                        if (player) ProgrammeInfoSheetFrame {
-                            ProgramDetails(ProgramDetailsState(), event, emptyList(), start.epochSeconds + 600, channel.name.orEmpty(),
-                                { shown, modifier -> ProvideArtworkSession(session) { ProgrammeHero(shown.image, channel.id, "101", channel.icon, modifier) } },
-                                { null }, true, remember { FocusRequester() }, remember { FocusRequester() }, {})
+                        if (player) PlayerDetailsSurface {
+                            ProgrammeDetailsPage(event, null, channel, start.epochSeconds + 600,
+                                listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
                         }
                         else if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
                             start.epochSeconds + if (scheduled) -60 else 600,
@@ -225,17 +224,10 @@ class ProgrammeDetailsCaptureTest {
             compose.onNodeWithTag("details-delete").assertIsFocused()
             compose.onNodeWithTag("details-description").assertDoesNotExist()
         }
-        // xhdpi: all three real hosts share x130/x562, y156 and 268dp slots.
+        // All origins now use the shared full-page geometry.
         val reading = compose.onNodeWithTag("details-information", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val actions = compose.onNodeWithTag("details-actions", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        if (player) {
-            assertEquals(260f, reading.left, .1f)
-            assertEquals(1124f, actions.left, .1f)
-            assertEquals(312f, reading.top, .1f)
-            assertEquals(reading.top, actions.top, .1f)
-            assertEquals(536f, reading.width, .1f)
-            assertEquals(reading.width, actions.width, .1f)
-        } else {
+        run {
             assertEquals(116f, reading.left, .1f)
             assertEquals(reading.left, actions.left, .1f)
             // The block ends at one bottom anchor (540 - 96 peek - 32 gap) and grows upward; a page

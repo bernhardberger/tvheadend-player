@@ -276,7 +276,7 @@ class PlayerFooterLayoutEvidenceTest {
     }
 
     @Test
-    fun upFromTheTimelineReachesTheCardAndDownReturnsBehindLive() {
+    fun upFromTheTimelineStaysAtTheTopEdgeBehindLive() {
         val backdrop = mutableStateOf(Backdrop.WHITE)
         show(
             behind = { true },
@@ -289,8 +289,7 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionUp)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
-        compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
-        key(Key.DirectionDown)
+        // Artwork is passive; Up cannot move focus out of the timeline.
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         compose.onNodeWithTag("player-go-live").assertDoesNotExist()
         recordPair("en-font1.0-960x540-mdpi-d1", "behind-live-focus-seekbar", "player-seekbar", backdrop)
@@ -354,9 +353,7 @@ class PlayerFooterLayoutEvidenceTest {
         assertEquals(1, commits)
         key(Key.DirectionUp)
         key(Key.DirectionUp)
-        // Without markers above it, Up reaches the top identity. Down retraces Up to the timeline.
-        compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
-        key(Key.DirectionDown)
+        // Without markers above it, Up stays on the timeline and commits the pending preview.
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         assertTrue(previewing)
         assertEquals(2, commits)
@@ -427,12 +424,9 @@ class PlayerFooterLayoutEvidenceTest {
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         assertMarker(3_599_999f / 3_600_000f)
-        // Up above the markers closes them and reaches the top identity; Down retraces Up to the
-        // timeline.
+        // Up above the markers closes them and returns to the timeline; artwork stays passive.
         key(Key.DirectionUp)
         assertFalse(navigation.open)
-        compose.onNodeWithTag(PlayerIdentityCardTag).assertIsFocused()
-        key(Key.DirectionDown)
         compose.onNodeWithTag("player-seekbar").assertIsFocused()
         key(Key.DirectionUp)
         assertMarker(0.75f)

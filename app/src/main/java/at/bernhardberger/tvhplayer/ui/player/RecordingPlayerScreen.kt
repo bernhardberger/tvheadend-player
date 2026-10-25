@@ -1,4 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.key
 
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
@@ -509,9 +511,6 @@ fun RecordingPlayerScreen(
 
     PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
-    LaunchedEffect(infoOpen) {
-        if (infoOpen) runCatching { infoFocus.requestFocus() }
-    }
 
     PlayerBackHandler(handlePlaybackBack)
     Box(
@@ -529,6 +528,13 @@ fun RecordingPlayerScreen(
                 if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
                     if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
                     return@onPreviewKeyEvent true
+                }
+                if (infoOpen) {
+                    return@onPreviewKeyEvent when (event.key) {
+                        Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Back -> false
+                        else -> true
+                    }
                 }
                 if (handlePlayerStopKeyWithoutTarget(
                         event = event,
@@ -654,7 +660,7 @@ fun RecordingPlayerScreen(
                     paused = !playWhenReady,
                     restoreFocus = when {
                         restoreQuickListControl != null -> restoreQuickListControl
-                        restoreInfoActionFocus -> PlayerIdentityCardTag
+                        restoreInfoActionFocus -> "player-info"
                         restoreOptionsFocus -> "player-settings"
                         else -> null
                     },
@@ -687,28 +693,9 @@ fun RecordingPlayerScreen(
                 onSeekMarker = ::seekMarker,
             ) }
 
-            PlayerPanelVisibility(Unit.takeIf { foregroundLayer == PlayerForegroundLayer.INFO }) {
-                PlaybackOptionsOverlayFrame(
-                    paneTitle = stringResource(R.string.player_info),
-                    panelTag = "recording-info-panel",
-                    panelWidth = PlaybackInfoPanelWidth,
-                ) {
-                    PlayerInfoReadingContent(
-                        title = entry.title.orEmpty(),
-                        subtitle = listOfNotNull(entry.subtitle, entry.channelName).joinToString(" / "),
-                        body = entry.summary?.takeIf(String::isNotBlank) ?: entry.description,
-                        readingFocus = infoFocus,
-                        modifier = Modifier.padding(PlaybackInfoPanelPadding),
-                        footer = {
-                            androidx.tv.material3.OutlinedButton(
-                                onClick = ::closeInfo,
-                                modifier = Modifier.align(Alignment.End),
-                            ) {
-                                Text(stringResource(R.string.player_info_close))
-                            }
-                        },
-                    )
-                }
+            if (foregroundLayer == PlayerForegroundLayer.INFO) {
+                RecordingPlayerDetails(entry, channel, nowSec, ::closeInfo,
+                    onBackKeyDown = { revealingKeyCode = AndroidKeyEvent.KEYCODE_BACK })
             }
 
             PlaybackStatsVisibility(

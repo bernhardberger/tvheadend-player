@@ -1,4 +1,5 @@
 <resources>
+    <string name="player_continue_watching">Weiterschauen</string>
     <string name="episode_season_compact">S%1$d</string>
     <string name="episode_number_compact">E%1$d</string>
     <string name="episode_part">Teil %1$d</string>
@@ -118,10 +119,7 @@
     <string name="player_channel_number_none">Kein Sender</string>
     <string name="player_shelf_playing">Wiedergabe</string>
     <string name="player_shelf_recording">Aufnahme läuft</string>
-    <string name="player_info_close">Info schließen</string>
-    <string name="player_info_pane_title">Programminformationen</string>
     <string name="player_info_unavailable_title">Programminformationen nicht verfügbar</string>
-    <string name="player_info_unavailable_message">Für %1$s sind derzeit keine Programminformationen verfügbar.</string>
     <string name="show_epg_menu_enabled">Programmführer-Menü anzeigen: Ein</string>
     <string name="show_epg_menu_disabled">Programmführer-Menü anzeigen: Aus</string>
     <string name="host">Host</string>
@@ -299,7 +297,6 @@
     <string name="record">Aufnehmen</string>
     <string name="cancel_recording">Aufnahme abbrechen</string>
     <string name="stop_recording">Aufnahme beenden</string>
-    <string name="recording_request_busy_action">Wird geplant…</string>
     <string name="cancel_recording_confirm_title">Diese Aufnahme absagen?</string>
     <string name="cancel_recording_confirm_message">%1$s auf %2$s, %3$s, wird nicht aufgenommen.</string>
     <string name="stop_recording_confirm_title">Diese Aufnahme beenden?</string>
@@ -523,11 +520,6 @@
     <string name="player_channel_card_hint_no_recents">Links oder rechts wechselt den Sender.</string>
     <string name="player_rail_watching">Läuft</string>
     <!-- Trial: program details -->
-    <string name="details_tab_details">Details</string>
-    <string name="details_tab_schedule">Programm</string>
-    <string name="details_action_record_series">Serie aufnehmen</string>
-    <string name="details_action_remind">Erinnern</string>
-    <string name="details_action_other_airings">Wiederholungen</string>
     <string name="details_read_more">Mehr Infos</string>
     <string name="details_important_information">Details</string>
     <string name="details_available_until">Verfügbar bis %1$s</string>
@@ -564,29 +556,16 @@
         <item quantity="other">Drehbuchautoren</item>
     </plurals>
     <string name="details_on_now">Jetzt</string>
-    <string name="details_watch">Ansehen</string>
     <string name="details_back_to_tv">Zurück zum TV</string>
-    <string name="details_description">Beschreibung</string>
-    <string name="details_summary">Zusammenfassung</string>
     <string name="details_genre">Genre</string>
     <string name="details_categories">Kategorien</string>
     <string name="details_keywords">Schlagwörter</string>
     <string name="details_episode">Folge</string>
     <string name="details_season">Staffel</string>
-    <string name="details_seasons">Staffeln</string>
-    <string name="details_episode_number">Folgennummer</string>
-    <string name="details_episodes">Folgen</string>
     <string name="details_part">Teil</string>
-    <string name="details_parts">Teile</string>
     <string name="details_age_rating">Altersfreigabe</string>
-    <string name="details_rating">Freigabe</string>
-    <string name="details_rating_authority">Prüfstelle</string>
-    <string name="details_rating_country">Freigabeland</string>
     <string name="details_stars">Sternebewertung</string>
-    <string name="details_copyright_year">Copyright-Jahr</string>
     <string name="details_first_aired">Erstausstrahlung</string>
-    <string name="details_new_yes">Neue Sendung: Ja</string>
-    <string name="details_new_no">Neue Sendung: Nein</string>
     <string name="keep_recording">Weiter aufnehmen</string>
     <string name="keep">Behalten</string>
     <string name="duration_unknown">unbekannter Dauer</string>

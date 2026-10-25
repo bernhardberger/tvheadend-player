@@ -975,6 +975,11 @@ fun AppRoot(
 
                     entry<LivePlayerKey> { destination ->
                         LivePlayerRouteContent(
+                            onShowGuide = { channelId, programme ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId,
+                                    programme?.id, programme?.start?.epochSeconds)
+                                navigateTopLevel(GuideKey)
+                            },
                             channelsVm = channelsVm,
                             contentAllowed = contentAllowed,
                             channelId = ChannelId(destination.channelId),

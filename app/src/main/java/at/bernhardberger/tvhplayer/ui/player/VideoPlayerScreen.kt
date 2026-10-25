@@ -64,10 +64,6 @@ import at.bernhardberger.tvhplayer.core.activeRecordingChannelIds
 import at.bernhardberger.tvhplayer.core.ChannelKeyAction
 import at.bernhardberger.tvhplayer.core.ChannelPickAction
 import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
-import at.bernhardberger.tvhplayer.core.LiveInfoRecordingState
-import at.bernhardberger.tvhplayer.core.ProgrammeAction
-import at.bernhardberger.tvhplayer.core.ProgrammeRecordingTarget
-import at.bernhardberger.tvhplayer.core.programmeActions
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
@@ -350,6 +346,7 @@ fun VideoPlayerScreen(
     notices: NoticeCenter = koinInject(),
     uiSettingsStore: at.bernhardberger.tvhplayer.settings.UiSettingsStore = koinInject(),
     onOpenConnectionSettings: () -> Unit = {},
+    onShowGuide: (ChannelId, EpgEventEntry?) -> Unit = { _, _ -> },
     connectionUiState: at.bernhardberger.tvhplayer.core.ConnectionUiState? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -413,16 +410,11 @@ fun VideoPlayerScreen(
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
     var restoreInfoFocus by remember { mutableStateOf(false) }
-    val programDetails = remember { ProgramDetailsState() }
     var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
     val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
     // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
-    var infoPendingAction by remember { mutableStateOf<ProgrammeAction?>(null) }
-    var infoMutation by remember { mutableStateOf<DvrMutationAction?>(null) }
-    var infoMutationTarget by remember { mutableStateOf<ProgrammeRecordingTarget?>(null) }
-    var infoMutationObservation by remember { mutableStateOf<SessionObservation?>(null) }
     val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
     val rootFocus = remember { FocusRequester() }
 
@@ -797,45 +789,32 @@ fun VideoPlayerScreen(
         }
     }
 
-    fun openInfo(returnTo: String? = null) {
-        programDetails.reset()
+    fun openInfo() {
         infoRailChannelId = null
-        infoPendingAction = null
-        infoMutation = null
-        infoReturnAction = returnTo ?: lastChromeAction.takeIf { layerState.chrome.controlsVisible }
+        infoReturnAction = "player-info"
         restoreInfoFocus = false
         layerState.openInfo()
     }
 
     fun dismissRecordingDialog() {
-        infoPendingAction = null
-        infoMutation = null
         layerState.dismissRecordingConfirmation()
-        programDetails.focusContent()
     }
 
     fun closeInfo() {
-        infoPendingAction = null
-        infoMutation = null
         layerState.dismissRecordingConfirmation()
-        layerState.closeInfo(returnToRail = infoRailChannelId != null)
-        infoRailChannelId?.let {
-            selectedId = it
-            infoRailChannelId = null
-            return
-        }
-        restoreInfoFocus = infoReturnAction == null
+        val returnToRail = infoRailChannelId != null
+        layerState.closeInfo(returnToRail = returnToRail)
+        infoRailChannelId = null
+        infoReturnAction = if (returnToRail) null else "player-info"
+        restoreInfoFocus = !returnToRail
     }
 
     /**
-     * An options key opened the options: commit a pending seek, drop a number entry,
-     * settle the recording state of a replaced Info panel and focus the page as the
-     * gear does.
+     * An options key opened the options: commit a pending seek and drop a number entry.
      */
     fun optionsOpenedFromKey(infoWasOpen: Boolean) {
         if (timelineState.seekPending) timelineState.commitPendingSeek()
         channelNumberInput = ""
-        if (infoWasOpen) { infoPendingAction = null; infoMutation = null }
         restoreOptionsFocus = false
     }
 
@@ -1099,23 +1078,6 @@ fun VideoPlayerScreen(
     val detailsChannelId = infoRailChannelId ?: currentChannelId
     val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
     val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
-    val actionableInfoEvent = currentProgrammeEvent(observation, programDetails.opened ?: detailsBaseEvent)
-    val currentRecording = remember(observation, actionableInfoEvent?.id) {
-        actionableInfoEvent?.let { observation.dvrEntryForEvent(it) }
-    }
-    val currentRecordingTarget = currentSession?.let { capability ->
-        actionableInfoEvent?.programmeRecordingTarget(capability)
-    }
-    val latestRecordingTarget by rememberUpdatedState(currentRecordingTarget)
-    LaunchedEffect(programDetails.selectionVersion, currentRecordingTarget) {
-        infoPendingAction = null
-        infoMutation = null
-        layerState.dismissRecordingConfirmation()
-    }
-    val infoActions = actionableInfoEvent?.let {
-        programmeActions(it, nowSec, currentRecording, canModifyRecordings = canModifyRecordings)
-    }.orEmpty()
-    val recordActionEligible = ProgrammeAction.RECORD in infoActions
     val currentSubscriptionFailure = subscriptionFailure.takeIf { playingLiveChannelId == currentChannelId }
         ?: (playbackState as? AppPlaybackState.Failed)?.subscriptionIssue
     val currentLiveInterrupted = liveInterrupted(
@@ -1259,61 +1221,6 @@ fun VideoPlayerScreen(
         ) layerState.onProgrammeChanged()
     }
 
-    fun confirmInfoRecording() {
-        val target = infoMutationTarget ?: return
-        val openingObservation = infoMutationObservation
-        val request = currentDvrMutation(infoMutation, openingObservation, session.observation.value)
-        val noticeContext = notices.context()
-        val selectionVersion = programDetails.selectionVersion
-        infoPendingAction = null
-        layerState.dismissRecordingConfirmation()
-        programDetails.focusContent()
-        if (request == null) { infoMutation = null; return }
-        // Keep the guard set for the whole input dispatch, including synchronous repository results.
-        scope.launch(kotlinx.coroutines.Dispatchers.Main) {
-            try {
-                val preferred = if (request is DvrMutationAction.CreateProgramme)
-                    uiSettingsStore.settings.first().recordingProfileId else null
-                val current = session.observation.value
-                val currentRequest = currentDvrMutation(request, openingObservation, current) ?: return@launch
-                val configured = if (currentRequest is DvrMutationAction.CreateProgramme)
-                    currentRequest.copy(configId = at.bernhardberger.tvhplayer.core.chooseDvrConfig(
-                        current.currentDvrConfigurations(), preferred)) else currentRequest
-                val feedback = dvrMutationActions.execute(configured)
-                notices.postDvrFailure(configured, feedback, noticeContext)
-            } finally {
-                if (detailsRecordingResultIsCurrent(request, infoMutation, target, latestRecordingTarget,
-                        layerState.infoOpen, selectionVersion == programDetails.selectionVersion) &&
-                    session.observation.value.currentSession === target.currentSession) {
-                    infoMutation = null
-                }
-            }
-        }
-    }
-
-    fun activateInfoRecording(action: ProgrammeAction = ProgrammeAction.RECORD) {
-        if (infoMutation != null || action !in infoActions) return
-        val target = currentRecordingTarget ?: return
-        val mutation = when (action) {
-            ProgrammeAction.RECORD -> DvrMutationAction.CreateProgramme(target, null)
-            ProgrammeAction.STOP_RECORDING -> currentRecording?.let { DvrMutationAction.Stop(target.currentSession, it.id) }
-            ProgrammeAction.CANCEL_RECORDING -> currentRecording?.let { DvrMutationAction.Cancel(target.currentSession, it.id) }
-            else -> null
-        } ?: return
-        infoMutation = mutation
-        infoMutationTarget = target
-        infoMutationObservation = observation
-        if (action != ProgrammeAction.RECORD) {
-            infoPendingAction = action
-            layerState.showRecordingConfirmation()
-        } else confirmInfoRecording()
-    }
-
-    LaunchedEffect(infoPendingAction, observation) {
-        if (infoPendingAction != null && (infoPendingAction !in infoActions ||
-                currentDvrMutation(infoMutation, infoMutationObservation, observation) == null)) dismissRecordingDialog()
-    }
-
     /**
      * Retunes the last live channel. While the session has the channel on screen, its failed
      * request ends here, so the retune is not covered by that failure's message; a channel the
@@ -1385,10 +1292,6 @@ fun VideoPlayerScreen(
     if (contentAllowed) PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = handle@{
-        // Trial: Back first undoes a step inside the program details.
-        if (playerForegroundLayer(currentPlayerForegroundContext()) == PlayerForegroundLayer.INFO &&
-            programDetails.back()
-        ) return@handle
         when (
             playerBackAction(
                 seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
@@ -1456,16 +1359,6 @@ fun VideoPlayerScreen(
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 if (layerState.infoOpen) {
-                    if (event.key == Key.Back) {
-                        // Rebuilding details can detach the KeyUp target. A fresh Back down is
-                        // still a new press, not a repeat of that unfinished revealing cycle.
-                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN && event.nativeKeyEvent.repeatCount == 0) {
-                            layerState.beginOpeningKeyCycle(keyCode)
-                            handlePlaybackBack()
-                        }
-                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
-                        return@onPreviewKeyEvent true
-                    }
                     if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
                         if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
                         return@onPreviewKeyEvent true
@@ -1474,7 +1367,7 @@ fun VideoPlayerScreen(
                     // (including Left-as-Back in the other panels) reaches the player underneath.
                     return@onPreviewKeyEvent when (event.key) {
                         Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
-                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter -> false
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Back -> false
                         else -> true
                     }
                 }
@@ -1662,16 +1555,7 @@ fun VideoPlayerScreen(
                     channelsVm.nowEvent(currentChannelId, nowSec), nowSec,
                     playbackIndicator = channelIndicator)
             },
-            details = (detailsChannel to detailsBaseEvent).takeIf {
-                layerState.infoOpen && (foregroundLayer == PlayerForegroundLayer.INFO ||
-                    foregroundLayer == PlayerForegroundLayer.CONFIRMATION)
-            },
-            // Held OK on a rail card: the programme opens as a dialog over the rail.
-            dialog = infoRailChannelId != null,
-            railHeader = if (programDetails.scheduleEntry && layerState.infoOpen) ({
-                val channel = channels.firstOrNull { it.id == (infoRailChannelId ?: selectedId) }
-                ProgrammeScheduleHeader(channelTitleText(channel?.visibleChannelNumber, channel?.name.orEmpty()))
-            }) else null,
+            details = null as Unit?,
             player = { keepControls ->
         PlayerChrome(
             mode = playerChromeMode(
@@ -1705,18 +1589,18 @@ fun VideoPlayerScreen(
                 tuning = compactTuning,
             ),
             actions = PlayerChromeActions(
-                active = layerState.chrome.controlsVisible && layerState.optionsPage == null,
+                active = layerState.chrome.controlsVisible && layerState.optionsPage == null && !layerState.infoOpen,
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
                     infoReturnAction != null && !layerState.infoOpen -> infoReturnAction
-                    restoreInfoFocus -> PlayerIdentityCardTag
+                    restoreInfoFocus -> "player-info"
                     restoreOptionsFocus -> "player-settings"
                     else -> layerState.restoreChannelAction
                 },
             ),
             entry = layerState.chrome.controlsEntry,
-            panelOpen = layerState.optionsPage != null,
+            panelOpen = layerState.optionsPage != null || layerState.infoOpen,
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
                 dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
@@ -1769,9 +1653,6 @@ fun VideoPlayerScreen(
                             onOpenDetails = { channel, _, keyCode ->
                                 keyCode?.let(layerState::beginOpeningKeyCycle)
                                 infoRailChannelId = channel.id
-                                programDetails.reset()
-                                infoPendingAction = null
-                                infoMutation = null
                                 infoReturnAction = null
                                 restoreInfoFocus = false
                                 layerState.openInfo()
@@ -1808,96 +1689,18 @@ fun VideoPlayerScreen(
         )
 
             },
-        ) { (shownChannel, shownEvent) ->
-            val shownChannelId = shownChannel?.id ?: shownEvent?.channelId ?: currentChannelId
-            val detailsIdentity = channelTitleText(shownChannel?.visibleChannelNumber, shownChannel?.name.orEmpty())
-            val watch: (() -> Unit)? = shownChannel?.takeIf { it.id != currentChannelId }?.let { channel ->
-                {
-                    infoRailChannelId = null
-                    infoPendingAction = null
-                    infoMutation = null
-                    infoReturnAction = null
-                    layerState.closeInfo()
-                    tuneChannel(channel)
-                }
-            }
-            LiveProgrammeInfoOverlay(
-                event = shownEvent,
-                channelIdentity = detailsIdentity,
-                channelName = shownChannel?.name.orEmpty(),
-                recordingScheduled = currentRecording != null,
-                canRecord = recordActionEligible,
-                recordingState = LiveInfoRecordingState.Idle,
-                confirmationVisible = false,
-                restoreRecordFocus = false,
-                onRecord = { activateInfoRecording() },
-                onRecordingActivate = { activateInfoRecording() },
-                onRecordingDismiss = ::dismissRecordingDialog,
-                onClose = ::closeInfo,
-                onWatch = watch,
-                onUp = {
-                    if (infoRailChannelId == null) {
-                        layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_UP)
-                        closeInfo()
-                    }
-                },
-                details = { recordFocus, firstFocus ->
-                    val shown = shownEvent ?: return@LiveProgrammeInfoOverlay
-                    val schedule = remember(observation, shownChannelId, shown.id) {
-                        channelSchedule(shown, { after -> observation.nextEvent(shownChannelId, after) })
-                    }
-                    ProgramDetails(
-                        state = programDetails,
-                        current = shown,
-                        schedule = schedule,
-                        nowSec = nowSec,
-                        channelIdentity = detailsIdentity,
-                        tile = { event, tileModifier ->
-                            ProgrammeHero(
-                                image = event.image,
-                                channelId = shownChannelId,
-                                channelNumber = shownChannel?.visibleChannelNumber?.toString().orEmpty(),
-                                picon = shownChannel?.icon,
-                                modifier = tileModifier,
-                                recordingBadge = observation.dvrEntryForEvent(event)?.let(::recordingIsRunning) == true,
-                            )
-                        },
-                        recordingFor = { event -> observation.dvrEntryForEvent(event) },
-                        canModifyRecordings = canModifyRecordings,
-                        recordFocus = recordFocus,
-                        firstFocus = firstFocus,
-                        onAction = { action -> if (action == ProgrammeAction.WATCH) watch?.invoke() else activateInfoRecording(action) },
-                        busy = infoMutation != null && infoPendingAction == null,
-                        showWatch = watch != null,
-                        onClose = {
-                            layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_UP)
-                            closeInfo()
-                        },
-                    )
-                },
+        ) { }
+        if (layerState.infoOpen && foregroundLayer == PlayerForegroundLayer.INFO) {
+            LivePlayerProgrammeDetails(
+                event = detailsBaseEvent, channel = detailsChannel, observation = observation,
+                currentObservation = { session.observation.value }, nowSec = nowSec,
+                mutations = dvrMutationActions, notices = notices, mutationScope = scope,
+                settingsStore = uiSettingsStore,
+                onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
+                onShowGuide = onShowGuide, onClose = ::closeInfo,
+                onBackKeyDown = { layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
+                fromPlayer = infoRailChannelId == null,
             )
-            infoPendingAction?.let { action ->
-                ConfirmProgrammeActionDialog(action, actionableInfoEvent?.title.orEmpty(),
-                    entries = infoMutationTarget?.eventId?.let { infoMutationObservation?.dvrEntriesForEvent(it) },
-                    configurations = observation.currentDvrConfigurations(),
-                    channelName = shownChannel?.name.orEmpty(),
-                    dateAndTime = at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule(actionableInfoEvent?.start?.epochSeconds),
-                    onDismiss = ::dismissRecordingDialog, onConfirm = ::confirmInfoRecording,
-                    onPreviewKeyEvent = { event ->
-                        val code = event.nativeKeyEvent.keyCode
-                        when {
-                            playbackSuppressesRevealingKey(layerState.revealingKeyCode, code) -> {
-                                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(code)
-                                true
-                            }
-                            // The confirmation owns Back through its card fade.
-                            event.key == Key.Back -> false
-                            event.key in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
-                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter) -> false
-                            else -> true
-                        }
-                    })
-            }
         }
 
         PlaybackStatsVisibility(

@@ -73,7 +73,7 @@ class LivePauseControlTest {
             show()
             compose.onNodeWithTag("player-pause").assertIsFocused().assertIsEnabled()
             compose.onNodeWithTag("player-settings").assertExists()
-            compose.onNodeWithTag("player-info").assertDoesNotExist()
+            compose.onNodeWithTag("player-info").assertExists()
         }
     }
 

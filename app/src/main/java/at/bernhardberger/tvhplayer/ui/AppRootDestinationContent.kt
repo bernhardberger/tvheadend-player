@@ -203,6 +203,7 @@ internal fun LivePlayerRouteContent(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
     onOpenConnectionSettings: () -> Unit = {},
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
     connectionUiState: ConnectionUiState? = null,
     startupTarget: ApplianceLaunchTarget? = null,
     onStartupOutcome: (ApplianceLaunchTarget, MainStartupPlaybackOutcome) -> Boolean = { _, _ -> false },
@@ -222,6 +223,7 @@ internal fun LivePlayerRouteContent(
             contentAllowed = contentAllowed,
             startupTarget = startupTarget,
             onStartupOutcome = onStartupOutcome,
+            onShowGuide = onShowGuide,
         )
     }
 }

@@ -144,6 +144,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlin.time.Instant
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.Dispatchers
@@ -529,13 +530,13 @@ class LivePlayerChromeScreenTest {
         assertTrue(exists("player-top-cluster"))
         assertEquals("the controls open on Play/Pause", listOf("player-pause"), focused())
         assertEquals("Down is consumed: the pause was not toggled", playWhenReady, player.playWhenReady)
-        assertEquals("the programme artwork opens details", listOf<String?>(PlayerIdentityCardTag),
+        assertEquals("the programme artwork is passive", emptyList<String?>(),
             (compose.onAllNodes(hasAnyAncestor(hasTestTag("player-info-bar")) and isFocusable()).fetchSemanticsNodes() +
                 compose.onAllNodes(hasTestTag("player-info-bar") and isFocusable()).fetchSemanticsNodes())
                 .map { it.config.getOrNull(SemanticsProperties.TestTag) })
         assertEquals("the top identity is passive", 0,
             compose.onAllNodes(hasTestTag(PlayerTopIdentityTag) and isFocusable()).fetchSemanticsNodes().size)
-        assertFalse("the action row has no Info", exists("player-info"))
+        assertTrue("the action row exposes Info", exists("player-info"))
         assertEquals("the header clock is never focusable", 0,
             compose.onAllNodes(hasAnyAncestor(hasTestTag("player-top-cluster")) and isFocusable()).fetchSemanticsNodes().size)
         assertTrue("the header keeps only the clock, no status chip: ${texts("player-header")}",
@@ -633,15 +634,15 @@ class LivePlayerChromeScreenTest {
             compose.onAllNodes(hasAnyAncestor(hasTestTag("player-hidden-slot")) and isFocusable()).fetchSemanticsNodes().size)
     }
 
-    @Test fun atTheLiveEdgeTheBarRowIsPassiveAndUpReachesOnlyTheTopIdentity() {
+    @Test fun atTheLiveEdgeTheBarRowIsPassiveAndUpStaysOnTheTimeline() {
         liveChrome(behindLiveMs = 0)
         assertEquals(listOf("player-pause"), focused())
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
+        assertEquals("artwork is passive", listOf("player-seekbar"), focused())
         key(Key.DirectionDown)
-        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
         assertFalse(exists("player-go-live"))
         assertFalse(exists("player-status-slot"))
         assertFalse("the controls have no state cell; the Pause button speaks for playback", exists("player-state"))
@@ -650,7 +651,7 @@ class LivePlayerChromeScreenTest {
         assertEquals(0, compose.onAllNodes(hasTestTag("player-live-state") and isFocusable(), useUnmergedTree = true).fetchSemanticsNodes().size)
     }
 
-    @Test fun behindLiveUpFromTheSeekbarReachesOnlyTheTopIdentity() {
+    @Test fun behindLiveUpFromTheSeekbarStaysOnTheTimeline() {
         liveChrome(behindLiveMs = 203_000)
         assertEquals(listOf("player-pause"), focused())
         assertEquals("Behind live", description("player-live-state"))
@@ -658,9 +659,9 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-seekbar"), focused())
         key(Key.DirectionUp)
-        assertEquals("the programme is above the seekbar", listOf(PlayerIdentityCardTag), focused())
+        assertEquals("artwork is passive", listOf("player-seekbar"), focused())
         key(Key.DirectionDown)
-        assertEquals("Down retraces Up to the seekbar", listOf("player-seekbar"), focused())
+        assertEquals("Down returns to the action row", listOf("player-pause"), focused())
         assertFalse("no Go live node", exists("player-go-live"))
         assertFalse(exists("player-go-live-label"))
     }
@@ -722,12 +723,13 @@ class LivePlayerChromeScreenTest {
     @Test fun playerInfoContainsProgrammeActionsAndBackReturnsDirectlyToControls() {
         screen()
         key(Key.Info)
-        assertTrue(exists("live-info-panel"))
-        assertEquals(listOf("live-info-record"), focused())
+        assertTrue(exists("programme-details-page"))
+        assertEquals(listOf("details-continue_watching"), focused())
         assertFalse(exists("live-info-stream-signal"))
         key(Key.Back)
-        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("programme-details-page"))
         assertTrue(exists("player-actions"))
+        assertEquals(listOf("player-info"), focused())
     }
 
     @Test fun playerBannerHidesFiveSecondsAfterThisTunesFirstFrame() {
@@ -781,48 +783,50 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("player-actions"))
     }
 
-    @Test fun programmeInfoUpdatesAcrossAProgrammeBoundaryAndSchedulingUpdate() {
+    @Test fun programmeInfoRetainsItsLastSnapshotAndContinueFocusAcrossBoundaryAndEviction() {
         screen()
         key(Key.Info)
         val now = System.currentTimeMillis() / 1_000L
+        val ended = EpgEvent.create(EventId(11L), ChannelId(1L), Instant.fromEpochSeconds(now - 1_800L),
+            Instant.fromEpochSeconds(now - 1L), title = "Ended programme", summary = "Last known summary")
         val nextProgramme = EpgEvent.create(EventId(21L), ChannelId(1L), Instant.fromEpochSeconds(now - 60L),
             Instant.fromEpochSeconds(now + 3_600L), title = "Next up", summary = "Summary")
+        session.publish(observation(now, listOf(ended, nextProgramme)))
+        repeat(2) { settle() }
+        assertEquals("Ended programme", texts("details-title"))
+        assertFalse(exists("details-record"))
+        assertEquals(listOf("details-continue_watching"), focused())
         session.publish(observation(now, listOf(nextProgramme)))
         repeat(2) { settle() }
-        assertTrue(texts("live-info-panel").contains("Next up"))
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals("Ended programme", texts("details-title"))
+        assertEquals(listOf("details-continue_watching"), focused())
         session.publish(observation(now, listOf(nextProgramme), recordings = listOf(
             DvrEntry.create(DvrEntryId(2L), eventId = nextProgramme.id, state = DvrEntryState.RECORDING),
         )))
         repeat(2) { settle() }
-        assertEquals("Stop recording", texts("live-info-record"))
-        assertEquals(listOf("live-info-record"), focused())
-        key(Key.Back)
-        assertFalse(exists("live-info-panel"))
+        assertEquals(listOf("details-continue_watching"), focused())
+        assertFalse(exists("details-stop"))
+        assertEquals("Ended programme", texts("details-title"))
+        session.publish(observation(now, listOf(nextProgramme), missingRequestedChannel = true))
+        repeat(2) { settle() }
+        assertEquals(listOf("player-info"), focused())
+        assertFalse(exists("programme-details-page"))
     }
 
-    @Test fun withoutEpgInfoKeepsCloseFocusedAndBackReturnsToControls() {
+    @Test fun withoutEpgInfoKeepsContinueWatchingFocusedAndBackReturnsToInfo() {
         screen(epg = false)
         key(Key.Info)
-        assertTrue(exists("live-info-panel"))
-        assertEquals(listOf("live-info-close"), focused())
+        assertTrue(exists("programme-details-page"))
+        assertEquals(listOf("details-continue_watching"), focused())
         key(Key.DirectionDown)
-        assertEquals(listOf("live-info-close"), focused())
+        assertEquals(listOf("details-continue_watching"), focused())
         key(Key.DirectionUp)
-        assertEquals(listOf("player-info-reading"), focused())
-        listOf(Key.DirectionLeft, Key.DirectionRight).forEach(::key)
-        assertEquals(listOf("player-info-reading"), focused())
-        key(Key.DirectionDown)
-        assertEquals(listOf("live-info-close"), focused())
+        assertEquals(listOf("details-continue_watching"), focused())
         assertFalse(exists("live-info-stream-signal"))
         key(Key.Back)
-        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("programme-details-page"))
         assertTrue(exists("player-actions"))
-        key(Key.Info)
-        assertEquals("Back to TV", texts("details-player-hint"))
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
-        assertFalse(exists("live-info-panel"))
+        assertEquals(listOf("player-info"), focused())
     }
 
     @Test fun theLiveChromeShowsNoStreamBadgesAndStartsNoDiagnostics() {
@@ -882,7 +886,7 @@ class LivePlayerChromeScreenTest {
 
             // Programme Info never starts full diagnostics. Stats for nerds still owns them.
             key(Key.Info)
-            assertTrue(exists("live-info-panel"))
+            assertTrue(exists("programme-details-page"))
             assertTrue(runtime.diagnostics.value.let { it.video == null && it.audio == null && it.live == null })
             key(Key.Back)
             compose.onNodeWithTag("player-settings").performSemanticsAction(SemanticsActions.RequestFocus)
@@ -942,9 +946,9 @@ class LivePlayerChromeScreenTest {
                 assertFalse("B's Banner '$staleBanner' shows no badge ('$stale')", staleBanner.contains(stale))
             }
             key(Key.Info)
-            assertTrue(exists("live-info-panel"))
+            assertTrue(exists("programme-details-page"))
             key(Key.Back)
-            assertFalse(exists("live-info-panel"))
+            assertFalse(exists("programme-details-page"))
             val staleControls = identityDescription()
             for (stale in listOf("lines", "Video", "Audio")) {
                 assertFalse("B's controls '$staleControls' show no stale '$stale'", staleControls.contains(stale))
@@ -1265,88 +1269,56 @@ class LivePlayerChromeScreenTest {
             .flatMap { it.config.getOrNull(SemanticsProperties.Text).orEmpty().map { text -> text.text } }
             .joinToString(" | ")
 
-    @Test fun playerInfoStartsOnRecordAndContainsFocusWithinProgrammeActionsAndReading() {
+    @Test fun playerInfoStartsOnContinueWatchingAndHasNoRetiredScheduleTabs() {
         screen()
         key(Key.Info)
-        assertEquals("The first action takes focus", listOf("live-info-record"), focused())
+        assertEquals("The first action takes focus", listOf("details-continue_watching"), focused())
         assertFalse(exists("details-schedule"))
-        assertFalse(exists("live-info-close"))
-        key(Key.DirectionLeft)
-        assertEquals(listOf("live-info-record"), focused())
-        key(Key.DirectionRight)
-        assertEquals(listOf("live-info-record"), focused())
-        repeat(3) { key(Key.DirectionDown) }
-        assertEquals(listOf("details-more-info"), focused())
-        key(Key.DirectionCenter)
-        assertEquals(listOf("player-info-reading"), focused())
-        for (index in 0..1) {
-            compose.onNodeWithTag("details-tab-$index").performSemanticsAction(SemanticsActions.RequestFocus)
-            settle()
-            assertEquals("tabs cannot take focus while More info is open", listOf("player-info-reading"), focused())
-        }
+        assertFalse(exists("details-tab-0"))
+        assertFalse(exists("details-tab-1"))
         key(Key.Back)
-        assertEquals("Back returns to the action that opened reading", listOf("details-more-info"), focused())
-        repeat(3) { key(Key.DirectionUp) }
-        key(Key.DirectionUp)
-        assertEquals("Up goes to the selected tab, not the nearest tab", listOf("details-tab-0"), focused())
-        key(Key.DirectionLeft)
-        assertEquals("tab edges cannot leave the layer", listOf("details-tab-0"), focused())
-        key(Key.DirectionDown)
-        assertEquals(listOf("live-info-record"), focused())
-        key(Key.Back)
-        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("programme-details-page"))
+        assertEquals(listOf("player-info"), focused())
     }
 
-    @Test fun playerInfoStartsOnRecordingWhenAlreadyScheduled() {
+    @Test fun playerInfoOffersCancelAfterContinueWatchingWhenAlreadyScheduled() {
         screen(recordingScheduled = true)
         key(Key.Info)
-        assertEquals(listOf("live-info-record"), focused())
-        assertEquals("Cancel recording", texts("live-info-record"))
-        key(Key.DirectionDown)
-        assertEquals(listOf("details-record-series"), focused())
+        assertEquals(listOf("details-continue_watching"), focused())
+        compose.onNodeWithTag("details-cancel").assertExists()
         key(Key.Back)
-        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("programme-details-page"))
     }
 
-    @Test fun playerInfoTabDownStartsAtTheFirstAction() {
-        screen()
-        key(Key.Info)
-        repeat(2) { key(Key.DirectionDown) }
-        assertEquals(listOf("details-other-airings"), focused())
-        compose.onNodeWithTag("details-tab-0").performSemanticsAction(SemanticsActions.RequestFocus)
-        settle()
-        key(Key.DirectionDown)
-        assertEquals(listOf("live-info-record"), focused())
-    }
-
-    @Test fun playerInfoOmitsMissingProgrammeTitleAndSubtitle() {
+    @Test fun playerInfoDoesNotInventMissingProgrammeTitleOrSubtitle() {
         screen()
         val now = System.currentTimeMillis() / 1_000L
         session.publish(observation(now, listOf(EpgEvent.create(EventId(31), ChannelId(1),
             Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600)))))
         settle()
         key(Key.Info)
-        assertEquals(listOf("live-info-record"), focused())
-        assertFalse(exists("details-title"))
+        assertEquals(listOf("details-continue_watching"), focused())
+        assertEquals("", texts("details-title"))
+        assertFalse(exists("details-subtitle"))
         assertFalse(exists("details-tab-1"))
     }
 
-    @Test fun playerInfoConsumesItsOpeningDownAndRestoresTheControlThatOpenedIt() {
+    @Test fun playerInfoConsumesRemoteCommandsAndReturnsToInfo() {
         screen()
         key(Key.DirectionDown)
         assertEquals(listOf("player-pause"), focused())
         key(Key.Info)
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals(listOf("details-continue_watching"), focused())
         assertFalse(exists("details-schedule"))
         val playing = player.playWhenReady
         listOf(Key.ChannelUp, Key.ChannelDown, Key.MediaStop, Key.MediaPause, Key.Menu, Key.Info).forEach(::key)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         assertEquals(playing, player.playWhenReady)
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals(listOf("details-continue_watching"), focused())
         key(Key.Back)
-        assertEquals(listOf("player-pause"), focused())
+        assertEquals(listOf("player-info"), focused())
         key(Key.Info)
-        assertEquals("a new visit resets Details and its action", listOf("live-info-record"), focused())
+        assertEquals("a new visit resets Details and its action", listOf("details-continue_watching"), focused())
     }
 
     @Test fun downFromTheActionRowOpensRowsAndUpFromTheTopOrBackReturnsToTheAction() {
@@ -1357,6 +1329,7 @@ class LivePlayerChromeScreenTest {
         for (close in listOf(Key.DirectionUp, Key.Back)) {
             key(Key.DirectionRight)
             key(Key.DirectionRight)
+            key(Key.DirectionRight)
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionDown)
             assertEquals("browser opens on the playing channel", listOf("player-channel-card-1"), focused())
@@ -1364,7 +1337,7 @@ class LivePlayerChromeScreenTest {
             // This screen's channel never leaves tuning.
             compose.onNode(hasTestTag("channel-tuning-indicator") and hasAnyAncestor(hasTestTag("player-now-playing")),
                 useUnmergedTree = true).assertExists("the strip carries the playback marker")
-            assertFalse("the programme info page does not open", exists("live-info-panel"))
+            assertFalse("the programme info page does not open", exists("programme-details-page"))
             assertEquals("the opening key tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
             if (close == Key.Back) {
                 key(Key.DirectionRight)
@@ -1376,11 +1349,12 @@ class LivePlayerChromeScreenTest {
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
+            key(Key.DirectionLeft)
         }
         assertEquals(listOf("player-pause"), focused())
     }
 
-    @Test fun holdOnACardOpensCurrentDetailsAndOneBackReturnsToItsCard() {
+    @Test fun holdOnACardOpensSharedDetailsAndBackRestoresTheRailCard() {
         screen()
         publishRailProgrammes()
         key(Key.DirectionDown)
@@ -1390,23 +1364,23 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-channel-card-2"), focused())
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter); advanceEventTime(1_200); keyUp(Key.DirectionCenter) }
         settle()
-        assertTrue("the programme's details open", exists("live-info-panel"))
-        assertTrue("as a dialog", exists("player-programme-dialog"))
+        assertTrue("the programme's shared details open", exists("programme-details-page"))
         assertFalse("without section tabs or heading", exists("details-top-row"))
         assertFalse("without the page hint", exists("details-player-hint"))
         assertEquals("nothing tunes", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         val action = focused()
         key(Key.DirectionUp)
-        assertTrue("Up does not close the dialog", exists("live-info-panel"))
+        assertTrue("Up does not close details", exists("programme-details-page"))
         assertEquals(action, focused())
         key(Key.Back)
-        assertFalse(exists("live-info-panel"))
-        assertEquals("one Back returns to the card", listOf("player-channel-card-2"), focused())
+        assertFalse(exists("programme-details-page"))
+        assertEquals("one Back returns to the invoking card", listOf("player-channel-card-2"), focused())
+        assertTrue(exists("player-channel-browser"))
         key(Key.DirectionCenter)
-        assertEquals("the first short OK after a native hold tunes", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        assertEquals("the first short OK after closing tunes channel 2", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         key(Key.Back)
         assertFalse(exists("player-channel-browser"))
-        assertEquals(listOf("player-pause"), focused())
+        assertEquals("subsequent Back from the rail returns to Pause", listOf("player-pause"), focused())
     }
 
     @Test fun accessibilityLongClickAfterCompletedOkDoesNotSwallowFirstDetailsOk() {
@@ -1419,7 +1393,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionLeft)
         compose.onNodeWithTag("player-channel-card-2").performSemanticsAction(SemanticsActions.OnLongClick)
         settle()
-        assertTrue(exists("live-info-panel"))
+        assertTrue(exists("programme-details-page"))
         key(Key.DirectionCenter)
         assertEquals("a fresh OK activates Watch", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
     }
@@ -1484,198 +1458,18 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-pause"), focused())
     }
 
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun detailsScheduleScrollsSmoothlyAndRestoresViewport() = scheduleScroll()
-
-    private fun scheduleScroll() {
-        screen()
-        val now = System.currentTimeMillis() / 1_000L
-        session.publish(observation(now, (0..11).map {
-            EpgEvent.create(EventId(11L + it), ChannelId(1), Instant.fromEpochSeconds(now - 600 + it * 1800),
-                Instant.fromEpochSeconds(now + 1200 + it * 1800), title = "Programme $it", summary = "Summary")
-        }))
-        settle()
-        key(Key.Info); key(Key.DirectionUp); key(Key.DirectionRight); key(Key.DirectionDown)
-        var node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
-        val list = node.layoutInfo.getModifierInfo()
-            .mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
-            .flatMap { it.inspectableElements.toList() }.map { it.value }
-            .filterIsInstance<androidx.compose.foundation.lazy.LazyListState>().single()
-        assertEquals("list is bounded by the visible viewport", node.boundsInRoot.height, list.layoutInfo.viewportSize.height.toFloat(), 1f)
-        assertTrue("both paths have more rows to scroll", list.canScrollForward)
-        assertPageTopBand()
-        val thumbnail = compose.onNodeWithTag("details-schedule-11", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        val thumbnailLeft = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(thumbnail.size.width / 2f, 0f)).x - thumbnail.size.width / 2f
-        assertEquals("only details-tab content is inset", 130f, thumbnailLeft, 0.5f)
-        val thumbnailTop = thumbnail.localToRoot(androidx.compose.ui.geometry.Offset(0f, thumbnail.size.height / 2f)).y - thumbnail.size.height / 2f
-        assertEquals("Now keeps trial.49's start position", 168f, thumbnailTop, 0.5f)
-        assertEquals("peek fractions use the reference canvas", 960, view.width)
-        assertEquals("peek fractions use the reference canvas", 540, view.height)
-        assertEquals("row gap is fixed", 13, list.layoutInfo.mainAxisItemSpacing)
-        assertEquals("viewport bleeds to the screen bottom", 540f, node.boundsInRoot.bottom, 0.5f)
-        val heading = compose.onNodeWithTag("details-tabs", useUnmergedTree = true).fetchSemanticsNode()
-        assertTrue("peek stays below the headline/tabs", node.boundsInRoot.top >= heading.boundsInRoot.bottom)
-        println("SCHEDULE viewport=${list.layoutInfo.viewportSize.height}")
-        val failures = mutableListOf<String>()
-        fun assertPeeks() {
-            val viewport = node.boundsInRoot
-            val cards = list.layoutInfo.visibleItemsInfo.map { item ->
-                val coordinates = compose.onNodeWithTag("details-schedule-${11 + item.index}", useUnmergedTree = true)
-                    .fetchSemanticsNode().layoutInfo.coordinates
-                val top = coordinates.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
-                val bottom = coordinates.localToRoot(androidx.compose.ui.geometry.Offset(0f, coordinates.size.height.toFloat())).y
-                top to bottom
-            }
-            fun fraction(top: Boolean): Float {
-                val edge = if (top) viewport.top else viewport.bottom
-                val card = cards.singleOrNull { (a, b) -> a < edge && b > edge } ?: return 0f
-                return (if (top) card.second - edge else edge - card.first) / (card.second - card.first)
-            }
-            if (list.canScrollBackward && fraction(true) !in 0.3f..0.55f)
-                failures += "top peek fraction=${fraction(true)} viewport=$viewport cards=$cards"
-            if (list.canScrollForward && fraction(false) !in 0.3f..0.55f)
-                failures += "bottom peek fraction=${fraction(false)} viewport=$viewport cards=$cards"
-        }
-        assertPeeks()
-        assertFalse("Now has no previous row", list.canScrollBackward)
-        fun scrollPosition(): Int = list.firstVisibleItemIndex *
-            (list.layoutInfo.visibleItemsInfo.first().size + list.layoutInfo.mainAxisItemSpacing) + list.firstVisibleItemScrollOffset
-        fun step(down: Boolean) {
-            val values = mutableListOf(scrollPosition())
-            compose.onRoot().performKeyInput { pressKey(if (down) Key.DirectionDown else Key.DirectionUp) }
-            repeat(40) {
-                compose.mainClock.advanceTimeBy(16)
-                compose.waitForIdle()
-                values += scrollPosition()
-                val focusedRow = compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().single()
-                val coordinates = focusedRow.layoutInfo.coordinates
-                val top = coordinates.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y
-                val bottom = coordinates.localToRoot(androidx.compose.ui.geometry.Offset(0f, coordinates.size.height.toFloat())).y
-                if (top < node.boundsInRoot.top - 1 || bottom > node.boundsInRoot.bottom + 1)
-                    failures += "focused row clipped down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
-                if ((list.canScrollBackward && top < node.boundsInRoot.top + 24f) ||
-                    (list.canScrollForward && bottom > node.boundsInRoot.bottom - 32f))
-                    failures += "focused row enters fade down=$down top=$top bottom=$bottom viewport=${node.boundsInRoot}"
-            }
-            println("SCHEDULE down=$down offsets=$values")
-            if (values.zipWithNext().any { (a, b) -> if (down) b < a else b > a }) failures += "wrong direction: $values"
-            if (values.last() != values.first() && values.distinct().size <= 2) failures += "single-frame jump: $values"
-        }
-        repeat(3) { step(down = true) }
-        assertEquals(listOf("details-schedule-14"), focused())
-        assertTrue(list.canScrollBackward && list.canScrollForward)
-        assertPeeks()
-        val precedingRow = compose.onNodeWithTag("details-schedule-13", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        assertTrue("one complete row above focus stays below the top fade",
-            precedingRow.localToRoot(androidx.compose.ui.geometry.Offset.Zero).y >= node.boundsInRoot.top + 24f)
-        val position = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
-        val fade = node.layoutInfo.getModifierInfo().first {
-            (it.modifier as? androidx.compose.ui.platform.InspectableValue)?.nameFallback == "drawWithContent"
-        }.modifier
-        // Replay the production edge mask over a solid colour; video/artwork cannot hide a missing fade.
-        compose.runOnIdle {
-            scrimUnderTest.value = Modifier.graphicsLayer { compositingStrategy = androidx.compose.ui.graphics.CompositingStrategy.Offscreen }
-                .then(fade).drawBehind { drawRect(Color.Red) }
-            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
-        }
-        repeat(2) { compose.mainClock.advanceTimeByFrame() }
-        val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
-        compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
-        println("FADE back=${list.canScrollBackward} forward=${list.canScrollForward} pixels=" + listOf(2, 16, 32, view.height / 2, view.height - 3).map { bitmap.getPixel(400, it).toUInt().toString(16) })
-        assertTrue("top edge mask fades", android.graphics.Color.green(bitmap.getPixel(400, 2)) > 200)
-        assertTrue("bottom edge mask fades", android.graphics.Color.green(bitmap.getPixel(400, view.height - 3)) > 200)
-        assertEquals("centre stays opaque", 0, android.graphics.Color.green(bitmap.getPixel(400, view.height / 2)))
-        bitmap.recycle()
-        compose.runOnIdle { scrimUnderTest.value = null }
-        key(Key.DirectionCenter)
-        key(Key.Back)
-        assertEquals(listOf("details-schedule-14"), focused())
-        node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
-        val restored = node.layoutInfo.getModifierInfo().mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
-            .flatMap { it.inspectableElements.toList() }.map { it.value }
-            .filterIsInstance<androidx.compose.foundation.lazy.LazyListState>().single()
-        assertTrue("the same viewport survives opening details", list === restored)
-        assertEquals("Back preserves index and pixel offset", position, restored.firstVisibleItemIndex to restored.firstVisibleItemScrollOffset)
-        repeat(3) { step(down = false) }
-        assertEquals(listOf("details-schedule-11"), focused())
-        assertFalse("return to Now removes the top fade", list.canScrollBackward)
-        assertPeeks()
-        repeat(2) { key(Key.DirectionDown) }
-        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-        compose.mainClock.advanceTimeBy(32)
-        compose.waitForIdle()
-        assertEquals("interrupt the fourth row's scroll", listOf("details-schedule-14"), focused())
-        key(Key.DirectionCenter)
-        assertEquals("the interrupted row opens details", listOf("details-record"), focused())
-        assertEquals("opening a programme does not also activate Record", 0,
-            compose.onAllNodes(isDialog()).fetchSemanticsNodes().size)
-        val interruptedPosition = list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset
-        key(Key.Back)
-        assertEquals("Back does not restart an interrupted focus scroll", interruptedPosition,
-            list.firstVisibleItemIndex to list.firstVisibleItemScrollOffset)
-        assertEquals("Back restores the interrupted row", listOf("details-schedule-14"), focused())
-        repeat(8) { key(Key.DirectionDown) }
-        assertEquals(listOf("details-schedule-22"), focused())
-        assertFalse("last row has no following peek or fade", list.canScrollForward)
-        node = compose.onNodeWithTag("details-schedule", useUnmergedTree = true).fetchSemanticsNode()
-        assertPeeks()
-        assertTrue(failures.joinToString("\n"), failures.isEmpty())
-    }
-
-    @Test fun playerInfoScheduleOpensAProgrammeAndBackRestoresTheRowThenDetails() {
-        screen()
-        key(Key.Info)
-        assertTrue("both known programs expose Schedule", exists("details-tab-1"))
-        key(Key.DirectionUp)
-        assertEquals(listOf("details-tab-0"), focused())
-        key(Key.DirectionRight)
-        assertEquals("changing tabs keeps focus on the tab", listOf("details-tab-1"), focused())
-        key(Key.DirectionRight)
-        assertEquals(listOf("details-tab-1"), focused())
-        key(Key.DirectionDown)
-        assertEquals(listOf("details-schedule-11"), focused())
-        key(Key.DirectionUp)
-        assertEquals(listOf("details-tab-1"), focused())
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        assertEquals(listOf("details-schedule-12"), focused())
-        key(Key.DirectionCenter)
-        assertEquals(listOf("details-record"), focused())
-        assertFalse("a schedule selection pushes details without tabs", exists("details-tab-0"))
-        assertFalse(exists("details-tab-1"))
-        assertTrue(texts("details-title").contains("Later"))
-        repeat(4) { key(Key.DirectionDown) }
-        assertEquals(listOf("details-more-info"), focused())
-        key(Key.DirectionCenter)
-        key(Key.Back)
-        assertEquals(listOf("details-more-info"), focused())
-        key(Key.Back)
-        assertEquals(listOf("details-schedule-12"), focused())
-        key(Key.Back)
-        assertEquals("Back from Schedule returns to Details", listOf("live-info-record"), focused())
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
-        assertEquals("tab Down starts at Now; opened programme Back still restores its row", listOf("details-schedule-11"), focused())
-        key(Key.Back)
-        key(Key.DirectionUp)
-        key(Key.Back)
-        assertEquals("Back from the first tab returns to its first action", listOf("live-info-record"), focused())
-        key(Key.Back)
-        assertFalse(exists("live-info-panel"))
-    }
-
     @Test fun playerInfoRecordsDirectlyThenOffersStopFromObservedState() {
         screen(recordingProfile = DvrConfigId("archive"))
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
         key(Key.Info)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         assertEquals(DvrConfigId("archive"), scheduleRequests.single().configId)
         publishInfoRecording(DvrEntryState.RECORDING)
-        assertEquals("Stop recording", texts("live-info-record"))
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals("Stop recording", texts("details-stop"))
+        assertEquals(listOf("details-stop"), focused())
         assertTrue("command success never posts a notice", notices.state.value.pending.isEmpty())
         assertFalse("the shared queue replaces the local notice", exists("programme-recording-notice"))
         session.dvrRepository.scriptStopEntry(DvrMutationResult.Confirmed(Unit))
@@ -1684,20 +1478,21 @@ class LivePlayerChromeScreenTest {
         confirmInfoAction(destructive = true)
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals(listOf("details-stop"), focused())
     }
 
     @Test fun playerInfoConfirmationBackIsSafeAndDoesNotCloseDetails() {
         screen(recordingScheduled = true)
         key(Key.Info)
+        compose.onNodeWithTag("details-cancel").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
         compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
-        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput { pressKey(Key.Back) }
+        compose.onNode(isDialog()).performKeyInput { pressKey(Key.Back) }
         settle()
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
-        assertTrue(exists("live-info-panel"))
-        assertEquals(listOf("live-info-record"), focused())
+        assertTrue(exists("programme-details-page"))
+        assertEquals(listOf("details-cancel"), focused())
         assertTrue(notices.state.value.pending.isEmpty())
     }
 
@@ -1705,58 +1500,38 @@ class LivePlayerChromeScreenTest {
         screen()
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
         key(Key.Info)
-        val click = compose.onNodeWithTag("live-info-record").fetchSemanticsNode()
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        val click = compose.onNodeWithTag("details-record").fetchSemanticsNode()
             .config[SemanticsActions.OnClick].action!!
         compose.runOnIdle { click(); click() }
         settle()
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals(listOf("details-record"), focused())
     }
 
     @Test fun playerInfoStopKeepReturnsToTheInvokingButtonWithoutSending() {
         screen()
         publishInfoRecording(DvrEntryState.RECORDING)
         key(Key.Info)
+        compose.onNodeWithTag("details-stop").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
         compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals("Keep recording")
             .performKeyInput { pressKey(Key.DirectionCenter) }
         settle()
         assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_STOP_ENTRY })
-        assertEquals(listOf("live-info-record"), focused())
-    }
-
-    @Test fun playerInfoRecordsFutureProgrammeDirectlyThenCanCancelTheSchedule() {
-        screen()
-        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(8)))
-        key(Key.Info)
-        key(Key.DirectionUp)
-        key(Key.DirectionRight)
-        key(Key.DirectionDown)
-        key(Key.DirectionDown)
-        key(Key.DirectionCenter)
-        key(Key.DirectionCenter)
-        compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
-        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
-        publishInfoRecording(DvrEntryState.SCHEDULED, EventId(12))
-        assertEquals("Cancel recording", texts("details-record"))
-        assertEquals(listOf("details-record"), focused())
-        session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
-        key(Key.DirectionCenter)
-        confirmInfoAction(destructive = true)
-        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
-        key(Key.Back)
-        assertEquals(listOf("details-schedule-12"), focused())
+        assertEquals(listOf("details-stop"), focused())
     }
 
     @Test fun playerInfoRecordingFailureKeepsRecordAndShowsANonFocusableNotice() {
         screen()
         session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
         key(Key.Info)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
-        assertEquals("Record", texts("live-info-record"))
-        assertEquals(listOf("live-info-record"), focused())
+        assertEquals("Record", texts("details-record"))
+        assertEquals(listOf("details-record"), focused())
         val notice = notices.state.value.pending.single().notice
         assertEquals(NoticeSeverity.FAILURE, notice.severity)
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED), notice)
@@ -1765,23 +1540,79 @@ class LivePlayerChromeScreenTest {
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
     }
 
-    @Test fun playerInfoUpOnEitherTabClosesAndRestoresTheInvokingControl() {
-        screen()
-        key(Key.DirectionDown)
-        for (tab in 0..1) {
-            assertEquals(listOf("player-pause"), focused())
-            key(Key.Info)
-            assertTrue("the shared pill is always visible", exists("details-player-hint"))
-            key(Key.DirectionUp)
-            if (tab == 1) key(Key.DirectionRight)
-            assertTrue(exists("details-player-hint"))
-            key(Key.DirectionUp)
-            assertFalse(exists("live-info-panel"))
-            assertEquals(listOf("player-pause"), focused())
-        }
+    @Test fun playerInfoRecordResultAfterCloseDoesNotAffectReopenedProgramme() {
+        val completion = CompletableDeferred<Unit>()
+        screen(scheduleCompletion = completion)
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
+        key(Key.Info)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        key(Key.Back)
+        val now = System.currentTimeMillis() / 1_000L
+        session.publish(observation(now, listOf(EpgEvent.create(EventId(21), ChannelId(1),
+            Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "New programme"))))
+        settle()
+        key(Key.Info)
+        assertEquals("New programme", texts("details-title"))
+        compose.runOnIdle { completion.complete(Unit) }
+        settle()
+        assertTrue("the closed page cannot post its failure into the new page", notices.state.value.pending.isEmpty())
+        assertEquals(listOf("details-continue_watching"), focused())
+        compose.onNodeWithTag("details-record").assertExists()
+        compose.onNodeWithTag("details-stop").assertDoesNotExist()
     }
 
-    @Test fun playerInfoMoreInfoKeepsIdentityAndAddsUntruncatedMetadata() {
+    @Test fun playerInfoRecordResultAfterSelectingAnotherAiringDoesNotAffectThatPage() {
+        val completion = CompletableDeferred<Unit>()
+        screen(scheduleCompletion = completion)
+        publishMatchingFutureProgramme()
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
+        key(Key.Info)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("details-card-12").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.runOnIdle { completion.complete(Unit) }
+        settle()
+        assertTrue(notices.state.value.pending.isEmpty())
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.onNodeWithTag("details-record").assertExists()
+    }
+
+    @Test fun playerInfoFutureAiringRecordsThenAutomaticallyFocusesCancel() {
+        screen()
+        publishMatchingFutureProgramme()
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Confirmed(DvrEntryId(7)))
+        key(Key.Info)
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("details-card-12").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        publishInfoRecording(DvrEntryState.SCHEDULED, EventId(12))
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+        session.dvrRepository.scriptCancelEntry(DvrMutationResult.Confirmed(Unit))
+        key(Key.DirectionCenter)
+        assertEquals(0, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+        confirmInfoAction(destructive = true)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_CANCEL_ENTRY })
+        compose.onNodeWithTag("details-cancel").assertIsFocused()
+    }
+
+    private fun publishMatchingFutureProgramme() {
+        val now = System.currentTimeMillis() / 1_000L
+        val events = (session.observation.value.epgState as EpgRepositoryState.Current).snapshot.events
+        session.publish(observation(now, listOf(events.first(), EpgEvent.create(EventId(12), ChannelId(1),
+            Instant.fromEpochSeconds(now + 3_600), Instant.fromEpochSeconds(now + 7_200), title = "Now showing"))))
+        settle()
+    }
+
+    @Test fun playerInfoUsesSharedDescriptionReaderAndReturnsToItsPanel() {
         screen()
         val now = System.currentTimeMillis() / 1_000L
         val description = "A full description with its own ending. ".repeat(24)
@@ -1792,47 +1623,23 @@ class LivePlayerChromeScreenTest {
             episode = at.bernhardberger.tvheadend.sdk.core.EpgEpisode(null, null, 2, null, 3, 6, null, null, null)))))
         settle()
         key(Key.Info)
-        repeat(3) { key(Key.DirectionDown) }
+        compose.onNodeWithTag("details-about-description").performSemanticsAction(SemanticsActions.RequestFocus)
         key(Key.DirectionCenter)
-        assertEquals(listOf("player-info-reading"), focused())
-        assertTrue(texts("details-title").contains("Now showing"))
-        assertTrue(texts("details-facts").contains("Drama"))
-        assertFalse("episode already used as subtitle is not duplicated", texts("details-facts").contains("S2"))
-        val text = texts("details-full-description")
-        listOf(description.trim(), "Summary", "A separate summary", "Categories", "Documentary", "Keywords", "Mountains", "Copyright year", "2024")
-            .forEach { assertTrue("reading includes $it", text.contains(it)) }
-        assertFalse("the visual heading is not repeated inside the reader", text.contains("More info"))
-        assertEquals("More info", compose.onNodeWithTag("player-info-reading").fetchSemanticsNode()
-            .config[SemanticsProperties.PaneTitle])
-        key(Key.DirectionUp)
-        key(Key.DirectionLeft)
-        key(Key.DirectionRight)
-        assertEquals("reading boundaries contain focus", listOf("player-info-reading"), focused())
-        repeat(8) { key(Key.DirectionDown) }
-        assertEquals(listOf("player-info-reading"), focused())
+        assertTrue(texts("details-reading-heading").contains("Now showing"))
+        assertTrue(texts("details-reading-text").contains(description.trim()))
         key(Key.Back)
-        assertEquals(listOf("details-more-info"), focused())
+        assertEquals(listOf("details-about-description"), focused())
     }
 
-    @Test fun upRevealLandsOnPauseAndTheProgrammeNeverZaps() {
+    @Test fun upRevealLandsOnPauseAndArtworkRemainsPassive() {
         screen()
         assertFalse("the live controls have no Record action", exists("player-record"))
         key(Key.DirectionUp)
         assertEquals("Up reveals controls onto Pause", listOf("player-pause"), focused())
         key(Key.DirectionUp)
-        assertEquals(listOf(PlayerIdentityCardTag), focused())
-        key(Key.DirectionRight)
-        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertEquals("focus stays on the programme", listOf(PlayerIdentityCardTag), focused())
-        compose.onRoot().performKeyInput {
-            keyDown(Key.DirectionLeft)
-            advanceEventTime(600)
-            keyUp(Key.DirectionLeft)
-        }
-        settle()
-        assertEquals("a held Left never zaps", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        assertEquals(listOf("player-pause"), focused())
+        assertFalse(compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config.contains(SemanticsActions.OnClick))
         assertFalse("no browser opens", exists("player-channel-browser"))
-        assertEquals("focus stays on the programme", listOf(PlayerIdentityCardTag), focused())
         assertTrue(identityDescription().contains("Name 1"))
     }
 
@@ -1855,136 +1662,20 @@ class LivePlayerChromeScreenTest {
         assertTrue("another channel keeps the browser", exists("player-channel-browser"))
     }
 
-    @Test fun programInfoMovesElementsNotSectionsThenRestoresFocusAndDisposesDetails() {
+    @Test fun sharedDetailsPreserveThePlayerAndDisposeOnBack() {
         screen()
         key(Key.DirectionDown)
-        val controls = compose.onNodeWithTag("player-pause", useUnmergedTree = true).fetchSemanticsNode().layoutInfo
-        val first = compose.onNodeWithTag("player-page-first").fetchSemanticsNode().layoutInfo.coordinates
-        val scrim = compose.onNodeWithTag("player-page-scrim").fetchSemanticsNode().layoutInfo.coordinates
-        val footerNode = compose.onNodeWithTag("player-footer").fetchSemanticsNode()
-        val footer = footerNode.layoutInfo.coordinates
-        val footerTop = footer.positionInRoot().y
-        val clock = compose.onNodeWithTag("player-top-cluster", useUnmergedTree = true).fetchSemanticsNode()
-        val clockTop = clock.boundsInRoot.top
-        compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput { pressKey(Key.Info) }
-        // The key's state write reaches the composition through the looper, not the frame clock. Without
-        // draining it, a loaded run steps the manual clock past frames in which nothing could start yet.
-        compose.waitForIdle()
-        compose.mainClock.advanceTimeBy(250)
-        val second = compose.onNodeWithTag("player-page-second").fetchSemanticsNode().layoutInfo.coordinates
-        val tabs = compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode().layoutInfo.coordinates
-        assertTrue(pageAlpha(footerNode) < 1f)
-        assertTrue(pageAlpha(compose.onNodeWithTag("details-top-row", useUnmergedTree = true).fetchSemanticsNode()) > 0f)
-        val strip = compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).fetchSemanticsNode()
-        val stripMotion = compose.onNodeWithTag("player-now-playing-motion", useUnmergedTree = true).fetchSemanticsNode()
-        assertTrue("controls-to-details fades the strip in", pageAlpha(stripMotion) > 0f && pageAlpha(stripMotion) < 1f)
-        val stripBounds = strip.boundsInRoot
-        val midTabsTop = tabs.positionInRoot().y
-        assertTrue("footer rises instead of pulling the viewport", footer.positionInRoot().y < footerTop)
-        assertEquals(0f, first.positionInRoot().y, 0f)
-        assertEquals(0f, second.positionInRoot().y, 0f)
-        assertEquals(clockTop, clock.boundsInRoot.top, 0f)
-        assertEquals(0f, scrim.positionInRoot().y, 0f)
-        assertTrue("neither moving section exposes an action", focused().none { it == "player-pause" || it == "live-info-record" })
-        settle()
-        assertTrue("tabs enter from below their rest", midTabsTop > tabs.positionInRoot().y)
-        assertTrue("clock ${clock.boundsInRoot} clears the details row at ${tabs.positionInRoot().y}",
-            tabs.positionInRoot().y - clock.boundsInRoot.bottom >= 8f)
-        assertEquals(listOf("live-info-record"), focused())
-        assertTrue("the controls stay composed behind the details", controls.isAttached)
-        assertPageTopBand()
-        assertEquals("the strip fades without travelling", stripBounds, strip.boundsInRoot)
-        assertEquals(58f, tabs.positionInRoot().x, 0.5f)
-        assertEquals(130f, compose.onNodeWithTag("details-information", useUnmergedTree = true)
-            .fetchSemanticsNode().layoutInfo.coordinates.positionInRoot().x, 0.5f)
-        assertEquals(1f, pageAlpha(compose.onNodeWithTag("player-now-playing-motion", useUnmergedTree = true)
-            .fetchSemanticsNode()), 0.001f)
-        compose.onRoot().performKeyInput { pressKey(Key.Back) }
-        compose.mainClock.advanceTimeBy(120)
-        assertTrue(second.isAttached)
-        assertEquals(0f, second.positionInRoot().y, 0f)
-        assertEquals(0f, scrim.positionInRoot().y, 0f)
-        settle()
-        assertFalse(second.isAttached)
-        assertEquals(listOf("player-pause"), focused())
-        compose.mainClock.autoAdvance = true
-        assertTrue("the return reuses the same controls", controls.isAttached)
+        val target = runtime.activeTarget.value
+        val playing = player.playWhenReady
+        key(Key.Info)
+        assertEquals(listOf("details-continue_watching"), focused())
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(playing, player.playWhenReady)
+        key(Key.Back)
+        assertFalse(exists("programme-details-page"))
+        assertEquals(listOf("player-info"), focused())
         assertFalse("controls rest has no now-playing strip", exists("player-now-playing"))
         assertTrue(exists("player-actions"))
-    }
-
-    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun controlsPageScrimFadesMonotonicallyDownAndBack() = pageScrimSeries()
-
-    private val scrimUnderTest = mutableStateOf<Modifier?>(null)
-
-    private fun pageScrimSeries() {
-        screen()
-        key(Key.DirectionDown)
-        compose.mainClock.autoAdvance = false
-        // Mirror the actual viewport draw modifier over white, without chrome/content occluding
-        // the sample points. It reads the production screen's live scrim inputs and page clock.
-        val drawModifier = compose.onNodeWithTag("player-page-scrim").fetchSemanticsNode()
-            .layoutInfo.getModifierInfo().single {
-                (it.modifier as? androidx.compose.ui.platform.InspectableValue)?.nameFallback == "drawWithCache"
-            }.modifier
-        compose.runOnIdle {
-            scrimUnderTest.value = drawModifier
-            androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
-        }
-        repeat(2) { compose.mainClock.advanceTimeByFrame() }
-        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-        fun sample(): List<Float> {
-            compose.waitForIdle()
-            compose.runOnIdle { view.draw(Canvas(bitmap)) }
-            return listOf(0.1f, 0.3f, 0.5f, 0.7f, 0.9f).map {
-                1f - android.graphics.Color.red(bitmap.getPixel(bitmap.width / 2, (bitmap.height * it).toInt())) / 255f
-            }
-        }
-        val failures = mutableListOf<String>()
-        for (down in listOf(true, false)) {
-            val frames = mutableListOf(sample())
-            compose.onRoot().performKeyInput { pressKey(if (!down) Key.Back else Key.Info) }
-            repeat(36) {
-                compose.mainClock.advanceTimeBy(16)
-                frames += sample()
-            }
-            println("SCRIM down=$down " + frames.filterIndexed { index, _ -> index % 2 == 0 }
-                .mapIndexed { index, values -> "${index * 32}:" + values.joinToString(",") { "%.3f".format(java.util.Locale.ROOT, it) } }.joinToString(";"))
-            assertTrue("the sampled scrim actually changes between the two rests",
-                if (down) frames.last()[1] > frames.first()[1] + 0.1f else frames.last()[1] < frames.first()[1] - 0.1f)
-            frames.zipWithNext().forEachIndexed { index, (from, to) ->
-                from.indices.forEach { y ->
-                    if (if (down) to[y] < from[y] - 1.01f / 255 else to[y] > from[y] + 1.01f / 255)
-                        failures += "down=$down at ${(index + 1) * 16}ms y=${y * 20 + 10}%: ${from[y]} -> ${to[y]}"
-                }
-            }
-        }
-        bitmap.recycle()
-        compose.mainClock.autoAdvance = true
-        assertTrue(failures.joinToString("\n"), failures.isEmpty())
-    }
-
-    /** Read the actual layer via Compose's inspector, without a production test seam. */
-    private fun pageAlpha(node: androidx.compose.ui.semantics.SemanticsNode): Float =
-        node.layoutInfo.getModifierInfo().mapNotNull { it.modifier as? androidx.compose.ui.platform.InspectableValue }
-            .filter { it.nameFallback == "graphicsLayer" }.fold(1f) { alpha, layer ->
-                @Suppress("UNCHECKED_CAST")
-                val block = layer.inspectableElements.first { it.name == "block" }.value as androidx.compose.ui.graphics.GraphicsLayerScope.() -> Unit
-                alpha * androidx.compose.ui.graphics.GraphicsLayerScope().apply(block).alpha
-            }
-
-    /** [key] returns from the details: they stay composed until the transition settles. */
-    private fun stepBackFromDetails(key: Key) {
-        val details = compose.onNodeWithTag("live-info-panel").fetchSemanticsNode().layoutInfo
-        compose.mainClock.autoAdvance = false
-        compose.onRoot().performKeyInput { pressKey(key) }
-        compose.mainClock.advanceTimeBy(220)
-        assertTrue("the details are still stepping out", details.isAttached)
-        settle()
-        assertFalse("the details leave once the step ends", details.isAttached)
-        compose.mainClock.autoAdvance = true
     }
 
     @Test fun shortOkTunesDirectlyAndKeepsBrowsingContext() {
@@ -1994,22 +1685,9 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionRight)
         key(Key.DirectionCenter)
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertFalse(exists("live-info-panel"))
+        assertFalse(exists("programme-details-page"))
         assertTrue(exists("player-channel-browser"))
         assertEquals(listOf("player-channel-card-2"), focused())
-    }
-
-    private fun assertPageTopBand() {
-        val strip = compose.onNodeWithTag("player-now-playing", useUnmergedTree = true).fetchSemanticsNode()
-        val hint = compose.onNodeWithTag("details-player-hint", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        val clock = compose.onNodeWithTag("player-top-cluster", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(58f, strip.boundsInRoot.left, 0.5f)
-        assertEquals(clock.center.y, strip.boundsInRoot.center.y, 0.5f)
-        assertEquals(clock.center.y, hint.center.y, 0.5f)
-        assertEquals(480f, hint.center.x, 0.5f)
-        assertTrue("strip clears the centered affordance", strip.boundsInRoot.right < hint.left)
-        assertTrue("affordance clears the clock", hint.right < clock.left)
-        assertFalse(strip.config.contains(SemanticsProperties.Focused))
     }
 
     private fun openRows() {
@@ -2020,7 +1698,7 @@ class LivePlayerChromeScreenTest {
 
     private fun confirmInfoAction(destructive: Boolean = false) {
         compose.onNodeWithTag("two-column-first").assertIsFocused()
-        compose.onNode(isDialog() and !hasTestTag("live-info-panel")).performKeyInput {
+        compose.onNode(isDialog()).performKeyInput {
             if (destructive) pressKey(Key.DirectionRight)
             pressKey(Key.DirectionCenter)
         }
@@ -2212,6 +1890,7 @@ class LivePlayerChromeScreenTest {
         afterTargetPlay: () -> Unit = {},
         acceptStartupOutcome: () -> Boolean = { true },
         onStartupOutcome: (MainStartupPlaybackOutcome) -> Unit = {},
+        scheduleCompletion: CompletableDeferred<Unit>? = null,
     ) {
         val now = System.currentTimeMillis() / 1_000L
         session = FakeTvheadendSession(observation(now, if (!epg) emptyList() else listOf(
@@ -2236,7 +1915,9 @@ class LivePlayerChromeScreenTest {
             override val dvrRepository = object : DvrRepository by session.dvrRepository {
                 override suspend fun scheduleEntry(currentSession: CurrentSessionObservation, request: DvrScheduleRequest): DvrMutationResult<DvrEntryId> {
                     scheduleRequests += request
-                    return session.dvrRepository.scheduleEntry(currentSession, request)
+                    val result = session.dvrRepository.scheduleEntry(currentSession, request)
+                    scheduleCompletion?.await()
+                    return result
                 }
             }
         }
@@ -2290,7 +1971,6 @@ class LivePlayerChromeScreenTest {
                             contentAllowed = contentAllowed(), notices = notices, uiSettingsStore = uiSettings,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
-                        scrimUnderTest.value?.let { Box(Modifier.fillMaxSize().background(Color.White).then(it)) }
                     }
                 }
             }
