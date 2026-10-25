@@ -687,7 +687,10 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   below the buttons-only header row, bottom-aligned to the ruler gap and at most
   480dp wide. Its fixed height includes room for a subtitle under a one-line title
   without displacing the facts; that extra line scales with the subtitle's text
-  style and top padding. There is no synopsis, and accessibility reads the
+  style and top padding. The facts row reserves at least 22dp, growing with
+  `labelMedium` line height plus the age rating's 4dp padding. The headline
+  keeps a 12dp gap above the ruler, with no extra grid spacer; when hidden,
+  the header row sits directly above the ruler. There is no synopsis, and accessibility reads the
   headline after the buttons. A 104dp channel column (124dp with
   Regular rows) and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
@@ -711,7 +714,10 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   and a time label the pill would touch is hidden rather than half covered. Each ruler time
   label starts at its half-hour's subtle boundary line, which runs the ruler
   band's height where that time's programmes start; the times share one
-  baseline centred in the band. Programme cells have no row track:
+  baseline centered in the band. The band is `labelSmall` line height plus 4dp
+  (20dp at default text size). The pill keeps its 4dp lift above the labels,
+  drawing unclipped into the space above the band; its line starts at its bottom.
+  Programme cells have no row track:
   they sit on the page like the channel tiles, one 4dp gutter apart across and
   between rows, so a schedule gap shows as nothing on air. A focused cell does
   not grow: it keeps its genre tint (or plain fill) and light text and gains a

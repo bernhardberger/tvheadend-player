@@ -169,7 +169,7 @@ internal fun TimelineTimeRuler(
         modifier = modifier
             .fillMaxWidth()
             .height(with(LocalDensity.current) {
-                maxOf(28.dp, MaterialTheme.typography.labelSmall.lineHeight.toDp() + 12.dp)
+                MaterialTheme.typography.labelSmall.lineHeight.toDp() + 4.dp
             }),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -179,7 +179,6 @@ internal fun TimelineTimeRuler(
             modifier = Modifier
                 .weight(1f)
                 .fillMaxHeight()
-                .clip(MaterialTheme.shapes.small)
                 .testTag("epg-time-ruler"),
         ) {
             val density = LocalDensity.current
@@ -213,7 +212,7 @@ internal fun TimelineTimeRuler(
                         )
                     }
                 },
-                modifier = Modifier.fillMaxSize().guideViewportFades(
+                modifier = Modifier.fillMaxSize().clip(MaterialTheme.shapes.small).guideViewportFades(
                     0f, trackWidthPx, guideInnerContinuation(earlierContent, laterContent, isRtl), isRtl,
                 ),
             ) { measurables, constraints ->
@@ -259,7 +258,8 @@ internal fun TimelineTimeRuler(
                 ) { measurables, constraints ->
                     val height = constraints.maxHeight
                     val pill = measurables[1].measure(Constraints(maxWidth = constraints.maxWidth, maxHeight = height))
-                    val pillTop = ((height - pill.height) / 2 - RulerPillLift.roundToPx()).coerceAtLeast(0)
+                    // Let the lifted pill draw into the space above the band without clipping it.
+                    val pillTop = (height - pill.height) / 2 - RulerPillLift.roundToPx()
                     val stemTop = pillTop + pill.height
                     val stem = measurables[0].measure(Constraints.fixed(2.dp.roundToPx(), (height - stemTop).coerceAtLeast(0)))
                     layout(constraints.maxWidth, height) {
@@ -813,7 +813,6 @@ internal fun GuidePreparationSkeleton(
                 .heightIn(min = guideHeaderMinHeight()),
         )
         headline?.invoke()
-        Spacer(Modifier.height(4.dp))
         GuideSkeletonGrid(
             windowStartSec = windowStartSec,
             windowEndSec = windowEndSec,

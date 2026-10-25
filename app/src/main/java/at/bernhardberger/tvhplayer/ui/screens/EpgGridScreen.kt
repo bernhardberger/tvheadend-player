@@ -1913,7 +1913,6 @@ fun EpgGridScreen(
                     modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
                 )
             }
-            Spacer(Modifier.height(4.dp))
             GuideTimelineBody(
                 motion = scopeMotion,
                 selectedKey = channelScope.activeTagId,

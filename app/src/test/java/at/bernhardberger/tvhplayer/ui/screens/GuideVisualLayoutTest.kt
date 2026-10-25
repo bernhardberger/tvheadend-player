@@ -14,6 +14,7 @@ import android.os.SystemClock
 import android.view.View
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -79,6 +80,8 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineGroupGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineTitleGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -157,8 +160,9 @@ class GuideVisualLayoutTest {
     private var backgroundColor = 0
     /** [guideHeadlineHeight] at the shown font scale, in px, which the test's density makes dp. */
     private var headlineHeight = 0f
-    private var previousHeadlineHeight = 0f
-    private var subtitleHeight = 0f
+    private var rulerHeight = 0f
+    private var previousRulerHeight = 0f
+    private var factsHeightDeficit = 0f
     private var callsAtEntry = 0
     private lateinit var readyObservation: SessionObservation
     private var playbackRequests = 0
@@ -351,17 +355,18 @@ class GuideVisualLayoutTest {
         val ruler = bounds("epg-time-ruler")
         assertEquals(242f, ruler.left, .1f)
         assertEquals(718f, ruler.width, .1f)
-        assertEquals(72f, ruler.top, .1f)
-        assertEquals(100f, ruler.bottom, .1f)
+        assertEquals(68f, ruler.top, .1f)
+        assertEquals(rulerHeight, ruler.height, .1f)
         val first = bounds("epg-channel-row-1")
         assertEquals(130f, first.left, .1f)
         // The header draws no title; Tags names the whole channel set.
         compose.onNode(hasText(context().getString(R.string.epg_title)) and hasAnyAncestor(hasTestTag("channels-header")), useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("channels-tags-button").assertContentDescriptionEquals(context().getString(
             R.string.header_button_value_description, context().getString(R.string.browse_tags), context().getString(R.string.all_channels)))
-        assertEquals(108f, first.top, .1f)
+        assertEquals("Shorter ruler and removed spacer move the first row up",
+            108f - (previousRulerHeight - rulerHeight + 4f), first.top, .1f)
         assertEquals("Dense rows by default", 56f, first.height, .1f)
-        assertEquals(168f, bounds("epg-channel-row-2").top, .1f)
+        assertEquals(first.top + first.height + 4f, bounds("epg-channel-row-2").top, .1f)
         assertEquals(130f, bounds("epg-channel-header-1").left, .1f)
         assertEquals(234f, bounds("epg-channel-header-1").right, .1f)
         compose.onNodeWithText("Channels", substring = false).assertDoesNotExist()
@@ -391,7 +396,7 @@ class GuideVisualLayoutTest {
         assertEquals("Cells fill their row", firstRow.height, cell.height, .1f)
         val dotY = ruler.bottom.toInt() - 4
         assertEquals("Ruler dot and the continuous line share one mapping", lineColor, bitmap.getPixel(x.toInt(), dotY))
-        assertEquals("No line above the ruler", backgroundColor, bitmap.getPixel(x.toInt(), 66))
+        assertEquals("No line above the lifted pill", backgroundColor, bitmap.getPixel(x.toInt(), 62))
         assertReadableFocus()
         bitmap.recycle()
         key(Key.DirectionCenter)
@@ -434,18 +439,29 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
-    @Test fun theNowPillSitsAboveTheLabelsAndItsLineStartsBelowIt() {
-        show()
+    @Test fun theNowPillSitsAboveTheLabelsAndItsLineStartsBelowIt() = liftedNowPill(1f)
+
+    @Test fun theShortRulerKeepsTheLiftedNowPillAtLargeText() = liftedNowPill(1.3f)
+
+    private fun liftedNowPill(scale: Float) {
+        show(scale = scale)
         val ruler = bounds("epg-time-ruler")
+        assertEquals("Ruler follows labelSmall line height plus 4dp", rulerHeight, ruler.height, .5f)
         val pill = bounds("epg-now-pill")
         val label = rulerLabel("21:00").fetchSemanticsNode().boundsInRoot
         assertTrue("The pill sits above the labels: pill=$pill label=$label", pill.center.y < label.center.y)
-        assertTrue("The pill stays inside the ruler: pill=$pill ruler=$ruler", pill.top >= ruler.top - .5f)
+        assertEquals("The pill retains its 4dp lift", 4f, label.center.y - pill.center.y, .5f)
+        assertTrue("The lifted pill stays on screen", pill.top >= 0f)
+        assertTrue("The pill draws above the band", pill.top < ruler.top)
         val stem = bounds("epg-now-stem")
         assertEquals("The line starts below the pill", pill.bottom, stem.top, .5f)
         assertEquals("The line runs to the ruler's bottom", ruler.bottom, stem.bottom, .5f)
+        val bitmap = capture("guide-lifted-pill-font$scale", scale, LayoutDirection.Ltr)
+        assertEquals("The pill paints above the ruler without clipping", lineColor,
+            bitmap.getPixel(pill.center.x.toInt(), pill.top.toInt() + 1))
+        bitmap.recycle()
         // The 20:00 label beside Now (20:15) would touch the pill, so it is left out.
-        rulerLabel("20:00").assertIsNotDisplayed()
+        if (scale == 1f) rulerLabel("20:00").assertIsNotDisplayed()
     }
 
     @Test fun theDateButtonSaysNowWhileTheWindowHoldsItAndOtherwiseItsHalfHour() {
@@ -701,7 +717,7 @@ class GuideVisualLayoutTest {
         val nowSec = androidx.compose.runtime.mutableLongStateOf(1750L)
         compose.setContent {
             TVHeadendPlayerTheme {
-                Box(Modifier.width(732.dp)) {
+                Box(Modifier.width(732.dp).padding(top = 12.dp)) {
                     TimelineTimeRuler(0, 7200, { nowSec.longValue })
                 }
             }
@@ -712,7 +728,8 @@ class GuideVisualLayoutTest {
             .assertIsDisplayed()
         assertEquals("The pill is centred on now", ruler.left + guideTimePositionPx(1750L, 0, 7200, ruler.width),
             pill.center.x, 1f)
-        assertTrue("The pill stays within the ruler band", pill.top >= ruler.top && pill.bottom <= ruler.bottom)
+        assertTrue("The lifted pill stays in the visible area", pill.top >= 0f && pill.bottom <= ruler.bottom)
+        assertTrue("The pill draws above the band", pill.top < ruler.top)
         assertTrue("The covered label starts under the pill",
             ruler.left + guideTimePositionPx(1800L, 0, 7200, ruler.width) < pill.right)
         compose.onNodeWithText(formatHm(1800L), useUnmergedTree = true).assertIsNotDisplayed()
@@ -850,7 +867,8 @@ class GuideVisualLayoutTest {
         assertEquals("Native text must grow the lane", 73f, first.height, .1f)
         assertChannelHeader(bitmap, 1.3f)
         val ruler = bounds("epg-time-ruler")
-        assertTrue("Header must grow rather than clip", ruler.top > 72f)
+        assertTrue("Header must grow rather than clip", ruler.top > 68f)
+        assertEquals("The ruler grows with labelSmall", rulerHeight, ruler.height, .5f)
         val start = checkNotNull(position.position.value).windowStartSec
         val cell = compose.onNode(hasText(title(2, 0)) and isFocused()).fetchSemanticsNode().boundsInRoot
         assertTrue("One hour occupies about half the two-hour track", cell.width > ruler.width * .45f)
@@ -1746,7 +1764,7 @@ class GuideVisualLayoutTest {
         }
     }
 
-    @Test fun headlineShowsTheSettledProgrammeAboveAboutFourAndAHalfRows() {
+    @Test fun headlineShowsTheSettledProgrammeAboveAboutFiveRows() {
         show(headline = true)
         // On the header, before the grid has focus: the programme the grid enters.
         headlineTitle(title(1, 0))
@@ -1757,7 +1775,7 @@ class GuideVisualLayoutTest {
         assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
         val first = bounds("epg-channel-row-1").top
         val rows = (540f - first) / (bounds("epg-channel-row-2").top - first)
-        assertEquals("About four and a half rows below the headline", 4.5f, rows, .3f)
+        assertEquals("About five rows below the headline", 5f, rows, .15f)
         compose.onNodeWithTag("channels-immersive-background").assertExists()
         compose.onNodeWithTag("guide-headline").assert(hasText(title(1, 0), substring = true))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
@@ -1877,15 +1895,15 @@ class GuideVisualLayoutTest {
         compose.waitUntil(5_000) { compose.onAllNodesWithTag("guide-headline").fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("channels-immersive-background").assertDoesNotExist()
         compose.onNodeWithTag("guide-view-headline").assertIsOff()
-        assertEquals("The grid takes the headline's room", 72f, bounds("epg-time-ruler").top, .1f)
-        assertTrue(withHeadline > 72f)
+        assertEquals("The grid takes the headline's room", bounds("channels-header").bottom, bounds("epg-time-ruler").top, .1f)
+        assertEquals(headlineHeight + GuideHeadlineRulerGap.value, withHeadline - bounds("epg-time-ruler").top, .5f)
         assertFalse("The choice is kept", runBlocking { uiSettings.settings.first() }.guideView.headline)
         key(Key.Back)
         tagFocused("channels-view-button")
         assertNoPlayback()
     }
 
-    @Test fun theHeadlineSitsBelowTheHeaderAndAddsExactlyASubtitleLineAboveTheRuler() {
+    @Test fun theHeadlineSitsBelowTheHeaderWithItsReservedHeightAndRulerGap() {
         show(headline = true)
         headlineTitle(title(1, 0))
         val header = bounds("channels-header")
@@ -1894,10 +1912,7 @@ class GuideVisualLayoutTest {
         assertEquals("The headline starts below the header row", header.bottom, headline.top, .5f)
         assertEquals("The headline keeps its fixed height", headlineHeight, headline.height, .5f)
         assertEquals("Timing anchors the content to the bottom", headline.bottom, bounds("guide-headline-metadata").bottom, .5f)
-        assertEquals(header.bottom + headlineHeight + GuideHeadlineRulerGap.value + 4f, bounds("epg-time-ruler").top, .5f)
-        val previousRulerTop = header.bottom + previousHeadlineHeight + GuideHeadlineRulerGap.value + 4f
-        assertEquals("Only the subtitle line moves the ruler", subtitleHeight,
-            bounds("epg-time-ruler").top - previousRulerTop, .5f)
+        assertEquals(header.bottom + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
         compose.onNodeWithTag("guide-headline")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
         // The buttons keep their keys: Up from the grid reaches the date button, not the headline.
@@ -1924,37 +1939,47 @@ class GuideVisualLayoutTest {
         capture("guide-headline-subtitle", 1f, LayoutDirection.Ltr).recycle()
     }
 
-    // Long group names and a genre keep their own row above the headline.
-    @Test fun theHeadlineClearsTheHeaderButtons() = headlineClearsTheButtons(1f)
-
-    @Test fun theHeadlineClearsTheHeaderButtonsAtLargeText() = headlineClearsTheButtons(1.3f)
-
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun theHeadlineClearsTheGermanHeaderButtons() {
-        Locale.setDefault(Locale.GERMANY)
-        headlineClearsTheButtons(1f)
+    @Test fun theHeadlineShowsSubtitleAndAgeRatingAtLargeText() {
+        show(scale = 1.3f, headline = true, genres = true,
+            subtitle = "Six weeks with the coastguard", rating = EpgRating(12, null, null, null, null, null))
+        headlineTitle(title(1, 0))
+        for (part in listOf("title", "subtitle", "facts", "rating", "metadata")) {
+            compose.onNodeWithTag("guide-headline-$part", useUnmergedTree = true).assertIsDisplayed()
+        }
+        assertEquals("The fixed headline reserves the scaled age-rating row", 0f, factsHeightDeficit, .1f)
     }
 
-    /** Long German buttons at large text keep their own row. */
+    // The headline stays below the header row for every group name and genre.
+    @Test fun theHeadlineStaysBelowTheHeaderRowWithLongGroupAndFilter() = headlineBelowTheHeader(1f)
+
+    @Test fun theHeadlineStaysBelowTheHeaderRowAtLargeText() = headlineBelowTheHeader(1.3f)
+
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
-    fun theHeadlineGoesBelowTheGermanHeaderButtonsAtLargeText() {
+    fun theHeadlineStaysBelowTheGermanHeaderRow() {
         Locale.setDefault(Locale.GERMANY)
-        headlineClearsTheButtons(1.3f)
+        headlineBelowTheHeader(1f)
+    }
+
+    /** The same below-header placement holds for long German buttons at large text. */
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
+    fun theHeadlineStaysBelowTheGermanHeaderRowAtLargeText() {
+        Locale.setDefault(Locale.GERMANY)
+        headlineBelowTheHeader(1.3f)
     }
 
     @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
-    fun theHeadlineClearsTheHeaderButtonsRightToLeft() {
+    fun theHeadlineStaysBelowTheHeaderRowRightToLeft() {
         Locale.setDefault(Locale.forLanguageTag("ar"))
-        headlineClearsTheButtons(1f, direction = LayoutDirection.Rtl)
+        headlineBelowTheHeader(1f, direction = LayoutDirection.Rtl)
     }
 
     @Test fun theHeadlineStaysBelowTheHeaderWithAShortGroupAndAFilter() =
-        headlineClearsTheButtons(1f, group = "Favourites", genre = ProgrammeCategory.SPORT)
+        headlineBelowTheHeader(1f, group = "Favourites", genre = ProgrammeCategory.SPORT)
 
     /**
-     * The headline stays below the buttons regardless of the [group] name or chosen [genre].
+     * The headline stays below the header row regardless of the [group] name or chosen [genre].
      */
-    private fun headlineClearsTheButtons(
+    private fun headlineBelowTheHeader(
         scale: Float,
         direction: LayoutDirection = LayoutDirection.Ltr,
         group: String = "Dokumentationen, Reportagen und Wissen aus aller Welt",
@@ -1985,7 +2010,7 @@ class GuideVisualLayoutTest {
         assertTrue("The headline is at most a hero wide", headline.width <= ImmersiveHeroWidth.value + .5f)
         assertEquals("The headline ends where it did below the row: $geometry",
             header.bottom + headlineHeight, headline.bottom, .5f)
-        assertEquals(header.bottom + headlineHeight + GuideHeadlineRulerGap.value + 4f, bounds("epg-time-ruler").top, .5f)
+        assertEquals(header.bottom + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
         capture("guide-headline-buttons-${Locale.getDefault().language}-font$scale" +
             if (genre == ProgrammeCategory.SPORT) "-short" else "", scale, direction).recycle()
         assertNoPlayback()
@@ -2343,7 +2368,7 @@ class GuideVisualLayoutTest {
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
         initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
         playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
-        lastPlayedChannel: ChannelId? = null) {
+        lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -2358,6 +2383,7 @@ class GuideVisualLayoutTest {
             } else Instant.fromEpochSeconds(eventHour + (offset + if (longProgramme && channel.id == ChannelId(1) && offset == 0) longProgrammeHours else 1) * 3600),
             title = title(channel.id.value.toInt(), offset), summary = "Synthetic offline programme metadata.",
             subtitle = subtitle.takeIf { channel.id == ChannelId(1) && offset == 0 },
+            rating = rating.takeIf { channel.id == ChannelId(1) && offset == 0 },
             // Sport on the first channel, no genre code on the second, children's programmes after.
             contentGenre = if (genres) ContentGenre.fromContentType(when (channel.id.value) { 1L -> 0x40L; 2L -> null; else -> 0x50L }) else null,
         )
@@ -2447,14 +2473,18 @@ class GuideVisualLayoutTest {
                     lineColor = MaterialTheme.colorScheme.primary.toArgb()
                     backgroundColor = MaterialTheme.colorScheme.background.toArgb()
                     headlineHeight = guideHeadlineHeight().value
+                    factsHeightDeficit = with(LocalDensity.current) {
+                        (guideHeadlineEyebrowHeight() + ProgrammeHeadlineTitleGap +
+                            MaterialTheme.typography.headlineSmall.lineHeight.toDp() +
+                            MaterialTheme.typography.bodyLarge.lineHeight.toDp() + 4.dp +
+                            ProgrammeHeadlineGroupGap +
+                            maxOf(ProgrammeHeadlineFactsLineHeight, MaterialTheme.typography.labelMedium.lineHeight.toDp() + 4.dp) +
+                            ProgrammeHeadlineLineGap + MaterialTheme.typography.labelMedium.lineHeight.toDp()).value - headlineHeight
+                    }
                     with(LocalDensity.current) {
                         val typography = MaterialTheme.typography
-                        subtitleHeight = (typography.bodyLarge.lineHeight.toDp() + 4.dp).value
-                        // The pre-subtitle height on 21ebb8e8, from the same text styles.
-                        previousHeadlineHeight = (guideHeadlineEyebrowHeight() + 8.dp +
-                            typography.headlineSmall.lineHeight.toDp() + ProgrammeHeadlineLineGap +
-                            ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap +
-                            typography.labelMedium.lineHeight.toDp()).value
+                        rulerHeight = (typography.labelSmall.lineHeight.toDp() + 4.dp).value
+                        previousRulerHeight = maxOf(28.dp, typography.labelSmall.lineHeight.toDp() + 12.dp).value
                     }
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
@@ -2594,6 +2624,7 @@ class GuideVisualLayoutTest {
                 "focus=${compose.onNode(isFocused()).fetchSemanticsNode().config.let { it.getOrElseNullable(SemanticsProperties.Text) { null } ?: it.getOrElseNullable(SemanticsProperties.ContentDescription) { null } }}; " +
                 "bounds=${compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot}; position=${position.position.value}\n" +
                 "ruler=${bounds("epg-time-ruler")}; nativeFocusPixels=${nativeFocusBounds(bitmap)}\n" +
+                "styleGeometry=rulerHeightDp=$rulerHeight; previousRulerHeightDp=$previousRulerHeight; headlineHeightDp=$headlineHeight; factsHeightDeficitDp=$factsHeightDeficit\n" +
                 "headerRefinement=inline number/logo or number/name; gutter=104dp; headerInset=12dp; numberGap=8dp; cellGap=4dp; nameType=titleSmall14/20 single line; picon=max48x28dp Fit (dense rows)\n" +
                 "production=TVHeadendPlayerTheme + SideRail + EpgGridScreen; native D-pad focus; fake SDK; intercepted synthetic picons\n" +
                 "background=opaque theme background, not live video; static Robolectric SDK34 native graphics only\n" +

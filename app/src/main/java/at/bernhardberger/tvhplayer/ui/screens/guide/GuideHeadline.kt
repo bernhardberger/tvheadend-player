@@ -175,7 +175,7 @@ internal fun guideHeadlineHeight(): Dp {
     return with(LocalDensity.current) {
         guideHeadlineEyebrowHeight() + ProgrammeHeadlineTitleGap +
             GuideHeadlineTitleStyle.lineHeight.toDp() + typography.bodyLarge.lineHeight.toDp() + 4.dp +
-            ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight +
+            ProgrammeHeadlineGroupGap + maxOf(ProgrammeHeadlineFactsLineHeight, typography.labelMedium.lineHeight.toDp() + 4.dp) +
             ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp()
     }
 }
@@ -191,7 +191,7 @@ internal val GuideHeadlineRulerGap = 12.dp
 
 /**
  * How far the headline's picture reaches below the headline and its gap: over the time ruler and
- * the first row, about 300dp tall at the default font. Its scrim clears it above the ruler, so it
+ * the first row. Its scrim clears it above the ruler, so it
  * fills the space above the grid without covering the grid.
  */
 private val GuideHeadlinePictureReach = 104.dp

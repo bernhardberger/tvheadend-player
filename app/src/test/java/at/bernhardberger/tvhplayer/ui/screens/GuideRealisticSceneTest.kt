@@ -91,7 +91,7 @@ import java.util.TimeZone
 import kotlin.time.Instant
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 
-/** The complete receiver-style fixture in the production guide, driven only with D-pad keys. */
+/** The complete receiver-style fixture in the production guide: D-pad journeys and viewport checks. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
     instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens"])
@@ -285,6 +285,13 @@ class GuideRealisticSceneTest {
         // The window around 20:00 runs 18:30 to 21:30, so hourly rows cross both of its edges.
         showAt("2026-09-15T20:00:00")
         moveToChannel(14)
+        // The shorter ruler can leave the first visible row exactly on the viewport edge.
+        // Offset the fixture by a fifth of a row stride so both outer rows are cut again.
+        val rowHeight = compose.onNodeWithTag("epg-channel-row-14").fetchSemanticsNode().boundsInRoot.height
+        compose.onNode(hasScrollAction()).performSemanticsAction(SemanticsActions.ScrollBy) { scroll ->
+            scroll(0f, (rowHeight + 4f) / 5f)
+        }
+        compose.waitForIdle()
         val viewport = compose.onNodeWithTag("epg-timeline-content").fetchSemanticsNode().boundsInRoot
         fun rowBounds(channel: Long) = compose.onAllNodesWithTag("epg-channel-row-$channel")
             .fetchSemanticsNodes().singleOrNull()?.boundsInRoot
