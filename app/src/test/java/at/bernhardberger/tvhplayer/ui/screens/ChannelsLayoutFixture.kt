@@ -89,8 +89,9 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         scheduledNext: Int? = null,
         video: android.graphics.Bitmap? = null,
         guidePending: Boolean = false,
+        firstTitle: String? = null,
     ) {
-        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending)
+        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle)
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
             configured = true, allChannelsVisible = false,
@@ -164,7 +165,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
 
     private fun observation(
         tags: Boolean, manyTags: Boolean, emptyGroup: Boolean, recordingNow: Int?, scheduledNext: Int?,
-        guidePending: Boolean,
+        guidePending: Boolean, firstTitle: String?,
     ): SessionObservation {
         val channels = LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
@@ -188,7 +189,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         }
         val now = System.currentTimeMillis() / 1000
         val events = channels.mapIndexedNotNull { index, channel ->
-            val title = LINE_UP[index].second ?: return@mapIndexedNotNull null
+            val title = firstTitle.takeIf { index == 0 } ?: LINE_UP[index].second ?: return@mapIndexedNotNull null
             listOf(
                 EpgEvent.create(
                     id = EventId(channel.id.value * 100), channelId = channel.id,

@@ -4,6 +4,8 @@ import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
@@ -42,6 +44,7 @@ import kotlinx.coroutines.CompletableDeferred
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
 
 /** D-pad contract of the Channels layouts: entry, header, panels, edges, paging and return focus. */
 @RunWith(RobolectricTestRunner::class)
@@ -554,6 +557,22 @@ class ChannelsLayoutFocusTest {
         val hero = compose.onNodeWithTag("channels-immersive-hero").getUnclippedBoundsInRoot()
         val title = compose.onNodeWithTag("channels-immersive-title").getUnclippedBoundsInRoot()
         assertEquals(hero.bottom.value, title.bottom.value, 1f)
+    }
+
+    // Real text metrics. Compose scales large text less from 1.03 on every API level, so at 1.3
+    // the rating box is exactly as tall as the facts line the hero reserves.
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun enlargedRatedProgrammeKeepsItsTwoLineTitleAndEveryLine() {
+        // A rated programme with a two-line title keeps every line of the hero.
+        fixture.show(immersive, scale = 1.3f, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
+            firstTitle = "Ridge Light: A Winter Journey Across the Northern Ridge and Its Forests")
+        fixture.awaitFocus(card(1))
+        compose.onNodeWithTag("channels-immersive-rating", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("channels-immersive-synopsis").assertExists()
+        val layouts = mutableListOf<TextLayoutResult>()
+        compose.onNodeWithTag("channels-immersive-title").fetchSemanticsNode()
+            .config[SemanticsActions.GetTextLayoutResult].action?.invoke(layouts)
+        assertEquals(2, layouts.single().lineCount)
     }
 
     @Test fun immersiveLogoWithoutArtComesOnlyOnceItHasLoaded() {
