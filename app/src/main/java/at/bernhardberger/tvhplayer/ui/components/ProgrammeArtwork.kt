@@ -41,12 +41,15 @@ internal fun ProgrammeArtwork(
     }
 }
 
-/** A channel's logo embedded in a programme picture's bottom-start corner, on a dark plate. */
+/**
+ * A channel's logo embedded in a programme picture's bottom-start corner, on a dark plate. Sized
+ * for an airing card's picture; a smaller picture passes its [scale], so the plate keeps its share.
+ */
 @Composable
-internal fun ArtworkLogoPlate(channelIcon: ArtworkId?, modifier: Modifier = Modifier) {
-    PiconBox(channelIcon, modifier.size(56.dp, 32.dp)
+internal fun ArtworkLogoPlate(channelIcon: ArtworkId?, modifier: Modifier = Modifier, scale: Float = 1f) {
+    PiconBox(channelIcon, modifier.size(56.dp * scale, 32.dp * scale)
         .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
-        .padding(horizontal = 4.dp, vertical = 3.dp))
+        .padding(horizontal = 4.dp * scale, vertical = 3.dp * scale))
 }
 
 @Composable

@@ -155,6 +155,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
 import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ArtworkLogoPlate
+import at.bernhardberger.tvhplayer.ui.components.AiringCardWidth
 
 /**
  * The row's cards: four and their gaps span the content from the keyline to the header's end
@@ -526,7 +527,8 @@ internal fun ChannelsRowCard(
             }
             // The picture carries the channel's logo in its embed corner, like the airing cards.
             if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
-                Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"))
+                Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"),
+                scale = width / AiringCardWidth)
             // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
             if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
                 compact = true)

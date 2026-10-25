@@ -430,7 +430,7 @@ private val DetailsPeek = 96.dp
 private val DetailsPeekSlack = 16.dp
 // The hint's distance from the screen bottom (JetFit "Navigation" hint, Figma 1155:37100).
 private val DetailsHintEdge = 24.dp
-private val AiringCardWidth = 220.dp
+internal val AiringCardWidth = 220.dp
 // Room around the cards for the native focus scale and outline.
 private val AiringCardRoom = 12.dp
 
