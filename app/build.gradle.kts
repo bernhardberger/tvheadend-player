@@ -5,7 +5,15 @@ import org.gradle.api.artifacts.component.ModuleComponentIdentifier
 import org.gradle.api.artifacts.component.ProjectComponentIdentifier
 import org.gradle.api.artifacts.result.ResolvedComponentResult
 import org.gradle.api.artifacts.result.ResolvedDependencyResult
-import org.gradle.api.tasks.Sync
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+import javax.inject.Inject
 
 plugins {
     alias(libs.plugins.android.application)
@@ -119,12 +127,37 @@ android {
 }
 
 // Bundle the repository's legal sources verbatim, rather than maintaining a second list.
-val aboutLegalAssets = tasks.register<Sync>("generateAboutLegalAssets") {
-    from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"))
-    into(layout.buildDirectory.dir("generated/aboutAssets/licenses"))
+abstract class GenerateAboutLegalAssets : DefaultTask() {
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.NAME_ONLY)
+    abstract val legalFiles: ConfigurableFileCollection
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @get:Inject
+    abstract val fileSystemOperations: FileSystemOperations
+
+    @TaskAction
+    fun generate() {
+        fileSystemOperations.sync {
+            from(legalFiles) { into("licenses") }
+            into(outputDirectory)
+        }
+    }
 }
-android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/aboutAssets").get().asFile)
-tasks.named("preBuild").configure { dependsOn(aboutLegalAssets) }
+
+androidComponents.onVariants { variant ->
+    val aboutLegalAssets = tasks.register<GenerateAboutLegalAssets>(
+        "generate${variant.name.replaceFirstChar { it.uppercase() }}AboutLegalAssets",
+    ) {
+        legalFiles.from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"))
+    }
+    variant.sources.assets?.addGeneratedSourceDirectory(
+        aboutLegalAssets,
+        GenerateAboutLegalAssets::outputDirectory,
+    )
+}
 
 androidComponents.beforeVariants { variant ->
     // Generate only Play release. Both shipping flavors consume the merged main profile.
