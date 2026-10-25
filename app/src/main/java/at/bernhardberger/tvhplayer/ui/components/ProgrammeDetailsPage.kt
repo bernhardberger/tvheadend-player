@@ -655,23 +655,20 @@ private fun AiringCard(
     val resources = LocalContext.current.resources
     val spokenEpisode = if (episode == episodeLabel(item.episode, resources))
         episodeLabel(item.episode, resources, spoken = true) else episode
-    StandardCardContainer(
-        modifier = Modifier.width(AiringCardWidth),
-        imageCard = { interaction ->
-            Card(onClick = onClick, onLongClick = contextMenu.onLongClick, interactionSource = interaction,
-                modifier = modifier.then(contextMenu.modifier).fillMaxWidth().aspectRatio(16f / 9f)
-                    .semantics { contentDescription = listOfNotNull(time, spokenEpisode, channelName).joinToString(", ") },
-                colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
-                border = embeddedProgressCardBorder()) {
-                ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running },
-                    Modifier.fillMaxSize(),
-                    plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
-                    progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
-            }
+    StandardProgrammeCard(
+        width = AiringCardWidth,
+        onClick = onClick,
+        onLongClick = contextMenu.onLongClick,
+        modifier = modifier.then(contextMenu.modifier)
+            .semantics { contentDescription = listOfNotNull(time, spokenEpisode, channelName).joinToString(", ") },
+        picture = {
+            ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running },
+                Modifier.fillMaxSize(),
+                plateModifier = Modifier.testTag("details-card-plate-${item.id.value}"),
+                progressModifier = Modifier.testTag("details-card-progress-${item.id.value}"))
         },
-        // The text starts below the focused card's scale and outline.
         title = {
-            Text(time, Modifier.fillMaxWidth().padding(top = AiringTextGap).clearAndSetSemantics { testTag = "details-card-time" },
+            Text(time, Modifier.fillMaxWidth().padding(top = StandardCardTextGap).clearAndSetSemantics { testTag = "details-card-time" },
                 style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
         },
         subtitle = {
@@ -690,8 +687,6 @@ private fun AiringCard(
     )
 }
 
-// Native 1.1 focus scale on a 220dp card adds ~6dp below it, plus the outline.
-private val AiringTextGap = 16.dp
 // The blurred backdrop's decode: 16:9 at a sixth of the screen, blurred at 160px wide. Three
 // passes of radius 3 there match the former 32dp live blur on a 1080p screen.
 private val DetailsBackdropDecodeSize = 320 to 180

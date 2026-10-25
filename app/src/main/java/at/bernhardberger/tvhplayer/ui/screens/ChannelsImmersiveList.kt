@@ -70,8 +70,12 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.sp
+import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.ProvideTextStyle
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -92,12 +96,12 @@ import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
+import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelLogoGlow
+import at.bernhardberger.tvhplayer.ui.components.ChannelNowIndicators
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
-import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
-import at.bernhardberger.tvhplayer.ui.components.CompactZapCardWidth
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.DetailsHero
 import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogo
@@ -114,8 +118,11 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineSynopsisGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineTitleGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
-import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
+import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
+import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.ScheduledIndicator
+import at.bernhardberger.tvhplayer.ui.components.SkeletonLine
+import at.bernhardberger.tvhplayer.ui.components.StandardProgrammeCard
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
 import at.bernhardberger.tvhplayer.ui.components.browseDrawerUnderlap
 import at.bernhardberger.tvhplayer.ui.components.browseScreenBackdrop
@@ -125,13 +132,45 @@ import at.bernhardberger.tvhplayer.ui.components.navigationEdgeFadeMask
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import at.bernhardberger.tvhplayer.ui.components.programmeAboutFacts
 import at.bernhardberger.tvhplayer.ui.components.programmeHeaderMetadata
+import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
+import at.bernhardberger.tvhplayer.ui.components.rememberBrowseContextMenuTrigger
 import at.bernhardberger.tvhplayer.ui.components.rememberDetailsTint
 import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.underBrowseShellScrim
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
 import kotlin.time.Instant
-import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
+import androidx.compose.ui.layout.ContentScale
+import coil3.compose.AsyncImage
+import coil3.compose.LocalPlatformContext
+import coil3.request.ImageRequest
+import coil3.request.transformations
+import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
+import at.bernhardberger.tvhplayer.ui.components.PiconBox
+
+/**
+ * The row's cards: four and their gaps span the content from the keyline to the header's end
+ * (x130 to x902), so the fifth peeks in at the screen edge.
+ */
+private val ImmersiveCardWidth = 178.dp
+
+/** The kit's 40sp leading spreads a two-line 32sp title apart; display type sits tighter. */
+private val ImmersiveTitleLineHeight = 36.sp
+
+/** The channel line's gap under the card: a 178dp card's focus scale needs about 8dp of it. */
+private val ImmersiveCardLabelGap = 12.dp
+
+/** The recording badge's inset in the card's corner, the kit's embed inset. */
+private val ImmersiveCardEmbedInset = 8.dp
+
+/** The programme line's clearance above the picture's bottom and its progress strip. */
+private val ImmersiveCardTextBottom = 8.dp
+
+/** A logo's clearance in the picture above the programme line and below the card's top. */
+private val ImmersiveCardLogoInset = 8.dp
+
+private const val ImmersiveCardLogoWidthFraction = 0.6f
 
 /** Room above and below the cards for their native focus scale and outline. */
 private val ImmersiveFocusRoom = 12.dp
@@ -363,9 +402,8 @@ private fun ChannelsCardRow(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, Instant.fromEpochSeconds(now))
                 }
-                CompactZapCard(
+                ChannelsRowCard(
                     channel = channel,
-                    number = channel.visibleChannelNumber,
                     event = event,
                     nowSec = now,
                     playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
@@ -373,13 +411,9 @@ private fun ChannelsCardRow(
                     recording = channelId in frame.recordingIds,
                     onClick = { if (current) cards.onPlay(channel) },
                     onLongClick = { if (current) cards.onOpenContextMenu(channelId) },
-                    tagPrefix = "channels-immersive",
-                    channelLed = true,
                     programmeLoading = frame.guideLoading,
-                    menuKey = true,
                     programmePicture = cards.programmePicture,
                     modifier = Modifier
-                        .width(CompactZapCardWidth)
                         .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
                         .tabFocus()
                         .focusProperties {
@@ -401,6 +435,99 @@ private fun ChannelsCardRow(
             }
         }
     }
+}
+
+/**
+ * A card of the immersive row, the details page's standard card: the current programme inside
+ * its picture, always, as a browse card names what it shows. With [programmePicture] the channel's
+ * logo and name go below; without a picture the logo stands on its ambient colour above the
+ * programme, and without [programmePicture] that logo names the channel, so nothing goes below. While the guide is [programmeLoading], a missing
+ * programme line is a [SkeletonLine] rather than "No program information".
+ */
+@Composable
+private fun ChannelsRowCard(
+    channel: Channel,
+    event: EpgEvent?,
+    nowSec: Long,
+    playbackIndicator: ChannelPlaybackIndicator,
+    recording: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+    programmeLoading: Boolean,
+    programmePicture: Boolean,
+    modifier: Modifier,
+) {
+    val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
+    val running = event?.takeIf { it.isRunning(nowSec) }
+    val programme = running?.title?.takeIf { it.isNotBlank() }
+    val tag = "channels-immersive-${channel.id.value}"
+    val session = LocalArtworkContext.current.currentSession
+    val art = running?.image?.takeIf { programmePicture && session != null }
+    var artFailed by remember(art, session) { mutableStateOf(false) }
+    val context = LocalPlatformContext.current
+    val textHeight = with(LocalDensity.current) { MaterialTheme.typography.titleSmall.lineHeight.toDp() } +
+        ImmersiveCardTextBottom
+    // A picture card has no text on it, so no scrim.
+    val artModel = remember(art, session) {
+        if (art == null || session == null) null else AppArtworkSource(session, art)
+    }
+    val showsArt = artModel != null && !artFailed
+    StandardProgrammeCard(
+        width = ImmersiveCardWidth,
+        onClick = onClick,
+        onLongClick = contextMenu.onLongClick,
+        modifier = modifier.then(contextMenu.modifier),
+        picture = {
+            if (artModel != null && !artFailed) AsyncImage(artModel, contentDescription = null,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),
+                onError = { artFailed = true })
+            else {
+                ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
+                Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
+                    contentAlignment = Alignment.Center) {
+                    PiconBox(channel.icon, Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction).fillMaxHeight()
+                        .testTag("$tag-picon"), ground = null)
+                }
+            }
+            val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = ImmersiveCardTextBottom)
+            // Without a picture the logo leads; beside picture cards its programme stays quiet.
+            if (!showsArt) ProvideTextStyle(MaterialTheme.typography.titleSmall.copy(
+                color = if (programmePicture) TvTextColors.secondary else TvTextColors.primary)) {
+                when {
+                    // The strip shows how far along it is; the headline gives the focused card's times.
+                    programme != null -> Text(programme, lineModifier.testTag("$tag-now"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    programmeLoading -> SkeletonLine(lineModifier.testTag("$tag-loading"))
+                    else -> Text(stringResource(R.string.no_epg), lineModifier.testTag("$tag-now"),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+            // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
+            if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
+                compact = true)
+            // Same embedded strip as the airing cards; the card's border keeps clear of it.
+            if (running != null) ProgressStrip(running.progress(nowSec),
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"), height = 3.dp)
+        },
+        title = {
+            // The logo card names the channel itself.
+            if (!programmePicture) return@StandardProgrammeCard
+            // Start-aligned like the kit's content block.
+            Row(Modifier.fillMaxWidth().padding(top = ImmersiveCardLabelGap), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                PiconBox(channel.icon, Modifier.size(36.dp, 20.dp).testTag("$tag-identity-picon"))
+                // The card's content colour: muted, and white on the focused card, so the eye goes there.
+                Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
+                    Modifier.weight(1f).testTag("$tag-identity"),
+                    style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
+                    recordingNow = false, playbackIndicator = playbackIndicator)
+            }
+        },
+        subtitle = {},
+        contentColor = CardContainerDefaults.contentColor(contentColor = TvTextColors.secondary,
+            focusedContentColor = TvTextColors.primary),
+    )
 }
 
 /** The focused channel's identity and programme, passive; it dissolves like the list preview. */
@@ -455,7 +582,8 @@ internal fun ChannelsImmersiveHero(
             synopsisLines = if (besideList) ImmersiveListSynopsisLines else ImmersiveSynopsisLines,
             loading = frame.guideLoading, fitSynopsis = besideList,
             // Beside the list the title steps down one size, so it doesn't compete with the rows.
-            titleStyle = if (besideList) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge,
+            titleStyle = if (besideList) MaterialTheme.typography.titleLarge
+                else MaterialTheme.typography.headlineLarge.copy(lineHeight = ImmersiveTitleLineHeight),
             // The kit's 16sp description; the narrow column beside the list keeps 14sp for its line length.
             synopsisStyle = if (besideList) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
             modifier = Modifier.wrapContentHeight(if (besideList) Alignment.Top else Alignment.Bottom))

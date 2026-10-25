@@ -7,6 +7,9 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assert
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.toPixelMap
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsOff
@@ -534,8 +537,9 @@ class ChannelsLayoutFocusTest {
     @Test fun immersiveChannelKeysPageByTheCardsOnScreen() {
         fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(2), ChannelId(2)))
         fixture.awaitFocus(card(2))
+        // Four whole cards span the content width.
         fixture.key(Key.ChannelDown)
-        fixture.awaitFocus(card(5))
+        fixture.awaitFocus(card(6))
         fixture.key(Key.ChannelUp)
         fixture.awaitFocus(card(2))
     }
@@ -636,6 +640,20 @@ class ChannelsLayoutFocusTest {
         compose.waitForIdle()
         compose.onNodeWithTag("channels-immersive-art").assertDoesNotExist()
         compose.onNodeWithTag("channels-immersive-picon").assertExists()
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun immersiveChannelLabelsAreMutedExceptUnderTheFocusedCard() {
+        fixture.show(immersive)
+        fixture.awaitFocus(card(1))
+        fun brightest(id: Int) = compose.onNodeWithTag("channels-immersive-$id-identity", useUnmergedTree = true)
+            .captureToImage().toPixelMap().let { pixels ->
+                (0 until pixels.width).maxOf { x -> (0 until pixels.height).maxOf { y -> pixels[x, y].luminance() } }
+            }
+        assertTrue("the focused card's label is brighter", brightest(1) > brightest(2) + 0.2f)
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(card(2))
+        assertTrue("the label follows focus", brightest(2) > brightest(1) + 0.2f)
     }
 
     @Test fun gridAndListDrawNoBackdrop() {
