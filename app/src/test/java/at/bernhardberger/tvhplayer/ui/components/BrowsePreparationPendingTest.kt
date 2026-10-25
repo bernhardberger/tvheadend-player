@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.ui.components
 import android.app.Application
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.getValue
@@ -36,7 +35,7 @@ class BrowsePreparationPendingTest {
         compose.setContent {
             Box(Modifier.fillMaxSize()) {
                 BrowsePreparationPending(
-                    PaddingValues(), initialFocusEnabled = true, ready = ready,
+                    initialFocusEnabled = true, ready = ready,
                     onReadyFocus = { canTakeFocus && runCatching { content.requestFocus() }.getOrDefault(false) },
                     handoffKey = canTakeFocus,
                     skeleton = { Box(Modifier.fillMaxSize().testTag("skeleton")) },

@@ -6,7 +6,6 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composer
 import androidx.compose.runtime.CompositionTracer
@@ -207,7 +206,7 @@ class BrowseDestinationTransitionTest {
                             entry<GuideKey>(metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.GUIDE)) {
                                 if (prepareGuide != null) {
                                     val prepared = rememberPreparedBrowseData(GuideKey, Unit) { prepareGuide() }
-                                    BrowsePreparationPending(PaddingValues(), false, ready = prepared != null)
+                                    BrowsePreparationPending(false, ready = prepared != null, skeleton = {})
                                 }
                                 Box(Modifier.fillMaxSize().background(Color.Green).testTag("destination-GUIDE"))
                             }

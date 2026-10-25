@@ -1,12 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,19 +13,14 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.Text
-import at.bernhardberger.tvhplayer.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.withContext
@@ -67,18 +59,17 @@ internal fun <I, T> rememberPreparedBrowseData(
 }
 
 /**
- * A temporary, static focus anchor; the real screen takes over when ready. It says "Loading…"
- * unless the screen gives a [skeleton] of itself to show instead, which then fills the screen.
+ * A temporary, static focus anchor; the real screen takes over when ready. Meanwhile it fills the
+ * screen with the screen's [skeleton] of itself.
  */
 @Composable
 internal fun BrowsePreparationPending(
-    contentPadding: PaddingValues,
     initialFocusEnabled: Boolean,
     ready: Boolean = false,
     onPendingFocus: () -> Unit = {},
     onReadyFocus: () -> Boolean = { false },
     handoffKey: Any? = Unit,
-    skeleton: (@Composable () -> Unit)? = null,
+    skeleton: @Composable () -> Unit,
 ) {
     val focus = remember { FocusRequester() }
     var focused by remember { mutableStateOf(false) }
@@ -97,41 +88,23 @@ internal fun BrowsePreparationPending(
     // Keep a focused anchor attached until the real screen has taken focus.
     // Disposing it first lets the native drawer reclaim focus during the vacancy.
     if (ready && !focused) return
-    if (skeleton != null) {
-        // The skeleton shows what is coming and speaks for the anchor, which draws nothing itself.
-        // Ready while the anchor still has focus, it covers the screen rather than show it with no
-        // visible focus while keys still come here.
-        Box(
-            Modifier
-                .fillMaxSize()
-                .zIndex(1f)
-                .then(if (ready) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
-                .testTag("browse-preparing")
-                .semantics(mergeDescendants = true) {}
-                .focusRequester(focus)
-                .onFocusChanged {
-                    focused = it.isFocused
-                    if (it.isFocused && !ready) onPendingFocus()
-                }
-                .focusable(),
-        ) {
-            skeleton()
-        }
-        return
-    }
-    Box(Modifier.fillMaxSize().padding(contentPadding).zIndex(1f), contentAlignment = Alignment.Center) {
-        Text(
-            stringResource(R.string.loading),
-            modifier = Modifier
-                .testTag("browse-preparing")
-                .focusRequester(focus)
-                .onFocusChanged {
-                    focused = it.isFocused
-                    if (it.isFocused && !ready) onPendingFocus()
-                }
-                .border(if (focused) 2.dp else 0.dp, MaterialTheme.colorScheme.onSurface)
-                .padding(16.dp)
-                .focusable(),
-        )
+    // The skeleton shows what is coming and speaks for the anchor, which draws nothing itself.
+    // Ready while the anchor still has focus, it covers the screen rather than show it with no
+    // visible focus while keys still come here.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .zIndex(1f)
+            .then(if (ready) Modifier.background(MaterialTheme.colorScheme.background) else Modifier)
+            .testTag("browse-preparing")
+            .semantics(mergeDescendants = true) {}
+            .focusRequester(focus)
+            .onFocusChanged {
+                focused = it.isFocused
+                if (it.isFocused && !ready) onPendingFocus()
+            }
+            .focusable(),
+    ) {
+        skeleton()
     }
 }

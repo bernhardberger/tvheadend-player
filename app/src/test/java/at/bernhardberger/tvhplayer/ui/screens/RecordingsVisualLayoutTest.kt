@@ -799,6 +799,43 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    @Test fun preparingShowsTheSkeletonWhereTheSyncingLibraryKeepsIt() = preparationSkeletonStaysInPlace(1f)
+
+    @Test fun preparingShowsTheSkeletonWhereTheSyncingLibraryKeepsItAtLargeText() = preparationSkeletonStaysInPlace(1.3f)
+
+    private fun preparationSkeletonStaysInPlace(scale: Float) {
+        connectionState.value = ConnectionUiState.SyncingChannels
+        show(scale = scale, empty = true)
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasText("Archive") and isFocused()).fetchSemanticsNodes().isNotEmpty()
+        }
+        val syncing = bounds("recordings-skeleton")
+        compose.runOnIdle { screenShown.value = false }
+        compose.waitForIdle()
+        // A new entry prepares its first frame: the focus anchor shows the same skeleton, not "Loading…".
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.runOnIdle { screenShown.value = true }
+            var frames = 0
+            while (compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()) {
+                assertTrue("The screen shows its preparation within a few frames", ++frames <= 10)
+                compose.mainClock.advanceTimeByFrame()
+            }
+            val preparing = hasTestTag("recordings-skeleton") and hasAnyAncestor(hasTestTag("browse-preparing"))
+            val skeleton = compose.onNode(preparing, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+            compose.onAllNodesWithText(ApplicationProvider.getApplicationContext<android.content.Context>()
+                .getString(at.bernhardberger.tvhplayer.R.string.loading)).assertCountEquals(0)
+            assertEquals("The preparing skeleton stands where the syncing one does at font $scale", syncing, skeleton)
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+        compose.waitUntil(10_000) {
+            compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty()
+        }
+        assertEquals(syncing, bounds("recordings-skeleton"))
+        assertNoCommands()
+    }
+
     @Test fun nestedUpReturnsToTabsAndModeChangesRetainArchiveLocation() {
         show()
         focused("recordings-folder-Documentaries")

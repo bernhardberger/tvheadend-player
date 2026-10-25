@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -155,7 +156,9 @@ import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingModeTabs
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingProblems
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingSchedule
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsEmptyState
+import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsPreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.recordings.RecordingsSkeleton
+import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsHeaderMinHeight
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsLoading
 import at.bernhardberger.tvhplayer.ui.screens.recordings.recordingsAppError
 import at.bernhardberger.tvhplayer.ui.screens.recordings.listItems
@@ -386,8 +389,9 @@ internal fun RecordingsScreenContent(
             false
         }
     }) content@{
-    BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = prepared != null,
-        onReadyFocus = { requestContentFocus = true; true })
+    BrowsePreparationPending(initialFocusEnabled, ready = prepared != null,
+        onReadyFocus = { requestContentFocus = true; true },
+        skeleton = { RecordingsPreparationSkeleton(contentPadding, startPadding) })
     if (prepared == null) return@content
     val observedEntries = prepared.input?.entries.orEmpty()
     val retained = retainedPreparation ?: prepared
@@ -545,6 +549,7 @@ internal fun RecordingsScreenContent(
             title = stringResource(R.string.recordings_title),
             modifier = Modifier
                 .padding(start = startPadding + TvBrowseLeadingInset, end = maxOf(endPadding, TvBrowseTrailingInset))
+                .heightIn(min = recordingsHeaderMinHeight())
                 .testTag("recordings-header"),
             leading = {
                 RecordingModeTabs(

@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -62,6 +63,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
@@ -117,6 +119,9 @@ import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.core.runningRecordings
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
+import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
+import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
+import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -1059,6 +1064,30 @@ internal fun recordingsLoading(
     connectionFailure: ConnectionUiState? = connectionUiState,
 ): Boolean = recordingsAppError(empty = true, connectionUiState, connectionFailure) == null &&
     recordingsEmptyMessageRes(connectionUiState) == R.string.recordings_loading
+
+/**
+ * The Recordings header's height, shared with [RecordingsPreparationSkeleton]'s empty header row so
+ * the skeleton does not move when the real screen replaces it: 40dp, or the mode tabs' label line
+ * with its padding once text grows.
+ */
+@Composable
+@ReadOnlyComposable
+internal fun recordingsHeaderMinHeight(): Dp = with(LocalDensity.current) {
+    maxOf(TvBrowseHeaderHeight, MaterialTheme.typography.titleSmall.lineHeight.toDp() + TvSpacing8 * 2)
+}
+
+/**
+ * The whole Recordings screen while it prepares its first frame: the header's empty row, then
+ * [RecordingsSkeleton] in the place it takes below the real header while the library syncs.
+ */
+@Composable
+internal fun RecordingsPreparationSkeleton(contentPadding: PaddingValues, startPadding: Dp) {
+    Column(Modifier.fillMaxSize().padding(top = contentPadding.calculateTopPadding())) {
+        Spacer(Modifier.height(recordingsHeaderMinHeight()))
+        Spacer(Modifier.height(TvSpacing12))
+        RecordingsSkeleton(Modifier.padding(start = startPadding + TvBrowseLeadingInset))
+    }
+}
 
 /**
  * The Archive while the recordings are on their way: the root's blank heading band, then passive

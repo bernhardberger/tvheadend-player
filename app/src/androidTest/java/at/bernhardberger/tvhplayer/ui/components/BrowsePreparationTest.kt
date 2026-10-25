@@ -2,7 +2,6 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import android.os.Looper
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.assertIsFocused
@@ -42,7 +41,7 @@ class BrowsePreparationTest {
                     }
                     Column {
                         Text("Requested ${authority.value}")
-                        if (prepared == null) BrowsePreparationPending(PaddingValues(), true)
+                        if (prepared == null) BrowsePreparationPending(true, skeleton = {})
                         else Text("Ready ${prepared.value}")
                     }
                 }

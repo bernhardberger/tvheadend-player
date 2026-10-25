@@ -1761,7 +1761,7 @@ fun EpgGridScreen(
 
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
-        BrowsePreparationPending(contentPadding, initialFocusEnabled, ready = preparedIndex != null,
+        BrowsePreparationPending(initialFocusEnabled, ready = preparedIndex != null,
             onPendingFocus = {
                 // Cold entry starts on the header; a player return enters its programme.
                 preparationEntryToScope = (!initialPositionDone && pendingPlayerReturn == null) || !programmeFocusOwned
