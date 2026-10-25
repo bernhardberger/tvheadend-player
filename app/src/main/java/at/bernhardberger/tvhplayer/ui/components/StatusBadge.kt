@@ -34,10 +34,12 @@ enum class StatusBadgeTone { NEUTRAL, RECORDING, ERROR }
 private val StatusBadgeHeight = 20.dp
 private val StatusBadgeShape = RoundedCornerShape(4.dp)
 private val StatusBadgeGlyphSize = 12.dp
+private val CompactStatusBadgeHeight = 16.dp
 
 /**
  * The one status tag, in one size, on dark surfaces only: eyebrows, info headers, menus and image
- * corners. Rows and grid cells use the dot of [RecordingStatusIndicator] instead.
+ * corners; [compact] steps it down for the corner of a small card. Rows and grid cells use the dot
+ * of [RecordingStatusIndicator] instead.
  */
 @Composable
 fun StatusBadge(
@@ -46,6 +48,7 @@ fun StatusBadge(
     modifier: Modifier = Modifier,
     @DrawableRes icon: Int? = null,
     contentDescription: String? = text,
+    compact: Boolean = false,
 ) {
     val (container, content) = when (tone) {
         StatusBadgeTone.NEUTRAL -> TvSurfaceColors.containerHighest to MaterialTheme.colorScheme.onSurfaceVariant
@@ -54,18 +57,19 @@ fun StatusBadge(
         StatusBadgeTone.ERROR -> MaterialTheme.colorScheme.error to MaterialTheme.colorScheme.onError
     }
     Row(
-        modifier.background(container, StatusBadgeShape).height(StatusBadgeHeight).padding(horizontal = 6.dp)
+        modifier.background(container, StatusBadgeShape)
+            .height(if (compact) CompactStatusBadgeHeight else StatusBadgeHeight).padding(horizontal = if (compact) 4.dp else 6.dp)
             .clearAndSetSemantics { contentDescription?.let { this.contentDescription = it } },
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 3.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(StatusBadgeGlyphSize), tint = content)
         } else if (tone == StatusBadgeTone.RECORDING) {
-            Box(Modifier.size(6.dp).background(content, CircleShape))
+            Box(Modifier.size(if (compact) 5.dp else 6.dp).background(content, CircleShape))
         }
         if (text != null) {
-            Text(text, style = MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, color = content)
+            Text(text, style = if (compact) MaterialTheme.typography.labelSmall else MaterialTheme.typography.labelMedium, maxLines = 1, softWrap = false, color = content)
         }
     }
 }
@@ -73,10 +77,11 @@ fun StatusBadge(
 /**
  * A DVR state as badges: `● REC` while recording, followed by "Errors" when the recording has them;
  * a clock for scheduled; "Failed" for a recording that failed. A completed or cancelled recording
- * has none. [label] false keeps the scheduled clock without its word, for small image corners.
+ * has none. [label] false keeps the scheduled clock without its word, for small image corners;
+ * [compact] steps the recording badges down for the corner of a small card.
  */
 @Composable
-fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: Boolean = true) {
+fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: Boolean = true, compact: Boolean = false) {
     when (state) {
         DvrEntryState.RECORDING, DvrEntryState.RECORDING_ERROR -> {
             val description = stringResource(
@@ -85,10 +90,10 @@ fun RecordingBadge(state: DvrEntryState?, modifier: Modifier = Modifier, label: 
             // One announcement for the pair; a caller's tag wins over the default one.
             Row(modifier.testTag("recording-badge").clearAndSetSemantics { contentDescription = description },
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-                StatusBadge(stringResource(R.string.player_status_rec), StatusBadgeTone.RECORDING)
+                StatusBadge(stringResource(R.string.player_status_rec), StatusBadgeTone.RECORDING, compact = compact)
                 if (state == DvrEntryState.RECORDING_ERROR) {
                     StatusBadge(stringResource(R.string.recording_badge_errors), StatusBadgeTone.ERROR,
-                        icon = R.drawable.ic_error_outlined)
+                        icon = R.drawable.ic_error_outlined, compact = compact)
                 }
             }
         }

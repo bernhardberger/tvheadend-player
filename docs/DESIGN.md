@@ -128,9 +128,11 @@ their lightness, keeping hue; plates, brand colours and readable parts stay.
 app's scrims; a caller on another solid colour names it (a focused row's light
 fill, the Channels logo plate). On dark grounds a colour counts as vanishing
 below 1.6:1, on light ones below 1.5:1, where 1.6 would turn mid oranges brown.
-A logo with its own treatment or ground (zap card halo; the details hero logo,
-the programme pane's logo picture and the player hero's logo on their own
-colour) is left alone.
+Logo cards and the programme pane's logo picture ink their logo for their
+ambient colour where the logo sits (accepted 2026-10-25), using its settled
+colour so a crossfade does not re-ink it. A logo with its own treatment
+(zap card halo over a picture; the details hero logo and the player hero's
+logo on their own colour) is left alone.
 When the ground changes, the logo shown last stays until the new copy is ready.
 
 Passive text steps down in three tones (accepted 2026-10-21), as the kit's
@@ -559,8 +561,12 @@ tuner loss and interruption are failures, limit expiry is informational.
 Visual baseline accepted for implementation 2026-10-04 after the coordinated
 browse concept review, revised in the U4 polish rounds through 2026-10-21. View
 options offer three layouts, in this order: **Immersive** (the default), **List**
-and **Grid**. Each layout keeps its own **Program art** switch; only List starts
-with it on. Off, cards and backdrops use channel logos instead of programme art.
+and **Grid**. Immersive and Grid each keep their own **Program art** switch, off
+by default; off, cards and backdrops use channel logos instead of programme art.
+List always shows programme art (its pane picture is the point), so it has no
+switch (owner, 2026-10-25). The switch sits below a divider under its own
+heading, "Immersive options" or "Grid options", since it applies to that layout
+only.
 
 - The header draws no title: the drawer already says where you are, and the
   destination's name ("Channels", "Guide") is the row's pane title for
@@ -613,7 +619,7 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   its top, level with the first row (y80), a 268×151 picture (the kit's
   four-column card; the headline below keeps to its width, so picture and text
   form one column) shows the focused programme's 16:9 artwork without its logo
-  plate. With Program art off or no artwork, it is a logo card's picture: the
+  plate. Without artwork, it is a logo card's picture: the
   logo on the logo cards' ambient colour from the logo, which here keeps its
   strength to the bottom, since no text sits on it. The headline that Immersive also
   uses hangs 20dp below it, start-aligned and at most 480dp wide. In the details
@@ -635,8 +641,8 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   Without EPG the title reads the no-EPG label and the other programme lines are
   omitted.
 - **List backdrop.** Without warm playback, List uses the Grid's blurred
-  backdrop below: the focused programme's art, or with Program art off or no art
-  the logo colour behind a blurred logo. A sharp picture in the corner would
+  backdrop below: the focused programme's art, or without art the logo colour
+  behind a blurred logo. A sharp picture in the corner would
   repeat the pane's picture, so the corner backdrop stays with Immersive. Over
   warm playback there is no backdrop.
 - The headline pane is passive and never an additional D-pad target. It

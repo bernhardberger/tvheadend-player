@@ -59,14 +59,17 @@ internal fun ChannelsViewOptionsPanel(
                 icon = layout.icon(),
             ))
         }
-        add(BrowsePanelEntry.Divider)
-        add(BrowsePanelEntry.Choice(
-            key = "channels-view-program-art",
-            label = stringResource(R.string.channels_view_program_art),
-            selected = false,
-            onClick = { onViewChange(view.toggledProgramArt()) },
-            checked = view.showsProgramArt,
-        ))
+        view.layout.optionsTitle()?.let { title ->
+            add(BrowsePanelEntry.Divider)
+            add(BrowsePanelEntry.Section(stringResource(title)))
+            add(BrowsePanelEntry.Choice(
+                key = "channels-view-program-art",
+                label = stringResource(R.string.channels_view_program_art),
+                selected = false,
+                onClick = { onViewChange(view.toggledProgramArt()) },
+                checked = view.showsProgramArt,
+            ))
+        }
     }
     BrowseSidePanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose) {
         BrowsePanelList(entries, radio = true)
@@ -83,4 +86,11 @@ private fun ChannelsLayout.icon(): Int = when (this) {
     ChannelsLayout.LIST -> R.drawable.ic_view_list
     ChannelsLayout.GRID -> R.drawable.ic_grid_view
     ChannelsLayout.IMMERSIVE -> R.drawable.ic_view_carousel
+}
+
+/** The heading over a layout's own options; the list has none. */
+private fun ChannelsLayout.optionsTitle(): Int? = when (this) {
+    ChannelsLayout.LIST -> null
+    ChannelsLayout.GRID -> R.string.channels_view_grid_options
+    ChannelsLayout.IMMERSIVE -> R.string.channels_view_immersive_options
 }

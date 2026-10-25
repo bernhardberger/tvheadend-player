@@ -80,20 +80,13 @@ class ChannelsLayoutCaptureTest {
         capture("grid-playing-2-other-channel", card(2))
     }
     @Test fun immersivePlaying() = playing(ChannelsLayout.IMMERSIVE, ::card)
-    @Test fun listPlayingWithoutArt() =
-        playing(ChannelsLayout.LIST, ::row, "list-logo", ChannelsView(ChannelsLayout.LIST, programArt = emptySet()))
     @Test fun listRecording() = recording(ChannelsLayout.LIST, ::row)
     @Test fun immersiveRecording() = recording(ChannelsLayout.IMMERSIVE, ::card)
     @Test fun gridRecording() = recording(ChannelsLayout.GRID, ::card)
 
     /** Channel 1 plays behind the screen: focus on it, on another channel, then on a header button. */
-    private fun playing(
-        layout: ChannelsLayout,
-        item: (Int) -> SemanticsMatcher,
-        slug: String = layout.name.lowercase(),
-        view: ChannelsView = ChannelsView(layout),
-    ) {
-        fixture.show(view, fixture.fixtureArt(), warmPlayback = true,
+    private fun playing(layout: ChannelsLayout, item: (Int) -> SemanticsMatcher, slug: String = layout.name.lowercase()) {
+        fixture.show(ChannelsView(layout), fixture.fixtureArt(), warmPlayback = true,
             playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), video = FixtureArt.art("harbor-lights-live"))
         capture("$slug-playing-1-same-channel", item(1))
         fixture.key(if (layout == ChannelsLayout.LIST) Key.DirectionDown else Key.DirectionRight)

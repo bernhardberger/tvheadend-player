@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -42,14 +41,11 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
-import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
-import at.bernhardberger.tvhplayer.ui.components.compactZapCardMinHeight
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
-import kotlin.math.floor
 
-/** Three columns keep the cards near 16:9 with whole rows on screen. */
-internal const val ChannelsGridColumns = 3
+/** Four columns of the immersive row's cards. */
+internal const val ChannelsGridColumns = 4
 
 /** Tighter than the columns, so more rows fit below the header. */
 private val ChannelsGridRowGap = 16.dp
@@ -57,16 +53,11 @@ private val ChannelsGridRowGap = 16.dp
 /** Room on every side for a focused card's native scale and its outer outline. */
 internal val ChannelsGridEdgeInset = 16.dp
 
-/** How much of the row above the focus stays in view once scrolled: its lower half, with the
- * programme and channel, cut off at the top like the kit's partially shown offscreen rows. */
-internal const val ChannelsGridPeekFraction = 0.5f
-
 /**
- * Wall of compact zap cards in [ChannelsGridColumns] columns. D-pad moves within the grid; Right at the last
+ * Wall of the immersive row's cards in [ChannelsGridColumns] columns. D-pad moves within the grid; Right at the last
  * column and Down at the last row stay, Left at the first column leaves for the navigation rail
- * and Up from the first row reaches the header buttons. Scrolled rows run on up to the screen's top,
- * [topOverflow] above the grid, where the header scrolls away with them; at the bottom they run off
- * the screen.
+ * and Up from the first row reaches the header buttons. The grid scrolls in place below the
+ * headline with the focused row pinned at its top, so no row is ever cut off there.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -86,29 +77,19 @@ internal fun ChannelsGrid(
     onExitTowardNavigation: () -> Unit,
     onPage: (Int) -> Boolean,
     modifier: Modifier = Modifier,
-    topOverflow: Dp = 0.dp,
 ) {
     val columns = ChannelsGridColumns
     val ltr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val density = LocalDensity.current
-    // The focus line counts from the screen's top, where the rows run once the header scrolls away.
     val bringIntoView = remember(density) {
         with(density) {
-            ChannelsGridBringIntoViewSpec(
-                topInsetPx = ChannelsGridEdgeInset.toPx(),
-                rowGapPx = ChannelsGridRowGap.toPx(),
-            )
+            ChannelsGridBringIntoViewSpec(topInsetPx = ChannelsGridEdgeInset.toPx())
         }
     }
     var focusedIndex by remember { mutableIntStateOf(-1) }
     val lastRow = channels.lastIndex / columns
     BoxWithConstraints(modifier) {
-    val cardHeight = channelsGridCardHeight(
-        columnWidth = (maxWidth - ChannelsGridEdgeInset * 2 - CompactZapCardGap * (columns - 1)) / columns,
-        rowsHeight = maxHeight - ChannelsGridEdgeInset - TvGridVerticalMargin,
-        rowGap = ChannelsGridRowGap,
-        minHeight = compactZapCardMinHeight(),
-    )
+    val cardWidth = (maxWidth - ChannelsGridEdgeInset * 2 - CompactZapCardGap * (columns - 1)) / columns
     CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
@@ -119,11 +100,10 @@ internal fun ChannelsGrid(
             contentPadding = PaddingValues(
                 start = ChannelsGridEdgeInset,
                 end = ChannelsGridEdgeInset,
-                top = topOverflow + ChannelsGridEdgeInset,
+                top = ChannelsGridEdgeInset,
                 bottom = TvGridVerticalMargin,
             ),
             modifier = Modifier
-                .overflowTop(topOverflow)
                 .fillMaxSize()
                 .testTag("channels-grid")
                 .focusGroup()
@@ -154,9 +134,8 @@ internal fun ChannelsGrid(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(now))
                 }
-                CompactZapCard(
+                ChannelsRowCard(
                     channel = channel,
-                    number = ChannelNavigation.numberForId(frame.ids, frame.numbers, channelId),
                     event = event,
                     nowSec = now,
                     playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
@@ -164,14 +143,11 @@ internal fun ChannelsGrid(
                     recording = channelId in frame.recordingIds,
                     onClick = { onPlay(channel) },
                     onLongClick = { onOpenContextMenu(channelId) },
-                    tagPrefix = "channels-grid",
-                    menuKey = true,
-                    programmePicture = programmePicture,
-                    preferredHeight = cardHeight,
-                    channelLed = true,
                     programmeLoading = frame.guideLoading,
+                    programmePicture = programmePicture,
+                    width = cardWidth,
+                    tagPrefix = "channels-grid",
                     modifier = Modifier
-                        .fillMaxWidth()
                         .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
                         .tabFocus()
                         .focusProperties {
@@ -208,31 +184,11 @@ internal fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable,
 }
 
 /**
- * A grid card's height: 16:9 of its column, or the card's [minHeight] when its text needs more.
- * When that leaves the last row on screen mostly shown and cut off, the cards get just short
- * enough that one more whole row fits in [rowsHeight], but never below [minHeight] or flatter
- * than 2:1.
- */
-internal fun channelsGridCardHeight(columnWidth: Dp, rowsHeight: Dp, rowGap: Dp, minHeight: Dp): Dp {
-    val base = maxOf(columnWidth * 9 / 16, minHeight)
-    val rows = floor((rowsHeight + rowGap) / (base + rowGap))
-    val remainder = rowsHeight + rowGap - (base + rowGap) * rows
-    if (remainder <= base / 2) return base
-    val fitted = (rowsHeight - rowGap * rows) / (rows + 1)
-    return if (fitted >= maxOf(minHeight, columnWidth / 2)) fitted else base
-}
-
-/**
- * Holds the focused row below the peeking half of the row above it, so the rows move under it
- * and the rows cut off at the edges are never the focused one. Near either end the scroll stops at its bound,
- * which leaves the first or last rows in place. The scroll re-asks during its animation, so the
- * answer depends only on the row-aligned target.
+ * Holds the focused row at the grid's top, below its inset, so the rows move under it and none is
+ * cut off above it. Near the end the scroll stops at its bound, which leaves the last rows in place.
  */
 @OptIn(ExperimentalFoundationApi::class)
-internal class ChannelsGridBringIntoViewSpec(
-    private val topInsetPx: Float,
-    private val rowGapPx: Float,
-) : BringIntoViewSpec {
+internal class ChannelsGridBringIntoViewSpec(private val topInsetPx: Float) : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float =
-        offset - (topInsetPx + size * ChannelsGridPeekFraction + rowGapPx)
+        offset - topInsetPx
 }

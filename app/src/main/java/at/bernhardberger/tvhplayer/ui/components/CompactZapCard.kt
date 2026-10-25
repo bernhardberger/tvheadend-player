@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
@@ -144,7 +145,13 @@ internal fun CompactZapCard(
                             .testTag("$tag-picon"),
                         transformation = haloTransformation,
                         // Over the picture there is no one colour to ink the logo for; its halo keeps it readable.
-                        ground = null,
+                        // On the logo card's colour it is inked for that colour at its middle.
+                        ground = when {
+                            logoOverArt -> null
+                            channelLed -> channelAccentGround(channel.icon, channel.id,
+                                depth = ((imageHeight - textBlockHeight) / 2 + CompactZapLogoTop) / imageHeight)
+                            else -> TvSurfaceColors.containerLowest
+                        },
                     )
                 }
                 // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
@@ -283,6 +290,16 @@ internal fun ChannelAccentFill(piconPath: ArtworkId?, channelId: ChannelId, modi
         LinearGradient(0f, 0f, 0f, size.height, top, bottom, Shader.TileMode.CLAMP)
     })
 }
+
+/**
+ * What a logo on [ChannelAccentFill] sits on at [depth], its share of the way down the fill, for
+ * [PiconBox]'s ground. The settled colour, so a crossfading fill does not ink the logo anew every frame.
+ */
+@Composable
+internal fun channelAccentGround(piconPath: ArtworkId?, channelId: ChannelId, depth: Float, bottomShare: Float = 0f): Color =
+    rememberChannelAccent(piconPath, channelId, onSettled = {})
+        .copy(alpha = CompactZapAccentAlpha * (1f - (1f - bottomShare) * depth.coerceIn(0f, 1f)))
+        .compositeOver(TvSurfaceColors.containerLowest)
 
 private const val CompactZapAccentAlpha = 0.48f
 
