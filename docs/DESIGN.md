@@ -263,6 +263,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Context menu | `components/BrowseContextMenu.kt` |
 | Two-column dialog | `components/TwoColumnDialog.kt` |
 | Centred prompt/confirmation card | `components/CentredDialog.kt` |
+| Guided step (setup flows) | `components/GuidedStep.kt` — guidance and step line left, fields or choices right, both a browse column wide; `GuidedStepAction` is the Wide button's look on a clickable `Surface`, because TV Material 1.1's `WideButton` cannot grow to a wrapped or translated subtitle; it copies `WideButtonDefaults` and changes nothing else |
 | Details page | `components/ProgrammeDetailsPage.kt` |
 | Quick-zap cards | `player/QuickZapPreview.kt` |
 

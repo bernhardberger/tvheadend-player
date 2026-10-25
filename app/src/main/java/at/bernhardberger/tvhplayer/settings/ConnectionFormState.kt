@@ -8,6 +8,8 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
+import at.bernhardberger.tvheadend.sdk.core.ServerAuthentication
+import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.first
 
@@ -38,13 +40,18 @@ internal class ConnectionFormState(
     private val parsedPort: Int?
         get() = port.toIntOrNull()?.takeIf { it in 1..65535 }
 
+    val hostMissing: Boolean
+        get() = host.isBlank()
+
+    val portInvalid: Boolean
+        get() = parsedPort == null
+
+    /** A username without a password, or the other way round; both or neither are complete. */
+    val credentialsIncomplete: Boolean
+        get() = username.isBlank() != password.isBlank()
+
     val canSubmit: Boolean
-        get() {
-            val credentialsComplete =
-                (username.isBlank() && password.isBlank()) ||
-                    (username.isNotBlank() && password.isNotBlank())
-            return host.isNotBlank() && parsedPort != null && credentialsComplete
-        }
+        get() = !hostMissing && !portInvalid && !credentialsIncomplete
 
     fun updateHost(host: String) {
         this.host = host
@@ -73,6 +80,18 @@ internal class ConnectionFormState(
 
     fun clearFeedback() {
         feedback = null
+    }
+
+    /** The profile these values describe, or null while [canSubmit] is false. */
+    fun serverProfile(): ServerProfile? {
+        val endpointPort = parsedPort
+        if (!canSubmit || endpointPort == null) return null
+        val authentication = if (username.isBlank()) {
+            ServerAuthentication.Anonymous
+        } else {
+            ServerAuthentication.Password(username, password)
+        }
+        return ServerProfile(host, endpointPort, authentication)
     }
 
     suspend fun loadFrom(settingsStore: ConnectionProfileEditor) {

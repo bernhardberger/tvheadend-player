@@ -38,6 +38,29 @@ class ConnectionFormStateTest {
     }
 
     @Test
+    fun serverProfileFollowsTheSameValidationAndSignInChoice() {
+        val form = ConnectionFormState(port = "9982")
+        assertTrue(form.hostMissing)
+        assertEquals(null, form.serverProfile())
+
+        // The SDK profile is opaque; the session tests cover what it carries.
+        form.updateHost(" $FAKE_HOST ")
+        assertTrue(form.serverProfile() != null)
+
+        form.updateUsername(FAKE_USERNAME)
+        assertTrue(form.credentialsIncomplete)
+        assertEquals(null, form.serverProfile())
+        form.updatePassword("   ")
+        assertEquals("A blank password is no sign-in", null, form.serverProfile())
+        form.updatePassword(FAKE_PASSWORD)
+        assertTrue(form.serverProfile() != null)
+
+        form.updatePort("70000")
+        assertTrue(form.portInvalid)
+        assertEquals(null, form.serverProfile())
+    }
+
+    @Test
     fun savedFormStateContainsOnlyTheEndpoint() {
         val form = ConnectionFormState(
             host = FAKE_HOST,

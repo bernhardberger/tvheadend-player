@@ -29,7 +29,9 @@ import androidx.compose.ui.text.input.VisualTransformation
  * settings form with the D-pad the field is [readOnly] so the IME stays hidden.
  * Only when the user explicitly confirms a field (OK / center) does it enter the
  * editing state (editingId == id), become editable and show the keyboard.
- * Pressing Back, moving focus away or completing the IME action leaves editing.
+ * Pressing Back, moving focus away or completing the IME action leaves editing. With
+ * [onImeAction] the field keeps [keyboardOptions]' IME action and the caller decides where
+ * editing goes next instead.
  */
 @Composable
 fun TvOutlinedTextField(
@@ -44,6 +46,10 @@ fun TvOutlinedTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     visualTransformation: VisualTransformation = VisualTransformation.None,
     singleLine: Boolean = true,
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    supportingText: (@Composable () -> Unit)? = null,
+    onImeAction: (() -> Unit)? = null,
 ) {
     val isEditing = editingId == id
     val focusRequester = remember { FocusRequester() }
@@ -67,10 +73,17 @@ fun TvOutlinedTextField(
         onValueChange = onValueChange,
         label = label,
         readOnly = !isEditing,
+        enabled = enabled,
+        isError = isError,
+        supportingText = supportingText,
         singleLine = singleLine,
-        keyboardOptions = keyboardOptions.copy(imeAction = ImeAction.Done),
+        keyboardOptions = if (onImeAction == null) keyboardOptions.copy(imeAction = ImeAction.Done) else keyboardOptions,
         visualTransformation = visualTransformation,
-        keyboardActions = KeyboardActions(onDone = { setEditingId(null) }),
+        keyboardActions = if (onImeAction == null) {
+            KeyboardActions(onDone = { setEditingId(null) })
+        } else {
+            KeyboardActions(onAny = { onImeAction() })
+        },
         modifier = modifier
             .focusRequester(focusRequester)
             .onFocusChanged { state ->

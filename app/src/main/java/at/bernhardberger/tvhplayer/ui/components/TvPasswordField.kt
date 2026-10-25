@@ -43,6 +43,11 @@ fun TvPasswordField(
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
     presentationValue: String? = null,
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    supportingText: (@Composable () -> Unit)? = null,
+    /** Replaces leaving the edit on Done, as in [TvOutlinedTextField]. */
+    onImeAction: (() -> Unit)? = null,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -77,8 +82,11 @@ fun TvPasswordField(
         label = { Text(stringResource(R.string.password)) },
         singleLine = true,
         readOnly = !isEditing,
+        enabled = enabled,
+        isError = isError,
+        supportingText = supportingText,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { setEditingId(null) }),
+        keyboardActions = KeyboardActions(onDone = { onImeAction?.invoke() ?: setEditingId(null) }),
 
         visualTransformation = if (displayedPresentation != null || passwordVisible) {
             VisualTransformation.None
@@ -130,6 +138,7 @@ fun TvPasswordField(
         trailingIcon = {
             IconButton(
                 onClick = { passwordVisible = !passwordVisible },
+                enabled = enabled,
                 interactionSource = remember { MutableInteractionSource() },
                 modifier = Modifier
                     .focusRequester(eyeFocus)
