@@ -181,7 +181,7 @@ class RecordingsVisualLayoutTest {
         compose.waitForIdle()
         compose.onNodeWithTag("recordings-space").assertDoesNotExist()
         assertEquals("the tabs keep their width", tabs, bounds("recordings-mode-tabs"))
-        listOf("Archive", "Continue watching", "Schedule", "Problems").forEach {
+        listOf("Archive", "Schedule", "Problems").forEach {
             val label = mutableListOf<TextLayoutResult>()
             compose.onNodeWithText(it, useUnmergedTree = true)
                 .performSemanticsAction(SemanticsActions.GetTextLayoutResult) { layout -> layout(label) }
@@ -199,7 +199,7 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recordings-folder-Documentaries")
         key(Key.DirectionUp)
-        listOf("Continue watching" to 1, "Schedule" to 20, "Problems" to 21).forEach { (tab, first) ->
+        listOf("Schedule" to 20, "Problems" to 21).forEach { (tab, first) ->
             key(Key.DirectionRight)
             compose.onNodeWithText(tab).assertIsFocused()
             key(Key.DirectionDown)
