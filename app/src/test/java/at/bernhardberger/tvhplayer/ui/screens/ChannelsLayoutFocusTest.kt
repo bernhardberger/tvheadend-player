@@ -668,6 +668,21 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-immersive-background").assertExists()
     }
 
+    @Test fun logoCardsMarkThePlayingChannelFocusedOrNot() {
+        val playing = hasTestTag("channel-playing-indicator") and hasAnyAncestor(card(1))
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
+            warmPlayback = true)
+        fixture.awaitFocus(card(1))
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(card(2))
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        compose.onNode(hasTestTag("channel-playing-indicator") and hasAnyAncestor(card(2)), useUnmergedTree = true)
+            .assertDoesNotExist()
+        compose.runOnIdle { fixture.channelsView = ChannelsView(ChannelsLayout.GRID) }
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+    }
+
     @Test fun immersiveBackgroundDrawsNothingOverWarmPlayback() {
         fixture.show(immersive, playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true)
         fixture.awaitFocus(card(1))

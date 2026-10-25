@@ -499,14 +499,25 @@ internal fun ChannelsRowCard(
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
                 .padding(start = 12.dp, end = 12.dp, bottom = ImmersiveCardTextBottom)
             // Without a picture the logo leads; beside picture cards its programme stays quiet.
-            if (!showsArt) ProvideTextStyle(MaterialTheme.typography.titleSmall.copy(
-                color = if (programmePicture) TvTextColors.secondary else TvTextColors.primary)) {
-                when {
-                    // The strip shows how far along it is; the headline gives the focused card's times.
-                    programme != null -> Text(programme, lineModifier.testTag("$tag-now"), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    programmeLoading -> SkeletonLine(lineModifier.testTag("$tag-loading"))
-                    else -> Text(stringResource(R.string.no_epg), lineModifier.testTag("$tag-now"),
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val lineColor = if (programmePicture) TvTextColors.secondary else TvTextColors.primary
+            if (!showsArt) CompositionLocalProvider(LocalContentColor provides lineColor) {
+                ProvideTextStyle(MaterialTheme.typography.titleSmall.copy(color = lineColor)) {
+                    Row(lineModifier, verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val textModifier = Modifier.weight(1f)
+                        when {
+                            // The strip shows how far along it is; the headline gives the focused card's times.
+                            programme != null -> Text(programme, textModifier.testTag("$tag-now"), maxLines = 1,
+                                overflow = TextOverflow.Ellipsis)
+                            programmeLoading -> SkeletonLine(textModifier.testTag("$tag-loading"))
+                            else -> Text(stringResource(R.string.no_epg), textModifier.testTag("$tag-now"),
+                                maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        // A logo card has no line below, so the playing mark ends its programme line.
+                        if (!programmePicture) ChannelNowIndicators(
+                            playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
+                            recordingNow = false, playbackIndicator = playbackIndicator)
+                    }
                 }
             }
             // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
