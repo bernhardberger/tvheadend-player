@@ -440,6 +440,7 @@ internal fun RecordingMetadataPane(
                 }
             }.takeIf(String::isNotEmpty),
             // How far it was watched, as the details page's timeline.
+            timingMaxLines = 2,
             progress = (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat(),
             progressColor = MaterialTheme.colorScheme.tertiary,
             synopsis = programmeSynopsis(entry.title, entry.subtitle, entry.summary, entry.description),

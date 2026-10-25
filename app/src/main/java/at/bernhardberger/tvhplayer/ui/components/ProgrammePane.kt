@@ -123,6 +123,7 @@ internal fun ProgrammeHeadline(
     facts: List<String> = emptyList(),
     rating: String? = null,
     timing: String? = null,
+    timingMaxLines: Int = 1,
     progress: Float? = null,
     progressColor: Color = MaterialTheme.colorScheme.primary,
     synopsis: String? = null,
@@ -167,8 +168,8 @@ internal fun ProgrammeHeadline(
         if (timing != null) {
             Row(Modifier.padding(top = if (hasFacts) ProgrammeHeadlineLineGap else ProgrammeHeadlineGroupGap).testTag("$tagPrefix-metadata"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // A second line for a long one, as German at a large font needs, rather than a lost word.
-                Text(timing, style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 2,
+                // Only recording metadata opts into wrapping its longer time/length line.
+                Text(timing, style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = timingMaxLines,
                     overflow = TextOverflow.Ellipsis)
                 // Shorter rather than pushed off the end by a long time line.
                 if (progress != null) ProgressStrip(progress, Modifier.weight(1f, fill = false).width(160.dp), progressColor)
