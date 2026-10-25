@@ -348,6 +348,30 @@ class RecordingPlayerChromeScreenTest {
         }
     }
 
+    @Test fun continueWatchingFromRecordingDetailsKeepsPlaybackAndRestoresInfo() {
+        var closed = false
+        screen(onClose = { closed = true })
+        playing()
+        val target = runtime.activeTarget.value
+        val mediaItem = player.currentMediaItem
+        val position = positionMs
+        assertTrue(player.playWhenReady)
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-info").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertTrue(exists("programme-details-page"))
+        assertEquals(listOf("details-continue_watching"), focused())
+        assertTrue("opening details leaves the recording playing", player.playWhenReady)
+        key(Key.DirectionCenter)
+        assertFalse(exists("programme-details-page"))
+        assertEquals(listOf("player-info"), focused())
+        assertFalse("Continue closes only details", closed)
+        assertTrue("Continue leaves playback running", player.playWhenReady)
+        assertEquals(target, runtime.activeTarget.value)
+        assertEquals(mediaItem, player.currentMediaItem)
+        assertEquals("Continue does not seek", position, positionMs)
+    }
+
     @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndTheBadgeSaysItStillRecords() {
         compose.setContent {
             TVHeadendPlayerTheme { RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true) }
