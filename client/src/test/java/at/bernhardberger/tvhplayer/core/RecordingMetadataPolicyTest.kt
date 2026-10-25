@@ -79,6 +79,16 @@ class RecordingMetadataPolicyTest {
         assertNull(recordingLengthSeconds(DvrEntry.create(DvrEntryId(1), start = at(1_000)), nowSec = 1_800))
     }
 
+    @Test fun failedRecordingNeedsRealFileTimesForItsRecordedLength() {
+        val failed = timed(DvrEntryState.COMPLETED_ERROR)
+        assertNull(recordingLengthSeconds(failed, nowSec = 99_999))
+        assertEquals(61L * 60, recordingPlannedSeconds(failed))
+        assertNull(recordingLengthSeconds(timed(DvrEntryState.COMPLETED_ERROR,
+            DvrRecordingFile.create(sizeBytes = 7)), nowSec = 99_999))
+        assertEquals(30L, recordingLengthSeconds(timed(DvrEntryState.COMPLETED_ERROR,
+            DvrRecordingFile.create(start = at(1_000), stop = at(1_030))), nowSec = 99_999))
+    }
+
     @Test fun anEntryThatNeverRecordedHasNoLength() {
         for (state in listOf(DvrEntryState.MISSED, DvrEntryState.INVALID)) {
             assertNull(recordingLengthSeconds(timed(state), nowSec = 99_999))
