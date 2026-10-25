@@ -531,8 +531,7 @@ internal fun ChannelsRowCard(
             val progress = programmeProgress(running, nowSec)
             if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
-                color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING ||
-                    playbackIndicator == ChannelPlaybackIndicator.PAUSED),
+                color = progressColor(watchingIndicator(running, nowSec).isPlayingItem),
                 height = 3.dp)
         },
         title = {

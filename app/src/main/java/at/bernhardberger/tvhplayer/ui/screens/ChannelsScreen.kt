@@ -3,12 +3,10 @@ package at.bernhardberger.tvhplayer.ui.screens
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 
-import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
-import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvhplayer.ui.components.channelPlaybackIndicator
-import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
 
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
@@ -205,14 +203,9 @@ fun ChannelsScreen(
     val observation by channelViewModel.observation.collectAsStateWithLifecycle()
     val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedId = selection.selectedId.collectAsStateWithLifecycle()
-    val playbackRuntime: AppPlaybackRuntime = koinInject()
-    val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
-    val playbackTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
-    val playWhenReady by rememberPlaybackIntent(playbackRuntime.player)
-    val playbackChannelId = (playbackTarget as? AppPlaybackTarget.Live)?.channelId
-    val playbackIndicator = playbackChannelId?.let {
-        channelPlaybackIndicator(it, playbackTarget, playbackState, playWhenReady)
-    } ?: ChannelPlaybackIndicator.NONE
+    // What plays comes from the app root, which holds it while a page fades into the player.
+    val playbackChannelId = LocalWatchingChannel.current
+    val playbackIndicator = if (playbackChannelId != null) LocalWatchingIndicator.current else ChannelPlaybackIndicator.NONE
     // The view is the screen's own, remembered for the whole app rather than per channel group.
     val settingsStore: UiSettingsStore = koinInject()
     val settingsScope = rememberCoroutineScope()
