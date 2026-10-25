@@ -523,7 +523,7 @@ class PlayerChromeCaptureTest {
                     recent.focusedId = channels[1].id
                 } }
                 PlayerPage<Unit>(details = null, railExpanded = true,
-                    nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW,
+                    nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1), "101", "Ridge Earth HD", LOGO, programme, NOW,
                         playbackIndicator = ChannelPlaybackIndicator.PLAYING) } },
                     player = {
                         Controls(timeshift, false, false, content, browser = state, emptyRecent = scene == Scene.BROWSER_EMPTY,
@@ -800,7 +800,7 @@ class PlayerChromeCaptureTest {
                 )
             },
         ) }
-        if (tray != null && browser == null) ProvideArtworkSession(session) { NowPlayingStrip("101", "Ridge Earth HD", LOGO, programme, NOW,
+        if (tray != null && browser == null) ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1), "101", "Ridge Earth HD", LOGO, programme, NOW,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp)) }
         }
     }

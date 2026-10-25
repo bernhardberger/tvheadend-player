@@ -107,7 +107,6 @@ import at.bernhardberger.tvhplayer.core.forEmptyChannelPresentation
 import at.bernhardberger.tvhplayer.core.shouldPresentEmptyTag
 import at.bernhardberger.tvhplayer.core.shouldRequestEmptyChannelsAction
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
-import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ChannelRow
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.components.AppErrorAlert
@@ -974,7 +973,6 @@ internal fun ChannelsScreenContent(
                                                 )
                                             }
                                         }
-                                    val prog = remember(now, nowSec) { now?.progress(nowSec) ?: 0f }
                                     val status = channelNowStatus(
                                         channelId = channelId,
                                         playingChannelId = playingChannelId,
@@ -1005,7 +1003,8 @@ internal fun ChannelsScreenContent(
                                         name = ch.name.orEmpty(),
                                         programTitle = now?.title ?: stringResource(R.string.no_epg),
                                         programmeLoading = now == null && frame.guideLoading,
-                                        progress = if (now != null) prog else null,
+                                        programme = now,
+                                        nowSec = nowSec,
                                         piconPath = ch.icon,
                                         programStartSec = now?.start?.epochSeconds,
                                         recordingNow = status.recordingNow,

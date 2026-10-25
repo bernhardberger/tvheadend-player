@@ -1,6 +1,9 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
+import at.bernhardberger.tvhplayer.ui.components.progressColor
 
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.ui.TvTextColors
@@ -992,6 +995,7 @@ internal fun RecordingsScreenContent(
                 androidx.compose.ui.platform.LocalConfiguration.current.locales[0]),
             summary = opened.summary?.takeIf(String::isNotBlank) ?: opened.description.orEmpty(),
             recordingState = opened.state,
+            playbackIndicator = watchingIndicator(opened.id),
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
@@ -1044,10 +1048,11 @@ internal fun RecordingsScreenContent(
             artwork = {
                 val artwork = (opened.image ?: opened.fanartImage)?.takeIf { selectedCapability != null }
                 ProvideArtworkSession(selectedCapability, observation) {
-                    ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, null,
+                    ProgrammeArtwork(artwork, opened.channelId?.let(channelsById::get)?.icon, recordingViewerPosition(opened.id)?.fraction,
                         Modifier.fillMaxSize().testTag(if (artwork != null)
                             "browse-context-artwork" else "browse-context-picon"),
-                        plateModifier = Modifier.testTag("browse-context-plate"))
+                        plateModifier = Modifier.testTag("browse-context-plate"),
+                        progressModifier = Modifier.testTag("browse-context-progress"), progressColor = progressColor(true))
                 }
             },
         )

@@ -61,7 +61,7 @@ internal fun ProgrammeDetailsHost(
         Unit
     }
     val departing = LocalPlayerEntryHandoff.current?.departing == true
-    val presentation = Triple(observation, rememberDetailsEpochSeconds(nowSecProvider), LocalActivePlaybackTarget.current)
+    val presentation = Triple(observation, rememberDetailsEpochSeconds(nowSecProvider), LocalWatchingTarget.current)
     var lastPresentation by remember { mutableStateOf(presentation) }
     // Playback can publish its target before the shell starts fading. Keep the page pressed,
     // not a relabelled/reflowed version of it, until that existing handoff removes the overlay.

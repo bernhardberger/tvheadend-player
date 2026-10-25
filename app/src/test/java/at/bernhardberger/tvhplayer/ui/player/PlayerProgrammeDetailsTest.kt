@@ -157,7 +157,7 @@ class PlayerProgrammeDetailsTest {
             var restore by remember { mutableStateOf<String?>("player-info") }
             val scope = rememberCoroutineScope()
             val close = { opened = false; restore = "player-info" }
-            CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+            CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
                 (if (recording) at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id)
                 else at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id)).takeIf { warm },
                 at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides

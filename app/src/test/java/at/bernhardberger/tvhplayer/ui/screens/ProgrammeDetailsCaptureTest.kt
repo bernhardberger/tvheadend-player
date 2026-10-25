@@ -124,7 +124,7 @@ class ProgrammeDetailsCaptureTest {
         val state = RecordingsScreenState().apply { mode.value = at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE }
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f),
-                at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
                     at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id),
                 at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
                     at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(requireNotNull(observation.currentSession), entry.id)) {

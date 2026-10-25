@@ -1,5 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
+import at.bernhardberger.tvhplayer.ui.components.progressColor
+
 import at.bernhardberger.tvhplayer.ui.notifications.label
 
 import androidx.annotation.DrawableRes
@@ -419,6 +425,9 @@ internal fun RecordingMetadataPane(
                     entry.start?.epochSeconds?.let { formatRecordingDate(it, dateOnly = true, locale = locale) },
                 ).joinToString(" • "), Modifier.testTag("recording-metadata-eyebrow")) {
                     // The pane's eyebrow badge, as on the details page; a completed recording needs none.
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
+                    ) { ChannelPlaybackMarker(watchingIndicator(entry.id)) }
                     RecordingBadge(entry.state)
                 }
             },
@@ -446,8 +455,8 @@ internal fun RecordingMetadataPane(
             }.takeIf(String::isNotEmpty),
             // How far it was watched, as the details page's timeline.
             timingMaxLines = 2,
-            progress = (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat(),
-            progressColor = MaterialTheme.colorScheme.tertiary,
+            progress = recordingViewerPosition(entry.id)?.fraction ?: (watchState as? RecordingWatchState.PartlyWatched)?.fraction?.toFloat(),
+            progressColor = progressColor(true),
             synopsis = programmeSynopsis(entry.title, entry.subtitle, entry.summary, entry.description),
             fitSynopsis = true,
             titleStyle = MaterialTheme.typography.titleLarge,
@@ -920,6 +929,11 @@ internal fun RecordingListRow(
                     }
                 }
                 // Watch state ends the line, so its marks form one column down the list.
+                val indicator = watchingIndicator(entry.id)
+                if (indicator != ChannelPlaybackIndicator.NONE) {
+                    Spacer(Modifier.width(TvSpacing8))
+                    ChannelPlaybackMarker(indicator)
+                }
                 if (watchState != RecordingWatchState.Unwatched) {
                     Spacer(Modifier.width(TvSpacing8))
                     RecordingWatchMark(watchState, Modifier.testTag("recording-list-watched-$itemKey"))

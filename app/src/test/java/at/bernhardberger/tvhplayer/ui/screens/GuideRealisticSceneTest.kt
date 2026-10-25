@@ -635,7 +635,7 @@ class GuideRealisticSceneTest {
         key(Key.Menu)
         when (action) {
             "Back" -> {
-                compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+                compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
                 compose.onNodeWithTag("details-watch").assertIsFocused()
             }
             "Keep", "Stop" -> {

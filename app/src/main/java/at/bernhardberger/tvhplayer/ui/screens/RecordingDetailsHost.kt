@@ -15,7 +15,7 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
-import at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.warmRecordingId
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
@@ -47,7 +47,7 @@ internal fun RecordingDetailsHost(
 ) {
     val departing = LocalPlayerEntryHandoff.current?.departing == true
     val entryPending = rememberPlayerEntryPending()
-    val presentation = Triple(observation, nowSec, warmRecordingId(LocalActivePlaybackTarget.current,
+    val presentation = Triple(observation, nowSec, warmRecordingId(LocalWatchingTarget.current,
         LocalRecordingPlaybackSelection.current, observation.currentSession))
     var lastPresentation by remember { mutableStateOf(presentation) }
     // Keep progress, metadata and actions from the activation while this shell leaves for playback.

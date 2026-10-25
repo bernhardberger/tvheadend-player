@@ -48,6 +48,13 @@ import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+import at.bernhardberger.tvhplayer.ui.TvTextColors
+import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.programmeProgress
+import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineGroupGap
@@ -263,6 +270,7 @@ private fun GuideHeadlineContent(
         }.orEmpty()
     }
     val now = nowSec()
+    val indicator = watchingIndicator(event, now)
     // The rows' marks as badges: a running recording or a scheduled one, a failed one as details
     // names it, and, beyond details, a finished one and a missed one.
     // The held event, as the cells pass it: the ID lookup only knows the current snapshot, not history.
@@ -277,6 +285,9 @@ private fun GuideHeadlineContent(
                 val channel = programme.channel
                 ProgrammeEyebrow(channel.icon, channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.semantics(mergeDescendants = true) {}.testTag("guide-headline-channel")) {
+                    androidx.compose.runtime.CompositionLocalProvider(
+                        androidx.tv.material3.LocalContentColor provides TvTextColors.secondary,
+                    ) { ChannelPlaybackMarker(indicator) }
                     when (mark) {
                         DvrEntryState.COMPLETED -> StatusBadge(stringResource(R.string.details_recorded), StatusBadgeTone.NEUTRAL,
                             Modifier.testTag("recording-badge-recorded"), icon = R.drawable.ic_fiber_manual_record)
@@ -296,7 +307,8 @@ private fun GuideHeadlineContent(
         facts = metadata,
         rating = event?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = event?.let { guideHeadlineTiming(it, now) },
-        progress = event?.takeIf { it.isRunning(now) }?.progress(now),
+        progress = programmeProgress(event, now),
+        progressColor = progressColor(indicator.isPlayingItem),
         // No synopsis: in the Guide the grid below carries the weight.
         loading = event == null && loading,
         titleStyle = titleStyle,

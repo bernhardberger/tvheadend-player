@@ -261,7 +261,7 @@ class InProgressRecordingResumeTest {
             val scope = rememberCoroutineScope()
             val content: @Composable () -> Unit = {
             androidx.compose.runtime.CompositionLocalProvider(
-                at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
                     at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(DvrEntryId(1)).takeIf { warm },
                 at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
                     at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(playbackSession, DvrEntryId(1)).takeIf { warm },

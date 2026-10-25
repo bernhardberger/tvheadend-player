@@ -25,6 +25,7 @@ internal fun ProgrammeArtwork(
     image: ArtworkId?, channelIcon: ArtworkId?, progress: Float?,
     modifier: Modifier = Modifier,
     plateModifier: Modifier = Modifier, progressModifier: Modifier = Modifier,
+    progressColor: Color = MaterialTheme.colorScheme.primary,
 ) {
     val session = LocalArtworkContext.current.currentSession
     Box(modifier.clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
@@ -39,7 +40,7 @@ internal fun ProgrammeArtwork(
         } else PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
-            progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = 3.dp)
+            progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = 3.dp, color = progressColor)
     }
 }
 

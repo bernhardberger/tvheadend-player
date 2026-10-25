@@ -985,8 +985,7 @@ private fun DetailsInformation(
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
             event?.firstAired, LocalConfiguration.current.locales[0], event?.contentGenre ?: recording?.contentGenre)
-        val timelineVisible = event != null && nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
-        val watchingEvent = timelineVisible && channel?.id != null && LocalWatchingChannel.current == channel.id
+        val timelineVisible = detailsFactsUseTimeline(event, nowSec)
         // The timeline already labels start/end; its remaining time is not the total runtime.
         val segments = facts.filter { it.kind != DetailsFactKind.LEFT &&
             (!timelineVisible || it.kind == DetailsFactKind.LENGTH) }.map { detailsFactValue(it, nowSec) } + metadata
@@ -1011,37 +1010,49 @@ private fun DetailsInformation(
             if (ratingText != null) ProgrammeAgeRatingBox(ratingText, "details-rating")
             }
         }
-        if (event != null && timelineVisible) {
-            Spacer(Modifier.height(8.dp))
-            val start = formatClock(event.start.epochSeconds)
-            val end = formatClock(event.stop.epochSeconds)
-            val spokenRange = formatTimeIntervalSpoken(event.start.epochSeconds, event.stop.epochSeconds, resources)
-            val minutesLeft = ((event.stop.epochSeconds - nowSec + 59) / 60).toInt()
-            val progress = ((nowSec - event.start.epochSeconds).toFloat() / (event.stop - event.start).inWholeSeconds).coerceIn(0f, 1f)
-            DetailsTimeline(start, progress, "$end • ${playerMinutesLeft(minutesLeft)}",
-                "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}",
-                Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(watchingEvent))
-        } else if (facts.any { it.kind == DetailsFactKind.LEFT }) {
-            Spacer(Modifier.height(8.dp))
-            val length = facts.first { it.kind == DetailsFactKind.LENGTH }.seconds
-            val left = facts.first { it.kind == DetailsFactKind.LEFT }.seconds
-            val position = length - left
-            val minutesLeft = ((left + 59) / 60).toInt()
-            DetailsTimeline(formatPlaybackDuration(position * 1000L), position.toFloat() / length,
-                "${formatPlaybackDuration(length * 1000L)} • ${playerMinutesLeft(minutesLeft)}",
-                stringResource(R.string.details_recording_progress_spoken,
-                    formatDurationMinutes(position / 60, resources, spoken = true),
-                    formatDurationMinutes(length / 60, resources, spoken = true),
-                    playerMinutesLeft(minutesLeft, spoken = true)), Modifier.widthIn(max = 470.dp).fillMaxWidth(),
-                // How far the viewer is, not time on air.
-                color = MaterialTheme.colorScheme.tertiary)
-        }
+        DetailsProgress(event, recording, recordingAdmission, nowSec)
         // The same warning as the recording's row and pane.
         if (recording != null && remember(recording) { recordingStoppedEarly(recording) != null }) {
             Spacer(Modifier.height(8.dp))
             ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early), R.drawable.ic_warning_outlined,
                 "details-stopped-early", modifier = Modifier.widthIn(max = 470.dp))
         }
+    }
+}
+
+internal fun detailsFactsUseTimeline(event: EpgEvent?, nowSec: Long): Boolean = event?.isRunning(nowSec) == true
+
+@Composable
+private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?, nowSec: Long) {
+    val resources = LocalContext.current.resources
+    val indicator = watchingIndicator(event, nowSec)
+    val progress = programmeProgress(event, nowSec)
+    if (event != null && (event.isRunning(nowSec) || progress != null)) {
+        Spacer(Modifier.height(8.dp))
+        val at = if (indicator.isPlayingItem) liveViewerEpochSec(event.channelId, nowSec) else nowSec
+        val start = formatClock(event.start.epochSeconds)
+        val end = formatClock(event.stop.epochSeconds)
+        val spokenRange = formatTimeIntervalSpoken(event.start.epochSeconds, event.stop.epochSeconds, resources)
+        val minutesLeft = at?.takeIf { progress != null }?.let { ((event.stop.epochSeconds - it + 59) / 60).toInt() }
+        DetailsTimeline(start, progress, if (minutesLeft != null) "$end • ${playerMinutesLeft(minutesLeft)}" else end,
+            if (minutesLeft != null) "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}" else spokenRange,
+            Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(indicator.isPlayingItem))
+    } else if (recording != null && (event == null || !event.isRunning(nowSec))) {
+        val facts = recordingDetailsFacts(recording, recordingAdmission, nowSec)
+        val viewer = recordingViewerPosition(recording.id)?.takeIf { it.fraction != null }
+        if (viewer == null && facts.none { it.kind == DetailsFactKind.LEFT }) return
+        Spacer(Modifier.height(8.dp))
+        val length = viewer?.durationMs?.div(1000L) ?: facts.first { it.kind == DetailsFactKind.LENGTH }.seconds
+        val position = viewer?.positionMs?.div(1000L)?.coerceIn(0, length)
+            ?: (length - facts.first { it.kind == DetailsFactKind.LEFT }.seconds)
+        val minutesLeft = ((length - position + 59) / 60).toInt()
+        DetailsTimeline(formatPlaybackDuration(position * 1000L), viewer?.fraction ?: (position.toFloat() / length),
+            "${formatPlaybackDuration(length * 1000L)} • ${playerMinutesLeft(minutesLeft)}",
+            stringResource(R.string.details_recording_progress_spoken,
+                formatDurationMinutes(position / 60, resources, spoken = true),
+                formatDurationMinutes(length / 60, resources, spoken = true),
+                playerMinutesLeft(minutesLeft, spoken = true)), Modifier.widthIn(max = 470.dp).fillMaxWidth(),
+            color = progressColor(true))
     }
 }
 
@@ -1071,7 +1082,7 @@ internal fun ProgrammeAgeRatingBox(rating: String, tag: String) {
 
 @Composable
 private fun DetailsTimeline(
-    startLabel: String, progress: Float, endLabel: String, spokenDescription: String, modifier: Modifier = Modifier,
+    startLabel: String, progress: Float?, endLabel: String, spokenDescription: String, modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,
 ) {
     Row(modifier.testTag("details-timeline").semantics(mergeDescendants = true) {
@@ -1079,7 +1090,8 @@ private fun DetailsTimeline(
     },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(startLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
-        ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), color = color, trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
+        if (progress != null) ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), color = color, trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
+        else Spacer(Modifier.weight(1f))
         Text(endLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
     }
 }
@@ -1102,7 +1114,16 @@ private fun DetailsActions(
                         up = FocusRequester.Cancel; down = FocusRequester.Cancel
                     }.testTag("details-${action.name.lowercase()}")
                 val content: @Composable RowScope.() -> Unit = {
-                    Icon(painterResource(action.icon()), null, Modifier.size(ButtonDefaults.IconSize))
+                    val indicator = when (action) {
+                        BrowseContextAction.WATCH -> watchingIndicator(event, nowSec)
+                        BrowseContextAction.PLAY, BrowseContextAction.RESUME -> watchingIndicator(recording?.id)
+                        BrowseContextAction.CONTINUE_WATCHING -> if (event == null) watchingIndicator(recording?.id)
+                            else watchingIndicator(event, nowSec)
+                        else -> ChannelPlaybackIndicator.NONE
+                    }
+                    if (indicator.isPlayingItem) {
+                        ChannelPlaybackMarker(indicator, size = ButtonDefaults.IconSize)
+                    } else Icon(painterResource(action.icon()), null, Modifier.size(ButtonDefaults.IconSize))
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
                         (event == null && recording?.state == DvrEntryState.SCHEDULED ||

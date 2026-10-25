@@ -67,6 +67,7 @@ internal fun BrowseContextMenu(
     programDetailsLabel: Boolean = false,
     backEnabled: Boolean = true,
     recordingState: DvrEntryState? = null,
+    playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
     artwork: @Composable () -> Unit,
 ) {
     val requesters = remember { BrowseContextAction.entries.associateWith { FocusRequester() } }
@@ -93,7 +94,10 @@ internal fun BrowseContextMenu(
                         color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
+                    Row(Modifier.heightIn(min = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ChannelPlaybackMarker(playbackIndicator)
+                        RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
+                    }
                     if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }

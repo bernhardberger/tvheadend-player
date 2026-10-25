@@ -110,6 +110,9 @@ import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
 import at.bernhardberger.tvhplayer.ui.components.LoadDetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.progressColor
+import at.bernhardberger.tvhplayer.ui.components.programmeProgress
+import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
@@ -524,7 +527,9 @@ internal fun ChannelsRowCard(
             if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
                 compact = true)
             // Same embedded strip as the airing cards; the card's border keeps clear of it.
-            if (running != null) ProgressStrip(running.progress(nowSec),
+            // The playing channel's strip follows the viewer, like the other channel cards.
+            val progress = programmeProgress(running, nowSec)
+            if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
                 color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING ||
                     playbackIndicator == ChannelPlaybackIndicator.PAUSED),
@@ -599,8 +604,6 @@ internal fun ChannelsImmersiveHero(
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
         // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
-            watching = channel.id == frame.playbackChannelId && frame.playbackIndicator in
-                listOf(ChannelPlaybackIndicator.PLAYING, ChannelPlaybackIndicator.PAUSED),
             synopsisLines = when {
                 sparse -> 0
                 besideList -> ImmersiveListSynopsisLines
@@ -629,12 +632,11 @@ internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
  * follows in the quietest tone.
  */
 @Composable
-private fun ChannelsHeadline(
+internal fun ChannelsHeadline(
     channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, recording: Boolean, now: Long,
     synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false, showNext: Boolean = true,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
-    watching: Boolean = false,
 ) {
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0]
@@ -660,8 +662,8 @@ private fun ChannelsHeadline(
         facts = metadata,
         rating = current?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
-        progress = current?.progress(now),
-        progressColor = progressColor(watching),
+        progress = programmeProgress(current, now),
+        progressColor = progressColor(watchingIndicator(current, now).isPlayingItem),
         synopsis = current?.takeIf { synopsisLines > 0 }?.let(::channelsProgrammeSynopsis),
         fitSynopsis = fitSynopsis,
         loading = current == null && loading,

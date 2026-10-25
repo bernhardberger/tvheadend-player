@@ -79,7 +79,7 @@ import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
-import at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -528,7 +528,7 @@ class RecordingPlayerChromeScreenTest {
             val target by runtime.activeTarget.collectAsState()
             val selection by runtime.recordingSelection.collectAsState()
             CompositionLocalProvider(LocalLifecycleOwner provides owner,
-                LocalActivePlaybackTarget provides target, LocalRecordingPlaybackSelection provides selection) {
+                LocalWatchingTarget provides target, LocalRecordingPlaybackSelection provides selection) {
                 TVHeadendPlayerTheme {
                     RecordingPlayerScreen(
                         recordingId = recording,

@@ -211,7 +211,7 @@ class GuideRenderingCostContractTest {
         assertFalse((guide + movedGuideSource).contains("var nowSec by remember"))
         assertTrue(ruler.contains("val nowSec = nowSecProvider()"))
         assertTrue(row.contains("val nowSec = nowSecProvider()"))
-        assertTrue(details.contains("nowSec = rememberDetailsEpochSeconds(nowSecProvider)"))
+        assertTrue(details.contains("rememberDetailsEpochSeconds(nowSecProvider)"))
         val detailsArguments = overlaySource.section("ProgrammeDetailsHost(", "onShowGuide =")
         assertFalse(detailsArguments.contains("nowSecProvider = nowSecProvider"))
         // The Show in Guide event callback may read wall-clock now; composition must not.
