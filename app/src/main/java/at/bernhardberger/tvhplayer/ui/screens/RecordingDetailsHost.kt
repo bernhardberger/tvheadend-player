@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.warmRecordingId
+import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
 import at.bernhardberger.tvhplayer.ui.screens.recordings.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -43,19 +44,25 @@ internal fun RecordingDetailsHost(
     backEnabled: Boolean = true,
     visibilityAlpha: State<Float>? = null,
 ) {
-    val capability = openingObservation.currentSession?.takeIf { observation.currentSession === it }
-    val opened = if (capability != null && observation.dvrState is DvrRepositoryState.Current)
-        observation.dvrEntry(recording.id) else recording
+    val departing = LocalPlayerEntryHandoff.current?.departing == true
+    val presentation = Triple(observation, nowSec, warmRecordingId(LocalActivePlaybackTarget.current,
+        LocalRecordingPlaybackSelection.current, observation.currentSession))
+    var lastPresentation by remember { mutableStateOf(presentation) }
+    // Keep progress, metadata and actions from the activation while this shell leaves for playback.
+    SideEffect { if (!departing) lastPresentation = presentation }
+    val (displayObservation, displayNowSec, playingId) = if (departing) lastPresentation else presentation
+    val capability = openingObservation.currentSession?.takeIf { displayObservation.currentSession === it }
+    val opened = if (capability != null && displayObservation.dvrState is DvrRepositoryState.Current)
+        displayObservation.dvrEntry(recording.id) else recording
     LaunchedEffect(opened == null) { if (opened == null) onClose() }
     if (opened == null) return
     val admission = capability?.let {
-        (if (observation.dvrState is DvrRepositoryState.Current) observation else openingObservation)
+        (if (displayObservation.dvrState is DvrRepositoryState.Current) displayObservation else openingObservation)
             .recordingPlaybackAdmission(opened)
     }
-    val channel = opened.channelId?.let(observation::channel)
-    val playing = capability != null && warmRecordingId(LocalActivePlaybackTarget.current,
-        LocalRecordingPlaybackSelection.current, capability) == opened.id
-    val canModify = capability != null && (observation.sessionState as? SessionState.Ready)
+    val channel = opened.channelId?.let(displayObservation::channel)
+    val playing = capability != null && playingId == opened.id
+    val canModify = capability != null && (displayObservation.sessionState as? SessionState.Ready)
         ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     var pending by remember { mutableStateOf<DvrMutationAction?>(null) }
     var focusedAction by remember { mutableStateOf(initialAction) }
@@ -70,7 +77,7 @@ internal fun RecordingDetailsHost(
     }
     Box(Modifier.onPreviewKeyEvent { event ->
         // A refresh can remove the confirmation between down and up.
-        if (event.key == confirmationKey && pending == null) {
+        if (departing) true else if (event.key == confirmationKey && pending == null) {
             if (event.type == KeyEventType.KeyUp) confirmationKey = null
             true
         } else {
@@ -79,14 +86,14 @@ internal fun RecordingDetailsHost(
             false
         }
     }) {
-        ProvideArtworkSession(capability, observation) {
+        ProvideArtworkSession(capability, displayObservation) {
             ProgrammeDetailsPage(
-                event = null, recording = opened, channel = channel, nowSec = nowSec,
-                recordingEvent = opened.eventId?.takeIf { capability != null }?.let(observation::event),
-                recordingConfigurations = observation.currentDvrConfigurations().takeIf { capability != null }.orEmpty(),
+                event = null, recording = opened, channel = channel, nowSec = displayNowSec,
+                recordingEvent = opened.eventId?.takeIf { capability != null }?.let(displayObservation::event),
+                recordingConfigurations = displayObservation.currentDvrConfigurations().takeIf { capability != null }.orEmpty(),
                 recordingAdmission = admission,
                 actions = recordingDetailsActions(opened, admission, canModify,
-                    channel != null, playing = playing, nowSec = nowSec),
+                    channel != null, playing = playing, nowSec = displayNowSec),
                 initialAction = focusedAction,
                 backEnabled = backEnabled && pending == null,
                 visibilityAlpha = visibilityAlpha,

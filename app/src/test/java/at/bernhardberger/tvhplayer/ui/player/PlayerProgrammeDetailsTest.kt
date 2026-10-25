@@ -159,7 +159,10 @@ class PlayerProgrammeDetailsTest {
             val close = { opened = false; restore = "player-info" }
             CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
                 (if (recording) at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id)
-                else at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id)).takeIf { warm }) {
+                else at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id)).takeIf { warm },
+                at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
+                    at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(
+                        checkNotNull(observation.currentSession), entry.id).takeIf { recording && warm }) {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,

@@ -11,6 +11,7 @@ import android.view.View
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -152,6 +153,9 @@ class PlayerEntryOverlayTest {
 
     @Test fun watchFromDetailsFadesTheDetailsIntoThePlayer() = watchFromOverlay(details = true)
 
+    @Test fun resumeFromRecordingDetailsKeepsItsPresentationWhileFadingIntoThePlayer() =
+        watchFromOverlay(details = true, recordings = true)
+
     @Test fun watchChannelFromAMenuWithoutProgrammeFadesTheMenuIntoThePlayer() =
         watchFromOverlay(details = false, programme = false)
 
@@ -221,30 +225,54 @@ class PlayerEntryOverlayTest {
         settle()
     }
 
-    private fun watchFromOverlay(details: Boolean, programme: Boolean = true) {
-        app(programme)
+    private fun watchFromOverlay(details: Boolean, programme: Boolean = true, recordings: Boolean = false) {
+        app(programme, recordings)
+        if (recordings) {
+            compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
+            compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("recording-list-entry-7").requestFocus()
+            settle()
+        }
         val browse = frame()
         key(Key.Menu)
         compose.onNodeWithTag("browse-context-menu").assertExists()
         if (details) {
-            compose.onNode(hasText("Program details") and hasClickAction()).performSemanticsAction(SemanticsActions.OnClick)
+            compose.onNode(hasText(if (recordings) "Details" else "Program details") and hasClickAction())
+                .performSemanticsAction(SemanticsActions.OnClick)
             settle()
-            compose.onNodeWithTag("details-watch").assertExists()
+            compose.onNodeWithTag(if (recordings) "details-resume" else "details-watch").assertExists()
         }
         val overlay = frame()
+        fun detailActions() = compose.onAllNodes(hasAnyAncestor(hasTestTag("details-actions")), useUnmergedTree = true)
+            .fetchSemanticsNodes().let { nodes ->
+                nodes.flatMap { node -> if (SemanticsProperties.Text in node.config)
+                    node.config[SemanticsProperties.Text].map { it.text } else emptyList() } to
+                    nodes.filter { SemanticsActions.OnClick in it.config }
+                        .map { it.config[SemanticsProperties.TestTag] to it.boundsInRoot.center }
+            }
+        val pressedActions = if (details) detailActions() else null
+        var departureSamples = 0
 
         compose.mainClock.autoAdvance = false
-        val watch = if (details) hasTestTag("details-watch")
+        val watch = if (details) hasTestTag(if (recordings) "details-resume" else "details-watch")
             else hasText(if (programme) "Watch" else "Watch channel") and hasClickAction() and
                 hasAnyAncestor(hasTestTag("browse-context-menu"))
         compose.onNode(watch).performSemanticsAction(SemanticsActions.OnClick)
         val frames = (1..(PlayerMotion.DestinationMs + 100) / 16).map {
             compose.mainClock.advanceTimeByFrame()
+            if (details) {
+                val departingActions = detailActions()
+                if (departingActions.first.isNotEmpty()) {
+                    assertEquals("departure frame $it keeps action labels and positions", pressedActions, departingActions)
+                    departureSamples++
+                }
+            }
             frame()
         }
+        if (details) assertTrue("sampled the departing details actions", departureSamples > 0)
         compose.mainClock.autoAdvance = true
         settle()
-        compose.onNodeWithTag("player-page-first", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag(if (recordings) "player-banner" else "player-page-first", useUnmergedTree = true).assertExists()
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         val shown = frame()
         val fits = frames.map { drawn -> residual(drawn, overlay, shown) to residual(drawn, browse, shown) }

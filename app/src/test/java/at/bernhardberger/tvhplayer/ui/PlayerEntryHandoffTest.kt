@@ -52,6 +52,7 @@ class PlayerEntryHandoffTest {
 
         resolve()
         assertEquals("the overlay closes once", listOf(1), closed)
+        assertFalse("a request that stays in browse releases its departure", handoff.departing)
         show(2)
         activate(2)
         assertEquals("a later activation is a new request", listOf(1, 2), requests)
@@ -59,12 +60,18 @@ class PlayerEntryHandoffTest {
 
     @Test fun aRequestThatOpensThePlayerLeavesItsOverlayToFadeWithBrowse() {
         show(1)
+        assertFalse(handoff.departing)
         activate(1)
+        assertTrue(handoff.departing)
         compose.runOnIdle { playerShown.value = true }
         resolve()
 
         assertTrue("the overlay is not closed behind the player: $closed", closed.isEmpty())
+        assertFalse("the player request has finished", handoff.pending)
+        assertTrue("the outgoing overlay still holds its presentation through the fade", handoff.departing)
         compose.onNodeWithTag("overlay-1").assertExists()
+        show(null)
+        assertFalse("disposing the outgoing page releases its presentation", handoff.departing)
     }
 
     @Test fun anOverlayDismissedWhileItsRequestIsPendingIsNotClosedAgain() {
@@ -73,6 +80,7 @@ class PlayerEntryHandoffTest {
         // The overlay is dismissed and another one opens before the request resolves.
         show(null)
         show(2)
+        assertFalse("a new page does not inherit the old page's departure", handoff.departing)
 
         resolve()
 

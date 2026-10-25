@@ -25,6 +25,7 @@ import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
 import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
+import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
 import org.koin.compose.koinInject
 
 /** Shared programme navigation and guarded DVR actions for Guide and Channels. */
@@ -59,7 +60,13 @@ internal fun ProgrammeDetailsHost(
         runCatching { returnFocusRequester?.requestFocus() }
         Unit
     }
-    val nowSec = rememberDetailsEpochSeconds(nowSecProvider)
+    val departing = LocalPlayerEntryHandoff.current?.departing == true
+    val presentation = Triple(observation, rememberDetailsEpochSeconds(nowSecProvider), LocalActivePlaybackTarget.current)
+    var lastPresentation by remember { mutableStateOf(presentation) }
+    // Playback can publish its target before the shell starts fading. Keep the page pressed,
+    // not a relabelled/reflowed version of it, until that existing handoff removes the overlay.
+    SideEffect { if (!departing) lastPresentation = presentation }
+    val (displayObservation, nowSec, playbackTarget) = if (departing) lastPresentation else presentation
     var selected by remember { mutableStateOf(openingEvent) }
     var stack by remember { mutableStateOf<List<Triple<EpgEvent, EventId, BrowseContextAction?>>>(emptyList()) }
     var returnCard by remember { mutableStateOf<EventId?>(null) }
@@ -76,26 +83,26 @@ internal fun ProgrammeDetailsHost(
     var menuConsumed by remember { mutableStateOf(false) }
     var mutationEvent by remember { mutableStateOf<EpgEvent?>(null) }
     // Opened before Ready, the session that arrives later becomes its own, so recording actions appear.
-    val sessionObservation = remember(openingObservation, observation.currentSession) {
-        if (openingObservation.currentSession != null) openingObservation else observation
+    val sessionObservation = remember(openingObservation, displayObservation.currentSession) {
+        if (openingObservation.currentSession != null) openingObservation else displayObservation
     }
-    val capability = sessionObservation.currentSession?.takeIf { it === observation.currentSession }
+    val capability = sessionObservation.currentSession?.takeIf { it === displayObservation.currentSession }
     // Opened before Ready it stays: Watch needs only the channel. A session it opened with is gone.
     val sessionLost = openingObservation.currentSession != null && capability == null
-    val live = observation.event(selected.id)
+    val live = displayObservation.event(selected.id)
     var lastKnown by remember(selected.id) { mutableStateOf(selected) }
     SideEffect { if (live != null) lastKnown = live }
     val event = live ?: lastKnown
-    val channel = event.channelId?.let(observation::channel)
-    val recording = observation.dvrEntryForEvent(event)
-    val canModify = capability != null && observation.dvrState is DvrRepositoryState.Current &&
-        (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
+    val channel = event.channelId?.let(displayObservation::channel)
+    val recording = displayObservation.dvrEntryForEvent(event)
+    val canModify = capability != null && displayObservation.dvrState is DvrRepositoryState.Current &&
+        (displayObservation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
-    val playingChannel = (LocalActivePlaybackTarget.current as? at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live)?.channelId
+    val playingChannel = (playbackTarget as? at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live)?.channelId
     fun isPlaying(event: EpgEvent) = capability != null && event.channelId == playingChannel &&
         nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
     val actions = programmeDetailsActions(event, nowSec, recording,
-        recording?.let(observation::recordingPlaybackAdmission), canModify,
+        recording?.let(displayObservation::recordingPlaybackAdmission), canModify,
         channel != null, liveProgramme = live != null, playing = isPlaying(event))
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
@@ -240,7 +247,7 @@ internal fun ProgrammeDetailsHost(
     val detailAlpha = animateShown(
         tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
         tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "browse-details-layer")
-    PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { closing || entryPending() }) {
+    PlayerMotionFrame(leaving = closing, modifier = Modifier.onPreviewKeyEvent { closing || departing || entryPending() }) {
     AnimatedContent(targetState = showContextMenu, transitionSpec = {
         // Details owns its fade so the shell uses exactly the same progress.
         (if (targetState) fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) else EnterTransition.None)
@@ -254,7 +261,7 @@ internal fun ProgrammeDetailsHost(
         CompositionLocalProvider(LocalPlayerPanelMotion provides this) {
         PlayerMotionFrame(leaving = closing || pendingAction != null) {
         ProgrammeContextMenu(
-            event, channel, recording, nowSec, canModify, capability, observation,
+            event, channel, recording, nowSec, canModify, capability, displayObservation,
             canPlayRecording = onPlayRecording != null,
             modifier = Modifier.onPreviewKeyEvent(keyHandler),
             onAction = act, onClose = closeAnimated,
@@ -271,23 +278,23 @@ internal fun ProgrammeDetailsHost(
             (fadeIn(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)) togetherWith
                 fadeOut(tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard))).using(null)
         }, label = "programme-details-stack") { page ->
-            val pageLive = observation.event(page.id)
+            val pageLive = displayObservation.event(page.id)
             val pageEvent = pageLive ?: if (page.id == selected.id) event else page
-            val pageChannel = pageEvent.channelId?.let(observation::channel)
-            val pageRecording = observation.dvrEntryForEvent(pageEvent)
+            val pageChannel = pageEvent.channelId?.let(displayObservation::channel)
+            val pageRecording = displayObservation.dvrEntryForEvent(pageEvent)
             // Once per programme, EPG publication and details minute, not per grid tick.
-            val snapshot = observation.epgSnapshotForDisplay
-            val airings = remember(pageEvent, snapshot, observation.channelState, nowSec) {
+            val snapshot = displayObservation.epgSnapshotForDisplay
+            val airings = remember(pageEvent, snapshot, displayObservation.channelState, nowSec) {
                 snapshot?.let { otherAirings(pageEvent, it.events, nowSec,
-                    channelNumber = { id -> observation.channel(id)?.number }) }.orEmpty()
+                    channelNumber = { id -> displayObservation.channel(id)?.number }) }.orEmpty()
             }
             val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording,
-                pageRecording?.let(observation::recordingPlaybackAdmission), canModify,
+                pageRecording?.let(displayObservation::recordingPlaybackAdmission), canModify,
                 pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent))
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             // The page shows its pictures with the session it was opened with.
-            PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability, observation) {
+            PlayerMotionFrame(leaving = page.id != selected.id || covered) { ProvideArtworkSession(capability, displayObservation) {
             ProgrammeDetailsPage(pageEvent, pageRecording, pageChannel, nowSec,
                 pageActions,
                 { action -> act(pageEvent, action) },
@@ -306,7 +313,7 @@ internal fun ProgrammeDetailsHost(
                 backEnabled = !closing && page.id == selected.id && menu == showContextMenu && !covered,
                 onActionFocused = { returnAction = it },
                 related = airings,
-                channelOf = observation::channel,
+                channelOf = displayObservation::channel,
                 returnToCard = returnCard,
                 onReturnToCardConsumed = { returnCard = null },
                 onRelated = pushPage,
@@ -321,10 +328,10 @@ internal fun ProgrammeDetailsHost(
     }
     }
     menuAiring?.let { airing ->
-        val menuEvent = observation.event(airing.id) ?: airing
-        ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(observation::channel),
-            observation.dvrEntryForEvent(menuEvent),
-            nowSec = nowSec, canModify = canModify, currentSession = capability, observation = observation,
+        val menuEvent = displayObservation.event(airing.id) ?: airing
+        ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(displayObservation::channel),
+            displayObservation.dvrEntryForEvent(menuEvent),
+            nowSec = nowSec, canModify = canModify, currentSession = capability, observation = displayObservation,
             canPlayRecording = onPlayRecording != null, onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))
     }
