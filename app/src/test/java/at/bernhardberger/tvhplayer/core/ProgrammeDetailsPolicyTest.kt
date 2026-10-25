@@ -14,8 +14,8 @@ class ProgrammeDetailsPolicyTest {
     private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null) = DvrEntry.create(
         DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds, files = files)
 
-    private fun file(path: String = "/rec/a.ts", start: Instant? = null) =
-        TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path, start = start)
+    private fun file(path: String = "/rec/a.ts", start: Instant? = null, stop: Instant? = null) =
+        TvheadendTestResultFactory.recordingFile(fileId = 1, serverPath = path, start = start, stop = stop)
 
     private fun admission(entry: DvrEntry, capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED) =
         SessionObservation.create(recordingProgressCapability = capability).recordingPlaybackAdmission(entry)
@@ -88,7 +88,9 @@ class ProgrammeDetailsPolicyTest {
 
     @Test fun failedRecordingProgressFollowsTheSdkResumeOffer() {
         assertEquals(DetailsFact(DetailsFactKind.LEFT, 80),
-            facts(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))).last())
+            facts(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file(start = event.start, stop = event.stop)))).last())
+        // A failed file without times has no known length, so nothing is left to count down.
+        assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.MISSED, 20, listOf(file()))).any { it.kind == DetailsFactKind.LEFT })
         assertFalse(facts(recording(DvrEntryState.COMPLETED_ERROR, 20)).any { it.kind == DetailsFactKind.LEFT })
         assertEquals(listOf(RESUME, START_OVER, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED_ERROR, 20, listOf(file()))))

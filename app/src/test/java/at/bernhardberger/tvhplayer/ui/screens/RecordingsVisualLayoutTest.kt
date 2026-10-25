@@ -512,11 +512,11 @@ class RecordingsVisualLayoutTest {
         compose.onNodeWithText("Canceled").assertDoesNotExist()
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("Missed", substring = true),
             useUnmergedTree = true).assertExists()
-        // Nothing was recorded, so the row gives its date but no length.
+        // Neither left a file, so both rows give their date but no length.
         compose.onNode(hasTestTag("recording-list-metadata-30") and hasText("90m", substring = true),
             useUnmergedTree = true).assertDoesNotExist()
         compose.onNode(hasTestTag("recording-list-metadata-31") and hasText("90m", substring = true),
-            useUnmergedTree = true).assertExists()
+            useUnmergedTree = true).assertDoesNotExist()
         compose.onAllNodesWithTag("recording-list-state-failed", useUnmergedTree = true).assertCountEquals(2)
         compose.onNodeWithTag("recording-list-state-cancelled", useUnmergedTree = true).assertDoesNotExist()
         capture("problems-missed", 1f)
