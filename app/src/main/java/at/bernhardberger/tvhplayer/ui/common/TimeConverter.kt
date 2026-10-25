@@ -69,6 +69,10 @@ fun formatClock(
 fun formatShortDate(time: TemporalAccessor, locale: Locale = Locale.getDefault()): String =
     formatter(android.text.format.DateFormat.getBestDateTimePattern(locale, "yMd"), locale).format(time)
 
+/** Day and abbreviated month without weekday or year, in locale-specific order. */
+fun formatDayMonth(time: TemporalAccessor, locale: Locale): String =
+    formatter(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).format(time)
+
 /** Full weekday and month for schedule section headings, in locale-specific order. */
 fun formatDayHeader(time: TemporalAccessor, locale: Locale): String =
     formatter(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMMEEEEd"), locale).format(time)

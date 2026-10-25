@@ -1,10 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.res.stringArrayResource
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.common.formatDayMonth
 import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
 import java.time.LocalDate
 
@@ -14,7 +15,4 @@ fun playerMinutesLeft(minutes: Int, spoken: Boolean = false): String = stringRes
 )
 
 @Composable
-fun playerRecordedDate(date: LocalDate): String {
-    val month = stringArrayResource(R.array.player_month_short)[date.monthValue - 1]
-    return stringResource(R.string.player_recorded_date, date.dayOfMonth, month)
-}
+fun playerRecordedDate(date: LocalDate): String = formatDayMonth(date, LocalConfiguration.current.locales[0])

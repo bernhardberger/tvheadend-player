@@ -513,11 +513,6 @@
     <string name="player_now_spoken">Jetzt: %1$s, %2$s</string>
     <string name="player_time_range_spoken">%1$s bis %2$s</string>
     <string name="player_recorded_spoken">%1$s, aufgenommen am %2$s, %3$s</string>
-    <string name="player_recorded_date">%1$d. %2$s</string>
-    <string-array name="player_month_short">
-        <item>Jan.</item><item>Feb.</item><item>März</item><item>Apr.</item><item>Mai</item><item>Juni</item>
-        <item>Juli</item><item>Aug.</item><item>Sep.</item><item>Okt.</item><item>Nov.</item><item>Dez.</item>
-    </string-array>
     <string name="player_channel">Sender</string>
     <string name="player_row_recent">Zuletzt gesehene Sender</string>
     <string name="player_channel_card_hint">Links oder rechts wechselt den Sender, OK zeigt zuletzt gesehene Sender.</string>

@@ -357,7 +357,7 @@ class PlayerChromeEvidenceTest {
             date = playerRecordedDate(LocalDate.of(2026, 9, 12))
             one = playerMinutesLeft(1, spoken = true); many = playerMinutesLeft(38, spoken = true)
         } }
-        assertEquals("12. Sep.", date)
+        assertEquals("12. Sept.", date)
         assertEquals("Noch 1 Minute", one)
         assertEquals("Noch 38 Minuten", many)
     }

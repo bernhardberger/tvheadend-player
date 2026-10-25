@@ -34,6 +34,10 @@ class LocaleFormattingTest {
             formatDayHeader(date, locale))
     }
 
+    @Test fun dayMonthOmitsWeekdayAndYear() = inSelectedLocales { locale ->
+        assertEquals(if (locale == Locale.US) "Mar 12" else "12. März", formatDayMonth(date, locale))
+    }
+
     @Test fun firstAiredRetainsLabeledMediumDate() = inSelectedLocales { locale ->
         assertEquals(if (locale == Locale.US) "Mar 12, 2026" else "12.03.2026",
             formatFirstAired(date.atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli(), locale))
