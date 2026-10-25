@@ -81,9 +81,10 @@ class SettingsVisualEvidenceTest {
                         SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
-                                listOf(settingsRootLevel(applianceBuild = true), settingsApplianceLevel(false, { accessibilityCalls++ }),
-                                    settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_overview_connected),
-                                        "tvheadend.local", 9982)) +
+                                // The status page opens only while a retry can fix the connection.
+                                listOf(settingsRootLevel(applianceBuild = true, connectionRetry = true), settingsApplianceLevel(false, { accessibilityCalls++ }),
+                                    settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
+                                        "tvheadend.local", 9982, degraded = true)) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
                                         {}, {}, { cacheCalls++; cacheState = CacheClearState.CLEARING }),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
@@ -103,7 +104,8 @@ class SettingsVisualEvidenceTest {
         }
         capture("$prefix-connection-preview")
         press(Key.DirectionCenter)
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.edit_connection)).assertIsFocused()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsFocused()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.edit_connection)).assertIsDisplayed()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         capture("$prefix-connection-overview")
         press(Key.Back)
@@ -113,7 +115,7 @@ class SettingsVisualEvidenceTest {
         assertEquals(130f, activeColumn.left, .5f)
         assertEquals(28f, activeColumn.top, .5f)
         assertEquals(340f, activeColumn.width, .5f)
-        if (fontScale == 1f) assertRowTops(76f, 136f, 196f, 256f, 316f)
+        if (fontScale == 1f) assertRowTops(76f, 136f, 196f, 256f, 316f, 376f)
         capture("$prefix-root")
         press(Key.DirectionDown)
         capture("$prefix-root-middle-focus", middleFocus = true)

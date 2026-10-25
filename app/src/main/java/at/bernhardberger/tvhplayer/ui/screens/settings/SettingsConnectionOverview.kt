@@ -76,6 +76,10 @@ internal fun settingsConnectionLevels(
     )
 }
 
+/** A retry can fix it: the connection is degraded and its recovery is not a settings change. */
+internal fun AppConnectionPresentation.offersConnectionRetry(): Boolean =
+    degraded && connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS
+
 /**
  * The catalog condition whose title and reason the overview's status shows, or null while it shows
  * its own status: loading, not configured, offline with saved channels, connecting or connected.

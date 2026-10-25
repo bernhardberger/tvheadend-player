@@ -47,15 +47,14 @@ class OfflinePatternTest {
                     settingsLevel(CONNECTION_EDITOR, "Edit connection", listOf(settingsRow("editor", "Server")))))
             }
         }
+        // A failure only new settings fix opens the setup flow straight away; there is nothing to retry.
         press(Key.DirectionCenter)
         compose.onNodeWithText("Try again").assertDoesNotExist()
-        compose.onNodeWithText("Edit connection").assertIsFocused()
-        press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()
         assertEquals(CONNECTION_EDITOR, navigation.stack.active.levelId)
         assertEquals(0, retries)
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Connection").assertIsFocused()
     }
 
     @Test fun retryStaysFocusedButDoesNotDispatchWhileConnecting() {
@@ -64,7 +63,7 @@ class OfflinePatternTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(connectionRetry = true),
                     settingsConnectionOverview("Connection unavailable", null, null,
                         degraded = true, connecting = connecting, onRetry = { retries++ })))
             }
@@ -96,7 +95,7 @@ class OfflinePatternTest {
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                         SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                             connectionDegraded = degraded, onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
-                            SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                            SettingsScreenNavigation(navigation, listOf(settingsRootLevel(connectionRetry = degraded),
                                 settingsConnectionOverview(
                                     if (degraded) "Can’t reach the server • Showing saved channels" else "Connected",
                                     null, 9982, degraded, onRetry = { retries++ })),
