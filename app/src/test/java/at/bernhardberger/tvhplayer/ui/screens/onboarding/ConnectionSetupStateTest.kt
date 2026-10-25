@@ -44,7 +44,7 @@ class ConnectionSetupStateTest {
         state.onServerOpened()
         assertEquals(1, state.searchRequest)
         assertFalse(state.hostError)
-        backgroundScope.launch { state.search() }
+        backgroundScope.launch { state.search(state.searchRequest) }
         runCurrent()
         discovery.value = discovering(LIVING_ROOM)
         runCurrent()
@@ -58,6 +58,31 @@ class ConnectionSetupStateTest {
         assertFalse(state.hostError)
         state.continueFromAddress()
         assertTrue(state.hostError)
+    }
+
+    @Test
+    fun staleSearchCannotStartOrClearTheCurrentSearch() = runTest {
+        val state = setup()
+        state.onServerOpened()
+        val firstRequest = state.searchRequest
+        val first = backgroundScope.launch { state.search(firstRequest) }
+        runCurrent()
+        state.onServerOpened()
+        val currentRequest = state.searchRequest
+        first.cancel()
+        runCurrent()
+        assertTrue(state.searching)
+        // The stale effect must return without collecting discovery or changing the busy state.
+        state.search(firstRequest)
+        assertTrue(state.searching)
+        assertTrue(state.servers.isEmpty())
+        val current = backgroundScope.launch { state.search(currentRequest) }
+        discovery.value = discovering(LIVING_ROOM)
+        runCurrent()
+        assertEquals(listOf(LIVING_ROOM), state.servers)
+        current.cancel()
+        runCurrent()
+        assertFalse(state.searching)
     }
 
     @Test
@@ -211,7 +236,7 @@ class ConnectionSetupStateTest {
         assertEquals(SetupStep.ADDRESS, state.step)
         assertTrue(state.searching)
         assertNull("The address entry holds focus until a server answers", state.findFocus)
-        backgroundScope.launch { state.search() }
+        backgroundScope.launch { state.search(state.searchRequest) }
         runCurrent()
         assertEquals(emptyList<DiscoveredTvheadendServer>(), state.servers)
 
@@ -236,7 +261,7 @@ class ConnectionSetupStateTest {
     fun aSearchThatFindsNothingEndsAfterItsWindowAndCanRetryInPlace() = runTest {
         val state = setup()
         state.findServer()
-        backgroundScope.launch { state.search() }
+        backgroundScope.launch { state.search(state.searchRequest) }
         advanceTimeBy(DiscoveryWindow - 1.milliseconds)
         assertTrue(state.searching)
         advanceTimeBy(2.milliseconds)
@@ -258,7 +283,7 @@ class ConnectionSetupStateTest {
         discovery.value = TvheadendDiscoveryState.Unavailable(TvheadendDiscoveryFailure.PERMISSION_DENIED)
         val state = setup()
         state.findServer()
-        backgroundScope.launch { state.search() }
+        backgroundScope.launch { state.search(state.searchRequest) }
         runCurrent()
         assertFalse(state.searching)
         assertEquals(emptyList<DiscoveredTvheadendServer>(), state.servers)
@@ -268,7 +293,7 @@ class ConnectionSetupStateTest {
     fun aServerThatLeavesHandsFocusOnButAMovedFocusStays() = runTest {
         val state = setup()
         state.findServer()
-        backgroundScope.launch { state.search() }
+        backgroundScope.launch { state.search(state.searchRequest) }
         discovery.value = discovering(LIVING_ROOM, OFFICE)
         runCurrent()
         state.onFindFocused(OFFICE)

@@ -133,7 +133,6 @@
     <string name="onboarding_title">Welcome to Tvheadend Player</string>
     <string name="onboarding_welcome_body">Watch live TV and recordings from your own Tvheadend server.</string>
     <string name="onboarding_find_searching">Searching…</string>
-    <string name="onboarding_find_still_searching">Still searching…</string>
     <string name="onboarding_find_on_network">On this network</string>
     <string name="onboarding_found_server_detail">%1$s · port %2$d</string>
     <string name="onboarding_find_none_body">Many Tvheadend servers don’t announce themselves on the network. Enter the address you use for Tvheadend’s web interface instead.</string>

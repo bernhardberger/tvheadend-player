@@ -137,6 +137,22 @@ class ConnectionFormStateTest {
     }
 
     @Test
+    fun deletingAReplacementRestoresTheSavedPasswordUntilExplicitlyCleared() = runTest {
+        val editor = FakeConnectionProfileEditor()
+        val form = ConnectionFormState()
+        form.loadFrom(editor)
+        form.updatePassword(EDITED_PASSWORD)
+        form.updatePassword("")
+        assertTrue(form.hasSavedPassword)
+        assertEquals("", form.password)
+        assertEquals(ConnectionFormFeedback.SAVED, form.submit(editor) { CredentialEditLease {} })
+        assertEquals(SavedPassword(FAKE_HOST, FAKE_PORT, FAKE_USERNAME, FAKE_PASSWORD), editor.savedPassword)
+        form.clearPassword()
+        assertFalse(form.hasSavedPassword)
+        assertTrue(form.credentialsIncomplete)
+    }
+
+    @Test
     fun anonymousProfilePrefillsEndpointWithoutAcquiringCredentialLease() = runTest {
         val editor = FakeConnectionProfileEditor(username = "", password = "")
         val form = ConnectionFormState()

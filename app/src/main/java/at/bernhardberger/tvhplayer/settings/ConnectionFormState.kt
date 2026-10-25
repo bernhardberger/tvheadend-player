@@ -35,7 +35,7 @@ internal class ConnectionFormState(
         private set
     // Kept only in memory for testing/saving, never passed to a text field or its visibility toggle.
     private var savedPassword by mutableStateOf("")
-    val hasSavedPassword: Boolean get() = savedPassword.isNotEmpty()
+    val hasSavedPassword: Boolean get() = password.isEmpty() && savedPassword.isNotEmpty()
     private val effectivePassword: String get() = password.ifEmpty { savedPassword }
     var feedback by mutableStateOf<ConnectionFormFeedback?>(null)
         private set
@@ -69,7 +69,7 @@ internal class ConnectionFormState(
     }
 
     fun updatePassword(password: String) {
-        savedPassword = ""
+        // An emptied replacement falls back to the saved sign-in; only Clear discards it.
         this.password = password
     }
 

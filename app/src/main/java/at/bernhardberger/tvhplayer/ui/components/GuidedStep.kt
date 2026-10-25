@@ -3,6 +3,8 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,9 +19,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -46,7 +53,7 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing80
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
-import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
+import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 
 /** The first field or button of a field step lines up with the step line's text. */
 val GuidedStepFieldTop = 6.dp
@@ -61,20 +68,30 @@ private val GuidedStepActionShape = RoundedCornerShape(12.dp)
  * [TvBrowseColumnWidth] wide and centred as a pair. Only [actions] holds focusable content.
  */
 @Composable
+@OptIn(ExperimentalFoundationApi::class)
 fun GuidedStepLayout(
     guidance: @Composable ColumnScope.() -> Unit,
     modifier: Modifier = Modifier,
     actionsTop: Dp = GuidedStepFieldTop,
     actions: @Composable ColumnScope.() -> Unit,
 ) {
-    Box(modifier.fillMaxSize().padding(top = TvSpacing80), contentAlignment = Alignment.TopCenter) {
+    val platformScroll = LocalBringIntoViewSpec.current
+    val density = LocalDensity.current
+    val focusScroll = remember(platformScroll, density) {
+        with(density) { InsetBringIntoViewSpec(platformScroll, 8.dp.toPx(), 8.dp.toPx()) }
+    }
+    // Reserve space around each viewport for the TV controls' focused scale.
+    Box(modifier.fillMaxSize().padding(top = TvSpacing80 - 8.dp, bottom = 32.dp), contentAlignment = Alignment.TopCenter) {
         Row(horizontalArrangement = Arrangement.spacedBy(TvBrowseColumnGap)) {
-            Column(Modifier.width(TvBrowseColumnWidth), content = guidance)
-            Column(
-                Modifier.width(TvBrowseColumnWidth).padding(top = actionsTop),
-                verticalArrangement = Arrangement.spacedBy(TvSpacing12),
-                content = actions,
-            )
+            Column(Modifier.width(TvBrowseColumnWidth).verticalScroll(rememberScrollState()).padding(top = 8.dp), content = guidance)
+            CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
+                Column(
+                    Modifier.width(TvBrowseColumnWidth).verticalScroll(rememberScrollState())
+                        .padding(top = 8.dp + actionsTop, bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(TvSpacing12),
+                    content = actions,
+                )
+            }
         }
     }
 }
@@ -119,17 +136,6 @@ fun GuidedStepGuidance(
             modifier = Modifier.padding(top = TvSpacing12),
         )
     }
-}
-
-/** A line between groups in the actions column, such as found servers and the address entry. */
-@Composable
-fun GuidedStepDivider() {
-    Box(
-        Modifier
-            .width(TvBrowseColumnWidth)
-            .height(1.dp)
-            .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTrackAlpha)),
-    )
 }
 
 /**
@@ -244,10 +250,13 @@ fun GuidedStepAction(
     /** The unfocused fill; list rows such as found servers pass [Color.Transparent]. */
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
     @DrawableRes trailingIcon: Int? = null,
+    enabled: Boolean = true,
+    leadingIcon: (@Composable () -> Unit)? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
         onClick = onClick,
+        enabled = enabled,
         modifier = modifier.width(TvBrowseColumnWidth).semantics { role = Role.Button },
         shape = ClickableSurfaceDefaults.shape(GuidedStepActionShape),
         colors = ClickableSurfaceDefaults.colors(
@@ -257,6 +266,8 @@ fun GuidedStepAction(
             focusedContentColor = colors.inverseOnSurface,
             pressedContainerColor = colors.onSurface,
             pressedContentColor = colors.inverseOnSurface,
+            disabledContainerColor = containerColor,
+            disabledContentColor = colors.onSurface.copy(alpha = TvTextDisabledAlpha),
         ),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
     ) {
@@ -267,7 +278,8 @@ fun GuidedStepAction(
             horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (icon != null) Icon(painterResource(icon), null, Modifier.size(24.dp))
+            if (leadingIcon != null) leadingIcon()
+            else if (icon != null) Icon(painterResource(icon), null, Modifier.size(24.dp))
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(vertical = 4.dp))
                 if (subtitle != null) {
@@ -298,4 +310,3 @@ fun GuidedStepBadge(@DrawableRes icon: Int, modifier: Modifier = Modifier) {
         )
     }
 }
-

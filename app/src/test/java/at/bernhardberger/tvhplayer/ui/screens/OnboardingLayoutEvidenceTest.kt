@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
@@ -47,6 +48,7 @@ class OnboardingLayoutEvidenceTest {
     private lateinit var state: ConnectionSetupState
     private val session = FakeTvheadendSession()
     private val discovery = MutableStateFlow(discovering())
+    private var captureScale = 1f
 
     @Test fun serverAccountAndConnectAreThreeSeparateScreens() {
         show(form = ConnectionFormState(host = "192.0.2.10"))
@@ -126,6 +128,62 @@ class OnboardingLayoutEvidenceTest {
         compose.onNodeWithTag("setup-find-server").assertIsNotEnabled().assertTextEquals("Searching…")
     }
 
+    @Test fun backToServerRestartsDiscoveryAndKeepsContinueFocused() {
+        show(form = ConnectionFormState(host = "192.0.2.10"))
+        repeat(3) { press(Key.DirectionDown) }
+        press(Key.DirectionCenter)
+        back()
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+        compose.onNodeWithTag("setup-find-server").assertTextEquals("Searching…")
+        assertTrue(state.searching)
+        discovery.value = discovering(SERVER)
+        compose.onNodeWithTag("setup-server-0").assertExists()
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+    }
+
+    @Test fun changeAddressAfterFailureRestartsDiscovery() {
+        show(form = ConnectionFormState(host = "192.0.2.10"))
+        repeat(3) { press(Key.DirectionDown) }
+        press(Key.DirectionCenter)
+        repeat(2) { press(Key.DirectionDown) }
+        press(Key.DirectionCenter)
+        compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE))) }
+        compose.onNodeWithTag("setup-action-change_address").requestFocus()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-find-server").assertIsFocused().assertTextEquals("Searching…")
+        assertTrue(state.searching)
+        discovery.value = discovering(SERVER)
+        compose.onNodeWithTag("setup-server-0").assertExists()
+    }
+
+    @Test fun handledFindFocusDoesNotReplayWhenReturningFromAccount() {
+        show(form = ConnectionFormState(host = "192.0.2.10"))
+        discovery.value = discovering(SERVER)
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-server-0").assertIsFocused()
+        discovery.value = discovering()
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        assertTrue(state.findFocusRequest > 0)
+        repeat(3) { press(Key.DirectionDown) }
+        press(Key.DirectionCenter)
+        back()
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+    }
+
+    @Test fun threeResultsScrollOnlyTheActionsAndKeepContinueInsideSafeArea() {
+        show()
+        val guidance = compose.onNodeWithText("Where’s your server?").fetchSemanticsNode().boundsInRoot
+        discovery.value = discovering(SERVER, SECOND_SERVER, THIRD_SERVER)
+        repeat(6) { press(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(1_000)
+        val action = compose.onNodeWithTag("setup-continue").assertIsFocused().assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        // Semantics reports the unscaled bounds; leave room for TV Surface's 1.1x focus scale.
+        assertEquals("The action must not be clipped", 48f, action.height, 0.6f)
+        assertTrue("Focus scale must clear the viewport edge", action.bottom + action.height * 0.05f <= 508f)
+        assertTrue("Focused shape must stay above the bottom safe edge", action.bottom + action.height * 0.05f <= 513f)
+        assertEquals(guidance, compose.onNodeWithText("Where’s your server?").fetchSemanticsNode().boundsInRoot)
+    }
+
     @Test fun editSearchesAutomaticallyWithPrefilledFieldsAndTheSameActionOrder() {
         showEdit()
         assertEquals(1, state.searchRequest)
@@ -181,6 +239,8 @@ class OnboardingLayoutEvidenceTest {
     @Test @Category(VisualCapture::class)
     fun captureWelcomeLargeFont() {
         show(SetupStep.WELCOME, scale = 1.3f)
+        press(Key.DirectionCenter)
+        back()
         compose.onNodeWithTag("setup-welcome-continue").assertIsFocused().assertIsDisplayed()
         capture("welcome-font1.3")
     }
@@ -189,6 +249,8 @@ class OnboardingLayoutEvidenceTest {
     @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun captureGermanWelcomeLargeFont() {
         show(SetupStep.WELCOME, scale = 1.3f)
+        press(Key.DirectionCenter)
+        back()
         compose.onNodeWithTag("setup-welcome-continue").assertIsFocused().assertIsDisplayed()
         capture("welcome-de-font1.3")
     }
@@ -263,6 +325,12 @@ class OnboardingLayoutEvidenceTest {
         press(Key.DirectionCenter)
         compose.onNodeWithTag("setup-password").performTextInput("replacement")
         compose.onNodeWithContentDescription("Show password").assertExists()
+        compose.onNodeWithTag("setup-password").performTextClearance()
+        compose.onNodeWithContentDescription("Show password").assertDoesNotExist()
+        back()
+        compose.onNodeWithText("Password saved").assertExists()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-password").performTextInput("replacement")
         back()
         press(Key.DirectionRight)
         compose.onNodeWithContentDescription("Show password").assertIsFocused()
@@ -289,21 +357,36 @@ class OnboardingLayoutEvidenceTest {
     @Test @Category(VisualCapture::class)
     fun captureServerStates() {
         show()
-        capture("server-empty")
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
         capture("server-searching")
         discovery.value = discovering(SERVER)
         compose.waitForIdle()
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
         capture("server-results")
         discovery.value = discovering()
         compose.mainClock.advanceTimeBy(13_000)
         capture("server-no-results")
         compose.runOnIdle { state.continueFromAddress() }
+        compose.onNodeWithTag("setup-host").assertIsFocused()
         capture("server-validation")
+    }
+
+    @Test @Category(VisualCapture::class)
+    fun captureThreeServersWithContinueFocused() {
+        show()
+        discovery.value = discovering(SERVER, SECOND_SERVER, THIRD_SERVER)
+        repeat(6) { press(Key.DirectionDown) }
+        compose.onNodeWithTag("setup-continue").assertIsFocused().assertIsDisplayed()
+        capture("server-three-results-continue")
     }
 
     @Test @Category(VisualCapture::class)
     fun capturePrefilledServerAndSavedAccount() {
         showEdit()
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
         capture("edit-prefilled-server")
         discovery.value = discovering(SERVER)
         compose.waitForIdle()
@@ -346,6 +429,7 @@ class OnboardingLayoutEvidenceTest {
 
     private fun show(step: SetupStep = SetupStep.ADDRESS, form: ConnectionFormState = ConnectionFormState(),
         mode: SetupMode = SetupMode.FIRST_RUN, scale: Float = 1f) {
+        captureScale = scale
         compose.setContent {
             view = LocalView.current
             val scope = rememberCoroutineScope()
@@ -371,18 +455,22 @@ class OnboardingLayoutEvidenceTest {
 
     private fun capture(name: String) {
         compose.mainClock.advanceTimeBy(1_000)
+        val focused = compose.onAllNodes(isFocused()).fetchSemanticsNodes().single()
+        val focus = focused.config[SemanticsProperties.TestTag]
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             val directory = File("build/outputs/onboarding-captures").apply { mkdirs() }
             File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=en; fontScale=1.0; step=${state.step}; mode=${state.mode}; production composables, fictional offline data")
+            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=${view.resources.configuration.locales[0].language}; fontScale=$captureScale; focus=$focus; step=${state.step}; mode=${state.mode}; production composables, fictional offline data")
             bitmap.recycle()
         }
     }
 }
 
 private val SERVER = DiscoveredTvheadendServer("Living room", "192.0.2.10", 9982)
+private val SECOND_SERVER = DiscoveredTvheadendServer("Office", "192.0.2.11", 9982)
+private val THIRD_SERVER = DiscoveredTvheadendServer("Guest room", "192.0.2.12", 9982)
 private object FixtureProfiles : ConnectionProfileEditor {
     override val serverSettings = emptyFlow<ServerSettings>()
     override suspend fun loadServerForEditing(applyAvailable: (String, Int, String, String) -> Unit) {

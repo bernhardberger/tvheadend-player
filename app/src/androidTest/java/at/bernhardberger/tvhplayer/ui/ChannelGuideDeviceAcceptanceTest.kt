@@ -152,18 +152,10 @@ class ChannelGuideDeviceAcceptanceTest {
         composeRule.onNode(hasText(connectionLabel) and hasClickAction())
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
-        val editLabel = composeRule.activity.getString(R.string.edit_connection)
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
-            composeRule.onAllNodes(hasText(editLabel) and hasClickAction())
-                .fetchSemanticsNodes()
-                .any { node -> node.config[SemanticsProperties.Focused] }
+            composeRule.onAllNodes(hasTestTag("setup-host")).fetchSemanticsNodes().size == 1
         }
-        composeRule.onNode(hasText(editLabel) and hasClickAction())
-            .performKeyInput { pressKey(Key.DirectionCenter) }
-        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
-            composeRule.onAllNodes(hasTestTag("setup-summary-sign_in")).fetchSemanticsNodes().size == 1
-        }
-        composeRule.onNode(hasTestTag("setup-summary-sign_in"))
+        composeRule.onNode(hasTestTag("setup-continue"))
             .requestFocus()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
@@ -174,9 +166,7 @@ class ChannelGuideDeviceAcceptanceTest {
         }
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(
-                hasTestTag("setup-password") and
-                    hasConfiguredFieldValue and
-                    SemanticsMatcher.keyIsDefined(SemanticsProperties.Password),
+                hasText(composeRule.activity.getString(R.string.onboarding_password_saved)),
             )
                 .fetchSemanticsNodes().size == 1
         }

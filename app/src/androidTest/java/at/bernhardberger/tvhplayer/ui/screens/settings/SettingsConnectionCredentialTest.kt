@@ -125,10 +125,14 @@ class SettingsConnectionSecureSurfaceTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertEquals(FAKE_HOST, form.host)
-            assertEquals(FAKE_PASSWORD, form.password)
+            assertEquals("", form.password)
+            assertTrue(form.hasSavedPassword)
         }
 
-        composeRule.onNode(hasTestTag("setup-test-and-save"))
+        composeRule.onNode(hasTestTag("setup-continue"))
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.onNode(hasTestTag("setup-continue"))
             .requestFocus()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.runOnIdle {
@@ -144,6 +148,8 @@ class SettingsConnectionSecureSurfaceTest {
             )
         }
         composeRule.waitForIdle()
+        composeRule.onNode(hasTestTag("setup-start-watching"))
+            .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.runOnIdle {
             assertEquals(1, editor.passwordSaveCount)
             assertEquals(FAKE_HOST, editor.savedHost)

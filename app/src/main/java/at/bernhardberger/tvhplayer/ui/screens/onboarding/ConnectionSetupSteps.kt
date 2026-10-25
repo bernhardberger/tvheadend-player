@@ -41,7 +41,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.error
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.liveRegion
@@ -66,7 +65,6 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing80
 import at.bernhardberger.tvhplayer.ui.TvTextDisabledAlpha
 import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
-import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepAction
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepBadge
@@ -76,9 +74,6 @@ import at.bernhardberger.tvhplayer.ui.components.GuidedStepLayout
 import at.bernhardberger.tvhplayer.ui.components.GuidedStepper
 import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
 import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
-
-/** The search's spinner, the same size and place while searching and beside the found list. */
-private val SearchIndicatorSize = 22.dp
 
 /** A TV button's height, so the step does not move as "Connecting…" takes the action's place. */
 private val MainActionHeight = 40.dp
@@ -110,7 +105,6 @@ private fun WelcomeStep(state: ConnectionSetupState) {
     val next = remember { FocusRequester() }
     LaunchedEffect(Unit) { next.requestFocus() }
     GuidedStepLayout(
-        modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 40.dp),
         guidance = {
             GuidedStepGuidance(
                 title = stringResource(R.string.onboarding_title),
@@ -144,52 +138,13 @@ private fun SetupStepper(current: Int, failed: Boolean = false) {
     )
 }
 
-/**
- * The search's one status line at the column edge: the spinner while it looks, in the same place
- * before and after servers answered, then the found list's label, with "Still searching…" while
- * the search goes on.
- */
-@Composable
-private fun FindStatus(searching: Boolean, found: Boolean) {
-    val colors = MaterialTheme.colorScheme
-    Row(
-        modifier = Modifier.width(TvBrowseColumnWidth).height(SearchIndicatorSize),
-        horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (searching) {
-            CircularProgressIndicator(
-                modifier = Modifier.size(SearchIndicatorSize),
-                strokeWidth = 3.dp,
-                color = colors.primary,
-            )
-        }
-        if (found) {
-            Text(
-                text = stringResource(R.string.onboarding_find_on_network),
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = colors.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
-                modifier = Modifier.semantics { heading() },
-            )
-        }
-        if (searching) {
-            Text(
-                text = stringResource(if (found) R.string.onboarding_find_still_searching else R.string.onboarding_find_searching),
-                style = MaterialTheme.typography.bodyMedium,
-                color = colors.onSurfaceVariant.copy(alpha = if (found) TvTextTertiaryAlpha else TvTextSecondaryAlpha),
-            )
-        }
-    }
-}
-
 @Composable
 private fun ServerSearch(state: ConnectionSetupState, search: FocusRequester) {
     LaunchedEffect(state.findFocusRequest) {
-        if (state.findFocusRequest > 0 && state.findFocus == null) search.requestFocus()
+        if (state.findFocus == null && state.takeFindFocusRequest(state.findFocusRequest)) search.requestFocus()
     }
     val request = state.searchRequest
-    LaunchedEffect(request) { if (request > 0 && state.searching) state.search() }
+    LaunchedEffect(request) { if (request > 0) state.search(request) }
     GuidedStepAction(
         title = stringResource(when {
             state.searching -> R.string.onboarding_find_searching
@@ -197,13 +152,25 @@ private fun ServerSearch(state: ConnectionSetupState, search: FocusRequester) {
             else -> R.string.onboarding_search_again
         }),
         icon = R.drawable.ic_search,
-        onClick = { if (!state.searching) state.findServer() },
+        enabled = !state.searching,
+        leadingIcon = if (state.searching) {
+            { CircularProgressIndicator(Modifier.size(24.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 3.dp) }
+        } else null,
+        onClick = state::findServer,
         modifier = Modifier.focusRequester(search).onFocusChanged {
             if (it.isFocused) state.onFindFocused(null)
-        }.semantics { if (state.searching) disabled() }.testTag("setup-find-server"),
+        }.testTag("setup-find-server"),
     )
     if (state.searchRequest > 0) {
-        FindStatus(searching = state.searching, found = state.servers.isNotEmpty())
+        if (state.servers.isNotEmpty()) {
+            Text(
+                text = stringResource(R.string.onboarding_find_on_network),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
+                modifier = Modifier.semantics { heading() },
+            )
+        }
         if (!state.searching && state.servers.isEmpty()) {
             Text(stringResource(R.string.onboarding_find_none_body), style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
@@ -217,7 +184,9 @@ private fun ServerSearch(state: ConnectionSetupState, search: FocusRequester) {
 @Composable
 private fun FoundServerRow(state: ConnectionSetupState, server: DiscoveredTvheadendServer, index: Int) {
     val requester = remember { FocusRequester() }
-    LaunchedEffect(state.findFocusRequest) { if (state.findFocus == server) requester.requestFocus() }
+    LaunchedEffect(state.findFocusRequest) {
+        if (state.findFocus == server && state.takeFindFocusRequest(state.findFocusRequest)) requester.requestFocus()
+    }
     GuidedStepAction(
         title = server.name,
         subtitle = stringResource(R.string.onboarding_found_server_detail, server.host, server.port),
@@ -246,7 +215,6 @@ private fun AddressStep(state: ConnectionSetupState) {
         }.requestFocus()
     }
     GuidedStepLayout(
-        modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 40.dp),
         guidance = {
             GuidedStepGuidance(
                 title = stringResource(R.string.onboarding_address_title),
@@ -418,7 +386,7 @@ private fun SignInStep(state: ConnectionSetupState) {
             SignInFocus.CONNECT -> connect
         }.requestFocus()
     }
-    GuidedStepLayout(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 40.dp), guidance = {
+    GuidedStepLayout(guidance = {
         GuidedStepGuidance(
             title = stringResource(R.string.onboarding_sign_in_title),
             body = stringResource(R.string.onboarding_sign_in_body),
@@ -457,7 +425,7 @@ private fun ConnectStep(state: ConnectionSetupState) {
         form.username.isBlank() -> stringResource(R.string.onboarding_connecting_body_anonymous)
         else -> stringResource(R.string.onboarding_connecting_body, form.username)
     }
-    GuidedStepLayout(modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 40.dp), guidance = {
+    GuidedStepLayout(guidance = {
         GuidedStepGuidance(title = title, body = body, stepper = { SetupStepper(SetupStage.CONNECT.ordinal) },
             meta = stringResource(R.string.onboarding_change_address_detail, host, form.port))
     }) {
@@ -560,7 +528,7 @@ private fun ConnectingStatus(modifier: Modifier) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         CircularProgressIndicator(
-            modifier = Modifier.size(SearchIndicatorSize),
+            modifier = Modifier.size(22.dp),
             strokeWidth = 3.dp,
             color = MaterialTheme.colorScheme.primary,
         )
@@ -589,7 +557,6 @@ private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
     val reason = if (failure.showsHint) text.paragraph(failure.condition) else text.reason(failure.condition)
     val body = if (state.mode == SetupMode.EDIT) stringResource(R.string.onboarding_edit_failure_body, reason) else reason
     GuidedStepLayout(
-        modifier = Modifier.verticalScroll(rememberScrollState()).padding(bottom = 40.dp),
         guidance = {
             GuidedStepGuidance(
                 title = text.title(failure.condition),

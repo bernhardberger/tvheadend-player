@@ -96,6 +96,14 @@ internal class ConnectionSetupState(
         private set
     var findFocusRequest by mutableIntStateOf(0)
         private set
+    private var handledFindFocusRequest = 0
+
+    /** A removed result's focus correction belongs to that visit, not a later Server entry. */
+    fun takeFindFocusRequest(request: Int): Boolean {
+        if (request <= handledFindFocusRequest) return false
+        handledFindFocusRequest = request
+        return true
+    }
 
     var addressFocus by mutableStateOf(AddressFocus.SEARCH)
         private set
@@ -147,8 +155,8 @@ internal class ConnectionSetupState(
      * Looks for servers for [DiscoveryWindow], keeping what it finds. The search step runs it, so
      * leaving the step stops it; an unavailable discovery ends it with what it had.
      */
-    suspend fun search() {
-        val request = searchRequest
+    suspend fun search(request: Int) {
+        if (request != searchRequest) return
         searching = true
         try {
             withTimeoutOrNull(DiscoveryWindow) {

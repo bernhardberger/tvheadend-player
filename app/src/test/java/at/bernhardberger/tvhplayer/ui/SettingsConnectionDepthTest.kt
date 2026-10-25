@@ -56,10 +56,13 @@ class SettingsConnectionDepthTest {
             TVHeadendPlayerTheme {
                 androidx.tv.material3.Surface {
                     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
+                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                         settingsLevel(CONNECTION_EDITOR, "Connection", emptyList(), activeContent = { requester, _ ->
                             SettingsConnection(requester, editor, session, { restores++ })
-                        })))
+                        })), contentPadding = padding, initialFocusEnabled = !drawerActive)
+                    }
                 }
             }
         }
@@ -68,7 +71,12 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         capture(view, "settings-entry")
         press(Key.DirectionCenter)
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
         compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        val bounds = compose.onNodeWithTag("setup-find-server").fetchSemanticsNode().boundsInRoot
+        assertEquals(696f, bounds.center.x, 0.5f)
+        assertEquals(110f, bounds.center.y, 0.5f)
         capture(view, "settings-prefilled-wizard")
     }
 
@@ -79,7 +87,7 @@ class SettingsConnectionDepthTest {
             view.draw(Canvas(bitmap))
             val directory = File("build/outputs/onboarding-captures").apply { mkdirs() }
             File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
-            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=en; fontScale=1.0; focus=${if (name == "settings-entry") "Connection" else "Server address"}; fictional offline data")
+            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=en; fontScale=1.0; focus=${if (name == "settings-entry") "Connection" else "setup-find-server"}; Settings inside SideRail; fictional offline data")
             bitmap.recycle()
         }
     }
