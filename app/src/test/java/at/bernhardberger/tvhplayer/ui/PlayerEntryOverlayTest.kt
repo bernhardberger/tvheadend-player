@@ -6,16 +6,24 @@ package at.bernhardberger.tvhplayer.ui
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.net.Uri
 import android.view.View
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.saveable.LocalSaveableStateRegistry
+import androidx.compose.runtime.saveable.SaveableStateRegistry
+import androidx.savedstate.serialization.decodeFromSavedState
+import androidx.navigation3.runtime.NavBackStack
+import kotlinx.serialization.serializer
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -25,6 +33,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.datasource.BaseDataSource
+import androidx.media3.datasource.DataSpec
+import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
@@ -33,6 +47,12 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
+import at.bernhardberger.tvheadend.sdk.core.RecordingProgressCapability
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestResultFactory
+import at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
@@ -44,6 +64,8 @@ import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
+import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
@@ -53,6 +75,8 @@ import at.bernhardberger.tvhplayer.notices.ConnectionNoticeSource
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
@@ -82,6 +106,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -93,6 +118,8 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import kotlin.time.Instant
+import kotlin.time.Duration.Companion.seconds
+import java.util.concurrent.CountDownLatch
 
 /**
  * Watch from an overlay goes straight into the player: the context menu or details page that is
@@ -102,15 +129,21 @@ import kotlin.time.Instant
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(TvheadendTestingApi::class, at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class)
 class PlayerEntryOverlayTest {
     @get:Rule val compose = createComposeRule()
+    private val savedState = SaveableStateRegistry(restoredValues = null, canBeSaved = { true })
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val catalog = ChannelCatalog.create((1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) })
     private lateinit var player: ExoPlayer
     private lateinit var view: View
+    private lateinit var session: FakeTvheadendSession
+    private lateinit var runtime: AppPlaybackRuntime
+    private val loadGate = CountDownLatch(1)
 
     @After fun after() {
+        loadGate.countDown()
         scope.cancel()
         if (::player.isInitialized) player.release()
     }
@@ -121,6 +154,72 @@ class PlayerEntryOverlayTest {
 
     @Test fun watchChannelFromAMenuWithoutProgrammeFadesTheMenuIntoThePlayer() =
         watchFromOverlay(details = false, programme = false)
+
+    @Test fun recordingRouteReturnsToTheWarmPlayerWithoutRestartingOrResumePrompt() {
+        recordingRow()
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
+        val selection = runtime.recordingSelection.value
+        assertEquals(DvrEntryId(7), warmRecordingId(runtime.activeTarget.value, selection, session.observation.value.currentSession))
+        compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        settle()
+        compose.onNodeWithTag("player-banner", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), runtime.activeTarget.value)
+            assertEquals(selection, runtime.recordingSelection.value)
+            assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK })
+        }
+
+        compose.runOnIdle {
+            val stack = savedState.performSave().values.flatten().filterIsInstance<android.os.Bundle>()
+                .mapNotNull { runCatching { decodeFromSavedState(serializer<NavBackStack<AppNavKey>>(), it) }.getOrNull() }
+                .single()
+            assertEquals(recordingPlayerKey(DvrEntryId(7), RecordingPlaybackStart.RESUME), stack.last())
+        }
+    }
+
+    @Test fun recordingStoppedAfterRenderingUsesTheNormalResumeChoice() = staleRecordingReturn(replace = false)
+
+    @Test fun recordingReplacedAfterRenderingUsesTheSelectedRowsResumeChoice() = staleRecordingReturn(replace = true)
+
+    private fun staleRecordingReturn(replace: Boolean) {
+        recordingRow()
+        // Keep the rendered action, then change playback before its activation without using a new composition's action.
+        val activate = compose.onNodeWithTag("recording-list-entry-7").fetchSemanticsNode()
+            .config[SemanticsActions.OnClick].action!!
+        var activated = false
+        var bindings = 0
+        compose.runOnIdle {
+            scope.launch {
+                if (replace) runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(8))),
+                    RecordingPlaybackStart.RESUME)
+                else runtime.stop()
+                bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
+                activate()
+                activated = true
+            }
+        }
+        compose.waitUntil(10_000) { activated }
+        settle()
+        compose.onNodeWithTag("recording-resume").assertExists()
+        compose.onNodeWithTag("player-banner", useUnmergedTree = true).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }) }
+    }
+
+    private fun recordingRow() {
+        app(programme = true, recordings = true)
+        compose.runOnIdle {
+            scope.launch {
+                runtime.playRecording(requireNotNull(currentRecordingPlaybackSelection(session.observation.value, DvrEntryId(7))),
+                    RecordingPlaybackStart.RESUME)
+            }
+        }
+        compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(DvrEntryId(7)) }
+        compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithTag("recording-list-entry-7").requestFocus()
+        settle()
+    }
 
     private fun watchFromOverlay(details: Boolean, programme: Boolean = true) {
         app(programme)
@@ -157,22 +256,37 @@ class PlayerEntryOverlayTest {
         }
     }
 
-    private fun app(programme: Boolean) {
+    private fun app(programme: Boolean, recordings: Boolean = false) {
         // The app reads the wall clock to find the programme on air, so it spans every time.
         val event = EpgEvent.create(EventId(1), ChannelId(1), AIRS_FROM, AIRS_UNTIL, title = "Ridge Light")
-        val session = FakeTvheadendSession(SessionObservation.create(
+        val entries = if (recordings) listOf(7L, 8L).map { id -> DvrEntry.create(
+            DvrEntryId(id), title = "Recording $id", state = DvrEntryState.COMPLETED,
+            start = AIRS_FROM, stop = AIRS_FROM + 3600.seconds, folder = emptyList(), playPosition = 754.seconds,
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "recording.ts", start = AIRS_FROM,
+                stop = AIRS_FROM + 3600.seconds)),
+        ) } else emptyList()
+        session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(catalog),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(if (programme) listOf(event) else emptyList())),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).apply { scriptLivePlaybackSuccess() }
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)),
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+        )).apply { scriptLivePlaybackSuccess(); if (recordings) scriptRecordingPlaybackSuccess() }
         val settings = PlayerSettingsStore(InMemoryData())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
         player = ExoPlayer.Builder(context).build()
-        val coordinator = createTvheadendPlaybackCoordinator(player).also { it.launchIn(scope) }
-        val runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
+        val base = player
+        val coordinatorPlayer = if (!recordings) base else object : ExoPlayer by base {
+            override fun setMediaSource(mediaSource: MediaSource) = base.setMediaSource(loading(mediaSource.mediaItem))
+            override fun setMediaSource(mediaSource: MediaSource, startPositionMs: Long) =
+                base.setMediaSource(loading(mediaSource.mediaItem), startPositionMs)
+            override fun setMediaSource(mediaSource: MediaSource, resetPosition: Boolean) =
+                base.setMediaSource(loading(mediaSource.mediaItem), resetPosition)
+        }
+        val coordinator = createTvheadendPlaybackCoordinator(coordinatorPlayer).also { it.launchIn(scope) }
+        runtime = AppPlaybackRuntime(player, session, coordinator, settings, profiles, scope,
             TvheadendAudioOutputProvider(context), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
@@ -199,6 +313,7 @@ class PlayerEntryOverlayTest {
         val server = ServerSettings(host = "offline.invalid")
         compose.setContent {
             view = LocalView.current
+            CompositionLocalProvider(LocalSaveableStateRegistry provides savedState) {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
                     AppRoot(
@@ -209,6 +324,7 @@ class PlayerEntryOverlayTest {
                         onRequestExit = {},
                     )
                 }
+            }
             }
         }
         compose.waitUntil(15_000) {
@@ -228,6 +344,18 @@ class PlayerEntryOverlayTest {
         compose.waitForIdle()
         settle()
     }
+
+    private fun loading(item: MediaItem): MediaSource = ProgressiveMediaSource.Factory {
+        object : BaseDataSource(false) {
+            override fun open(dataSpec: DataSpec): Long {
+                loadGate.await()
+                throw java.io.IOException("closed")
+            }
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int = C.RESULT_END_OF_INPUT
+            override fun getUri(): Uri? = null
+            override fun close() = Unit
+        }
+    }.createMediaSource(item)
 
     private fun settle() {
         repeat(10) {

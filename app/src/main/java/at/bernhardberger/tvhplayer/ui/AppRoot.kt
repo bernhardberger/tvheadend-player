@@ -554,10 +554,7 @@ fun AppRoot(
     val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
     val recordingSelection by playbackRuntime.recordingSelection.collectAsStateWithLifecycle()
     val playbackObservation by tvheadendSession.observation.collectAsStateWithLifecycle()
-    val warmRecordingId = activeRecordingId?.takeIf {
-        recordingSelection?.recordingId == it &&
-            recordingSelection?.currentSession === playbackObservation.currentSession
-    }
+    val warmRecordingId = warmRecordingId(activeTarget, recordingSelection, playbackObservation.currentSession)
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings()
     )
@@ -935,18 +932,25 @@ fun AppRoot(
                                 navigateTopLevel(GuideKey)
                             },
                             playingRecordingId = warmRecordingId,
-                            onReturnToRecording = {
-                                warmRecordingId?.let { id ->
+                            onReturnToRecording = { id ->
+                                val currentTarget = playbackRuntime.activeTarget.value
+                                val currentSelection = playbackRuntime.recordingSelection.value
+                                val stillWarm = warmRecordingId(currentTarget, currentSelection,
+                                    tvheadendSession.observation.value.currentSession) == id
+                                if (stillWarm) {
                                     playbackRuntime.notePlaybackIntent()
                                     playerEntry.request(playbackSelectionScope) {
                                         val target = playbackOrchestrator.requestRecordingPlayer(
-                                            activeChannelId, activeRecordingId, id,
+                                            activeChannelId = null, activeRecordingId = id, requestedRecordingId = id,
                                             restartPlayback = false,
-                                            startPlayback = {},
+                                            startPlayback = {
+                                                playbackRuntime.playRecording(requireNotNull(currentSelection), RecordingPlaybackStart.RESUME)
+                                            },
                                         ) ?: return@request
                                         backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.RESUME))
                                     }
                                 }
+                                stillWarm
                             },
                             onWatchChannel = requestLivePlayer,
                             contentAllowed = contentAllowed,

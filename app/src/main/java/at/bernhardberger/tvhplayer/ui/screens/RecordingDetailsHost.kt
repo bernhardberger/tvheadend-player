@@ -15,6 +15,9 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.common.formatRecordingSchedule
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
+import at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.ui.warmRecordingId
 import at.bernhardberger.tvhplayer.ui.screens.recordings.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -50,8 +53,8 @@ internal fun RecordingDetailsHost(
             .recordingPlaybackAdmission(opened)
     }
     val channel = opened.channelId?.let(observation::channel)
-    val playing = capability != null && at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget.current ==
-        at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(opened.id)
+    val playing = capability != null && warmRecordingId(LocalActivePlaybackTarget.current,
+        LocalRecordingPlaybackSelection.current, capability) == opened.id
     val canModify = capability != null && (observation.sessionState as? SessionState.Ready)
         ?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     var pending by remember { mutableStateOf<DvrMutationAction?>(null) }

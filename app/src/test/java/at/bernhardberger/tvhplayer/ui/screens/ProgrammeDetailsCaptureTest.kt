@@ -125,7 +125,9 @@ class ProgrammeDetailsCaptureTest {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, 1f),
                 at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
-                    at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id)) {
+                    at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id),
+                at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
+                    at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(requireNotNull(observation.currentSession), entry.id)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     if (player) RecordingPlayerDetails(entry, observation, observation, { observation },
@@ -133,7 +135,7 @@ class ProgrammeDetailsCaptureTest {
                         onPlayRecording = { _, _ -> error("Unexpected playback") }, onClose = {})
                     else RecordingsScreenContent(observation, state = state, dvrMutationActions = mutations,
                         notices = notices, onPlayRecording = { _, _ -> error("Unexpected playback") },
-                        playingRecordingId = entry.id, onReturnToRecording = {})
+                        playingRecordingId = entry.id, onReturnToRecording = { true })
                 }
             }
         }

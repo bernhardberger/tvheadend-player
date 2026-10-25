@@ -122,7 +122,7 @@ class InProgressRecordingResumeTest {
     @Test fun completedWarmRecordingReturnsWithoutResumePopupOrPlaybackRequest() {
         var returns = 0
         val starts = openDetails(754L, directly = true, warm = true, completed = true,
-            onReturn = { returns++ })
+            onReturn = { id -> assertEquals(DvrEntryId(1), id); returns++; true })
         compose.onNodeWithTag("recording-resume").assertDoesNotExist()
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.runOnIdle { assertEquals(1, returns); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
@@ -138,6 +138,28 @@ class InProgressRecordingResumeTest {
         assertWarmDetails()
     }
 
+    @Test fun rejectedWarmReturnUsesTheNormalCompletedRecordingResumeChoice() {
+        val starts = openDetails(754L, directly = true, warm = true, completed = true,
+            onReturn = { id -> assertEquals(DvrEntryId(1), id); false })
+        compose.onNodeWithTag("recording-resume").assertExists()
+        compose.runOnIdle { assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun detailsDoNotOfferContinueForARecordingFromAnotherSession() {
+        openDetails(754L, warm = true, staleSession = true)
+        compose.onNodeWithTag("details-continue_watching").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+    }
+
+    @Test fun rejectedContinueFromDetailsKeepsTheNormalResumeChoiceOpen() {
+        var attempts = 0
+        val starts = openDetails(754L, warm = true, completed = true,
+            onReturn = { attempts++; false })
+        compose.onNodeWithTag("details-continue_watching").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-resume").assertExists()
+        compose.runOnIdle { assertEquals(1, attempts); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
     private fun assertWarmDetails() {
         compose.onNodeWithTag("details-continue_watching").assertIsFocused()
         compose.onNodeWithTag("details-start_over").assertExists()
@@ -148,10 +170,12 @@ class InProgressRecordingResumeTest {
     }
 
     private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false,
-        warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false,
-        onReturn: () -> Unit = {}): List<RecordingPlaybackStart> {
+        warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false, staleSession: Boolean = false,
+        onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds, completed)
+        val playbackSession = requireNotNull(if (staleSession) observation(playPositionSeconds, completed).currentSession
+            else observation.currentSession)
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -167,12 +191,14 @@ class InProgressRecordingResumeTest {
             androidx.compose.runtime.CompositionLocalProvider(
                 at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
                     at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(DvrEntryId(1)).takeIf { warm },
+                at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
+                    at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(playbackSession, DvrEntryId(1)).takeIf { warm },
             ) {
             TVHeadendPlayerTheme {
                 if (fromPlayer) at.bernhardberger.tvhplayer.ui.player.RecordingPlayerDetails(
                     observation.dvrSnapshotForDisplay!!.entries.single(), observation, observation, { observation },
                     System.currentTimeMillis() / 1000L, actions, notices, androidx.compose.runtime.rememberCoroutineScope(),
-                    onPlayRecording = { _, start -> starts += start }, onClose = onReturn,
+                    onPlayRecording = { _, start -> starts += start }, onClose = { onReturn(DvrEntryId(1)) },
                 ) else RecordingsScreenContent(
                     observation = observation,
                     state = state,

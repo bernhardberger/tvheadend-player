@@ -149,7 +149,7 @@ internal fun RecordingsRouteContent(
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit,
     state: RecordingsScreenState,
     playingRecordingId: at.bernhardberger.tvheadend.sdk.core.DvrEntryId? = null,
-    onReturnToRecording: () -> Unit = {},
+    onReturnToRecording: (at.bernhardberger.tvheadend.sdk.core.DvrEntryId) -> Boolean = { false },
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("recordings")) {

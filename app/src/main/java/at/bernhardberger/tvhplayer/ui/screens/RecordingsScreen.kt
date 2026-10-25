@@ -238,7 +238,7 @@ fun RecordingsScreen(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
     playingRecordingId: DvrEntryId? = null,
-    onReturnToRecording: () -> Unit = {},
+    onReturnToRecording: (DvrEntryId) -> Boolean = { false },
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
     val dvrMutationActions = remember(session.dvrRepository) {
@@ -280,7 +280,7 @@ internal fun RecordingsScreenContent(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
     playingRecordingId: DvrEntryId? = null,
-    onReturnToRecording: () -> Unit = {},
+    onReturnToRecording: (DvrEntryId) -> Boolean = { false },
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
     notices: NoticeCenter = koinInject(),
@@ -352,14 +352,12 @@ internal fun RecordingsScreenContent(
         }
     }
 
-    fun openRecording(entry: DvrEntry) {
-        if (entry.id == playingRecordingId) {
-            onReturnToRecording()
-            return
-        }
-        val capability = observation.currentSession
+    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true) {
+        if (returnIfPlaying && entry.id == playingRecordingId && onReturnToRecording(entry.id)) return
+        val current = latestObservationProvider()
+        val capability = current.currentSession
         val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
-            capability?.let { observation.recordingPlaybackAdmission(entry) })
+            capability?.let { current.recordingPlaybackAdmission(entry) })
         showContextMenu = false
         if (capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
                 action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)) {
@@ -372,7 +370,7 @@ internal fun RecordingsScreenContent(
         contentFocusOwned = false
         detailsInitialAction = null
         detailsEntry = entry
-        detailsObservation = observation
+        detailsObservation = current
     }
 
     val location = when (mode) {
@@ -1100,8 +1098,9 @@ internal fun RecordingsScreenContent(
                 watch(id, name)
             } },
             onContinueWatching = {
-                closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
-                onReturnToRecording()
+                if (onReturnToRecording(opened.id)) {
+                    closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
+                } else openRecording(opened, returnIfPlaying = false)
             },
             onClose = { visibility.targetState = false },
         )
