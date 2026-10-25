@@ -197,11 +197,11 @@ internal fun CompactZapCard(
             }
         },
         description = {
-            if (currentEvent != null) {
+            val progress = programmeProgress(currentEvent, nowSec)
+            if (progress != null) {
                 ProgressStrip(
-                    progress = ((nowSec - currentEvent.start.epochSeconds).toDouble() /
-                        (currentEvent.stop.epochSeconds - currentEvent.start.epochSeconds)).toFloat(),
-                    color = progressColor(playbackIndicator.isPlayingItem),
+                    progress = progress,
+                    color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem),
                     height = 2.dp,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )

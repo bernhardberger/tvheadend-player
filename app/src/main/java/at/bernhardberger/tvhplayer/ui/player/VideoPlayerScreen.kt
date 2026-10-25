@@ -1553,7 +1553,8 @@ fun VideoPlayerScreen(
             nowPlaying = {
                 NowPlayingStrip(currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
                     channelsVm.nowEvent(currentChannelId, nowSec), nowSec,
-                    playbackIndicator = channelIndicator)
+                    playbackIndicator = channelIndicator,
+                    programmeAt = { at -> channelsVm.nowEvent(currentChannelId, at) })
             },
             details = null as Unit?,
             player = { keepControls ->

@@ -33,6 +33,8 @@ import at.bernhardberger.tvhplayer.ui.components.progressColor
 import at.bernhardberger.tvhplayer.ui.components.programmeProgress
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.isPlayingItem
+import at.bernhardberger.tvhplayer.ui.components.liveViewerEpochSec
+import at.bernhardberger.tvhplayer.ui.common.isRunning
 
 /** Passive identity of the playing channel, independent of the programme being browsed. */
 @Composable
@@ -44,19 +46,23 @@ internal fun NowPlayingStrip(
     nowSec: Long,
     modifier: Modifier = Modifier,
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
+    programmeAt: (Long) -> EpgEvent? = { null },
 ) {
-    val current = programme?.takeIf { it.start.epochSeconds <= nowSec && nowSec < it.stop.epochSeconds }
+    val at = liveViewerEpochSec(programme?.channelId, nowSec)
+    val displayed = if (programme != null && at != null && at < programme.start.epochSeconds)
+        programmeAt(at) ?: programme else programme
+    val current = displayed?.takeIf { it.isRunning(nowSec) || (at != null && it.isRunning(at)) }
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(48.dp, 27.dp).clip(PlayerChromeTokens.chipShape), contentAlignment = Alignment.Center) {
             if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
-            val progress = programmeProgress(programme, nowSec)
+            val progress = programmeProgress(current, nowSec)
             if (progress != null) ProgressStrip(
                 progress = progress,
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = 2.dp,
-                color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem),
+                color = progressColor(watchingIndicator(current, nowSec).isPlayingItem),
             )
         }
         Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max)) {

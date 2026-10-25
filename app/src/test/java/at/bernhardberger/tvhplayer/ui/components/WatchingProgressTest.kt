@@ -102,6 +102,8 @@ class WatchingProgressTest {
     private val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds,
         title = "Ridge Light", subtitle = "Beyond the Arctic Circle", image = ArtworkId(2),
         summary = "A winter expedition follows the changing light across the ridge.")
+    private val previousEvent = EpgEvent.create(EventId(2), channel.id, start - 3600.seconds, start,
+        title = "Before the Ridge")
     private val recording = DvrEntry.create(DvrEntryId(1), channelId = channel.id, title = event.title,
         channelName = channel.name, start = start, stop = event.stop, state = DvrEntryState.COMPLETED,
         image = event.image, playPosition = 60.seconds)
@@ -215,6 +217,56 @@ class WatchingProgressTest {
         show("programme")
         progressBar().assertDoesNotExist()
         marker().assertExists()
+        compose.onNodeWithText("19:00", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("21:00", useUnmergedTree = true).assertExists()
+    }
+    @Test fun detailsTimelineVisibilityDoesNotReadLiveSample() {
+        var reads = 0
+        var visible = false
+        val sample = object : State<LiveViewerPosition?> {
+            override val value: LiveViewerPosition? get() { reads++; return livePosition.value }
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalLivePosition provides sample,
+                LocalWatchingChannel provides channel.id,
+                LocalWatchingTarget provides AppPlaybackTarget.Live(channel.id),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PAUSED) {
+                visible = detailsTimelineVisible(event, event.stop.epochSeconds + 1)
+            }
+        }
+        compose.runOnIdle { assertTrue(visible); assertEquals(0, reads) }
+    }
+    @Test fun unrelatedLiveProgrammeDoesNotReadSample() {
+        var reads = 0
+        val sample = object : State<LiveViewerPosition?> {
+            override val value: LiveViewerPosition? get() { reads++; return livePosition.value }
+        }
+        compose.setContent {
+            CompositionLocalProvider(LocalLivePosition provides sample,
+                LocalWatchingChannel provides ChannelId(99),
+                LocalWatchingTarget provides AppPlaybackTarget.Live(ChannelId(99)),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+                programmeProgress(event, now)
+                watchingIndicator(event, now)
+            }
+        }
+        compose.runOnIdle { assertEquals(0, reads) }
+    }
+    @Test fun compactCardUsesPausedAndRewoundViewerFraction() = liveFractions("card")
+    @Test fun channelRowUsesPausedAndRewoundViewerFraction() = liveFractions("channel-row")
+    @Test fun channelsHeadlineUsesPausedAndRewoundViewerFraction() = liveFractions("channels-headline")
+    @Test fun zapShowsTheProgrammeAtTheRewoundPosition() {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("zap")
+        compose.onNodeWithText(previousEvent.title!!, useUnmergedTree = true).assertExists()
+        assertFraction(.5f)
+        assertOrangeProgress()
+    }
+    @Test fun zapFallsBackToCurrentProgrammeWhenHistoryIsMissing() {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
+        show("zap-no-history")
+        compose.onNodeWithText(event.title!!, useUnmergedTree = true).assertExists()
     }
     @Test fun guideAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("guide")
     @Test fun contextAtLiveEdgeHasNoHiddenFirstFrame() = liveEdgeFractions("menu")
@@ -410,13 +462,13 @@ class WatchingProgressTest {
         livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds + 1200)
         show(surface)
         assertFraction(1f / 6f)
-        if (surface != "menu") assertOrangeProgress()
+        if (surface != "menu") assertProgressColor(viewerColor, dimmed = surface == "card")
         compose.runOnIdle { livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds + 600) }
         assertFraction(1f / 12f)
-        if (surface != "menu") assertOrangeProgress()
+        if (surface != "menu") assertProgressColor(viewerColor, dimmed = surface == "card")
         compose.runOnIdle { target.value = AppPlaybackTarget.Live(ChannelId(99)) }
         assertFraction(.25f)
-        if (surface != "menu") assertProgressColor(ambientColor)
+        if (surface != "menu") assertProgressColor(ambientColor, dimmed = surface == "card")
     }
 
     private fun assertFraction(value: Float) = progressBar().assert(
@@ -458,6 +510,27 @@ class WatchingProgressTest {
     }
 
     @Test @Category(VisualCapture::class) fun guidePlayingCapture() = captureSurface("guide")
+    @Test @Category(VisualCapture::class) fun detailsUnknownPositionCapture() {
+        livePosition.value = LiveViewerPosition(channel.id, null)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("programme")
+        save("details-unknown-position")
+    }
+    @Test @Category(VisualCapture::class) fun pausedCompactCardCapture() = pausedChannelCapture("card")
+    @Test @Category(VisualCapture::class) fun pausedChannelRowCapture() = pausedChannelCapture("channel-row")
+    @Test @Category(VisualCapture::class) fun pausedChannelsHeadlineCapture() = pausedChannelCapture("channels-headline")
+    @Test @Category(VisualCapture::class) fun rewoundPreviousProgrammeCapture() {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 1800)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show("zap")
+        save("zap-previous-programme")
+    }
+    private fun pausedChannelCapture(surface: String) {
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds + 600)
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        show(surface)
+        save("$surface-paused")
+    }
     @Test @Category(VisualCapture::class) fun programmePlayingCapture() = captureSurface("programme", "details-watch")
     @Test @Category(VisualCapture::class) fun menuPlayingCapture() = captureSurface("menu")
     @Test @Category(VisualCapture::class) fun zapPlayingCapture() = captureSurface("zap")
@@ -494,15 +567,23 @@ class WatchingProgressTest {
     private fun assertOrangeProgress() {
         assertProgressColor(viewerColor)
     }
-    private fun assertProgressColor(expected: Int) {
+    private fun assertProgressColor(expected: Int, dimmed: Boolean = false) {
         val node = progressBar().fetchSemanticsNode()
         val bounds = node.boundsInRoot
         val fraction = node.config[SemanticsProperties.ProgressBarRangeInfo].current
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         // Rounded artwork/strip corners can antialias an individual pixel in a short fill.
+        val expectedHsv = FloatArray(3).also { android.graphics.Color.colorToHSV(expected, it) }
         assertTrue("Expected progress color $expected", (bounds.left.toInt() until
-            (bounds.left + bounds.width * fraction).toInt()).any { bitmap.getPixel(it, bounds.center.y.toInt()) == expected })
+            (bounds.left + bounds.width * fraction).toInt()).any {
+            val actual = bitmap.getPixel(it, bounds.center.y.toInt())
+            // The TV CompactCard dims its description slot; compare hue, not opaque RGB there.
+            if (dimmed) {
+                val hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(actual, it) }
+                kotlin.math.abs(hsv[0] - expectedHsv[0]) < 5f && hsv[1] > .4f
+            } else actual == expected
+        })
         bitmap.recycle()
     }
 
@@ -532,8 +613,17 @@ class WatchingProgressTest {
                                         BrowseContextAction.SHOW_GUIDE), {}, {})
                                 "menu" -> ProgrammeContextMenu(event, channel, null, true, false, now, false,
                                     observation.currentSession, observation, false, { _, _ -> }, {})
-                                "zap" -> NowPlayingStrip("101", channel.name.orEmpty(), picon, event, now,
-                                    Modifier.padding(48.dp), indicator.value)
+                                "zap", "zap-no-history" -> NowPlayingStrip("101", channel.name.orEmpty(), picon, event, now,
+                                    Modifier.padding(48.dp), indicator.value,
+                                    programmeAt = { at -> previousEvent.takeIf {
+                                        surface != "zap-no-history" && at >= it.start.epochSeconds && at < it.stop.epochSeconds } })
+                                "card" -> CompactZapCard(channel, 101, event, now, indicator.value, false, {},
+                                    Modifier.padding(48.dp).width(196.dp))
+                                "channel-row" -> ChannelRow(number = 101, name = channel.name.orEmpty(), programTitle = event.title.orEmpty(),
+                                    programme = event, nowSec = now, piconPath = picon, playbackIndicator = indicator.value,
+                                    onFocus = {}, onConfirm = {}, modifier = Modifier.padding(48.dp).width(396.dp))
+                                "channels-headline" -> at.bernhardberger.tvhplayer.ui.screens.ChannelsHeadline(channel, event, null,
+                                    false, false, now, 3, false, Modifier.padding(48.dp).width(600.dp))
                                 "row" -> Column(Modifier.padding(48.dp).width(480.dp)) {
                                     RecordingListRow(recording, channel.icon, 60.seconds, false, onClick = {})
                                     RecordingListRow(DvrEntry.create(DvrEntryId(2), title = "Other recording"), null, null, true, onClick = {})

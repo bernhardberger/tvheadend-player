@@ -990,7 +990,7 @@ private fun DetailsInformation(
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
             event?.firstAired, LocalConfiguration.current.locales[0], event?.contentGenre ?: recording?.contentGenre)
-        val timelineVisible = event != null && (event.isRunning(nowSec) || watchingIndicator(event, nowSec).isPlayingItem)
+        val timelineVisible = detailsTimelineVisible(event, nowSec)
         // The timeline already labels start/end; its remaining time is not the total runtime.
         val segments = facts.filter { it.kind != DetailsFactKind.LEFT &&
             (!timelineVisible || it.kind == DetailsFactKind.LENGTH) }.map { detailsFactValue(it, nowSec) } + metadata
@@ -1026,19 +1026,24 @@ private fun DetailsInformation(
 }
 
 @Composable
+internal fun detailsTimelineVisible(event: EpgEvent?, nowSec: Long): Boolean =
+    event != null && (event.isRunning(nowSec) ||
+        (LocalWatchingChannel.current == event.channelId && LocalWatchingIndicator.current.isPlayingItem))
+
+@Composable
 private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, facts: List<DetailsFact>, nowSec: Long) {
     val resources = LocalContext.current.resources
     val indicator = watchingIndicator(event, nowSec)
     val progress = programmeProgress(event, nowSec)
-    if (event != null && progress != null) {
+    if (event != null && detailsTimelineVisible(event, nowSec)) {
         Spacer(Modifier.height(8.dp))
-        val at = if (indicator.isPlayingItem) liveViewerEpochSec(event.channelId, nowSec) ?: return else nowSec
+        val at = if (indicator.isPlayingItem) liveViewerEpochSec(event.channelId, nowSec) else nowSec
         val start = formatClock(event.start.epochSeconds)
         val end = formatClock(event.stop.epochSeconds)
         val spokenRange = formatTimeIntervalSpoken(event.start.epochSeconds, event.stop.epochSeconds, resources)
-        val minutesLeft = ((event.stop.epochSeconds - at + 59) / 60).toInt()
-        DetailsTimeline(start, progress, "$end • ${playerMinutesLeft(minutesLeft)}",
-            "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}",
+        val minutesLeft = at?.takeIf { progress != null }?.let { ((event.stop.epochSeconds - it + 59) / 60).toInt() }
+        DetailsTimeline(start, progress, if (minutesLeft != null) "$end • ${playerMinutesLeft(minutesLeft)}" else end,
+            if (minutesLeft != null) "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}" else spokenRange,
             Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(indicator.isPlayingItem))
     } else if (recording != null && (event == null || !event.isRunning(nowSec))) {
         val viewer = recordingViewerPosition(recording.id)?.takeIf { it.fraction != null }
@@ -1084,7 +1089,7 @@ internal fun ProgrammeAgeRatingBox(rating: String, tag: String) {
 
 @Composable
 private fun DetailsTimeline(
-    startLabel: String, progress: Float, endLabel: String, spokenDescription: String, modifier: Modifier = Modifier,
+    startLabel: String, progress: Float?, endLabel: String, spokenDescription: String, modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,
 ) {
     Row(modifier.testTag("details-timeline").semantics(mergeDescendants = true) {
@@ -1092,7 +1097,8 @@ private fun DetailsTimeline(
     },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(startLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
-        ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), color = color, trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
+        if (progress != null) ProgressStrip(progress, Modifier.weight(1f).testTag("details-progress"), color = color, trackColor = MaterialTheme.colorScheme.surfaceVariant, height = 4.dp)
+        else Spacer(Modifier.weight(1f))
         Text(endLabel, style = MaterialTheme.typography.labelMedium, color = TvTextColors.tertiary)
     }
 }

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -76,7 +78,8 @@ fun ChannelRow(
     number: Long?,
     name: String,
     programTitle: String,
-    progress: Float?,
+    programme: EpgEvent?,
+    nowSec: Long,
     piconPath: ArtworkId?,
     programStartSec: Long? = null,
     recordingNow: Boolean = false,
@@ -150,11 +153,12 @@ fun ChannelRow(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                val progress = programmeProgress(programme, nowSec)
                 if (progress != null) {
                     Spacer(Modifier.height(ChannelProgressGap))
                     ProgressStrip(
                         progress = progress,
-                        color = progressColor(playbackIndicator.isPlayingItem),
+                        color = progressColor(watchingIndicator(programme, nowSec).isPlayingItem),
                         height = ChannelRowProgressHeight,
                         trackColor = if (focused) {
                             MaterialTheme.colorScheme.inverseOnSurface.copy(
