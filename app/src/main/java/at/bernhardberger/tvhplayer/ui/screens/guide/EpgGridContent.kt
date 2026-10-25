@@ -155,6 +155,22 @@ internal fun guideTimelineRowHeight(rows: GuideRows = GuideRows.DENSE): Dp = wit
 }
 
 @Composable
+private fun guideRulerHeight(): Dp = with(LocalDensity.current) {
+    MaterialTheme.typography.labelSmall.lineHeight.toDp() + RulerVerticalSpace
+}
+
+/** Without the headline's gap, keep the lifted pill below a scaled header button. */
+@Composable
+internal fun guideHeaderRulerClearance(): Dp = with(LocalDensity.current) {
+    val pillHeight = MaterialTheme.typography.labelSmall.lineHeight.toDp() + RulerPillVerticalPadding * 2
+    val overflow = maxOf(0.dp, RulerPillLift - (guideRulerHeight() - pillHeight) / 2)
+    // ButtonDefaults.scale() in TV Material 1.1.0 uses 1.1 for focus (also RoundIconButton).
+    // ButtonScale's fields are internal, so this mirrors that library default, not a custom scale.
+    val focusGrowth = guideHeaderMinHeight() * ((1.1 - 1.0) / 2).toFloat()
+    kotlin.math.ceil((overflow + focusGrowth).toPx()).toInt().toDp()
+}
+
+@Composable
 internal fun TimelineTimeRuler(
     windowStartSec: Long,
     windowEndSec: Long,
@@ -168,9 +184,7 @@ internal fun TimelineTimeRuler(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(with(LocalDensity.current) {
-                MaterialTheme.typography.labelSmall.lineHeight.toDp() + 4.dp
-            }),
+            .height(guideRulerHeight()),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The channel column needs no heading: the space only aligns the ruler with the track.
@@ -244,7 +258,7 @@ internal fun TimelineTimeRuler(
                             Modifier
                                 .testTag("epg-now-pill")
                                 .background(nowColor, CircleShape)
-                                .padding(horizontal = RulerPillPadding, vertical = 1.dp),
+                                .padding(horizontal = RulerPillPadding, vertical = RulerPillVerticalPadding),
                         ) {
                             Text(
                                 text = nowClock,
@@ -681,6 +695,8 @@ internal fun TimelineProgrammeCell(
 /** The now pill's side padding, and how far it sits above the labels' centre line. */
 private val RulerPillPadding = 6.dp
 private val RulerPillLift = 4.dp
+private val RulerPillVerticalPadding = 1.dp
+private val RulerVerticalSpace = 4.dp
 
 /** A focused programme cell's ring. It draws inside the cell, which keeps its size on focus. */
 private val GuideFocusRingWidth = 2.dp
@@ -813,6 +829,7 @@ internal fun GuidePreparationSkeleton(
                 .heightIn(min = guideHeaderMinHeight()),
         )
         headline?.invoke()
+        if (headline == null) Spacer(Modifier.height(guideHeaderRulerClearance()))
         GuideSkeletonGrid(
             windowStartSec = windowStartSec,
             windowEndSec = windowEndSec,

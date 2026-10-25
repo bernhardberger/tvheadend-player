@@ -690,7 +690,9 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   style and top padding. The facts row reserves at least 22dp, growing with
   `labelMedium` line height plus the age rating's 4dp padding. The headline
   keeps a 12dp gap above the ruler, with no extra grid spacer; when hidden,
-  the header row sits directly above the ruler. There is no synopsis, and accessibility reads the
+  clearance above the ruler reserves the now pill's upward overflow plus half
+  the header button's growth at TV Material's 1.1 focused scale, rounded up to a
+  whole pixel. There is no synopsis, and accessibility reads the
   headline after the buttons. A 104dp channel column (124dp with
   Regular rows) and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the

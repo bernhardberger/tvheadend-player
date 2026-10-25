@@ -137,6 +137,7 @@ import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderMinHeight
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderRulerClearance
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
@@ -1928,6 +1929,8 @@ fun EpgGridScreen(
                     nowSec = nowSecProvider,
                     modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
                 )
+            } else {
+                Spacer(Modifier.height(guideHeaderRulerClearance()))
             }
             GuideTimelineBody(
                 motion = scopeMotion,
