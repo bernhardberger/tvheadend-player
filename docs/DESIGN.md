@@ -939,11 +939,15 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 
 ### Retained programme history (revised 2026-09-22)
 
-- On entry from another destination, Guide opens near Now on the playing channel,
+- On app start or entry from another destination, Guide opens near Now on the playing channel,
   or the last channel focused in Guide when playback is absent or outside the active
-  group. It keeps the group and genre filter, not the remembered time. Rail trips
-  and closing panels or details keep the exact spot; player Back keeps its return
-  target. Guide permits navigation into the preceding six hours of
+  group. With neither available in the group, it falls back to last played, selected,
+  then the first channel. It keeps the group and genre filter, not the remembered time.
+  Changing groups within Guide likewise prefers the last focused Guide channel over
+  last played when playback is absent or outside the new group. Rail trips within
+  the same destination and closing panels or details keep the exact spot. Live-player
+  Back keeps its return target; recording-player Back restores the programme, time
+  window and channel viewport left in Guide. Guide permits navigation into the preceding six hours of
   retained programme metadata. Left/Right navigate programmes; Up/Down preserve
   the time anchor; Now returns to the current schedule.
 - Past programmes use SDK-owned display history. No historical coverage request

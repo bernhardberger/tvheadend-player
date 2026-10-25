@@ -575,9 +575,11 @@ fun AppRoot(
     val currentDestination = backStack.lastOrNull()
     // Live player Back targets the browse destination it returned to, once.
     var livePlayerReturn by remember { mutableStateOf<Pair<AppNavKey, PlayerReturnFocus>?>(null) }
+    var recordingPlayerReturnToGuide by remember { mutableStateOf(false) }
     var guideChannelRequest by remember { mutableStateOf<PlayerReturnFocus?>(null) }
     LaunchedEffect(currentDestination) {
         if (livePlayerReturn?.first != currentDestination) livePlayerReturn = null
+        if (currentDestination != GuideKey) recordingPlayerReturnToGuide = false
         if (currentDestination != GuideKey) guideChannelRequest = null
     }
     val playerReturnFor = { destination: AppNavKey ->
@@ -880,6 +882,7 @@ fun AppRoot(
                             contentPadding = contentPadding,
                             initialFocusEnabled = !drawerActive && currentDestination == GuideKey,
                             playerReturn = guideChannelRequest ?: playerReturnFor(GuideKey),
+                            browseReturn = recordingPlayerReturnToGuide,
                             view = uiSettings.guideView,
                             connectionUiState = connectionUiState,
                             connectionFailure = browseConnectionFailure,
@@ -1032,7 +1035,10 @@ fun AppRoot(
                             playbackStart = destination.start.toPlaybackStart(),
                             connectionState = connectionState,
                             onReconnect = appVm::reconnectNow,
-                            onClose = { backStack.popNavigation() },
+                            onClose = {
+                                backStack.popNavigation()
+                                recordingPlayerReturnToGuide = backStack.lastOrNull() == GuideKey
+                            },
                             onOpenConnectionSettings = {
                                 navigateTopLevel(SettingsKey(SettingsSection.CONNECTION))
                             },

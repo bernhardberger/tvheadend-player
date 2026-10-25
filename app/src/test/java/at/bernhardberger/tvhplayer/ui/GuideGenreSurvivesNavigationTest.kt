@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -108,7 +109,40 @@ class GuideGenreSurvivesNavigationTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val catalog = ChannelCatalog.create((1..3L).map { Channel.create(ChannelId(it), name = "Name $it", number = it) })
     private lateinit var player: ExoPlayer
+    private lateinit var back: androidx.activity.OnBackPressedDispatcher
     private val guidePosition = GuidePositionStore()
+
+    @Test fun recordingPlayerBackRestoresTheGuideProgrammeWindowAndViewport() {
+        app(withRecording = true)
+        openDestination("nav-channels", Key.DirectionDown, "nav-epg")
+        focus("guide-date-button")
+        repeat(6) { key(Key.DirectionDown) }
+        val nowWindow = checkNotNull(guidePosition.position.value).windowStartSec
+        key(Key.DirectionLeft)
+        val left = checkNotNull(guidePosition.position.value)
+        org.junit.Assert.assertEquals(ChannelId(6), left.channelId)
+        org.junit.Assert.assertEquals(EventId(66), left.eventId)
+        org.junit.Assert.assertTrue(left.windowStartSec < nowWindow)
+        org.junit.Assert.assertTrue(left.firstVisibleColumn > 0)
+        key(Key.Enter)
+        focus("details-play")
+        key(Key.Enter)
+        compose.onNodeWithTag("guide-date-button").assertDoesNotExist()
+        // Back first dismisses player chrome if it is still visible, then closes the player.
+        repeat(3) {
+            if (compose.onAllNodes(hasTestTag("guide-date-button")).fetchSemanticsNodes().isEmpty()) {
+                compose.runOnIdle { back.onBackPressed() }
+                settle()
+            }
+        }
+        compose.onNodeWithTag("guide-date-button").assertExists()
+        // Returning from the full-screen player, unlike changing destinations, retains the exact spot.
+        org.junit.Assert.assertEquals(left, guidePosition.position.value)
+        focus("guide-date-button")
+        key(Key.DirectionDown)
+        compose.onNode(hasText("Recorded programme") and isFocused()).assertExists()
+        org.junit.Assert.assertEquals(left, guidePosition.position.value)
+    }
 
     @Test fun leavingForChannelsWithTheRailOpenReentersGuideAtNow() {
         app()
@@ -186,20 +220,36 @@ class GuideGenreSurvivesNavigationTest {
         key(Key.Enter)
     }
 
-    private fun app() {
-        // The app reads the wall clock to find the programme on air, so the events span every time.
+    private fun app(withRecording: Boolean = false) {
+        // Most events span every time; the recording journey has a past programme and a scrolled channel.
+        val now = kotlin.time.Clock.System.now().epochSeconds
+        val catalog = if (withRecording) ChannelCatalog.create((1..8L).map {
+            Channel.create(ChannelId(it), name = "Name $it", number = it)
+        }) else this.catalog
         fun event(channel: Long, genre: Long) = EpgEvent.create(EventId(channel), ChannelId(channel), AIRS_FROM, AIRS_UNTIL,
             title = "Programme $channel", contentGenre = ContentGenre.fromContentType(genre))
+        val events = catalog.channels.map { channel ->
+            if (withRecording && channel.id == ChannelId(6)) EpgEvent.create(EventId(6), channel.id,
+                Instant.fromEpochSeconds(now - 1800), AIRS_UNTIL, title = "Programme 6")
+            else event(channel.id.value, if (channel.id == ChannelId(1)) 0x40L else 0x50L)
+        } + if (withRecording) listOf(EpgEvent.create(EventId(66), ChannelId(6), Instant.fromEpochSeconds(now - 7200),
+                Instant.fromEpochSeconds(now - 3600), title = "Recorded programme")) else emptyList()
         val session = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(catalog),
             // Sport on the first channel, children's programmes after.
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(
-                events = listOf(event(1, 0x40L), event(2, 0x50L), event(3, 0x50L)),
+                events = events,
                 coverages = catalog.channels.map { EpgCoverage.create(it.id, AIRS_FROM, AIRS_UNTIL) },
             )),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
-        )).apply { scriptLivePlaybackSuccess() }
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(if (withRecording) listOf(
+                at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
+                    id = at.bernhardberger.tvheadend.sdk.core.DvrEntryId(7),
+                    eventId = EventId(66), channelId = ChannelId(6),
+                    state = at.bernhardberger.tvheadend.sdk.core.DvrEntryState.COMPLETED, title = "Recorded programme",
+                ),
+            ) else emptyList())),
+        )).apply { scriptLivePlaybackSuccess(); if (withRecording) scriptRecordingPlaybackSuccess() }
         val settings = PlayerSettingsStore(InMemoryData())
         val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
@@ -233,6 +283,7 @@ class GuideGenreSurvivesNavigationTest {
         compose.setContent {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
+                    back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     AppRoot(
                         startupState = MainStartupState.Ready(server, autoStartPlayback = false),
                         runtimeServerSettings = server,

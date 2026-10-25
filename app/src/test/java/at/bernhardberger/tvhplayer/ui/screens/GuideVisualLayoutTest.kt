@@ -163,6 +163,97 @@ class GuideVisualLayoutTest {
     private lateinit var readyObservation: SessionObservation
     private var playbackRequests = 0
     private var navigationRequests = 0
+    private var guideActive by mutableStateOf(true)
+
+    @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
+        val coverageRelease = CompletableDeferred<Unit>()
+        val preparationRelease = java.util.concurrent.CountDownLatch(1)
+        try {
+            show(initialCoverage = false, beforeCoverageBatch = { _, _ -> coverageRelease.await() })
+            key(Key.DirectionDown)
+            focused(title(1, 0))
+            compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            compose.runOnIdle { guideActive = false }
+            val snapshot = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+            val onAir = EpgEvent.create(EventId(310), ChannelId(3), Instant.fromEpochSeconds(hour),
+                Instant.fromEpochSeconds(hour + 3600), title = title(3, 0))
+            val fresh = EpgSnapshot.create(events = snapshot.events + onAir,
+                historicalEvents = snapshot.historicalEvents, coverages = (1L..12L).map {
+                    EpgCoverage.create(ChannelId(it), Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
+                })
+            // Read BrowsePreparationKt.preparationDispatcher to hold its serial lane without a production seam.
+            val dispatcher = try {
+                Class.forName("at.bernhardberger.tvhplayer.ui.components.BrowsePreparationKt")
+                    .getDeclaredField("preparationDispatcher").apply { isAccessible = true }
+                    .get(null) as kotlinx.coroutines.CoroutineDispatcher
+            } catch (failure: ReflectiveOperationException) {
+                throw AssertionError("Cannot hold BrowsePreparationKt.preparationDispatcher for the entry race", failure)
+            }
+            val held = java.util.concurrent.CountDownLatch(1)
+            dispatcher.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
+                held.countDown()
+                check(preparationRelease.await(30, java.util.concurrent.TimeUnit.SECONDS))
+            }
+            assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            publishEvents(fresh.events, fresh, covered = true)
+            compose.runOnIdle {
+                position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
+                guideActive = true
+            }
+            compose.waitForIdle()
+            // New coverage must not settle entry against old rows and remember their fallback.
+            preparationRelease.countDown()
+            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(3, 0))).fetchSemanticsNodes().isNotEmpty() }
+            key(Key.DirectionDown)
+            focused(title(3, 0))
+            assertEquals(ChannelId(3), position.position.value?.channelId)
+            assertNoPlayback()
+        } finally {
+            preparationRelease.countDown()
+            coverageRelease.complete(Unit)
+        }
+    }
+
+    @Test fun offlineRetainedEntryUsesAvailableFallbackInsteadOfTheOldTarget() {
+        val release = CompletableDeferred<Unit>()
+        try {
+            show(initialCoverage = false, beforeCoverageBatch = { _, _ -> release.await() })
+            key(Key.DirectionDown)
+            key(Key.DirectionRight)
+            focused(title(1, 1))
+            compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            compose.runOnIdle { guideActive = false }
+            compose.runOnIdle {
+                val observation = session.observation.value
+                session.publish(SessionObservation.create(sessionState = SessionState.Disconnected,
+                    channelState = observation.channelState, epgState = observation.epgState, dvrState = observation.dvrState))
+            }
+            compose.waitForIdle()
+            compose.runOnIdle {
+                position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
+                guideActive = true
+            }
+            key(Key.DirectionDown)
+            focused(title(4, 0))
+            assertNoPlayback()
+        } finally { release.complete(Unit) }
+    }
+
+    @Test fun groupChangeKeepsTheLastFocusedGuideChannelAheadOfLastPlayed() {
+        show(groupWithoutFirst = true, lastPlayedChannel = ChannelId(1))
+        key(Key.DirectionDown)
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        compose.onNodeWithTag("channels-tags-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        key(Key.Enter)
+        tagFocused("channels-tags-all")
+        key(Key.DirectionDown)
+        tagFocused("channels-tags-1")
+        key(Key.Enter)
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        assertNoPlayback(additionalCoverageCalls = 1)
+    }
     private val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
     private val now = hour + 15 * 60
 
@@ -2251,7 +2342,8 @@ class GuideVisualLayoutTest {
         recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false,
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
         initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
-        playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null) {
+        playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
+        lastPlayedChannel: ChannelId? = null) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -2318,7 +2410,9 @@ class GuideVisualLayoutTest {
         model = ChannelsViewModel(session, tagSettings)
         models.put("channels", model)
         player = ExoPlayer.Builder(context()).build()
-        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player).also { it.launchIn(runtimeScope) }, settings, profiles,
+        val runtime = AppPlaybackRuntime(player, session, createTvheadendPlaybackCoordinator(player).also {
+            if (playingChannel != null) it.launchIn(runtimeScope)
+        }, settings, profiles,
             runtimeScope, TvheadendAudioOutputProvider(context()), PlaybackAudioFocus.None, PlaybackRuntimePolicy.fromPlayerSettings())
         if (playingChannel != null) {
             @OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
@@ -2332,6 +2426,7 @@ class GuideVisualLayoutTest {
         }
         val selection = ChannelSelectionStore()
         val lastPlayed = LastPlayedChannelStore(context())
+        if (lastPlayedChannel != null) runBlocking { lastPlayed.setChannelId(lastPlayedChannel) }
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
@@ -2367,6 +2462,7 @@ class GuideVisualLayoutTest {
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
                             var genre by remember { mutableStateOf(initialGenre) }
                             EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view, channelViewModel = model,
+                                guideActive = guideActive,
                                 playerReturn = playerReturn,
                                 genre = genre, onGenreChange = { genre = it },
                                 session = guideSession, playerSession = runtime, selection = selection, guidePositionStore = position,
@@ -2380,6 +2476,7 @@ class GuideVisualLayoutTest {
         }
         if (!connecting) {
             if (playerReturn != null) {
+                // savedTimelineReturn fixtures request header focus for geometry setup only, not return-policy evidence.
                 compose.waitUntil(10_000) { compose.onAllNodesWithTag("guide-date-button").fetchSemanticsNodes().isNotEmpty() }
                 compose.onNodeWithTag("guide-date-button").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
             }
