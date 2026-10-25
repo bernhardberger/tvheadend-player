@@ -93,7 +93,8 @@ class ConnectionFormStateTest {
         assertEquals(FAKE_HOST, form.host)
         assertEquals(FAKE_PORT.toString(), form.port)
         assertEquals(FAKE_USERNAME, form.username)
-        assertEquals(FAKE_PASSWORD, form.password)
+        assertEquals("", form.password)
+        assertTrue(form.hasSavedPassword)
 
         form.updateHost(" $EDITED_HOST ")
         form.updatePort(EDITED_PORT.toString())
@@ -115,6 +116,24 @@ class ConnectionFormStateTest {
         assertEquals("", form.username)
         assertEquals("", form.password)
         assertFalse(form.toString().contains(EDITED_PASSWORD))
+    }
+
+    @Test
+    fun savedPasswordIsRetainedForSubmitButNeverBecomesFieldText() = runTest {
+        val editor = FakeConnectionProfileEditor()
+        val form = ConnectionFormState()
+        form.loadFrom(editor)
+        assertEquals("", form.password)
+        assertTrue(form.canSubmit)
+        assertTrue(form.hasSavedPassword)
+        assertEquals(ConnectionFormFeedback.SAVED, form.submit(editor) { CredentialEditLease {} })
+        assertEquals(SavedPassword(FAKE_HOST, FAKE_PORT, FAKE_USERNAME, FAKE_PASSWORD), editor.savedPassword)
+
+        form.updatePassword(EDITED_PASSWORD)
+        assertFalse(form.hasSavedPassword)
+        form.clearPassword()
+        assertFalse(form.hasSavedPassword)
+        assertTrue(form.credentialsIncomplete)
     }
 
     @Test
@@ -156,31 +175,6 @@ class ConnectionFormStateTest {
     }
 
     @Test
-    fun clearingSavedPasswordKeepsTheCurrentEndpointAndZerosCredentials() = runTest {
-        val editor = FakeConnectionProfileEditor(
-            serverSettings = ServerSettings(
-                host = FAKE_HOST,
-                htspPort = FAKE_PORT,
-                username = FAKE_USERNAME,
-                passwordConfigured = true,
-            ),
-        )
-        val form = ConnectionFormState(
-            host = FAKE_HOST,
-            port = FAKE_PORT.toString(),
-            username = FAKE_USERNAME,
-            password = FAKE_PASSWORD,
-        )
-
-        val feedback = form.clearSavedPassword(editor)
-
-        assertEquals(ConnectionFormFeedback.SAVED, feedback)
-        assertEquals(FAKE_HOST to FAKE_PORT, editor.savedAnonymous)
-        assertEquals("", form.username)
-        assertEquals("", form.password)
-    }
-
-    @Test
     fun failedSubmissionReturnsTypedFeedbackWithoutClearingCredentials() = runTest {
         val editor = FakeConnectionProfileEditor(failOnSave = true)
         val form = ConnectionFormState()
@@ -193,7 +187,8 @@ class ConnectionFormStateTest {
         )
         assertEquals(ConnectionFormFeedback.SAVE_FAILED, form.feedback)
         assertEquals(FAKE_USERNAME, form.username)
-        assertEquals(FAKE_PASSWORD, form.password)
+        assertEquals("", form.password)
+        assertTrue(form.hasSavedPassword)
     }
 
     @Test

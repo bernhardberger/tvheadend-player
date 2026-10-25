@@ -28,6 +28,7 @@ import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -62,7 +63,6 @@ internal class ConnectionSetupState(
     private val scope: CoroutineScope,
     val mode: SetupMode = SetupMode.FIRST_RUN,
     step: SetupStep = mode.firstStep,
-    choice: ServerChoice = ServerChoice.TYPED,
     private val restoreSaved: suspend () -> Unit = {},
     private val credentialLease: () -> CredentialEditLease = { CredentialEditLease {} },
     /** Runs once the connection is saved; the editor leaves with it. */
@@ -74,51 +74,32 @@ internal class ConnectionSetupState(
 
     var step by mutableStateOf(step)
         private set
-    var serverChoice by mutableStateOf(choice)
-        private set
     var failure by mutableStateOf<SetupFailure?>(null)
         private set
     var saving by mutableStateOf(false)
-        private set
-
-    /** True while "Clear saved password" stores the connection without its sign-in. */
-    var clearingPassword by mutableStateOf(false)
-        private set
-
-    /** True while a test runs or a passed one is being saved: what "Test and save" shows as busy. */
-    val testing: Boolean get() = step == SetupStep.CONNECTING || saving
-
-    var welcomeFocus by mutableStateOf(WelcomeFocus.FIND)
         private set
 
     /** The servers the search found so far, in the SDK's order. */
     var servers by mutableStateOf(emptyList<DiscoveredTvheadendServer>())
         private set
 
-    /** True while [search] still looks; a restored search step starts looking again. */
-    var searching by mutableStateOf(step == SetupStep.FIND)
+    /** True while the Server screen's inline search is running. */
+    var searching by mutableStateOf(false)
         private set
 
     /** Changes whenever a new search should start. */
     var searchRequest by mutableIntStateOf(0)
         private set
 
-    /** The found server that holds or takes focus on the search step; null is "Enter address manually". */
+    /** The focused discovery result, or null for the search action. */
     var findFocus by mutableStateOf<DiscoveredTvheadendServer?>(null)
         private set
-    private var chosenServer: DiscoveredTvheadendServer? = null
+    var findFocusRequest by mutableIntStateOf(0)
+        private set
 
-    var addressFocus by mutableStateOf(AddressFocus.HOST)
+    var addressFocus by mutableStateOf(AddressFocus.SEARCH)
         private set
     var signInFocus by mutableStateOf(SignInFocus.USERNAME)
-        private set
-
-    /** The summary row that opened the current step, which takes focus again on the way back. */
-    var summaryFocus by mutableStateOf(SummaryFocus.ADDRESS)
-        private set
-
-    /** Whether the saved connection has a sign-in that "Clear saved password" can remove. */
-    var savedSignIn by mutableStateOf(false)
         private set
 
     /** Changes whenever a step asks for its focus target again, even on the same step. */
@@ -129,6 +110,7 @@ internal class ConnectionSetupState(
     private var signInErrorShown by mutableStateOf(false)
     private var sessionWork: Job? = null
     private val sessionLock = Mutex()
+    private var accepted = false
 
     val hostError: Boolean get() = addressErrorsShown && form.hostMissing
     val portError: Boolean get() = addressErrorsShown && form.portInvalid
@@ -144,60 +126,21 @@ internal class ConnectionSetupState(
      */
     suspend fun loadSaved() {
         if (restored) form.loadSignInFrom(profiles) else form.loadFrom(profiles)
-        savedSignIn = form.username.isNotBlank()
     }
 
     fun enterAddress() {
-        when {
-            step == SetupStep.WELCOME -> {
-                welcomeFocus = WelcomeFocus.TYPE
-                serverChoice = ServerChoice.TYPED
-            }
-            step == SetupStep.FIND || (serverChoice == ServerChoice.FOUND && !editing) -> {
-                serverChoice = ServerChoice.TYPED_AFTER_SEARCH
-            }
-            editing -> serverChoice = ServerChoice.TYPED
-        }
-        focusAddress(AddressFocus.HOST)
+        focusAddress(AddressFocus.SEARCH)
         step = SetupStep.ADDRESS
     }
 
-    /** A summary row: opens its step, clears the saved password, or tests and saves. */
-    fun openFromSummary(row: SummaryFocus) {
-        if (step != SetupStep.SUMMARY || saving || clearingPassword) return
-        summaryFocus = row
-        when (row) {
-            SummaryFocus.ADDRESS -> openAddress(AddressFocus.HOST)
-            SummaryFocus.PORT -> openAddress(AddressFocus.PORT)
-            SummaryFocus.SIGN_IN -> openSignIn(SignInFocus.USERNAME)
-            SummaryFocus.FIND -> findServer()
-            SummaryFocus.CLEAR_PASSWORD -> clearSavedPassword()
-            SummaryFocus.TEST -> connect()
-        }
+    /** Both entry points search automatically without changing the entered or saved fields. */
+    fun onServerOpened() {
+        findServer()
     }
 
-    private fun openAddress(target: AddressFocus) {
-        serverChoice = ServerChoice.TYPED
-        focusAddress(target)
-        step = SetupStep.ADDRESS
-    }
-
-    private fun openSignIn(target: SignInFocus) {
-        focusSignIn(target)
-        step = SetupStep.SIGN_IN
-    }
-
-    private fun returnToSummary(target: SummaryFocus) {
-        summaryFocus = target
-        focusRequest += 1
-        step = SetupStep.SUMMARY
-    }
-
-    /** Opens the search step and starts looking ("Find my server", "Search again"). */
+    /** Starts discovery inside the Server step without moving focus away from the action. */
     fun findServer() {
-        welcomeFocus = WelcomeFocus.FIND
         startSearch()
-        step = SetupStep.FIND
     }
 
     /**
@@ -205,6 +148,8 @@ internal class ConnectionSetupState(
      * leaving the step stops it; an unavailable discovery ends it with what it had.
      */
     suspend fun search() {
+        val request = searchRequest
+        searching = true
         try {
             withTimeoutOrNull(DiscoveryWindow) {
                 discovery()
@@ -215,14 +160,14 @@ internal class ConnectionSetupState(
                     .collect(::showServers)
             }
         } finally {
-            searching = false
+            if (request == searchRequest) searching = false
         }
     }
 
     private fun showServers(found: List<DiscoveredTvheadendServer>) {
         val target = findFocus
-        // The first find takes focus, and a server that left the list hands it on.
-        if ((servers.isEmpty() && found.isNotEmpty()) || (target != null && target !in found)) {
+        // Never steal focus from an address being typed while discovery answers.
+        if (target != null && target !in found) {
             focusFind(found.firstOrNull())
         }
         servers = found
@@ -233,26 +178,19 @@ internal class ConnectionSetupState(
         findFocus = server
     }
 
-    /** Takes a found server's address and port and goes on to the sign-in. */
+    /** Choosing an announced server fills its address and advances to Account. */
     fun chooseServer(server: DiscoveredTvheadendServer) {
-        chosenServer = server
-        serverChoice = ServerChoice.FOUND
         form.updateHost(server.host)
         form.updatePort(server.port.toString())
         addressErrorsShown = false
-        if (editing) {
-            returnToSummary(SummaryFocus.TEST)
-            return
-        }
-        focusSignIn(firstEmptySignInField() ?: SignInFocus.CONNECT)
-        step = SetupStep.SIGN_IN
+        continueFromAddress()
     }
 
     private fun startSearch() {
         servers = emptyList()
         searching = true
         searchRequest += 1
-        focusFind(null)
+        findFocus = null
     }
 
     /** Goes on to the sign-in when the address is valid; otherwise shows why and focuses it. */
@@ -261,7 +199,6 @@ internal class ConnectionSetupState(
         when {
             form.hostMissing -> focusAddress(AddressFocus.HOST)
             form.portInvalid -> focusAddress(AddressFocus.PORT)
-            editing -> returnToSummary(SummaryFocus.TEST)
             else -> {
                 focusSignIn(firstEmptySignInField() ?: SignInFocus.CONNECT)
                 step = SetupStep.SIGN_IN
@@ -269,58 +206,48 @@ internal class ConnectionSetupState(
         }
     }
 
-    /** The editor's sign-in: back to the summary when complete; otherwise shows why and focuses the empty field. */
+    /** Account is complete with both credentials or neither; a retained password also counts. */
     fun continueFromSignIn() {
         signInErrorShown = true
         val empty = firstEmptySignInField()
-        if (form.credentialsIncomplete && empty != null) focusSignIn(empty) else returnToSummary(SummaryFocus.TEST)
+        if (form.credentialsIncomplete && empty != null) focusSignIn(empty) else connect()
     }
 
     /** Starts the test when the sign-in is complete; otherwise shows why and focuses the empty field. */
     fun connect() {
+        if (step == SetupStep.CONNECTING || saving) return
         signInErrorShown = true
         val profile = form.serverProfile()
         if (profile == null) {
-            if (editing) openIncomplete() else focusSignIn(firstEmptySignInField() ?: SignInFocus.USERNAME)
+            if (form.hostMissing || form.portInvalid) {
+                enterAddress()
+                addressErrorsShown = true
+                focusAddress(if (form.hostMissing) AddressFocus.HOST else AddressFocus.PORT)
+            } else {
+                step = SetupStep.SIGN_IN
+                focusSignIn(firstEmptySignInField() ?: SignInFocus.USERNAME)
+            }
             return
         }
         failure = null
-        if (editing) summaryFocus = SummaryFocus.TEST else focusSignIn(SignInFocus.CONNECT)
         step = SetupStep.CONNECTING
-        replaceSessionWork {
-            if (editing) {
-                testAndSave(profile)
-            } else {
-                val result = session.connectForSetup(profile)
-                // Back may cancel during the test's closing disconnect, which still returns.
-                currentCoroutineContext().ensureActive()
-                failure = result
-                step = if (result == null) SetupStep.DONE else SetupStep.FAILED
-            }
-        }
-    }
-
-    /** "Test and save" with something missing opens the step that misses it, showing why. */
-    private fun openIncomplete() {
-        addressErrorsShown = true
-        when {
-            form.hostMissing -> openAddress(AddressFocus.HOST)
-            form.portInvalid -> openAddress(AddressFocus.PORT)
-            else -> openSignIn(firstEmptySignInField() ?: SignInFocus.USERNAME)
-        }
+        replaceSessionWork { test(profile) }
     }
 
     /**
-     * Saves a passed test right away. Anything short of a saved profile reconnects the saved
-     * connection, also when the test is cancelled or the editor closes during it.
+     * Holds a passed connection for the final action. Cancellation, Back and disposal restore
+     * the old connection until that action has committed; no draft can outlive this flow.
      */
-    private suspend fun testAndSave(profile: ServerProfile) {
+    private suspend fun test(profile: ServerProfile) {
         var settled = false
+        var passed = false
+        accepted = false
         try {
             val result = session.connectForSetup(profile)
+            passed = result == null
             if (result != null) {
                 // Reconnected before the failure shows, so "Save anyway" cannot land before it.
-                withContext(NonCancellable) { restoreSaved() }
+                if (editing) withContext(NonCancellable) { restoreSaved() }
                 settled = true
                 // Back during the restore dismissed this test; a newer one may already be running.
                 currentCoroutineContext().ensureActive()
@@ -328,12 +255,14 @@ internal class ConnectionSetupState(
                 step = SetupStep.FAILED
                 return
             }
-            saving = true
-            settled = withContext(NonCancellable) { commit() }
-            if (!settled) returnToSummary(SummaryFocus.TEST)
+            currentCoroutineContext().ensureActive()
+            step = SetupStep.DONE
+            awaitCancellation()
         } finally {
-            saving = false
-            if (!settled) withContext(NonCancellable) { restoreSaved() }
+            if (!settled && !accepted) withContext(NonCancellable) {
+                if (passed) session.disconnect()
+                if (editing) restoreSaved()
+            }
         }
     }
 
@@ -368,42 +297,30 @@ internal class ConnectionSetupState(
     private suspend fun commit(): Boolean {
         val saved = form.submit(profiles, credentialLease) == ConnectionFormFeedback.SAVED
         if (saved) {
+            accepted = true
+            sessionWork?.cancel()
             form.clearPassword()
             onSaved()
         }
         return saved
     }
 
-    /** Stores the saved connection without its sign-in; the summary then shows it signs in without one. */
-    private fun clearSavedPassword() {
-        clearingPassword = true
-        scope.launch {
-            try {
-                if (form.clearSavedPassword(profiles) == ConnectionFormFeedback.SAVED) {
-                    savedSignIn = false
-                    returnToSummary(SummaryFocus.SIGN_IN)
-                }
-            } finally {
-                clearingPassword = false
-            }
-        }
+    /** Draft-only, like every other edit. Back must not erase the saved connection's credentials. */
+    fun clearSavedPassword() {
+        form.clearCredentials()
+        focusSignIn(SignInFocus.USERNAME)
     }
 
     /** One step back, keeping what was entered. False on the first step, where the flow lets Back go. */
     fun back(): Boolean {
-        if (saving || clearingPassword) return true
-        val previous = step.previous(serverChoice, mode) ?: return false
+        if (saving) return true
+        val previous = step.previous(mode) ?: return false
         when (step) {
             // An edit's cancelled test reconnects the saved connection as it ends.
-            SetupStep.CONNECTING -> sessionWork?.cancel()
-            // The tested profile stays connected only to be saved by "Start watching".
-            SetupStep.DONE -> replaceSessionWork { session.disconnect() }
+            SetupStep.CONNECTING, SetupStep.DONE -> sessionWork?.cancel()
             else -> Unit
         }
         when (previous) {
-            SetupStep.WELCOME -> welcomeFocus = if (step == SetupStep.FIND) WelcomeFocus.FIND else WelcomeFocus.TYPE
-            SetupStep.SUMMARY -> focusRequest += 1
-            SetupStep.FIND -> returnToSearch()
             SetupStep.ADDRESS -> focusAddress(AddressFocus.CONTINUE)
             SetupStep.SIGN_IN -> focusSignIn(SignInFocus.CONNECT)
             else -> Unit
@@ -412,23 +329,14 @@ internal class ConnectionSetupState(
         return true
     }
 
-    /** Back on the search: the chosen server again, or a fresh search where the last one found nothing. */
-    private fun returnToSearch() {
-        when {
-            servers.isEmpty() -> startSearch()
-            serverChoice == ServerChoice.FOUND -> focusFind(chosenServer?.takeIf { it in servers } ?: servers.first())
-            else -> focusFind(null)
-        }
-    }
-
     private fun focusFind(target: DiscoveredTvheadendServer?) {
         findFocus = target
-        focusRequest += 1
+        findFocusRequest += 1
     }
 
     private fun firstEmptySignInField(): SignInFocus? = when {
         form.username.isBlank() -> SignInFocus.USERNAME
-        form.password.isBlank() -> SignInFocus.PASSWORD
+        form.password.isBlank() && !form.hasSavedPassword -> SignInFocus.PASSWORD
         else -> null
     }
 
@@ -465,12 +373,11 @@ internal class ConnectionSetupState(
             credentialLease: () -> CredentialEditLease,
             onSaved: () -> Unit,
         ): Saver<ConnectionSetupState, Any> = listSaver(
-            save = { listOf(it.step.resumable(mode).name, it.serverChoice.name) },
+            save = { listOf(it.step.resumable().name) },
             restore = {
                 ConnectionSetupState(
                     form, session, profiles, discovery, scope, mode,
                     step = SetupStep.valueOf(it[0]),
-                    choice = ServerChoice.valueOf(it[1]),
                     restoreSaved = restoreSaved,
                     credentialLease = credentialLease,
                     onSaved = onSaved,

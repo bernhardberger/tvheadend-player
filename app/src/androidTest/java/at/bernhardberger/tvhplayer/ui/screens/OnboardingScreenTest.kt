@@ -38,25 +38,21 @@ class OnboardingScreenTest {
     private val session = FakeTvheadendSession()
 
     @Test
-    fun welcomeChoiceOpensTheAddressOnTheServerField() {
-        show(SetupStep.WELCOME, ConnectionFormState())
-
+    fun serverStartsOnSearchAndContinueValidatesTheAddress() {
+        show(SetupStep.ADDRESS, ConnectionFormState())
         composeRule.onNodeWithTag("setup-find-server").assertIsFocused()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithTag("setup-enter-address").assertIsFocused()
+        repeat(3) { press(Key.DirectionDown) }
+        composeRule.onNodeWithTag("setup-continue").assertIsFocused()
         press(Key.DirectionCenter)
         composeRule.onNodeWithTag("setup-host").assertIsFocused()
     }
 
     @Test
-    fun aSearchWithoutServersOffersTheAddressFirst() {
-        show(SetupStep.WELCOME, ConnectionFormState())
-
+    fun aSearchWithoutServersStaysBesideTheAddress() {
+        show(SetupStep.ADDRESS, ConnectionFormState())
         press(Key.DirectionCenter)
-        composeRule.onNodeWithText("No servers found").assertExists()
-        composeRule.onNodeWithTag("setup-enter-address").assertIsFocused()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithTag("setup-search-again").assertIsFocused()
+        composeRule.onNodeWithTag("setup-host").assertExists()
+        composeRule.onNodeWithText("Search again").assertIsFocused()
     }
 
     @Test
@@ -69,9 +65,9 @@ class OnboardingScreenTest {
             password = FAKE_PASSWORD,
         )
         show(SetupStep.SIGN_IN, form, editor)
-
-        composeRule.onNodeWithTag("setup-connect").assertIsFocused()
+        composeRule.onNodeWithTag("setup-continue").assertIsFocused()
         press(Key.DirectionCenter)
+        composeRule.onNodeWithTag("setup-connecting").assertIsFocused()
         composeRule.runOnIdle {
             assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
             assertEquals("Nothing is saved before the test passes", 0, editor.passwordSaveCount)

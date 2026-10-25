@@ -27,7 +27,6 @@ import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthKeyCycle
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
-import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.rememberConnectionSetupState
 import org.koin.compose.koinInject
@@ -87,7 +86,6 @@ internal fun SettingsConnection(
     session: TvheadendSession = koinInject(),
     restoreSaved: suspend () -> Unit = rememberSavedConnectionRestore(session),
     form: ConnectionFormState = rememberConnectionFormState(),
-    onNavigateLeft: (KeyEvent) -> Boolean = { false },
     onSaved: () -> Unit = {},
 ) {
     val window = LocalActivity.current?.window
@@ -111,9 +109,8 @@ internal fun SettingsConnection(
     val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     val backCycle = remember { DepthKeyCycle() }
     // The depth host pops on an editor's unhandled Back key, so the key goes to the back
-    // dispatcher here, where the flow's step and a field being edited take it first. Left on the
-    // summary leaves for the overview like any Settings level; the steps it opens keep Left to
-    // themselves, so it cannot drop what was entered.
+    // dispatcher here, where the wizard and an edited field take it first. Left remains local
+    // to the full-screen wizard rather than popping a Settings level.
     Box(
         Modifier
             .fillMaxSize()
@@ -125,7 +122,7 @@ internal fun SettingsConnection(
                             dispatcher.onBackPressed()
                             true
                         }
-                    KeyEvent.KEYCODE_DPAD_LEFT -> state.step != SetupStep.SUMMARY || onNavigateLeft(native)
+                    KeyEvent.KEYCODE_DPAD_LEFT -> true
                     else -> false
                 }
             }

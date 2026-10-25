@@ -9,25 +9,21 @@ import org.junit.Test
 
 class ConnectionSetupPolicyTest {
     @Test
-    fun backWalksTheStepsAndLeavesTheFlowOnlyFromWelcome() {
-        for (choice in ServerChoice.entries) {
-            assertNull(SetupStep.WELCOME.previous(choice))
-            assertEquals(SetupStep.WELCOME, SetupStep.FIND.previous(choice))
-            for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
-                assertEquals(SetupStep.SIGN_IN, step.previous(choice))
-                assertEquals(SetupStep.SIGN_IN, step.resumable())
-            }
+    fun bothModesUseThreeScreensAndBackLeavesOnlyFromServer() {
+        assertEquals(SetupStep.WELCOME, SetupMode.FIRST_RUN.firstStep)
+        assertEquals(SetupStep.ADDRESS, SetupMode.EDIT.firstStep)
+        assertNull(SetupStep.WELCOME.stage)
+        assertNull(SetupStep.WELCOME.previous())
+        assertEquals(SetupStep.WELCOME, SetupStep.ADDRESS.previous())
+        assertNull(SetupStep.ADDRESS.previous(SetupMode.EDIT))
+        assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous())
+        assertEquals(SetupStage.SERVER, SetupStep.ADDRESS.stage)
+        assertEquals(SetupStage.SIGN_IN, SetupStep.SIGN_IN.stage)
+        for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
+            assertEquals(SetupStep.SIGN_IN, step.previous())
+            assertEquals(SetupStep.SIGN_IN, step.resumable())
+            assertEquals(SetupStage.CONNECT, step.stage)
         }
-    }
-
-    @Test
-    fun backReturnsToWhereTheServerWasChosen() {
-        assertEquals(SetupStep.WELCOME, SetupStep.ADDRESS.previous(ServerChoice.TYPED))
-        assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous(ServerChoice.TYPED))
-        assertEquals(SetupStep.FIND, SetupStep.ADDRESS.previous(ServerChoice.TYPED_AFTER_SEARCH))
-        assertEquals(SetupStep.ADDRESS, SetupStep.SIGN_IN.previous(ServerChoice.TYPED_AFTER_SEARCH))
-        assertEquals("A found server skips the address", SetupStep.FIND, SetupStep.SIGN_IN.previous(ServerChoice.FOUND))
-        assertEquals(SetupStep.FIND, SetupStep.FIND.resumable())
     }
 
     @Test
@@ -60,23 +56,6 @@ class ConnectionSetupPolicyTest {
             listOf(SetupFailure.UNREACHABLE),
             SetupFailure.entries.filter { SetupAction.CONTINUE_ANYWAY in it.actions },
         )
-    }
-
-    @Test
-    fun editingGoesBackToTheSummaryExceptAnAddressTypedOnTheSearch() {
-        val edit = SetupMode.EDIT
-        assertEquals(SetupStep.SUMMARY, edit.firstStep)
-        for (choice in ServerChoice.entries) {
-            assertNull(SetupStep.SUMMARY.previous(choice, edit))
-            for (step in listOf(SetupStep.FIND, SetupStep.SIGN_IN, SetupStep.CONNECTING, SetupStep.FAILED)) {
-                assertEquals(SetupStep.SUMMARY, step.previous(choice, edit))
-            }
-            for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
-                assertEquals(SetupStep.SUMMARY, step.resumable(edit))
-            }
-        }
-        assertEquals(SetupStep.SUMMARY, SetupStep.ADDRESS.previous(ServerChoice.TYPED, edit))
-        assertEquals(SetupStep.FIND, SetupStep.ADDRESS.previous(ServerChoice.TYPED_AFTER_SEARCH, edit))
     }
 
     @Test

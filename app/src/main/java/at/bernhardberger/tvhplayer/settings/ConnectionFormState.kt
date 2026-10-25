@@ -11,7 +11,6 @@ import at.bernhardberger.tvheadend.sdk.core.DEFAULT_HTSP_PORT
 import at.bernhardberger.tvheadend.sdk.core.ServerAuthentication
 import at.bernhardberger.tvheadend.sdk.core.ServerProfile
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.flow.first
 
 internal enum class ConnectionFormFeedback {
     SAVED,
@@ -34,6 +33,10 @@ internal class ConnectionFormState(
         private set
     var password by mutableStateOf(password)
         private set
+    // Kept only in memory for testing/saving, never passed to a text field or its visibility toggle.
+    private var savedPassword by mutableStateOf("")
+    val hasSavedPassword: Boolean get() = savedPassword.isNotEmpty()
+    private val effectivePassword: String get() = password.ifEmpty { savedPassword }
     var feedback by mutableStateOf<ConnectionFormFeedback?>(null)
         private set
 
@@ -48,7 +51,7 @@ internal class ConnectionFormState(
 
     /** A username without a password, or the other way round; both or neither are complete. */
     val credentialsIncomplete: Boolean
-        get() = username.isBlank() != password.isBlank()
+        get() = username.isBlank() != effectivePassword.isBlank()
 
     val canSubmit: Boolean
         get() = !hostMissing && !portInvalid && !credentialsIncomplete
@@ -66,16 +69,18 @@ internal class ConnectionFormState(
     }
 
     fun updatePassword(password: String) {
+        savedPassword = ""
         this.password = password
     }
 
     fun clearPassword() {
         password = ""
+        savedPassword = ""
     }
 
     fun clearCredentials() {
         username = ""
-        password = ""
+        clearPassword()
     }
 
     fun clearFeedback() {
@@ -89,7 +94,7 @@ internal class ConnectionFormState(
         val authentication = if (username.isBlank()) {
             ServerAuthentication.Anonymous
         } else {
-            ServerAuthentication.Password(username, password)
+            ServerAuthentication.Password(username, effectivePassword)
         }
         return ServerProfile(host, endpointPort, authentication)
     }
@@ -99,7 +104,8 @@ internal class ConnectionFormState(
             this.host = host
             this.port = port.toString()
             this.username = username
-            this.password = password
+            this.password = ""
+            this.savedPassword = password
         }
     }
 
@@ -107,7 +113,8 @@ internal class ConnectionFormState(
     suspend fun loadSignInFrom(settingsStore: ConnectionProfileEditor) {
         settingsStore.loadServerForEditing { _, _, username, password ->
             this.username = username
-            this.password = password
+            this.password = ""
+            this.savedPassword = password
         }
     }
 
@@ -128,23 +135,11 @@ internal class ConnectionFormState(
                     host = host.trim(),
                     htspPort = endpointPort,
                     username = username,
-                    password = password,
+                    password = effectivePassword,
                     credentialLease = acquireCredentialLease(),
                 )
             }
         }
-    }
-
-    suspend fun clearSavedPassword(
-        settingsStore: ConnectionProfileEditor,
-    ): ConnectionFormFeedback = runProfileOperation {
-        val current = settingsStore.serverSettings.first()
-        if (current.host.isNotBlank()) {
-            settingsStore.saveServer(current.host, current.htspPort)
-        } else {
-            settingsStore.clearProfile()
-        }
-        clearCredentials()
     }
 
     private suspend fun runProfileOperation(

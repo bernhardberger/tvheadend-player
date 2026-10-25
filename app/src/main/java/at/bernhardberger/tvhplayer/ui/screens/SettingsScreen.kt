@@ -58,7 +58,7 @@ internal fun SettingsScreen(
 internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD, showRecordings: Boolean = false): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
     settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general_nav), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune),
     settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list),
-    settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
+    settingsConnectionEntry(),
     settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
 ) + (if (showRecordings) listOf(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
     icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + (if (applianceBuild) listOf(
@@ -66,6 +66,14 @@ internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_B
 ) else emptyList()) + listOf(
     settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info_outline),
 ))
+
+@Composable
+private fun settingsConnectionEntry(): DepthRow {
+    val row = settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
+        icon = R.drawable.ic_cloud, trailingIcon = R.drawable.ic_edit)
+    return DepthRow(DepthItem(SettingsSection.CONNECTION.name), leafLevelId = CONNECTION_EDITOR,
+        content = row.content)
+}
 
 @Composable
 internal fun SettingsScreenNavigation(

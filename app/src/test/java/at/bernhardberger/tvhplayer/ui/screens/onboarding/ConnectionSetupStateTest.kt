@@ -39,11 +39,45 @@ class ConnectionSetupStateTest {
     private val discovery = MutableStateFlow(discovering())
 
     @Test
+    fun automaticAndManualSearchNeverValidateTheAddress() = runTest {
+        val state = setup()
+        state.onServerOpened()
+        assertEquals(1, state.searchRequest)
+        assertFalse(state.hostError)
+        backgroundScope.launch { state.search() }
+        runCurrent()
+        discovery.value = discovering(LIVING_ROOM)
+        runCurrent()
+        assertFalse(state.hostError)
+        discovery.value = discovering()
+        advanceTimeBy(DiscoveryWindow + 1.milliseconds)
+        runCurrent()
+        assertFalse(state.searching)
+        assertFalse(state.hostError)
+        state.findServer()
+        assertFalse(state.hostError)
+        state.continueFromAddress()
+        assertTrue(state.hostError)
+    }
+
+    @Test
+    fun openingTheEditorStartsDiscoveryWithoutChangingTheSavedFields() = runTest {
+        val state = edit()
+        val savedHost = form.host
+        val savedPort = form.port
+        state.onServerOpened()
+        assertEquals(1, state.searchRequest)
+        assertTrue(state.searching)
+        assertEquals(savedHost, form.host)
+        assertEquals(savedPort, form.port)
+    }
+
+    @Test
     fun addressFocusesTheFirstInvalidFieldBeforeGoingOn() = runTest {
         val state = setup()
         state.enterAddress()
         assertEquals(SetupStep.ADDRESS, state.step)
-        assertEquals(AddressFocus.HOST, state.addressFocus)
+        assertEquals(AddressFocus.SEARCH, state.addressFocus)
         assertFalse("Errors wait for the first attempt", state.hostError)
 
         state.continueFromAddress()
@@ -79,7 +113,6 @@ class ConnectionSetupStateTest {
         val state = signIn(username = USERNAME, password = PASSWORD)
         state.connect()
         assertEquals(SetupStep.CONNECTING, state.step)
-        assertEquals(SignInFocus.CONNECT, state.signInFocus)
         runCurrent()
         assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
         assertNull("Nothing is saved before the test passes", profiles.saved)
@@ -152,7 +185,7 @@ class ConnectionSetupStateTest {
         assertEquals(PASSWORD, form.password)
         assertTrue(state.back())
         assertEquals(SetupStep.WELCOME, state.step)
-        assertFalse("Back on the first step belongs to the caller", state.back())
+        assertFalse("Back on Welcome belongs to the caller", state.back())
     }
 
     @Test
@@ -172,10 +205,10 @@ class ConnectionSetupStateTest {
     }
 
     @Test
-    fun aFoundServerSkipsTheAddressAndBackReturnsToIt() = runTest {
+    fun discoveryDoesNotStealFocusAndChoosingAServerAdvancesToAccount() = runTest {
         val state = setup()
         state.findServer()
-        assertEquals(SetupStep.FIND, state.step)
+        assertEquals(SetupStep.ADDRESS, state.step)
         assertTrue(state.searching)
         assertNull("The address entry holds focus until a server answers", state.findFocus)
         backgroundScope.launch { state.search() }
@@ -185,24 +218,22 @@ class ConnectionSetupStateTest {
         discovery.value = discovering(LIVING_ROOM, OFFICE)
         runCurrent()
         assertEquals(listOf(LIVING_ROOM, OFFICE), state.servers)
-        assertEquals("The first find takes focus", LIVING_ROOM, state.findFocus)
+        assertNull("Typing is not interrupted by discovery", state.findFocus)
 
         state.chooseServer(OFFICE)
         assertEquals(SetupStep.SIGN_IN, state.step)
         assertEquals(OFFICE.host, form.host)
         assertEquals("9983", form.port)
         assertEquals(SignInFocus.USERNAME, state.signInFocus)
-
         assertTrue(state.back())
-        assertEquals(SetupStep.FIND, state.step)
-        assertEquals(OFFICE, state.findFocus)
+        assertEquals(SetupStep.ADDRESS, state.step)
         assertTrue(state.back())
         assertEquals(SetupStep.WELCOME, state.step)
-        assertEquals(WelcomeFocus.FIND, state.welcomeFocus)
+        assertFalse(state.back())
     }
 
     @Test
-    fun aSearchThatFindsNothingEndsAfterItsWindowAndStartsAgainOnReturn() = runTest {
+    fun aSearchThatFindsNothingEndsAfterItsWindowAndCanRetryInPlace() = runTest {
         val state = setup()
         state.findServer()
         backgroundScope.launch { state.search() }
@@ -215,8 +246,8 @@ class ConnectionSetupStateTest {
         state.enterAddress()
         assertEquals(SetupStep.ADDRESS, state.step)
         val request = state.searchRequest
-        assertTrue(state.back())
-        assertEquals(SetupStep.FIND, state.step)
+        state.findServer()
+        assertEquals(SetupStep.ADDRESS, state.step)
         assertTrue("An empty search starts again", state.searching)
         assertEquals(request + 1, state.searchRequest)
         assertNull(state.findFocus)
@@ -253,40 +284,12 @@ class ConnectionSetupStateTest {
     }
 
     @Test
-    fun theAddressAfterASearchGoesBackToTheSearch() = runTest {
-        val state = setup()
-        state.enterAddress()
-        assertTrue(state.back())
-        assertEquals(SetupStep.WELCOME, state.step)
-        assertEquals(WelcomeFocus.TYPE, state.welcomeFocus)
-
-        state.findServer()
-        state.enterAddress()
-        assertEquals(ServerChoice.TYPED_AFTER_SEARCH, state.serverChoice)
-        assertTrue(state.back())
-        assertEquals(SetupStep.FIND, state.step)
-    }
-
-    @Test
-    fun editRowsOpenTheirStepAndComeBackToTheSummary() = runTest {
+    fun editingUsesTheSameWizardAndDoesNotSaveDrafts() = runTest {
         val state = edit()
-        assertEquals(SetupStep.SUMMARY, state.step)
-        assertFalse("The summary is the editor's first step", state.back())
-
-        state.openFromSummary(SummaryFocus.PORT)
         assertEquals(SetupStep.ADDRESS, state.step)
-        assertEquals(AddressFocus.PORT, state.addressFocus)
-        assertTrue(state.back())
-        assertEquals(SetupStep.SUMMARY, state.step)
-        assertEquals("Back returns to the row that opened the step", SummaryFocus.PORT, state.summaryFocus)
-
-        state.openFromSummary(SummaryFocus.ADDRESS)
+        assertFalse(state.back())
         form.updateHost(OFFICE.host)
         state.continueFromAddress()
-        assertEquals(SetupStep.SUMMARY, state.step)
-        assertEquals(SummaryFocus.TEST, state.summaryFocus)
-
-        state.openFromSummary(SummaryFocus.SIGN_IN)
         assertEquals(SetupStep.SIGN_IN, state.step)
         form.updatePassword("")
         state.continueFromSignIn()
@@ -294,29 +297,25 @@ class ConnectionSetupStateTest {
         assertEquals(SignInFocus.PASSWORD, state.signInFocus)
         form.updatePassword(PASSWORD)
         state.continueFromSignIn()
-        assertEquals(SummaryFocus.TEST, state.summaryFocus)
-
-        state.openFromSummary(SummaryFocus.FIND)
-        state.enterAddress()
-        assertEquals(ServerChoice.TYPED_AFTER_SEARCH, state.serverChoice)
-        assertTrue(state.back())
-        assertEquals(SetupStep.FIND, state.step)
-        state.chooseServer(LIVING_ROOM)
-        assertEquals(SetupStep.SUMMARY, state.step)
-        assertEquals(LIVING_ROOM.host, form.host)
+        assertEquals(SetupStep.CONNECTING, state.step)
         assertEquals(USERNAME, form.username)
-        assertEquals(emptyList<FakeSessionCall>(), session.calls)
+        runCurrent()
+        assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
         assertNull(profiles.saved)
     }
 
     @Test
-    fun editSavesAPassedTestAtOnceAndLeaves() = runTest {
+    fun editSavesAPassedTestOnlyOnTheFinalAction() = runTest {
         val state = edit()
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         assertEquals(SetupStep.CONNECTING, state.step)
         runCurrent()
         assertNull("The current connection stays saved during the test", profiles.saved)
         session.publish(ready())
+        runCurrent()
+        assertEquals(SetupStep.DONE, state.step)
+        assertNull(profiles.saved)
+        state.save()
         runCurrent()
         assertEquals("$HOST:9982:$USERNAME", profiles.saved)
         assertEquals(1, leaves)
@@ -327,7 +326,7 @@ class ConnectionSetupStateTest {
     @Test
     fun editRestoresTheSavedConnectionAfterAFailedTestAndCanSaveAnyway() = runTest {
         val state = edit()
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
         runCurrent()
@@ -344,16 +343,32 @@ class ConnectionSetupStateTest {
     @Test
     fun editBackCancelsTheTestAndRestoresTheSavedConnection() = runTest {
         val state = edit()
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         assertTrue(state.back())
-        assertEquals(SetupStep.SUMMARY, state.step)
-        assertEquals(SummaryFocus.TEST, state.summaryFocus)
+        assertEquals(SetupStep.SIGN_IN, state.step)
         runCurrent()
         assertEquals(1, restores)
         assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
         assertNull(profiles.saved)
         assertEquals(PASSWORD, form.password)
+    }
+
+    @Test
+    fun editBackFromSuccessRestoresTheSavedConnectionWithoutSaving() = runTest {
+        val state = edit()
+        state.connect()
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+        assertEquals(SetupStep.DONE, state.step)
+        assertNull(profiles.saved)
+        assertTrue(state.back())
+        runCurrent()
+        assertEquals(1, restores)
+        assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
+        assertNull(profiles.saved)
+        assertEquals(0, leaves)
     }
 
     @Test
@@ -367,7 +382,7 @@ class ConnectionSetupStateTest {
                 session.publish(ready())
             },
         )
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         assertTrue("The first test is cancelled and cleans up", state.back())
         runCurrent()
@@ -375,11 +390,11 @@ class ConnectionSetupStateTest {
         assertEquals(firstTest, session.calls)
         assertEquals(1, restores)
 
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         assertTrue("The second test is cancelled while it waits", state.back())
         runCurrent()
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         assertEquals("Nothing starts while the first test still restores", firstTest, session.calls)
 
@@ -402,7 +417,7 @@ class ConnectionSetupStateTest {
     fun aFailureCancelledWhileItRestoresNeverShows() = runTest {
         val restoring = CompletableDeferred<Unit>()
         val state = edit(restoreSaved = { restores++; restoring.await() })
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
         runCurrent()
@@ -413,7 +428,7 @@ class ConnectionSetupStateTest {
         runCurrent()
         restoring.complete(Unit)
         runCurrent()
-        assertEquals("Back dismissed the test before its failure showed", SetupStep.SUMMARY, state.step)
+        assertEquals("Back dismissed the test before its failure showed", SetupStep.SIGN_IN, state.step)
         assertNull(state.failure)
         assertEquals("The finished restore is not repeated", 1, restores)
     }
@@ -422,13 +437,13 @@ class ConnectionSetupStateTest {
     fun aFailureCancelledWhileItRestoresLeavesTheNextTestRunning() = runTest {
         val restoring = CompletableDeferred<Unit>()
         val state = edit(restoreSaved = { restores++; restoring.await() })
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
         runCurrent()
         assertTrue(state.back())
         runCurrent()
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         val firstTest = listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT, FakeSessionCall.DISCONNECT)
         assertEquals("The next test waits for the restore", firstTest, session.calls)
@@ -444,6 +459,8 @@ class ConnectionSetupStateTest {
         runCurrent()
         session.publish(ready())
         runCurrent()
+        state.save()
+        runCurrent()
         assertEquals("$HOST:9982:$USERNAME", profiles.saved)
     }
 
@@ -451,7 +468,7 @@ class ConnectionSetupStateTest {
     fun aReadyFromBeforeTheTestNeverSavesIt() = runTest {
         session.publish(ready())
         val state = edit()
-        state.openFromSummary(SummaryFocus.TEST)
+        state.connect()
         runCurrent()
         assertEquals(SetupStep.CONNECTING, state.step)
         assertNull("The saved connection's Ready is not this test's", profiles.saved)
@@ -460,6 +477,8 @@ class ConnectionSetupStateTest {
         runCurrent()
         assertNull(profiles.saved)
         session.publish(ready())
+        runCurrent()
+        state.save()
         runCurrent()
         assertEquals("$HOST:9982:$USERNAME", profiles.saved)
     }
@@ -513,25 +532,18 @@ class ConnectionSetupStateTest {
     }
 
     @Test
-    fun clearingTheSavedPasswordIsNotATest() = runTest {
-        val clearing = CompletableDeferred<Unit>()
-        val state = edit(profiles = object : ConnectionProfileEditor by profiles {
-            override val serverSettings = flow {
-                clearing.await()
-                emit(ServerSettings(host = HOST))
-            }
-        })
+    fun clearingSavedCredentialsOnlyChangesTheDraft() = runTest {
+        val state = edit()
         state.loadSaved()
-        state.openFromSummary(SummaryFocus.CLEAR_PASSWORD)
-        runCurrent()
-        assertTrue(state.clearingPassword)
-        assertFalse("Test and save is not busy", state.testing)
-        clearing.complete(Unit)
-        runCurrent()
-        assertFalse(state.clearingPassword)
+        state.clearSavedPassword()
+        assertEquals("", form.password)
+        assertEquals("", form.username)
+        assertFalse(form.hasSavedPassword)
+        assertNull(profiles.saved)
+        assertTrue(session.calls.isEmpty())
     }
 
-    private fun TestScope.setup(step: SetupStep = SetupStep.WELCOME) =
+    private fun TestScope.setup(step: SetupStep = SetupStep.ADDRESS) =
         ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope, step = step)
 
     private var restores = 0

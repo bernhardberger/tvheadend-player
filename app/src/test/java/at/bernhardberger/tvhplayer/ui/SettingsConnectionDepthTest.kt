@@ -1,12 +1,16 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
 import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.StateRestorationTester
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -18,6 +22,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.*
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.screens.*
@@ -26,10 +31,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
+import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], qualifiers = "en-w960dp-h540dp-land-mdpi", application = Application::class)
@@ -40,10 +47,47 @@ class SettingsConnectionDepthTest {
     private val session = FakeTvheadendSession()
     private var restores = 0
 
+    @Test @Category(VisualCapture::class)
+    fun captureSettingsConnectionEntryAndPrefilledWizard() {
+        val editor = Editor()
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                androidx.tv.material3.Surface {
+                    val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
+                    SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                        settingsLevel(CONNECTION_EDITOR, "Connection", emptyList(), activeContent = { requester, _ ->
+                            SettingsConnection(requester, editor, session, { restores++ })
+                        })))
+                }
+            }
+        }
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
+        compose.onNodeWithText("Connection").assertIsFocused()
+        capture(view, "settings-entry")
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        capture(view, "settings-prefilled-wizard")
+    }
+
+    private fun capture(view: View, name: String) {
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val directory = File("build/outputs/onboarding-captures").apply { mkdirs() }
+            File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=en; fontScale=1.0; focus=${if (name == "settings-entry") "Connection" else "Server address"}; fictional offline data")
+            bitmap.recycle()
+        }
+    }
+
     @Composable
     private fun Editor.Screen(form: ConnectionFormState, requester: FocusRequester, left: (KeyEvent) -> Boolean,
         onSaved: () -> Unit = {}) =
-        SettingsConnection(requester, this, session, { restores++ }, form, left, onSaved)
+        SettingsConnection(requester, this, session, { restores++ }, form, onSaved)
 
     @Test fun overviewDefersSecureEditorAndBackUnwindsStepsBeforeReturningToEditAction() {
         val editor = Editor()
@@ -64,10 +108,6 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         assertEquals(0, editor.loads)
         assertFalse(secure())
-        press(Key.DirectionCenter)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
-        assertFalse(secure())
-        assertEquals(0, editor.loads)
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
         assertEquals(0, editor.loads)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
@@ -77,10 +117,11 @@ class SettingsConnectionDepthTest {
         compose.waitForIdle()
         assertTrue(secure())
         assertEquals(1, editor.loads)
-        compose.onNodeWithTag(SUMMARY_ADDRESS).assertIsFocused() // entry release must not open the address
-        press(Key.DirectionCenter)
-        compose.onNodeWithTag("setup-host").assertIsFocused()
+        // The release that opened the wizard must not also open the keyboard.
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("setup-host").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(1)
         compose.runOnIdle { form.updateHost("draft.invalid") }
@@ -90,8 +131,6 @@ class SettingsConnectionDepthTest {
         press(Key.Back)
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         compose.onNodeWithTag("setup-host").assertIsFocused()
-        press(Key.Back)
-        compose.onNodeWithTag(SUMMARY_ADDRESS).assertIsFocused()
         assertEquals("draft.invalid", form.host)
         assertTrue(navigation.stack.canPop)
         // A global destination departure also tears down the live editor immediately.
@@ -101,16 +140,14 @@ class SettingsConnectionDepthTest {
         assertEquals("", form.password)
         compose.runOnIdle { current = true }
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Connection").assertIsFocused()
         assertFalse(secure())
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
         assertEquals(emptyList<FakeSessionCall>(), session.calls)
-        press(Key.Back)
-        compose.onNodeWithText("Connection").assertIsFocused()
     }
 
-    @Test fun leftLeavesOnlyFromTheSummaryAndTheBoundaryPopOwnsRepeatsAcrossDisposal() {
+    @Test fun leftStaysInTheWizardAndBackFromServerReturnsWithoutSaving() {
         val editor = Editor()
         val form = ConnectionFormState()
         lateinit var navigation: DepthNavigationState
@@ -129,35 +166,21 @@ class SettingsConnectionDepthTest {
             }
         }
         press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
-        press(Key.DirectionDown)
-        press(Key.DirectionCenter)
+        repeat(2) { press(Key.DirectionDown) }
         compose.onNodeWithTag("setup-port").assertIsFocused()
         press(Key.DirectionLeft) // A step keeps Left, so it cannot drop what was entered.
         compose.onNodeWithTag("setup-port").assertIsFocused()
         assertTrue(navigation.stack.canPop)
         press(Key.Back)
-        compose.onNodeWithTag("setup-summary-port").assertIsFocused()
-        repeat(3) { press(Key.DirectionDown) }
-        compose.onNodeWithText("Clear saved password").assertIsFocused()
-        compose.onRoot().performKeyInput { keyDown(Key.DirectionLeft) }
-        compose.waitForIdle()
-        compose.onNodeWithText("Edit connection").assertIsFocused()
-        compose.runOnUiThread {
-            val now = android.os.SystemClock.uptimeMillis()
-            compose.activity.dispatchKeyEvent(android.view.KeyEvent(now, now,
-                android.view.KeyEvent.ACTION_DOWN, android.view.KeyEvent.KEYCODE_DPAD_LEFT, 1))
-        }
-        compose.onRoot().performKeyInput { keyUp(Key.DirectionLeft) }
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Connection").assertIsFocused()
         compose.onNodeWithTag("nav-settings").assertIsNotFocused()
-        assertEquals(2, navigation.stack.frames.size)
+        assertEquals(1, navigation.stack.frames.size)
         assertFalse(secure())
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
     }
 
-    @Test fun aFailedTestOffersSaveAnywayAndBackReturnsToTestAndSave() {
+    @Test fun aFailedTestOffersSaveAnywayAndBackUnwindsTheWizard() {
         val editor = Editor()
         val form = ConnectionFormState()
         compose.setContent {
@@ -170,18 +193,18 @@ class SettingsConnectionDepthTest {
             }
         }
         press(Key.DirectionCenter)
-        press(Key.DirectionCenter)
-        testAndSave()
+        connect()
         compose.runOnIdle { session.publish(unavailable()) }
         compose.onNodeWithTag("setup-action-try_again").assertIsFocused()
         compose.onNodeWithText("Save anyway").assertIsDisplayed()
         compose.onNodeWithText("Your current connection stays in use.", substring = true).assertIsDisplayed()
         assertEquals(1, restores)
         press(Key.Back)
-        compose.onNodeWithTag(TEST_AND_SAVE).assertIsFocused()
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
         assertEquals(0, editor.saves)
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        press(Key.Back)
+        compose.onNodeWithText("Connection").assertIsFocused()
         assertFalse(secure())
     }
 
@@ -220,26 +243,24 @@ class SettingsConnectionDepthTest {
                         activeContent = { requester, left -> editor.Screen(form, requester, left, navigation::pop) })))
             }
         }
-        press(Key.DirectionCenter)
         assertEquals(0, editor.loads)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Connection").assertIsFocused()
         val parent = navigation.stack.active
         press(Key.DirectionCenter)
-        testAndSave()
+        connect()
         compose.runOnIdle { session.publish(ready()) }
         compose.waitForIdle()
+        compose.onNodeWithTag("setup-start-watching").assertIsFocused()
+        assertEquals(0, editor.saves)
+        press(Key.DirectionCenter)
         assertEquals(CONNECTION_EDITOR, navigation.stack.active.levelId)
         assertEquals(ConnectionFormFeedback.SAVE_FAILED, form.feedback)
-        compose.onNodeWithTag(TEST_AND_SAVE).assertIsFocused()
-        assertEquals("An unsaved test gives the current connection back", 1, restores)
+        compose.onNodeWithTag("setup-start-watching").assertIsFocused()
         editor.failSave = false
         press(Key.DirectionCenter)
-        // A fresh attempt shows it started before its own Ready counts.
-        compose.runOnIdle { session.publish(SessionObservation.create(sessionState = SessionState.Connecting)) }
-        compose.runOnIdle { session.publish(ready()) }
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Connection").assertIsFocused()
         assertEquals(2, editor.saves)
-        assertEquals(1, restores)
+        assertEquals(0, restores)
         assertEquals(parent, navigation.stack.active)
         assertFalse(secure())
         assertEquals("", form.password)
@@ -268,15 +289,19 @@ class SettingsConnectionDepthTest {
         assertEquals("typed.invalid", form.host)
         assertEquals("9983", form.port)
         assertEquals("fixture", form.username)
-        assertEquals("test-only password", form.password)
+        assertEquals("", form.password)
+        assertTrue(form.hasSavedPassword)
     }
 
-    /** Down from the address row to "Test and save" (past "Clear saved password") and starts the test. */
-    private fun testAndSave() {
-        compose.onNodeWithTag(SUMMARY_ADDRESS).assertIsFocused()
-        repeat(5) { press(Key.DirectionDown) }
-        compose.onNodeWithTag(TEST_AND_SAVE).assertIsFocused()
+    private fun connect() {
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        repeat(3) { press(Key.DirectionDown) }
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
         press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-connecting").assertIsFocused()
+        assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
     }
 
     private fun ready() = SessionObservation.create(
@@ -288,6 +313,3 @@ class SettingsConnectionDepthTest {
     private fun unavailable() =
         SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE))
 }
-
-private const val SUMMARY_ADDRESS = "setup-summary-address"
-private const val TEST_AND_SAVE = "setup-test-and-save"
