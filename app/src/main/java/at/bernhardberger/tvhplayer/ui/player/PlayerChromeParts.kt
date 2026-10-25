@@ -220,8 +220,8 @@ internal fun QuickZapTrayPreviewFrame(
 }
 
 /**
- * The info bar for a recording: `Recorded 12 Sep • Ends 23:45` (now plus the remaining playback)
- * or, still recording, `Recording until 22:08` (the stop with its padding), above the title; the episode fills the last row.
+ * The info bar keeps the recorded date and start time above the title, followed by the estimated
+ * playback end or, while still recording, the padded recording stop. The episode fills the last row.
  * A recording has no real next item, so there is no Next (UX-02).
  */
 @Composable
@@ -236,7 +236,8 @@ internal fun recordingInfoBarData(
     val start = entry.start
     val stop = entry.stop
     val recordedDate = start?.let {
-        playerRecordedDate(java.time.Instant.ofEpochSecond(it.epochSeconds).atZone(ZoneId.systemDefault()).toLocalDate())
+        val local = java.time.Instant.ofEpochSecond(it.epochSeconds).atZone(ZoneId.systemDefault())
+        "${playerRecordedDate(local.toLocalDate())} ${formatClock(it.epochSeconds)}"
     }
     val endsAt = recordingEndsAtSec(nowSec, positionMs, durationMs)
     return PlayerInfoBarData(
@@ -248,7 +249,10 @@ internal fun recordingInfoBarData(
             formatTimeIntervalSpoken(start.epochSeconds, stop.epochSeconds, androidx.compose.ui.platform.LocalResources.current)
         } else "",
         metadata = when {
-            growing -> recordingPaddedStop(entry)?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) }
+            growing -> listOfNotNull(
+                recordedDate?.let { stringResource(R.string.player_recorded_on, it) },
+                recordingPaddedStop(entry)?.let { stringResource(R.string.player_recording_until, formatClock(it.epochSeconds)) },
+            ).joinToString(" • ").takeIf(String::isNotBlank)
             recordedDate != null && endsAt != null -> stringResource(R.string.player_recorded_ends, recordedDate, formatClock(endsAt))
             else -> null
         },

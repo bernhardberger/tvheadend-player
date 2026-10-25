@@ -347,6 +347,7 @@ fun VideoPlayerScreen(
     uiSettingsStore: at.bernhardberger.tvhplayer.settings.UiSettingsStore = koinInject(),
     onOpenConnectionSettings: () -> Unit = {},
     onShowGuide: (ChannelId, EpgEventEntry?) -> Unit = { _, _ -> },
+    onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     connectionUiState: at.bernhardberger.tvhplayer.core.ConnectionUiState? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -1699,7 +1700,7 @@ fun VideoPlayerScreen(
                 onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
                 onBackKeyDown = { layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
-                fromPlayer = infoRailChannelId == null,
+                onPlayRecording = onPlayRecording,
             )
         }
 

@@ -132,6 +132,20 @@ class AppRootPlaybackOrchestratorTest {
         assertNull(live.await())
     }
 
+    @Test fun matchingRecordingReturnDoesNotStartPlayback() = runTest {
+        val orchestrator = AppRootPlaybackOrchestrator()
+        val target = orchestrator.requestRecordingPlayer(null, DvrEntryId(7), DvrEntryId(7),
+            restartPlayback = false, startPlayback = { error("Must not restart") })
+        assertEquals(PlayerRouteTarget.Recording(DvrEntryId(7)), target)
+    }
+
+    @Test fun explicitStartOverStillRestartsMatchingRecording() = runTest {
+        val orchestrator = AppRootPlaybackOrchestrator()
+        var starts = 0
+        orchestrator.requestRecordingPlayer(null, DvrEntryId(7), DvrEntryId(7)) { starts++ }
+        assertEquals(1, starts)
+    }
+
     @Test
     fun liveSelectionSupersedesAnInFlightRecordingRequest() = runTest {
         val orchestrator = AppRootPlaybackOrchestrator()

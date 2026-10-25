@@ -97,6 +97,69 @@ class ProgrammeDetailsCaptureTest {
     @Test fun guideWithoutButtonsTrapsPanelFocusAndBackCloses() = emptyPanel(guide = true)
     @Test fun recordingWithoutButtonsTrapsPanelFocusAndBackCloses() = emptyPanel(guide = false)
 
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun warmRecordingFromBrowse() = warmRecording(player = false)
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun warmRecordingFromPlayer() = warmRecording(player = true)
+
+    @OptIn(TvheadendTestingApi::class)
+    private fun warmRecording(player: Boolean) {
+        val entry = DvrEntry.create(DvrEntryId(1), channelId = channel.id, channelName = channel.name,
+            title = "Ridge Light", subtitle = "Beyond the Arctic Circle", description = description,
+            start = start, stop = start + 7200.seconds, image = ArtworkId(2), playPosition = 3723.seconds,
+            folder = emptyList(), state = DvrEntryState.COMPLETED)
+        val observation = SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels = listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
+            recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+        )
+        val mutations = DvrMutationActions(scheduleEntry = { _, _ -> error("Unexpected mutation") },
+            stopEntry = { _, _ -> error("Unexpected mutation") }, cancelEntry = { _, _ -> error("Unexpected mutation") },
+            deleteEntry = { _, _ -> error("Unexpected mutation") }, updateWatchStateCommand = { _, _, _ -> error("Unexpected mutation") })
+        val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
+            at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
+        }
+        val state = RecordingsScreenState().apply { mode.value = at.bernhardberger.tvhplayer.core.DvrLibraryMode.ARCHIVE }
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f),
+                at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+                    at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id),
+                at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
+                    at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(requireNotNull(observation.currentSession), entry.id)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    if (player) RecordingPlayerDetails(entry, observation, observation, { observation },
+                        start.epochSeconds + 8000, mutations, notices, androidx.compose.runtime.rememberCoroutineScope(),
+                        onPlayRecording = { _, _ -> error("Unexpected playback") }, onClose = {})
+                    else RecordingsScreenContent(observation, state = state, dvrMutationActions = mutations,
+                        notices = notices, onPlayRecording = { _, _ -> error("Unexpected playback") },
+                        playingRecordingId = entry.id, onReturnToRecording = { _, beforeRequest -> beforeRequest(); true })
+                }
+            }
+        }
+        if (!player) {
+            compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty() }
+            compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+            compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        }
+        compose.onNodeWithTag("details-continue_watching").assertIsFocused()
+        compose.onNodeWithTag("details-start_over").assertExists()
+        compose.onNodeWithTag("details-mark_watched").assertExists()
+        compose.onNodeWithTag("details-delete").assertExists()
+        compose.onNodeWithTag("details-timeline").assertExists()
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        val directory = File("build/outputs/details-unify").apply { mkdirs() }
+        File(directory, "warm-recording-${if (player) "player" else "browse"}-en-font1.0.png").outputStream().use {
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+        bitmap.recycle()
+    }
+
     @Test fun guideBackFromMoreInfoReturnsToDetailsThenCloses() {
         var shown by mutableStateOf(true)
         lateinit var dispatcher: OnBackPressedDispatcher
@@ -106,7 +169,7 @@ class ProgrammeDetailsCaptureTest {
             TVHeadendPlayerTheme {
                 dispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                 if (shown) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
-                    programmeDetailsActions(event, start.epochSeconds - 60, null, null, true, true, true),
+                    programmeDetailsActions(event, start.epochSeconds - 60, null, null, true, true),
                     {}, { shown = false }, related = listOf(EpgEvent.create(EventId(2),
                         channel.id, event.stop, event.stop + 3600.seconds, title = "Next"))) }
             }
@@ -133,7 +196,7 @@ class ProgrammeDetailsCaptureTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, now,
-                    programmeDetailsActions(event, now, null, null, canModify, now >= start.epochSeconds, true),
+                    programmeDetailsActions(event, now, null, null, canModify, now >= start.epochSeconds),
                     {}, {}) }
             }
         }
@@ -159,10 +222,10 @@ class ProgrammeDetailsCaptureTest {
                     Button(onClick = {}) { Text("Underlying action") }
                     if (shown) {
                         if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, null, channel, start.epochSeconds - 60,
-                            programmeDetailsActions(event, start.epochSeconds - 60, null, null, canModify, false, true),
+                            programmeDetailsActions(event, start.epochSeconds - 60, null, null, canModify, false),
                             {}, { shown = false }) }
                         else ProvideArtworkSession(session) { ProgrammeDetailsPage(null, entry, channel, 0L,
-                            recordingDetailsActions(entry, null, canModify, false),
+                            recordingDetailsActions(entry, null, canModify, false, nowSec = 0),
                             {}, { shown = false }) }
                     }
                 }
@@ -209,9 +272,9 @@ class ProgrammeDetailsCaptureTest {
                         else if (guide) ProvideArtworkSession(session) { ProgrammeDetailsPage(event, entry.takeIf { scheduled }, channel,
                             start.epochSeconds + if (scheduled) -60 else 600,
                             programmeDetailsActions(event, start.epochSeconds + if (scheduled) -60 else 600,
-                                entry.takeIf { scheduled }, admitted(entry.takeIf { scheduled }), true, true, true), {}, {}) }
+                                entry.takeIf { scheduled }, admitted(entry.takeIf { scheduled }), true, true), {}, {}) }
                         else ProvideArtworkSession(session) { ProgrammeDetailsPage(null, entry, channel, 0L,
-                            recordingDetailsActions(entry, admitted(entry), true, true), {}, {},
+                            recordingDetailsActions(entry, admitted(entry), true, true, nowSec = 0), {}, {},
                             recordingAdmission = admitted(entry)) }
                     }
                 }

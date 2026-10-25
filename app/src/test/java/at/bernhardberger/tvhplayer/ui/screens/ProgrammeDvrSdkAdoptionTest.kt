@@ -118,7 +118,7 @@ class ProgrammeDvrSdkAdoptionTest {
                     androidx.tv.material3.Text("Origin card")
                 }
                 if (opened) ProgrammeDetailsHost(event, opening, opening, { session.observation.value }, { 2000L },
-                    fromGuide = true, showContextMenu = !details, onShowDetails = {},
+                    showContextMenu = !details, onShowDetails = {},
                     mutations = actions, notices = notices, mutationScope = scope, mutationInFlight = inFlight,
                     onPlay = { _, _ -> }, onPlayRecording = {}, onClose = { opened = false },
                     returnFocusRequester = origin, settingsStore = UiSettingsStore(context))
@@ -180,7 +180,7 @@ class ProgrammeDvrSdkAdoptionTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsHost(event, observation, observation, { observation }, { 2000L },
-                    fromGuide = true, showContextMenu = !details, onShowDetails = {},
+                    showContextMenu = !details, onShowDetails = {},
                     mutations = actions, notices = notices, onPlay = { _, _ -> }, onPlayRecording = {},
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },

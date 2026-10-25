@@ -12,6 +12,21 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff
+import at.bernhardberger.tvhplayer.ui.PlayerEntryOverlays
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -119,9 +134,118 @@ class InProgressRecordingResumeTest {
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 
-    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false): List<RecordingPlaybackStart> {
+    @Test fun completedWarmRecordingReturnsWithoutResumePopupOrPlaybackRequest() {
+        var returns = 0
+        val starts = openDetails(754L, directly = true, warm = true, completed = true,
+            onReturn = { id -> assertEquals(DvrEntryId(1), id); returns++; true })
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, returns); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun browseWarmDetailsHasTheSameActionsAndProgressAsPlayerDetails() {
+        openDetails(754L, warm = true)
+        assertWarmDetails()
+    }
+
+    @Test fun playerWarmDetailsHasTheSameActionsAndProgressAsBrowseDetails() {
+        openDetails(754L, warm = true, fromPlayer = true)
+        assertWarmDetails()
+    }
+
+    @Test fun rejectedWarmReturnUsesTheNormalCompletedRecordingResumeChoice() {
+        val starts = openDetails(754L, directly = true, warm = true, completed = true,
+            onReturn = { id -> assertEquals(DvrEntryId(1), id); false })
+        compose.onNodeWithTag("recording-resume").assertExists()
+        compose.runOnIdle { assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun detailsDoNotOfferContinueForARecordingFromAnotherSession() {
+        openDetails(754L, warm = true, staleSession = true)
+        compose.onNodeWithTag("details-continue_watching").assertDoesNotExist()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+    }
+
+    @Test fun rejectedContinueFromDetailsKeepsTheNormalResumeChoiceOpen() {
+        var attempts = 0
+        val handoff = PlayerEntryHandoff()
+        val starts = openDetails(754L, warm = true, completed = true,
+            handoff = handoff,
+            onReturn = { attempts++; false })
+        compose.onNodeWithTag("details-continue_watching").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("recording-resume").assertExists()
+        compose.runOnIdle {
+            assertFalse("a rejected return must not register a close for the reopened flow", handoff.departing)
+            assertEquals(1, attempts)
+            assertEquals(emptyList<RecordingPlaybackStart>(), starts)
+        }
+    }
+
+    @Test fun queuedContinueRegistersDepartureBeforeRequestAndKeepsItsActionsStable() {
+        val handoff = PlayerEntryHandoff()
+        val requestGate = CompletableDeferred<Unit>()
+        val starts = openDetails(754L, warm = true, completed = true, handoff = handoff, requestGate = requestGate)
+        compose.mainClock.advanceTimeBy(1_000)
+        fun actions() = compose.onAllNodes(hasAnyAncestor(hasTestTag("details-actions")), useUnmergedTree = true)
+            .fetchSemanticsNodes().let { nodes ->
+                nodes.flatMap { node -> if (SemanticsProperties.Text in node.config)
+                    node.config[SemanticsProperties.Text].map { it.text } else emptyList() } to
+                    nodes.filter { SemanticsActions.OnClick in it.config }
+                        .map { it.config[SemanticsProperties.TestTag] to it.boundsInRoot.center }
+            }
+        val pressedActions = actions()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("details-continue_watching").performSemanticsAction(SemanticsActions.OnClick)
+        compose.runOnIdle {
+            assertTrue("return request is queued", handoff.pending)
+            assertTrue("accepted return registered its close before starting the request", handoff.departing)
+        }
+        repeat(PlayerMotion.DestinationMs / 16) {
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("queued departure frame ${it + 1}", pressedActions, actions())
+        }
+        compose.onNodeWithTag("details-delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
+        compose.runOnIdle { requestGate.complete(Unit) }
+        compose.mainClock.autoAdvance = true
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.runOnIdle { assertFalse(handoff.departing); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun recordingPlayerDetailsSwallowKeysWhileAnEntryRequestIsPending() {
+        val handoff = PlayerEntryHandoff()
+        val requestGate = CompletableDeferred<Unit>()
+        val scope = CoroutineScope(Dispatchers.Main)
+        try {
+            openDetails(754L, warm = true, completed = true, fromPlayer = true, handoff = handoff)
+            compose.runOnIdle { handoff.request(scope) { requestGate.await() } }
+            compose.runOnIdle { assertTrue(handoff.pending); assertFalse(handoff.departing) }
+            compose.onNodeWithTag("details-delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    private fun assertWarmDetails() {
+        compose.onNodeWithTag("details-continue_watching").assertIsFocused()
+        compose.onNodeWithTag("details-start_over").assertExists()
+        compose.onNodeWithTag("details-stop").assertExists()
+        compose.onNodeWithTag("details-watch").assertDoesNotExist()
+        compose.onNodeWithTag("details-resume").assertDoesNotExist()
+        compose.onNodeWithTag("details-timeline").assertExists()
+    }
+
+    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false,
+        warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false, staleSession: Boolean = false,
+        handoff: PlayerEntryHandoff? = null, requestGate: CompletableDeferred<Unit>? = null,
+        onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
-        val observation = observation(playPositionSeconds)
+        val observation = observation(playPositionSeconds, completed)
+        val playbackSession = requireNotNull(if (staleSession) observation(playPositionSeconds, completed).currentSession
+            else observation.currentSession)
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -129,21 +253,46 @@ class InProgressRecordingResumeTest {
             deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
-        val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        val state = RecordingsScreenState().apply { mode.value = if (completed) DvrLibraryMode.ARCHIVE else DvrLibraryMode.SCHEDULE }
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
         }
         compose.setContent {
+            val scope = rememberCoroutineScope()
+            val content: @Composable () -> Unit = {
+            androidx.compose.runtime.CompositionLocalProvider(
+                at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+                    at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(DvrEntryId(1)).takeIf { warm },
+                at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
+                    at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(playbackSession, DvrEntryId(1)).takeIf { warm },
+            ) {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(
+                if (fromPlayer) at.bernhardberger.tvhplayer.ui.player.RecordingPlayerDetails(
+                    observation.dvrSnapshotForDisplay!!.entries.single(), observation, observation, { observation },
+                    System.currentTimeMillis() / 1000L, actions, notices, androidx.compose.runtime.rememberCoroutineScope(),
+                    onPlayRecording = { _, start -> starts += start }, onClose = { onReturn(DvrEntryId(1)) },
+                ) else RecordingsScreenContent(
                     observation = observation,
                     state = state,
                     dvrMutationActions = actions,
                     notices = notices,
                     onPlayRecording = { _, start -> starts += start },
+                    playingRecordingId = DvrEntryId(1).takeIf { warm },
+                    onReturnToRecording = { id, beforeRequest ->
+                        val accepted = onReturn(id)
+                        if (accepted) {
+                            beforeRequest()
+                            if (handoff != null) handoff.request(scope) { requestGate?.await() }
+                        }
+                        accepted
+                    },
                 )
             }
+            }
+            }
+            if (handoff == null) content() else PlayerEntryOverlays(handoff, playerShown = { false }, content = content)
         }
+        if (fromPlayer) { compose.waitForIdle(); return starts }
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
@@ -153,16 +302,18 @@ class InProgressRecordingResumeTest {
         return starts
     }
 
-    private fun observation(playPositionSeconds: Long?): SessionObservation {
+    private fun observation(playPositionSeconds: Long?, completed: Boolean = false): SessionObservation {
         val now = System.currentTimeMillis()
         val entry = DvrEntry.create(
             id = DvrEntryId(1),
             title = "Evening News",
-            state = DvrEntryState.RECORDING,
+            state = if (completed) DvrEntryState.COMPLETED else DvrEntryState.RECORDING,
             start = Instant.fromEpochMilliseconds(now - 1_800_000),
             stop = Instant.fromEpochMilliseconds(now + 1_800_000),
             folder = emptyList(),
-            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "News/evening-news.ts")),
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "evening-news.ts",
+                start = Instant.fromEpochMilliseconds(now - 1_800_000),
+                stop = Instant.fromEpochMilliseconds(now))),
             playPosition = playPositionSeconds?.seconds,
         )
         return SessionObservation.create(

@@ -71,7 +71,7 @@ internal fun GuideOverlayHost(
         ProgrammeDetailsHost(
             openingEvent = openingEvent, openingObservation = openingObservation,
             observation = observation, currentObservation = currentObservation,
-            nowSecProvider = { System.currentTimeMillis() / 1000L }, fromGuide = true, showContextMenu = showContextMenu,
+            nowSecProvider = { System.currentTimeMillis() / 1000L }, showContextMenu = showContextMenu,
             mutationScope = mutationScope, mutationInFlight = mutationInFlight,
             onShowDetails = onShowDetails,
             mutations = mutations, notices = notices, onPlay = onPlay,

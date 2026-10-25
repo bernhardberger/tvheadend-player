@@ -44,7 +44,7 @@ class ProgrammeDetailsPanelTest {
                         description = "A programme description",
                     ) else event, channel = null,
                     recording = recording.value, nowSec = 1_000,
-                    actions = programmeDetailsActions(event, 1_000, recording.value, null, canModify.value, false, true),
+                    actions = programmeDetailsActions(event, 1_000, recording.value, null, canModify.value, false),
                     related = if (withDescription) listOf(EpgEvent.create(EventId(22), title = "Next programme",
                         start = event.stop, stop = Instant.fromEpochSeconds(4_000))) else emptyList(),
                     onAction = {}, onClose = {},

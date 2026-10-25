@@ -146,7 +146,10 @@ internal fun RecordingsRouteContent(
     onOpenConnectionSettings: () -> Unit,
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit,
     onWatchChannel: (ChannelId, String) -> Unit,
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit,
     state: RecordingsScreenState,
+    playingRecordingId: at.bernhardberger.tvheadend.sdk.core.DvrEntryId? = null,
+    onReturnToRecording: (at.bernhardberger.tvheadend.sdk.core.DvrEntryId, () -> Unit) -> Boolean = { _, _ -> false },
 ) {
     if (contentAllowed) {
         ContentContainer(modifier = Modifier.profileLayout("recordings")) {
@@ -160,7 +163,10 @@ internal fun RecordingsRouteContent(
                 onOpenConnectionSettings = onOpenConnectionSettings,
                 onPlayRecording = onPlayRecording,
                 onWatchChannel = onWatchChannel,
+                onShowGuide = onShowGuide,
                 state = state,
+                playingRecordingId = playingRecordingId,
+                onReturnToRecording = onReturnToRecording,
             )
         }
     }
@@ -202,6 +208,7 @@ internal fun LivePlayerRouteContent(
     channelName: String,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    onPlayRecording: (RecordingPlaybackSelection) -> Unit,
     onOpenConnectionSettings: () -> Unit = {},
     onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
     connectionUiState: ConnectionUiState? = null,
@@ -224,6 +231,7 @@ internal fun LivePlayerRouteContent(
             startupTarget = startupTarget,
             onStartupOutcome = onStartupOutcome,
             onShowGuide = onShowGuide,
+            onPlayRecording = onPlayRecording,
         )
     }
 }
@@ -255,10 +263,12 @@ internal fun RecordingPlayerRouteContent(
     connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
+    onShowGuide: (ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit,
     onOpenConnectionSettings: () -> Unit,
 ) {
     if (contentAllowed) {
         RecordingPlayerScreen(
+            onShowGuide = onShowGuide,
             recordingId = recordingId,
             playbackStart = playbackStart,
             connectionState = connectionState,

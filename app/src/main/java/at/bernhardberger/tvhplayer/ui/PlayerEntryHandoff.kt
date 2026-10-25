@@ -60,6 +60,9 @@ internal class PlayerEntryHandoff {
         private set
     private val closes = mutableStateListOf<DeferredClose>()
 
+    /** The outgoing overlay stays up through the request and the shell's fade into the player. */
+    val departing: Boolean get() = closes.isNotEmpty()
+
     private class DeferredClose(val overlay: Any, val close: () -> Unit)
 
     fun closeBehindPlayer(overlay: Any, close: () -> Unit) {

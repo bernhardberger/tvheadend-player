@@ -246,7 +246,7 @@ private fun IdentityContent(
     val ink = if (focused) LocalContentColor.current else MaterialTheme.colorScheme.onSurface
     Row(Modifier.padding(horizontal = IdentityInset, vertical = IdentityVerticalPadding),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdentityTextGap)) {
-        Box(Modifier.size(ChipWidth, ChipHeight).clip(PlayerChromeTokens.chipShape).background(TvSurfaceColors.containerLowest),
+        Box(Modifier.size(ChipWidth, ChipHeight),
             contentAlignment = Alignment.Center) {
             if (content.picon != null) {
                 PiconBox(content.picon, Modifier.padding(4.dp).testTag("player-top-identity-logo"))

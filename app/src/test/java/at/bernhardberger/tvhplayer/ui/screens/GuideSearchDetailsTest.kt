@@ -55,7 +55,7 @@ class GuideSearchDetailsTest {
                     restoreFocusTo = restore, onFocusRestored = { restore = null })
                 details?.let { event ->
                     ProgrammeDetailsHost(event, observation, observation, { observation }, { 150L },
-                        fromGuide = true, showContextMenu = false, onShowDetails = {},
+                        showContextMenu = false, onShowDetails = {},
                         mutations = DvrMutationActions(session.dvrRepository), notices = notices,
                         mutationScope = mutationScope, mutationInFlight = mutationInFlight,
                         onPlay = { _, _ -> }, onPlayRecording = null,

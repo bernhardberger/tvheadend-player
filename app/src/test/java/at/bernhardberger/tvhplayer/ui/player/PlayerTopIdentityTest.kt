@@ -230,6 +230,33 @@ class PlayerTopIdentityTest {
         assertTrue("details remains reachable", exists("player-info"))
     }
 
+    @Test fun recordingInfoKeepsTheRecordedDateAndStartTimeWhileGrowing() {
+        var growing by mutableStateOf(false)
+        val start = kotlin.time.Instant.parse("2026-09-15T19:00:00Z")
+        val entry = at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
+            at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), title = "Ridge Light", start = start,
+            stop = kotlin.time.Instant.parse("2026-09-15T21:00:00Z"))
+        lateinit var info: PlayerInfoBarData
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                info = recordingInfoBarData(entry, 101, start.epochSeconds + 8000, 300_000, 7_200_000, growing)
+                PlayerInfoBar(info, Modifier.testTag("recorded-info"), identity = {})
+            }
+        }
+        for (stillRecording in listOf(false, true)) {
+            compose.runOnIdle { growing = stillRecording }
+            compose.waitForIdle()
+            val date = requireNotNull(info.recordedDate)
+            assertTrue("recorded time follows the local clock", date.endsWith(at.bernhardberger.tvhplayer.ui.common.formatClock(start.epochSeconds)))
+            assertTrue("the growing status never replaces the recorded date", requireNotNull(info.metadata).contains(date))
+            compose.onNodeWithTag("player-info-programme", useUnmergedTree = true).assertExists()
+            compose.onNodeWithTag("recorded-info")
+                .fetchSemanticsNode().config[SemanticsProperties.ContentDescription].joinToString().let {
+                    assertTrue("the recorded date and time are spoken", it.contains(date))
+                }
+        }
+    }
+
     private var timeshift by mutableStateOf(
         AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = -203_000, liveEdgeMs = 0, timingKnown = true))
     private var restoreFocus by mutableStateOf<String?>(null)

@@ -5,6 +5,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -66,6 +67,8 @@ import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.data.ConnectionState
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -76,6 +79,8 @@ import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -91,6 +96,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.koin.compose.KoinApplication
+import org.koin.dsl.module
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -244,9 +251,9 @@ class RecordingPlayerChromeScreenTest {
         }
         compose.waitForIdle()
         assertEquals("Recorded ${finished.recordedDate} • Ends ${formatClock(1_700_010_000 + 1_800)}", finished.metadata)
-        assertEquals("Recording until ${formatClock(1_700_003_600)}", growing.metadata)
+        assertEquals("Recorded ${growing.recordedDate} • Recording until ${formatClock(1_700_003_600)}", growing.metadata)
         // Tvheadend stops after the post-padding, not at the programme's end.
-        assertEquals("Recording until ${formatClock(1_700_003_600 + 7_200)}", padded.metadata)
+        assertEquals("Recorded ${padded.recordedDate} • Recording until ${formatClock(1_700_003_600 + 7_200)}", padded.metadata)
     }
 
     @Test fun aGrowingRecordingCarriesTheRecBadge() {
@@ -513,8 +520,15 @@ class RecordingPlayerChromeScreenTest {
             compose.waitUntil(10_000) { install.isCompleted }
             assertEquals(AppPlaybackTarget.Recording(recording), runtime.activeTarget.value)
         }
+        val noticeModule = module {
+            single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
+        }
         compose.setContent {
-            CompositionLocalProvider(LocalLifecycleOwner provides owner) {
+            KoinApplication(application = { modules(noticeModule) }) {
+            val target by runtime.activeTarget.collectAsState()
+            val selection by runtime.recordingSelection.collectAsState()
+            CompositionLocalProvider(LocalLifecycleOwner provides owner,
+                LocalActivePlaybackTarget provides target, LocalRecordingPlaybackSelection provides selection) {
                 TVHeadendPlayerTheme {
                     RecordingPlayerScreen(
                         recordingId = recording,
@@ -527,6 +541,7 @@ class RecordingPlayerChromeScreenTest {
                         onClose = onClose,
                     )
                 }
+            }
             }
         }
         if (listed) compose.waitUntil(10_000) { runtime.activeTarget.value == AppPlaybackTarget.Recording(recording) }

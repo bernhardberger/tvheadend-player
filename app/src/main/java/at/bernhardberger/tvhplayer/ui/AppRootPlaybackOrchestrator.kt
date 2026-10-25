@@ -8,7 +8,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.core.CurrentChannelReadiness
 import at.bernhardberger.tvhplayer.core.WarmPlaybackTarget
 import at.bernhardberger.tvhplayer.core.WarmReturnOpportunity
@@ -28,6 +31,15 @@ internal sealed interface PlayerRouteTarget {
     data class Recording(
         val recordingId: DvrEntryId,
     ) : PlayerRouteTarget
+}
+
+/** A recording can be returned to only while both its identity and owning session still match. */
+internal fun warmRecordingId(
+    activeTarget: AppPlaybackTarget?,
+    selection: RecordingPlaybackSelection?,
+    currentSession: CurrentSessionObservation?,
+): DvrEntryId? = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId?.takeIf {
+    selection?.recordingId == it && selection.currentSession === currentSession
 }
 
 @Stable
@@ -77,6 +89,7 @@ internal class AppRootPlaybackOrchestrator {
         activeChannelId: ChannelId?,
         activeRecordingId: DvrEntryId?,
         requestedRecordingId: DvrEntryId,
+        restartPlayback: Boolean = true,
         startPlayback: suspend () -> Unit,
     ): PlayerRouteTarget.Recording? {
         val generation = ++playbackSelectionGeneration
@@ -87,7 +100,7 @@ internal class AppRootPlaybackOrchestrator {
             currentIdentity = activeRecordingId,
             requestedIdentity = requestedRecordingId,
         )
-        startPlayback()
+        if (restartPlayback || activeRecordingId != requestedRecordingId) startPlayback()
         if (generation != playbackSelectionGeneration) return null
         return PlayerRouteTarget.Recording(requestedRecordingId)
     }
