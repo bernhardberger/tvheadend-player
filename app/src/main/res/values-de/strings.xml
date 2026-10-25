@@ -160,7 +160,7 @@
     <string name="onboarding_connecting_title">Verbindung mit %1$s</string>
     <string name="onboarding_connecting_body">Der Server wird geprüft und du wirst als %1$s angemeldet. Drücke Zurück, um abzubrechen.</string>
     <string name="onboarding_connecting_body_anonymous">Der Server wird geprüft. Drücke Zurück, um abzubrechen.</string>
-    <string name="onboarding_connecting">Wird verbunden</string>
+    <string name="onboarding_connecting">Wird verbunden…</string>
     <string name="onboarding_failure_meta">%1$s · Port %2$s · Benutzer %3$s</string>
     <string name="onboarding_failure_meta_anonymous">%1$s · Port %2$s</string>
     <string name="onboarding_change_address">Adresse ändern</string>

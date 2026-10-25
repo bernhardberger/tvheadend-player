@@ -399,6 +399,55 @@ class ConnectionSetupStateTest {
     }
 
     @Test
+    fun aFailureCancelledWhileItRestoresNeverShows() = runTest {
+        val restoring = CompletableDeferred<Unit>()
+        val state = edit(restoreSaved = { restores++; restoring.await() })
+        state.openFromSummary(SummaryFocus.TEST)
+        runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
+        runCurrent()
+        assertEquals("The failure waits for the saved connection", 1, restores)
+        assertEquals(SetupStep.CONNECTING, state.step)
+
+        assertTrue(state.back())
+        runCurrent()
+        restoring.complete(Unit)
+        runCurrent()
+        assertEquals("Back dismissed the test before its failure showed", SetupStep.SUMMARY, state.step)
+        assertNull(state.failure)
+        assertEquals("The finished restore is not repeated", 1, restores)
+    }
+
+    @Test
+    fun aFailureCancelledWhileItRestoresLeavesTheNextTestRunning() = runTest {
+        val restoring = CompletableDeferred<Unit>()
+        val state = edit(restoreSaved = { restores++; restoring.await() })
+        state.openFromSummary(SummaryFocus.TEST)
+        runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
+        runCurrent()
+        assertTrue(state.back())
+        runCurrent()
+        state.openFromSummary(SummaryFocus.TEST)
+        runCurrent()
+        val firstTest = listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT, FakeSessionCall.DISCONNECT)
+        assertEquals("The next test waits for the restore", firstTest, session.calls)
+
+        restoring.complete(Unit)
+        runCurrent()
+        assertEquals("The old failure does not replace the running test", SetupStep.CONNECTING, state.step)
+        assertNull(state.failure)
+        assertEquals(1, restores)
+        assertEquals(firstTest + listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+
+        session.publish(SessionObservation.create(sessionState = SessionState.Connecting))
+        runCurrent()
+        session.publish(ready())
+        runCurrent()
+        assertEquals("$HOST:9982:$USERNAME", profiles.saved)
+    }
+
+    @Test
     fun aReadyFromBeforeTheTestNeverSavesIt() = runTest {
         session.publish(ready())
         val state = edit()

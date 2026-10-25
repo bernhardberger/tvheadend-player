@@ -28,6 +28,8 @@ import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.dropWhile
 import kotlinx.coroutines.flow.first
@@ -290,6 +292,8 @@ internal class ConnectionSetupState(
                 testAndSave(profile)
             } else {
                 val result = session.testConnection(profile)
+                // Back may cancel during the test's closing disconnect, which still returns.
+                currentCoroutineContext().ensureActive()
                 failure = result
                 step = if (result == null) SetupStep.DONE else SetupStep.FAILED
             }
@@ -318,6 +322,8 @@ internal class ConnectionSetupState(
                 // Reconnected before the failure shows, so "Save anyway" cannot land before it.
                 withContext(NonCancellable) { restoreSaved() }
                 settled = true
+                // Back during the restore dismissed this test; a newer one may already be running.
+                currentCoroutineContext().ensureActive()
                 failure = result
                 step = SetupStep.FAILED
                 return
@@ -489,8 +495,9 @@ internal fun discoverServers(context: Context): Flow<TvheadendDiscoveryState> = 
  *
  * `connect` returns once the SDK admitted the attempt and runs it asynchronously. The disconnect
  * before it leaves the session [SessionState.Disconnected]; should it still show an earlier Ready
- * or Unavailable, that outcome is not this attempt's, and only one after the attempt showed it
- * started ([SessionState.Connecting] or [SessionState.Synchronizing]) counts.
+ * or Unavailable, that outcome is not this attempt's and is skipped, together with any repeat of
+ * it, until the session shows any state that is not an outcome (Disconnected, Connecting or
+ * Synchronizing). The first outcome after that counts.
  * [SessionCommandResult.NO_CHANGE] means someone else selected this configuration between the
  * disconnect and the connect, whose outcome may already be past; the test starts over once.
  */

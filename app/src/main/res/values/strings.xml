@@ -162,7 +162,7 @@
     <string name="onboarding_connecting_title">Connecting to %1$s</string>
     <string name="onboarding_connecting_body">Checking the server and signing in as %1$s. Press Back to cancel.</string>
     <string name="onboarding_connecting_body_anonymous">Checking the server. Press Back to cancel.</string>
-    <string name="onboarding_connecting">Connecting</string>
+    <string name="onboarding_connecting">Connecting…</string>
     <string name="onboarding_failure_meta">%1$s · port %2$s · user %3$s</string>
     <string name="onboarding_failure_meta_anonymous">%1$s · port %2$s</string>
     <string name="onboarding_change_address">Change address</string>

@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -53,7 +54,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
-import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.android.DiscoveredTvheadendServer
@@ -84,7 +84,10 @@ private val WelcomeChoiceTop = 64.dp
 /** The search's spinner, the same size and place while searching and beside the found list. */
 private val SearchIndicatorSize = 22.dp
 
-/** About four found servers; more scroll, so the address entry stays on screen below them. */
+/** A TV button's height, so the step does not move as "Connecting…" takes the action's place. */
+private val MainActionHeight = 40.dp
+
+/** About three and a half found servers, so a fourth shows more scroll; the address entry stays on screen below. */
 private val FoundServersMaxHeight = 272.dp
 
 private const val HOST_FIELD = "setup-host"
@@ -277,7 +280,8 @@ private fun FoundServers(state: ConnectionSetupState) {
             .heightIn(max = FoundServersMaxHeight)
             .verticalScroll(rememberScrollState())
             .padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        // The action cards' spacing, so a focused card keeps background between it and the next.
+        verticalArrangement = Arrangement.spacedBy(TvSpacing12),
     ) {
         state.servers.forEachIndexed { index, server ->
             key(server) { FoundServerRow(state, server, index) }
@@ -584,8 +588,7 @@ private fun SignInFields(
 /**
  * A step's main action (Continue, Connect, Test and save). It is never disabled and keeps a tonal
  * fill when unfocused, so it never reads as unavailable: pressed with something missing, the step
- * shows why under the field and focuses it. While [busy] it stays focused as a "Connecting" that
- * Back cancels.
+ * shows why under the field and focuses it. While [busy] the slot shows [ConnectingStatus].
  */
 @Composable
 internal fun MainActionButton(
@@ -594,22 +597,50 @@ internal fun MainActionButton(
     modifier: Modifier = Modifier,
     busy: Boolean = false,
 ) {
+    if (busy) {
+        ConnectingStatus(modifier)
+        return
+    }
     Button(
-        onClick = { if (!busy) onClick() },
+        onClick = onClick,
         modifier = modifier,
         colors = ButtonDefaults.colors(
             containerColor = MaterialTheme.colorScheme.secondaryContainer,
             contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
         ),
     ) {
-        if (busy) {
-            CircularProgressIndicator(
-                modifier = Modifier.padding(end = 8.dp).size(16.dp),
-                strokeWidth = 2.dp,
-                color = LocalContentColor.current,
-            )
-        }
-        Text(stringResource(if (busy) R.string.onboarding_connecting else label))
+        Text(stringResource(label))
+    }
+}
+
+/**
+ * The running test in the main action's place: a spinner and "Connecting…" as plain text, nothing
+ * to press. It holds the focus the action had, so Back, which cancels, stays with the step and
+ * accessibility services read the status.
+ */
+@Composable
+private fun ConnectingStatus(modifier: Modifier) {
+    val requester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { requester.requestFocus() }
+    Row(
+        modifier = modifier
+            .focusRequester(requester)
+            .focusable()
+            .heightIn(min = MainActionHeight)
+            .semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite },
+        horizontalArrangement = Arrangement.spacedBy(TvSpacing12),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        CircularProgressIndicator(
+            modifier = Modifier.size(SearchIndicatorSize),
+            strokeWidth = 3.dp,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        Text(
+            text = stringResource(R.string.onboarding_connecting),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
+        )
     }
 }
 

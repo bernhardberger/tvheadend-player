@@ -175,6 +175,7 @@ class OnboardingLayoutEvidenceTest {
         press(Key.DirectionCenter)
         assertEquals(SetupStep.CONNECTING, state.step)
         compose.onNodeWithTag("setup-connect").assertIsFocused().assertTextEquals(label(R.string.onboarding_connecting))
+            .assert(hasNoClickAction())
         compose.onNodeWithTag("setup-username").assertIsNotEnabled()
 
         back()
@@ -249,6 +250,10 @@ class OnboardingLayoutEvidenceTest {
         compose.onNodeWithText(label(R.string.onboarding_find_still_searching)).assertExists()
         assertSearchIndicatorAtColumnEdge()
         assertEquals(ACTIONS_LEFT, compose.onNodeWithTag("setup-server-1").fetchSemanticsNode().boundsInRoot.left, .5f)
+        compose.mainClock.advanceTimeBy(1_000) // the focused card at its full scale
+        val focused = compose.onNodeWithTag("setup-server-0").assertIsFocused().fetchSemanticsNode().boundsInRoot
+        val next = compose.onNodeWithTag("setup-server-1").fetchSemanticsNode().boundsInRoot
+        assertTrue("Background between the focused card and the next: ${next.top - focused.bottom}", next.top - focused.bottom >= 8f)
         capture("en-font1.0-find-results", textBounds(R.string.onboarding_find_title), "Living room")
     }
 
@@ -320,6 +325,7 @@ class OnboardingLayoutEvidenceTest {
     fun captureConnecting() {
         startTest()
         compose.onNodeWithTag("setup-connect").assertIsFocused().assertTextEquals(label(R.string.onboarding_connecting))
+            .assert(hasNoClickAction())
         capture("en-font1.0-connecting", textBounds(R.string.onboarding_connecting_title, HOST), "Connecting (Back cancels)")
     }
 
