@@ -59,14 +59,16 @@ internal fun ChannelsViewOptionsPanel(
                 icon = layout.icon(),
             ))
         }
-        add(BrowsePanelEntry.Divider)
-        add(BrowsePanelEntry.Choice(
-            key = "channels-view-program-art",
-            label = stringResource(R.string.channels_view_program_art),
-            selected = false,
-            onClick = { onViewChange(view.toggledProgramArt()) },
-            checked = view.showsProgramArt,
-        ))
+        if (view.layout.hasArtSwitch) {
+            add(BrowsePanelEntry.Divider)
+            add(BrowsePanelEntry.Choice(
+                key = "channels-view-program-art",
+                label = stringResource(R.string.channels_view_program_art),
+                selected = false,
+                onClick = { onViewChange(view.toggledProgramArt()) },
+                checked = view.showsProgramArt,
+            ))
+        }
     }
     BrowseSidePanel(stringResource(R.string.channels_view_options), "channels-view-panel", onClose) {
         BrowsePanelList(entries, radio = true)

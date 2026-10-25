@@ -236,20 +236,16 @@ class ChannelsLayoutFocusTest {
         fixture.awaitFocus(row(2))
     }
 
-    @Test fun viewOptionsOfferProgramArtForEachLayoutAndEachKeepsItsValue() {
+    @Test fun viewOptionsOfferProgramArtForTheCardLayoutsAndEachKeepsItsValue() {
         fixture.show(list)
         fixture.awaitFocus(row(1))
         fixture.key(Key.DirectionUp)
         fixture.key(Key.DirectionRight)
         fixture.key(Key.DirectionCenter)
         fixture.awaitFocus(option("layout-list"))
-        // The list starts with the focused programme's picture behind it.
-        compose.onNode(option("program-art")).assertIsOn()
-        repeat(2) { fixture.key(Key.DirectionDown) }
-        fixture.awaitFocus(option("program-art"))
-        fixture.key(Key.DirectionCenter)
-        compose.onNode(option("program-art")).assertIsOff()
-        repeat(3) { fixture.key(Key.DirectionUp) }
+        // The list always shows the focused programme's picture, so it has no switch.
+        compose.onNode(option("program-art")).assertDoesNotExist()
+        fixture.key(Key.DirectionUp)
         fixture.awaitFocus(option("layout-immersive"))
         fixture.key(Key.DirectionCenter)
         compose.onNode(option("program-art")).assertIsOff()

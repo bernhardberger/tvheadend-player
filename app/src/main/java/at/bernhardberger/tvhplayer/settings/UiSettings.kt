@@ -58,7 +58,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
     suspend fun setChannelsView(view: ChannelsView) {
         dataStore.edit { preferences ->
             preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
-            ChannelsLayout.entries.forEach { preferences[Keys.channelsProgramArt(it)] = it in view.programArt }
+            ChannelsLayout.entries.filter { it.hasArtSwitch }
+                .forEach { preferences[Keys.channelsProgramArt(it)] = it in view.programArt }
         }
     }
 
