@@ -109,7 +109,6 @@
     <string name="select_channel_hint">Select a channel on the left to see details.</string>
 
     <!-- Settings screen -->
-    <string name="settings_server">Connection</string>
     <string name="settings_general">General</string>
     <string name="settings_general_nav">General</string>
     <string name="settings_navigation">Navigation</string>
@@ -124,7 +123,6 @@
     <string name="player_info_unavailable_title">Program information unavailable</string>
     <string name="show_epg_menu_enabled">Show Guide menu: On</string>
     <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
-    <string name="host">Host</string>
     <string name="port_htsp">HTSP port</string>
     <string name="port_http">Http Port</string>
     <string name="username">Username</string>
@@ -173,6 +171,13 @@
     <string name="onboarding_change_sign_in_anonymous">Without a sign-in</string>
     <string name="onboarding_continue_anyway">Continue anyway</string>
     <string name="onboarding_continue_anyway_detail">Save and start offline. The app connects when the server answers.</string>
+    <string name="onboarding_edit_body">Choose what to change. Test and save keeps your current connection until the new one works.</string>
+    <string name="onboarding_edit_sign_in">Sign-in</string>
+    <string name="onboarding_edit_find_server">Find server</string>
+    <string name="onboarding_test_and_save">Test and save</string>
+    <string name="onboarding_save_anyway">Save anyway</string>
+    <string name="onboarding_save_anyway_detail">Use this server from now on. The app connects when it answers.</string>
+    <string name="onboarding_edit_failure_body">%1$s Your current connection stays in use.</string>
     <string name="onboarding_done_title">Connected to %1$s</string>
     <string name="onboarding_done_body">Signed in as %1$s. Your channels and guide load next.</string>
     <string name="onboarding_done_body_anonymous">Your channels and guide load next.</string>
@@ -245,7 +250,6 @@
 
     <string name="error_prefix">Error:</string>
 
-    <string name="save">Save</string>
     <string name="back">Back</string>
 
     <!-- Password visibility -->

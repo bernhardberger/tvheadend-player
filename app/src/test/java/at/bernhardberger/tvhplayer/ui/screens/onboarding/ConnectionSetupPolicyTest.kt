@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.onboarding
 import at.bernhardberger.tvheadend.sdk.core.SessionFailure
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
@@ -57,6 +58,37 @@ class ConnectionSetupPolicyTest {
         assertEquals(
             listOf(SetupFailure.UNREACHABLE),
             SetupFailure.entries.filter { SetupAction.CONTINUE_ANYWAY in it.actions },
+        )
+    }
+
+    @Test
+    fun editingGoesBackToTheSummaryExceptAnAddressTypedOnTheSearch() {
+        val edit = SetupMode.EDIT
+        assertEquals(SetupStep.SUMMARY, edit.firstStep)
+        for (choice in ServerChoice.entries) {
+            assertNull(SetupStep.SUMMARY.previous(choice, edit))
+            for (step in listOf(SetupStep.FIND, SetupStep.SIGN_IN, SetupStep.CONNECTING, SetupStep.FAILED)) {
+                assertEquals(SetupStep.SUMMARY, step.previous(choice, edit))
+            }
+            for (step in listOf(SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE)) {
+                assertEquals(SetupStep.SUMMARY, step.resumable(edit))
+            }
+        }
+        assertEquals(SetupStep.SUMMARY, SetupStep.ADDRESS.previous(ServerChoice.TYPED, edit))
+        assertEquals(SetupStep.FIND, SetupStep.ADDRESS.previous(ServerChoice.TYPED_AFTER_SEARCH, edit))
+    }
+
+    @Test
+    fun editingSavesAnUnreachableServerAnywayInsteadOfContinuing() {
+        for (failure in SetupFailure.entries) {
+            val actions = failure.actionsFor(SetupMode.EDIT)
+            assertEquals(failure.actions.size, actions.size)
+            assertFalse(SetupAction.CONTINUE_ANYWAY in actions)
+            assertEquals(failure.actions, failure.actionsFor(SetupMode.FIRST_RUN))
+        }
+        assertEquals(
+            listOf(SetupAction.TRY_AGAIN, SetupAction.CHANGE_ADDRESS, SetupAction.SAVE_ANYWAY),
+            SetupFailure.UNREACHABLE.actionsFor(SetupMode.EDIT),
         )
     }
 }

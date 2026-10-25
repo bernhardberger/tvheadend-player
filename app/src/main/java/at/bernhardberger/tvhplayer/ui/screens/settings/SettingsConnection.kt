@@ -1,53 +1,35 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
+import android.view.KeyEvent
 import android.view.Window
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.focusGroup
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.tv.material3.Button
-import androidx.tv.material3.MaterialTheme
-import androidx.tv.material3.OutlinedButton
-import androidx.tv.material3.Text
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.onPreviewKeyEvent
-import androidx.compose.ui.input.key.onKeyEvent
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthKeyCycle
-import android.view.KeyEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
-import at.bernhardberger.tvhplayer.R
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
+import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
-import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
-import at.bernhardberger.tvhplayer.ui.components.TvOutlinedTextField
-import at.bernhardberger.tvhplayer.ui.components.TvPasswordField
-import at.bernhardberger.tvhplayer.ui.components.SettingsPane
-import kotlinx.coroutines.launch
+import at.bernhardberger.tvhplayer.ui.components.depth.DepthKeyCycle
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.rememberConnectionSetupState
 import org.koin.compose.koinInject
 import java.util.WeakHashMap
 
@@ -102,141 +84,65 @@ internal object ConnectionSecureWindow {
 internal fun SettingsConnection(
     initialFocusRequester: FocusRequester,
     settingsStore: ConnectionProfileEditor = koinInject<AppProfileOwner>(),
+    session: TvheadendSession = koinInject(),
+    restoreSaved: suspend () -> Unit = rememberSavedConnectionRestore(session),
     form: ConnectionFormState = rememberConnectionFormState(),
     onNavigateLeft: (KeyEvent) -> Boolean = { false },
     onSaved: () -> Unit = {},
 ) {
-    val scope = rememberCoroutineScope()
-    val activity = LocalActivity.current
-    val window = activity?.window
-
+    val window = LocalActivity.current?.window
     DisposableEffect(window) {
         val lease = ConnectionSecureWindow.acquire(window)
         onDispose(lease::release)
     }
-
-    var editingId by rememberSaveable { mutableStateOf<String?>(null) }
-    val keyCycles = remember { DepthKeyCycle() }
-
-    LaunchedEffect(settingsStore, form) {
-        form.loadFrom(settingsStore)
-    }
-
-    DisposableEffect(form) {
-        onDispose(form::clearCredentials)
-    }
-
-    SettingsPane(title = stringResource(R.string.settings_server), modifier = Modifier.onPreviewKeyEvent { event ->
-        val native = event.nativeKeyEvent
-        if (native.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && editingId == null) {
-            return@onPreviewKeyEvent onNavigateLeft(native)
-        }
-        if (native.keyCode != KeyEvent.KEYCODE_BACK) {
-            return@onPreviewKeyEvent false
-        }
-        keyCycles.handle(native.keyCode, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
-            when {
-                native.keyCode == KeyEvent.KEYCODE_BACK && editingId != null -> { editingId = null; true }
-                else -> false
-            }
-        }
-    }.onKeyEvent { event ->
-        // Text input gets cursor movement first; an unhandled Left at its edge still
-        // belongs to the editor. Otherwise the persistent host searches local controls
-        // and owns the complete exit cycle across this pane's disposal.
-        editingId != null && event.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_LEFT
-    }) {
-        // Preserve the existing form layout while keeping Save reachable on short or
-        // enlarged-text viewports. Only the editor body scrolls, not its heading.
-        Column(
-            modifier = Modifier
-                .width(560.dp)
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .focusGroup()
-        ) {
-
-            TvOutlinedTextField(
-                id = "host",
-                editingId = editingId,
-                setEditingId = { editingId = it },
-                value = form.host,
-                onValueChange = form::updateHost,
-                label = { Text(stringResource(R.string.host)) },
-                modifier = Modifier.focusRequester(initialFocusRequester),
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            TvOutlinedTextField(
-                id = "port",
-                editingId = editingId,
-                setEditingId = { editingId = it },
-                value = form.port,
-                onValueChange = form::updatePort,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                label = { Text(stringResource(R.string.port_htsp)) }
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            TvOutlinedTextField(
-                id = "user",
-                editingId = editingId,
-                setEditingId = { editingId = it },
-                value = form.username,
-                onValueChange = form::updateUsername,
-                label = { Text(stringResource(R.string.username)) },
-                modifier = Modifier.testTag("connection-username"),
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            TvPasswordField(
-                id = "pass",
-                editingId = editingId,
-                setEditingId = { editingId = it },
-                value = form.password,
-                onValueChange = {
-                    form.updatePassword(it)
-                    form.clearFeedback()
-                },
-                modifier = Modifier.testTag("connection-password"),
-            )
-
-            Spacer(Modifier.height(12.dp))
-
-            if (form.feedback == ConnectionFormFeedback.SAVE_FAILED) {
-                Text(
-                    text = stringResource(R.string.connection_save_failed),
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    enabled = form.canSubmit,
-                    onClick = {
-                        scope.launch {
-                            val result = form.submit(settingsStore) {
-                                ConnectionSecureWindow.acquire(window)
-                            }
-                            if (result == ConnectionFormFeedback.SAVED) onSaved()
+    val context = LocalContext.current.applicationContext
+    val state = rememberConnectionSetupState(
+        session = session,
+        profiles = settingsStore,
+        discovery = { discoverServers(context) },
+        mode = SetupMode.EDIT,
+        restoreSaved = restoreSaved,
+        credentialLease = { ConnectionSecureWindow.acquire(window) },
+        onSaved = onSaved,
+        form = form,
+    )
+    LaunchedEffect(state) { state.loadSaved() }
+    DisposableEffect(state) { onDispose(state.form::clearCredentials) }
+    val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+    val backCycle = remember { DepthKeyCycle() }
+    // The depth host pops on an editor's unhandled Back key, so the key goes to the back
+    // dispatcher here, where the flow's step and a field being edited take it first. Left on the
+    // summary leaves for the overview like any Settings level; the steps it opens keep Left to
+    // themselves, so it cannot drop what was entered.
+    Box(
+        Modifier
+            .fillMaxSize()
+            .onKeyEvent { event ->
+                val native = event.nativeKeyEvent
+                when (native.keyCode) {
+                    KeyEvent.KEYCODE_BACK -> dispatcher != null &&
+                        backCycle.handle(native.keyCode, native.action == KeyEvent.ACTION_DOWN, native.repeatCount) {
+                            dispatcher.onBackPressed()
+                            true
                         }
-                    },
-                ) {
-                    Text(stringResource(R.string.save))
-                }
-
-                OutlinedButton(
-                    onClick = {
-                        scope.launch {
-                            form.clearSavedPassword(settingsStore)
-                        }
-                    },
-                ) {
-                    Text(stringResource(R.string.clear_saved_password))
+                    KeyEvent.KEYCODE_DPAD_LEFT -> state.step != SetupStep.SUMMARY || onNavigateLeft(native)
+                    else -> false
                 }
             }
-        }
+            .focusRequester(initialFocusRequester)
+            .focusGroup(),
+    ) {
+        ConnectionSetupFlow(state)
+    }
+}
+
+/** Reconnects the saved connection after the editor's test interrupted it. */
+@Composable
+private fun rememberSavedConnectionRestore(
+    session: TvheadendSession,
+    owner: AppProfileOwner = koinInject(),
+): suspend () -> Unit = remember(session, owner) {
+    {
+        (owner.serverProfile.value as? ServerProfileReadResult.Available)?.let { session.connect(it.profile) }
     }
 }

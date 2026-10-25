@@ -40,6 +40,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupState
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.DiscoveryWindow
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discovering
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -289,6 +290,31 @@ class OnboardingLayoutEvidenceTest {
         capture("en-font1.0-wrong-sign-in", textBounds(R.string.onboarding_change_sign_in), "Change sign-in")
     }
 
+    @Test
+    @Category(VisualCapture::class)
+    fun captureEditSummary() {
+        showEdit()
+        wakeFocus()
+        capture("en-font1.0-edit-summary", textBounds(R.string.edit_connection), "Server address")
+    }
+
+    @Test
+    @Category(VisualCapture::class)
+    fun captureEditUnreachable() {
+        showEdit()
+        compose.onNodeWithTag("setup-test-and-save").requestFocus()
+        press(Key.DirectionCenter)
+        session.publish(unavailable(SessionFailure.SERVER_UNREACHABLE))
+        compose.waitForIdle()
+        capture("en-font1.0-edit-unreachable", textBounds(R.string.onboarding_save_anyway), "Try again")
+    }
+
+    private fun showEdit() = show(
+        SetupStep.SUMMARY,
+        ConnectionFormState(host = HOST, username = USERNAME, password = PASSWORD),
+        SetupMode.EDIT,
+    )
+
     private fun startTest() {
         show(SetupStep.SIGN_IN, ConnectionFormState(host = HOST, username = USERNAME, password = PASSWORD))
         compose.onNodeWithTag("setup-connect").assertIsFocused()
@@ -296,7 +322,11 @@ class OnboardingLayoutEvidenceTest {
         assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
     }
 
-    private fun show(step: SetupStep = SetupStep.WELCOME, form: ConnectionFormState = ConnectionFormState()) {
+    private fun show(
+        step: SetupStep = SetupStep.WELCOME,
+        form: ConnectionFormState = ConnectionFormState(),
+        mode: SetupMode = SetupMode.FIRST_RUN,
+    ) {
         compose.setContent {
             view = LocalView.current
             val scope = rememberCoroutineScope()
@@ -311,7 +341,7 @@ class OnboardingLayoutEvidenceTest {
                         ),
                     ) {
                         state = remember {
-                            ConnectionSetupState(form, session, NoProfiles, { discovery }, scope, step)
+                            ConnectionSetupState(form, session, NoProfiles, { discovery }, scope, mode, step = step)
                         }
                         ConnectionSetupFlow(state)
                     }

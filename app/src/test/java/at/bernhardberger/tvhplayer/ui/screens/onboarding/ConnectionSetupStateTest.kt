@@ -264,8 +264,111 @@ class ConnectionSetupStateTest {
         assertEquals(SetupStep.FIND, state.step)
     }
 
+    @Test
+    fun editRowsOpenTheirStepAndComeBackToTheSummary() = runTest {
+        val state = edit()
+        assertEquals(SetupStep.SUMMARY, state.step)
+        assertFalse("The summary is the editor's first step", state.back())
+
+        state.openFromSummary(SummaryFocus.PORT)
+        assertEquals(SetupStep.ADDRESS, state.step)
+        assertEquals(AddressFocus.PORT, state.addressFocus)
+        assertTrue(state.back())
+        assertEquals(SetupStep.SUMMARY, state.step)
+        assertEquals("Back returns to the row that opened the step", SummaryFocus.PORT, state.summaryFocus)
+
+        state.openFromSummary(SummaryFocus.ADDRESS)
+        form.updateHost(OFFICE.host)
+        state.continueFromAddress()
+        assertEquals(SetupStep.SUMMARY, state.step)
+        assertEquals(SummaryFocus.TEST, state.summaryFocus)
+
+        state.openFromSummary(SummaryFocus.SIGN_IN)
+        assertEquals(SetupStep.SIGN_IN, state.step)
+        form.updatePassword("")
+        state.continueFromSignIn()
+        assertEquals(SetupStep.SIGN_IN, state.step)
+        assertEquals(SignInFocus.PASSWORD, state.signInFocus)
+        form.updatePassword(PASSWORD)
+        state.continueFromSignIn()
+        assertEquals(SummaryFocus.TEST, state.summaryFocus)
+
+        state.openFromSummary(SummaryFocus.FIND)
+        state.enterAddress()
+        assertEquals(ServerChoice.TYPED_AFTER_SEARCH, state.serverChoice)
+        assertTrue(state.back())
+        assertEquals(SetupStep.FIND, state.step)
+        state.chooseServer(LIVING_ROOM)
+        assertEquals(SetupStep.SUMMARY, state.step)
+        assertEquals(LIVING_ROOM.host, form.host)
+        assertEquals(USERNAME, form.username)
+        assertEquals(emptyList<FakeSessionCall>(), session.calls)
+        assertNull(profiles.saved)
+    }
+
+    @Test
+    fun editSavesAPassedTestAtOnceAndLeaves() = runTest {
+        val state = edit()
+        state.openFromSummary(SummaryFocus.TEST)
+        assertEquals(SetupStep.CONNECTING, state.step)
+        runCurrent()
+        assertNull("The current connection stays saved during the test", profiles.saved)
+        session.publish(ready())
+        runCurrent()
+        assertEquals("$HOST:9982:$USERNAME", profiles.saved)
+        assertEquals(1, leaves)
+        assertEquals("The passed connection is the app's now", 0, restores)
+        assertEquals("", form.password)
+    }
+
+    @Test
+    fun editRestoresTheSavedConnectionAfterAFailedTestAndCanSaveAnyway() = runTest {
+        val state = edit()
+        state.openFromSummary(SummaryFocus.TEST)
+        runCurrent()
+        session.publish(SessionObservation.create(sessionState = SessionState.Unavailable(SessionFailure.SERVER_UNREACHABLE)))
+        runCurrent()
+        assertEquals(SetupStep.FAILED, state.step)
+        assertEquals(1, restores)
+        assertNull(profiles.saved)
+
+        state.onAction(SetupAction.SAVE_ANYWAY)
+        runCurrent()
+        assertEquals("$HOST:9982:$USERNAME", profiles.saved)
+        assertEquals(1, leaves)
+    }
+
+    @Test
+    fun editBackCancelsTheTestAndRestoresTheSavedConnection() = runTest {
+        val state = edit()
+        state.openFromSummary(SummaryFocus.TEST)
+        runCurrent()
+        assertTrue(state.back())
+        assertEquals(SetupStep.SUMMARY, state.step)
+        assertEquals(SummaryFocus.TEST, state.summaryFocus)
+        runCurrent()
+        assertEquals(1, restores)
+        assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
+        assertNull(profiles.saved)
+        assertEquals(PASSWORD, form.password)
+    }
+
     private fun TestScope.setup(step: SetupStep = SetupStep.WELCOME) =
-        ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope, step)
+        ConnectionSetupState(form, session, profiles, { discovery }, backgroundScope, step = step)
+
+    private var restores = 0
+    private var leaves = 0
+
+    private fun TestScope.edit(): ConnectionSetupState {
+        form.updateHost(HOST)
+        form.updateUsername(USERNAME)
+        form.updatePassword(PASSWORD)
+        return ConnectionSetupState(
+            form, session, profiles, { discovery }, backgroundScope, SetupMode.EDIT,
+            restoreSaved = { restores++ },
+            onSaved = { leaves++ },
+        )
+    }
 
     private fun TestScope.signIn(username: String, password: String): ConnectionSetupState {
         form.updateHost(HOST)

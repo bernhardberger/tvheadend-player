@@ -8,12 +8,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
@@ -47,6 +51,8 @@ class SettingsConnectionSecureSurfaceTest {
                 SettingsConnection(
                     initialFocusRequester = remember { FocusRequester() },
                     settingsStore = FakeConnectionProfileEditor(),
+                    session = FakeTvheadendSession(),
+                    restoreSaved = {},
                 )
             }
         }
@@ -70,6 +76,8 @@ class SettingsConnectionSecureSurfaceTest {
                 SettingsConnection(
                     initialFocusRequester = remember { FocusRequester() },
                     settingsStore = FakeConnectionProfileEditor(),
+                    session = FakeTvheadendSession(),
+                    restoreSaved = {},
                 )
             }
         }
@@ -99,14 +107,19 @@ class SettingsConnectionSecureSurfaceTest {
     }
 
     @Test
-    fun saveSubmitsTheSharedFormThroughTheProfileEditor() {
+    fun aPassedTestSavesTheSharedFormThroughTheProfileEditor() {
         val editor = FakeConnectionProfileEditor()
+        val session = FakeTvheadendSession()
         val form = ConnectionFormState()
+        var saved = 0
         composeRule.setContent {
             SettingsConnection(
                 initialFocusRequester = remember { FocusRequester() },
                 settingsStore = editor,
+                session = session,
+                restoreSaved = {},
                 form = form,
+                onSaved = { saved += 1 },
             )
         }
         composeRule.waitForIdle()
@@ -115,9 +128,21 @@ class SettingsConnectionSecureSurfaceTest {
             assertEquals(FAKE_PASSWORD, form.password)
         }
 
-        composeRule.onNode(hasText("Save") and hasClickAction())
+        composeRule.onNode(hasTestTag("setup-test-and-save"))
             .requestFocus()
             .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.runOnIdle {
+            session.publish(
+                SessionObservation.create(
+                    sessionState = SessionState.Ready(
+                        ServerCapabilities.create(
+                            streaming = CapabilityAccess.ALLOWED,
+                            dvrWrite = CapabilityAccess.ALLOWED,
+                        ),
+                    ),
+                ),
+            )
+        }
         composeRule.waitForIdle()
         composeRule.runOnIdle {
             assertEquals(1, editor.passwordSaveCount)
@@ -125,7 +150,7 @@ class SettingsConnectionSecureSurfaceTest {
             assertEquals(FAKE_PORT, editor.savedPort)
             assertEquals(FAKE_USERNAME, editor.savedUsername)
             assertEquals(ConnectionFormFeedback.SAVED, form.feedback)
-            assertEquals(FAKE_PASSWORD, form.password)
+            assertEquals(1, saved)
         }
     }
 

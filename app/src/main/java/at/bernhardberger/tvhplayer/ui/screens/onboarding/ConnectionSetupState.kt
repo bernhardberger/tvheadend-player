@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -42,6 +43,10 @@ import kotlinx.coroutines.withTimeoutOrNull
  * the connection test and the final save. The test runs on the app's one [session] before
  * anything is saved, so a profile is only stored once it connected or the user chose to continue
  * anyway.
+ *
+ * Editing ([SetupMode.EDIT]) tests on the same session, which interrupts the saved connection, so
+ * a failed or cancelled test reconnects it with [restoreSaved]; it stays the app's connection until
+ * the new one passed and is saved, or the user saved anyway.
  */
 @Stable
 internal class ConnectionSetupState(
@@ -51,9 +56,16 @@ internal class ConnectionSetupState(
     /** Starts one network search; collecting it runs discovery until cancelled. */
     private val discovery: () -> Flow<TvheadendDiscoveryState>,
     private val scope: CoroutineScope,
-    step: SetupStep = SetupStep.WELCOME,
+    val mode: SetupMode = SetupMode.FIRST_RUN,
+    step: SetupStep = mode.firstStep,
     choice: ServerChoice = ServerChoice.TYPED,
+    private val restoreSaved: suspend () -> Unit = {},
+    private val credentialLease: () -> CredentialEditLease = { CredentialEditLease {} },
+    /** Runs once the connection is saved; the editor leaves with it. */
+    private val onSaved: () -> Unit = {},
 ) {
+    private val editing get() = mode == SetupMode.EDIT
+
     var step by mutableStateOf(step)
         private set
     var serverChoice by mutableStateOf(choice)
@@ -87,6 +99,14 @@ internal class ConnectionSetupState(
     var signInFocus by mutableStateOf(SignInFocus.USERNAME)
         private set
 
+    /** The summary row that opened the current step, which takes focus again on the way back. */
+    var summaryFocus by mutableStateOf(SummaryFocus.ADDRESS)
+        private set
+
+    /** Whether the saved connection has a sign-in that "Clear saved password" can remove. */
+    var savedSignIn by mutableStateOf(false)
+        private set
+
     /** Changes whenever a step asks for its focus target again, even on the same step. */
     var focusRequest by mutableIntStateOf(0)
         private set
@@ -103,18 +123,56 @@ internal class ConnectionSetupState(
         if (step == SetupStep.SIGN_IN) signInFocus = firstEmptySignInField() ?: SignInFocus.CONNECT
     }
 
+    /** Fills the form with the saved connection, as editing starts. */
+    suspend fun loadSaved() {
+        form.loadFrom(profiles)
+        savedSignIn = form.username.isNotBlank()
+    }
+
     fun enterAddress() {
         when {
             step == SetupStep.WELCOME -> {
                 welcomeFocus = WelcomeFocus.TYPE
                 serverChoice = ServerChoice.TYPED
             }
-            step == SetupStep.FIND || serverChoice == ServerChoice.FOUND -> {
+            step == SetupStep.FIND || (serverChoice == ServerChoice.FOUND && !editing) -> {
                 serverChoice = ServerChoice.TYPED_AFTER_SEARCH
             }
+            editing -> serverChoice = ServerChoice.TYPED
         }
         focusAddress(AddressFocus.HOST)
         step = SetupStep.ADDRESS
+    }
+
+    /** A summary row: opens its step, clears the saved password, or tests and saves. */
+    fun openFromSummary(row: SummaryFocus) {
+        if (step != SetupStep.SUMMARY || saving) return
+        summaryFocus = row
+        when (row) {
+            SummaryFocus.ADDRESS -> openAddress(AddressFocus.HOST)
+            SummaryFocus.PORT -> openAddress(AddressFocus.PORT)
+            SummaryFocus.SIGN_IN -> openSignIn(SignInFocus.USERNAME)
+            SummaryFocus.FIND -> findServer()
+            SummaryFocus.CLEAR_PASSWORD -> clearSavedPassword()
+            SummaryFocus.TEST -> connect()
+        }
+    }
+
+    private fun openAddress(target: AddressFocus) {
+        serverChoice = ServerChoice.TYPED
+        focusAddress(target)
+        step = SetupStep.ADDRESS
+    }
+
+    private fun openSignIn(target: SignInFocus) {
+        focusSignIn(target)
+        step = SetupStep.SIGN_IN
+    }
+
+    private fun returnToSummary(target: SummaryFocus) {
+        summaryFocus = target
+        focusRequest += 1
+        step = SetupStep.SUMMARY
     }
 
     /** Opens the search step and starts looking ("Find my server", "Search again"). */
@@ -164,6 +222,10 @@ internal class ConnectionSetupState(
         form.updateHost(server.host)
         form.updatePort(server.port.toString())
         addressErrorsShown = false
+        if (editing) {
+            returnToSummary(SummaryFocus.TEST)
+            return
+        }
         focusSignIn(firstEmptySignInField() ?: SignInFocus.CONNECT)
         step = SetupStep.SIGN_IN
     }
@@ -181,6 +243,7 @@ internal class ConnectionSetupState(
         when {
             form.hostMissing -> focusAddress(AddressFocus.HOST)
             form.portInvalid -> focusAddress(AddressFocus.PORT)
+            editing -> returnToSummary(SummaryFocus.TEST)
             else -> {
                 focusSignIn(firstEmptySignInField() ?: SignInFocus.CONNECT)
                 step = SetupStep.SIGN_IN
@@ -188,21 +251,67 @@ internal class ConnectionSetupState(
         }
     }
 
+    /** The editor's sign-in: back to the summary when complete; otherwise shows why and focuses the empty field. */
+    fun continueFromSignIn() {
+        signInErrorShown = true
+        val empty = firstEmptySignInField()
+        if (form.credentialsIncomplete && empty != null) focusSignIn(empty) else returnToSummary(SummaryFocus.TEST)
+    }
+
     /** Starts the test when the sign-in is complete; otherwise shows why and focuses the empty field. */
     fun connect() {
         signInErrorShown = true
         val profile = form.serverProfile()
         if (profile == null) {
-            focusSignIn(firstEmptySignInField() ?: SignInFocus.USERNAME)
+            if (editing) openIncomplete() else focusSignIn(firstEmptySignInField() ?: SignInFocus.USERNAME)
             return
         }
         failure = null
-        focusSignIn(SignInFocus.CONNECT)
+        if (editing) summaryFocus = SummaryFocus.TEST else focusSignIn(SignInFocus.CONNECT)
         step = SetupStep.CONNECTING
         replaceSessionWork {
+            if (editing) {
+                testAndSave(profile)
+            } else {
+                val result = session.testConnection(profile)
+                failure = result
+                step = if (result == null) SetupStep.DONE else SetupStep.FAILED
+            }
+        }
+    }
+
+    /** "Test and save" with something missing opens the step that misses it, showing why. */
+    private fun openIncomplete() {
+        addressErrorsShown = true
+        when {
+            form.hostMissing -> openAddress(AddressFocus.HOST)
+            form.portInvalid -> openAddress(AddressFocus.PORT)
+            else -> openSignIn(firstEmptySignInField() ?: SignInFocus.USERNAME)
+        }
+    }
+
+    /**
+     * Saves a passed test right away. Anything short of a saved profile reconnects the saved
+     * connection, also when the test is cancelled or the editor closes during it.
+     */
+    private suspend fun testAndSave(profile: ServerProfile) {
+        var settled = false
+        try {
             val result = session.testConnection(profile)
-            failure = result
-            step = if (result == null) SetupStep.DONE else SetupStep.FAILED
+            if (result != null) {
+                // Reconnected before the failure shows, so "Save anyway" cannot land before it.
+                withContext(NonCancellable) { restoreSaved() }
+                settled = true
+                failure = result
+                step = SetupStep.FAILED
+                return
+            }
+            saving = true
+            settled = withContext(NonCancellable) { commit() }
+            if (!settled) returnToSummary(SummaryFocus.TEST)
+        } finally {
+            saving = false
+            if (!settled) withContext(NonCancellable) { restoreSaved() }
         }
     }
 
@@ -214,18 +323,44 @@ internal class ConnectionSetupState(
                 focusSignIn(firstEmptySignInField() ?: SignInFocus.PASSWORD)
                 step = SetupStep.SIGN_IN
             }
-            SetupAction.CONTINUE_ANYWAY -> save()
+            SetupAction.CONTINUE_ANYWAY, SetupAction.SAVE_ANYWAY -> save()
         }
     }
 
-    /** Saves the tested profile ("Start watching", "Continue anyway"); the app root then leaves the flow. */
+    /**
+     * Saves the profile ("Start watching", "Continue anyway", "Save anyway"); the app root then
+     * leaves the first-run flow, and [onSaved] the editor.
+     */
     fun save() {
         if (saving) return
         saving = true
         scope.launch {
             try {
-                val result = form.submit(profiles) { CredentialEditLease {} }
-                if (result == ConnectionFormFeedback.SAVED) form.clearPassword()
+                commit()
+            } finally {
+                saving = false
+            }
+        }
+    }
+
+    private suspend fun commit(): Boolean {
+        val saved = form.submit(profiles, credentialLease) == ConnectionFormFeedback.SAVED
+        if (saved) {
+            form.clearPassword()
+            onSaved()
+        }
+        return saved
+    }
+
+    /** Stores the saved connection without its sign-in; the summary then shows it signs in without one. */
+    private fun clearSavedPassword() {
+        saving = true
+        scope.launch {
+            try {
+                if (form.clearSavedPassword(profiles) == ConnectionFormFeedback.SAVED) {
+                    savedSignIn = false
+                    returnToSummary(SummaryFocus.SIGN_IN)
+                }
             } finally {
                 saving = false
             }
@@ -235,8 +370,9 @@ internal class ConnectionSetupState(
     /** One step back, keeping what was entered. False on the first step, where the flow lets Back go. */
     fun back(): Boolean {
         if (saving) return true
-        val previous = step.previous(serverChoice) ?: return false
+        val previous = step.previous(serverChoice, mode) ?: return false
         when (step) {
+            // An edit's cancelled test reconnects the saved connection as it ends.
             SetupStep.CONNECTING -> sessionWork?.cancel()
             // The tested profile stays connected only to be saved by "Start watching".
             SetupStep.DONE -> replaceSessionWork { session.disconnect() }
@@ -244,6 +380,7 @@ internal class ConnectionSetupState(
         }
         when (previous) {
             SetupStep.WELCOME -> welcomeFocus = if (step == SetupStep.FIND) WelcomeFocus.FIND else WelcomeFocus.TYPE
+            SetupStep.SUMMARY -> focusRequest += 1
             SetupStep.FIND -> returnToSearch()
             SetupStep.ADDRESS -> focusAddress(AddressFocus.CONTINUE)
             SetupStep.SIGN_IN -> focusSignIn(SignInFocus.CONNECT)
@@ -299,13 +436,20 @@ internal class ConnectionSetupState(
             profiles: ConnectionProfileEditor,
             discovery: () -> Flow<TvheadendDiscoveryState>,
             scope: CoroutineScope,
+            mode: SetupMode,
+            restoreSaved: suspend () -> Unit,
+            credentialLease: () -> CredentialEditLease,
+            onSaved: () -> Unit,
         ): Saver<ConnectionSetupState, Any> = listSaver(
-            save = { listOf(it.step.resumable().name, it.serverChoice.name) },
+            save = { listOf(it.step.resumable(mode).name, it.serverChoice.name) },
             restore = {
                 ConnectionSetupState(
-                    form, session, profiles, discovery, scope,
+                    form, session, profiles, discovery, scope, mode,
                     step = SetupStep.valueOf(it[0]),
                     choice = ServerChoice.valueOf(it[1]),
+                    restoreSaved = restoreSaved,
+                    credentialLease = credentialLease,
+                    onSaved = onSaved,
                 )
             },
         )
@@ -344,10 +488,27 @@ internal fun rememberConnectionSetupState(
     session: TvheadendSession,
     profiles: ConnectionProfileEditor,
     discovery: () -> Flow<TvheadendDiscoveryState>,
+    mode: SetupMode = SetupMode.FIRST_RUN,
+    restoreSaved: suspend () -> Unit = {},
+    credentialLease: () -> CredentialEditLease = { CredentialEditLease {} },
+    onSaved: () -> Unit = {},
+    form: ConnectionFormState = rememberConnectionFormState(),
 ): ConnectionSetupState {
-    val form = rememberConnectionFormState()
     val scope = rememberCoroutineScope()
-    return rememberSaveable(saver = ConnectionSetupState.saver(form, session, profiles, discovery, scope)) {
-        ConnectionSetupState(form, session, profiles, discovery, scope)
+    val currentRestoreSaved by rememberUpdatedState(restoreSaved)
+    val currentLease by rememberUpdatedState(credentialLease)
+    val currentOnSaved by rememberUpdatedState(onSaved)
+    val restore: suspend () -> Unit = { currentRestoreSaved() }
+    val lease = { currentLease() }
+    val saved = { currentOnSaved() }
+    return rememberSaveable(
+        saver = ConnectionSetupState.saver(form, session, profiles, discovery, scope, mode, restore, lease, saved),
+    ) {
+        ConnectionSetupState(
+            form, session, profiles, discovery, scope, mode,
+            restoreSaved = restore,
+            credentialLease = lease,
+            onSaved = saved,
+        )
     }
 }

@@ -106,7 +106,7 @@ class OnboardingScreenTest {
             val scope = rememberCoroutineScope()
             TVHeadendPlayerTheme {
                 // A search that ends at once with nothing, as on a network where no server announces itself.
-                ConnectionSetupFlow(remember { ConnectionSetupState(form, session, editor, { emptyFlow() }, scope, step) })
+                ConnectionSetupFlow(remember { ConnectionSetupState(form, session, editor, { emptyFlow() }, scope, step = step) })
             }
         }
         composeRule.waitForIdle()

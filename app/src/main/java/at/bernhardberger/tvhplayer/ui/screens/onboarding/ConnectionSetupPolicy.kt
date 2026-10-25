@@ -8,16 +8,31 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * The screens of the guided connection setup. [FIND] searches the network; [CONNECTING] is the
- * sign-in screen with its test running in place; [FAILED] shows the test's outcome.
+ * screen the test started from with the test running in place; [FAILED] shows the test's outcome.
+ * [SUMMARY] is where editing a saved connection starts.
  */
 internal enum class SetupStep {
     WELCOME,
+    SUMMARY,
     FIND,
     ADDRESS,
     SIGN_IN,
     CONNECTING,
     FAILED,
     DONE,
+}
+
+/**
+ * The first-run setup, or editing the saved connection from Settings. Editing starts at the
+ * summary, whose rows open the steps that return to it, and saves once the test passes.
+ */
+internal enum class SetupMode {
+    FIRST_RUN,
+    EDIT,
+    ;
+
+    val firstStep: SetupStep
+        get() = if (this == EDIT) SetupStep.SUMMARY else SetupStep.WELCOME
 }
 
 /** How the server was chosen, which decides where Back goes from the address and the sign-in. */
@@ -32,14 +47,27 @@ internal enum class ServerChoice {
     FOUND,
 }
 
-/** Where Back goes; null leaves the flow, so the activity's own Back reaches the TV home. */
-internal fun SetupStep.previous(choice: ServerChoice): SetupStep? = when (this) {
-    SetupStep.WELCOME -> null
-    SetupStep.FIND -> SetupStep.WELCOME
-    SetupStep.ADDRESS -> if (choice == ServerChoice.TYPED) SetupStep.WELCOME else SetupStep.FIND
-    SetupStep.SIGN_IN -> if (choice == ServerChoice.FOUND) SetupStep.FIND else SetupStep.ADDRESS
-    SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
-}
+/**
+ * Where Back goes; null leaves the flow, so the activity's own Back reaches the TV home, or the
+ * editor's returns to Settings. While editing, every step goes back to the summary, except an
+ * address typed on the search, which goes back to that search.
+ */
+internal fun SetupStep.previous(choice: ServerChoice, mode: SetupMode = SetupMode.FIRST_RUN): SetupStep? =
+    if (mode == SetupMode.EDIT) {
+        when (this) {
+            SetupStep.WELCOME, SetupStep.SUMMARY -> null
+            SetupStep.ADDRESS -> if (choice == ServerChoice.TYPED_AFTER_SEARCH) SetupStep.FIND else SetupStep.SUMMARY
+            else -> SetupStep.SUMMARY
+        }
+    } else {
+        when (this) {
+            SetupStep.WELCOME, SetupStep.SUMMARY -> null
+            SetupStep.FIND -> SetupStep.WELCOME
+            SetupStep.ADDRESS -> if (choice == ServerChoice.TYPED) SetupStep.WELCOME else SetupStep.FIND
+            SetupStep.SIGN_IN -> if (choice == ServerChoice.FOUND) SetupStep.FIND else SetupStep.ADDRESS
+            SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
+        }
+    }
 
 /**
  * How long a search looks for announcing servers. Discovery itself never ends, and most servers
@@ -49,10 +77,12 @@ internal val DiscoveryWindow = 10.seconds
 
 /**
  * The step a recreated flow resumes on. The test and its result belong to a session the saved
- * state cannot restore, and the password is never saved, so those resume on the sign-in.
+ * state cannot restore, and the password is never saved, so those resume on the sign-in, or on
+ * the summary they started from while editing.
  */
-internal fun SetupStep.resumable(): SetupStep = when (this) {
-    SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStep.SIGN_IN
+internal fun SetupStep.resumable(mode: SetupMode = SetupMode.FIRST_RUN): SetupStep = when (this) {
+    SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE ->
+        if (mode == SetupMode.EDIT) SetupStep.SUMMARY else SetupStep.SIGN_IN
     else -> this
 }
 
@@ -61,7 +91,7 @@ internal enum class SetupStage { SERVER, SIGN_IN, CONNECT }
 
 internal val SetupStep.stage: SetupStage
     get() = when (this) {
-        SetupStep.WELCOME, SetupStep.FIND, SetupStep.ADDRESS -> SetupStage.SERVER
+        SetupStep.WELCOME, SetupStep.SUMMARY, SetupStep.FIND, SetupStep.ADDRESS -> SetupStage.SERVER
         SetupStep.SIGN_IN -> SetupStage.SIGN_IN
         SetupStep.CONNECTING, SetupStep.FAILED, SetupStep.DONE -> SetupStage.CONNECT
     }
@@ -71,6 +101,9 @@ internal enum class SetupAction {
     CHANGE_ADDRESS,
     CHANGE_SIGN_IN,
     CONTINUE_ANYWAY,
+
+    /** The editor's [CONTINUE_ANYWAY]: saves the untested connection in place of the current one. */
+    SAVE_ANYWAY,
 }
 
 /**
@@ -109,6 +142,14 @@ internal enum class SetupFailure(
     ),
 }
 
+/** The failure's actions in [mode]; editing saves anyway instead of continuing anyway. */
+internal fun SetupFailure.actionsFor(mode: SetupMode): List<SetupAction> =
+    if (mode == SetupMode.EDIT) {
+        actions.map { if (it == SetupAction.CONTINUE_ANYWAY) SetupAction.SAVE_ANYWAY else it }
+    } else {
+        actions
+    }
+
 internal fun SessionFailure.toSetupFailure(): SetupFailure = when (kind) {
     SessionFailureKind.SERVER_UNREACHABLE,
     SessionFailureKind.NETWORK_UNAVAILABLE,
@@ -131,3 +172,6 @@ internal enum class WelcomeFocus { FIND, TYPE }
 internal enum class AddressFocus { HOST, PORT, CONTINUE }
 
 internal enum class SignInFocus { USERNAME, PASSWORD, CONNECT }
+
+/** The editor summary's rows in screen order; [TEST] is "Test and save". */
+internal enum class SummaryFocus { ADDRESS, PORT, SIGN_IN, FIND, CLEAR_PASSWORD, TEST }

@@ -107,7 +107,6 @@
     <string name="epg_next">Danach um %1$s</string>
     <string name="select_channel_hint">Wähle links einen Sender aus, um Details anzuzeigen.</string>
 
-    <string name="settings_server">Verbindung</string>
     <string name="settings_general">Allgemein</string>
     <string name="settings_general_nav">Allgemein</string>
     <string name="settings_navigation">Navigation</string>
@@ -122,7 +121,6 @@
     <string name="player_info_unavailable_title">Programminformationen nicht verfügbar</string>
     <string name="show_epg_menu_enabled">Programmführer-Menü anzeigen: Ein</string>
     <string name="show_epg_menu_disabled">Programmführer-Menü anzeigen: Aus</string>
-    <string name="host">Host</string>
     <string name="port_htsp">HTSP-Port</string>
     <string name="port_http">HTTP-Port</string>
     <string name="username">Benutzername</string>
@@ -171,6 +169,13 @@
     <string name="onboarding_change_sign_in_anonymous">Ohne Anmeldung</string>
     <string name="onboarding_continue_anyway">Trotzdem fortfahren</string>
     <string name="onboarding_continue_anyway_detail">Speichern und offline starten. Die App verbindet sich, sobald der Server antwortet.</string>
+    <string name="onboarding_edit_body">Wähle, was du ändern möchtest. Testen und speichern behält deine aktuelle Verbindung, bis die neue funktioniert.</string>
+    <string name="onboarding_edit_sign_in">Anmeldung</string>
+    <string name="onboarding_edit_find_server">Server finden</string>
+    <string name="onboarding_test_and_save">Testen und speichern</string>
+    <string name="onboarding_save_anyway">Trotzdem speichern</string>
+    <string name="onboarding_save_anyway_detail">Diesen Server ab jetzt verwenden. Die App verbindet sich, sobald er antwortet.</string>
+    <string name="onboarding_edit_failure_body">%1$s Deine aktuelle Verbindung bleibt bestehen.</string>
     <string name="onboarding_done_title">Mit %1$s verbunden</string>
     <string name="onboarding_done_body">Angemeldet als %1$s. Als Nächstes werden deine Sender und das Programm geladen.</string>
     <string name="onboarding_done_body_anonymous">Als Nächstes werden deine Sender und das Programm geladen.</string>
@@ -242,7 +247,6 @@
     <string name="select_profile">Profil auswählen</string>
 
     <string name="error_prefix">Fehler:</string>
-    <string name="save">Speichern</string>
     <string name="back">Zurück</string>
     <string name="show_password">Passwort anzeigen</string>
     <string name="hide_password">Passwort ausblenden</string>

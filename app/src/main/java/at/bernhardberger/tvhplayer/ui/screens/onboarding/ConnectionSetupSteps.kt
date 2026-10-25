@@ -92,17 +92,23 @@ private const val USERNAME_FIELD = "setup-username"
 private const val PASSWORD_FIELD = "setup-password"
 
 /**
- * The setup's steps. Back goes one step back and keeps what was entered; on the welcome it is
- * left to the activity, which leaves for the TV home.
+ * The setup's steps. Back goes one step back and keeps what was entered; on the welcome, or the
+ * editor's summary, it is left to the activity, which leaves for the TV home, or to Settings.
  */
 @Composable
 internal fun ConnectionSetupFlow(state: ConnectionSetupState) {
-    BackHandler(enabled = state.step.previous(state.serverChoice) != null) { state.back() }
-    when (state.step) {
+    BackHandler(enabled = state.step.previous(state.serverChoice, state.mode) != null) { state.back() }
+    // The test runs in place on the screen it started from: the sign-in, or the editor's summary.
+    val screen = when {
+        state.step != SetupStep.CONNECTING -> state.step
+        state.mode == SetupMode.EDIT -> SetupStep.SUMMARY
+        else -> SetupStep.SIGN_IN
+    }
+    when (screen) {
         SetupStep.WELCOME -> WelcomeStep(state)
+        SetupStep.SUMMARY -> SummaryStep(state)
         SetupStep.FIND -> FindStep(state)
         SetupStep.ADDRESS -> AddressStep(state)
-        // One branch, so the test runs in place on the sign-in it started from.
         SetupStep.SIGN_IN, SetupStep.CONNECTING -> SignInStep(state)
         SetupStep.FAILED -> FailureStep(state, state.failure ?: SetupFailure.OTHER)
         SetupStep.DONE -> DoneStep(state)
@@ -471,11 +477,22 @@ private fun SignInStep(state: ConnectionSetupState) {
             passwordFocus = password,
             onPasswordDone = { state.focusSignIn(SignInFocus.CONNECT) },
         )
-        ConnectButton(
-            connecting = connecting,
-            onClick = state::connect,
-            modifier = Modifier.focusRequester(connect),
-        )
+        if (state.mode == SetupMode.EDIT) {
+            // The editor tests from its summary, which this returns to.
+            Button(
+                onClick = state::continueFromSignIn,
+                modifier = Modifier.focusRequester(connect).testTag("setup-continue"),
+            ) {
+                Text(stringResource(R.string.onboarding_continue))
+            }
+        } else {
+            BusyButton(
+                busy = connecting,
+                label = R.string.onboarding_connect,
+                onClick = state::connect,
+                modifier = Modifier.focusRequester(connect).testTag("setup-connect"),
+            )
+        }
     }
 }
 
@@ -553,21 +570,21 @@ private fun SignInFields(
     }
 }
 
-/** Connect; while the test runs it stays focused as a busy "Connecting" that Back cancels. */
+/** Starts the test; while it runs it stays focused as a busy "Connecting" that Back cancels. */
 @Composable
-private fun ConnectButton(connecting: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+internal fun BusyButton(busy: Boolean, @StringRes label: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
     Button(
-        onClick = { if (!connecting) onClick() },
-        modifier = modifier.testTag("setup-connect"),
+        onClick = { if (!busy) onClick() },
+        modifier = modifier,
     ) {
-        if (connecting) {
+        if (busy) {
             CircularProgressIndicator(
                 modifier = Modifier.padding(end = 8.dp).size(16.dp),
                 strokeWidth = 2.dp,
                 color = LocalContentColor.current,
             )
         }
-        Text(stringResource(if (connecting) R.string.onboarding_connecting else R.string.onboarding_connect))
+        Text(stringResource(if (busy) R.string.onboarding_connecting else label))
     }
 }
 
@@ -585,18 +602,20 @@ private fun FailureStep(state: ConnectionSetupState, failure: SetupFailure) {
     } else {
         stringResource(R.string.onboarding_failure_meta, host, port, form.username)
     }
+    val reason = if (failure.showsHint) text.paragraph(failure.condition) else text.reason(failure.condition)
+    val body = if (state.mode == SetupMode.EDIT) stringResource(R.string.onboarding_edit_failure_body, reason) else reason
     GuidedStepLayout(
         guidance = {
             GuidedStepGuidance(
                 title = text.title(failure.condition),
-                body = if (failure.showsHint) text.paragraph(failure.condition) else text.reason(failure.condition),
+                body = body,
                 stepper = { SetupStepper(SetupStage.CONNECT.ordinal, failed = true) },
                 meta = meta,
             )
         },
         actionsTop = GuidedStepChoiceTop,
     ) {
-        failure.actions.forEachIndexed { index, action ->
+        failure.actionsFor(state.mode).forEachIndexed { index, action ->
             SetupActionButton(
                 action = action,
                 form = form,
@@ -644,6 +663,11 @@ private fun SetupActionButton(
             title = R.string.onboarding_continue_anyway
             icon = R.drawable.ic_arrow_forward
             subtitle = stringResource(R.string.onboarding_continue_anyway_detail)
+        }
+        SetupAction.SAVE_ANYWAY -> {
+            title = R.string.onboarding_save_anyway
+            icon = R.drawable.ic_cloud_off
+            subtitle = stringResource(R.string.onboarding_save_anyway_detail)
         }
     }
     GuidedStepAction(
@@ -698,7 +722,7 @@ private fun DoneStep(state: ConnectionSetupState) {
 }
 
 @Composable
-private fun SaveFailedText(feedback: ConnectionFormFeedback?) {
+internal fun SaveFailedText(feedback: ConnectionFormFeedback?) {
     if (feedback != ConnectionFormFeedback.SAVE_FAILED) return
     Text(
         text = stringResource(R.string.connection_save_failed),

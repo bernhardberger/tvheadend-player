@@ -13,7 +13,6 @@ class SemanticColorUsageTest {
     @Test
     fun successMetadataRecordingAndFailureUseTheirOwnedRoles() {
         assertContains("ui/screens/onboarding/ConnectionSetupSteps.kt", "MaterialTheme.colorScheme.error")
-        assertContains("ui/screens/settings/SettingsConnection.kt", "MaterialTheme.colorScheme.error")
         assertContains(
             "ui/components/ProgrammeDetailsLayout.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",

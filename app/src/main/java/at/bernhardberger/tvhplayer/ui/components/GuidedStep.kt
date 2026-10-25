@@ -218,7 +218,8 @@ private fun MarkerText(text: String, color: Color) {
 }
 
 /**
- * A step's choice in the kit Wide button's look, with an optional explanation and leading icon.
+ * A step's choice in the kit Wide button's look, with an optional explanation, leading icon and
+ * trailing icon, such as the chevron of a row that opens its own step.
  * TV Material 1.1's WideButton lays its content out at its 240dp minimum and never grows past
  * its minimum height, so it would cut a long or translated explanation; this one wraps it.
  */
@@ -231,6 +232,7 @@ fun GuidedStepAction(
     @DrawableRes icon: Int? = null,
     /** The unfocused fill; list rows such as found servers pass [Color.Transparent]. */
     containerColor: Color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+    @DrawableRes trailingIcon: Int? = null,
 ) {
     val colors = MaterialTheme.colorScheme
     Surface(
@@ -265,6 +267,7 @@ fun GuidedStepAction(
                     )
                 }
             }
+            if (trailingIcon != null) Icon(painterResource(trailingIcon), null, Modifier.size(24.dp))
         }
     }
 }
