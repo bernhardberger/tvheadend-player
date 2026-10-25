@@ -128,9 +128,11 @@ their lightness, keeping hue; plates, brand colours and readable parts stay.
 app's scrims; a caller on another solid colour names it (a focused row's light
 fill, the Channels logo plate). On dark grounds a colour counts as vanishing
 below 1.6:1, on light ones below 1.5:1, where 1.6 would turn mid oranges brown.
-A logo with its own treatment or ground (zap card halo; the details hero logo,
-the programme pane's logo picture and the player hero's logo on their own
-colour) is left alone.
+Logo cards and the programme pane's logo picture ink their logo for their
+ambient colour where the logo sits (accepted 2026-10-25), using its settled
+colour so a crossfade does not re-ink it. A logo with its own treatment
+(zap card halo over a picture; the details hero logo and the player hero's
+logo on their own colour) is left alone.
 When the ground changes, the logo shown last stays until the new copy is ready.
 
 Passive text steps down in three tones (accepted 2026-10-21), as the kit's

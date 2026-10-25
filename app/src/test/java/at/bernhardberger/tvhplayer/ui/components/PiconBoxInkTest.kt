@@ -180,12 +180,11 @@ class PiconBoxInkTest {
         }.memoryCache { MemoryCache.Builder().maxSizeBytes(16L * 1024 * 1024).build() }
             .crossfade(PlayerMotion.MediumMs).build()
 
-    @Test fun aPaneLogoOnItsOwnColourKeepsItsPixels() {
+    @Test fun aPaneLogoOnItsOwnColourIsInkedForThatColour() {
         showPanePicture(ChannelId(1))
-        compose.waitUntil(5_000) { pixels("pane-logo").dimBlue > 0 }
+        compose.waitUntil(5_000) { pixels("pane-logo").light > 0 }
         val shown = pixels("pane-logo")
-        assertTrue("the logo's own strokes expected: $shown", shown.dimBlue >= 200)
-        assertEquals("the logo on its own colour must stay as drawn: $shown", 0, shown.light)
+        assertTrue("the dim logo should be lightened on its dark colour: $shown", shown.light >= 200)
     }
 
     @Test fun aPaneLogoWithoutItsColourIsInkedForThePlainGround() {

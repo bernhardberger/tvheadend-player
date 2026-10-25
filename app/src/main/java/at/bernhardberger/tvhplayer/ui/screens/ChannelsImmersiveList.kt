@@ -147,6 +147,7 @@ import coil3.request.ImageRequest
 import coil3.request.transformations
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.components.ChannelAccentFill
+import at.bernhardberger.tvhplayer.ui.components.channelAccentGround
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 
 /**
@@ -485,8 +486,10 @@ private fun ChannelsRowCard(
                 ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
                     contentAlignment = Alignment.Center) {
+                    val pictureHeight = ImmersiveCardWidth * 9f / 16f
                     PiconBox(channel.icon, Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction).fillMaxHeight()
-                        .testTag("$tag-picon"), ground = null)
+                        .testTag("$tag-picon"),
+                        ground = channelAccentGround(channel.icon, channel.id, depth = (pictureHeight - textHeight) / 2 / pictureHeight))
                 }
             }
             val lineModifier = Modifier.align(Alignment.BottomStart).fillMaxWidth()
