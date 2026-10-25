@@ -153,16 +153,20 @@ class ChannelGuideDeviceAcceptanceTest {
             .assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
+            composeRule.onAllNodes(hasTestTag("setup-host")).fetchSemanticsNodes().size == 1
+        }
+        composeRule.onNode(hasTestTag("setup-continue"))
+            .requestFocus()
+            .performKeyInput { pressKey(Key.DirectionCenter) }
+        composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(
-                hasTestTag("connection-username") and hasConfiguredFieldValue,
+                hasTestTag("setup-username") and hasConfiguredFieldValue,
             )
                 .fetchSemanticsNodes().size == 1
         }
         composeRule.waitUntil(timeoutMillis = DEVICE_TIMEOUT_MILLIS) {
             composeRule.onAllNodes(
-                hasTestTag("connection-password") and
-                    hasConfiguredFieldValue and
-                    SemanticsMatcher.keyIsDefined(SemanticsProperties.Password),
+                hasText(composeRule.activity.getString(R.string.onboarding_password_saved)),
             )
                 .fetchSemanticsNodes().size == 1
         }

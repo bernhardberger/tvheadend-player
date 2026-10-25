@@ -67,9 +67,9 @@ internal fun settingsConnectionLevels(
             recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS),
         settingsLevel(CONNECTION_EDITOR, stringResource(R.string.edit_connection),
             listOf(settingsRow("editor-placeholder", stringResource(R.string.edit_connection))),
-            activeContent = { requester, left ->
+            activeContent = { requester, _ ->
                 val visit = navigation.stack.visit
-                SettingsConnection(requester, onNavigateLeft = left, onSaved = {
+                SettingsConnection(requester, onSaved = {
                     if (navigation.stack.visit == visit && navigation.stack.active.levelId == CONNECTION_EDITOR) navigation.pop()
                 })
             }),

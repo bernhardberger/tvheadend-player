@@ -36,6 +36,12 @@ enum class AppErrorCondition(val number: Int, val kind: AppErrorKind) {
     /** The SDK retries by itself and there is nothing saved to show instead. */
     RECONNECTING(110, AppErrorKind.CONNECTION),
 
+    /** Something answered at the address, but not Tvheadend's HTSP service; told apart from 105 where a setup test can. */
+    NOT_TVHEADEND(111, AppErrorKind.CONNECTION),
+
+    /** This device has no network, so no server can answer; told apart from 101 where a setup test can. */
+    NO_NETWORK(112, AppErrorKind.CONNECTION),
+
     NO_FREE_ADAPTER(201, AppErrorKind.CHANNEL),
     NO_SIGNAL(202, AppErrorKind.CHANNEL),
     MUX_NOT_ENABLED(203, AppErrorKind.CHANNEL),
@@ -89,11 +95,13 @@ fun AppErrorCondition.actions(
         AppErrorCondition.RECONNECTING -> SETTINGS
         AppErrorCondition.UNREACHABLE,
         AppErrorCondition.TIMEOUT,
+        AppErrorCondition.NO_NETWORK,
         AppErrorCondition.NO_CHANNELS,
         AppErrorCondition.LOAD_FAILED -> recovery.buttons(default = RETRY_AND_SETTINGS)
         AppErrorCondition.AUTHENTICATION_REJECTED,
         AppErrorCondition.PERMISSION_DENIED,
         AppErrorCondition.INCOMPATIBLE_SERVER,
+        AppErrorCondition.NOT_TVHEADEND,
         AppErrorCondition.CREDENTIAL_UNAVAILABLE,
         AppErrorCondition.NOT_CONFIGURED -> recovery.buttons(default = SETTINGS)
         AppErrorCondition.NO_FREE_ADAPTER,

@@ -42,7 +42,14 @@ fun TvPasswordField(
     value: String,
     onValueChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    /** Inside the outline, as in [TvOutlinedTextField]; null where the caller shows it above. */
+    label: (@Composable () -> Unit)? = { Text(stringResource(R.string.password)) },
     presentationValue: String? = null,
+    enabled: Boolean = true,
+    isError: Boolean = false,
+    supportingText: (@Composable () -> Unit)? = null,
+    /** Replaces leaving the edit on Done, as in [TvOutlinedTextField]. */
+    onImeAction: (() -> Unit)? = null,
 ) {
     val keyboard = LocalSoftwareKeyboardController.current
     val focusManager = LocalFocusManager.current
@@ -51,10 +58,12 @@ fun TvPasswordField(
     val eyeFocus = remember { FocusRequester() }
 
     var passwordVisible by remember { mutableStateOf(false) }
+    var textFocused by remember { mutableStateOf(false) }
 
     val isEditing = editingId == id
     val displayedPresentation = presentationValue.takeIf { !isEditing && value.isEmpty() }
     val displayedValue = displayedPresentation ?: value
+    val canReveal = presentationValue == null || value.isNotEmpty()
 
     BackHandler(enabled = isEditing) { setEditingId(null) }
 
@@ -74,11 +83,14 @@ fun TvPasswordField(
     OutlinedTextField(
         value = displayedValue,
         onValueChange = onValueChange,
-        label = { Text(stringResource(R.string.password)) },
+        label = label,
         singleLine = true,
         readOnly = !isEditing,
+        enabled = enabled,
+        isError = isError,
+        supportingText = supportingText,
         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { setEditingId(null) }),
+        keyboardActions = KeyboardActions(onDone = { onImeAction?.invoke() ?: setEditingId(null) }),
 
         visualTransformation = if (displayedPresentation != null || passwordVisible) {
             VisualTransformation.None
@@ -89,10 +101,13 @@ fun TvPasswordField(
         modifier = modifier
             .focusRequester(textFocus)
             .onFocusChanged { state ->
+                textFocused = state.isFocused
                 if (!state.isFocused && isEditing) setEditingId(null)
             }
             .onPreviewKeyEvent { ev ->
-                if (ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                // This modifier also sees events from the nested eye button. Only the text
+                // target may open the IME; let the TV button handle its own activation.
+                if (!textFocused || ev.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
 
                 when (ev.key) {
                     Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
@@ -103,7 +118,7 @@ fun TvPasswordField(
                     }
 
                     Key.DirectionRight -> {
-                        if (!isEditing) {
+                        if (!isEditing && canReveal) {
                             eyeFocus.requestFocus()
                             true
                         } else false
@@ -127,32 +142,30 @@ fun TvPasswordField(
                 }
             },
 
-        trailingIcon = {
-            IconButton(
-                onClick = { passwordVisible = !passwordVisible },
-                interactionSource = remember { MutableInteractionSource() },
-                modifier = Modifier
-                    .focusRequester(eyeFocus)
-                    .onKeyEvent { ev ->
-                        if (ev.type != KeyEventType.KeyDown) return@onKeyEvent false
+        trailingIcon = if (canReveal) {
+            {
+                IconButton(
+                    onClick = { passwordVisible = !passwordVisible },
+                    enabled = enabled,
+                    interactionSource = remember { MutableInteractionSource() },
+                    modifier = Modifier
+                        .focusRequester(eyeFocus)
+                        .onKeyEvent { ev ->
+                            if (ev.type != KeyEventType.KeyDown) return@onKeyEvent false
 
-                        when (ev.key) {
-                            Key.Enter, Key.NumPadEnter, Key.DirectionCenter -> {
-                                passwordVisible = !passwordVisible
-                                true
+                            when (ev.key) {
+                                Key.DirectionLeft -> {
+                                    textFocus.requestFocus()
+                                    true
+                                }
+
+                                else -> false
                             }
-
-                            Key.DirectionLeft -> {
-                                textFocus.requestFocus()
-                                true
-                            }
-
-                            else -> false
                         }
-                    }
-            ) {
-                Icon(painter = painterResource(icon), contentDescription = desc)
+                ) {
+                    Icon(painter = painterResource(icon), contentDescription = desc)
+                }
             }
-        }
+        } else null
     )
 }

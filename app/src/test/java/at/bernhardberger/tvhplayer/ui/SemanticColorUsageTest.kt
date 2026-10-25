@@ -12,8 +12,7 @@ class SemanticColorUsageTest {
 
     @Test
     fun successMetadataRecordingAndFailureUseTheirOwnedRoles() {
-        assertContains("ui/screens/OnboardingScreen.kt", "MaterialTheme.colorScheme.error")
-        assertContains("ui/screens/settings/SettingsConnection.kt", "MaterialTheme.colorScheme.error")
+        assertContains("ui/screens/onboarding/ConnectionSetupSteps.kt", "MaterialTheme.colorScheme.error")
         assertContains(
             "ui/components/ProgrammeDetailsLayout.kt",
             "color = MaterialTheme.colorScheme.onSurfaceVariant",
@@ -25,7 +24,7 @@ class SemanticColorUsageTest {
         assertContains("ui/components/StatusBadge.kt", "StatusBadgeTone.RECORDING -> TvRecordingContainerColor")
 
         val scopedSources = listOf(
-            "ui/screens/OnboardingScreen.kt",
+            "ui/screens/onboarding/ConnectionSetupSteps.kt",
             "ui/screens/settings/SettingsConnection.kt",
             "ui/screens/RecordingsScreen.kt",
             "ui/screens/recordings/RecordingsContent.kt",

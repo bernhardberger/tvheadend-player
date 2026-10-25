@@ -1,25 +1,33 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.hasClickAction
-import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
-import androidx.compose.ui.test.requestFocus
+import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
+import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
+import at.bernhardberger.tvheadend.sdk.core.SessionObservation
+import at.bernhardberger.tvheadend.sdk.core.SessionState
+import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
 import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupState
+import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupStep
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emptyFlow
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -27,30 +35,28 @@ import org.junit.Test
 class OnboardingScreenTest {
     @get:Rule
     val composeRule = createComposeRule()
+    private val session = FakeTvheadendSession()
 
     @Test
-    fun introductionContinueMovesToConnectionStep() {
-        var step by mutableStateOf(OnboardingStep.INTRODUCTION)
-
-        composeRule.setContent {
-            TVHeadendPlayerTheme {
-                if (step == OnboardingStep.INTRODUCTION) {
-                    OnboardingIntroduction { step = OnboardingStep.CONNECTION }
-                } else {
-                    androidx.tv.material3.Text("Connection step")
-                }
-            }
-        }
-
-        composeRule.onNode(hasText("Set up server connection") and hasClickAction())
-            .requestFocus()
-            .performKeyInput { pressKey(Key.DirectionCenter) }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithText("Connection step").assertIsDisplayed()
+    fun serverStartsOnSearchAndContinueValidatesTheAddress() {
+        show(SetupStep.ADDRESS, ConnectionFormState())
+        composeRule.onNodeWithTag("setup-find-server").assertIsFocused()
+        repeat(3) { press(Key.DirectionDown) }
+        composeRule.onNodeWithTag("setup-continue").assertIsFocused()
+        press(Key.DirectionCenter)
+        composeRule.onNodeWithTag("setup-host").assertIsFocused()
     }
 
     @Test
-    fun connectionSubmissionUsesSharedFormAndZerosThePassword() {
+    fun aSearchWithoutServersStaysBesideTheAddress() {
+        show(SetupStep.ADDRESS, ConnectionFormState())
+        press(Key.DirectionCenter)
+        composeRule.onNodeWithTag("setup-host").assertExists()
+        composeRule.onNodeWithText("Search again").assertIsFocused()
+    }
+
+    @Test
+    fun startWatchingSavesTheTestedProfileAndZerosThePassword() {
         val editor = FakeOnboardingConnectionProfileEditor()
         val form = ConnectionFormState(
             host = " $FAKE_HOST ",
@@ -58,21 +64,25 @@ class OnboardingScreenTest {
             username = FAKE_USERNAME,
             password = FAKE_PASSWORD,
         )
-
-        composeRule.setContent {
-            TVHeadendPlayerTheme {
-                OnboardingConnection(
-                    settingsStore = editor,
-                    onBack = {},
-                    form = form,
-                )
-            }
+        show(SetupStep.SIGN_IN, form, editor)
+        composeRule.onNodeWithTag("setup-continue").assertIsFocused()
+        press(Key.DirectionCenter)
+        composeRule.onNodeWithTag("setup-connecting").assertIsFocused()
+        composeRule.runOnIdle {
+            assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls)
+            assertEquals("Nothing is saved before the test passes", 0, editor.passwordSaveCount)
         }
-
-        composeRule.onNode(hasText("Save and continue") and hasClickAction())
-            .requestFocus()
-            .performKeyInput { pressKey(Key.DirectionCenter) }
+        session.publish(
+            SessionObservation.create(
+                sessionState = SessionState.Ready(
+                    ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED),
+                ),
+            ),
+        )
         composeRule.waitForIdle()
+        composeRule.onNodeWithTag("setup-start-watching").assertIsFocused()
+        press(Key.DirectionCenter)
+
         composeRule.runOnIdle {
             assertEquals(1, editor.passwordSaveCount)
             assertEquals(FAKE_HOST, editor.savedHost)
@@ -81,6 +91,26 @@ class OnboardingScreenTest {
             assertEquals(ConnectionFormFeedback.SAVED, form.feedback)
             assertEquals("", form.password)
         }
+    }
+
+    private fun show(
+        step: SetupStep,
+        form: ConnectionFormState,
+        editor: ConnectionProfileEditor = FakeOnboardingConnectionProfileEditor(),
+    ) {
+        composeRule.setContent {
+            val scope = rememberCoroutineScope()
+            TVHeadendPlayerTheme {
+                // A search that ends at once with nothing, as on a network where no server announces itself.
+                ConnectionSetupFlow(remember { ConnectionSetupState(form, session, editor, { emptyFlow() }, scope, step = step) })
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun press(key: Key) {
+        composeRule.onRoot().performKeyInput { pressKey(key) }
+        composeRule.waitForIdle()
     }
 }
 

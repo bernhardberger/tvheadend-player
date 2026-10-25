@@ -59,6 +59,8 @@ class AppErrorTest {
         AppErrorCondition.NO_CHANNELS to retry,
         AppErrorCondition.LOAD_FAILED to retry,
         AppErrorCondition.RECONNECTING to settings,
+        AppErrorCondition.NOT_TVHEADEND to settings,
+        AppErrorCondition.NO_NETWORK to retry,
     )
 
     /** Real SDK admissions, built through its test factory. */

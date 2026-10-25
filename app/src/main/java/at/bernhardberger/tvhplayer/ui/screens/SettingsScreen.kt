@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.settings.UiSettings
@@ -8,6 +9,7 @@ import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
@@ -15,6 +17,9 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.*
 import at.bernhardberger.tvhplayer.ui.common.recordingSpaceText
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
+import at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering
+import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
+import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.screens.settings.*
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
@@ -58,7 +63,7 @@ internal fun SettingsScreen(
 internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD, showRecordings: Boolean = false): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
     settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general_nav), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune),
     settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list),
-    settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
+    settingsConnectionEntry(),
     settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
 ) + (if (showRecordings) listOf(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
     icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + (if (applianceBuild) listOf(
@@ -66,6 +71,14 @@ internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_B
 ) else emptyList()) + listOf(
     settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info),
 ))
+
+@Composable
+private fun settingsConnectionEntry(): DepthRow {
+    val row = settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
+        icon = R.drawable.ic_cloud, trailingIcon = R.drawable.ic_edit)
+    return DepthRow(DepthItem(SettingsSection.CONNECTION.name), leafLevelId = CONNECTION_EDITOR,
+        content = row.content)
+}
 
 @Composable
 internal fun SettingsScreenNavigation(
@@ -85,16 +98,25 @@ internal fun SettingsScreenNavigation(
     // host so that depth motion stays inside the browse viewport and never paints
     // across the drawer.
     val inset = contentPadding.calculateStartPadding(layoutDirection) + TvBrowseLeadingInset
+    val connectionEditor = navigation.stack.active.levelId == CONNECTION_EDITOR
+    val layering = LocalBrowseContentLayering.current
+    val pageKey = remember { Any() }
+    val opacity = remember { mutableFloatStateOf(1f) }
+    DisposableEffect(layering, connectionEditor, isCurrent) {
+        if (connectionEditor && isCurrent) layering?.details?.set(pageKey, opacity)
+        onDispose { layering?.details?.remove(pageKey) }
+    }
     DepthNavigation(
         state = navigation,
         levels = levels.associateBy { it.id },
         fallbackLevel = { id -> settingsLevel(id, unavailable, listOf(settingsRow("unavailable", unavailable, onClick = navigation::pop))) },
         columnWidth = SettingsDepthColumnWidth,
         columnGap = SettingsDepthColumnGap,
-        contentPadding = PaddingValues(start = inset,
+        contentPadding = if (connectionEditor) PaddingValues(0.dp) else PaddingValues(start = inset,
             top = contentPadding.calculateTopPadding(),
             bottom = contentPadding.calculateBottomPadding()),
-        modifier = Modifier.fillMaxSize(),
+        modifier = (if (connectionEditor) Modifier.browseDetailsViewport()
+            .background(MaterialTheme.colorScheme.background) else Modifier).fillMaxSize(),
         initialFocusEnabled = initialFocusEnabled,
         backEnabled = backEnabled,
         isCurrent = isCurrent,
