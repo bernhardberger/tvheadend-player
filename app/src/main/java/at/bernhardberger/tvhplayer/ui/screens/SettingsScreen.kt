@@ -64,7 +64,7 @@ internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_B
     icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + (if (applianceBuild) listOf(
     settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance_nav), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home),
 ) else emptyList()) + listOf(
-    settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info_outline),
+    settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info),
 ))
 
 @Composable

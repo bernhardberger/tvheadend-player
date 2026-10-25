@@ -16,6 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -81,16 +83,29 @@ class SettingsAboutTest {
         press(Key.DirectionDown)
         compose.onNodeWithText("Not connected", substring = true).assertIsFocused()
         press(Key.DirectionDown)
+        compose.onNodeWithText("GNU General Public License v3")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         press(Key.DirectionCenter)
+        compose.onNode(isDialog()).assertExists()
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        val scroll = compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+        val before = scroll.value()
         repeat(5) { press(Key.DirectionDown) }
+        compose.runOnIdle { org.junit.Assert.assertTrue(scroll.value() > before) }
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
         press(Key.Back)
         compose.onNodeWithText("GNU General Public License v3").assertIsFocused()
         press(Key.DirectionDown)
+        compose.onNodeWithText("Notices and third-party libraries", substring = true)
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
         press(Key.DirectionCenter)
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
-        press(Key.DirectionLeft)
+        val noticesScroll = compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+        press(Key.DirectionDown)
+        compose.runOnIdle { org.junit.Assert.assertTrue(noticesScroll.value() > 0f) }
+        press(Key.Back)
         compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()
         press(Key.Back)
         compose.onNodeWithText("About").assertIsFocused()
@@ -121,8 +136,13 @@ class SettingsAboutTest {
     private fun save(name: String) {
         compose.waitForIdle()
         compose.runOnIdle {
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            view.draw(Canvas(bitmap))
+            // Dialogs own a separate window; capture the top window, not the Settings view beneath it.
+            val global = Class.forName("android.view.WindowManagerGlobal")
+            val instance = global.getMethod("getInstance").invoke(null)
+            val windows = global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<*>
+            val captureView = windows.lastOrNull() as? View ?: view
+            val bitmap = Bitmap.createBitmap(captureView.width, captureView.height, Bitmap.Config.ARGB_8888)
+            captureView.draw(Canvas(bitmap))
             val target = File("../build/review/about/$name.png")
             target.parentFile.mkdirs()
             target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
@@ -131,7 +151,10 @@ class SettingsAboutTest {
     }
 
     private fun press(key: Key) {
-        compose.onRoot().performKeyInput { pressKey(key) }
+        val target = if (compose.onAllNodes(isDialog()).fetchSemanticsNodes().isNotEmpty()) {
+            compose.onNodeWithTag("player-info-reading")
+        } else compose.onNode(isFocused())
+        target.performKeyInput { pressKey(key) }
         compose.mainClock.advanceTimeBy(1200)
         compose.waitForIdle()
     }
