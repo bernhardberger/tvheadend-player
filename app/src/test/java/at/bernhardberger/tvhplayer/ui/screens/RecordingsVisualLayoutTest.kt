@@ -846,6 +846,28 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    /** The G10's Sports folder showed half a row above its first whole one after a visit scrolled it. */
+    @Test fun previewOfAScrolledFolderStartsWithAWholeRowUnderItsHeading() {
+        show(entries = (1L..14L).map { recording(it, "Event $it", "Sports/League%02d/event.ts".format(it)) } +
+            recording(30, "Harbor Lights Live", "concert.ts"))
+        focused("recordings-folder-Sports")
+        val fresh = previewFirstInk()
+        key(Key.DirectionRight)
+        focused("recordings-folder-Sports/League01")
+        repeat(9) { key(Key.DirectionDown) }
+        focused("recordings-folder-Sports/League10")
+        key(Key.Back)
+        focused("recordings-folder-Sports")
+        capture("preview-after-scrolled-visit", 1f)
+        val returned = previewFirstInk()
+        assertEquals("the preview's first row starts where an unvisited one does", fresh.first, returned.first, 1f)
+        assertEquals("and is as bright, not under the top fade", fresh.second, returned.second, .05f)
+        // Entering again still lands on the row the visit left.
+        key(Key.DirectionRight)
+        focused("recordings-folder-Sports/League10")
+        assertNoCommands()
+    }
+
     @Test fun removedPathReconcilesWithoutStealingTabOrDrawerFocus() {
         show()
         focused("recordings-folder-Documentaries")
@@ -1446,6 +1468,30 @@ class RecordingsVisualLayoutTest {
         assertEquals(0, playbackRequests)
         assertEquals(0, navigationRequests)
         assertTrue("Browsing/details must not dispatch any SDK command", session.calls.isEmpty())
+    }
+
+    /**
+     * The first line from the top of the preview's list band with ink where its rows' folder icons
+     * are, and the brightest ink of the row it starts.
+     */
+    private fun previewFirstInk(): Pair<Float, Float> {
+        val preview = bounds("depth-preview")
+        // The preview's list starts level with the root's, whose first row is the Sports folder.
+        val listTop = bounds("recordings-folder-Sports").top - 4f
+        return compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            fun brightness(x: Int, y: Int) =
+                android.graphics.Color.valueOf(bitmap.getPixel(x, y)).run { maxOf(red(), green(), blue()) }
+            val background = brightness(preview.right.toInt() - 4, preview.bottom.toInt() - 4)
+            val icons = preview.left.toInt() until preview.left.toInt() + 80
+            val first = (listTop.toInt() until preview.bottom.toInt()).first { y ->
+                icons.any { x -> brightness(x, y) > background + .15f }
+            }
+            val peak = (first until first + 24).maxOf { y -> icons.maxOf { x -> brightness(x, y) } }
+            bitmap.recycle()
+            first.toFloat() to peak
+        }
     }
 
     private fun capture(name: String, scale: Float, focusEvidence: String? = null) {

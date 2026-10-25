@@ -21,22 +21,25 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
 
-// Browse lists run to the bottom edge of the screen and fade out where rows continue,
-// as the Cards example of the TV Design Kit does: opaque to about three quarters of
-// the 540dp canvas, transparent at the edge. Rows that scrolled away above fade under
-// a shorter band, shown only while there are any.
+// Browse lists run to the bottom edge of the screen and fade out where rows continue.
+// The fade keeps to the last row's height or so, so the row cut by the edge still reads
+// as the list going on, as Google TV's lists do. Rows that scrolled away above fade
+// under a shorter band, shown only while there are any.
 
 /** Fade where rows continue past the bottom edge of the screen. */
-internal val ListBottomFadeHeight = 140.dp
+internal val ListBottomFadeHeight = 80.dp
 
 /** Fade where rows have scrolled away above the list. */
 internal val ListTopFadeHeight = 48.dp
 
-/** Extra room between either fade and the focused row's native scale. */
+/** Extra room between the top fade and the focused row's native scale. */
 internal val ListFocusBreathingRoom = 8.dp
 
-/** Bottom band kept clear of focused rows, and the list's bottom content padding. */
-internal val ListBottomReserve = ListBottomFadeHeight + ListFocusBreathingRoom
+/**
+ * Bottom band kept clear of focused rows, and the list's bottom content padding: deeper than
+ * the fade, so the rows after the focused one stay in view above it.
+ */
+internal val ListBottomReserve = 148.dp
 
 /** Top band kept clear of focused rows while earlier rows exist. */
 internal val ListScrolledTopReserve = ListTopFadeHeight + ListFocusBreathingRoom
@@ -120,15 +123,16 @@ private val ListFocusOverhang = 24.dp
 /**
  * Fades a list's edges only while rows continue past them; read during drawing. The mask's
  * offscreen layer reaches [ListFocusOverhang] past both sides of the list without changing its
- * layout, so a scaled focused row keeps its rounded ends.
+ * layout, so a scaled focused row keeps its rounded ends. Without [topFade], a list that starts
+ * at a whole row shows it unfaded.
  */
-internal fun Modifier.listEdgeFades(listState: LazyListState): Modifier = this
+internal fun Modifier.listEdgeFades(listState: LazyListState, topFade: Boolean = true): Modifier = this
     .layout { measurable, constraints ->
         val overhang = ListFocusOverhang.roundToPx()
         val placeable = measurable.measure(constraints.offset(horizontal = 2 * overhang))
         layout(placeable.width - 2 * overhang, placeable.height) { placeable.placeRelative(-overhang, 0) }
     }
-    .listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { listState.canScrollBackward }) {
+    .listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { topFade && listState.canScrollBackward }) {
         listState.canScrollForward
     }
     .layout { measurable, constraints ->

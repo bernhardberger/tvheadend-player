@@ -562,6 +562,13 @@ private fun DepthStripPane(
     DisposableEffect(active, capturedVisit, initialFocusEnabled, identities) {
         onDispose { pageJob?.cancel(); pageTarget = null }
     }
+    // A level left scrolled keeps its list for the next visit, with a row partly under the top
+    // fade; as a preview it starts with that row whole under its heading instead, unfaded. Back
+    // to the row's start, as a list at its end has no later row to start with.
+    val preview = !visuallyActive && column.path.size == activePath.size + 1
+    if (preview && list.firstVisibleItemScrollOffset > 0) {
+        SideEffect { list.requestScrollToItem(list.firstVisibleItemIndex) }
+    }
     val targetId = if (active) focusedItemId else column.level.initialItemId
     LaunchedEffect(capturedVisit, active, initialFocusEnabled, targetId, column.level.rows.map { it.item.id }) {
         if (targetId == null) return@LaunchedEffect
@@ -633,7 +640,7 @@ private fun DepthStripPane(
                     state = list,
                     contentPadding = PaddingValues(top = DepthListTopReserve, bottom = ListBottomReserve),
                     modifier = Modifier.fillMaxSize()
-                        .listEdgeFades(list)
+                        .listEdgeFades(list, topFade = !preview)
                         .then(if (active && activeFocusRequester != null) Modifier.focusRequester(activeFocusRequester) else Modifier)
                         .onFocusChanged {
                             if (!it.hasFocus) { pageJob?.cancel(); pageTarget = null }
