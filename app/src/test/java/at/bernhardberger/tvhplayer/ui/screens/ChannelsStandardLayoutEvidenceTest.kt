@@ -746,7 +746,8 @@ class ChannelsStandardLayoutEvidenceTest {
 
         key(Key.DirectionDown)
         row(LONG_TEXT).assertIsFocused()
-        assertDescriptionFits(3)
+        // The long programme keeps three whole synopsis lines, one at larger text.
+        assertDescriptionFits(if (fontScale == 1f) 3 else 1)
         captureBackgrounds("$prefix-long-programme")
 
         key(Key.DirectionDown)
