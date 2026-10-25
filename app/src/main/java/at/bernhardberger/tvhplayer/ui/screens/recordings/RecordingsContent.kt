@@ -74,6 +74,7 @@ import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.em
 import androidx.tv.material3.Icon
@@ -107,12 +108,14 @@ import at.bernhardberger.tvhplayer.core.offeredResumePosition
 import at.bernhardberger.tvhplayer.core.recordingTimeLeft
 import at.bernhardberger.tvhplayer.ui.player.playerMinutesLeft
 import at.bernhardberger.tvhplayer.core.recordingPaddedStop
+import at.bernhardberger.tvhplayer.core.recordingSizeBytes
 import at.bernhardberger.tvhplayer.core.recordingStoppedEarly
 import at.bernhardberger.tvhplayer.core.recordingListMetadata
 import at.bernhardberger.tvhplayer.core.recordingListPageTargetIndex
 import at.bernhardberger.tvhplayer.core.summarizeDvrFolder
 import at.bernhardberger.tvhplayer.core.watchedCount
 import at.bernhardberger.tvhplayer.core.runningRecordings
+import at.bernhardberger.tvhplayer.ui.TvBrowseColumnGap
 import at.bernhardberger.tvhplayer.ui.TvBrowseColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
@@ -355,7 +358,9 @@ internal fun RecordingNowFolderRow(
 /**
  * The focused recording beside the list, laid out as the Channels pane: its picture, then the
  * channel and day with the recording's state, what it is, its facts, when it ran with how far it
- * was watched, and the synopsis; how it ended and whether it was watched close it.
+ * was watched, and the synopsis; how it ended and whether it was watched close it. Beside the
+ * Schedule a padded stop and the rule that set it up join them; beside the Problems what went
+ * wrong is always said in words, with what is left of the file.
  */
 @Composable
 internal fun RecordingMetadataPane(
@@ -363,6 +368,7 @@ internal fun RecordingMetadataPane(
     piconPath: ArtworkId?,
     admission: RecordingPlaybackAdmission?,
     modifier: Modifier = Modifier,
+    kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
 ) {
     if (entry == null) {
         Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -386,7 +392,14 @@ internal fun RecordingMetadataPane(
     }
     val stoppedEarly = remember(entry) { recordingStoppedEarly(entry) != null }
     val failure = entry.subscriptionError?.label()
+        ?: if (kind == RecordingRowKind.PROBLEM) problemStateLabel(entry.state) else null
     val watched = watchState == RecordingWatchState.Watched
+    val rule = if (kind == RecordingRowKind.SCHEDULE) recordingRuleLabel(entry) else null
+    val partialSize = if (kind == RecordingRowKind.PROBLEM) recordingSizeBytes(entry)?.takeIf { it > 0 } else null
+    // The Schedule row's own words for the padded stop, when the padding moves it.
+    val paddedStop = recordingPaddedStop(entry)?.takeIf {
+        kind == RecordingRowKind.SCHEDULE && it.epochSeconds != entry.stop?.epochSeconds
+    }?.let { stringResource(R.string.recordings_until, formatClock(it.epochSeconds)) }
     // Level with the first row, below the list's own top padding.
     Column(modifier.fillMaxSize().padding(top = 4.dp).testTag("recording-metadata-pane")) {
         ProgrammePanePicture(
@@ -416,7 +429,12 @@ internal fun RecordingMetadataPane(
                 append(entry.start?.epochSeconds?.let { start ->
                     entry.stop?.epochSeconds?.let { formatTimeInterval(start, it) } ?: formatClock(start)
                 }.orEmpty())
-                recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 }?.let {
+                paddedStop?.let {
+                    if (isNotEmpty()) append(" • ")
+                    append(it)
+                }
+                // A scheduled entry has recorded nothing yet; its length would be only the plan.
+                recordingLengthSeconds(entry, nowSec)?.takeIf { it > 0 && entry.state != DvrEntryState.SCHEDULED }?.let {
                     if (isNotEmpty()) append(" • ")
                     append(resources.getString(R.string.recording_length_recorded, formatRecordedDuration(it, resources)))
                 }
@@ -429,11 +447,19 @@ internal fun RecordingMetadataPane(
             titleStyle = MaterialTheme.typography.titleLarge,
             synopsisStyle = MaterialTheme.typography.bodyMedium,
             // Under its time, how it ended and how watching it would go, each with its row's mark.
-            status = if (failure == null && !stoppedEarly && !watched && timeLeft == null) null else { statusModifier ->
+            status = if (failure == null && !stoppedEarly && !watched && timeLeft == null && rule == null &&
+                partialSize == null) null else { statusModifier ->
                 Column(statusModifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    rule?.let { (text, icon) ->
+                        ProgrammeStatusLine(text, icon, "recording-metadata-rule", maxLines = 2)
+                    }
                     failure?.let {
                         ProgrammeStatusLine(it, R.drawable.ic_error_outlined, "recording-metadata-failure",
                             color = MaterialTheme.colorScheme.error, maxLines = 2)
+                    }
+                    partialSize?.let {
+                        ProgrammeStatusLine(stringResource(R.string.recording_partial_file, formatFileSize(it, LocalContext.current)),
+                            R.drawable.ic_folder, "recording-metadata-partial-file")
                     }
                     if (stoppedEarly) {
                         ProgrammeStatusLine(stringResource(R.string.recordings_stopped_early),
@@ -458,6 +484,58 @@ internal fun RecordingMetadataPane(
     }
 }
 
+/** A failed or cancelled recording's state in the words its notice uses. */
+@Composable
+private fun problemStateLabel(state: DvrEntryState?): String? = when (state) {
+    DvrEntryState.FILE_MISSING -> R.string.error_303_title
+    DvrEntryState.MISSED -> R.string.recording_notice_missed
+    DvrEntryState.COMPLETED_ERROR -> R.string.recording_notice_failed
+    DvrEntryState.INVALID -> R.string.recording_notice_canceled
+    else -> null
+}?.let { stringResource(it) }
+
+/** The rule a scheduled recording comes from, with its mark, when the server says it has one. */
+@Composable
+private fun recordingRuleLabel(entry: DvrEntry): Pair<String, Int>? = when {
+    entry.autorecRuleId != null -> stringResource(R.string.recording_from_series_rule) to R.drawable.ic_event
+    entry.timerecRuleId != null -> stringResource(R.string.recording_from_timer_rule) to R.drawable.ic_schedule
+    else -> null
+}
+
+/**
+ * A Schedule or Problems list in Archive's first column, with the focused recording's pane where
+ * Archive shows its preview: below the heading band, level with the first row. The pane is passive;
+ * focus stays in the list.
+ */
+@Composable
+private fun RecordingListWithPane(
+    entry: DvrEntry?,
+    kind: RecordingRowKind,
+    piconForEntry: (DvrEntry) -> ArtworkId?,
+    admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
+    paneBottom: Dp,
+    list: @Composable () -> Unit,
+) {
+    Row(Modifier.fillMaxSize()) {
+        Box(Modifier.width(TvBrowseColumnWidth).fillMaxHeight()) { list() }
+        Box(
+            Modifier
+                .padding(start = TvBrowseColumnGap, top = recordingsHeadingBandHeight())
+                .width(TvBrowseColumnWidth)
+                .fillMaxHeight()
+                .focusProperties { canFocus = false },
+        ) {
+            RecordingMetadataPane(
+                entry = entry,
+                piconPath = entry?.let(piconForEntry),
+                admission = entry?.let(admissionForEntry),
+                modifier = Modifier.padding(bottom = paneBottom),
+                kind = kind,
+            )
+        }
+    }
+}
+
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 internal fun RecordingSchedule(
@@ -468,9 +546,10 @@ internal fun RecordingSchedule(
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     piconForEntry: (DvrEntry) -> ArtworkId?,
-    resumePositionForEntry: (DvrEntry) -> Duration?,
+    admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
+    paneBottom: Dp = 0.dp,
 ) {
     if (groups.isEmpty()) {
         ModeEmptyState(R.string.recordings_schedule_empty)
@@ -507,98 +586,102 @@ internal fun RecordingSchedule(
             if (owner?.isCurrent != false) onScrollChanged(it)
         }
     }
-    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
-        LazyColumn(
-            state = listState,
-            userScrollEnabled = active,
-            // Full-width native rows grow by more than the narrow archive rows.
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = ListBottomReserve),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .listEdgeFades(listState)
-                .onFocusChanged {
-                    if (!it.hasFocus) {
-                        pageFocusJob?.cancel()
-                        pageTargetKey = null
-                        pendingPageKey = null
-                    }
-                }
-                .focusGroup()
-                .focusRestorer(selectedFocus)
-                .testTag("recordings-schedule-list")
-                .onPreviewKeyEvent { event ->
-                    if (owner?.isCurrent == false) return@onPreviewKeyEvent true
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    pageFocusJob?.cancel()
-                    pageTargetKey = null
-                    val direction = ChannelNavigation.pageDirectionForKeyCode(
-                        event.nativeKeyEvent.keyCode
-                    ) ?: run {
-                        pendingPageKey = null
-                        return@onPreviewKeyEvent false
-                    }
-                    val current = entries.indexOfFirst {
-                        "recording:${recordingItemKey(it.id)}" == pendingPageKey
-                    }.takeIf { it >= 0 } ?: entries.indexOfFirst {
-                        "recording:${recordingItemKey(it.id)}" == selectedKey
-                    }
-                    val target = recordingListPageTargetIndex(
-                        entries.size,
-                        current,
-                        listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
-                        direction,
-                    ) ?: run {
-                        pendingPageKey = null
-                        return@onPreviewKeyEvent true
-                    }
-                    pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
-                    pageFocusJob = scope.launch {
-                        val layout = listState.layoutInfo
-                        val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                            layout.beforeContentPadding.toFloat(),
-                            (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
-                            layout.viewportSize.height.toFloat(),
-                        ).roundToInt()
-                        listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
-                        if (owner?.isCurrent == false) return@launch
-                        pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
-                    }
-                    true
-                },
-        ) {
-            groups.forEachIndexed { index, section ->
-                item(key = "header-${section.kind}-${section.date}") {
-                    RecordingSectionHeader(
-                        text = scheduleSectionLabel(section),
-                        first = index == 0,
-                    )
-                }
-                items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
-                    val rowKey = "recording:${recordingItemKey(entry.id)}"
-                    if (active && pageTargetKey == rowKey) {
-                        LaunchedEffect(rowKey) {
-                            if (owner?.isCurrent != false && pageTargetKey == rowKey) {
-                                runCatching { selectedFocus.requestFocus() }
-                                pageTargetKey = null
-                                pendingPageKey = null
-                            }
+    val paneEntry = entries.firstOrNull { "recording:${recordingItemKey(it.id)}" == focusTargetKey }
+    RecordingListWithPane(paneEntry, RecordingRowKind.SCHEDULE, piconForEntry, admissionForEntry, paneBottom) {
+        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+            LazyColumn(
+                state = listState,
+                userScrollEnabled = active,
+                contentPadding = PaddingValues(bottom = ListBottomReserve),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .listEdgeFades(listState)
+                    .onFocusChanged {
+                        if (!it.hasFocus) {
+                            pageFocusJob?.cancel()
+                            pageTargetKey = null
+                            pendingPageKey = null
                         }
                     }
-                    RecordingListRow(
-                        entry = entry,
-                        piconPath = piconForEntry(entry),
-                        resumePosition = resumePositionForEntry(entry),
-                        selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                        focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
-                        selectedFocus = selectedFocus,
-                        onFocused = {
-                            onFocused("recording:${recordingItemKey(entry.id)}")
-                        },
-                        onClick = { onOpen(entry) },
-                        onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
-                        kind = RecordingRowKind.SCHEDULE,
-                    )
+                    .focusGroup()
+                    .focusRestorer(selectedFocus)
+                    .testTag("recordings-schedule-list")
+                    .onPreviewKeyEvent { event ->
+                        if (owner?.isCurrent == false) return@onPreviewKeyEvent true
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        // As in the Archive, nothing to the right of a row takes focus: the pane is passive.
+                        if (event.key == Key.DirectionRight) return@onPreviewKeyEvent true
+                        pageFocusJob?.cancel()
+                        pageTargetKey = null
+                        val direction = ChannelNavigation.pageDirectionForKeyCode(
+                            event.nativeKeyEvent.keyCode
+                        ) ?: run {
+                            pendingPageKey = null
+                            return@onPreviewKeyEvent false
+                        }
+                        val current = entries.indexOfFirst {
+                            "recording:${recordingItemKey(it.id)}" == pendingPageKey
+                        }.takeIf { it >= 0 } ?: entries.indexOfFirst {
+                            "recording:${recordingItemKey(it.id)}" == selectedKey
+                        }
+                        val target = recordingListPageTargetIndex(
+                            entries.size,
+                            current,
+                            listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
+                            direction,
+                        ) ?: run {
+                            pendingPageKey = null
+                            return@onPreviewKeyEvent true
+                        }
+                        pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
+                        pageFocusJob = scope.launch {
+                            val layout = listState.layoutInfo
+                            val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                                layout.beforeContentPadding.toFloat(),
+                                (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                                layout.viewportSize.height.toFloat(),
+                            ).roundToInt()
+                            listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
+                            if (owner?.isCurrent == false) return@launch
+                            pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
+                        }
+                        true
+                    },
+            ) {
+                groups.forEachIndexed { index, section ->
+                    item(key = "header-${section.kind}-${section.date}") {
+                        RecordingSectionHeader(
+                            text = scheduleSectionLabel(section),
+                            first = index == 0,
+                        )
+                    }
+                    items(section.entries, key = { recordingItemKey(it.id) }) { entry ->
+                        val rowKey = "recording:${recordingItemKey(entry.id)}"
+                        if (active && pageTargetKey == rowKey) {
+                            LaunchedEffect(rowKey) {
+                                if (owner?.isCurrent != false && pageTargetKey == rowKey) {
+                                    runCatching { selectedFocus.requestFocus() }
+                                    pageTargetKey = null
+                                    pendingPageKey = null
+                                }
+                            }
+                        }
+                        RecordingListRow(
+                            entry = entry,
+                            piconPath = piconForEntry(entry),
+                            resumePosition = offeredResumePosition(admissionForEntry(entry)),
+                            selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
+                            focusTarget = active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
+                            selectedFocus = selectedFocus,
+                            onFocused = {
+                                onFocused("recording:${recordingItemKey(entry.id)}")
+                            },
+                            onClick = { onOpen(entry) },
+                            onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
+                            kind = RecordingRowKind.SCHEDULE,
+                        )
+                    }
                 }
             }
         }
@@ -615,9 +698,10 @@ internal fun RecordingProblems(
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
     piconForEntry: (DvrEntry) -> ArtworkId?,
-    resumePositionForEntry: (DvrEntry) -> Duration?,
+    admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
+    paneBottom: Dp = 0.dp,
 ) {
     val entries = DvrProblemBucket.entries.flatMap { groups[it].orEmpty() }
     if (entries.isEmpty()) {
@@ -655,107 +739,112 @@ internal fun RecordingProblems(
             if (owner?.isCurrent != false) onScrollChanged(it)
         }
     }
-    CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
-        LazyColumn(
-            state = listState,
-            userScrollEnabled = active,
-            contentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = ListBottomReserve),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .listEdgeFades(listState)
-                .onFocusChanged {
-                    if (!it.hasFocus) {
+    val paneEntry = entries.firstOrNull { "recording:${recordingItemKey(it.id)}" == focusTargetKey }
+    RecordingListWithPane(paneEntry, RecordingRowKind.PROBLEM, piconForEntry, admissionForEntry, paneBottom) {
+        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoViewSpec) {
+            LazyColumn(
+                state = listState,
+                userScrollEnabled = active,
+                contentPadding = PaddingValues(bottom = ListBottomReserve),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .listEdgeFades(listState)
+                    .onFocusChanged {
+                        if (!it.hasFocus) {
+                            pageFocusJob?.cancel()
+                            pageTargetKey = null
+                            pendingPageKey = null
+                        }
+                    }
+                    .focusGroup()
+                    .focusRestorer(selectedFocus)
+                    .testTag("recordings-problems-list")
+                    .onPreviewKeyEvent { event ->
+                        if (owner?.isCurrent == false) return@onPreviewKeyEvent true
+                        if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        // As in the Archive, nothing to the right of a row takes focus: the pane is passive.
+                        if (event.key == Key.DirectionRight) return@onPreviewKeyEvent true
                         pageFocusJob?.cancel()
                         pageTargetKey = null
-                        pendingPageKey = null
-                    }
-                }
-                .focusGroup()
-                .focusRestorer(selectedFocus)
-                .testTag("recordings-problems-list")
-                .onPreviewKeyEvent { event ->
-                    if (owner?.isCurrent == false) return@onPreviewKeyEvent true
-                    if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                    pageFocusJob?.cancel()
-                    pageTargetKey = null
-                    val direction = ChannelNavigation.pageDirectionForKeyCode(
-                        event.nativeKeyEvent.keyCode
-                    ) ?: run {
-                        pendingPageKey = null
-                        return@onPreviewKeyEvent false
-                    }
-                    val current = entries.indexOfFirst {
-                        "recording:${recordingItemKey(it.id)}" == pendingPageKey
-                    }.takeIf { it >= 0 } ?: entries.indexOfFirst {
-                        "recording:${recordingItemKey(it.id)}" == selectedKey
-                    }
-                    val target = recordingListPageTargetIndex(
-                        entries.size,
-                        current,
-                        listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
-                        direction,
-                    ) ?: run {
-                        pendingPageKey = null
-                        return@onPreviewKeyEvent true
-                    }
-                    pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
-                    pageFocusJob = scope.launch {
-                        val layout = listState.layoutInfo
-                        val focusOffset = bringIntoViewSpec.calculateScrollDistance(
-                            layout.beforeContentPadding.toFloat(),
-                            (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
-                            layout.viewportSize.height.toFloat(),
-                        ).roundToInt()
-                        listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
-                        if (owner?.isCurrent == false) return@launch
-                        pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
-                    }
-                    true
-                },
-        ) {
-            val firstBucket = DvrProblemBucket.entries.firstOrNull { groups[it].orEmpty().isNotEmpty() }
-            DvrProblemBucket.entries.forEach { bucket ->
-                val bucketEntries = groups[bucket].orEmpty()
-                if (bucketEntries.isNotEmpty()) {
-                    item(key = "header-$bucket") {
-                        RecordingSectionHeader(
-                            stringResource(
-                                if (bucket == DvrProblemBucket.FAILED) {
-                                    R.string.recordings_failed
-                                } else {
-                                    R.string.recordings_cancelled
-                                }
-                            ),
-                            first = bucket == firstBucket,
-                        )
-                    }
-                    items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
-                        val rowKey = "recording:${recordingItemKey(entry.id)}"
-                        if (active && pageTargetKey == rowKey) {
-                            LaunchedEffect(rowKey) {
-                                if (owner?.isCurrent != false && pageTargetKey == rowKey) {
-                                    runCatching { selectedFocus.requestFocus() }
-                                    pageTargetKey = null
-                                    pendingPageKey = null
+                        val direction = ChannelNavigation.pageDirectionForKeyCode(
+                            event.nativeKeyEvent.keyCode
+                        ) ?: run {
+                            pendingPageKey = null
+                            return@onPreviewKeyEvent false
+                        }
+                        val current = entries.indexOfFirst {
+                            "recording:${recordingItemKey(it.id)}" == pendingPageKey
+                        }.takeIf { it >= 0 } ?: entries.indexOfFirst {
+                            "recording:${recordingItemKey(it.id)}" == selectedKey
+                        }
+                        val target = recordingListPageTargetIndex(
+                            entries.size,
+                            current,
+                            listState.layoutInfo.visibleItemsInfo.count { it.key is Long },
+                            direction,
+                        ) ?: run {
+                            pendingPageKey = null
+                            return@onPreviewKeyEvent true
+                        }
+                        pendingPageKey = "recording:${recordingItemKey(entries[target].id)}"
+                        pageFocusJob = scope.launch {
+                            val layout = listState.layoutInfo
+                            val focusOffset = bringIntoViewSpec.calculateScrollDistance(
+                                layout.beforeContentPadding.toFloat(),
+                                (layout.visibleItemsInfo.firstOrNull { it.key is Long }?.size ?: 0).toFloat(),
+                                layout.viewportSize.height.toFloat(),
+                            ).roundToInt()
+                            listState.animateScrollToItem(lazyIndexes.getValue(entries[target].id), focusOffset)
+                            if (owner?.isCurrent == false) return@launch
+                            pageTargetKey = "recording:${recordingItemKey(entries[target].id)}"
+                        }
+                        true
+                    },
+            ) {
+                val firstBucket = DvrProblemBucket.entries.firstOrNull { groups[it].orEmpty().isNotEmpty() }
+                DvrProblemBucket.entries.forEach { bucket ->
+                    val bucketEntries = groups[bucket].orEmpty()
+                    if (bucketEntries.isNotEmpty()) {
+                        item(key = "header-$bucket") {
+                            RecordingSectionHeader(
+                                stringResource(
+                                    if (bucket == DvrProblemBucket.FAILED) {
+                                        R.string.recordings_failed
+                                    } else {
+                                        R.string.recordings_cancelled
+                                    }
+                                ),
+                                first = bucket == firstBucket,
+                            )
+                        }
+                        items(bucketEntries, key = { recordingItemKey(it.id) }) { entry ->
+                            val rowKey = "recording:${recordingItemKey(entry.id)}"
+                            if (active && pageTargetKey == rowKey) {
+                                LaunchedEffect(rowKey) {
+                                    if (owner?.isCurrent != false && pageTargetKey == rowKey) {
+                                        runCatching { selectedFocus.requestFocus() }
+                                        pageTargetKey = null
+                                        pendingPageKey = null
+                                    }
                                 }
                             }
+                            RecordingListRow(
+                                entry = entry,
+                                piconPath = piconForEntry(entry),
+                                resumePosition = offeredResumePosition(admissionForEntry(entry)),
+                                selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
+                                focusTarget =
+                                    active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
+                                selectedFocus = selectedFocus,
+                                onFocused = {
+                                    onFocused("recording:${recordingItemKey(entry.id)}")
+                                },
+                                onClick = { onOpen(entry) },
+                                onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
+                                kind = RecordingRowKind.PROBLEM,
+                            )
                         }
-                        RecordingListRow(
-                            entry = entry,
-                            piconPath = piconForEntry(entry),
-                            resumePosition = resumePositionForEntry(entry),
-                            selected = selectedKey == "recording:${recordingItemKey(entry.id)}",
-                            focusTarget =
-                                active && focusTargetKey == "recording:${recordingItemKey(entry.id)}",
-                            selectedFocus = selectedFocus,
-                            onFocused = {
-                                onFocused("recording:${recordingItemKey(entry.id)}")
-                            },
-                            onClick = { onOpen(entry) },
-                            onOpenContextMenu = onOpenContextMenu?.let { open -> { open(entry) } },
-                            kind = RecordingRowKind.PROBLEM,
-                        )
                     }
                 }
             }

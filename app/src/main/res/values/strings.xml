@@ -533,6 +533,11 @@
     <string name="recording_ends_at">Ends at %1$s</string>
     <!-- Beside the programme's time range, so a padded file's longer length does not read as a contradiction. -->
     <string name="recording_length_recorded">%1$s recorded</string>
+    <!-- Beside a scheduled recording that one of the server's rules set up. -->
+    <string name="recording_from_series_rule">Part of a series recording</string>
+    <string name="recording_from_timer_rule">Part of a repeating timer</string>
+    <!-- Beside a failed recording: the size of the file it left behind. -->
+    <string name="recording_partial_file">Partial file • %1$s</string>
     <string name="recording_play_from_beginning">Play from beginning</string>
     <string name="recording_still_recording">Still recording</string>
     <string name="recording_duration_unavailable">Duration unavailable</string>

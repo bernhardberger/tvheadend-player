@@ -418,6 +418,9 @@
     <string name="recording_resume_from">Fortsetzen ab %1$s</string>
     <string name="recording_ends_at">Endet um %1$s</string>
     <string name="recording_length_recorded">%1$s aufgenommen</string>
+    <string name="recording_from_series_rule">Teil einer Serienaufnahme</string>
+    <string name="recording_from_timer_rule">Teil eines wiederkehrenden Timers</string>
+    <string name="recording_partial_file">Teildatei • %1$s</string>
     <string name="recording_play_from_beginning">Von Anfang an abspielen</string>
     <string name="recording_still_recording">Aufnahme läuft noch</string>
     <string name="recording_duration_unavailable">Dauer nicht verfügbar</string>

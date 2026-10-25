@@ -167,7 +167,9 @@ internal fun ProgrammeHeadline(
         if (timing != null) {
             Row(Modifier.padding(top = if (hasFacts) ProgrammeHeadlineLineGap else ProgrammeHeadlineGroupGap).testTag("$tagPrefix-metadata"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(timing, style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 1)
+                // A second line for a long one, as German at a large font needs, rather than a lost word.
+                Text(timing, style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 2,
+                    overflow = TextOverflow.Ellipsis)
                 // Shorter rather than pushed off the end by a long time line.
                 if (progress != null) ProgressStrip(progress, Modifier.weight(1f, fill = false).width(160.dp), progressColor)
             }

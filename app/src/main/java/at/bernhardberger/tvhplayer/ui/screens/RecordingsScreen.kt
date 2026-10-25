@@ -714,8 +714,8 @@ internal fun RecordingsScreenContent(
                 )
                 DvrLibraryMode.SCHEDULE -> Box(
                     modifier = Modifier
-                        // Full-width native focus growth needs extra trailing safe-area reserve.
-                        .padding(start = startPadding + TvBrowseLeadingInset - 24.dp, end = maxOf(endPadding, TvBrowseTrailingInset) + 12.dp - 24.dp)
+                        // Archive's columns: the list in its first, the focused recording where it shows its preview.
+                        .padding(start = startPadding + TvBrowseLeadingInset, end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged {
                             if (!owner.isCurrent) return@onFocusChanged
@@ -746,9 +746,8 @@ internal fun RecordingsScreenContent(
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
-                            resumePositionForEntry = {
-                                at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
-                            },
+                            admissionForEntry = { observation.recordingPlaybackAdmission(it) },
+                            paneBottom = contentPadding.calculateBottomPadding(),
                             initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
                                 if (owner.isCurrent && generation == focusRecoveryGeneration) {
@@ -760,7 +759,7 @@ internal fun RecordingsScreenContent(
                 }
                 DvrLibraryMode.PROBLEMS -> Box(
                     modifier = Modifier
-                        .padding(start = startPadding + TvBrowseLeadingInset - 24.dp, end = maxOf(endPadding, TvBrowseTrailingInset) + 12.dp - 24.dp)
+                        .padding(start = startPadding + TvBrowseLeadingInset, end = endPadding)
                         .fillMaxSize()
                         .onFocusChanged {
                             if (!owner.isCurrent) return@onFocusChanged
@@ -791,9 +790,8 @@ internal fun RecordingsScreenContent(
                             piconForEntry = { entry ->
                                 entry.channelId?.let(channelsById::get)?.icon
                             },
-                            resumePositionForEntry = {
-                                at.bernhardberger.tvhplayer.core.offeredResumePosition(observation.recordingPlaybackAdmission(it))
-                            },
+                            admissionForEntry = { observation.recordingPlaybackAdmission(it) },
+                            paneBottom = contentPadding.calculateBottomPadding(),
                             initialScrollIndex = frame.scrollIndex,
                             onScrollChanged = {
                                 if (owner.isCurrent && generation == focusRecoveryGeneration) {

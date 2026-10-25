@@ -48,6 +48,7 @@ import at.bernhardberger.tvhplayer.ui.components.SideRail
 import java.io.File
 import java.util.Locale
 import java.util.TimeZone
+import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
 import org.junit.After
@@ -331,6 +332,7 @@ class RecordingsVisualLayoutTest {
     @Test fun scheduleAndProblemsKeepNativeRowsAndTruthfulStatus() {
         show()
         focused("recordings-folder-Documentaries")
+        val archiveRow = bounds("recordings-folder-Documentaries")
         key(Key.DirectionUp)
         compose.onNodeWithText("Archive").assertIsFocused()
         key(Key.DirectionRight)
@@ -338,23 +340,31 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
         assertOverlineAboveTitle(20)
-        assertFullWidthFocusInside("recordings-schedule-list", 20)
+        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary")
         // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
         assertTrailingStateMark(20, "Scheduled")
-        capture("schedule", 1f, assertFullWidthFocusSafeArea(20))
+        // The pane is passive: Right stays on the row, as on an Archive recording.
+        key(Key.DirectionRight)
+        focused("recording-list-entry-20")
+        capture("schedule", 1f)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         compose.onNodeWithText("Problems").assertIsFocused()
         key(Key.DirectionDown)
         focused("recording-list-entry-21")
         assertOverlineAboveTitle(21)
-        assertFullWidthFocusInside("recordings-problems-list", 21)
+        assertArchiveColumns(21, archiveRow, "Unfinished expedition")
+        // Without a reason from the server the pane says what happened in its notice's words.
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording failed"),
+            useUnmergedTree = true).assertIsDisplayed()
+        key(Key.DirectionRight)
+        focused("recording-list-entry-21")
         compose.onNodeWithTag("recording-list-state-failed", useUnmergedTree = true).assertIsDisplayed()
         compose.onNode(hasTestTag("recording-list-metadata-21") and hasText("Failed", substring = true),
             useUnmergedTree = true).assertExists()
         // The state no longer leads the row, so the logo keeps the column it has on every other tab.
         assertEquals(32f * 1.05f, bounds("recording-list-leading-21").width, .1f)
-        capture("problems", 1f, assertFullWidthFocusSafeArea(21))
+        capture("problems", 1f)
         assertNoCommands()
     }
 
@@ -370,6 +380,7 @@ class RecordingsVisualLayoutTest {
         val firstRowTop = bounds("recordings-folder-Documentaries").top
         key(Key.DirectionCenter)
         focused("recording-list-entry-1")
+        val archivePane = bounds("recording-metadata-pane")
         capture("archive-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-2")
@@ -383,9 +394,13 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recording-list-entry-40")
         assertDenseListGeometry(firstRowTop)
+        // The focused entry's pane takes the place and size of the Archive's recording preview.
+        assertEquals(archivePane, bounds("recording-metadata-pane"))
+        assertPaneTitle("Scheduled expedition 1")
         capture("schedule-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-41")
+        assertPaneTitle("Scheduled expedition 2")
         capture("schedule-middle-focus", 1f, assertMiddleFocus(41))
         key(Key.DirectionUp)
         key(Key.DirectionUp)
@@ -394,9 +409,12 @@ class RecordingsVisualLayoutTest {
         key(Key.DirectionDown)
         focused("recording-list-entry-60")
         assertDenseListGeometry(firstRowTop)
+        assertEquals(archivePane, bounds("recording-metadata-pane"))
+        assertPaneTitle("Unfinished expedition 1")
         capture("problems-multi-item", 1f)
         key(Key.DirectionDown)
         focused("recording-list-entry-61")
+        assertPaneTitle("Unfinished expedition 2")
         capture("problems-middle-focus", 1f, assertMiddleFocus(61))
         assertNoCommands()
     }
@@ -404,23 +422,107 @@ class RecordingsVisualLayoutTest {
     @Test fun largerCallerEndPaddingIsPreservedWithoutDoublingFocusReserve() {
         show(endPadding = 100.dp)
         focused("recordings-folder-Documentaries")
+        val archiveRow = bounds("recordings-folder-Documentaries")
         assertEquals(860f, bounds("recordings-header").right, .1f)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-20")
-        assertEquals(848f, bounds("recording-list-entry-20").right, .1f)
-        assertFullWidthFocusInside("recordings-schedule-list", 20)
+        assertArchiveColumns(20, archiveRow, "Tomorrow's documentary")
+        assertTrue(bounds("recording-metadata-pane").right <= 860f)
         // A scheduled row carries its clock at the end, as channel rows do; the overline keeps only times.
         assertTrailingStateMark(20, "Scheduled")
-        capture("schedule-end100", 1f, assertFullWidthFocusSafeArea(20))
+        capture("schedule-end100", 1f)
         key(Key.DirectionUp)
         key(Key.DirectionRight)
         key(Key.DirectionDown)
         focused("recording-list-entry-21")
-        assertEquals(848f, bounds("recording-list-entry-21").right, .1f)
-        assertFullWidthFocusInside("recordings-problems-list", 21)
-        assertFullWidthFocusSafeArea(21)
+        assertArchiveColumns(21, archiveRow, "Unfinished expedition")
+        assertTrue(bounds("recording-metadata-pane").right <= 860f)
+        assertNoCommands()
+    }
+
+    @Test fun schedulePaneGivesThePaddedStopAndRuleAndProblemsPaneWhatWentWrong() {
+        show(entries = paneEntries(long = false))
+        focused("recordings-folder-Sport")
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-40")
+        // The padded stop in the Schedule row's own words, and the series rule that set it up.
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("• until", substring = true),
+            useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and hasText("Part of a series recording"),
+            useUnmergedTree = true).assertIsDisplayed()
+        // Nothing is recorded yet, so the planned length is not given as recorded.
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("recorded", substring = true),
+            useUnmergedTree = true).assertDoesNotExist()
+        capture("schedule-pane", 1f)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-41")
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-rule")) and hasText("Part of a repeating timer"),
+            useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-metadata")) and hasText("until", substring = true),
+            useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionUp)
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        key(Key.DirectionDown)
+        focused("recording-list-entry-60")
+        // The server's reason in plain words, and what is left of the file.
+        val size = formatFileSize(1_200_000_000L, ApplicationProvider.getApplicationContext<Application>())
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording storage full"),
+            useUnmergedTree = true).assertIsDisplayed()
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-partial-file")) and hasText("Partial file • $size"),
+            useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("recording-metadata-rule", useUnmergedTree = true).assertDoesNotExist()
+        capture("problems-pane", 1f)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-61")
+        compose.onNode(hasAnyAncestor(hasTestTag("recording-metadata-failure")) and hasText("Recording missed"),
+            useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("recording-metadata-partial-file", useUnmergedTree = true).assertDoesNotExist()
+        assertNoCommands()
+    }
+
+    @Test
+    @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
+    fun germanLargeSchedulePaneAndProblemsPaneKeepTheirLinesWhole() {
+        Locale.setDefault(Locale.GERMANY)
+        show(scale = 1.3f, entries = paneEntries(long = true))
+        focused("recordings-folder-Sport")
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-40")
+        assertOverlineAboveTitle(40)
+        assertPaneLinesWhole("recording-metadata-title", "recording-metadata-metadata", "recording-metadata-rule")
+        capture("schedule-pane-de-font1.3", 1.3f)
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        key(Key.DirectionDown)
+        focused("recording-list-entry-60")
+        assertOverlineAboveTitle(60)
+        assertPaneLinesWhole("recording-metadata-title", "recording-metadata-metadata", "recording-metadata-failure",
+            "recording-metadata-partial-file")
+        capture("problems-pane-de-font1.3", 1.3f)
+        assertNoCommands()
+    }
+
+    @Test fun emptyScheduleAndProblemsKeepTheirMessageWithoutAPane() {
+        show(entries = listOf(recording(1, "Kept match", "Sport/kept.ts")))
+        focused("recordings-folder-Sport")
+        key(Key.DirectionUp)
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Schedule").assertIsFocused()
+        compose.onNodeWithText("Nothing is recording or scheduled.").assertIsDisplayed()
+        compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
+        key(Key.DirectionRight)
+        compose.onNodeWithText("Problems").assertIsFocused()
+        compose.onNodeWithText("No recording problems.").assertIsDisplayed()
+        compose.onNodeWithTag("recording-metadata-pane", useUnmergedTree = true).assertDoesNotExist()
+        capture("empty-problems", 1f)
         assertNoCommands()
     }
 
@@ -1210,34 +1312,71 @@ class RecordingsVisualLayoutTest {
             }
     }
 
-    private fun assertFullWidthFocusInside(listTag: String, id: Long) {
-        val list = bounds(listTag)
+    /** The row in Archive's first column, the pane where Archive shows its preview, level with the first row. */
+    private fun assertArchiveColumns(id: Long, archiveRow: Rect, paneTitle: String) {
         val row = bounds("recording-list-entry-$id")
-        assertGrowthInside(row, list)
+        assertEquals(archiveRow.left, row.left, .5f)
+        assertEquals(archiveRow.width, row.width, .5f)
+        val pane = bounds("recording-metadata-pane")
+        assertEquals(row.left + 340f + 92f, pane.left, .5f)
+        assertEquals(archiveRow.top, pane.top, .5f)
+        assertPaneTitle(paneTitle)
     }
 
-    private fun assertFullWidthFocusSafeArea(id: Long): String {
-        val centerY = bounds("recording-list-entry-$id").center.y.toInt()
-        return compose.runOnIdle {
-            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
-            try {
-                view.draw(Canvas(bitmap))
-                // Sample the native light focused surface beyond its text/icons, after graphicsLayer scale.
-                val maxX = (bitmap.width / 2 until bitmap.width).lastOrNull { x ->
-                    val pixel = bitmap.getPixel(x, centerY)
-                    android.graphics.Color.red(pixel) >= 180 &&
-                        android.graphics.Color.green(pixel) >= 180 && android.graphics.Color.blue(pixel) >= 180
-                }
-                assertNotNull("Native focused surface must be visible", maxX)
-                val gap = bitmap.width - (requireNotNull(maxX) + 1)
-                val evidence = "Native focus recording:$id maxPixelX=$maxX trailingGap=${gap}px"
-                println(evidence)
-                assertTrue("$evidence; required >=48px", gap >= 48)
-                evidence
-            } finally {
-                bitmap.recycle()
+    private fun assertPaneTitle(title: String) {
+        compose.onNode(hasTestTag("recording-metadata-title") and hasText(title), useUnmergedTree = true)
+            .assertIsDisplayed()
+    }
+
+    /**
+     * The pane's [title] and [lines] show and end inside the pane and the screen; the lines' text is
+     * whole, while the title may give way to an ellipsis as on every pane.
+     */
+    private fun assertPaneLinesWhole(title: String, vararg lines: String) {
+        val pane = bounds("recording-metadata-pane")
+        (listOf(title) + lines).forEach { tag ->
+            val rect = compose.onNodeWithTag(tag, useUnmergedTree = true).assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+            assertTrue("$tag $rect ends inside the pane $pane", rect.bottom <= pane.bottom + .5f && rect.right <= pane.right + .5f)
+            assertTrue("$tag $rect stays on screen", rect.right <= 960f)
+        }
+        lines.forEach { tag ->
+            val texts = compose.onAllNodes((hasTestTag(tag) or hasAnyAncestor(hasTestTag(tag))) and
+                SemanticsMatcher.keyIsDefined(SemanticsActions.GetTextLayoutResult), useUnmergedTree = true)
+            val count = texts.fetchSemanticsNodes().size
+            assertTrue("$tag has text", count > 0)
+            repeat(count) { index ->
+                val results = mutableListOf<TextLayoutResult>()
+                texts[index].performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(results) }
+                val layout = results.single()
+                assertFalse("$tag '${layout.layoutInput.text}' must stay whole", layout.hasVisualOverflow)
             }
         }
+    }
+
+    private fun paneEntries(long: Boolean): List<DvrEntry> {
+        val start = 1_791_086_400L
+        val title = if (long) "Die außergewöhnliche Reise der Polarlichter: Eine Winterexpedition durch die Arktis"
+            else "Coastal Final"
+        val channel = if (long) "Ridge Earth Mountain Channel HD Extra" else "Ridge Earth HD"
+        return listOf(
+            recording(1, "Kept match", "Sport/kept.ts"),
+            DvrEntry.create(DvrEntryId(40), title = title, state = DvrEntryState.SCHEDULED,
+                start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + 90 * 60),
+                startExtraMinutes = 2.minutes, stopExtraMinutes = 15.minutes,
+                autorecRuleId = AutorecRuleId("series"), channelName = channel,
+                subtitle = if (long) "Zweiter Teil: Über die Gletscher bis an den Rand der Welt" else "Second leg",
+                description = "Follow a small team of naturalists through remote landscapes."),
+            DvrEntry.create(DvrEntryId(41), title = "Evening news", state = DvrEntryState.SCHEDULED,
+                start = Instant.fromEpochSeconds(start + 7_200), stop = Instant.fromEpochSeconds(start + 9_000),
+                timerecRuleId = TimerecRuleId("timer"), channelName = channel),
+            DvrEntry.create(DvrEntryId(60), title = title, state = DvrEntryState.COMPLETED_ERROR,
+                start = Instant.fromEpochSeconds(start - 86_400), stop = Instant.fromEpochSeconds(start - 86_400 + 5_400),
+                subscriptionError = DvrSubscriptionError.NO_DISK_SPACE, dataSizeBytes = 1_200_000_000L,
+                channelName = channel, subtitle = if (long) "Zweiter Teil: Über die Gletscher" else null),
+            DvrEntry.create(DvrEntryId(61), title = "Missed match", state = DvrEntryState.MISSED,
+                start = Instant.fromEpochSeconds(start - 2 * 86_400), stop = Instant.fromEpochSeconds(start - 2 * 86_400 + 5_400),
+                channelName = channel),
+        )
     }
 
     private fun assertGrowthInside(row: Rect, list: Rect) {
