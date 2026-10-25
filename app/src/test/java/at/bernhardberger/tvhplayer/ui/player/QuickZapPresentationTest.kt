@@ -117,6 +117,17 @@ class QuickZapPresentationTest {
     private var picks = 0
     private var confirmPicks = true
     private var focusColor = 0
+    private var viewerProgressColor = 0
+
+    private fun assertViewerProgressColor(message: String, pixel: Int) {
+        val expected = FloatArray(3)
+        val actual = FloatArray(3)
+        android.graphics.Color.colorToHSV(viewerProgressColor, expected)
+        android.graphics.Color.colorToHSV(pixel, actual)
+        // Native focused/pressed state layers darken the strip without changing its hue.
+        assertEquals(message, expected[0], actual[0], 3f)
+        assertEquals(message, expected[1], actual[1], .1f)
+    }
     private var defaultZone: TimeZone? = null
 
     @Before fun pinClock() {
@@ -342,7 +353,7 @@ class QuickZapPresentationTest {
             val progress = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
                 .fetchSemanticsNode().boundsInRoot
             val strip = pixel(progress.left + progress.width * .1f, progress.bottom - .75f * scale)
-            assertTrue("lower progress strip remains visible", android.graphics.Color.blue(strip) > android.graphics.Color.red(strip) + 30)
+            assertViewerProgressColor("orange lower progress strip remains visible", strip)
             bitmap.recycle()
             capture("$prefix-native-corner-$state", 2, fontScale)
             File("../artifacts/quick-zap/$prefix-native-corner-$state-geometry.txt").writeText(
@@ -520,8 +531,7 @@ class QuickZapPresentationTest {
                 (progressBounds.left + progressBounds.width * .1f).toInt(),
                 (progressBounds.bottom - 1f).toInt(),
             )
-            assertTrue("cyan progress is painted above the bottom edge, not covered by the gray ring",
-                android.graphics.Color.blue(pixel) > android.graphics.Color.red(pixel) + 30)
+            assertViewerProgressColor("orange progress is painted above the bottom edge, not covered by the gray ring", pixel)
             bitmap.recycle()
         }
         capture("en-font1-expanded")
@@ -722,6 +732,7 @@ class QuickZapPresentationTest {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     focusColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
+                    viewerProgressColor = at.bernhardberger.tvhplayer.ui.components.progressColor(true).toArgb()
                     Box(Modifier.fillMaxSize().background(if (bright) Color(0xFFDDEAF0) else Color(0xFF24384A))
                         .onPreviewKeyEvent { event ->
                             val code = event.nativeKeyEvent.keyCode

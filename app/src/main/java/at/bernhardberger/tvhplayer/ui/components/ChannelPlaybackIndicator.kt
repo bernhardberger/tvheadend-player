@@ -1,6 +1,16 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.CircularProgressIndicator
@@ -85,6 +95,24 @@ internal fun ChannelPlaybackMarker(
                 strokeWidth = 2.dp,
             )
         }
+    } else if (indicator == ChannelPlaybackIndicator.PLAYING) {
+        val phase = rememberInfiniteTransition(label = "watching").animateFloat(
+            initialValue = 0f, targetValue = 1f,
+            animationSpec = infiniteRepeatable(tween(1_400, easing = LinearEasing), RepeatMode.Restart),
+            label = "soundBars",
+        )
+        val color = LocalContentColor.current
+        Canvas(slot.clearAndSetSemantics {
+            if (announceState) contentDescription = description
+        }) {
+            // Read animation state only while drawing, never while composing a row.
+            val width = this.size.width / 7f
+            repeat(3) { index ->
+                val height = this.size.height * watchingBarHeight(index, phase.value)
+                drawRoundRect(color, Offset(width * (1 + index * 2), (this.size.height - height) / 2),
+                    Size(width, height), CornerRadius(width / 2))
+            }
+        }
     } else {
         Icon(
             painterResource(if (indicator == ChannelPlaybackIndicator.PAUSED) R.drawable.ic_pause else R.drawable.ic_play_arrow),
@@ -94,3 +122,6 @@ internal fun ChannelPlaybackMarker(
         )
     }
 }
+
+internal fun watchingBarHeight(index: Int, phase: Float): Float =
+    0.3f + 0.45f * ((kotlin.math.sin((phase + index / 3f) * 2 * kotlin.math.PI) + 1) / 2).toFloat()

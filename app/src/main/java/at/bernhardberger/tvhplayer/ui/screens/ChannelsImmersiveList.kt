@@ -104,6 +104,7 @@ import at.bernhardberger.tvhplayer.ui.components.DetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.FocusBackdrop
 import at.bernhardberger.tvhplayer.ui.components.LoadDetailsHeroLogo
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
+import at.bernhardberger.tvhplayer.ui.components.progressColor
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
@@ -449,6 +450,8 @@ internal fun ChannelsImmersiveHero(
         // AnimatedContent hands its fixed height to the content; wrapping keeps short text on the row.
         // Beside the list the headline hangs from the picture, and the synopsis takes what is left.
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
+            watching = channel.id == frame.playbackChannelId && frame.playbackIndicator in
+                listOf(ChannelPlaybackIndicator.PLAYING, ChannelPlaybackIndicator.PAUSED),
             synopsisLines = if (besideList) ImmersiveListSynopsisLines else ImmersiveSynopsisLines,
             loading = frame.guideLoading, fitSynopsis = besideList,
             // Beside the list the title steps down one size, so it doesn't compete with the rows.
@@ -473,6 +476,7 @@ private fun ChannelsHeadline(
     synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
+    watching: Boolean = false,
 ) {
     val resources = LocalContext.current.resources
     val locale = LocalConfiguration.current.locales[0]
@@ -499,6 +503,7 @@ private fun ChannelsHeadline(
         rating = current?.rating?.let { programmeAgeRating(it.label, it.age) },
         timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
         progress = current?.progress(now),
+        progressColor = progressColor(watching),
         synopsis = current?.let(::channelsProgrammeSynopsis),
         fitSynopsis = fitSynopsis,
         loading = current == null && loading,

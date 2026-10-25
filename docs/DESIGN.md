@@ -65,6 +65,11 @@ Meaning of colour:
   dialogs alike); cyan = time passing on air, independent of the viewer (how far
   the current programme or a running recording is). One bar, one meaning; if a
   surface needs both, show two bars rather than one bar in two colours.
+  The channel being watched uses orange in Channels List, Grid, Immersive,
+  Quick Zap and on the playing programme's details page. At the live edge its
+  length stays the same. Other channels remain cyan. Paused/rewound viewer-position
+  plumbing is a follow-up: these browse bars currently retain on-air lengths.
+  This does not change Guide cells, focus/selection tint, menus or buttons.
 - **Recording red** means "a recording exists or runs". **`error`** means "a
   failure the user must act on". No component declares its own red: marks come
   from `RecordingStatusIndicator` (dot) and `RecordingBadge` (badge), and a
@@ -524,6 +529,10 @@ tuner loss and interruption are failures, limit expiry is informational.
 ## 9. Lists, cards, progress
 
 - Rows and cards are TV Material `ListItem`/`Card` with library indication.
+  The playing-channel marker is three small animated sound bars in the existing
+  neutral content colour and icon slot, with its existing accessible description.
+  Animation is read in the draw phase, not row composition, and stays still when
+  the system animator duration scale is zero. Pause and tuning keep their own marks.
   Recording and playing markers are separate data states shown by badge/icon,
   never by overloading focus or selection styling.
 - Passive on-air progress on cards and rows is cyan and has no terminal marker

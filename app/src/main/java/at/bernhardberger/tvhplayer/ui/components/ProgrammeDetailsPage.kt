@@ -991,6 +991,7 @@ private fun DetailsInformation(
             LocalConfiguration.current.locales[0]), resources, event?.episode ?: recording?.episode,
             event?.firstAired, LocalConfiguration.current.locales[0], event?.contentGenre ?: recording?.contentGenre)
         val timelineVisible = event != null && nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
+        val watchingEvent = timelineVisible && channel?.id != null && LocalWatchingChannel.current == channel.id
         // The timeline already labels start/end; its remaining time is not the total runtime.
         val segments = facts.filter { it.kind != DetailsFactKind.LEFT &&
             (!timelineVisible || it.kind == DetailsFactKind.LENGTH) }.map { detailsFactValue(it, nowSec) } + metadata
@@ -1024,7 +1025,7 @@ private fun DetailsInformation(
             val progress = ((nowSec - event.start.epochSeconds).toFloat() / (event.stop - event.start).inWholeSeconds).coerceIn(0f, 1f)
             DetailsTimeline(start, progress, "$end • ${playerMinutesLeft(minutesLeft)}",
                 "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}",
-                Modifier.widthIn(max = 470.dp).fillMaxWidth())
+                Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(watchingEvent))
         } else if (facts.any { it.kind == DetailsFactKind.LEFT }) {
             Spacer(Modifier.height(8.dp))
             val length = facts.first { it.kind == DetailsFactKind.LENGTH }.seconds

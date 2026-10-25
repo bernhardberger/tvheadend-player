@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
+import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
+
 import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 
 import androidx.activity.compose.BackHandler
@@ -816,6 +818,7 @@ fun AppRoot(
     }
     val content: @Composable (PaddingValues, Boolean, Boolean, List<AppNavKey>) -> Unit = {
             contentPadding, drawerActive, contentAllowed, shellBackStack ->
+            ProvideWatchingProgress(playbackRuntime) {
             Box(Modifier.fillMaxSize().profileRouteDraw(currentDestination?.destination?.name ?: "NONE", drawerActive)) {
                 // The full-screen shell only ever shows players: its edges are player transitions.
                 val playerTransition = shellBackStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey }
@@ -1047,6 +1050,7 @@ fun AppRoot(
                 },
                 )
 
+            }
             }
     }
 

@@ -72,6 +72,13 @@ class ChannelsLayoutCaptureTest {
     }
 
     @Test fun listPlaying() = playing(ChannelsLayout.LIST, ::row)
+    @Test fun gridPlaying() {
+        fixture.show(ChannelsView(ChannelsLayout.GRID), fixture.fixtureArt(), warmPlayback = true,
+            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), video = FixtureArt.art("harbor-lights-live"))
+        capture("grid-playing-1-same-channel", card(1))
+        fixture.key(Key.DirectionRight)
+        capture("grid-playing-2-other-channel", card(2))
+    }
     @Test fun immersivePlaying() = playing(ChannelsLayout.IMMERSIVE, ::card)
     @Test fun listPlayingWithoutArt() =
         playing(ChannelsLayout.LIST, ::row, "list-logo", ChannelsView(ChannelsLayout.LIST, programArt = emptySet()))

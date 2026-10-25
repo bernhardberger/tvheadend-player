@@ -201,6 +201,7 @@ internal fun CompactZapCard(
                 ProgressStrip(
                     progress = ((nowSec - currentEvent.start.epochSeconds).toDouble() /
                         (currentEvent.stop.epochSeconds - currentEvent.start.epochSeconds)).toFloat(),
+                    color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING || playbackIndicator == ChannelPlaybackIndicator.PAUSED),
                     height = 2.dp,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )
@@ -292,4 +293,3 @@ private val CompactZapLogoInset = 8.dp
 private val CompactZapStripRoom = 8.dp
 
 private const val CompactZapLogoWidthFraction = 0.6f
-
