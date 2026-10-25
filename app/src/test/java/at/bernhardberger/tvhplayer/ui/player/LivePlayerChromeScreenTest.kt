@@ -297,9 +297,13 @@ class LivePlayerChromeScreenTest {
     @Test fun startupPlayerReportsItsExistingUnavailableOutcomeSoCoverCanRelease() {
         val outcomes = mutableListOf<MainStartupPlaybackOutcome>()
         screen(failing = true, contentAllowed = { false }, startup = true, onStartupOutcome = { outcomes += it })
-        // The real player's failure can arrive after entry settles; let its state recompose.
+        // A late player failure posts to Android Main. Advancing Compose's clock alone does not
+        // drain Robolectric's looper or deliver the recomposed startup outcome.
         compose.mainClock.autoAdvance = true
-        compose.waitUntil(5_000) { outcomes.contains(MainStartupPlaybackOutcome.RECOVERY) }
+        compose.waitUntil(5_000) {
+            compose.waitForIdle()
+            outcomes.contains(MainStartupPlaybackOutcome.RECOVERY)
+        }
         assertFalse(exists("player-banner"))
     }
 
