@@ -126,6 +126,7 @@ import at.bernhardberger.tvhplayer.core.PlayerSurface
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
 import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
@@ -783,7 +784,7 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("player-actions"))
     }
 
-    @Test fun programmeInfoRetainsItsLastSnapshotAndContinueFocusAcrossBoundaryAndEviction() {
+    @Test fun programmeInfoRetainsItsLastSnapshotAndWatchFocusAcrossBoundaryAndEviction() {
         screen()
         key(Key.Info)
         val now = System.currentTimeMillis() / 1_000L
@@ -795,16 +796,17 @@ class LivePlayerChromeScreenTest {
         repeat(2) { settle() }
         assertEquals("Ended programme", texts("details-title"))
         assertFalse(exists("details-record"))
-        assertEquals(listOf("details-continue_watching"), focused())
+        // The ended programme is not the one at the viewer position: it offers Watch, which returns to the picture.
+        assertEquals(listOf("details-watch"), focused())
         session.publish(observation(now, listOf(nextProgramme)))
         repeat(2) { settle() }
         assertEquals("Ended programme", texts("details-title"))
-        assertEquals(listOf("details-continue_watching"), focused())
+        assertEquals(listOf("details-watch"), focused())
         session.publish(observation(now, listOf(nextProgramme), recordings = listOf(
             DvrEntry.create(DvrEntryId(2L), eventId = nextProgramme.id, state = DvrEntryState.RECORDING),
         )))
         repeat(2) { settle() }
-        assertEquals(listOf("details-continue_watching"), focused())
+        assertEquals(listOf("details-watch"), focused())
         assertFalse(exists("details-stop"))
         assertEquals("Ended programme", texts("details-title"))
         session.publish(observation(now, listOf(nextProgramme), missingRequestedChannel = true))
@@ -1985,14 +1987,15 @@ class LivePlayerChromeScreenTest {
                     LocalLifecycleOwner provides owner,
                     LocalDensity provides Density(LocalDensity.current.density, fontScale),
                 ) {
-                    TVHeadendPlayerTheme {
+                    // The app root shows the player inside the runtime's watching state.
+                    TVHeadendPlayerTheme { ProvideWatchingProgress(runtime) {
                         view = LocalView.current
                         VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
                             channels, screenSession, ChannelId(1), "Name 1", {}, onClose, runtime,
                             contentAllowed = contentAllowed(), notices = notices, uiSettingsStore = uiSettings,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,
                             onStartupOutcome = { _, outcome -> onStartupOutcome(outcome); acceptStartupOutcome() })
-                    }
+                    } }
                 }
             }
         }

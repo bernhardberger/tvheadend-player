@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import android.app.Application
 import androidx.compose.runtime.*
 import androidx.compose.ui.input.key.Key
@@ -160,6 +161,10 @@ class PlayerProgrammeDetailsTest {
             CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
                 (if (recording) at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id)
                 else at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id)).takeIf { warm },
+                // The app root derives the watched channel and its state from the same target.
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel provides channel.id.takeIf { warm && !recording },
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides
+                    (if (warm) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE),
                 at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
                     at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(
                         checkNotNull(observation.currentSession), entry.id).takeIf { recording && warm }) {

@@ -61,12 +61,13 @@ internal fun ProgrammeDetailsHost(
         Unit
     }
     val departing = LocalPlayerEntryHandoff.current?.departing == true
-    val presentation = Triple(observation, rememberDetailsEpochSeconds(nowSecProvider), LocalWatchingTarget.current)
+    val presentation = Pair(observation, rememberDetailsEpochSeconds(nowSecProvider))
     var lastPresentation by remember { mutableStateOf(presentation) }
     // Playback can publish its target before the shell starts fading. Keep the page pressed,
     // not a relabelled/reflowed version of it, until that existing handoff removes the overlay.
+    // Its data and clock are held here; what plays is held by HoldWatching around browse.
     SideEffect { if (!departing) lastPresentation = presentation }
-    val (displayObservation, nowSec, playbackTarget) = if (departing) lastPresentation else presentation
+    val (displayObservation, nowSec) = if (departing) lastPresentation else presentation
     var selected by remember { mutableStateOf(openingEvent) }
     var stack by remember { mutableStateOf<List<Triple<EpgEvent, EventId, BrowseContextAction?>>>(emptyList()) }
     var returnCard by remember { mutableStateOf<EventId?>(null) }
@@ -98,9 +99,9 @@ internal fun ProgrammeDetailsHost(
     val canModify = capability != null && displayObservation.dvrState is DvrRepositoryState.Current &&
         (displayObservation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
-    val playingChannel = (playbackTarget as? at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live)?.channelId
-    fun isPlaying(event: EpgEvent) = capability != null && event.channelId == playingChannel &&
-        nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
+    // Playing is the programme at the viewer's position on the watched channel, as its marks show it.
+    @Composable
+    fun isPlaying(event: EpgEvent) = capability != null && watchingIndicator(event, nowSec) != ChannelPlaybackIndicator.NONE
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(displayObservation::recordingPlaybackAdmission), canModify,
         channel != null, liveProgramme = live != null, playing = isPlaying(event))
