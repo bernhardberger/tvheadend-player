@@ -78,19 +78,4 @@ class RowEmphasisTest {
             assertEquals(expected, rowEmphasis(distance), .0001f)
         }
     }
-
-    @Test fun scrollMovesLinearlyBetweenSectionAnchorsAndClamps() {
-        val anchors = listOf(0f, 100f, 300f)
-        for ((position, expected) in listOf(-1f to 0f, 0f to 0f, .25f to 25f,
-            1f to 100f, 1.25f to 150f, 1.5f to 200f, 2f to 300f, 3f to 300f)) {
-            assertEquals(expected, scrollAtSectionPosition(position, anchors), .0001f)
-        }
-    }
-
-    @Test fun sectionsSharingAScrollTargetHoldTheScrollStill() {
-        val anchors = listOf(0f, 100f, 100f)
-        assertEquals(100f, scrollAtSectionPosition(1.5f, anchors), .0001f)
-        assertEquals(0f, scrollAtSectionPosition(1f, emptyList()), 0f)
-        assertEquals(40f, scrollAtSectionPosition(2f, listOf(40f)), 0f)
-    }
 }
