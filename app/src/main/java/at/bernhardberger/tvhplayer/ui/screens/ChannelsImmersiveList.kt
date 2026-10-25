@@ -107,8 +107,10 @@ import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineGroupGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineSynopsisGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineTitleGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePanePicture
 import at.bernhardberger.tvhplayer.ui.components.ProgrammePaneWidth
 import at.bernhardberger.tvhplayer.ui.components.programmeSynopsis
@@ -418,9 +420,9 @@ internal fun ChannelsImmersiveHero(
     // A fixed height keeps the row in place while the hero's text changes length; shorter text
     // sits on the row, so a two-line title grows upward. Beside the list nothing moves with it.
     val height = with(LocalDensity.current) {
-        typography.labelMedium.lineHeight.toDp() + 8.dp + typography.headlineLarge.lineHeight.toDp() * 2 +
+        typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineTitleGap + typography.headlineLarge.lineHeight.toDp() * 2 +
             4.dp + typography.bodyLarge.lineHeight.toDp() +
-            ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() +
+            ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() +
             ProgrammeHeadlineSynopsisGap + typography.bodyLarge.lineHeight.toDp() * ImmersiveSynopsisLines +
             ProgrammeHeadlineSynopsisGap + typography.labelMedium.lineHeight.toDp()
     }

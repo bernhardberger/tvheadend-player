@@ -616,8 +616,10 @@ with it on. Off, cards and backdrops use channel logos instead of programme art.
   narrow column beside the list). Eyebrow, facts, time and Next are metadata in the
   kit's 12sp `labelMedium`. The list alone ends on a quiet
   `Next • HH:MM title` line, with the scheduled clock when that
-  programme is to be recorded. Gaps are 8dp between eyebrow, title, facts and
-  time (4dp before the subtitle) and 20dp before the synopsis and before Next.
+  programme is to be recorded. The lines form groups (accepted 2026-10-25): the
+  eyebrow 2dp above the title, so it reads as the title's label, and the subtitle
+  4dp under it; 12dp to the facts, with the time 4dp under them; 20dp before the
+  synopsis and before Next. The Guide and Recordings share this headline.
   The synopsis takes up to three whole lines of the room left above the bottom
   safe inset (y512), and is left out rather than cut when no whole line fits.
   Without EPG the title reads the no-EPG label and the other programme lines are

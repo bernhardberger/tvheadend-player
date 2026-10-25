@@ -50,7 +50,9 @@ import at.bernhardberger.tvhplayer.ui.common.progress
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeEyebrow
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadline
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineFactsLineHeight
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineGroupGap
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineLineGap
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeHeadlineTitleGap
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.ui.components.RecordingBadge
 import at.bernhardberger.tvhplayer.ui.components.StatusBadge
@@ -171,8 +173,8 @@ private val GuideHeadlineTitleStyle @Composable get() = MaterialTheme.typography
 private fun guideHeadlineHeight(): Dp {
     val typography = MaterialTheme.typography
     return with(LocalDensity.current) {
-        maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + 8.dp +
-            GuideHeadlineTitleStyle.lineHeight.toDp() + ProgrammeHeadlineLineGap + ProgrammeHeadlineFactsLineHeight +
+        maxOf(GuideHeadlinePiconHeight, typography.labelMedium.lineHeight.toDp()) + ProgrammeHeadlineTitleGap +
+            GuideHeadlineTitleStyle.lineHeight.toDp() + ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight +
             ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp()
     }
 }

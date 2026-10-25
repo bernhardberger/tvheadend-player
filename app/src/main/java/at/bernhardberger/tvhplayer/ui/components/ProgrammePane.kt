@@ -57,8 +57,17 @@ internal val ProgrammePanePictureGap = 20.dp
 /** The kit's gap between the title group and the description. */
 internal val ProgrammeHeadlineSynopsisGap = 20.dp
 
-/** Between the facts and time lines of the headline. */
-internal val ProgrammeHeadlineLineGap = 8.dp
+/**
+ * Above the title: little, as the title's own leading already spaces it, so the eyebrow reads as
+ * the title's label rather than the caption of what stands above it.
+ */
+internal val ProgrammeHeadlineTitleGap = 2.dp
+
+/** Between the title group (eyebrow, title, subtitle) and the facts group below it. */
+internal val ProgrammeHeadlineGroupGap = 12.dp
+
+/** Between the lines of one group: the facts and their time. */
+internal val ProgrammeHeadlineLineGap = 4.dp
 
 /** The facts line, as tall as its outlined age rating. */
 internal val ProgrammeHeadlineFactsLineHeight = 22.dp
@@ -131,17 +140,17 @@ internal fun ProgrammeHeadline(
         Column(modifier) {
             eyebrow()
             CompositionLocalProvider(LocalContentColor provides colors.onSurface) {
-                SkeletonLine(Modifier.padding(top = 8.dp).testTag("$tagPrefix-loading"), titleStyle, widthFraction = 0.7f)
-                SkeletonLine(Modifier.padding(top = ProgrammeHeadlineLineGap), typography.labelMedium, widthFraction = 0.35f)
+                SkeletonLine(Modifier.padding(top = ProgrammeHeadlineTitleGap).testTag("$tagPrefix-loading"), titleStyle, widthFraction = 0.7f)
+                SkeletonLine(Modifier.padding(top = ProgrammeHeadlineGroupGap), typography.labelMedium, widthFraction = 0.35f)
             }
         }
         return
     }
-    val titleLineHeight = with(LocalDensity.current) { titleStyle.lineHeight.toDp() } + 8.dp
+    val titleLineHeight = with(LocalDensity.current) { titleStyle.lineHeight.toDp() } + ProgrammeHeadlineTitleGap
     HeadlineColumn(modifier, titleLineHeight) {
         Box(Modifier.layoutId(HeadlinePart.EYEBROW)) { eyebrow() }
         Text(title, style = titleStyle, color = colors.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.layoutId(HeadlinePart.TITLE).padding(top = 8.dp).testTag("$tagPrefix-title"))
+            modifier = Modifier.layoutId(HeadlinePart.TITLE).padding(top = ProgrammeHeadlineTitleGap).testTag("$tagPrefix-title"))
         subtitle?.takeIf(String::isNotBlank)?.let {
             // Regular weight, as the kit's dialog keeps everything under its title; white, as it
             // names the episode with the title.
@@ -149,12 +158,14 @@ internal fun ProgrammeHeadline(
                 maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(top = 4.dp).testTag("$tagPrefix-subtitle"))
         }
-        if (facts.isNotEmpty() || rating != null) {
+        // The facts and the time form one group under the title's.
+        val hasFacts = facts.isNotEmpty() || rating != null
+        if (hasFacts) {
             ProgrammeFacts(facts, rating, "$tagPrefix-rating",
-                Modifier.layoutId(HeadlinePart.FACTS).padding(top = ProgrammeHeadlineLineGap).testTag("$tagPrefix-facts"))
+                Modifier.layoutId(HeadlinePart.FACTS).padding(top = ProgrammeHeadlineGroupGap).testTag("$tagPrefix-facts"))
         }
         if (timing != null) {
-            Row(Modifier.padding(top = ProgrammeHeadlineLineGap).testTag("$tagPrefix-metadata"),
+            Row(Modifier.padding(top = if (hasFacts) ProgrammeHeadlineLineGap else ProgrammeHeadlineGroupGap).testTag("$tagPrefix-metadata"),
                 verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(timing, style = typography.labelMedium, color = TvTextColors.tertiary, maxLines = 1)
                 // Shorter rather than pushed off the end by a long time line.
@@ -180,7 +191,7 @@ internal fun ProgrammeHeadline(
         val details = subtitle?.isNotBlank() == true || facts.isNotEmpty() || rating != null || timing != null ||
             synopsis?.isNotBlank() == true
         footer?.invoke(Modifier.layoutId(HeadlinePart.FOOTER)
-            .padding(top = if (details) ProgrammeHeadlineSynopsisGap else ProgrammeHeadlineLineGap))
+            .padding(top = if (details) ProgrammeHeadlineSynopsisGap else ProgrammeHeadlineGroupGap))
     }
 }
 
