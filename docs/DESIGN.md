@@ -1064,6 +1064,16 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   Destructive confirmations focus the safe choice; Back equals it.
 - **Record** acts immediately, without a confirmation; the recording profile
   comes from Settings → Recordings.
+- Programme and recording details use the same actions whether opened from
+  Channels, Guide, Recordings or the player. Availability depends on the item,
+  server permissions and current playback, not the entry screen. The playing
+  item offers Continue watching in place of Watch or Resume; this returns to
+  the existing player without a restart, seek or resume prompt. Other actions,
+  including Play recording and Show in Guide, remain available when applicable.
+- A recording has one details page for its synopsis, watched progress and
+  actions, including during playback. Recorded date metadata uses the current
+  locale in both player bars; the top bar's channel logo has no synthetic chip
+  background or frame.
 - Option lists inside the player stay in the modal side panel above.
 
 ## 11. Icons

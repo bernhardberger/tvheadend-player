@@ -43,7 +43,38 @@ class PlayerProgrammeDetailsTest {
         back()
     }
 
-    @Test fun recordingDetailsIsReadOnlyAndBackRestoresInfo() {
+    @Test fun browseHostUsedByGuideAndChannelsHasTheSameWarmActionsAsPlayer() {
+        show(recording = false, browse = true)
+        open()
+        compose.onNodeWithTag("details-watch").assertDoesNotExist()
+        compose.onNodeWithTag("details-show_guide").assertExists()
+        compose.onNodeWithTag("details-record").assertDoesNotExist()
+    }
+
+    @Test fun playerDetailsForAnotherTargetOfferWatchInsteadOfContinue() {
+        show(recording = false, warm = false)
+        compose.onNodeWithTag("player-info").performKeyInput { pressKey(Key.DirectionCenter) }
+        settle()
+        compose.onNodeWithTag("details-watch").assertIsFocused()
+        compose.onNodeWithTag("details-continue_watching").assertDoesNotExist()
+        compose.onNodeWithTag("details-show_guide").assertExists()
+    }
+
+    @Test fun playerEndedProgrammeOffersPlayRecordingAction() {
+        show(recording = false, withRecording = true)
+        open(primaryAction = "watch")
+        compose.onNodeWithTag("details-play").assertExists()
+        compose.onNodeWithTag("details-show_guide").assertExists()
+    }
+
+    @Test fun browseEndedProgrammeOffersTheSamePlayRecordingAction() {
+        show(recording = false, browse = true, withRecording = true)
+        open(primaryAction = "watch")
+        compose.onNodeWithTag("details-play").assertExists()
+        compose.onNodeWithTag("details-show_guide").assertExists()
+    }
+
+    @Test fun recordingDetailsUsesCurrentAdmissionAndBackRestoresInfo() {
         show(recording = true)
         open()
         compose.onNodeWithText("Recorded program").assertExists()
@@ -85,12 +116,12 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
     }
 
-    private fun open() {
+    private fun open(primaryAction: String = "continue_watching") {
         compose.onNodeWithTag("player-info").assertIsFocused()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         settle()
-        // The opening OK did not activate the newly focused Continue watching action.
-        compose.onNodeWithTag("details-continue_watching").assertIsFocused()
+        // The opening OK did not activate the newly focused action.
+        compose.onNodeWithTag("details-$primaryAction").assertIsFocused()
     }
 
     private fun back() {
@@ -100,13 +131,18 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("player-info").assertIsFocused()
     }
 
-    private fun show(recording: Boolean, onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> }) {
+    private fun show(recording: Boolean, browse: Boolean = false, warm: Boolean = true, withRecording: Boolean = false,
+        onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> }) {
+        val entry = DvrEntry.create(DvrEntryId(1), title = "Recorded program", description = "Recording synopsis",
+            eventId = watched.id.takeIf { withRecording },
+            state = DvrEntryState.COMPLETED.takeIf { withRecording })
+        val nowSec = if (withRecording) 4_000L else 2_000L
         val observation = FakeTvheadendSession(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED,
                 dvrWrite = CapabilityAccess.DENIED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(watched))),
-            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = listOf(entry))),
         )).observation.value
         val mutations = DvrMutationActions(
             scheduleEntry = { _, _ -> error("Unexpected DVR mutation") },
@@ -121,6 +157,9 @@ class PlayerProgrammeDetailsTest {
             var restore by remember { mutableStateOf<String?>("player-info") }
             val scope = rememberCoroutineScope()
             val close = { opened = false; restore = "player-info" }
+            CompositionLocalProvider(at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+                (if (recording) at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(entry.id)
+                else at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id)).takeIf { warm }) {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = PlayerChromeMode.CONTROLS,
@@ -133,13 +172,22 @@ class PlayerProgrammeDetailsTest {
                     onInteraction = {}, onFocusRestored = { restore = null },
                 )
                 if (opened) {
-                    if (recording) RecordingPlayerDetails(DvrEntry.create(DvrEntryId(1),
-                        title = "Recorded program", description = "Recording synopsis"), channel, 2_000, close)
-                    else LivePlayerProgrammeDetails(watched, channel, observation, { observation }, 2_000,
+                    if (recording) RecordingPlayerDetails(entry, observation, observation, { observation },
+                        2_000, mutations, notices, scope,
+                        onPlayRecording = { _, _ -> error("Unexpected playback command") }, onClose = close)
+                    else if (browse) at.bernhardberger.tvhplayer.ui.screens.ProgrammeDetailsHost(
+                        watched, observation, observation, { observation }, { nowSec },
+                        showContextMenu = false, onShowDetails = {}, mutations = mutations, notices = notices,
+                        mutationScope = scope, mutationInFlight = remember { mutableStateOf(null) },
+                        onPlay = { _, _ -> error("Unexpected playback command") }, onPlayRecording = {},
+                        onClose = close, settingsStore = settings, onShowGuide = onShowGuide,
+                    ) else LivePlayerProgrammeDetails(watched, channel, observation, { observation }, nowSec,
                         mutations, notices, scope, settings,
                         onPlay = { _, _ -> error("Unexpected playback command") },
+                        onPlayRecording = {},
                         onShowGuide = onShowGuide, onClose = close)
                 }
+            }
             }
         }
         settle()

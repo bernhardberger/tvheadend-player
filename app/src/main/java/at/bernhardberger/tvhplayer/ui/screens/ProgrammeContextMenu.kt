@@ -19,8 +19,6 @@ internal fun ProgrammeContextMenu(
     event: EpgEvent,
     channel: Channel?,
     recording: DvrEntry?,
-    fromGuide: Boolean,
-    stacked: Boolean,
     nowSec: Long,
     canModify: Boolean,
     currentSession: CurrentSessionObservation?,
@@ -36,7 +34,7 @@ internal fun ProgrammeContextMenu(
         ?.let(observation::recordingPlaybackAdmission)
     val actions = channelContextActions(event, nowSec, recording, admission, canModify)
     val showGuide = BrowseContextAction.SHOW_GUIDE in programmeDetailsActions(event, nowSec, recording, null,
-        canModify, channel != null && currentSession != null, fromGuide, stacked = stacked)
+        canModify, channel != null && currentSession != null)
     BrowseContextMenu(
         title = event.title.orEmpty(),
         channel = channelTitleText(channel?.number, channel?.name.orEmpty()),
@@ -45,7 +43,7 @@ internal fun ProgrammeContextMenu(
         summary = event.summary?.takeIf(String::isNotBlank) ?: event.description.orEmpty(),
         actions = actions.filter { it != BrowseContextAction.SHOW_GUIDE } +
             listOfNotNull(BrowseContextAction.SHOW_GUIDE.takeIf { showGuide }),
-        watchChannel = !event.isRunning(nowSec), programDetailsLabel = !fromGuide,
+        watchChannel = !event.isRunning(nowSec), programDetailsLabel = true,
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         recordingState = recording?.state,
         artwork = {

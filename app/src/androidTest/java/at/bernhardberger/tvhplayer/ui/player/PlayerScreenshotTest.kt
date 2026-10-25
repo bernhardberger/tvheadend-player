@@ -138,9 +138,12 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                                 { infoOpen = false; restoreInfo = true }, { infoOpen = false; restoreInfo = true })
                         }
                     } else if (scenario == "recording-info") {
-                        RecordingPlayerDetails(at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
+                        PlayerDetailsSurface { at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(
+                            null, at.bernhardberger.tvheadend.sdk.core.DvrEntry.create(
                             at.bernhardberger.tvheadend.sdk.core.DvrEntryId(1), title = programme(true).title,
-                            description = programme(true).description), null, 0L, {})
+                            description = programme(true).description), null, 0L,
+                            actions = listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING),
+                            onAction = {}, onClose = {}) }
                     } else if (scenario.startsWith("seek")) {
                         val history = if (scenario == "seek-shallow") 60_000L else 5_400_000L
                         QuickStepBanner(

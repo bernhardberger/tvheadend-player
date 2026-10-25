@@ -148,7 +148,7 @@ class BrowseContextMenuScreenTest {
         card.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN))
         card.performKeyPress(activation(android.view.KeyEvent.ACTION_DOWN, 1))
         compose.onNodeWithText("Watch channel").assertIsFocused()
-        listOf("Details", "Record", "Show in Guide").forEach { compose.onNodeWithText(it).assertExists() }
+        listOf("Program details", "Record", "Show in Guide").forEach { compose.onNodeWithText(it).assertExists() }
         compose.onNode(hasText("100 Ridge Earth SD • ", substring = true) and hasAnyAncestor(hasTestTag("browse-context-menu"))).assertExists()
         compose.onNodeWithTag("browse-context-artwork").assertExists()
         compose.onNodeWithTag("nav-channels").assertDoesNotExist()
@@ -170,7 +170,7 @@ class BrowseContextMenuScreenTest {
         openAirings()
         compose.onNodeWithTag("details-card-3").performKeyInput { pressKey(Key.DirectionRight) }
         compose.onNodeWithTag("details-card-4").performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Details", substring = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithText("Program details", substring = false).requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-show_guide").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         assertEquals(EventId(4), guideProgramme?.id)
         assertEquals(ChannelId(2), guideRequest)
@@ -191,7 +191,7 @@ class BrowseContextMenuScreenTest {
         val card = compose.onNodeWithTag("details-card-4")
         val scroll = detailsScroll()
         card.performKeyInput { pressKey(Key.Menu) }
-        compose.onNodeWithText("Details", substring = false).requestFocus().assertIsFocused()
+        compose.onNodeWithText("Program details", substring = false).requestFocus().assertIsFocused()
         compose.mainClock.autoAdvance = false
         fun assertCoveredFrames(returning: Boolean = false) {
             repeat(24) { frame ->
@@ -206,7 +206,7 @@ class BrowseContextMenuScreenTest {
             }
         }
         try {
-            compose.onNodeWithText("Details", substring = false).performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithText("Program details", substring = false).performKeyInput { pressKey(Key.DirectionCenter) }
             assertCoveredFrames()
             compose.onNodeWithTag("details-watch").assertIsFocused()
             compose.runOnIdle { back.onBackPressed() }
@@ -1342,7 +1342,7 @@ class BrowseContextMenuScreenTest {
                         if (guideMenu) ProgrammeDetailsHost(
                             openingEvent = event, openingObservation = observation, observation = observation,
                             currentObservation = { session.observation.value }, nowSecProvider = { now.epochSeconds },
-                            fromGuide = true, showContextMenu = !guideDetails, onShowDetails = {},
+                            showContextMenu = !guideDetails, onShowDetails = {},
                             mutations = DvrMutationActions(session.dvrRepository), notices = notices,
                             mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                             mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },

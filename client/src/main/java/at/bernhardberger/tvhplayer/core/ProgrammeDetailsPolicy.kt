@@ -29,25 +29,23 @@ fun programmeDetailsActions(
     recordingAdmission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
     canWatchChannel: Boolean,
-    fromGuide: Boolean,
     liveProgramme: Boolean = true,
-    stacked: Boolean = false,
-    fromPlayer: Boolean = false,
+    playing: Boolean = false,
 ): List<BrowseContextAction> = buildList {
-    if (fromPlayer) add(BrowseContextAction.CONTINUE_WATCHING)
+    if (playing) add(BrowseContextAction.CONTINUE_WATCHING)
     else if (canWatchChannel) add(BrowseContextAction.WATCH)
     programmeActions(event, nowSec, recording,
-        canModifyRecordings = canModifyRecordings && (!fromPlayer || nowSec < event.stop.epochSeconds),
+        canModifyRecordings = canModifyRecordings,
         recordingAdmission = recordingAdmission).forEach {
         when (it) {
             ProgrammeAction.WATCH -> Unit
             ProgrammeAction.RECORD -> if (liveProgramme) add(BrowseContextAction.RECORD)
             ProgrammeAction.STOP_RECORDING -> add(BrowseContextAction.STOP)
             ProgrammeAction.CANCEL_RECORDING -> add(BrowseContextAction.CANCEL)
-            ProgrammeAction.WATCH_FROM_START -> if (recording != null && !fromPlayer) add(BrowseContextAction.PLAY)
+            ProgrammeAction.WATCH_FROM_START -> if (recording != null) add(BrowseContextAction.PLAY)
         }
     }
-    if ((!fromGuide || stacked) && canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
+    if (canWatchChannel) add(BrowseContextAction.SHOW_GUIDE)
 }
 
 fun recordingDetailsActions(
@@ -55,16 +53,21 @@ fun recordingDetailsActions(
     admission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
     canWatchChannel: Boolean,
-    fromPlayer: Boolean = false,
+    playing: Boolean = false,
+    nowSec: Long,
 ): List<BrowseContextAction> = buildList {
-    if (fromPlayer) {
+    if (playing) {
         add(BrowseContextAction.CONTINUE_WATCHING)
-        return@buildList
     }
-    if (recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
+    if (!playing && recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
     addAll(recordingContextActions(recording, admission, canModifyRecordings).filter {
-        it != BrowseContextAction.DETAILS
+        it != BrowseContextAction.DETAILS && (!playing || it !in listOf(
+            BrowseContextAction.WATCH, BrowseContextAction.RESUME, BrowseContextAction.PLAY))
     })
+    if (canWatchChannel && recording.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
+            DvrEntryState.RECORDING_ERROR) && recording.stop?.epochSeconds?.let { it > nowSec } == true) {
+        add(BrowseContextAction.SHOW_GUIDE)
+    }
 }
 
 /**

@@ -104,7 +104,7 @@ class GuideHistoryCompositionTest {
         var recording by mutableStateOf<DvrEntry?>(null)
         compose.setContent { TVHeadendPlayerTheme {
             ProgrammeDetailsPage(selected, recording, null, 4000,
-                programmeDetailsActions(selected, 4000, recording, admitted(recording), true, false, true, liveProgramme = live),
+                programmeDetailsActions(selected, 4000, recording, admitted(recording), true, false, liveProgramme = live),
                 {}, {})
         } }
         compose.onNodeWithText(label(R.string.record)).assertDoesNotExist()

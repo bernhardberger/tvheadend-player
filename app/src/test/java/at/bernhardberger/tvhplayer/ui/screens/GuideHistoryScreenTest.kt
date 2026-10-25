@@ -113,7 +113,7 @@ class GuideHistoryScreenTest {
             back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
             TVHeadendPlayerTheme {
                 val current by session.observation.collectAsState()
-                ProgrammeDetailsHost(event, opening, current, { session.observation.value }, { 50 }, fromGuide = true,
+                ProgrammeDetailsHost(event, opening, current, { session.observation.value }, { 50 },
                     showContextMenu = menu, onShowDetails = {}, mutations = mutations,
                     mutationScope = androidx.compose.runtime.rememberCoroutineScope(),
                     mutationInFlight = androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(null) },
@@ -232,7 +232,7 @@ class GuideHistoryScreenTest {
         focused("Channel 1 hour 0")
         if (transition == "menu-details") {
             key(Key.Menu)
-            compose.onNodeWithText("Details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithText("Program details").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
             compose.onNodeWithTag("details-watch").assertIsFocused()
             compose.mainClock.autoAdvance = false
             try {

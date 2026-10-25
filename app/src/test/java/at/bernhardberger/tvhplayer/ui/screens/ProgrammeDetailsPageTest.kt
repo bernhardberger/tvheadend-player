@@ -377,7 +377,7 @@ class ProgrammeDetailsPageTest {
             TVHeadendPlayerTheme {
                 ProgrammeDetailsPage(event = null, recording = entry.value, channel = channel,
                     nowSec = start.epochSeconds,
-                    actions = recordingDetailsActions(entry.value, admitted(entry.value), writable.value, false),
+                    actions = recordingDetailsActions(entry.value, admitted(entry.value), writable.value, false, nowSec = 0),
                     recordingAdmission = admitted(entry.value), onAction = selected::add, onClose = {})
             }
         }
@@ -1218,8 +1218,8 @@ class ProgrammeDetailsPageTest {
                         }
                         val details: @androidx.compose.runtime.Composable () -> Unit = {
                         ProvideArtworkSession(session) { ProgrammeDetailsPage(shown.takeUnless { recording }, entry.takeIf { recording || future }, channel, now,
-                            if (recording) recordingDetailsActions(entry, admitted(entry), true, true)
-                            else programmeDetailsActions(shown, now, entry.takeIf { future }, admitted(entry.takeIf { future }), true, true, false),
+                            if (recording) recordingDetailsActions(entry, admitted(entry), true, true, nowSec = now)
+                            else programmeDetailsActions(shown, now, entry.takeIf { future }, admitted(entry.takeIf { future }), true, true),
                               {}, onClose, related = if (recording || noAirings) emptyList() else if (runningCard)
                                   listOf(EpgEvent.create(EventId(2), otherChannel.id, start, event.stop, title = event.title)) else if (todayCard)
                                   listOf(EpgEvent.create(EventId(2), channel.id, start + 3600.seconds, event.stop, title = event.title)) else airings,

@@ -36,7 +36,6 @@ internal fun ProgrammeDetailsHost(
     observation: SessionObservation,
     currentObservation: () -> SessionObservation,
     nowSecProvider: () -> Long,
-    fromGuide: Boolean,
     showContextMenu: Boolean,
     onShowDetails: () -> Unit,
     mutations: DvrMutationActions,
@@ -49,7 +48,6 @@ internal fun ProgrammeDetailsHost(
     onClose: () -> Unit,
     returnFocusRequester: FocusRequester? = null,
     settingsStore: UiSettingsStore = koinInject(),
-    fromPlayer: Boolean = false,
     retainPlayerSnapshot: Boolean = false,
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
@@ -93,10 +91,12 @@ internal fun ProgrammeDetailsHost(
     val canModify = capability != null && observation.dvrState is DvrRepositoryState.Current &&
         (observation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
+    val playingChannel = (LocalActivePlaybackTarget.current as? at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live)?.channelId
+    fun isPlaying(event: EpgEvent) = capability != null && event.channelId == playingChannel &&
+        nowSec >= event.start.epochSeconds && nowSec < event.stop.epochSeconds
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(observation::recordingPlaybackAdmission), canModify,
-        channel != null, fromGuide, liveProgramme = live != null, stacked = stack.isNotEmpty(),
-        fromPlayer = fromPlayer && stack.isEmpty())
+        channel != null, liveProgramme = live != null, playing = isPlaying(event))
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
@@ -161,7 +161,10 @@ internal fun ProgrammeDetailsHost(
     }
     val act: (EpgEvent, BrowseContextAction) -> Unit = action@{ programme, action ->
         if (action == BrowseContextAction.CONTINUE_WATCHING) {
-            closeAnimated()
+            if (retainPlayerSnapshot) closeAnimated() else programme.channelId?.let(currentObservation()::channel)?.let {
+                closeBehindPlayer(close)
+                onPlay(it.id, it.name.orEmpty())
+            }
             return@action
         }
         if (inFlight != null && action in listOf(BrowseContextAction.RECORD,
@@ -173,7 +176,7 @@ internal fun ProgrammeDetailsHost(
             val event = current.event(programme.id) ?: programme
             event.channelId?.let(current::channel)?.let {
                 if (action == BrowseContextAction.WATCH) {
-                    if (fromPlayer) close() else closeBehindPlayer(close)
+                    if (retainPlayerSnapshot) close() else closeBehindPlayer(close)
                     onPlay(it.id, it.name.orEmpty())
                 } else {
                     close()
@@ -251,7 +254,7 @@ internal fun ProgrammeDetailsHost(
         CompositionLocalProvider(LocalPlayerPanelMotion provides this) {
         PlayerMotionFrame(leaving = closing || pendingAction != null) {
         ProgrammeContextMenu(
-            event, channel, recording, fromGuide, stack.isNotEmpty(), nowSec, canModify, capability, observation,
+            event, channel, recording, nowSec, canModify, capability, observation,
             canPlayRecording = onPlayRecording != null,
             modifier = Modifier.onPreviewKeyEvent(keyHandler),
             onAction = act, onClose = closeAnimated,
@@ -280,9 +283,7 @@ internal fun ProgrammeDetailsHost(
             }
             val pageActions = programmeDetailsActions(pageEvent, nowSec, pageRecording,
                 pageRecording?.let(observation::recordingPlaybackAdmission), canModify,
-                pageChannel != null, fromGuide, liveProgramme = pageLive != null,
-                stacked = page.id != openingEvent.id || stack.isNotEmpty(),
-                fromPlayer = fromPlayer && page.id == openingEvent.id && stack.isEmpty())
+                pageChannel != null, liveProgramme = pageLive != null, playing = isPlaying(pageEvent))
                 .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
             val covered = menuAiring != null || pendingAction != null
             // The page shows its pictures with the session it was opened with.
@@ -322,7 +323,7 @@ internal fun ProgrammeDetailsHost(
     menuAiring?.let { airing ->
         val menuEvent = observation.event(airing.id) ?: airing
         ProgrammeContextMenu(menuEvent, menuEvent.channelId?.let(observation::channel),
-            observation.dvrEntryForEvent(menuEvent), fromGuide = true, stacked = true,
+            observation.dvrEntryForEvent(menuEvent),
             nowSec = nowSec, canModify = canModify, currentSession = capability, observation = observation,
             canPlayRecording = onPlayRecording != null, onAction = act, onClose = { menuAiring = null }, backEnabled = !closing,
             modifier = Modifier.onPreviewKeyEvent(keyHandler))

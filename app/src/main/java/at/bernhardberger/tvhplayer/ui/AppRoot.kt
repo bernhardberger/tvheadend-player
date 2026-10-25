@@ -552,6 +552,12 @@ fun AppRoot(
     val videoPresentation by playbackRuntime.videoPresentation.collectAsStateWithLifecycle()
     val activeChannelId = (activeTarget as? AppPlaybackTarget.Live)?.channelId
     val activeRecordingId = (activeTarget as? AppPlaybackTarget.Recording)?.recordingId
+    val recordingSelection by playbackRuntime.recordingSelection.collectAsStateWithLifecycle()
+    val playbackObservation by tvheadendSession.observation.collectAsStateWithLifecycle()
+    val warmRecordingId = activeRecordingId?.takeIf {
+        recordingSelection?.recordingId == it &&
+            recordingSelection?.currentSession === playbackObservation.currentSession
+    }
     val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
         initialValue = PlayerSettings()
     )
@@ -923,6 +929,25 @@ fun AppRoot(
                         metadata = mapOf(SIDEBAR_SCENE_DESTINATION to AppDestination.RECORDINGS),
                     ) {
                         RecordingsRouteContent(
+                            onShowGuide = { channelId, programme ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId,
+                                    programme?.id, programme?.start?.epochSeconds)
+                                navigateTopLevel(GuideKey)
+                            },
+                            playingRecordingId = warmRecordingId,
+                            onReturnToRecording = {
+                                warmRecordingId?.let { id ->
+                                    playbackRuntime.notePlaybackIntent()
+                                    playerEntry.request(playbackSelectionScope) {
+                                        val target = playbackOrchestrator.requestRecordingPlayer(
+                                            activeChannelId, activeRecordingId, id,
+                                            restartPlayback = false,
+                                            startPlayback = {},
+                                        ) ?: return@request
+                                        backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.RESUME))
+                                    }
+                                }
+                            },
                             onWatchChannel = requestLivePlayer,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
@@ -975,6 +1000,15 @@ fun AppRoot(
 
                     entry<LivePlayerKey> { destination ->
                         LivePlayerRouteContent(
+                            onPlayRecording = { selection ->
+                                playerEntry.request(playbackSelectionScope) {
+                                    val target = playbackOrchestrator.requestRecordingPlayer(
+                                        activeChannelId, activeRecordingId, selection.recordingId,
+                                        startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
+                                    ) ?: return@request
+                                    backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.START_OVER))
+                                }
+                            },
                             onShowGuide = { channelId, programme ->
                                 guideChannelRequest = PlayerReturnFocus(channelId, channelId,
                                     programme?.id, programme?.start?.epochSeconds)
@@ -1038,6 +1072,11 @@ fun AppRoot(
 
                     entry<RecordingPlayerKey> { destination ->
                         RecordingPlayerRouteContent(
+                            onShowGuide = { channelId, programme ->
+                                guideChannelRequest = PlayerReturnFocus(channelId, channelId,
+                                    programme?.id, programme?.start?.epochSeconds)
+                                navigateTopLevel(GuideKey)
+                            },
                             contentAllowed = contentAllowed,
                             recordingId = DvrEntryId(destination.recordingId),
                             playbackStart = destination.start.toPlaybackStart(),

@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 
 internal val LocalWatchingChannel = compositionLocalOf<ChannelId?> { null }
+internal val LocalActivePlaybackTarget = compositionLocalOf<AppPlaybackTarget?> { null }
 
 /** Identity only: no playback-position sampling or per-row collection. */
 @Composable
@@ -21,7 +22,7 @@ internal fun ProvideWatchingProgress(runtime: AppPlaybackRuntime, content: @Comp
     val playback by runtime.state.collectAsStateWithLifecycle()
     val channel = (target as? AppPlaybackTarget.Live)?.channelId
         ?.takeIf { playback == AppPlaybackState.Playing || playback == AppPlaybackState.Buffering }
-    CompositionLocalProvider(LocalWatchingChannel provides channel, content = content)
+    CompositionLocalProvider(LocalWatchingChannel provides channel, LocalActivePlaybackTarget provides target, content = content)
 }
 
 /** Single colour decision for all viewer-position and ambient progress strips. */

@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.components.CentredDialog
@@ -233,7 +235,10 @@ fun RecordingsScreen(
     onOpenConnectionSettings: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     onWatchChannel: ((ChannelId, String) -> Unit)? = null,
+    onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
+    playingRecordingId: DvrEntryId? = null,
+    onReturnToRecording: () -> Unit = {},
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
     val dvrMutationActions = remember(session.dvrRepository) {
@@ -250,7 +255,10 @@ fun RecordingsScreen(
         onOpenConnectionSettings = onOpenConnectionSettings,
         onPlayRecording = onPlayRecording,
         onWatchChannel = onWatchChannel,
+        onShowGuide = onShowGuide,
         state = state,
+        playingRecordingId = playingRecordingId,
+        onReturnToRecording = onReturnToRecording,
         dvrMutationActions = dvrMutationActions,
         currentObservation = { session.observation.value },
     )
@@ -269,7 +277,10 @@ internal fun RecordingsScreenContent(
     onOpenConnectionSettings: () -> Unit = {},
     onPlayRecording: (RecordingPlaybackSelection, RecordingPlaybackStart) -> Unit = { _, _ -> },
     onWatchChannel: ((ChannelId, String) -> Unit)? = null,
+    onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
+    playingRecordingId: DvrEntryId? = null,
+    onReturnToRecording: () -> Unit = {},
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
     notices: NoticeCenter = koinInject(),
@@ -342,6 +353,10 @@ internal fun RecordingsScreenContent(
     }
 
     fun openRecording(entry: DvrEntry) {
+        if (entry.id == playingRecordingId) {
+            onReturnToRecording()
+            return
+        }
         val capability = observation.currentSession
         val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
             capability?.let { observation.recordingPlaybackAdmission(entry) })
@@ -1046,19 +1061,16 @@ internal fun RecordingsScreenContent(
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard), "recording-details-from-menu")
         val alpha = remember(detailAlpha, menuAlpha) { derivedStateOf { detailAlpha.value * menuAlpha.value } }
         // Details show their pictures with the session they were opened with.
-        ProvideArtworkSession(selectedCapability, observation) { ProgrammeDetailsPage(
-            event = null,
+        RecordingDetailsHost(
+            onShowGuide = onShowGuide,
             recording = opened,
+            openingObservation = requireNotNull(detailsObservation),
+            observation = observation,
+            currentObservation = currentObservation,
             nowSec = nowSec,
-            recordingEvent = opened.eventId?.takeIf { selectedCapability != null }?.let(observation::event),
-            recordingConfigurations = observation.currentDvrConfigurations().takeIf { selectedCapability != null }.orEmpty(),
-            channel = opened.channelId?.let(channelsById::get),
-            recordingAdmission = openedAdmission,
-            actions = recordingDetailsActions(opened, openedAdmission,
-                canModifyRecordings = selectedCapability != null &&
-                (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
-                    ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-                canWatchChannel = opened.channelId?.let(channelsById::get) != null && onWatchChannel != null),
+            mutations = dvrMutationActions,
+            notices = notices,
+            mutationScope = scope,
             initialAction = when (detailsInitialAction) {
                 RecordingDetailsAction.CANCEL,
                 RecordingDetailsAction.STOP -> when (opened.state) {
@@ -1074,51 +1086,25 @@ internal fun RecordingsScreenContent(
             },
             backEnabled = backEnabled && !closing && menu == showContextMenu && pendingAction == null,
             visibilityAlpha = alpha,
-            onAction = { action ->
-                val current = currentObservation()
-                val capability = selectedCapability?.takeIf { current.currentSession === it }
-                when (action) {
-                BrowseContextAction.WATCH, BrowseContextAction.RESUME, BrowseContextAction.PLAY,
-                BrowseContextAction.START_OVER -> {
-                    // A scheduled entry's channel is live playback: the player waits for the session.
-                    val watchChannel = action == BrowseContextAction.WATCH && opened.state == DvrEntryState.SCHEDULED
-                    if (watchChannel || capability != null) closeBehindPlayer {
-                        detailsEntry = null
-                        detailsObservation = null
-                        detailsInitialAction = null
-                        requestContentFocus = true
-                    }
-                    if (watchChannel) {
-                        opened.channelId?.let(current::channel)?.let { ch ->
-                            onWatchChannel?.invoke(ch.id, ch.name.orEmpty())
-                        }
-                    } else capability?.let {
-                        onPlayRecording(RecordingPlaybackSelection(it, opened.id),
-                            if (action == BrowseContextAction.RESUME || action == BrowseContextAction.WATCH)
-                                RecordingPlaybackStart.RESUME else RecordingPlaybackStart.START_OVER)
-                    }
+            onPlayRecording = { selection, start ->
+                closeBehindPlayer {
+                    detailsEntry = null
+                    detailsObservation = null
+                    detailsInitialAction = null
+                    requestContentFocus = true
                 }
-                BrowseContextAction.STOP -> {
-                detailsInitialAction = RecordingDetailsAction.STOP
-                pendingMutation = capability?.let { DvrMutationAction.Stop(it, opened.id) }
-                pendingAction = PendingRecordingAction.STOP
-                }
-                BrowseContextAction.CANCEL -> {
-                detailsInitialAction = RecordingDetailsAction.CANCEL
-                pendingMutation = capability?.let { DvrMutationAction.Cancel(it, opened.id) }
-                pendingAction = PendingRecordingAction.CANCEL
-                }
-                BrowseContextAction.DELETE -> {
-                detailsInitialAction = RecordingDetailsAction.DELETE
-                pendingMutation = capability?.let { DvrMutationAction.Delete(it, opened.id) }
-                pendingAction = PendingRecordingAction.DELETE
-                }
-                BrowseContextAction.MARK_WATCHED, BrowseContextAction.MARK_UNWATCHED -> markRecording(action)
-                else -> Unit
-                }
+                onPlayRecording(selection, start)
+            },
+            onWatchChannel = onWatchChannel?.let { watch -> { id, name ->
+                closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
+                watch(id, name)
+            } },
+            onContinueWatching = {
+                closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
+                onReturnToRecording()
             },
             onClose = { visibility.targetState = false },
-        ) }
+        )
         }
         }
         }

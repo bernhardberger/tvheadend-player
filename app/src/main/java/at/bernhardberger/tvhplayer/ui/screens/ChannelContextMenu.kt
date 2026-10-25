@@ -48,7 +48,7 @@ internal fun ChannelContextMenu(
     LaunchedEffect(capability) { if (opening.currentSession != null && capability == null) onClose() }
     if (event != null) {
         ProgrammeDetailsHost(event, opening, observation, { session.observation.value }, nowSecProvider,
-            fromGuide = false, showContextMenu = !showDetails, onShowDetails = onShowDetails,
+            showContextMenu = !showDetails, onShowDetails = onShowDetails,
             mutations = mutations, notices = notices,
             mutationScope = mutationScope, mutationInFlight = mutationInFlight,
             onPlay = onPlay, onPlayRecording = onPlayRecording, onShowGuide = onShowGuide, onClose = onClose,

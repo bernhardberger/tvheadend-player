@@ -77,6 +77,7 @@ internal class AppRootPlaybackOrchestrator {
         activeChannelId: ChannelId?,
         activeRecordingId: DvrEntryId?,
         requestedRecordingId: DvrEntryId,
+        restartPlayback: Boolean = true,
         startPlayback: suspend () -> Unit,
     ): PlayerRouteTarget.Recording? {
         val generation = ++playbackSelectionGeneration
@@ -87,7 +88,7 @@ internal class AppRootPlaybackOrchestrator {
             currentIdentity = activeRecordingId,
             requestedIdentity = requestedRecordingId,
         )
-        startPlayback()
+        if (restartPlayback || activeRecordingId != requestedRecordingId) startPlayback()
         if (generation != playbackSelectionGeneration) return null
         return PlayerRouteTarget.Recording(requestedRecordingId)
     }

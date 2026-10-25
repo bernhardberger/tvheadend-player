@@ -119,9 +119,39 @@ class InProgressRecordingResumeTest {
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
     }
 
-    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false): List<RecordingPlaybackStart> {
+    @Test fun completedWarmRecordingReturnsWithoutResumePopupOrPlaybackRequest() {
+        var returns = 0
+        val starts = openDetails(754L, directly = true, warm = true, completed = true,
+            onReturn = { returns++ })
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, returns); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun browseWarmDetailsHasTheSameActionsAndProgressAsPlayerDetails() {
+        openDetails(754L, warm = true)
+        assertWarmDetails()
+    }
+
+    @Test fun playerWarmDetailsHasTheSameActionsAndProgressAsBrowseDetails() {
+        openDetails(754L, warm = true, fromPlayer = true)
+        assertWarmDetails()
+    }
+
+    private fun assertWarmDetails() {
+        compose.onNodeWithTag("details-continue_watching").assertIsFocused()
+        compose.onNodeWithTag("details-start_over").assertExists()
+        compose.onNodeWithTag("details-stop").assertExists()
+        compose.onNodeWithTag("details-watch").assertDoesNotExist()
+        compose.onNodeWithTag("details-resume").assertDoesNotExist()
+        compose.onNodeWithTag("details-timeline").assertExists()
+    }
+
+    private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false,
+        warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false,
+        onReturn: () -> Unit = {}): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
-        val observation = observation(playPositionSeconds)
+        val observation = observation(playPositionSeconds, completed)
         val actions = DvrMutationActions(
             scheduleEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             stopEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
@@ -129,21 +159,33 @@ class InProgressRecordingResumeTest {
             deleteEntry = { _, _ -> DvrMutationResult.Failed(TvheadendFailure.NOT_READY, mayHaveApplied = false) },
             updateWatchStateCommand = { _, _, _ -> error("Unexpected watch-state update") },
         )
-        val state = RecordingsScreenState().apply { mode.value = DvrLibraryMode.SCHEDULE }
+        val state = RecordingsScreenState().apply { mode.value = if (completed) DvrLibraryMode.ARCHIVE else DvrLibraryMode.SCHEDULE }
         val notices = at.bernhardberger.tvhplayer.notices.NoticeCenter({ 0L }) {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
         }
         compose.setContent {
+            androidx.compose.runtime.CompositionLocalProvider(
+                at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
+                    at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(DvrEntryId(1)).takeIf { warm },
+            ) {
             TVHeadendPlayerTheme {
-                RecordingsScreenContent(
+                if (fromPlayer) at.bernhardberger.tvhplayer.ui.player.RecordingPlayerDetails(
+                    observation.dvrSnapshotForDisplay!!.entries.single(), observation, observation, { observation },
+                    System.currentTimeMillis() / 1000L, actions, notices, androidx.compose.runtime.rememberCoroutineScope(),
+                    onPlayRecording = { _, start -> starts += start }, onClose = onReturn,
+                ) else RecordingsScreenContent(
                     observation = observation,
                     state = state,
                     dvrMutationActions = actions,
                     notices = notices,
                     onPlayRecording = { _, start -> starts += start },
+                    playingRecordingId = DvrEntryId(1).takeIf { warm },
+                    onReturnToRecording = onReturn,
                 )
             }
+            }
         }
+        if (fromPlayer) { compose.waitForIdle(); return starts }
         compose.waitUntil(10_000) {
             compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
@@ -153,16 +195,18 @@ class InProgressRecordingResumeTest {
         return starts
     }
 
-    private fun observation(playPositionSeconds: Long?): SessionObservation {
+    private fun observation(playPositionSeconds: Long?, completed: Boolean = false): SessionObservation {
         val now = System.currentTimeMillis()
         val entry = DvrEntry.create(
             id = DvrEntryId(1),
             title = "Evening News",
-            state = DvrEntryState.RECORDING,
+            state = if (completed) DvrEntryState.COMPLETED else DvrEntryState.RECORDING,
             start = Instant.fromEpochMilliseconds(now - 1_800_000),
             stop = Instant.fromEpochMilliseconds(now + 1_800_000),
             folder = emptyList(),
-            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "News/evening-news.ts")),
+            files = listOf(TvheadendTestResultFactory.recordingFile(serverPath = "evening-news.ts",
+                start = Instant.fromEpochMilliseconds(now - 1_800_000),
+                stop = Instant.fromEpochMilliseconds(now))),
             playPosition = playPositionSeconds?.seconds,
         )
         return SessionObservation.create(

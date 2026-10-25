@@ -48,10 +48,10 @@ internal fun LivePlayerProgrammeDetails(
     mutationScope: CoroutineScope,
     settingsStore: UiSettingsStore,
     onPlay: (ChannelId, String) -> Unit,
+    onPlayRecording: ((at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection) -> Unit)? = null,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onClose: () -> Unit,
     onBackKeyDown: () -> Unit = {},
-    fromPlayer: Boolean = true,
 ) {
     // Freeze the watched-position programme at entry; the host refreshes its data by ID.
     val openingEvent = remember { event }
@@ -66,7 +66,6 @@ internal fun LivePlayerProgrammeDetails(
                 observation = observation,
                 currentObservation = currentObservation,
                 nowSecProvider = { latestNow.value },
-                fromGuide = false,
                 showContextMenu = false,
                 onShowDetails = {},
                 mutations = mutations,
@@ -74,11 +73,10 @@ internal fun LivePlayerProgrammeDetails(
                 mutationScope = mutationScope,
                 mutationInFlight = inFlight,
                 onPlay = onPlay,
-                onPlayRecording = null,
+                onPlayRecording = onPlayRecording,
                 onShowGuide = onShowGuide,
                 onClose = onClose,
                 settingsStore = settingsStore,
-                fromPlayer = fromPlayer,
                 retainPlayerSnapshot = true,
             )
         } else {
@@ -92,14 +90,24 @@ internal fun LivePlayerProgrammeDetails(
 @Composable
 internal fun RecordingPlayerDetails(
     recording: DvrEntry,
-    channel: Channel?,
+    openingObservation: SessionObservation,
+    observation: SessionObservation,
+    currentObservation: () -> SessionObservation,
     nowSec: Long,
+    mutations: DvrMutationActions,
+    notices: NoticeCenter,
+    mutationScope: CoroutineScope,
+    onPlayRecording: (at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection, at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart) -> Unit,
     onClose: () -> Unit,
+    onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     onBackKeyDown: () -> Unit = {},
 ) {
     PlayerDetailsSurface(onBackKeyDown) {
-        ProgrammeDetailsPage(null, recording, channel, nowSec,
-            actions = recordingDetailsActions(recording, null, false, false, fromPlayer = true),
-            onAction = { onClose() }, onClose = onClose)
+        at.bernhardberger.tvhplayer.ui.screens.RecordingDetailsHost(
+            recording, openingObservation, observation, currentObservation, nowSec,
+            mutations, notices, mutationScope,
+            onPlayRecording = onPlayRecording, onClose = onClose, onContinueWatching = onClose,
+            onShowGuide = onShowGuide,
+        )
     }
 }

@@ -107,12 +107,17 @@ fun RecordingPlayerScreen(
     onReconnect: () -> Unit,
     onClose: () -> Unit,
     onOpenConnectionSettings: () -> Unit = {},
+    onShowGuide: (at.bernhardberger.tvheadend.sdk.core.ChannelId, at.bernhardberger.tvheadend.sdk.core.EpgEvent?) -> Unit = { _, _ -> },
 ) {
     val playerClose = rememberPlayerClose(onClose)
     // First, before the route restore: a user stop since the last intent closes the screen.
     val screenEntry = rememberPlayerEntry(session::enterPlayerScreen, playerClose)
     val connectionAvailable = connectionState is ConnectionState.Connected
     val scope = rememberCoroutineScope()
+    val mutations = remember(tvheadendSession.dvrRepository) {
+        at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions(tvheadendSession.dvrRepository)
+    }
+    val notices: at.bernhardberger.tvhplayer.notices.NoticeCenter = koinInject()
     val playbackState by session.state.collectAsStateWithLifecycle()
     val activeTarget by session.activeTarget.collectAsStateWithLifecycle()
     val videoPresentation by session.videoPresentation.collectAsStateWithLifecycle()
@@ -694,7 +699,13 @@ fun RecordingPlayerScreen(
             ) }
 
             if (foregroundLayer == PlayerForegroundLayer.INFO) {
-                RecordingPlayerDetails(entry, channel, nowSec, ::closeInfo,
+                RecordingPlayerDetails(entry, requireNotNull(targetObservation), observation,
+                    { tvheadendSession.observation.value }, nowSec, mutations, notices, scope,
+                    onShowGuide = onShowGuide,
+                    onPlayRecording = { selection, start ->
+                        closeInfo()
+                        scope.launch { session.playRecording(selection, start) }
+                    }, onClose = ::closeInfo,
                     onBackKeyDown = { revealingKeyCode = AndroidKeyEvent.KEYCODE_BACK })
             }
 
