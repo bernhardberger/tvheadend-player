@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
@@ -77,17 +78,23 @@ fun GuidedStepLayout(
 ) {
     val platformScroll = LocalBringIntoViewSpec.current
     val density = LocalDensity.current
+    val actionScroll = rememberScrollState()
     val focusScroll = remember(platformScroll, density) {
-        with(density) { InsetBringIntoViewSpec(platformScroll, 8.dp.toPx(), 8.dp.toPx()) }
+        with(density) { InsetBringIntoViewSpec(platformScroll, 8.dp.toPx(), 32.dp.toPx()) }
     }
     // Reserve space around each viewport for the TV controls' focused scale.
-    Box(modifier.fillMaxSize().padding(top = TvSpacing80 - 8.dp, bottom = 32.dp), contentAlignment = Alignment.TopCenter) {
+    Box(modifier.fillMaxSize().padding(top = TvSpacing80 - 8.dp, bottom = 27.dp), contentAlignment = Alignment.TopCenter) {
         Row(horizontalArrangement = Arrangement.spacedBy(TvBrowseColumnGap)) {
             Column(Modifier.width(TvBrowseColumnWidth).verticalScroll(rememberScrollState()).padding(top = 8.dp), content = guidance)
             CompositionLocalProvider(LocalBringIntoViewSpec provides focusScroll) {
                 Column(
-                    Modifier.width(TvBrowseColumnWidth).verticalScroll(rememberScrollState())
-                        .padding(top = 8.dp + actionsTop, bottom = 8.dp),
+                    Modifier.width(TvBrowseColumnWidth)
+                        // The mask's layer must include the native focused-scale overhang.
+                        .requiredWidth(TvBrowseColumnWidth + 48.dp)
+                        .listEdgeFadeMask(0.dp, 24.dp, { false }, { actionScroll.canScrollForward })
+                        .padding(horizontal = 24.dp)
+                        .verticalScroll(actionScroll)
+                        .padding(top = 8.dp + actionsTop, bottom = 32.dp),
                     verticalArrangement = Arrangement.spacedBy(TvSpacing12),
                     content = actions,
                 )

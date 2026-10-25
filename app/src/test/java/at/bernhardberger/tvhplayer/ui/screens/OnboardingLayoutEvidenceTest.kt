@@ -179,7 +179,7 @@ class OnboardingLayoutEvidenceTest {
         val action = compose.onNodeWithTag("setup-continue").assertIsFocused().assertIsDisplayed().fetchSemanticsNode().boundsInRoot
         // Semantics reports the unscaled bounds; leave room for TV Surface's 1.1x focus scale.
         assertEquals("The action must not be clipped", 48f, action.height, 0.6f)
-        assertTrue("Focus scale must clear the viewport edge", action.bottom + action.height * 0.05f <= 508f)
+        assertTrue("Focus scale must clear the bottom fade", action.bottom + action.height * 0.05f <= 540f - 27f - 24f)
         assertTrue("Focused shape must stay above the bottom safe edge", action.bottom + action.height * 0.05f <= 513f)
         assertEquals(guidance, compose.onNodeWithText("Where’s your server?").fetchSemanticsNode().boundsInRoot)
     }
