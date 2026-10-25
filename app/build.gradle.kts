@@ -118,6 +118,14 @@ android {
     }
 }
 
+// Bundle the repository's legal sources verbatim, rather than maintaining a second list.
+val aboutLegalAssets = tasks.register<Sync>("generateAboutLegalAssets") {
+    from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"))
+    into(layout.buildDirectory.dir("generated/aboutAssets/licenses"))
+}
+android.sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/aboutAssets").get().asFile)
+tasks.named("preBuild").configure { dependsOn(aboutLegalAssets) }
+
 androidComponents.beforeVariants { variant ->
     // Generate only Play release. Both shipping flavors consume the merged main profile.
     if (variant.buildType?.startsWith("nonMinified") == true ||

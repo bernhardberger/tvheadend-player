@@ -49,7 +49,8 @@ internal fun SettingsScreen(
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
-    ) + recordingLevels + if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
+    ) + recordingLevels + settingsAboutLevels(observation.sessionState, applianceBuild) +
+        if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent)
 }
 
@@ -60,9 +61,11 @@ internal fun settingsRootLevel(applianceBuild: Boolean = BuildConfig.APPLIANCE_B
     settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
     settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
 ) + (if (showRecordings) listOf(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
-    icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + if (applianceBuild) listOf(
+    icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + (if (applianceBuild) listOf(
     settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance_nav), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home),
-) else emptyList())
+) else emptyList()) + listOf(
+    settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL),
+))
 
 @Composable
 internal fun SettingsScreenNavigation(

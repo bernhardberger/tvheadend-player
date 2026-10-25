@@ -245,7 +245,7 @@ class SettingsDepthNavigationTest {
         }
     }
 
-    @Test fun playRootHasFourSectionsAndApplianceAddsOnlyTheLastSection() {
+    @Test fun bothRootsEndWithAboutAndApplianceAddsItsOwnSectionBeforeIt() {
         lateinit var play: DepthLevel
         lateinit var appliance: DepthLevel
         compose.setContent {
@@ -257,8 +257,8 @@ class SettingsDepthNavigationTest {
         compose.runOnIdle {
             val sections = listOf(SettingsSection.GENERAL, SettingsSection.CHANNEL_TAGS,
                 SettingsSection.CONNECTION, SettingsSection.PLAYER).map { it.name }
-            assertEquals(sections, play.rows.map { it.item.id })
-            assertEquals(sections + SettingsSection.APPLIANCE.name, appliance.rows.map { it.item.id })
+            assertEquals(sections + ABOUT_LEVEL, play.rows.map { it.item.id })
+            assertEquals(sections + SettingsSection.APPLIANCE.name + ABOUT_LEVEL, appliance.rows.map { it.item.id })
         }
     }
 

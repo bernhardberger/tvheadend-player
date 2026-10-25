@@ -1,0 +1,16 @@
+<resources>
+    <string name="settings_about">About</string>
+    <string name="about_version">Version</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">Server</string>
+    <string name="about_not_connected">Not connected</string>
+    <string name="about_connected">Connected</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">Based on TVHStream by Preclikos</string>
+    <string name="about_notices">Notices and third-party libraries</string>
+    <string name="about_translators">Translator credits</string>
+    <!-- One entry per language: language name followed by contributor names. -->
+    <string-array name="about_translator_credits" translatable="false" />
+</resources>
