@@ -65,7 +65,7 @@ class DrawerBackdropFadeTest {
         fixture.awaitFocus(hasTestTag("channel-card-${channel.value}"))
         settle()
         fixture.key(Key.DirectionUp)
-        fixture.awaitFocus(hasTestTag("channels-group-button"))
+        fixture.awaitFocus(hasTestTag("channels-tags-button"))
         fixture.key(Key.DirectionLeft)
         fixture.awaitFocus(hasTestTag("nav-channels"))
         settle()
