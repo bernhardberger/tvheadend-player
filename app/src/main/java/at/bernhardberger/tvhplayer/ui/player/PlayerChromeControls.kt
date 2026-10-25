@@ -145,7 +145,6 @@ internal fun PlayerChromeControls(
     var lastFocusedControl by remember { mutableStateOf<String?>(null) }
     var relocatingKey by remember { mutableStateOf<Key?>(null) }
     var timelineFocused by remember { mutableStateOf(false) }
-    val programmeFocused = lastFocusedControl == "player-info"
     val chromeAlpha = rememberPlayerChromeAlpha(timelineFocused, previewing)
     val chromeHidden = timelineFocused && previewing
     // Capture ownership before the timeline's focus node goes. Compose may automatically focus a
@@ -279,7 +278,7 @@ internal fun PlayerChromeControls(
                     }
         if (recording != null) {
             // The step's target label paints over the info bar, which fades out meanwhile.
-            val showPreview = previewing && !markerNavigation.open && !programmeFocused
+            val showPreview = previewing && !markerNavigation.open
             val infoAlpha by animateFloatAsState(if (showPreview) 0f else 1f,
                 tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
             Box(Modifier.graphicsLayer { alpha = infoAlpha }) {
@@ -323,10 +322,9 @@ internal fun PlayerChromeControls(
         } else previewFeedback
         // The info bar rests right above the timeline. A seek label or feedback paints over the
         // bar, so the bar fades out meanwhile instead of anything moving.
-        val statusTextShown = !programmeFocused && (if (seekable) previewing || seekFeedback != null else scheduleFeedback != null)
+        val statusTextShown = if (seekable) previewing || seekFeedback != null else scheduleFeedback != null
         val infoAlpha by animateFloatAsState(if (statusTextShown) 0f else 1f,
             tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard), label = "player-info-bar-seek")
-        // Programme Info remains visible while focused; feedback resumes after leaving it.
         val barStatus = if (previewing) live.barStatus(state, window = live.programmeWindow)
             else rememberPlayerBarStatus(state, liveBar?.end).takeIf { live.liveAvailable }
         infoBar({ infoAlpha }, Modifier) {
@@ -338,11 +336,11 @@ internal fun PlayerChromeControls(
                 timeshiftPosition = requireNotNull(timelinePosition),
                 stepDeltaMs = live.stepDeltaMs,
                 programmeWindow = programmeWindow,
-                previewing = previewing && !programmeFocused,
+                previewing = previewing,
                 collapsed = false,
                 barStatus = barStatus,
                 timeshiftStartLabel = timeshiftStartClock(live.timeshift, live.nowSec),
-                feedback = seekFeedback.takeUnless { programmeFocused },
+                feedback = seekFeedback,
                 feedbackIsError = timeshiftFeedbackIsError || previewing && programmeWindow?.targetAvailable == false,
                 paused = paused,
                 onSeekTo = { onInteraction(); onSeek(it - timeshiftState.positionMs) },
@@ -363,7 +361,7 @@ internal fun PlayerChromeControls(
             PlayerPresentedLiveTimeline(
                 presentation = requireNotNull(liveBar),
                 state = state,
-                feedback = scheduleFeedback.takeUnless { programmeFocused },
+                feedback = scheduleFeedback,
                 feedbackIsError = timeshiftFeedbackIsError,
                 modifier = (if (pausable) timelineModifier else if (event != null) Modifier.testTag("player-schedule-progress") else Modifier)
                     .then(if (pausable || event != null) Modifier.semantics(mergeDescendants = true) {

@@ -100,9 +100,6 @@ internal fun ProgrammeDetailsHost(
         .filter { it != BrowseContextAction.PLAY || onPlayRecording != null && capability != null }
     val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
     val closing = !visibility.targetState
-    var attached by remember { mutableStateOf(true) }
-    DisposableEffect(Unit) { onDispose { attached = false } }
-    val currentSelection by rememberUpdatedState(selected.id)
     val closeAnimated = { visibility.targetState = false }
     BackHandler(enabled = closing) { }
     LaunchedEffect(visibility.isIdle, visibility.currentState, closing) {
@@ -141,7 +138,6 @@ internal fun ProgrammeDetailsHost(
     fun executeDirect(mutation: DvrMutationAction) {
         if (inFlight != null) return
         inFlight = mutation
-        val requestSelection = selected.id
         // Queue after this input dispatch so even an immediate result cannot admit a second click.
         mutationScope.launch(kotlinx.coroutines.Dispatchers.Main) {
             try {
@@ -156,11 +152,8 @@ internal fun ProgrammeDetailsHost(
                     request.copy(configId = chooseDvrConfig(current.currentDvrConfigurations(), preferred)) else request
                 val context = notices.context()
                 val result = mutations.execute(configured)
-                // Browse menus intentionally close when sending Record. Player details instead
-                // own the result only while the same programme page remains open.
-                if (!retainPlayerSnapshot || attached && visibility.targetState && currentSelection == requestSelection) {
-                    notices.postDvrFailure(configured, result, context)
-                }
+                // Command failures survive navigation; NoticeCenter owns their context lifetime.
+                notices.postDvrFailure(configured, result, context)
             } finally {
                 inFlight = null
             }

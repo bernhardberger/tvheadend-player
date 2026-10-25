@@ -1540,6 +1540,25 @@ class LivePlayerChromeScreenTest {
         assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
     }
 
+    @Test fun playerInfoRecordFailureAfterContinueWatchingPostsNotice() {
+        val completion = CompletableDeferred<Unit>()
+        screen(scheduleCompletion = completion)
+        session.dvrRepository.scriptScheduleEntry(DvrMutationResult.Failed(TvheadendFailure.ACCESS_DENIED, mayHaveApplied = false))
+        key(Key.Info)
+        compose.onNodeWithTag("details-record").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        assertEquals(1, session.calls.count { it == FakeSessionCall.DVR_SCHEDULE_ENTRY })
+        compose.onNodeWithTag("details-continue_watching").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.runOnIdle { completion.complete(Unit) }
+        settle()
+        assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED),
+            notices.state.value.pending.single().notice)
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        assertEquals(listOf("player-info"), focused())
+    }
+
     @Test fun playerInfoRecordResultAfterCloseDoesNotAffectReopenedProgramme() {
         val completion = CompletableDeferred<Unit>()
         screen(scheduleCompletion = completion)
@@ -1557,7 +1576,8 @@ class LivePlayerChromeScreenTest {
         assertEquals("New programme", texts("details-title"))
         compose.runOnIdle { completion.complete(Unit) }
         settle()
-        assertTrue("the closed page cannot post its failure into the new page", notices.state.value.pending.isEmpty())
+        assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED),
+            notices.state.value.pending.single().notice)
         assertEquals(listOf("details-continue_watching"), focused())
         compose.onNodeWithTag("details-record").assertExists()
         compose.onNodeWithTag("details-stop").assertDoesNotExist()
@@ -1578,7 +1598,8 @@ class LivePlayerChromeScreenTest {
         compose.onNodeWithTag("details-watch").assertIsFocused()
         compose.runOnIdle { completion.complete(Unit) }
         settle()
-        assertTrue(notices.state.value.pending.isEmpty())
+        assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED),
+            notices.state.value.pending.single().notice)
         compose.onNodeWithTag("details-watch").assertIsFocused()
         compose.onNodeWithTag("details-record").assertExists()
     }

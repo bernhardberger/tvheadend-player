@@ -14,6 +14,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
@@ -55,22 +56,20 @@ class PlayerIdentityCardTest {
         assertEquals(1, infos)
     }
 
-    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun persistentLiveFeedbackDoesNotHideFocusedProgrammeInfo() = focusedInfoDuringFeedback(recording = false)
+    @Test fun persistentLiveSeekFeedbackRemainsVisibleWithInfoFocused() = focusedInfoDuringFeedback(recording = false)
 
-    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
-    fun retainedRecordingSeekPreviewDoesNotHideFocusedProgrammeInfo() = focusedInfoDuringFeedback(recording = true)
+    @Test fun retainedRecordingSeekPreviewRemainsVisibleWithInfoFocused() = focusedInfoDuringFeedback(recording = true)
 
-    private fun focusedInfoDuringFeedback(recording: Boolean) {
-        lateinit var view: android.view.View
+    @Test fun liveScheduleFeedbackRemainsVisibleWithInfoFocused() = focusedInfoDuringFeedback(recording = false, seekable = false)
+
+    private fun focusedInfoDuringFeedback(recording: Boolean, seekable: Boolean = true) {
         compose.setContent {
             TVHeadendPlayerTheme {
-                view = androidx.compose.ui.platform.LocalView.current
                 if (recording) RecordingChromeFixture(targetMs = 1_900_000L,
                     onInfo = { infos++ })
                 else PlayerChrome(mode = PlayerChromeMode.CONTROLS,
                     content = PlayerChromeContent("20:15", PlayerInfoBarData("101", "Ridge Earth", "Programme", "20:00–21:00")),
-                    timeline = PlayerChromeTimeline.Live(AppTimeshiftState(available = true, timingKnown = true,
+                    timeline = PlayerChromeTimeline.Live(AppTimeshiftState(available = seekable, timingKnown = true,
                         bufferStartMs = -600_000, positionMs = -60_000, liveEdgeMs = 0), nowSec = 1_800,
                         feedback = "Persistent seek feedback"),
                     actions = PlayerChromeActions(active = true, paused = false),
@@ -84,22 +83,8 @@ class PlayerIdentityCardTest {
         assertEquals(listOf("player-stop"), focused())
         key(Key.DirectionRight)
         assertEquals(listOf("player-info"), focused())
-        assertFalse("focused Info is not overpainted by recording seek status", exists("recording-seek-preview"))
-        compose.onNodeWithText("Persistent seek feedback", useUnmergedTree = true).assertDoesNotExist()
-        fun pixels(): IntArray {
-            val bitmap = android.graphics.Bitmap.createBitmap(view.width, view.height, android.graphics.Bitmap.Config.ARGB_8888)
-            compose.runOnIdle { view.draw(android.graphics.Canvas(bitmap)) }
-            val rect = bounds("player-info")
-            val width = rect.width.toInt(); val height = rect.height.toInt()
-            return IntArray(width * height).also {
-                bitmap.getPixels(it, 0, width, rect.left.toInt(), rect.top.toInt(), width, height)
-                bitmap.recycle()
-            }
-        }
-        val withFeedback = pixels()
-        assertTrue("persistent feedback leaves the rendered focused artwork visibly painted", withFeedback.count {
-            android.graphics.Color.red(it) > 180 && android.graphics.Color.green(it) > 180
-        } > 20)
+        if (recording) compose.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true).assertIsDisplayed()
+        else compose.onNodeWithText("Persistent seek feedback", useUnmergedTree = true).assertIsDisplayed()
         key(Key.DirectionCenter)
         assertEquals("OK reaches programme details", 1, infos)
     }
