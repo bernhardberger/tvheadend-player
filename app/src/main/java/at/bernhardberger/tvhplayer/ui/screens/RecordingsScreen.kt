@@ -238,7 +238,7 @@ fun RecordingsScreen(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
     playingRecordingId: DvrEntryId? = null,
-    onReturnToRecording: (DvrEntryId) -> Boolean = { false },
+    onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean = { _, _ -> false },
 ) {
     val observation by session.observation.collectAsStateWithLifecycle()
     val dvrMutationActions = remember(session.dvrRepository) {
@@ -280,7 +280,7 @@ internal fun RecordingsScreenContent(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> },
     state: RecordingsScreenState? = null,
     playingRecordingId: DvrEntryId? = null,
-    onReturnToRecording: (DvrEntryId) -> Boolean = { false },
+    onReturnToRecording: (DvrEntryId, () -> Unit) -> Boolean = { _, _ -> false },
     dvrMutationActions: DvrMutationActions,
     currentObservation: () -> SessionObservation = { observation },
     notices: NoticeCenter = koinInject(),
@@ -353,7 +353,7 @@ internal fun RecordingsScreenContent(
     }
 
     fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true) {
-        if (returnIfPlaying && entry.id == playingRecordingId && onReturnToRecording(entry.id)) return
+        if (returnIfPlaying && entry.id == playingRecordingId && onReturnToRecording(entry.id, {})) return
         val current = latestObservationProvider()
         val capability = current.currentSession
         val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
@@ -1098,9 +1098,11 @@ internal fun RecordingsScreenContent(
                 watch(id, name)
             } },
             onContinueWatching = {
-                if (onReturnToRecording(opened.id)) {
+                val returned = onReturnToRecording(opened.id) {
+                    // Register only after warm validation, but before the request makes the handoff pending.
                     closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
-                } else openRecording(opened, returnIfPlaying = false)
+                }
+                if (!returned) openRecording(opened, returnIfPlaying = false)
             },
             onClose = { visibility.targetState = false },
         )

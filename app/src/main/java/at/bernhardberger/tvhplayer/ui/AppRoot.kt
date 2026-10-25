@@ -932,12 +932,13 @@ fun AppRoot(
                                 navigateTopLevel(GuideKey)
                             },
                             playingRecordingId = warmRecordingId,
-                            onReturnToRecording = { id ->
+                            onReturnToRecording = { id, beforeRequest ->
                                 val currentTarget = playbackRuntime.activeTarget.value
                                 val currentSelection = playbackRuntime.recordingSelection.value
                                 val stillWarm = warmRecordingId(currentTarget, currentSelection,
                                     tvheadendSession.observation.value.currentSession) == id
                                 if (stillWarm) {
+                                    beforeRequest()
                                     playbackRuntime.notePlaybackIntent()
                                     playerEntry.request(playbackSelectionScope) {
                                         val target = playbackOrchestrator.requestRecordingPlayer(

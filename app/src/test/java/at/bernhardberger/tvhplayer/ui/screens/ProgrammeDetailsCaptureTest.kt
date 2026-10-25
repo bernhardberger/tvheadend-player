@@ -135,7 +135,7 @@ class ProgrammeDetailsCaptureTest {
                         onPlayRecording = { _, _ -> error("Unexpected playback") }, onClose = {})
                     else RecordingsScreenContent(observation, state = state, dvrMutationActions = mutations,
                         notices = notices, onPlayRecording = { _, _ -> error("Unexpected playback") },
-                        playingRecordingId = entry.id, onReturnToRecording = { true })
+                        playingRecordingId = entry.id, onReturnToRecording = { _, beforeRequest -> beforeRequest(); true })
                 }
             }
         }

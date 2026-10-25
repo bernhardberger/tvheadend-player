@@ -12,6 +12,21 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
+import at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff
+import at.bernhardberger.tvhplayer.ui.PlayerEntryOverlays
+import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -153,11 +168,65 @@ class InProgressRecordingResumeTest {
 
     @Test fun rejectedContinueFromDetailsKeepsTheNormalResumeChoiceOpen() {
         var attempts = 0
+        val handoff = PlayerEntryHandoff()
         val starts = openDetails(754L, warm = true, completed = true,
+            handoff = handoff,
             onReturn = { attempts++; false })
         compose.onNodeWithTag("details-continue_watching").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.mainClock.advanceTimeBy(1_000)
         compose.onNodeWithTag("recording-resume").assertExists()
-        compose.runOnIdle { assertEquals(1, attempts); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+        compose.runOnIdle {
+            assertFalse("a rejected return must not register a close for the reopened flow", handoff.departing)
+            assertEquals(1, attempts)
+            assertEquals(emptyList<RecordingPlaybackStart>(), starts)
+        }
+    }
+
+    @Test fun queuedContinueRegistersDepartureBeforeRequestAndKeepsItsActionsStable() {
+        val handoff = PlayerEntryHandoff()
+        val requestGate = CompletableDeferred<Unit>()
+        val starts = openDetails(754L, warm = true, completed = true, handoff = handoff, requestGate = requestGate)
+        compose.mainClock.advanceTimeBy(1_000)
+        fun actions() = compose.onAllNodes(hasAnyAncestor(hasTestTag("details-actions")), useUnmergedTree = true)
+            .fetchSemanticsNodes().let { nodes ->
+                nodes.flatMap { node -> if (SemanticsProperties.Text in node.config)
+                    node.config[SemanticsProperties.Text].map { it.text } else emptyList() } to
+                    nodes.filter { SemanticsActions.OnClick in it.config }
+                        .map { it.config[SemanticsProperties.TestTag] to it.boundsInRoot.center }
+            }
+        val pressedActions = actions()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithTag("details-continue_watching").performSemanticsAction(SemanticsActions.OnClick)
+        compose.runOnIdle {
+            assertTrue("return request is queued", handoff.pending)
+            assertTrue("accepted return registered its close before starting the request", handoff.departing)
+        }
+        repeat(PlayerMotion.DestinationMs / 16) {
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("queued departure frame ${it + 1}", pressedActions, actions())
+        }
+        compose.onNodeWithTag("details-delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
+        compose.runOnIdle { requestGate.complete(Unit) }
+        compose.mainClock.autoAdvance = true
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.runOnIdle { assertFalse(handoff.departing); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun recordingPlayerDetailsSwallowKeysWhileAnEntryRequestIsPending() {
+        val handoff = PlayerEntryHandoff()
+        val requestGate = CompletableDeferred<Unit>()
+        val scope = CoroutineScope(Dispatchers.Main)
+        try {
+            openDetails(754L, warm = true, completed = true, fromPlayer = true, handoff = handoff)
+            compose.runOnIdle { handoff.request(scope) { requestGate.await() } }
+            compose.runOnIdle { assertTrue(handoff.pending); assertFalse(handoff.departing) }
+            compose.onNodeWithTag("details-delete").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
+            compose.onNodeWithTag("recording-confirmation-back").assertDoesNotExist()
+        } finally {
+            scope.cancel()
+        }
     }
 
     private fun assertWarmDetails() {
@@ -171,6 +240,7 @@ class InProgressRecordingResumeTest {
 
     private fun openDetails(playPositionSeconds: Long?, directly: Boolean = false, menuOnly: Boolean = false,
         warm: Boolean = false, completed: Boolean = false, fromPlayer: Boolean = false, staleSession: Boolean = false,
+        handoff: PlayerEntryHandoff? = null, requestGate: CompletableDeferred<Unit>? = null,
         onReturn: (DvrEntryId) -> Boolean = { true }): List<RecordingPlaybackStart> {
         val starts = mutableListOf<RecordingPlaybackStart>()
         val observation = observation(playPositionSeconds, completed)
@@ -188,6 +258,8 @@ class InProgressRecordingResumeTest {
             at.bernhardberger.tvhplayer.notices.NoticeContext(0, observation.currentSession?.generationIdentity)
         }
         compose.setContent {
+            val scope = rememberCoroutineScope()
+            val content: @Composable () -> Unit = {
             androidx.compose.runtime.CompositionLocalProvider(
                 at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget provides
                     at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(DvrEntryId(1)).takeIf { warm },
@@ -206,10 +278,19 @@ class InProgressRecordingResumeTest {
                     notices = notices,
                     onPlayRecording = { _, start -> starts += start },
                     playingRecordingId = DvrEntryId(1).takeIf { warm },
-                    onReturnToRecording = onReturn,
+                    onReturnToRecording = { id, beforeRequest ->
+                        val accepted = onReturn(id)
+                        if (accepted) {
+                            beforeRequest()
+                            if (handoff != null) handoff.request(scope) { requestGate?.await() }
+                        }
+                        accepted
+                    },
                 )
             }
             }
+            }
+            if (handoff == null) content() else PlayerEntryOverlays(handoff, playerShown = { false }, content = content)
         }
         if (fromPlayer) { compose.waitForIdle(); return starts }
         compose.waitUntil(10_000) {

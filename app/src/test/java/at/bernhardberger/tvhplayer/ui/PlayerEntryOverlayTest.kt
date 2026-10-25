@@ -156,6 +156,9 @@ class PlayerEntryOverlayTest {
     @Test fun resumeFromRecordingDetailsKeepsItsPresentationWhileFadingIntoThePlayer() =
         watchFromOverlay(details = true, recordings = true)
 
+    @Test fun continueFromWarmRecordingDetailsKeepsItsPresentationWhileFadingIntoThePlayer() =
+        watchFromOverlay(details = true, recordings = true, warm = true)
+
     @Test fun watchChannelFromAMenuWithoutProgrammeFadesTheMenuIntoThePlayer() =
         watchFromOverlay(details = false, programme = false)
 
@@ -225,9 +228,9 @@ class PlayerEntryOverlayTest {
         settle()
     }
 
-    private fun watchFromOverlay(details: Boolean, programme: Boolean = true, recordings: Boolean = false) {
-        app(programme, recordings)
-        if (recordings) {
+    private fun watchFromOverlay(details: Boolean, programme: Boolean = true, recordings: Boolean = false, warm: Boolean = false) {
+        if (warm) recordingRow() else app(programme, recordings)
+        if (recordings && !warm) {
             compose.onNodeWithTag("nav-recordings").performSemanticsAction(SemanticsActions.OnClick)
             compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-7")).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithTag("recording-list-entry-7").requestFocus()
@@ -240,7 +243,7 @@ class PlayerEntryOverlayTest {
             compose.onNode(hasText(if (recordings) "Details" else "Program details") and hasClickAction())
                 .performSemanticsAction(SemanticsActions.OnClick)
             settle()
-            compose.onNodeWithTag(if (recordings) "details-resume" else "details-watch").assertExists()
+            compose.onNodeWithTag(if (warm) "details-continue_watching" else if (recordings) "details-resume" else "details-watch").assertExists()
         }
         val overlay = frame()
         fun detailActions() = compose.onAllNodes(hasAnyAncestor(hasTestTag("details-actions")), useUnmergedTree = true)
@@ -254,7 +257,7 @@ class PlayerEntryOverlayTest {
         var departureSamples = 0
 
         compose.mainClock.autoAdvance = false
-        val watch = if (details) hasTestTag(if (recordings) "details-resume" else "details-watch")
+        val watch = if (details) hasTestTag(if (warm) "details-continue_watching" else if (recordings) "details-resume" else "details-watch")
             else hasText(if (programme) "Watch" else "Watch channel") and hasClickAction() and
                 hasAnyAncestor(hasTestTag("browse-context-menu"))
         compose.onNode(watch).performSemanticsAction(SemanticsActions.OnClick)

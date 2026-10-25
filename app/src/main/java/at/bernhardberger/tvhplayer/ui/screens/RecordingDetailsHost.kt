@@ -19,6 +19,7 @@ import at.bernhardberger.tvhplayer.ui.components.LocalActivePlaybackTarget
 import at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.warmRecordingId
 import at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff
+import at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending
 import at.bernhardberger.tvhplayer.ui.screens.recordings.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -45,6 +46,7 @@ internal fun RecordingDetailsHost(
     visibilityAlpha: State<Float>? = null,
 ) {
     val departing = LocalPlayerEntryHandoff.current?.departing == true
+    val entryPending = rememberPlayerEntryPending()
     val presentation = Triple(observation, nowSec, warmRecordingId(LocalActivePlaybackTarget.current,
         LocalRecordingPlaybackSelection.current, observation.currentSession))
     var lastPresentation by remember { mutableStateOf(presentation) }
@@ -77,7 +79,7 @@ internal fun RecordingDetailsHost(
     }
     Box(Modifier.onPreviewKeyEvent { event ->
         // A refresh can remove the confirmation between down and up.
-        if (departing) true else if (event.key == confirmationKey && pending == null) {
+        if (departing || entryPending()) true else if (event.key == confirmationKey && pending == null) {
             if (event.type == KeyEventType.KeyUp) confirmationKey = null
             true
         } else {
