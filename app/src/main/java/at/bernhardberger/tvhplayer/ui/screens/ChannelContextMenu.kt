@@ -15,6 +15,9 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import kotlinx.coroutines.CoroutineScope
 import org.koin.compose.koinInject
 
@@ -57,6 +60,8 @@ internal fun ChannelContextMenu(
         title = at.bernhardberger.tvhplayer.ui.components.channelTitleText(channel.number, channel.name.orEmpty()),
         channel = "", episode = "", time = "", watchChannel = true,
         actions = listOf(BrowseContextAction.WATCH, BrowseContextAction.SHOW_GUIDE),
+        playbackIndicator = if (LocalWatchingChannel.current == channelId) LocalWatchingIndicator.current
+            else ChannelPlaybackIndicator.NONE,
         onClose = onClose,
         modifier = Modifier.onPreviewKeyEvent { entryPending() },
         onAction = { action ->

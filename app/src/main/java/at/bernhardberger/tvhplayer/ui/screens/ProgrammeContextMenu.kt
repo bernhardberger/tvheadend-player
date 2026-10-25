@@ -35,6 +35,7 @@ internal fun ProgrammeContextMenu(
     val admission = recording?.takeIf { canPlayRecording && currentSession != null }
         ?.let(observation::recordingPlaybackAdmission)
     val actions = channelContextActions(event, nowSec, recording, admission, canModify)
+    val indicator = watchingIndicator(event, nowSec)
     val showGuide = BrowseContextAction.SHOW_GUIDE in programmeDetailsActions(event, nowSec, recording, null,
         canModify, channel != null && currentSession != null, fromGuide, stacked = stacked)
     BrowseContextMenu(
@@ -48,6 +49,7 @@ internal fun ProgrammeContextMenu(
         watchChannel = !event.isRunning(nowSec), programDetailsLabel = !fromGuide,
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         recordingState = recording?.state,
+        playbackIndicator = indicator,
         artwork = {
             // The menu shows its pictures with the session it was opened with.
             ProvideArtworkSession(currentSession, observation) {
@@ -55,7 +57,8 @@ internal fun ProgrammeContextMenu(
                     Modifier.fillMaxSize().testTag(if (event.image != null && currentSession != null)
                         "browse-context-artwork" else "browse-context-picon"),
                     plateModifier = Modifier.testTag("browse-context-plate"),
-                    progressModifier = Modifier.testTag("browse-context-progress"))
+                    progressModifier = Modifier.testTag("browse-context-progress"),
+                    progressColor = progressColor(indicator != ChannelPlaybackIndicator.NONE))
             }
         },
     )

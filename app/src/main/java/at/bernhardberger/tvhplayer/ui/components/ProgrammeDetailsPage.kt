@@ -1026,20 +1026,22 @@ private fun DetailsInformation(
             DetailsTimeline(start, progress, "$end • ${playerMinutesLeft(minutesLeft)}",
                 "$spokenRange, ${playerMinutesLeft(minutesLeft, spoken = true)}",
                 Modifier.widthIn(max = 470.dp).fillMaxWidth(), color = progressColor(watchingEvent))
-        } else if (facts.any { it.kind == DetailsFactKind.LEFT }) {
+        } else if (recordingViewerPosition(recording?.id)?.fraction != null || facts.any { it.kind == DetailsFactKind.LEFT }) {
             Spacer(Modifier.height(8.dp))
-            val length = facts.first { it.kind == DetailsFactKind.LENGTH }.seconds
-            val left = facts.first { it.kind == DetailsFactKind.LEFT }.seconds
-            val position = length - left
+            val viewer = recordingViewerPosition(recording?.id)?.takeIf { it.fraction != null }
+            val length = viewer?.durationMs?.div(1000L) ?: facts.first { it.kind == DetailsFactKind.LENGTH }.seconds
+            val position = viewer?.positionMs?.div(1000L)?.coerceIn(0, length)
+                ?: (length - facts.first { it.kind == DetailsFactKind.LEFT }.seconds)
+            val left = length - position
             val minutesLeft = ((left + 59) / 60).toInt()
-            DetailsTimeline(formatPlaybackDuration(position * 1000L), position.toFloat() / length,
+            DetailsTimeline(formatPlaybackDuration(position * 1000L), viewer?.fraction ?: (position.toFloat() / length),
                 "${formatPlaybackDuration(length * 1000L)} • ${playerMinutesLeft(minutesLeft)}",
                 stringResource(R.string.details_recording_progress_spoken,
                     formatDurationMinutes(position / 60, resources, spoken = true),
                     formatDurationMinutes(length / 60, resources, spoken = true),
                     playerMinutesLeft(minutesLeft, spoken = true)), Modifier.widthIn(max = 470.dp).fillMaxWidth(),
                 // How far the viewer is, not time on air.
-                color = MaterialTheme.colorScheme.tertiary)
+                color = progressColor(true))
         }
         // The same warning as the recording's row and pane.
         if (recording != null && remember(recording) { recordingStoppedEarly(recording) != null }) {
@@ -1107,7 +1109,10 @@ private fun DetailsActions(
                         up = FocusRequester.Cancel; down = FocusRequester.Cancel
                     }.testTag("details-${action.name.lowercase()}")
                 val content: @Composable RowScope.() -> Unit = {
-                    Icon(painterResource(action.icon()), null, Modifier.size(ButtonDefaults.IconSize))
+                    val indicator = if (event == null) watchingIndicator(recording?.id) else watchingIndicator(event, nowSec)
+                    if (action.icon() == R.drawable.ic_play_arrow && indicator != ChannelPlaybackIndicator.NONE) {
+                        ChannelPlaybackMarker(indicator, size = ButtonDefaults.IconSize)
+                    } else Icon(painterResource(action.icon()), null, Modifier.size(ButtonDefaults.IconSize))
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
                         (event == null && recording?.state == DvrEntryState.SCHEDULED ||

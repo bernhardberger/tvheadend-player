@@ -44,7 +44,17 @@ fun channelPlaybackIndicator(
     state: AppPlaybackState,
     playWhenReady: Boolean,
 ): ChannelPlaybackIndicator {
-    if (target != AppPlaybackTarget.Live(channelId)) return ChannelPlaybackIndicator.NONE
+    return playbackIndicator(AppPlaybackTarget.Live(channelId), target, state, playWhenReady)
+}
+
+/** The same presentation contract for live channels and recordings, independent of their surface. */
+internal fun playbackIndicator(
+    item: AppPlaybackTarget?,
+    target: AppPlaybackTarget?,
+    state: AppPlaybackState,
+    playWhenReady: Boolean,
+): ChannelPlaybackIndicator {
+    if (item == null || target != item) return ChannelPlaybackIndicator.NONE
     return when (state) {
         AppPlaybackState.Playing, AppPlaybackState.Buffering ->
             if (playWhenReady) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.PAUSED

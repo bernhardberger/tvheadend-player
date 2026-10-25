@@ -31,6 +31,7 @@ import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.progressColor
 
 /** Passive identity of the playing channel, independent of the programme being browsed. */
 @Composable
@@ -47,7 +48,8 @@ internal fun NowPlayingStrip(
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(Modifier.size(48.dp, 27.dp).clip(PlayerChromeTokens.chipShape)
-            .background(TvSurfaceColors.containerLowest), contentAlignment = Alignment.Center) {
+            .then(if (picon == null) Modifier.background(TvSurfaceColors.containerLowest) else Modifier),
+            contentAlignment = Alignment.Center) {
             if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
@@ -55,6 +57,8 @@ internal fun NowPlayingStrip(
                 progress = ((nowSec - current.start.epochSeconds).toDouble() /
                     (current.stop.epochSeconds - current.start.epochSeconds)).toFloat(),
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = 2.dp,
+                color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING ||
+                    playbackIndicator == ChannelPlaybackIndicator.PAUSED),
             )
         }
         Column(Modifier.widthIn(max = 200.dp).width(IntrinsicSize.Max)) {
