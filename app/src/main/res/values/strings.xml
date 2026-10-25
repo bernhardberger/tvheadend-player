@@ -152,6 +152,8 @@
     <string name="browse_tags">Tags</string>
     <string name="channels_view_options">View options</string>
     <string name="channels_view_layout">Layout</string>
+    <string name="channels_view_immersive_options">Immersive options</string>
+    <string name="channels_view_grid_options">Grid options</string>
     <string name="channels_view_program_art">Program art</string>
     <string name="guide_view_rows">Rows</string>
     <string name="guide_view_rows_dense">Dense</string>

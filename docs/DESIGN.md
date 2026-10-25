@@ -561,7 +561,9 @@ options offer three layouts, in this order: **Immersive** (the default), **List*
 and **Grid**. Immersive and Grid each keep their own **Program art** switch, off
 by default; off, cards and backdrops use channel logos instead of programme art.
 List always shows programme art (its pane picture is the point), so it has no
-switch (owner, 2026-10-25).
+switch (owner, 2026-10-25). The switch sits below a divider under its own
+heading, "Immersive options" or "Grid options", since it applies to that layout
+only.
 
 - The header draws no title: the drawer already says where you are, and the
   destination's name ("Channels", "Guide") is the row's pane title for
