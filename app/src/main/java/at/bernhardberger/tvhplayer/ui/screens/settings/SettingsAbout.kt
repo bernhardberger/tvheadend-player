@@ -63,7 +63,10 @@ private fun aboutServerText(state: SessionState): String {
 private fun aboutReadingLevel(id: String, title: String, asset: String): DepthLevel {
     val context = LocalContext.current
     return settingsLevel(id, title, emptyList(), activeContent = { requester, left ->
-        val text = remember(asset) { context.assets.open("licenses/$asset").bufferedReader().use { it.readText() } }
+        val text = remember(asset) {
+            val source = context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
+            if (asset == "NOTICE.md") aboutNoticeText(source) else source
+        }
         ProgrammeDetailsFullDescription(
             modifier = Modifier.padding(end = 48.dp).focusRequester(requester).onPreviewKeyEvent {
                 it.nativeKeyEvent.keyCode == KeyEvent.KEYCODE_DPAD_LEFT && left(it.nativeKeyEvent)

@@ -105,12 +105,17 @@ class SettingsAboutTest {
 
     private fun capture(name: String, scale: Float) {
         show(scale)
+        save("$name-root")
         press(Key.DirectionCenter)
         save(name)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         press(Key.DirectionCenter)
         save("$name-license")
+        press(Key.Back)
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        save("$name-notices")
     }
 
     private fun save(name: String) {
