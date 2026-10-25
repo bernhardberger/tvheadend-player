@@ -729,7 +729,12 @@ class QuickZapPresentationTest {
                     dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
                 )).captureCurrentSession()
             }
-            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
+            // The app root provides what plays; the drawer's own playing props come from the same runtime.
+            CompositionLocalProvider(LocalDensity provides Density(1f, fontScale),
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel provides playing,
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
+                    playing?.let(at.bernhardberger.tvhplayer.playback.AppPlaybackTarget::Live),
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides indicator) {
                 TVHeadendPlayerTheme {
                     focusColor = androidx.tv.material3.MaterialTheme.colorScheme.onSurface.toArgb()
                     viewerProgressColor = at.bernhardberger.tvhplayer.ui.components.progressColor(true).toArgb()

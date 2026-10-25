@@ -29,6 +29,10 @@ import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
+import at.bernhardberger.tvheadend.sdk.core.EventId
+import kotlin.time.Instant
 import org.junit.Assert.assertTrue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
@@ -42,6 +46,10 @@ class ChannelRowTest {
     @get:Rule
     val composeTestRule = createComposeRule()
 
+    /** On air from 0 to 1,000 s; a row's progress is its share at the row's now. */
+    private val runningEvent = EpgEvent.create(id = EventId(1), channelId = ChannelId(1),
+        start = Instant.fromEpochSeconds(0), stop = Instant.fromEpochSeconds(1_000), title = "Večerní zprávy")
+
     @Test
     fun showsChannelAndProgramme_andConfirmsOnClick() {
         var confirmed = false
@@ -52,7 +60,7 @@ class ChannelRowTest {
                     number = 3,
                     name = "ČT1 HD",
                     programTitle = "Večerní zprávy",
-                    progress = 0.5f,
+                    programme = runningEvent, nowSec = 500,
                     piconPath = null,
                     onFocus = {},
                     onConfirm = { confirmed = true }
@@ -87,7 +95,7 @@ class ChannelRowTest {
                                 "A very long localized channel title that must ellipsize"
                             },
                             programTitle = "Večerní zprávy",
-                            progress = 0.5f,
+                            programme = runningEvent, nowSec = 500,
                             piconPath = null,
                             recordingNow = index != 1,
                             playingNow = index != 1,
@@ -141,7 +149,7 @@ class ChannelRowTest {
                             number = number.toLong(),
                             name = "Channel $number",
                             programTitle = "Programme $number",
-                            progress = 0.5f,
+                            programme = runningEvent, nowSec = 500,
                             piconPath = null,
                             onFocus = { focusedNumber = number },
                             onConfirm = {},
@@ -177,7 +185,7 @@ class ChannelRowTest {
                             number = number.toLong(),
                             name = "Channel $number",
                             programTitle = "Programme $number",
-                            progress = 0.5f,
+                            programme = runningEvent, nowSec = 500,
                             piconPath = null,
                             onFocus = { selectedNumber.intValue = number },
                             onConfirm = {},
@@ -231,7 +239,7 @@ class ChannelRowTest {
                     number = 1,
                     name = "Channel",
                     programTitle = "Programme",
-                    progress = 0.25f,
+                    programme = runningEvent, nowSec = 250,
                     piconPath = null,
                     onFocus = {},
                     onConfirm = {},
