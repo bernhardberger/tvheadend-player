@@ -291,7 +291,7 @@ internal class ConnectionSetupState(
             if (editing) {
                 testAndSave(profile)
             } else {
-                val result = session.testConnection(profile)
+                val result = session.connectForSetup(profile)
                 // Back may cancel during the test's closing disconnect, which still returns.
                 currentCoroutineContext().ensureActive()
                 failure = result
@@ -317,7 +317,7 @@ internal class ConnectionSetupState(
     private suspend fun testAndSave(profile: ServerProfile) {
         var settled = false
         try {
-            val result = session.testConnection(profile)
+            val result = session.connectForSetup(profile)
             if (result != null) {
                 // Reconnected before the failure shows, so "Save anyway" cannot land before it.
                 withContext(NonCancellable) { restoreSaved() }
@@ -501,7 +501,7 @@ internal fun discoverServers(context: Context): Flow<TvheadendDiscoveryState> = 
  * [SessionCommandResult.NO_CHANGE] means someone else selected this configuration between the
  * disconnect and the connect, whose outcome may already be past; the test starts over once.
  */
-internal suspend fun TvheadendSession.testConnection(profile: ServerProfile): SetupFailure? {
+internal suspend fun TvheadendSession.connectForSetup(profile: ServerProfile): SetupFailure? {
     var passed = false
     try {
         repeat(2) {
