@@ -66,6 +66,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -139,6 +140,7 @@ import at.bernhardberger.tvhplayer.ui.components.rememberTabReader
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.underBrowseShellScrim
 import at.bernhardberger.tvhplayer.ui.player.programmeFactsSegments
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
 import kotlin.time.Instant
 import androidx.compose.ui.layout.ContentScale
 import coil3.compose.AsyncImage
@@ -159,8 +161,8 @@ private val ImmersiveCardWidth = 178.dp
 /** The kit's 40sp leading spreads a two-line 32sp title apart; display type sits tighter. */
 private val ImmersiveTitleLineHeight = 36.sp
 
-/** The channel line's gap under the card: a 178dp card's focus scale needs about 8dp of it. */
-private val ImmersiveCardLabelGap = 12.dp
+/** The channel line's gap under the card: just what a 178dp card's focus scale and outline need. */
+private val ImmersiveCardLabelGap = 8.dp
 
 /** The recording badge's inset in the card's corner, the kit's embed inset. */
 private val ImmersiveCardEmbedInset = 8.dp
@@ -439,14 +441,14 @@ private fun ChannelsCardRow(
 }
 
 /**
- * A card of the immersive row, the details page's standard card: the current programme inside
+ * A card of the immersive row and the grid, the details page's standard card: the current programme inside
  * its picture, always, as a browse card names what it shows. With [programmePicture] the channel's
  * logo and name go below; without a picture the logo stands on its ambient colour above the
  * programme, and without [programmePicture] that logo names the channel, so nothing goes below. While the guide is [programmeLoading], a missing
  * programme line is a [SkeletonLine] rather than "No program information".
  */
 @Composable
-private fun ChannelsRowCard(
+internal fun ChannelsRowCard(
     channel: Channel,
     event: EpgEvent?,
     nowSec: Long,
@@ -457,11 +459,13 @@ private fun ChannelsRowCard(
     programmeLoading: Boolean,
     programmePicture: Boolean,
     modifier: Modifier,
+    width: Dp = ImmersiveCardWidth,
+    tagPrefix: String = "channels-immersive",
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onLongClick, menuKey = true)
     val running = event?.takeIf { it.isRunning(nowSec) }
     val programme = running?.title?.takeIf { it.isNotBlank() }
-    val tag = "channels-immersive-${channel.id.value}"
+    val tag = "$tagPrefix-${channel.id.value}"
     val session = LocalArtworkContext.current.currentSession
     val art = running?.image?.takeIf { programmePicture && session != null }
     var artFailed by remember(art, session) { mutableStateOf(false) }
@@ -474,7 +478,7 @@ private fun ChannelsRowCard(
     }
     val showsArt = artModel != null && !artFailed
     StandardProgrammeCard(
-        width = ImmersiveCardWidth,
+        width = width,
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
         modifier = modifier.then(contextMenu.modifier),
@@ -486,7 +490,7 @@ private fun ChannelsRowCard(
                 ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 Box(Modifier.fillMaxSize().padding(top = ImmersiveCardLogoInset, bottom = textHeight + ImmersiveCardLogoInset),
                     contentAlignment = Alignment.Center) {
-                    val pictureHeight = ImmersiveCardWidth * 9f / 16f
+                    val pictureHeight = width * 9f / 16f
                     PiconBox(channel.icon, Modifier.fillMaxWidth(ImmersiveCardLogoWidthFraction).fillMaxHeight()
                         .testTag("$tag-picon"),
                         ground = channelAccentGround(channel.icon, channel.id, depth = (pictureHeight - textHeight) / 2 / pictureHeight))
@@ -510,7 +514,10 @@ private fun ChannelsRowCard(
                 compact = true)
             // Same embedded strip as the airing cards; the card's border keeps clear of it.
             if (running != null) ProgressStrip(running.progress(nowSec),
-                Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"), height = 3.dp)
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
+                color = progressColor(playbackIndicator == ChannelPlaybackIndicator.PLAYING ||
+                    playbackIndicator == ChannelPlaybackIndicator.PAUSED),
+                height = 3.dp)
         },
         title = {
             // The logo card names the channel itself.
@@ -522,7 +529,7 @@ private fun ChannelsRowCard(
                 // The card's content colour: muted, and white on the focused card, so the eye goes there.
                 Text(channelTitleText(channel.visibleChannelNumber, channel.name.orEmpty()),
                     Modifier.weight(1f).testTag("$tag-identity"),
-                    style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Normal), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
                     recordingNow = false, playbackIndicator = playbackIndicator)
             }
@@ -541,6 +548,7 @@ internal fun ChannelsImmersiveHero(
     nowSec: () -> Long,
     modifier: Modifier,
     besideList: Boolean = false,
+    sparse: Boolean = false,
 ) {
     // A leaving group keeps showing its own channel while it fades.
     val focusedId = rememberTabReader(frame.focusedId)
@@ -550,7 +558,7 @@ internal fun ChannelsImmersiveHero(
     val typography = MaterialTheme.typography
     // A fixed height keeps the row in place while the hero's text changes length; shorter text
     // sits on the row, so a two-line title grows upward. Beside the list nothing moves with it.
-    val height = with(LocalDensity.current) {
+    val height = if (sparse) guideHeadlineHeight() else with(LocalDensity.current) {
         typography.labelMedium.lineHeight.toDp() + ProgrammeHeadlineTitleGap + typography.headlineLarge.lineHeight.toDp() * 2 +
             4.dp + typography.bodyLarge.lineHeight.toDp() +
             ProgrammeHeadlineGroupGap + ProgrammeHeadlineFactsLineHeight + ProgrammeHeadlineLineGap + typography.labelMedium.lineHeight.toDp() +
@@ -582,11 +590,19 @@ internal fun ChannelsImmersiveHero(
         ChannelsHeadline(channel, current, next, nextScheduled, channel.id in frame.recordingIds, now,
             watching = channel.id == frame.playbackChannelId && frame.playbackIndicator in
                 listOf(ChannelPlaybackIndicator.PLAYING, ChannelPlaybackIndicator.PAUSED),
-            synopsisLines = if (besideList) ImmersiveListSynopsisLines else ImmersiveSynopsisLines,
-            loading = frame.guideLoading, fitSynopsis = besideList,
-            // Beside the list the title steps down one size, so it doesn't compete with the rows.
-            titleStyle = if (besideList) MaterialTheme.typography.titleLarge
-                else MaterialTheme.typography.headlineLarge.copy(lineHeight = ImmersiveTitleLineHeight),
+            synopsisLines = when {
+                sparse -> 0
+                besideList -> ImmersiveListSynopsisLines
+                else -> ImmersiveSynopsisLines
+            },
+            loading = frame.guideLoading, fitSynopsis = besideList, showNext = !sparse,
+            // Beside the list the title steps down one size, so it doesn't compete with the rows;
+            // the sparse headline over the grid is the Guide's.
+            titleStyle = when {
+                sparse -> MaterialTheme.typography.headlineSmall
+                besideList -> MaterialTheme.typography.titleLarge
+                else -> MaterialTheme.typography.headlineLarge.copy(lineHeight = ImmersiveTitleLineHeight)
+            },
             // The kit's 16sp description; the narrow column beside the list keeps 14sp for its line length.
             synopsisStyle = if (besideList) MaterialTheme.typography.bodyMedium else MaterialTheme.typography.bodyLarge,
             modifier = Modifier.wrapContentHeight(if (besideList) Alignment.Top else Alignment.Bottom))
@@ -604,7 +620,7 @@ internal fun channelsProgrammeSynopsis(event: EpgEvent): String? =
 @Composable
 private fun ChannelsHeadline(
     channel: Channel, current: EpgEvent?, next: EpgEvent?, nextScheduled: Boolean, recording: Boolean, now: Long,
-    synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false,
+    synopsisLines: Int, loading: Boolean, modifier: Modifier, fitSynopsis: Boolean = false, showNext: Boolean = true,
     titleStyle: TextStyle = MaterialTheme.typography.headlineLarge,
     synopsisStyle: TextStyle = MaterialTheme.typography.bodyLarge,
     watching: Boolean = false,
@@ -635,13 +651,13 @@ private fun ChannelsHeadline(
         timing = current?.let { formatTimeInterval(it.start.epochSeconds, it.stop.epochSeconds) },
         progress = current?.progress(now),
         progressColor = progressColor(watching),
-        synopsis = current?.let(::channelsProgrammeSynopsis),
+        synopsis = current?.takeIf { synopsisLines > 0 }?.let(::channelsProgrammeSynopsis),
         fitSynopsis = fitSynopsis,
         loading = current == null && loading,
         titleStyle = titleStyle,
         synopsisStyle = synopsisStyle,
         // As the player's info bar has it: now above, what follows on the bottom edge, quieter.
-        footer = next?.let { { footerModifier -> NextProgramme(it, nextScheduled, footerModifier) } },
+        footer = next?.takeIf { showNext }?.let { { footerModifier -> NextProgramme(it, nextScheduled, footerModifier) } },
     )
 }
 

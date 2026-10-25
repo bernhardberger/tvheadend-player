@@ -130,6 +130,7 @@ import at.bernhardberger.tvhplayer.ui.TvPanelBrowseAlpha
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlinx.coroutines.Job
@@ -664,8 +665,8 @@ internal fun ChannelsScreenContent(
             .graphicsLayer { alpha = 1f - (detailsLayering?.detailsAlpha() ?: if (showProgrammeDetails) 1f else 0f) },
     ) {
         // Behind the header from the screen's top: it follows focus across groups, while the
-        // group's content fades on its own. The grid and list sit on the plain page background.
-        if (channels.isNotEmpty() && layout == ChannelsLayout.IMMERSIVE) {
+        // group's content fades on its own. The list sits on the plain page background.
+        if (channels.isNotEmpty() && layout != ChannelsLayout.LIST) {
             ProvideArtworkSession(observation.currentSession, channelScopeState.observation) {
                 ChannelsImmersiveBackground(
                     programArt = view.showsProgramArt,
@@ -677,6 +678,10 @@ internal fun ChannelsScreenContent(
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
                     endInset = detailPanePadding.calculateEndPadding(layoutDirection),
                     modifier = Modifier.fillMaxSize(),
+                    // Over the grid the picture ends with the headline, clear of the cards.
+                    pictureHeight = if (layout == ChannelsLayout.GRID) {
+                        contentPadding.calculateTopPadding() + TvBrowseHeaderHeight + ChannelsHeaderGap + guideHeadlineHeight()
+                    } else null,
                 )
             }
         }
@@ -702,8 +707,6 @@ internal fun ChannelsScreenContent(
                 onFocused = {
                     didInitialRestore = true
                     relinquishContentFocus()
-                    // The grid brings its header back with its first row.
-                    if (layout == ChannelsLayout.GRID) coroutineScope.launch { gridState.animateScrollToItem(0) }
                 },
                 onOpen = ::showPanel,
                 onMoveToContent = ::focusBrowseContent,
@@ -712,23 +715,16 @@ internal fun ChannelsScreenContent(
                 onReturnToContent = if (layout == ChannelsLayout.LIST) {
                     { scopeEntryChannelId() != null && focusBrowseContent() }
                 } else null,
-                // The grid's header scrolls away with its first row, over the rows reaching up behind it.
-                // The immersive header takes no row: it overlays the body from the top. Neither does
-                // the list's: its buttons sit above the details, and the list column starts level with them.
-                modifier = Modifier.zIndex(1f).then(
-                    if (layout == ChannelsLayout.GRID) Modifier.graphicsLayer {
-                        val scrolled = if (gridState.firstVisibleItemIndex == 0) gridState.firstVisibleItemScrollOffset else Int.MAX_VALUE
-                        translationY = -minOf(scrolled.toFloat(), size.height + ChannelsHeaderGap.toPx() + contentPadding.calculateTopPadding().toPx())
-                    } else Modifier.layout { measurable, constraints ->
-                        val placeable = measurable.measure(constraints)
-                        layout(placeable.width, 0) { placeable.place(0, 0) }
-                    },
-                ).padding(
+                // The header takes no row: it overlays the body from the top. The list's buttons sit
+                // above the details, and the list column starts level with them.
+                modifier = Modifier.zIndex(1f).layout { measurable, constraints ->
+                    val placeable = measurable.measure(constraints)
+                    layout(placeable.width, 0) { placeable.place(0, 0) }
+                }.padding(
                     start = startPadding + TvBrowseLeadingInset,
                     end = maxOf(endPadding, TvBrowseTrailingInset),
                 ),
             )
-            if (layout == ChannelsLayout.GRID) Spacer(Modifier.height(ChannelsHeaderGap))
             // What the list layout shows below the header instead of beside it keeps the header's band.
             val listHeaderBand = if (layout == ChannelsLayout.LIST) TvBrowseHeaderHeight + ChannelsHeaderGap else 0.dp
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -876,12 +872,19 @@ internal fun ChannelsScreenContent(
                         )
                         .fillMaxSize(),
                 ) {
+                    // The header overlays the body's top; the headline and the grid start below it
+                    // and stay put while the grid scrolls.
+                    Spacer(Modifier.height(TvBrowseHeaderHeight + ChannelsHeaderGap))
                     UnavailableTagNotice(
                         visible = tagNotice,
                         onDismiss = { if (owner.isCurrent) onDismissTagNotice() },
                         modifier = Modifier.zIndex(1f).padding(horizontal = ChannelsGridEdgeInset),
                     )
                     if (tagNotice) Spacer(Modifier.height(8.dp))
+                    ChannelsImmersiveHero(channels, frame, nowSecProvider, Modifier.padding(start = ChannelsGridEdgeInset),
+                        sparse = true)
+                    // The immersive row's 40dp from headline to cards, less the grid's own inset.
+                    Spacer(Modifier.height(ChannelsGridHeadlineGap - ChannelsGridEdgeInset))
                     ChannelsGrid(
                         channels = channels,
                         frame = frame,
@@ -898,7 +901,6 @@ internal fun ChannelsScreenContent(
                         onExitTowardNavigation = { relinquishContentFocus() },
                         onPage = ::pageChannels,
                         modifier = Modifier.weight(1f).fillMaxWidth().then(contentEntry),
-                        topOverflow = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight + ChannelsHeaderGap,
                     )
                 }
             } else Row(
@@ -1275,6 +1277,9 @@ private fun connectingMessage(state: ConnectionUiState): String = stringResource
 
 /** Between the header and the content below it. */
 private val ChannelsHeaderGap = 8.dp
+
+/** From the grid's headline to its first cards, as the kit's immersive list has it. */
+private val ChannelsGridHeadlineGap = 40.dp
 
 /** Focused-programme dissolve. Short enough to keep row-to-row browsing responsive. */
 internal const val ChannelsDetailCrossfadeMillis = 160

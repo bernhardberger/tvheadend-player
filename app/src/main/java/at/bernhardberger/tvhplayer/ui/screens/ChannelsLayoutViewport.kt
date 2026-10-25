@@ -40,8 +40,7 @@ internal class ChannelsListViewport(
 }
 
 /**
- * A grid puts the target's row just below the peeking half of the row above it, where focus
- * scrolling holds it; paging keeps the column.
+ * A grid puts the target's row at its top, where focus scrolling holds it; paging keeps the column.
  */
 internal class ChannelsGridViewport(
     private val state: LazyGridState,
@@ -60,22 +59,17 @@ internal class ChannelsGridViewport(
     }
 
     override suspend fun scrollToChannel(index: Int, animate: Boolean) {
-        val (row, offset) = peekingRowFor(index)
+        val (row, offset) = rowFor(index)
         if (animate) state.animateScrollToItem(row, offset) else state.scrollToItem(row, offset)
     }
 
     override fun requestScrollToChannel(index: Int) {
-        val (row, offset) = peekingRowFor(index)
+        val (row, offset) = rowFor(index)
         state.requestScrollToItem(row, offset)
     }
 
-    /** The row above the target, scrolled so only its peeking part shows; the first row stays put. */
-    private fun peekingRowFor(index: Int): Pair<Int, Int> {
-        val rowStart = index - index % columns
-        if (rowStart == 0) return 0 to 0
-        val rowHeight = state.layoutInfo.visibleItemsInfo.firstOrNull()?.size?.height ?: 0
-        return rowStart - columns to (rowHeight * (1f - ChannelsGridPeekFraction)).toInt()
-    }
+    /** The target's row, at the grid's top. */
+    private fun rowFor(index: Int): Pair<Int, Int> = index - index % columns to 0
 }
 
 /**
