@@ -95,7 +95,6 @@ class WatchingProgressTest {
     private lateinit var view: View
     private var viewerColor = 0
     private var ambientColor = 0
-    private var backgroundColor = 0
     private val start = Instant.parse("2026-09-15T19:00:00Z")
     private val now = start.epochSeconds + 1800
     private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
@@ -535,12 +534,12 @@ class WatchingProgressTest {
         show("zap")
         compose.onNodeWithTag("channel-paused-indicator", useUnmergedTree = true).assertExists()
         assertOrangeProgress()
-        assertNoPlate()
+        assertPlate()
     }
     @Test fun zapWithoutLogoKeepsChannelNumberFallback() {
         show("zap", picon = null)
         compose.onNodeWithText("101", useUnmergedTree = true).assertIsDisplayed()
-        assertNoPlate()
+        assertPlate()
     }
     @Test fun recordingRowMarksPlaybackRatherThanSelection() {
         show("row")
@@ -628,12 +627,14 @@ class WatchingProgressTest {
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(value, 0f..1f)))
     private fun progressBar() = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
         useUnmergedTree = true)
-    private fun assertNoPlate() {
+    private fun assertPlate() {
         val bar = progressBar().fetchSemanticsNode().boundsInRoot
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
-        // Inside the logo slot's horizontal padding, above the strip, not the rounded corner.
-        assertEquals(backgroundColor, bitmap.getPixel(bar.left.toInt() + 2, bar.top.toInt() - 15))
+        // Inside the logo slot's horizontal padding, above the strip, not the rounded corner:
+        // the plate carries the strip, so the strip never floats over the picture.
+        assertEquals(at.bernhardberger.tvhplayer.ui.TvSurfaceColors.containerLowest.toArgb(),
+            bitmap.getPixel(bar.left.toInt() + 2, bar.top.toInt() - 15))
         bitmap.recycle()
     }
     private fun assertOrangeProgress() {
@@ -671,7 +672,6 @@ class WatchingProgressTest {
                     view = LocalView.current
                     viewerColor = MaterialTheme.colorScheme.tertiary.toArgb()
                     ambientColor = MaterialTheme.colorScheme.primary.toArgb()
-                    backgroundColor = MaterialTheme.colorScheme.background.toArgb()
                     ProvideArtworkSession(observation.currentSession) {
                         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
                             when (surface) {

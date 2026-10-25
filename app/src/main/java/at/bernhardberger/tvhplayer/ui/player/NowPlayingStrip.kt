@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +24,7 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
@@ -56,7 +58,9 @@ internal fun NowPlayingStrip(
     val current = displayed?.takeIf { it.isRunning(nowSec) || (at != null && it.isRunning(at)) }
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.size(48.dp, 27.dp).clip(PlayerChromeTokens.chipShape), contentAlignment = Alignment.Center) {
+        // The plate carries the progress strip; without it the strip would float under the logo.
+        Box(Modifier.size(48.dp, 27.dp).clip(PlayerChromeTokens.chipShape).background(TvSurfaceColors.containerLowest),
+            contentAlignment = Alignment.Center) {
             if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
             else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
