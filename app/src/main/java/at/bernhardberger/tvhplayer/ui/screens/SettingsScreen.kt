@@ -1,7 +1,13 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvhplayer.settings.UiSettings
@@ -40,6 +46,7 @@ internal fun SettingsScreen(
     settingsStore: UiSettingsStore = koinInject(),
 ) {
     val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
+    var setupOpen by rememberSaveable { mutableStateOf(false) }
     val observation by channelsVm.observation.collectAsStateWithLifecycle()
     val profiles = observation.currentDvrConfigurations()
     val settings by settingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
@@ -48,7 +55,7 @@ internal fun SettingsScreen(
         recordingSpaceText(observation.dvrDiskSpaceState)) { id ->
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
-    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation, connectionPresentation, onRetry) + settingsPlayerLevels(navigation) + listOf(
+    val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
         settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty()),
         settingsKeepChannelLevel(navigation),
         settingsFrameRateLevel(navigation),
@@ -56,7 +63,11 @@ internal fun SettingsScreen(
         settingsChannelTagsLevel(channelsVm),
     ) + recordingLevels + settingsAboutLevels(observation.sessionState, applianceBuild) +
         if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
-    SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent)
+    SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
+        setup = if (setupOpen) {
+            { SettingsConnection(remember { FocusRequester() }, onSaved = { setupOpen = false }) }
+        } else null,
+        onCloseSetup = { setupOpen = false })
 }
 
 @Composable
@@ -84,6 +95,9 @@ internal fun SettingsScreenNavigation(
     contentPadding: PaddingValues = TvFullScreenPadding,
     backEnabled: Boolean = true,
     isCurrent: Boolean = true,
+    /** The connection setup, shown over Settings while it is open; Settings stays where it was. */
+    setup: (@Composable () -> Unit)? = null,
+    onCloseSetup: () -> Unit = {},
 ) {
     val rootFocus = LocalBrowseNavigationFocus.current
     val unavailable = stringResource(R.string.settings_unavailable)
@@ -94,28 +108,41 @@ internal fun SettingsScreenNavigation(
     // host so that depth motion stays inside the browse viewport and never paints
     // across the drawer.
     val inset = contentPadding.calculateStartPadding(layoutDirection) + TvBrowseLeadingInset
-    val connectionEditor = navigation.stack.active.levelId == CONNECTION_EDITOR
+    val setupOpen = setup != null
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
     val opacity = remember { mutableFloatStateOf(1f) }
-    DisposableEffect(layering, connectionEditor, isCurrent) {
-        if (connectionEditor && isCurrent) layering?.details?.set(pageKey, opacity)
+    DisposableEffect(layering, setupOpen, isCurrent) {
+        if (setupOpen && isCurrent) layering?.details?.set(pageKey, opacity)
         onDispose { layering?.details?.remove(pageKey) }
     }
-    DepthNavigation(
-        state = navigation,
-        levels = levels.associateBy { it.id },
-        fallbackLevel = { id -> settingsLevel(id, unavailable, listOf(settingsRow("unavailable", unavailable, onClick = navigation::pop))) },
-        columnWidth = SettingsDepthColumnWidth,
-        columnGap = SettingsDepthColumnGap,
-        contentPadding = if (connectionEditor) PaddingValues(0.dp) else PaddingValues(start = inset,
-            top = contentPadding.calculateTopPadding(),
-            bottom = contentPadding.calculateBottomPadding()),
-        modifier = (if (connectionEditor) Modifier.browseDetailsViewport()
-            .background(MaterialTheme.colorScheme.background) else Modifier).fillMaxSize(),
-        initialFocusEnabled = initialFocusEnabled,
-        backEnabled = backEnabled,
-        isCurrent = isCurrent,
-        onRootBack = rootFocus?.let { { it.requestFocus() } },
-    )
+    Box(Modifier.fillMaxSize()) {
+        // Settings keeps its columns and focus under the setup; nothing behind it takes focus or
+        // Back, and closing the setup returns focus to the row that opened it.
+        DepthNavigation(
+            state = navigation,
+            levels = levels.associateBy { it.id },
+            fallbackLevel = { id -> settingsLevel(id, unavailable, listOf(settingsRow("unavailable", unavailable, onClick = navigation::pop))) },
+            columnWidth = SettingsDepthColumnWidth,
+            columnGap = SettingsDepthColumnGap,
+            contentPadding = PaddingValues(start = inset,
+                top = contentPadding.calculateTopPadding(),
+                bottom = contentPadding.calculateBottomPadding()),
+            modifier = Modifier.fillMaxSize()
+                .then(if (setupOpen) Modifier.clearAndSetSemantics { } else Modifier)
+                .focusProperties { onEnter = { if (setupOpen) cancelFocusChange() } }
+                .focusGroup(),
+            initialFocusEnabled = initialFocusEnabled && !setupOpen,
+            backEnabled = backEnabled && !setupOpen,
+            isCurrent = isCurrent,
+            onRootBack = rootFocus?.let { { it.requestFocus() } },
+        )
+        if (setup != null) {
+            // Registered before the setup's own handler, so its steps go back first.
+            BackHandler(isCurrent && backEnabled, onCloseSetup)
+            Box(Modifier.browseDetailsViewport().background(MaterialTheme.colorScheme.background).fillMaxSize()) {
+                setup()
+            }
+        }
+    }
 }

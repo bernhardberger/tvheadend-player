@@ -184,13 +184,17 @@ class OnboardingLayoutEvidenceTest {
         assertEquals(guidance, compose.onNodeWithText("Where’s your server?").fetchSemanticsNode().boundsInRoot)
     }
 
-    @Test fun editSearchesAutomaticallyWithPrefilledFieldsAndTheSameActionOrder() {
+    @Test fun editStartsOnContinueWithPrefilledFieldsAndSearchesOnlyWhenAsked() {
         showEdit()
-        assertEquals(1, state.searchRequest)
-        assertTrue(state.searching)
+        assertEquals(0, state.searchRequest)
+        assertFalse(state.searching)
         assertEquals("192.0.2.10", state.form.host)
-        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
         compose.onNodeWithTag("setup-welcome-continue").assertDoesNotExist()
+        repeat(3) { press(Key.DirectionUp) }
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        press(Key.DirectionCenter)
+        assertTrue(state.searching)
         discovery.value = discovering(SERVER)
         compose.waitForIdle()
         press(Key.DirectionDown)

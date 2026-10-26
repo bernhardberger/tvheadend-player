@@ -173,6 +173,7 @@ private fun ServerSearch(state: ConnectionSetupState, search: FocusRequester) {
         }
         if (!state.searching && state.servers.isEmpty()) {
             Text(stringResource(R.string.onboarding_find_none_body), style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha),
                 modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite })
         }
         state.servers.forEachIndexed { index, server ->

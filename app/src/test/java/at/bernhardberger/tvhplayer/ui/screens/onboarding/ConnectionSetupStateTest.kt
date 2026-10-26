@@ -85,11 +85,15 @@ class ConnectionSetupStateTest {
     }
 
     @Test
-    fun openingTheEditorStartsDiscoveryWithoutChangingTheSavedFields() = runTest {
+    fun openingTheEditorWaitsOnContinueAndSearchesOnlyWhenAsked() = runTest {
         val state = edit()
         val savedHost = form.host
         val savedPort = form.port
         state.onServerOpened()
+        assertEquals(0, state.searchRequest)
+        assertFalse(state.searching)
+        assertEquals(AddressFocus.CONTINUE, state.addressFocus)
+        state.findServer()
         assertEquals(1, state.searchRequest)
         assertTrue(state.searching)
         assertEquals(savedHost, form.host)

@@ -28,7 +28,6 @@ import at.bernhardberger.tvhplayer.ui.common.AppErrorText
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import org.koin.compose.koinInject
 
-internal const val CONNECTION_EDITOR = "connection-editor"
 internal const val EDIT_CONNECTION = "edit-connection"
 internal const val RETRY_CONNECTION = "retry-connection"
 internal const val CONNECTION_STATUS = "connection-status"
@@ -37,9 +36,9 @@ internal const val CONNECTION_PORT = "connection-port"
 
 @Composable
 internal fun settingsConnectionLevels(
-    navigation: DepthNavigationState,
     presentation: AppConnectionPresentation,
     onRetry: () -> Unit,
+    onSetUp: () -> Unit,
     owner: AppProfileOwner = koinInject(),
 ): List<DepthLevel> {
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
@@ -67,15 +66,8 @@ internal fun settingsConnectionLevels(
             degraded = presentation.degraded, onRetry = onRetry,
             connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
                 connection == ConnectionUiState.SyncingChannels,
-            recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS),
-        settingsLevel(CONNECTION_EDITOR, stringResource(R.string.setup_connection),
-            listOf(settingsRow("editor-placeholder", stringResource(R.string.setup_connection))),
-            activeContent = { requester, _ ->
-                val visit = navigation.stack.visit
-                SettingsConnection(requester, onSaved = {
-                    if (navigation.stack.visit == visit && navigation.stack.active.levelId == CONNECTION_EDITOR) navigation.pop()
-                })
-            }),
+            recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS,
+            onSetUp = onSetUp),
     )
 }
 
@@ -106,17 +98,17 @@ internal fun connectionOverviewFailure(
 internal fun settingsConnectionOverview(
     status: String, host: String?, port: Int?, degraded: Boolean = false,
     onRetry: () -> Unit = {}, recoveryRequiresSettings: Boolean = false,
-    connecting: Boolean = false,
+    connecting: Boolean = false, onSetUp: () -> Unit = {},
 ): DepthLevel {
     val showRetry = degraded && !recoveryRequiresSettings
     val retryAction: () -> Unit = { if (!connecting) onRetry() }
     val missing = stringResource(R.string.connection_overview_unavailable)
     val edit = settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
-        supporting = stringResource(R.string.setup_connection_description), trailingIcon = R.drawable.ic_arrow_forward)
+        supporting = stringResource(R.string.setup_connection_description), trailingIcon = R.drawable.ic_arrow_forward,
+        onClick = onSetUp)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
         trailingIcon = R.drawable.ic_refresh, onClick = retryAction)
-    val editRow = DepthRow(DepthItem(EDIT_CONNECTION), leafLevelId = CONNECTION_EDITOR, content = edit.content)
     // The current connection follows its actions as focusable rows without an action, as in TV settings.
     val info = listOf(
         settingsRow(CONNECTION_STATUS, stringResource(R.string.connection_overview_status), status),
@@ -124,6 +116,6 @@ internal fun settingsConnectionOverview(
         settingsRow(CONNECTION_PORT, stringResource(R.string.port_htsp), port?.toString() ?: missing),
     )
     return settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        (if (showRetry) listOf(retry) else emptyList()) + editRow + info,
+        (if (showRetry) listOf(retry) else emptyList()) + edit + info,
         initialItemId = if (showRetry) RETRY_CONNECTION else EDIT_CONNECTION)
 }

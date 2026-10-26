@@ -103,7 +103,8 @@ internal class ConnectionSetupState(
         return true
     }
 
-    var addressFocus by mutableStateOf(AddressFocus.SEARCH)
+    /** First run starts on the search; editing starts on Continue, which keeps the saved address. */
+    var addressFocus by mutableStateOf(if (editing) AddressFocus.CONTINUE else AddressFocus.SEARCH)
         private set
     var signInFocus by mutableStateOf(SignInFocus.USERNAME)
         private set
@@ -139,9 +140,12 @@ internal class ConnectionSetupState(
         step = SetupStep.ADDRESS
     }
 
-    /** Both entry points search automatically without changing the entered or saved fields. */
+    /**
+     * First run searches as the Server step opens. Editing already has an address, so it searches
+     * only when asked.
+     */
     fun onServerOpened() {
-        findServer()
+        if (!editing) findServer()
     }
 
     /** Starts discovery inside the Server step without moving focus away from the action. */

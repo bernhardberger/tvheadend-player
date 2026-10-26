@@ -9,7 +9,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
@@ -37,14 +43,28 @@ class OfflinePatternTest {
 
     @Test fun profileFailuresKeepTheExistingSettingsRecoveryAction() {
         var retries = 0
-        lateinit var navigation: DepthNavigationState
+        var setupOpen by mutableStateOf(false)
         compose.setContent {
             TVHeadendPlayerTheme {
-                navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                     settingsConnectionOverview("Saved sign-in unavailable", null, null,
-                        degraded = true, onRetry = { retries++ }, recoveryRequiresSettings = true),
-                    settingsLevel(CONNECTION_EDITOR, "Set up connection", listOf(settingsRow("editor", "Server")))))
+                        degraded = true, onRetry = { retries++ }, recoveryRequiresSettings = true,
+                        onSetUp = { setupOpen = true })),
+                    setup = if (setupOpen) {
+                        {
+                            val server = remember { FocusRequester() }
+                            LaunchedEffect(Unit) { server.requestFocus() }
+                            // Like the setup, Back goes to the back dispatcher, where Settings closes it.
+                            val dispatcher = androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current!!
+                                .onBackPressedDispatcher
+                            androidx.tv.material3.Button(onClick = {}, modifier = Modifier.focusRequester(server)
+                                .onKeyEvent { it.key == Key.Back && it.type == KeyEventType.KeyUp && dispatcher.onBackPressed().let { true } }) {
+                                androidx.tv.material3.Text("Server")
+                            }
+                        }
+                    } else null,
+                    onCloseSetup = { setupOpen = false })
             }
         }
         press(Key.DirectionCenter)
@@ -52,7 +72,7 @@ class OfflinePatternTest {
         compose.onNodeWithText("Set up connection").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()
-        assertEquals(CONNECTION_EDITOR, navigation.stack.active.levelId)
+        assertTrue(setupOpen)
         assertEquals(0, retries)
         press(Key.Back)
         compose.onNodeWithText("Set up connection").assertIsFocused()
