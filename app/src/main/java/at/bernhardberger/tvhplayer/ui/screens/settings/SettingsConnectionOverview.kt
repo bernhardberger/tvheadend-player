@@ -31,6 +31,9 @@ import org.koin.compose.koinInject
 internal const val CONNECTION_EDITOR = "connection-editor"
 internal const val EDIT_CONNECTION = "edit-connection"
 internal const val RETRY_CONNECTION = "retry-connection"
+internal const val CONNECTION_STATUS = "connection-status"
+internal const val CONNECTION_SERVER = "connection-server"
+internal const val CONNECTION_PORT = "connection-port"
 
 @Composable
 internal fun settingsConnectionLevels(
@@ -76,10 +79,6 @@ internal fun settingsConnectionLevels(
     )
 }
 
-/** A retry can fix it: the connection is degraded and its recovery is not a settings change. */
-internal fun AppConnectionPresentation.offersConnectionRetry(): Boolean =
-    degraded && connection.primaryRecoveryAction() != ConnectionRecoveryAction.SETTINGS
-
 /**
  * The catalog condition whose title and reason the overview's status shows, or null while it shows
  * its own status: loading, not configured, offline with saved channels, connecting or connected.
@@ -117,34 +116,14 @@ internal fun settingsConnectionOverview(
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
         trailingIcon = R.drawable.ic_refresh, onClick = retryAction)
-    val retryRow = DepthRow(DepthItem(RETRY_CONNECTION), onActivate = retryAction) { modifier, activate ->
-        Column {
-            ConnectionValueRow(stringResource(R.string.connection_overview_status), status)
-            retry.content(modifier, activate)
-        }
-    }
-    // Information scrolls with its next action; it never becomes a D-pad stop.
-    val row = DepthRow(DepthItem(EDIT_CONNECTION), leafLevelId = CONNECTION_EDITOR) { modifier, activate ->
-        Column {
-            if (!showRetry) ConnectionValueRow(stringResource(R.string.connection_overview_status), status)
-            ConnectionValueRow(stringResource(R.string.connection_overview_server), host ?: missing)
-            ConnectionValueRow(stringResource(R.string.port_htsp), port?.toString() ?: missing)
-            edit.content(modifier, activate)
-        }
-    }
-    return settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        (if (showRetry) listOf(retryRow) else emptyList()) + row,
-        initialItemId = if (showRetry) RETRY_CONNECTION else EDIT_CONNECTION)
-}
-
-@Composable
-private fun ConnectionValueRow(title: String, value: String) {
-    ListItem(selected = false, onClick = {},
-        headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium) },
-        supportingContent = { Text(value, style = MaterialTheme.typography.bodyMedium) },
-        colors = ListItemDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
-        modifier = Modifier.fillMaxWidth().padding(bottom = TvSpacing8)
-            .focusProperties { canFocus = false }
-            .clearAndSetSemantics { text = AnnotatedString("$title\n$value") },
+    val editRow = DepthRow(DepthItem(EDIT_CONNECTION), leafLevelId = CONNECTION_EDITOR, content = edit.content)
+    // The current connection follows its actions as focusable rows without an action, as in TV settings.
+    val info = listOf(
+        settingsRow(CONNECTION_STATUS, stringResource(R.string.connection_overview_status), status),
+        settingsRow(CONNECTION_SERVER, stringResource(R.string.connection_overview_server), host ?: missing),
+        settingsRow(CONNECTION_PORT, stringResource(R.string.port_htsp), port?.toString() ?: missing),
     )
+    return settingsLevel(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
+        (if (showRetry) listOf(retry) else emptyList()) + editRow + info,
+        initialItemId = if (showRetry) RETRY_CONNECTION else EDIT_CONNECTION)
 }

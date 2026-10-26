@@ -17,7 +17,6 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
@@ -83,8 +82,7 @@ class SettingsAboutTest {
         press(Key.DirectionDown)
         compose.onNodeWithText("Not connected", substring = true).assertIsFocused()
         press(Key.DirectionDown)
-        compose.onNodeWithText("GNU General Public License v3")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose.onNodeWithText("GNU General Public License v3").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNode(isDialog()).assertExists()
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
@@ -97,8 +95,7 @@ class SettingsAboutTest {
         press(Key.Back)
         compose.onNodeWithText("GNU General Public License v3").assertIsFocused()
         press(Key.DirectionDown)
-        compose.onNodeWithText("Notices and third-party libraries", substring = true)
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+        compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithTag("player-info-reading").assertIsFocused()
         val noticesScroll = compose.onNode(hasScrollAction() and hasAnyAncestor(isDialog())).fetchSemanticsNode()

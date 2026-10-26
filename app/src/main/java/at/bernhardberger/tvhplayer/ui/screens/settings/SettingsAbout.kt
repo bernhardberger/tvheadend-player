@@ -2,8 +2,6 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,7 +22,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.tv.material3.Button
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.SessionState
@@ -32,8 +29,6 @@ import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsFullDescription
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
-import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
 import at.bernhardberger.tvhplayer.ui.TvFullScreenPadding
 
 internal const val ABOUT_LEVEL = "settings-about"
@@ -44,14 +39,20 @@ internal fun settingsAboutLevels(
     applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
 ): List<DepthLevel> {
     val credits = stringArrayResource(R.array.about_translator_credits).filter { it.isNotBlank() }
+    // The reader is a dialog over Settings; the rows stay list items with the details page's read-more arrow.
+    var reading by remember { mutableStateOf<Pair<String, String>?>(null) }
+    reading?.let { (title, asset) -> AboutReadingDialog(title, asset) { reading = null } }
+    val license = stringResource(R.string.about_license)
+    val notices = stringResource(R.string.about_notices)
     val rows = listOf(
         settingsRow("version", stringResource(R.string.about_version), stringResource(
             R.string.about_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
             stringResource(if (applianceBuild) R.string.about_build_appliance else R.string.about_build_play))),
         settingsRow("server", stringResource(R.string.about_server), aboutServerText(sessionState)),
-        aboutReadingButton("license", stringResource(R.string.about_license), "LICENSE"),
-        aboutReadingButton("notices", stringResource(R.string.about_notices), "NOTICE.md",
-            supporting = stringResource(R.string.about_attribution)),
+        settingsRow("license", license, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
+            onClick = { reading = license to "LICENSE" }),
+        settingsRow("notices", notices, supporting = stringResource(R.string.about_attribution), titleMaxLines = 3,
+            trailingIcon = R.drawable.ic_arrow_forward, onClick = { reading = notices to "NOTICE.md" }),
     ) + credits.mapIndexed { index, credit ->
         settingsRow("translator-$index", credit, titleMaxLines = Int.MAX_VALUE,
             section = if (index == 0) stringResource(R.string.about_translators) else null)
@@ -69,18 +70,6 @@ private fun aboutServerText(state: SessionState): String {
         .filter { it.isNotBlank() }.joinToString(" · ")
         .ifEmpty { stringResource(R.string.about_connected) }
 }
-
-private fun aboutReadingButton(id: String, title: String, asset: String, supporting: String? = null): DepthRow =
-    DepthRow(DepthItem(id), {}) { modifier, _ ->
-        var open by remember { mutableStateOf(false) }
-        Button(onClick = { open = true }, modifier = modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-            Column {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (supporting != null) Text(supporting, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        if (open) AboutReadingDialog(title, asset) { open = false }
-    }
 
 @Composable
 private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Unit) {

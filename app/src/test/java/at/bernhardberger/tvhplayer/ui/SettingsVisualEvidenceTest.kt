@@ -82,7 +82,7 @@ class SettingsVisualEvidenceTest {
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
                                 // The status page opens only while a retry can fix the connection.
-                                listOf(settingsRootLevel(applianceBuild = true, connectionRetry = true), settingsApplianceLevel(false, { accessibilityCalls++ }),
+                                listOf(settingsRootLevel(applianceBuild = true), settingsApplianceLevel(false, { accessibilityCalls++ }),
                                     settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
                                         "tvheadend.local", 9982, degraded = true)) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,

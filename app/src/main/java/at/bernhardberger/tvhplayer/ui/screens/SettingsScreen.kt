@@ -49,7 +49,7 @@ internal fun SettingsScreen(
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(navigation, connectionPresentation, onRetry) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty(), connectionPresentation.offersConnectionRetry()),
+        settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty()),
         settingsKeepChannelLevel(navigation),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
@@ -63,11 +63,11 @@ internal fun SettingsScreen(
 internal fun settingsRootLevel(
     applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
     showRecordings: Boolean = false,
-    connectionRetry: Boolean = false,
 ): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
     settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general_nav), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune),
     settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list),
-    settingsConnectionEntry(connectionRetry),
+    settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
+        child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
     settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
 ) + (if (showRecordings) listOf(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
     icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + (if (applianceBuild) listOf(
@@ -75,20 +75,6 @@ internal fun settingsRootLevel(
 ) else emptyList()) + listOf(
     settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info),
 ))
-
-/**
- * Connection opens the setup flow to edit it. While a retry can fix the connection, it opens the
- * status page first: what is wrong, Try again, and Edit connection.
- */
-@Composable
-private fun settingsConnectionEntry(retry: Boolean): DepthRow {
-    if (retry) return settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud)
-    val row = settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        icon = R.drawable.ic_cloud, trailingIcon = R.drawable.ic_edit)
-    return DepthRow(DepthItem(SettingsSection.CONNECTION.name), leafLevelId = CONNECTION_EDITOR,
-        content = row.content)
-}
 
 @Composable
 internal fun SettingsScreenNavigation(

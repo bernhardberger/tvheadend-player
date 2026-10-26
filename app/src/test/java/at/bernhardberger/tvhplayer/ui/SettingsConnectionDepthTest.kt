@@ -59,6 +59,7 @@ class SettingsConnectionDepthTest {
                     SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
+                        settingsConnectionOverview("Connected", "tvheadend.local", 9982),
                         settingsLevel(CONNECTION_EDITOR, "Connection", emptyList(), activeContent = { requester, _ ->
                             SettingsConnection(requester, editor, session, { restores++ })
                         })), contentPadding = padding, initialFocusEnabled = !drawerActive)
@@ -70,6 +71,9 @@ class SettingsConnectionDepthTest {
         press(Key.DirectionUp)
         compose.onNodeWithText("Connection").assertIsFocused()
         capture(view, "settings-entry")
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Edit connection").assertIsFocused()
+        capture(view, "settings-connection-page")
         press(Key.DirectionCenter)
         press(Key.DirectionDown)
         press(Key.DirectionUp)
@@ -114,6 +118,8 @@ class SettingsConnectionDepthTest {
             }
         }
         compose.onNodeWithText("Connection").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertEquals(0, editor.loads)
         assertFalse(secure())
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
@@ -148,7 +154,7 @@ class SettingsConnectionDepthTest {
         assertEquals("", form.password)
         compose.runOnIdle { current = true }
         press(Key.Back)
-        compose.onNodeWithText("Connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertFalse(secure())
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
@@ -174,15 +180,16 @@ class SettingsConnectionDepthTest {
             }
         }
         press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         repeat(2) { press(Key.DirectionDown) }
         compose.onNodeWithTag("setup-port").assertIsFocused()
         press(Key.DirectionLeft) // A step keeps Left, so it cannot drop what was entered.
         compose.onNodeWithTag("setup-port").assertIsFocused()
         assertTrue(navigation.stack.canPop)
         press(Key.Back)
-        compose.onNodeWithText("Connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         compose.onNodeWithTag("nav-settings").assertIsNotFocused()
-        assertEquals(1, navigation.stack.frames.size)
+        assertEquals(2, navigation.stack.frames.size)
         assertFalse(secure())
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
@@ -201,6 +208,7 @@ class SettingsConnectionDepthTest {
             }
         }
         press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
         connect()
         compose.runOnIdle { session.publish(unavailable()) }
         compose.onNodeWithTag("setup-action-try_again").assertIsFocused()
@@ -212,7 +220,7 @@ class SettingsConnectionDepthTest {
         assertEquals(0, editor.saves)
         press(Key.Back)
         press(Key.Back)
-        compose.onNodeWithText("Connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertFalse(secure())
     }
 
@@ -253,6 +261,8 @@ class SettingsConnectionDepthTest {
         }
         assertEquals(0, editor.loads)
         compose.onNodeWithText("Connection").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         val parent = navigation.stack.active
         press(Key.DirectionCenter)
         connect()
@@ -266,7 +276,7 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithTag("setup-start-watching").assertIsFocused()
         editor.failSave = false
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Connection").assertIsFocused()
+        compose.onNodeWithText("Edit connection").assertIsFocused()
         assertEquals(2, editor.saves)
         assertEquals(0, restores)
         assertEquals(parent, navigation.stack.active)
