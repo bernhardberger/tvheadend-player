@@ -163,6 +163,8 @@ internal fun ProgrammeDetailsPage(
     var heroHeight by remember { mutableIntStateOf(0) }
     var factsHeadingHeight by remember { mutableIntStateOf(0) }
     var factsTop by remember { mutableIntStateOf(Int.MAX_VALUE) }
+    // The height of the text under the airing cards as last laid out; only the scroll reads it.
+    val airingsText = remember { mutableIntStateOf(0) }
     val density = LocalDensity.current
     val headingKeyline = with(density) { DetailsSectionKeyline.roundToPx() }
     val scope = rememberCoroutineScope()
@@ -215,19 +217,22 @@ internal fun ProgrammeDetailsPage(
     val airingsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.AIRINGS) 1f else 0f, RowChangeMotion, label = "details-airings")
     val factsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.FACTS) 1f else 0f, RowChangeMotion, label = "details-facts")
     // Focus search moves between the sections. The focused item's section comes to the heading
-    // keyline, the hero to the page's top. Where the item sits names its section: the focus
-    // callbacks have not yet run when the page brings it into view.
-    val pageSpec = remember(pageScroll, headingKeyline) {
-        object : BringIntoViewSpec {
-            override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
-                val top = offset + pageScroll.value
-                val sectionTop = when {
-                    top < heroHeight -> return -pageScroll.value.toFloat()
-                    top < factsTop -> heroHeight
-                    else -> factsTop
-                }
-                return (sectionTop - headingKeyline - pageScroll.value).toFloat()
+    // keyline, the hero to the page's top, in one calm motion as the airings row's text shrinks or
+    // grows (the hero stands for its About panel too). The facts aim past the text the airings row
+    // is still going to lose, so their heading reaches the keyline without passing it.
+    val pageSpec = rememberSectionScrollSpec(pageScroll,
+        if (returnToCard in ids) DetailsSection.AIRINGS else DetailsSection.ACTIONS, RowChangeMotion,
+        sectionAt = { top ->
+            when {
+                top < heroHeight -> DetailsSection.ACTIONS
+                top < factsTop -> DetailsSection.AIRINGS
+                else -> DetailsSection.FACTS
             }
+        }) {
+        when (it) {
+            DetailsSection.ACTIONS, DetailsSection.ABOUT -> 0
+            DetailsSection.AIRINGS -> heroHeight - headingKeyline
+            DetailsSection.FACTS -> factsTop - airingsText.intValue - headingKeyline
         }
     }
     val readingTransition = updateTransition(reading, label = "details-reading")
@@ -373,7 +378,8 @@ internal fun ProgrammeDetailsPage(
                     if (ids.isNotEmpty()) DetailsAirings(related, title, event?.let { detailsSubtitle(it, resources) } ?: recording?.subtitle,
                         nowSec, channelOf, listState, cardFocus, lastCard, section == DetailsSection.AIRINGS, { airingsEmphasis.value },
                          Modifier.onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS },
-                        onFocused = { lastCard = it }, onClick = { if (backEnabled) onRelated(it) },
+                        onFocused = { lastCard = it }, onTextHeight = { airingsText.intValue = it },
+                        onClick = { if (backEnabled) onRelated(it) },
                         onOpenContextMenu = onRelatedContextMenu?.let { open -> { if (backEnabled) open(it) } },
                         bottomSpace = if (importantFacts.isNotEmpty()) DetailsSectionGap else DetailsSafeEdge)
                      if (importantFacts.isNotEmpty()) Column(Modifier.fillMaxWidth()
@@ -581,11 +587,19 @@ private fun DetailsAboutFacts(facts: List<Pair<String, String>>, abbreviatedLabe
 private fun DetailsAirings(
     airings: List<EpgEvent>, pageTitle: String, pageEpisode: String?, nowSec: Long,
     channelOf: (ChannelId) -> Channel?, listState: LazyListState, requesters: Map<EventId, FocusRequester>,
-    lastCard: EventId?, rowFocused: Boolean, emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit, onClick: (EpgEvent) -> Unit,
+    lastCard: EventId?, rowFocused: Boolean, emphasis: () -> Float, modifier: Modifier, onFocused: (EventId) -> Unit,
+    onTextHeight: (Int) -> Unit, onClick: (EpgEvent) -> Unit,
     bottomSpace: androidx.compose.ui.unit.Dp,
     onOpenContextMenu: ((EpgEvent) -> Unit)?,
 ) {
     val keyline = with(LocalDensity.current) { DetailsKeyline.toPx() }
+    // The row's height beyond its cards' pictures is the text it shows, measured as laid out, so
+    // the page knows what the row still loses while the text shrinks, also when it opened focused.
+    val cardRoom = with(LocalDensity.current) { AiringCardRoom.roundToPx() } * 2
+    val rowHeight = remember { mutableIntStateOf(0) }
+    val pictureHeight = remember { mutableIntStateOf(0) }
+    val textHeight = { (rowHeight.intValue - cardRoom - pictureHeight.intValue).coerceAtLeast(0) }
+    DisposableEffect(Unit) { onDispose { onTextHeight(0) } }
     // The focused card moves to the text keyline; other cards scroll off the screen normally.
     val bringIntoView = remember(keyline) { object : BringIntoViewSpec {
         override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float) = offset - keyline
@@ -601,7 +615,8 @@ private fun DetailsAirings(
                     if (listState.layoutInfo.visibleItemsInfo.any { it.key == lastCard?.value })
                         lastCard?.let(requesters::get)?.requestFocus()
                 }
-            }.focusGroup().rowContentEmphasis(emphasis).testTag("details-airings"),
+            }.focusGroup().rowContentEmphasis(emphasis).testTag("details-airings")
+                .onSizeChanged { rowHeight.intValue = it.height; onTextHeight(textHeight()) },
                 state = listState,
                 contentPadding = PaddingValues(horizontal = DetailsKeyline, vertical = AiringCardRoom),
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -609,6 +624,7 @@ private fun DetailsAirings(
                     AiringCard(item, airingEpisode(item, pageTitle, pageEpisode, LocalContext.current.resources), item.channelId?.let(channelOf), nowSec,
                         textShown,
                         Modifier.focusRequester(requesters.getValue(item.id))
+                            .onSizeChanged { pictureHeight.intValue = it.height; onTextHeight(textHeight()) }
                             .onFocusChanged { if (it.isFocused) onFocused(item.id) }
                             .focusProperties {
                                 if (index == 0) left = FocusRequester.Cancel
