@@ -31,7 +31,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
         fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
-        val CHANNELS_IMMERSIVE_CHANNEL_NAMES = booleanPreferencesKey("channelsImmersiveChannelNames")
+        fun channelsChannelNames(layout: ChannelsLayout) = booleanPreferencesKey("channelsChannelNames${layout.name}")
         val GUIDE_ROWS = stringPreferencesKey("guideRows")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
@@ -44,7 +44,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
             channelsView = resolveChannelsView(
-                preferences[Keys.CHANNELS_LAYOUT], preferences[Keys.CHANNELS_IMMERSIVE_CHANNEL_NAMES],
+                preferences[Keys.CHANNELS_LAYOUT], { preferences[Keys.channelsChannelNames(it)] },
             ) { preferences[Keys.channelsProgramArt(it)] },
             guideView = resolveGuideView(
                 preferences[Keys.GUIDE_ROWS], preferences[Keys.GUIDE_HEADLINE], preferences[Keys.GUIDE_GENRE_COLORS],
@@ -62,8 +62,10 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
             ChannelsLayout.entries.filter { it.hasArtSwitch }
-                .forEach { preferences[Keys.channelsProgramArt(it)] = it in view.programArt }
-            preferences[Keys.CHANNELS_IMMERSIVE_CHANNEL_NAMES] = view.channelNames
+                .forEach {
+                    preferences[Keys.channelsProgramArt(it)] = it in view.programArt
+                    preferences[Keys.channelsChannelNames(it)] = it in view.channelNames
+                }
         }
     }
 

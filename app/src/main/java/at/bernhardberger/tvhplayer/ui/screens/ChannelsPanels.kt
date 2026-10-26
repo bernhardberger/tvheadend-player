@@ -39,8 +39,8 @@ internal fun ChannelsTagsPanel(
 }
 
 /**
- * View options: the layouts, then the current layout's program art switch where it has one, and
- * the immersive row's channel names. Each
+ * View options: the layouts, then the current layout's program art and channel names switches
+ * where it has them. Each
  * change applies at once; Back closes the panel.
  */
 @Composable
@@ -70,12 +70,12 @@ internal fun ChannelsViewOptionsPanel(
                 onClick = { onViewChange(view.toggledProgramArt()) },
                 checked = view.showsProgramArt,
             ))
-            if (view.layout == ChannelsLayout.IMMERSIVE) add(BrowsePanelEntry.Choice(
+            add(BrowsePanelEntry.Choice(
                 key = "channels-view-channel-names",
                 label = stringResource(R.string.channels_view_channel_names),
                 selected = false,
                 onClick = { onViewChange(view.toggledChannelNames()) },
-                checked = view.channelNames,
+                checked = view.showsChannelNames,
             ))
         }
     }

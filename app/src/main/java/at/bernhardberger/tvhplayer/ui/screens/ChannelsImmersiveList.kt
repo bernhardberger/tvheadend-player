@@ -454,7 +454,7 @@ private fun ChannelsCardRow(
  * logo sits in the picture's corner; without a picture the logo stands on its ambient colour above
  * the programme. With [channelName] the channel's number and name go below, and the playing mark
  * with them; without, the mark ends the programme line or sits in the picture's other bottom corner.
- * The grid names picture cards only. While the guide is [programmeLoading], a missing
+ * While the guide is [programmeLoading], a missing
  * programme line is a [SkeletonLine] rather than "No program information".
  */
 @Composable
@@ -469,7 +469,7 @@ internal fun ChannelsRowCard(
     programmeLoading: Boolean,
     programmePicture: Boolean,
     modifier: Modifier,
-    channelName: Boolean = programmePicture,
+    channelName: Boolean,
     width: Dp = ImmersiveCardWidth,
     tagPrefix: String = "channels-immersive",
 ) {

@@ -265,10 +265,17 @@ class ChannelsLayoutFocusTest {
         repeat(2) { fixture.key(Key.DirectionUp) }
         fixture.awaitFocus(option("layout-grid"))
         fixture.key(Key.DirectionCenter)
-        // Immersive's switches do not reach the grid, which has no channel names switch.
+        // Immersive's switches do not reach the grid, which starts with logos and without names.
         compose.onNode(option("program-art")).assertIsOff()
-        compose.onNode(option("channel-names")).assertDoesNotExist()
-        assertEquals(ChannelsView(ChannelsLayout.GRID, emptySet(), channelNames = true), fixture.channelsView)
+        compose.onNode(option("channel-names")).assertIsOff()
+        repeat(2) { fixture.key(Key.DirectionDown) }
+        fixture.awaitFocus(option("channel-names"))
+        fixture.key(Key.DirectionCenter)
+        compose.onNode(option("channel-names")).assertIsOn()
+        assertEquals(
+            ChannelsView(ChannelsLayout.GRID, emptySet(), setOf(ChannelsLayout.IMMERSIVE, ChannelsLayout.GRID)),
+            fixture.channelsView,
+        )
     }
 
     @Test fun cardPictureLeadsWithTheProgrammeAndFallsBackToTheLogo() {
@@ -286,13 +293,24 @@ class ChannelsLayoutFocusTest {
         compose.onNodeWithTag("channels-grid-1-picon", useUnmergedTree = true).assertExists()
     }
 
-    @Test fun gridCardsAreTheImmersiveRowsLogoCardsWithoutTheChannelNameAndPictureCardsNameItBelow() {
-        fixture.show(grid.toggledProgramArt())
+    @Test fun gridCardsNameTheirChannelBelowOnlyWithChannelNamesOn() {
+        val playing = hasTestTag("channel-playing-indicator")
+        fixture.show(grid, imageLoader = fixture.fixtureArt(), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
+            warmPlayback = true)
         fixture.awaitFocus(card(1))
-        compose.onNodeWithTag("channels-grid-1-now", useUnmergedTree = true).assertTextEquals("Ridge Light")
+        // The grid starts without names: the picture's logo plate names the channel and the mark sits opposite it.
         compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertDoesNotExist()
-        compose.runOnIdle { fixture.channelsView = grid }
+        compose.onNodeWithTag("channels-grid-1-art-playing", useUnmergedTree = true).assertExists()
+        compose.runOnIdle { fixture.channelsView = grid.toggledChannelNames() }
         compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
+        compose.onNodeWithTag("channels-grid-1-art-playing", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        // Logo cards name their channel below too once names are on.
+        compose.runOnIdle { fixture.channelsView = grid.toggledProgramArt().toggledChannelNames() }
+        compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
+        compose.runOnIdle { fixture.channelsView = grid.toggledProgramArt() }
+        compose.onNodeWithTag("channels-grid-1-identity", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
     }
 
     @Test fun singleGroupHidesTheGroupButtonAndUpReachesViewOptions() {
@@ -369,7 +387,8 @@ class ChannelsLayoutFocusTest {
     }
 
     @Test fun gridChannelKeysPageByVisibleRowsAndKeepTheColumn() {
-        fixture.show(grid, playerReturn = PlayerReturnFocus(ChannelId(2), ChannelId(2)))
+        // Named cards are taller, so one row is visible per page here.
+        fixture.show(grid.toggledChannelNames(), playerReturn = PlayerReturnFocus(ChannelId(2), ChannelId(2)))
         fixture.awaitFocus(card(2))
         fixture.key(Key.ChannelDown)
         fixture.awaitFocus(card(6))

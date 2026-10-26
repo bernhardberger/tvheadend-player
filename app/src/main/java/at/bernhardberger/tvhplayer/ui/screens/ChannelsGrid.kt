@@ -67,6 +67,8 @@ internal fun ChannelsGrid(
     nowSec: () -> Long,
     state: LazyGridState,
     programmePicture: Boolean,
+    /** Whether each card's channel is named below it. */
+    channelNames: Boolean,
     isCurrent: Boolean,
     focusRequesters: Map<ChannelId, FocusRequester>,
     navigationFocus: FocusRequester?,
@@ -145,6 +147,7 @@ internal fun ChannelsGrid(
                     onLongClick = { onOpenContextMenu(channelId) },
                     programmeLoading = frame.guideLoading,
                     programmePicture = programmePicture,
+                    channelName = channelNames,
                     width = cardWidth,
                     tagPrefix = "channels-grid",
                     modifier = Modifier

@@ -9,32 +9,37 @@ import org.junit.Test
 
 class ChannelsViewTest {
     @Test
-    fun theListAlwaysShowsArtImmersiveStartsWithArtWithoutNamesAndTheGridWithLogos() {
+    fun theListAlwaysShowsArtAndNamesImmersiveStartsWithArtTheGridWithLogosBothWithoutNames() {
         assertTrue(ChannelsView(ChannelsLayout.LIST).showsProgramArt)
+        assertTrue(ChannelsView(ChannelsLayout.LIST).showsChannelNames)
         assertTrue(ChannelsView(ChannelsLayout.IMMERSIVE).showsProgramArt)
-        assertFalse(ChannelsView(ChannelsLayout.IMMERSIVE).channelNames)
+        assertFalse(ChannelsView(ChannelsLayout.IMMERSIVE).showsChannelNames)
         assertFalse(ChannelsView(ChannelsLayout.GRID).showsProgramArt)
+        assertFalse(ChannelsView(ChannelsLayout.GRID).showsChannelNames)
     }
 
     @Test
     fun channelNamesToggleWithoutTouchingTheArt() {
         val named = ChannelsView().toggledChannelNames()
-        assertTrue(named.channelNames)
+        assertTrue(named.showsChannelNames)
         assertTrue(named.showsProgramArt)
         assertEquals(ChannelsView(), named.toggledChannelNames())
     }
 
     @Test
-    fun theSwitchChangesOnlyItsOwnLayout() {
-        val grid = ChannelsView(ChannelsLayout.GRID).toggledProgramArt()
+    fun theSwitchesChangeOnlyTheirOwnLayout() {
+        val grid = ChannelsView(ChannelsLayout.GRID).toggledProgramArt().toggledChannelNames()
         assertTrue(grid.showsProgramArt)
-        assertTrue("Immersive keeps its art", grid.copy(layout = ChannelsLayout.IMMERSIVE).showsProgramArt)
-        assertEquals(ChannelsView(ChannelsLayout.GRID), grid.toggledProgramArt())
+        assertTrue(grid.showsChannelNames)
+        val immersive = grid.copy(layout = ChannelsLayout.IMMERSIVE)
+        assertTrue("Immersive keeps its art", immersive.showsProgramArt)
+        assertFalse("Immersive keeps its names off", immersive.showsChannelNames)
+        assertEquals(ChannelsView(ChannelsLayout.GRID), grid.toggledProgramArt().toggledChannelNames())
     }
 
     @Test
     fun missingOrUnknownStoredValuesFallBackToTheDefaults() {
-        assertEquals(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE), channelNames = false), ChannelsView())
+        assertEquals(ChannelsView(ChannelsLayout.IMMERSIVE, setOf(ChannelsLayout.IMMERSIVE), emptySet()), ChannelsView())
         assertEquals(ChannelsView(), resolveChannelsView(null) { null })
         // Round 3's ROWS is an unknown value.
         assertEquals(ChannelsView(), resolveChannelsView("ROWS") { null })
@@ -47,6 +52,10 @@ class ChannelsViewTest {
             ChannelsView(ChannelsLayout.GRID),
             resolveChannelsView("GRID", programArt = mapOf(ChannelsLayout.GRID to false, ChannelsLayout.LIST to true)::get),
         )
+        assertEquals(
+            ChannelsView(ChannelsLayout.GRID, channelNames = setOf(ChannelsLayout.GRID)),
+            resolveChannelsView("GRID", channelNames = mapOf(ChannelsLayout.GRID to true, ChannelsLayout.LIST to true)::get) { null },
+        )
     }
 
     @Test
@@ -56,8 +65,8 @@ class ChannelsViewTest {
         val view = ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.IMMERSIVE, ChannelsLayout.GRID))
         store.setChannelsView(view)
         assertEquals(view, store.settings.first().channelsView)
-        val logosWithNames = ChannelsView(ChannelsLayout.IMMERSIVE, emptySet(), channelNames = true)
-        store.setChannelsView(logosWithNames)
-        assertEquals(logosWithNames, store.settings.first().channelsView)
+        val namedGrid = ChannelsView(ChannelsLayout.GRID, emptySet(), setOf(ChannelsLayout.GRID))
+        store.setChannelsView(namedGrid)
+        assertEquals(namedGrid, store.settings.first().channelsView)
     }
 }
