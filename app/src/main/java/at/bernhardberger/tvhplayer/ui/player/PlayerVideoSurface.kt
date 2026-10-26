@@ -82,11 +82,35 @@ fun PlayerVideoSurface(
         }
     }
     var geometryVersion by remember(player) { mutableIntStateOf(0) }
-    var hasPostRevealSize by remember(player, videoVisible) { mutableStateOf(false) }
+    val inputPictureSize = remember(player, geometryVersion, videoVisible) {
+        val format = (player as? ExoPlayer)?.videoFormat
+        // Media3 1.11.1 derives tunnelled output geometry from the input format (no codec crop).
+        // Match MediaCodecVideoRenderer.onOutputFormatChanged's applied rotation and pixel ratio.
+        if (format != null && format.width > 0 && format.height > 0) {
+            val rotated = format.rotationDegrees == 90 || format.rotationDegrees == 270
+            VideoSize(
+                if (rotated) format.height else format.width,
+                if (rotated) format.width else format.height,
+                if (rotated) 1f / format.pixelWidthHeightRatio else format.pixelWidthHeightRatio,
+            )
+        } else {
+            VideoSize.UNKNOWN
+        }
+    }
+    var hasCurrentSize by remember(player, videoVisible) {
+        // A normal tunnelled size callback precedes the first frame and thus the reveal. Read
+        // again in this composition, rather than requiring a callback after listener replacement.
+        val decoded = player.videoSize
+        mutableStateOf(
+            videoVisible && inputPictureSize.width > 0 && inputPictureSize.height > 0 &&
+                decoded.width == inputPictureSize.width && decoded.height == inputPictureSize.height &&
+                decoded.pixelWidthHeightRatio == inputPictureSize.pixelWidthHeightRatio,
+        )
+    }
     DisposableEffect(player, videoVisible) {
         val sizeListener = object : Player.Listener {
             override fun onVideoSizeChanged(size: VideoSize) {
-                if (videoVisible && size.width > 0 && size.height > 0) hasPostRevealSize = true
+                if (videoVisible && size.width > 0 && size.height > 0) hasCurrentSize = true
                 geometryVersion++
             }
         }
@@ -100,7 +124,7 @@ fun PlayerVideoSurface(
                 // A fallback reveal with no geometry must also recover when only the input
                 // format arrives: tunnelled size callbacks can remain absent or be unchanged.
                 // Once decoded geometry arrives, input formats can be ahead of the shown frame.
-                if (!hasPostRevealSize) geometryVersion++
+                if (!hasCurrentSize) geometryVersion++
             }
         }
         player.addListener(sizeListener)
@@ -115,27 +139,17 @@ fun PlayerVideoSurface(
     // during replacement) are not target-scoped, so neither may reshape the retained picture.
     // Use the existing presentation reveal as the commit point, without changing its cover rules.
     // Re-read the player there too: a same-size target need not send another size callback.
-    val pictureSize = remember(player, geometryVersion, videoVisible, hasPostRevealSize) {
+    val pictureSize = remember(player, geometryVersion, videoVisible, hasCurrentSize) {
         val exoPlayer = player as? ExoPlayer
-        val format = exoPlayer?.videoFormat
         // Media3 1.11.1 publishes tunnelled sizes only from processed-frame callbacks, which
-        // may lag the cover's fallback reveal. Its current input format arrives earlier. The
-        // tunnelled renderer derives output geometry directly from that format (no codec crop),
-        // so use it until this reveal gets a valid size callback, not the previous target's size.
-        // After that, decoded sizes keep in-stream aspect changes aligned with the shown frame.
-        // Match MediaCodecVideoRenderer.onOutputFormatChanged's applied rotation and pixel ratio.
-        if (hasPostRevealSize || exoPlayer?.isTunnelingEnabled != true) {
+        // may lag the cover's fallback reveal. Use input geometry until the decoded size matches
+        // at reveal or a valid size callback arrives afterward. Then decoded sizes keep in-stream
+        // aspect changes aligned with the shown frame rather than the buffered input format.
+        if (hasCurrentSize || exoPlayer?.isTunnelingEnabled != true) {
             player.videoSize
-        } else if (format != null && format.width > 0 && format.height > 0) {
-            val rotated = format.rotationDegrees == 90 || format.rotationDegrees == 270
-            VideoSize(
-                if (rotated) format.height else format.width,
-                if (rotated) format.width else format.height,
-                if (rotated) 1f / format.pixelWidthHeightRatio else format.pixelWidthHeightRatio,
-            )
         } else {
             // With no current tunnelled format, even a non-zero reported size may be stale.
-            VideoSize.UNKNOWN
+            inputPictureSize
         }
     }
     var presentedFrameAspect by remember(player) { mutableStateOf<Float?>(null) }

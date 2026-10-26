@@ -264,6 +264,14 @@ class PlayerVideoSurfaceCoverTest {
     }
 
     @Test fun tunneledPlaybackFollowsDecodedGeometryAfterRevealAndResetsOnTheNextReveal() {
+        assertTunneledDecodedGeometry(sizeBeforeReveal = false)
+    }
+
+    @Test fun tunneledRevealRecognizesMatchingDecodedGeometryWithoutAPostRevealCallback() {
+        assertTunneledDecodedGeometry(sizeBeforeReveal = true)
+    }
+
+    private fun assertTunneledDecodedGeometry(sizeBeforeReveal: Boolean) {
         val visible = mutableStateOf(false)
         val narrow = VideoSize(720, 576, 0, 12f / 11f)
         val wide = VideoSize(720, 576, 0, 16f / 11f)
@@ -303,16 +311,18 @@ class PlayerVideoSurfaceCoverTest {
             assertEquals(height, surface.height.toFloat(), 0.5f)
         }
         repeat(2) {
-            // Covered callbacks do not establish the decoded size of the next shown target.
+            // Only a decoded size matching the reveal's format can be trusted before reveal.
             reportFormat(narrow)
-            reportSize(wide)
+            reportSize(if (sizeBeforeReveal) narrow else wide)
             compose.runOnIdle { visible.value = true }
             assertShape(800f, 600f)
-            // An unknown post-reveal size must not end the input-format fallback either.
-            reportSize(VideoSize.UNKNOWN)
-            assertShape(800f, 600f)
-            reportSize(narrow)
-            assertShape(800f, 600f)
+            if (!sizeBeforeReveal) {
+                // An unknown post-reveal size must not end the input-format fallback either.
+                reportSize(VideoSize.UNKNOWN)
+                assertShape(800f, 600f)
+                reportSize(narrow)
+                assertShape(800f, 600f)
+            }
             // The renderer reads the upcoming ad's format ahead of the picture on screen.
             reportFormat(wide)
             assertShape(800f, 600f)
