@@ -437,7 +437,8 @@ internal fun PlaybackOptionsSheetContent(
                 )
                 PlaybackOptionsPage.SUBTITLES -> TrackOptionsPage(
                     title = stringResource(R.string.subtitles),
-                    currentValue = subtitlesValue,
+                    // Without tracks the Off row says why once; the header names only the state.
+                    currentValue = if (subtitleState == PlaybackTrackContentState.EMPTY) subtitlesOffLabel else subtitlesValue,
                     tracks = subtitleTracks,
                     contentState = subtitleState,
                     unavailableLabel = stringResource(R.string.no_subtitles),

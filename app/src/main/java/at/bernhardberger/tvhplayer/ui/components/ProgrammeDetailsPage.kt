@@ -365,6 +365,10 @@ internal fun ProgrammeDetailsPage(
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }
                             .scrollSection(pageSpec, DetailsSection.ACTIONS)) {
+                        // Beside the framed art the information stands at least its height, so the
+                        // description below, which reaches the art's edge, always clears it.
+                        Box(if (framedChannel != null) Modifier.heightIn(min = PlayerChromeTokens.heroHeight) else Modifier,
+                            contentAlignment = Alignment.BottomStart) {
                         DetailsInformation(event, recording, recordingAdmission, channel, nowSec,
                             corner = when {
                                 glowChannel != null -> DetailsHeroLogoSize.first
@@ -378,10 +382,13 @@ internal fun ProgrammeDetailsPage(
                                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
+                        }
                          if (hasAbout) {
                              // Group gap; also clears the 1.05 focus growth (~3dp) and its 2dp outline.
                              Spacer(Modifier.height(24.dp))
                             DetailsAbout(synopsis, { reading = true },
+                                // Under the framed art the card ends on the art's edge, the page's end keyline.
+                                wide = framedChannel != null,
                                 Modifier.focusRequester(aboutFocus).onFocusChanged {
                                     if (it.isFocused) section = DetailsSection.ABOUT
                                 }.focusProperties { canFocus = backEnabled })
@@ -469,8 +476,8 @@ internal val AiringCardWidth = 220.dp
 private val AiringCardRoom = 12.dp
 
 @Composable
-private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifier) {
-    Box(Modifier.widthIn(max = 584.dp).testTag("details-about")) {
+private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, wide: Boolean = false, modifier: Modifier) {
+    Box((if (wide) Modifier.fillMaxWidth() else Modifier.widthIn(max = 584.dp)).testTag("details-about")) {
         val interaction = remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
         DetailsReadingPanel(onRead, modifier.fillMaxWidth().testTag("details-about-description"), interaction) {

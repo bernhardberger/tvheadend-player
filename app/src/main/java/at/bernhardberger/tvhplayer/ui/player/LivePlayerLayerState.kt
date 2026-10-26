@@ -30,6 +30,11 @@ import kotlinx.coroutines.CoroutineScope
 
 private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
 
+/** Actions Back from the rail returns to: every action-row button the rail can be entered from. */
+private val RailReturnActions = setOf(
+    "player-pause", "player-stop", "player-audio", "player-subtitles", "player-info", "player-settings",
+)
+
 @Stable
 internal class LivePlayerLayerState(
     scope: CoroutineScope,
@@ -82,7 +87,7 @@ internal class LivePlayerLayerState(
         private set
 
     fun onActionFocused(action: String) = profileTrace("P44:focus:control") {
-        lastFocusedAction = action.takeIf { it in setOf("player-pause", "player-stop", "player-settings") } ?: lastFocusedAction
+        lastFocusedAction = action.takeIf { it in RailReturnActions } ?: lastFocusedAction
         lastFocusedControl = action.takeUnless { it == "player-seekbar" }
     }
 

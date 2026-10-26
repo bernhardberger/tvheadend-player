@@ -570,21 +570,12 @@ class LivePlayerChromeScreenTest {
     }
 
     @Test fun trackButtonsStandBesideInfoOnlyWithAChoiceAndReturnFocusFromTheirList() = timeshiftPlaying {
-        fun audio(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
-            .setId(id).setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage(language).setChannelCount(2).build()),
-            false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(selected))
-        fun publish(tracks: Tracks) {
-            forcedTracks = tracks
-            compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
-            // A few frames only: the controls' hide timer must not run out in between.
-            settleFrames()
-        }
-        publish(Tracks(listOf(audio("a1", "en", true))))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
         key(Key.DirectionDown)
         assertTrue(exists("player-info"))
         assertFalse("one audio track offers no choice", exists("player-audio"))
         assertFalse("nor do subtitles without a track", exists("player-subtitles"))
-        publish(Tracks(listOf(audio("a1", "en", true), audio("a2", "de", false))))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
         assertTrue(exists("player-audio"))
         assertFalse(exists("player-subtitles"))
         val button = compose.onNodeWithTag("player-audio").fetchSemanticsNode()
@@ -604,6 +595,55 @@ class LivePlayerChromeScreenTest {
         assertFalse("focus moved into the quick list", focused() == listOf("player-audio"))
         key(Key.Back)
         assertEquals(listOf("player-audio"), focused())
+    }
+
+    @Test fun theSubtitlesButtonStandsWithOneTrackSaysOffAndReturnsFocusFromItsList() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+        key(Key.DirectionDown)
+        assertFalse(exists("player-subtitles"))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), subtitleTrack("s1", "de"))))
+        assertFalse("one audio track still offers no choice", exists("player-audio"))
+        val button = compose.onNodeWithTag("player-subtitles").fetchSemanticsNode()
+        assertEquals(listOf("Subtitles"), button.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals("Off", button.config.getOrNull(SemanticsProperties.StateDescription))
+        compose.onNodeWithTag("player-info").performSemanticsAction(SemanticsActions.RequestFocus)
+        settleFrames()
+        key(Key.DirectionLeft)
+        assertEquals(listOf("player-subtitles"), focused())
+        key(Key.DirectionCenter)
+        assertTrue("the Subtitles quick list opens", exists("playback-options-subtitles-off"))
+        assertTrue("with its track", exists("playback-options-track-list"))
+        key(Key.Back)
+        assertEquals(listOf("player-subtitles"), focused())
+    }
+
+    @Test fun aFocusedTrackButtonThatGoesHandsFocusToInfo() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
+        key(Key.DirectionDown)
+        for (button in listOf("player-audio", "player-subtitles")) {
+            compose.onNodeWithTag(button).performSemanticsAction(SemanticsActions.RequestFocus)
+            settleFrames()
+            assertEquals(listOf(button), focused())
+            // The choice shrinks to one audio track and no subtitles.
+            publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+            assertFalse(exists(button))
+            assertEquals("$button's neighbour takes focus", listOf("player-info"), focused())
+            publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
+        }
+    }
+
+    @Test fun backFromTheRailReturnsToTheTrackOrInfoButtonItWasEnteredFrom() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
+        key(Key.DirectionDown)
+        for (button in listOf("player-audio", "player-subtitles", "player-info")) {
+            compose.onNodeWithTag(button).performSemanticsAction(SemanticsActions.RequestFocus)
+            settleFrames()
+            key(Key.DirectionDown)
+            assertTrue("Down from $button opens the rail", railOpen())
+            key(Key.Back)
+            assertFalse(railOpen())
+            assertEquals(listOf(button), focused())
+        }
     }
 
     @Test fun numberEntryKeepsTheControlsUpWithoutFocusAndReturnsToTheSeekbar() = timeshiftPlaying { pauses ->
@@ -1983,6 +2023,21 @@ class LivePlayerChromeScreenTest {
         val directory = File("../artifacts/player-chrome").apply { mkdirs() }
         File(directory, "unavailable-$locale-font$fontScale.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
+    }
+
+    private fun audioTrack(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
+        .setId(id).setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage(language).setChannelCount(2).build()),
+        false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(selected))
+
+    private fun subtitleTrack(id: String, language: String) = Tracks.Group(TrackGroup(Format.Builder()
+        .setId(id).setSampleMimeType(MimeTypes.APPLICATION_DVBSUBS).setLanguage(language).build()),
+        false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+
+    private fun publishTracks(tracks: Tracks) {
+        forcedTracks = tracks
+        compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
+        // A few frames only: the controls' hide timer must not run out in between.
+        settleFrames()
     }
 
     private fun exists(tag: String) =

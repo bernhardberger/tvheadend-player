@@ -157,10 +157,15 @@ internal fun PlayerChromeControls(
     // surviving action during apply; that must not erase the disappearing node's fallback.
     val removedFocusTarget = when (lastFocusedControl) {
         "player-seekbar" -> if (timelineFocusable) timelineFocus else initialFocus
+        // A track button goes with its choice (zap pending, failure, fewer tracks); its neighbour Info takes over.
+        "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
+        "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> null
     }
     val pageActive = LocalPlayerPageActive.current
-    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive) {
+    val audioShown = actions.tracks.audio != null
+    val subtitlesShown = actions.tracks.subtitles != null
+    LaunchedEffect(actions.active, restoreFocus, seekable, pausable, pageActive, audioShown, subtitlesShown) {
         if (actions.active && pageActive) {
             val target = when (restoreFocus) {
                 null -> null

@@ -36,8 +36,12 @@ import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.net.Uri
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.Player
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.Tracks
 import androidx.media3.datasource.BaseDataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
@@ -119,6 +123,7 @@ class RecordingPlayerChromeScreenTest {
     private val playerListeners = mutableListOf<Player.Listener>()
     /** The player reports READY and playing, as once the recording's first frame is out. */
     private var forcedReady = false
+    private var forcedTracks: Tracks? = null
     private var positionMs = 600_000L
     private val loadGate = CountDownLatch(1)
 
@@ -450,6 +455,23 @@ class RecordingPlayerChromeScreenTest {
         }
     }
 
+    @Test fun trackButtonsOpenTheirListReturnFocusAndHandItToInfoWhenTheyGo() {
+        screen()
+        playing()
+        key(Key.DirectionDown)
+        assertFalse(exists("player-audio"))
+        publishTracks(Tracks(listOf(audioTrack("a1", "de", true), audioTrack("a2", "en", false))))
+        compose.onNodeWithTag("player-audio").performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        key(Key.DirectionCenter)
+        assertTrue("the Audio quick list opens", exists("playback-options-track-list"))
+        key(Key.Back)
+        assertEquals(listOf("player-audio"), focused())
+        publishTracks(Tracks(listOf(audioTrack("a1", "de", true))))
+        assertFalse(exists("player-audio"))
+        assertEquals("its neighbour takes focus", listOf("player-info"), focused())
+    }
+
     @Test fun continueWatchingFromRecordingDetailsKeepsPlaybackAndRestoresInfo() {
         var closed = false
         screen(onClose = { closed = true })
@@ -529,6 +551,16 @@ class RecordingPlayerChromeScreenTest {
         compose.waitForIdle()
     }
 
+    private fun audioTrack(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
+        .setId(id).setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage(language).setChannelCount(2).build()),
+        false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(selected))
+
+    private fun publishTracks(tracks: Tracks) {
+        forcedTracks = tracks
+        compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
+        settle()
+    }
+
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
@@ -594,6 +626,7 @@ class RecordingPlayerChromeScreenTest {
             override fun getPlaybackState(): Int = if (forcedReady) Player.STATE_READY else base.playbackState
             override fun isPlaying(): Boolean = forcedReady && base.playWhenReady
             override fun getDuration(): Long = 3_600_000L
+            override fun getCurrentTracks(): Tracks = forcedTracks ?: base.currentTracks
             override fun getCurrentPosition(): Long = positionMs
             override fun isCurrentMediaItemSeekable(): Boolean = true
             override fun isCommandAvailable(command: Int): Boolean =

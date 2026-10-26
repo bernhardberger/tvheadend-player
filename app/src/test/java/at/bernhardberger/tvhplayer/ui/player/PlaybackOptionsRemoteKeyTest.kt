@@ -25,6 +25,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performSemanticsAction
@@ -329,6 +330,8 @@ class PlaybackOptionsRemoteKeyTest {
         assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.optionsPage)
         compose.onNodeWithTag(OFF_ROW).assertIsFocused()
         compose.onNodeWithTag(OFF_SUPPORT, useUnmergedTree = true).assertTextEquals("No subtitles on this channel")
+        // The row says why once; the header names only the state.
+        compose.onNodeWithText("No subtitles available.", substring = true, useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("playback-options-track-empty").assertDoesNotExist()
         press(Key.DirectionDown)
         compose.onNodeWithTag(OFF_ROW).assertIsFocused()

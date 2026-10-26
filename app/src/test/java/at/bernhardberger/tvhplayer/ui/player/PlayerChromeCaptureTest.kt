@@ -390,6 +390,8 @@ class PlayerChromeCaptureTest {
         RECORDING_STEP_LONG_START, RECORDING_STEP_LONG_END, RECORDING_CONTROLS_STEP_LONG_START, RECORDING_CONTROLS_STEP_LONG_END,
         // Player (i) focus and the channel rail's Recent row.
         INFO_FOCUSED, RECORDING_INFO_FOCUSED, RECENT_OPEN, BROWSER_NOW, BROWSER_EMPTY,
+        // The track buttons beside Info, focused.
+        AUDIO_FOCUSED, SUBTITLES_FOCUSED,
     }
 
     /** [Scene.CONTROLS_REVEAL_MID] composes the Banner, then the controls take it over. */
@@ -468,6 +470,8 @@ class PlayerChromeCaptureTest {
             }
             if (next == Scene.INFO_FOCUSED || next == Scene.RECORDING_INFO_FOCUSED) compose.onNodeWithTag("player-info").assertIsFocused()
             if (next == Scene.RECENT_OPEN) compose.onNodeWithTag("player-channel-card-2").assertIsFocused()
+            if (next == Scene.AUDIO_FOCUSED) compose.onNodeWithTag("player-audio").assertIsFocused()
+            if (next == Scene.SUBTITLES_FOCUSED) compose.onNodeWithTag("player-subtitles").assertIsFocused()
             if (next == Scene.BROWSER_NOW) compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
             if (next == Scene.BROWSER_EMPTY) {
                 compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
@@ -659,6 +663,9 @@ class PlayerChromeCaptureTest {
             Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
             Scene.INFO_FOCUSED -> Controls(timeshift, false, false, content, focus = "player-info")
+            Scene.AUDIO_FOCUSED, Scene.SUBTITLES_FOCUSED -> Controls(timeshift, false, false, content, peek = true,
+                focus = if (scene == Scene.AUDIO_FOCUSED) "player-audio" else "player-subtitles",
+                tracks = PlayerTrackButtons(audio = "English", subtitles = "Off"))
             Scene.BROWSER_NOW, Scene.RECENT_OPEN, Scene.BROWSER_EMPTY -> {
                 val state = remember(scene) { PlayerChannelBrowserState().apply {
                     if (scene == Scene.RECENT_OPEN) row = PlayerChannelRow.RECENT
