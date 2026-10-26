@@ -2035,11 +2035,12 @@ class GuideVisualLayoutTest {
         val wanted = rowTitleBottom + (rowHeight - rowTitleBottom) / 3
         val geometry = "drop=$drop shown=$shown wanted=$wanted stride=$stride"
         assertTrue("Never more than half a row: $geometry", drop in 0f..stride / 2 + .5f)
+        // What the grid would show unmoved decides whether it moves, and by how much.
+        val unmoved = (540f - (first.top - drop)).mod(stride)
+        val expected = (unmoved - wanted).mod(stride).takeIf { it <= stride / 2 } ?: 0f
+        assertEquals("The drop this geometry calls for: $geometry unmoved=$unmoved", expected, drop, 1f)
         if (drop > .5f) {
             assertEquals("The cut row shows its title and a third of the rest: $geometry", wanted, shown, 1f)
-        } else {
-            assertTrue("Unmoved, the cut row shows less, by under half a row: $geometry",
-                shown in wanted - stride / 2 - 1f..wanted + 1f)
         }
         capture("guide-bottom-row-${rows.name.lowercase()}-font$scale", scale, LayoutDirection.Ltr).recycle()
         assertNoPlayback()

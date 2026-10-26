@@ -197,7 +197,8 @@ internal val GuideHeadlineRulerGap = 12.dp
  * How far the headline, ruler and grid move down below the header row, so the row the screen's
  * bottom edge cuts shows its title and a third of the rest. A row that ends flush with the edge, or
  * a sliver of one, hides that the grid goes on. Never more than half a row: a cut row already
- * showing less than its title keeps its place rather than giving up most of a row.
+ * showing less than its title keeps its place rather than giving up most of a row. A notice above
+ * the ruler (channel set unavailable, stale data) is passing and left out, so it shifts the cut.
  */
 @Composable
 internal fun guideHeadlineDrop(viewportHeight: Dp, contentTop: Dp, gridTopPadding: Dp, rows: GuideRows): Dp {
