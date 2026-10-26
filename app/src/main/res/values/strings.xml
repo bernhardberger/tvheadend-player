@@ -597,6 +597,7 @@
     <string name="player_seekbar_timeshift_description">Timeshift position %1$s behind live. %2$s</string>
     <string name="player_seekbar_timeshift_live_description">Timeshift position Live. %1$s</string>
     <string name="timeshift_seek_preview_description">%1$s, target %2$s. %3$s. %4$s</string>
+    <string name="timeshift_seek_preview_short_description">%1$s, target %2$s. %3$s</string>
     <!-- Spoken offset of a seek step from where stepping started; %1$s is the spoken duration. -->
     <string name="seek_offset_forward_description">%1$s forward</string>
     <string name="seek_offset_back_description">%1$s back</string>

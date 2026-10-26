@@ -81,9 +81,11 @@ internal fun RecordingBannerTimeline(timeline: PlayerChromeTimeline.Recording, s
         requireNotNull(readout.target),
         recordingLengthStatus(timeline, range),
     )
+    val spoken = rememberSettledStep(description).orEmpty()
     Column(
         Modifier.fillMaxWidth().testTag("recording-seek-preview").clearAndSetSemantics {
-            contentDescription = description
+            // Spoken once stepping rests, with the final value; the label shows every step.
+            contentDescription = spoken
             liveRegion = LiveRegionMode.Polite
         },
     ) {

@@ -425,8 +425,8 @@ class PlayerTimelineTruthfulnessTest {
             .assertDoesNotExist()
         composeRule.onNodeWithTag("timeshift-seek-preview")
             .assertContentDescriptionEquals(
-                "30 seconds back, target −2:00. " +
-                    "2:00 behind live. Buffer starts 15:00 behind live."
+                "30 seconds back, target 2:00 behind live. " +
+                    "Buffer starts 15:00 behind live."
             )
     }
 

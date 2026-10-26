@@ -475,6 +475,7 @@
     <string name="player_seekbar_timeshift_description">Timeshift-Position %1$s hinter Live. %2$s</string>
     <string name="player_seekbar_timeshift_live_description">Timeshift-Position Live. %1$s</string>
     <string name="timeshift_seek_preview_description">%1$s, Ziel %2$s. %3$s. %4$s</string>
+    <string name="timeshift_seek_preview_short_description">%1$s, Ziel %2$s. %3$s</string>
     <string name="seek_offset_forward_description">%1$s vor</string>
     <string name="seek_offset_back_description">%1$s zurück</string>
     <string name="seek_offset_none_description">Keine Änderung</string>

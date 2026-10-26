@@ -62,21 +62,17 @@ internal fun TimeshiftSeekPreviewTimeline(
             (targetState.liveEdgeMs - targetState.bufferStartMs).coerceAtLeast(0L)
         ),
     )
-    val description = stringResource(
-        R.string.timeshift_seek_preview_description,
-        stepOffsetDescription(decision.deltaMs),
-        requireNotNull(readout.target),
-        behindLiveLabel,
-        bufferStartDescription,
-    )
+    val description = liveStepDescription(decision.deltaMs, readout, targetClock != null, behindLiveLabel, bufferStartDescription)
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
+    val spoken = rememberSettledStep((programmeWindow?.let {
+        "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
+            if (!it.targetAvailable) " $unavailableTarget" else ""
+    } ?: description) + feedback?.let { ". $it" }.orEmpty()).orEmpty()
 
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
         .clearAndSetSemantics {
-            contentDescription = (programmeWindow?.let {
-                "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
-                    if (!it.targetAvailable) " $unavailableTarget" else ""
-            } ?: description) + feedback?.let { ". $it" }.orEmpty()
+            // Spoken once stepping rests, with the final value; the label shows every step.
+            contentDescription = spoken
             liveRegion = LiveRegionMode.Polite
         }) {
     PlayerTimelineBlock(

@@ -216,10 +216,10 @@ U20 items, as the owner noticed them in use:
    Decide whether it goes (the details page and the Guide cover it) or is
    reworked; ties in with the U8 programme-details redesign.
 5. **Channel rail.** Needs a second look (with the U1 rail trials).
-6. **Scrubbing in steps, not to absolute times.** The timeline preview shows
-   the absolute position ("1:03:20"). For sports especially, steps relative to
-   the current position read better ("+3 min"). Decide the preview label and
-   the step sizes.
+6. **Scrubbing in steps, not to absolute times.** The timeline preview now
+   shows the relative offset from where stepping started ("+3:00", "−1:30"),
+   with the target's absolute time ("1:03:20", or the clock for live) small
+   beside it. The step sizes are still to be decided.
 7. **Channel number entry in place.** The number entry overlay feels detached;
    it should sit where the chrome's channel identity is and morph from it.
 

@@ -69,9 +69,17 @@ class PlaybackTimeFormatTest {
     }
 
     @Test
-    fun stepOffsetUsesTheLocalesDigitsAndKeepsTheRealMinus() {
-        assertEquals("−١:٣٠", formatStepOffset(-90_000L, Locale.forLanguageTag("ar-EG-u-nu-arab")))
-        assertEquals("+3:00", formatStepOffset(180_000L, Locale.GERMANY))
+    fun stepOffsetUsesLatinDigitsInEveryLocaleAndKeepsTheRealMinus() {
+        val previous = Locale.getDefault()
+        try {
+            for (tag in listOf("ar-EG-u-nu-arab", "de-DE", "fa-IR")) {
+                Locale.setDefault(Locale.forLanguageTag(tag))
+                assertEquals(tag, "−1:30", formatStepOffset(-90_000L))
+                assertEquals(tag, "+1:02:00", formatStepOffset(3_720_000L))
+            }
+        } finally {
+            Locale.setDefault(previous)
+        }
     }
 
     @Test

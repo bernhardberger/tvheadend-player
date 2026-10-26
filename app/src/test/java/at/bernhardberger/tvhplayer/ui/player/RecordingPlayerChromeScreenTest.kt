@@ -185,7 +185,7 @@ class RecordingPlayerChromeScreenTest {
             compose.mainClock.advanceTimeBy(100)
             compose.waitForIdle()
             assertTrue("the step previews in the Banner", exists("player-banner"))
-            assertTrue(description("recording-seek-preview").startsWith(target))
+            assertTrue(spokenStep("recording-seek-preview").startsWith(target))
             repeat(8) { settle() }
             assertFalse("the Banner hides again", exists("player-banner"))
         }
@@ -207,11 +207,29 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the label reads the offset from the start", texts("+1:00"))
         assertEquals("0:11:00", compose.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
             .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
-        assertTrue(description("recording-seek-preview").startsWith("1 minute forward, target 0:11:00"))
+        assertTrue(spokenStep("recording-seek-preview").startsWith("1 minute forward, target 0:11:00"))
         compose.onRoot().performKeyInput { pressKey(Key.MediaRewind) }
         compose.mainClock.advanceTimeBy(100)
         compose.waitForIdle()
         assertTrue("stepping back reduces the offset", texts("+0:30"))
+    }
+
+    @Test fun stepsInQuickSuccessionAreAnnouncedOnceWithTheFinalValue() {
+        screen()
+        playing()
+        repeat(8) { settle() }
+        positionMs = 600_000L
+        settle()
+        repeat(3) {
+            compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+            assertEquals("a held key announces nothing while it steps", "", description("recording-seek-preview"))
+        }
+        assertTrue("the label still follows every step", texts("+1:30"))
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
     }
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
@@ -315,7 +333,7 @@ class RecordingPlayerChromeScreenTest {
         assertFalse(exists("player-actions"))
         assertFalse("no focusable seekbar in the Banner", exists("player-seekbar"))
         assertEquals("30 seconds back, target 0:09:30. Total 1:00:00.",
-            description("recording-seek-preview"))
+            spokenStep("recording-seek-preview"))
     }
 
     @Test fun upFromTheSeekbarStaysAtTheTopEdgeAndTheBarRowHasNoStatusSlot() {
@@ -469,6 +487,13 @@ class RecordingPlayerChromeScreenTest {
     private fun description(tag: String): String =
         compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].joinToString()
+
+    /** The spoken description once stepping has rested past the announcement window. */
+    private fun spokenStep(tag: String): String {
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        return description(tag)
+    }
 
     private fun focused(): List<String> =
         compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()

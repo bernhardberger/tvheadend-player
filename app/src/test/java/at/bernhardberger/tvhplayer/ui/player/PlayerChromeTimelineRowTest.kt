@@ -3,7 +3,9 @@ package at.bernhardberger.tvhplayer.ui.player
 import android.app.Application
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.platform.LocalContext
@@ -169,6 +171,94 @@ class PlayerChromeTimelineRowTest {
         assertTrue(texts("−0:06"))
     }
 
+    // 2b. What a step says: once, after stepping rests, without repeating itself.
+
+    private fun spoken(tag: String, merged: Boolean = false): String =
+        compose.onNodeWithTag(tag, useUnmergedTree = !merged).fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].joinToString()
+
+    private fun restFor(ms: Long) {
+        compose.mainClock.advanceTimeBy(ms)
+        compose.waitForIdle()
+    }
+
+    @Test fun aLiveStepWithAKnownClockSaysTheOffsetTheTargetAndTheDistanceOnce() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TimeshiftSeekPreviewTimeline(atEdge.copy(timingKnown = true), TimeshiftSeekDecision(-180_000, -180_000, false), nowSec = now)
+            }
+        }
+        restFor(500)
+        assertEquals(
+            "3 minutes back, target ${formatClock(now - 180)}. 3:00 behind live. Buffer starts 10:00 behind live.",
+            spoken("timeshift-seek-preview"),
+        )
+    }
+
+    @Test fun aLiveStepToTheEdgeDoesNotSayLiveTwice() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme { TimeshiftSeekPreviewTimeline(extrapolated, TimeshiftSeekDecision(-4_000, 4_000, false), nowSec = now) }
+        }
+        restFor(500)
+        val said = spoken("timeshift-seek-preview")
+        assertTrue(said, said.startsWith("4 seconds forward, target Live. Buffer starts"))
+        assertFalse(said, said.contains("Live. Live"))
+    }
+
+    @Test fun aLiveStepWithoutKnownTimingSaysTheDistanceBehindLiveOnce() {
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TimeshiftSeekPreviewTimeline(atEdge.copy(timingKnown = false), TimeshiftSeekDecision(-180_000, -180_000, false), nowSec = now)
+            }
+        }
+        restFor(500)
+        assertEquals("3 minutes back, target 3:00 behind live. Buffer starts 10:00 behind live.", spoken("timeshift-seek-preview"))
+    }
+
+    @Test fun stepsInQuickSuccessionAreAnnouncedOnceWithTheFinalLiveValue() {
+        var decision by mutableStateOf(TimeshiftSeekDecision(-30_000, -30_000, false))
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme { TimeshiftSeekPreviewTimeline(atEdge.copy(timingKnown = true), decision, nowSec = now) }
+        }
+        restFor(100)
+        for (delta in listOf(-60_000L, -90_000L, -120_000L)) {
+            compose.runOnIdle { decision = TimeshiftSeekDecision(delta, delta, false) }
+            restFor(100)
+            assertEquals("a held key announces nothing while it steps", "", spoken("timeshift-seek-preview"))
+        }
+        assertTrue("the label still follows every step", texts("−2:00"))
+        restFor(500)
+        assertEquals(
+            "2 minutes back, target ${formatClock(now - 120)}. 2:00 behind live. Buffer starts 10:00 behind live.",
+            spoken("timeshift-seek-preview"),
+        )
+    }
+
+    @Test fun theFocusedSeekbarSpeaksALiveStepWithAnHourOffset() {
+        val buffer = atEdge.copy(timingKnown = true, bufferStartMs = -7_200_000)
+        chrome(PlayerChromeMode.CONTROLS, live(buffer.copy(positionMs = -300_000), committedState = buffer.copy(positionMs = -4_000_000),
+            previewing = true, step = TimeshiftSeekDecision(-300_000, 3_700_000, false)))
+        assertEquals(
+            "1 hour 1 minute 40 seconds forward, target ${formatClock(now - 300)}. 5:00 behind live. Buffer starts 2:00:00 behind live.",
+            spoken("player-seekbar", merged = true),
+        )
+    }
+
+    @Test fun theFocusedRecordingSeekbarSpeaksAStepWithAnHourOffset() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(mode = PlayerChromeMode.CONTROLS, positionMs = 1_045_000, durationMs = 7_200_000,
+                    targetMs = 4_765_000, originMs = 1_045_000)
+            }
+        }
+        settle()
+        assertEquals("1 hour 2 minutes forward, target 1:19:25. Total 2:00:00.", spoken("player-seekbar", merged = true))
+    }
+
     // 3. A preview into a metadata gap does not borrow the committed programme.
 
     private val programme = EpgEvent.create(EventId(42), ChannelId(1), Instant.fromEpochSeconds(now - 3_600),
@@ -279,7 +369,7 @@ class PlayerChromeTimelineRowTest {
         liveAvailable: Boolean = true,
     ) = PlayerChromeTimeline.Live(
         timeshift = timeshift, nowSec = now, committedTimeshift = committedState, committedWindow = committedWindow,
-        previewing = previewing, step = step, liveAvailable = liveAvailable,
+        previewing = previewing, step = step, stepDeltaMs = step?.deltaMs, liveAvailable = liveAvailable,
     )
 
     private fun chrome(mode: PlayerChromeMode, timeline: PlayerChromeTimeline.Live) {

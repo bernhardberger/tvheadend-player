@@ -713,6 +713,9 @@ class PlayerFooterLayoutEvidenceTest {
         capture("$locale-font$fontScale-missing-epg-full-preview", focus = "none")
         compose.runOnIdle { standalone = true }
         assertEquals(2f / 3, bounds("player-timeline-fill").width / bounds("player-timeline-track").width, 0.005f)
+        // The step is spoken once stepping rests.
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
         compose.onNodeWithTag("timeshift-seek-preview").assert(androidx.compose.ui.test.SemanticsMatcher("sampled thirty seconds behind") {
             it.config[SemanticsProperties.ContentDescription].joinToString().contains("0:30")
         })
