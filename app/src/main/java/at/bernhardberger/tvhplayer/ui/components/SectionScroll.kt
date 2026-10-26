@@ -29,9 +29,12 @@ import kotlinx.coroutines.launch
  * so it can aim at where the section ends up after the page's own animations. The page starts with
  * input focus in [initial].
  *
- * Only the focus request of a section change gives way to the move. Every other request (a focus
- * restore within its section, a requester of its own) takes the standard path to its section's
- * [target]: it scrolls with the request, completes with it and stops when its caller is cancelled.
+ * Only the focus request of a section change gives way to the move. A request for the section a
+ * move is taking into place completes at once, before the move ends, since the move already ends
+ * at that section's [target]; a page whose own requester must wait for its content to be in place
+ * shouldn't use this spec. Every other request (a focus restore within its section, a requester in
+ * another section) takes the standard path to its section's [target]: it scrolls with the request,
+ * completes with it and stops when its caller is cancelled.
  */
 @Composable
 internal fun <S> rememberSectionScrollSpec(
