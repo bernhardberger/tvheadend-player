@@ -248,6 +248,9 @@ internal fun ProgrammeDetailsPage(
     // colour glows over the page instead, opaque in itself.
     val background = rememberDetailsTint(art, picon.takeIf { art != null })
     val glowChannel = channel?.id?.takeIf { art == null && picon != null }
+    // The player's rail opens another channel's programme over the playing video, so its picture
+    // does not show behind the page: it stands framed in the second column instead.
+    val framedChannel = channel?.takeIf { warmPlayback && LocalPlayerDetailsFramedArt.current }
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
         Box(Modifier.browseDetailsViewport().then(modifier).fillMaxSize()
              .graphicsLayer { this.alpha = alpha.value }
@@ -312,6 +315,18 @@ internal fun ProgrammeDetailsPage(
                             translationY = -pageScroll.value.toFloat()
                             this.alpha = 1f - readingProgress.value
                         }.testTag("details-hero-logo"))
+            } else if (framedChannel != null) {
+                // The rail preview's hero, the picture or the channel's colour with its logo,
+                // scrolling away with the page like the logo above.
+                ProgrammeHero(event?.image ?: recording?.image, framedChannel.id,
+                    framedChannel.number?.toString().orEmpty(), framedChannel.icon,
+                    Modifier.align(Alignment.TopEnd).padding(top = DetailsSafeEdge, end = DetailsKeyline)
+                        .graphicsLayer {
+                            translationY = -pageScroll.value.toFloat()
+                            this.alpha = 1f - readingProgress.value
+                            shape = PlayerChromeTokens.heroShape
+                            clip = true
+                        }.testTag("details-framed-art"))
             }
             readingTransition.AnimatedContent(transitionSpec = {
                 (fadeIn(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard)) togetherWith
@@ -350,7 +365,16 @@ internal fun ProgrammeDetailsPage(
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }
                             .scrollSection(pageSpec, DetailsSection.ACTIONS)) {
-                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec, besideLogo = glowChannel != null) {
+                        // Beside the framed art the information stands at least its height, so the
+                        // description below, which reaches the art's edge, always clears it.
+                        Box(if (framedChannel != null) Modifier.heightIn(min = PlayerChromeTokens.heroHeight) else Modifier,
+                            contentAlignment = Alignment.BottomStart) {
+                        DetailsInformation(event, recording, recordingAdmission, channel, nowSec,
+                            corner = when {
+                                glowChannel != null -> DetailsHeroLogoSize.first
+                                framedChannel != null -> PlayerChromeTokens.heroWidth
+                                else -> null
+                            }) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
                                 Text(text, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
@@ -358,10 +382,13 @@ internal fun ProgrammeDetailsPage(
                                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                             }
                         }
+                        }
                          if (hasAbout) {
                              // Group gap; also clears the 1.05 focus growth (~3dp) and its 2dp outline.
                              Spacer(Modifier.height(24.dp))
                             DetailsAbout(synopsis, { reading = true },
+                                // Under the framed art the card ends on the art's edge, the page's end keyline.
+                                wide = framedChannel != null,
                                 Modifier.focusRequester(aboutFocus).onFocusChanged {
                                     if (it.isFocused) section = DetailsSection.ABOUT
                                 }.focusProperties { canFocus = backEnabled })
@@ -449,8 +476,8 @@ internal val AiringCardWidth = 220.dp
 private val AiringCardRoom = 12.dp
 
 @Composable
-private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifier) {
-    Box(Modifier.widthIn(max = 584.dp).testTag("details-about")) {
+private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, wide: Boolean = false, modifier: Modifier) {
+    Box((if (wide) Modifier.fillMaxWidth() else Modifier.widthIn(max = 584.dp)).testTag("details-about")) {
         val interaction = remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
         DetailsReadingPanel(onRead, modifier.fillMaxWidth().testTag("details-about-description"), interaction) {
@@ -969,7 +996,7 @@ internal fun programmeHeaderMetadata(facts: List<Pair<String, String>>, resource
 private fun DetailsInformation(
     event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?,
     channel: Channel?, nowSec: Long,
-    besideLogo: Boolean,
+    corner: Dp?,
     synopsis: @Composable () -> Unit,
 ) {
     // Only the title spans the page; the remaining information keeps its narrow text column.
@@ -986,9 +1013,9 @@ private fun DetailsInformation(
         Spacer(Modifier.height(8.dp))
         Text(event?.title ?: recording?.title.orEmpty(),
             Modifier.fillMaxWidth()
-                .then(if (besideLogo) Modifier.padding(end = DetailsHeroLogoSize.first + DetailsTitleLogoGap) else Modifier)
+                .then(if (corner != null) Modifier.padding(end = corner + DetailsTitleLogoGap) else Modifier)
                 .testTag("details-title").semantics { heading() },
-            style = MaterialTheme.typography.displaySmall, maxLines = if (besideLogo) 2 else 1,
+            style = MaterialTheme.typography.displaySmall, maxLines = if (corner != null) 2 else 1,
             overflow = TextOverflow.Ellipsis)
         val subtitle = (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)
         subtitle?.let {

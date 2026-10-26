@@ -569,6 +569,83 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-stop"), focused())
     }
 
+    @Test fun trackButtonsStandBesideInfoOnlyWithAChoiceAndReturnFocusFromTheirList() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+        key(Key.DirectionDown)
+        assertTrue(exists("player-info"))
+        assertFalse("one audio track offers no choice", exists("player-audio"))
+        assertFalse("nor do subtitles without a track", exists("player-subtitles"))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false))))
+        assertTrue(exists("player-audio"))
+        assertFalse(exists("player-subtitles"))
+        val button = compose.onNodeWithTag("player-audio").fetchSemanticsNode()
+        assertEquals(listOf("Audio"), button.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertTrue("it announces the current choice: ${button.config}",
+            button.config.getOrNull(SemanticsProperties.StateDescription).orEmpty().isNotEmpty())
+        val audioBounds = button.boundsInRoot
+        val info = compose.onNodeWithTag("player-info").fetchSemanticsNode().boundsInRoot
+        assertTrue("Audio stands before Info at the end: $audioBounds vs $info", audioBounds.right <= info.left)
+        // Left from Info reaches it; it then opens the Audio list, and Back returns to it.
+        compose.onNodeWithTag("player-info").performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        key(Key.DirectionLeft)
+        assertEquals(listOf("player-audio"), focused())
+        key(Key.DirectionCenter)
+        assertTrue("the Audio quick list opens", exists("playback-options-track-list"))
+        assertFalse("focus moved into the quick list", focused() == listOf("player-audio"))
+        key(Key.Back)
+        assertEquals(listOf("player-audio"), focused())
+    }
+
+    @Test fun theSubtitlesButtonStandsWithOneTrackSaysOffAndReturnsFocusFromItsList() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+        key(Key.DirectionDown)
+        assertFalse(exists("player-subtitles"))
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), subtitleTrack("s1", "de"))))
+        assertFalse("one audio track still offers no choice", exists("player-audio"))
+        val button = compose.onNodeWithTag("player-subtitles").fetchSemanticsNode()
+        assertEquals(listOf("Subtitles"), button.config.getOrNull(SemanticsProperties.ContentDescription))
+        assertEquals("Off", button.config.getOrNull(SemanticsProperties.StateDescription))
+        compose.onNodeWithTag("player-info").performSemanticsAction(SemanticsActions.RequestFocus)
+        settleFrames()
+        key(Key.DirectionLeft)
+        assertEquals(listOf("player-subtitles"), focused())
+        key(Key.DirectionCenter)
+        assertTrue("the Subtitles quick list opens", exists("playback-options-subtitles-off"))
+        assertTrue("with its track", exists("playback-options-track-list"))
+        key(Key.Back)
+        assertEquals(listOf("player-subtitles"), focused())
+    }
+
+    @Test fun aFocusedTrackButtonThatGoesHandsFocusToInfo() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
+        key(Key.DirectionDown)
+        for (button in listOf("player-audio", "player-subtitles")) {
+            compose.onNodeWithTag(button).performSemanticsAction(SemanticsActions.RequestFocus)
+            settleFrames()
+            assertEquals(listOf(button), focused())
+            // The choice shrinks to one audio track and no subtitles.
+            publishTracks(Tracks(listOf(audioTrack("a1", "en", true))))
+            assertFalse(exists(button))
+            assertEquals("$button's neighbour takes focus", listOf("player-info"), focused())
+            publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
+        }
+    }
+
+    @Test fun backFromTheRailReturnsToTheTrackOrInfoButtonItWasEnteredFrom() = timeshiftPlaying {
+        publishTracks(Tracks(listOf(audioTrack("a1", "en", true), audioTrack("a2", "de", false), subtitleTrack("s1", "de"))))
+        key(Key.DirectionDown)
+        for (button in listOf("player-audio", "player-subtitles", "player-info")) {
+            compose.onNodeWithTag(button).performSemanticsAction(SemanticsActions.RequestFocus)
+            settleFrames()
+            key(Key.DirectionDown)
+            assertTrue("Down from $button opens the rail", railOpen())
+            key(Key.Back)
+            assertFalse(railOpen())
+            assertEquals(listOf(button), focused())
+        }
+    }
+
     @Test fun numberEntryKeepsTheControlsUpWithoutFocusAndReturnsToTheSeekbar() = timeshiftPlaying { pauses ->
         key(Key.DirectionDown)
         key(Key.DirectionUp)
@@ -1306,7 +1383,7 @@ class LivePlayerChromeScreenTest {
     private fun assertUnknownProgramme() {
         val info = compose.onNodeWithTag("player-info-bar").fetchSemanticsNode().config
             .getOrElse(SemanticsProperties.ContentDescription) { emptyList() }.joinToString(" ")
-        assertTrue("unknown playback does not claim the airing programme: $info", info.contains("Program information unavailable"))
+        assertTrue("unknown playback does not claim the airing programme: $info", info.contains("No program information"))
         assertFalse("unknown playback has no Next: $info", info.contains("Next 1") || info.contains("Next 2"))
     }
 
@@ -1421,7 +1498,7 @@ class LivePlayerChromeScreenTest {
                 assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
             }
             key(close)
-            assertFalse(exists("player-channel-browser"))
+            assertFalse(railOpen())
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
@@ -1451,11 +1528,11 @@ class LivePlayerChromeScreenTest {
         key(Key.Back)
         assertFalse(exists("programme-details-page"))
         assertEquals("one Back returns to the invoking card", listOf("player-channel-card-2"), focused())
-        assertTrue(exists("player-channel-browser"))
+        assertTrue(railOpen())
         key(Key.DirectionCenter)
         assertEquals("the first short OK after closing tunes channel 2", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         key(Key.Back)
-        assertFalse(exists("player-channel-browser"))
+        assertFalse(railOpen())
         assertEquals("subsequent Back from the rail returns to Pause", listOf("player-pause"), focused())
     }
 
@@ -1481,7 +1558,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionRight)
         assertEquals(listOf("player-channel-card-2"), focused())
         key(Key.Back)
-        assertFalse(exists("player-channel-browser"))
+        assertFalse(railOpen())
         compose.mainClock.autoAdvance = false
         compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
         repeat(6) {
@@ -1494,6 +1571,21 @@ class LivePlayerChromeScreenTest {
         compose.mainClock.autoAdvance = true
         settle()
         assertEquals(listOf("player-channel-card-2"), focused())
+    }
+
+    @Test fun theRailPreviewDescribesTheFocusedCardAfterEveryMove() {
+        screen()
+        publishRailProgrammes()
+        openRows()
+        fun previewText() = compose.onAllNodes(hasAnyAncestor(hasTestTag("player-zap-preview")), useUnmergedTree = true)
+            .fetchSemanticsNodes().flatMap { node -> node.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } }
+        assertFalse("card 1 is not described by its neighbour: ${previewText()}", "Second channel now" in previewText())
+        key(Key.DirectionRight)
+        assertEquals(listOf("player-channel-card-2"), focused())
+        assertTrue("card 2 is described: ${previewText()}", "Second channel now" in previewText())
+        key(Key.DirectionLeft)
+        assertEquals(listOf("player-channel-card-1"), focused())
+        assertFalse("back on card 1: ${previewText()}", "Second channel now" in previewText())
     }
 
     @Test fun recentCardTunedElsewhereReopensTheRowOnItsFirstCardFromTheFirstFrame() {
@@ -1530,7 +1622,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionDown)
         assertEquals(listOf("player-channel-card-1"), focused())
         key(Key.Back)
-        assertFalse(exists("player-channel-browser"))
+        assertFalse(railOpen())
         assertEquals(listOf("player-pause"), focused())
     }
 
@@ -1736,7 +1828,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionUp)
         assertEquals(listOf("player-pause"), focused())
         assertFalse(compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().config.contains(SemanticsActions.OnClick))
-        assertFalse("no browser opens", exists("player-channel-browser"))
+        assertFalse("no browser opens", railOpen())
         assertTrue(identityDescription().contains("Name 1"))
     }
 
@@ -1749,14 +1841,14 @@ class LivePlayerChromeScreenTest {
         assertEquals("newest recent channel", listOf("player-channel-card-2"), focused())
         assertEquals("browsing tunes nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         key(Key.Back)
-        assertFalse("Back closes the browser", exists("player-channel-browser"))
+        assertFalse("Back closes the browser", railOpen())
         assertEquals("and returns to Pause", listOf("player-pause"), focused())
         assertTrue("the controls stay", exists("player-actions"))
         key(Key.DirectionDown)
         assertEquals("remembered tab opens on cards", listOf("player-channel-card-2"), focused())
         key(Key.DirectionCenter)
         assertEquals("OK on a recent channel tunes it", AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
-        assertTrue("another channel keeps the browser", exists("player-channel-browser"))
+        assertTrue("another channel keeps the browser", railOpen())
     }
 
     @Test fun sharedDetailsPreserveThePlayerAndDisposeOnBack() {
@@ -1783,7 +1875,7 @@ class LivePlayerChromeScreenTest {
         key(Key.DirectionCenter)
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(exists("programme-details-page"))
-        assertTrue(exists("player-channel-browser"))
+        assertTrue(railOpen())
         assertEquals(listOf("player-channel-card-2"), focused())
     }
 
@@ -1876,7 +1968,7 @@ class LivePlayerChromeScreenTest {
         openRows()
         key(Key.ChannelUp)
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
-        assertTrue("the browser stays open", exists("player-channel-browser"))
+        assertTrue("the browser stays open", railOpen())
     }
 
     @Test fun channelUpTunesWithTheRailClosed() {
@@ -1933,8 +2025,26 @@ class LivePlayerChromeScreenTest {
         bitmap.recycle()
     }
 
+    private fun audioTrack(id: String, language: String, selected: Boolean) = Tracks.Group(TrackGroup(Format.Builder()
+        .setId(id).setSampleMimeType(MimeTypes.AUDIO_AAC).setLanguage(language).setChannelCount(2).build()),
+        false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(selected))
+
+    private fun subtitleTrack(id: String, language: String) = Tracks.Group(TrackGroup(Format.Builder()
+        .setId(id).setSampleMimeType(MimeTypes.APPLICATION_DVBSUBS).setLanguage(language).build()),
+        false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+
+    private fun publishTracks(tracks: Tracks) {
+        forcedTracks = tracks
+        compose.runOnIdle { playerListeners.toList().forEach { it.onTracksChanged(tracks) } }
+        // A few frames only: the controls' hide timer must not run out in between.
+        settleFrames()
+    }
+
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** The closed rail stays composed to peek, cleared from what accessibility reads; the merged tree respects that. */
+    private fun railOpen() = compose.onAllNodes(hasTestTag("player-channel-browser")).fetchSemanticsNodes().isNotEmpty()
 
     /** Tags of the nodes an accessibility service can activate, adjust or run custom actions on. */
     private fun actionable(): List<String> = compose.onAllNodes(SemanticsMatcher("actionable") { node ->

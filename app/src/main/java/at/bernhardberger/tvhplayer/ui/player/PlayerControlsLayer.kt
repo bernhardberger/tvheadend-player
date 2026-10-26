@@ -50,9 +50,12 @@ internal fun PlayerControlsLayer(
         visible = shown,
         // The fade in runs below, after the first frames. The exit fades here.
         enter = EnterTransition.None,
+        // An exit accelerates: a decelerating fade drops fast and then lingers faint as a ghost.
         exit = fadeOut(
-            if (modalVisible) tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)
-            else tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard)
+            tween(
+                if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs,
+                easing = PlayerMotion.StandardAccelerate,
+            )
         ),
         modifier = modifier,
     ) {
@@ -60,7 +63,7 @@ internal fun PlayerControlsLayer(
         val viewport = LocalPlayerPageScrim.current
         val fade = animateShown(
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
-            tween(if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
+            tween(if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs, easing = PlayerMotion.StandardAccelerate),
             "viewport-chrome",
         )
         androidx.compose.runtime.SideEffect { viewport?.alpha = { fade.value * appear.value } }

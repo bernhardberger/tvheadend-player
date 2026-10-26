@@ -52,13 +52,13 @@ class PlayerTopIdentityTest {
 
     @Test fun theIdentityStandsAtTheTopStartOnTheStripsAnchor() {
         chrome(PlayerChromeMode.CONTROLS)
-        val chip = bounds("player-top-identity-number")
+        val name = bounds("player-top-identity-name")
         val identity = bounds(PlayerTopIdentityTag)
         val clock = bounds("player-top-cluster")
         // The strip's chip starts on the grid margin and is centred on the clock's line, as this is.
         assertEquals("the chip starts on the grid margin", TvGridHorizontalMargin.value,
             identity.left + 24f, 0.5f)
-        assertTrue("the number sits in the chip", chip.left >= identity.left + 24f)
+        assertEquals("without a logo the name starts on the grid margin", TvGridHorizontalMargin.value, name.left, 0.5f)
         assertEquals("centred on the clock's line", clock.center.y, identity.center.y, 1f)
         assertTrue("it stands in the top band", identity.bottom < 120f)
         assertEquals("centred on the room's header band", TvGridVerticalMargin.value + 20f, identity.center.y, 1f)

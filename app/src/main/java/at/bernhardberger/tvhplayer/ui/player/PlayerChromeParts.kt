@@ -189,6 +189,9 @@ internal fun QuickZapTrayPreview(
     }
 }
 
+private const val QuickZapPreviewOutMs = 75
+private const val QuickZapPreviewInDelayMs = 50
+
 /**
  * Fades between the focused cards' previews: out quickly, in a little slower. Each side
  * renders its own [snapshot]; a new card fades, a changed programme of the same card updates
@@ -202,9 +205,13 @@ internal fun QuickZapTrayPreviewFrame(
 ) {
     AnimatedContent(
         targetState = snapshot,
+        // A short fade through: both sides are bottom-aligned texts of different lengths, so an
+        // overlap would stack two titles and descriptions. The new side waits for the old one.
         transitionSpec = {
-            (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard)) togetherWith
-                fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
+            (fadeIn(
+                tween(PlayerMotion.ShortMs, delayMillis = QuickZapPreviewInDelayMs, easing = PlayerMotion.EmphasizedDecelerate)
+            ) togetherWith
+                fadeOut(tween(QuickZapPreviewOutMs, easing = PlayerMotion.StandardAccelerate))).using(null)
         },
         contentKey = { it?.channelId },
         // Both sides sit on the cards while they overlap, as the slot itself does; a shorter

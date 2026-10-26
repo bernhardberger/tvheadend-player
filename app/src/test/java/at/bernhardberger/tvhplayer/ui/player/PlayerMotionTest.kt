@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import android.app.Application
@@ -795,7 +796,9 @@ class PlayerMotionTest {
         var fieldWidth = 0
         compose.setContent {
             view = LocalView.current
-            val content = PlayerChromeContent("", liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, false, 0, "Programme"))
+            // With a logo: without one the identity has no chip for the entry's chip to stand on.
+            val content = PlayerChromeContent("", liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, false, 0, "Programme"),
+                picon = ArtworkId.parse("imagecache/2"))
             TVHeadendPlayerTheme {
                 // The entry's three-digit field, in tabular digits.
                 val measurer = rememberTextMeasurer()
@@ -812,7 +815,7 @@ class PlayerMotionTest {
         compose.waitForIdle()
         fun identity(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
         val bounds = identity(PlayerTopIdentityTag)
-        val chip = identity("player-top-identity-number")
+        val chip = identity("player-top-identity-logo")
         val name = identity("player-top-identity-name")
         // The identity alone, as the entry's plate covers it: it gives way quickly and returns softly.
         val rest = ink(view, name)

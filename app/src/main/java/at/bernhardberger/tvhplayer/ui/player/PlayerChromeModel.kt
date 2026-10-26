@@ -129,4 +129,8 @@ internal data class PlayerChromeActions(
     val livePause: LivePauseAvailability? = null,
     /** Test tag of the control that takes focus back, such as after a panel closes. */
     val restoreFocus: String? = null,
+    val tracks: PlayerTrackButtons = PlayerTrackButtons(),
 )
+
+/** The action row's Audio and Subtitles buttons, each the current choice of its list; null leaves it out. */
+internal data class PlayerTrackButtons(val audio: String? = null, val subtitles: String? = null)

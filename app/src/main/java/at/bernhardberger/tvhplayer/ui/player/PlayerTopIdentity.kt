@@ -297,15 +297,14 @@ private fun IdentityContent(
 ) {
     val info = content.info
     val ink = if (focused) LocalContentColor.current else MaterialTheme.colorScheme.onSurface
-    Row(Modifier.padding(horizontal = IdentityInset, vertical = IdentityVerticalPadding),
+    // The chip's height even without one, so the identity keeps its place and size on every channel.
+    Row(Modifier.padding(horizontal = IdentityInset, vertical = IdentityVerticalPadding).heightIn(min = ChipHeight),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(IdentityTextGap)) {
-        Box(Modifier.size(ChipWidth, ChipHeight),
-            contentAlignment = Alignment.Center) {
-            if (content.picon != null) {
+        // Without a picon there is no logo slot: the name starts on the keyline and already carries
+        // the number, which a number chip would only repeat.
+        if (content.picon != null) {
+            Box(Modifier.size(ChipWidth, ChipHeight), contentAlignment = Alignment.Center) {
                 PiconBox(content.picon, Modifier.padding(4.dp).testTag("player-top-identity-logo"))
-            } else {
-                Text(info.channelNumber, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1, modifier = Modifier.testTag("player-top-identity-number"))
             }
         }
         Text(channelTitleText(info.channelNumber.toLongOrNull(), info.channelName),

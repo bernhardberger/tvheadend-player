@@ -25,6 +25,11 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.C
+import androidx.media3.common.Format
+import androidx.media3.common.MimeTypes
+import androidx.media3.common.TrackGroup
+import androidx.media3.common.Tracks
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
@@ -128,6 +133,8 @@ class PlaybackPanelCaptureTest {
         MENU("playback-options-overlay"),
         AUDIO_QUICK_LIST("playback-options-overlay"),
         SUBTITLES_QUICK_LIST("playback-options-overlay"),
+        // As the Subtitles button opens it on a programme with subtitles.
+        SUBTITLES_QUICK_LIST_TRACKS("playback-options-overlay"),
         RECORDING_MENU("playback-options-overlay"),
     }
 
@@ -135,6 +142,12 @@ class PlaybackPanelCaptureTest {
         lateinit var view: View
         var surface by mutableStateOf(Surface.MENU)
         val player = PlaybackOptionsTrackListTest.player(PlaybackOptionsTrackListTest.orfTracks())
+        val withSubtitles = PlaybackOptionsTrackListTest.player(Tracks(PlaybackOptionsTrackListTest.orfTracks().groups +
+            listOf("de", "en").map { language ->
+                Tracks.Group(TrackGroup("dvb-$language", Format.Builder().setId("dvb-$language")
+                    .setSampleMimeType(MimeTypes.APPLICATION_DVBSUBS).setLanguage(language).build()),
+                    false, intArrayOf(C.FORMAT_HANDLED), booleanArrayOf(false))
+            }))
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
                 TVHeadendPlayerTheme {
@@ -145,13 +158,14 @@ class PlaybackPanelCaptureTest {
                             {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                             recording = surface == Surface.RECORDING_MENU,
                         )
-                        Surface.AUDIO_QUICK_LIST, Surface.SUBTITLES_QUICK_LIST -> PlaybackOptionsSheet(
+                        Surface.AUDIO_QUICK_LIST, Surface.SUBTITLES_QUICK_LIST, Surface.SUBTITLES_QUICK_LIST_TRACKS -> PlaybackOptionsSheet(
                             if (surface == Surface.AUDIO_QUICK_LIST) {
                                 PlaybackOptionsPage.AUDIO
                             } else {
                                 PlaybackOptionsPage.SUBTITLES
                             },
-                            player, false, AspectRatioMode.FIT, false,
+                            if (surface == Surface.SUBTITLES_QUICK_LIST_TRACKS) withSubtitles else player,
+                            false, AspectRatioMode.FIT, false,
                             {}, {}, {}, audioAutomatic = true, onAutomaticAudio = {},
                             quickList = PlaybackQuickListSignals(),
                         )

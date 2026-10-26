@@ -2,12 +2,8 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.ui.Alignment
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -32,8 +28,8 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
-import at.bernhardberger.tvhplayer.ui.components.RowChangeMs
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
 import at.bernhardberger.tvhplayer.ui.components.RowDimAlpha
 import at.bernhardberger.tvhplayer.ui.components.RowHeaderQuietAlpha
@@ -69,10 +65,10 @@ internal fun PlayerChannelBrowserHint(
 ) {
     AnimatedContent(hasRecent && state.row == PlayerChannelRow.RECENT, modifier, label = "player-channel-hint",
         contentAlignment = Alignment.Center,
+        // A fade through: both labels sit centred in one place, so overlapping them would stack the
+        // text. It ends with the row change. Any direction selects the motion; none is on screen.
         transitionSpec = {
-            (fadeIn(RowChangeMotion) togetherWith
-                fadeOut(tween(RowChangeMs / 2, easing = PlayerMotion.StandardAccelerate)))
-                .using(SizeTransform(clip = false))
+            BrowseMotionPolicy.fadeThroughTransform(direction = 1).using(SizeTransform(clip = false))
         }) { belowFirst ->
         PlayerDownHint(if (belowFirst) channelsTitle else stringResource(R.string.details_back_to_tv), up = true)
     }
@@ -194,6 +190,7 @@ internal fun PlayerChannelBrowser(
                         color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(PlayerChannelRowTitleGap))
                     Box(Modifier.height(cardHeight).graphicsLayer { alpha = lerp(RowDimAlpha, 1f, emphasis()) }) {
+                        CompositionLocalProvider(LocalChannelPeekAnchor provides (row == current)) {
                         ChannelDrawer(
                             channels = if (row == PlayerChannelRow.ON_NOW) channels else recentChannels,
                             selectedId = state.collection(row).focusedId,
@@ -211,6 +208,7 @@ internal fun PlayerChannelBrowser(
                             } },
                             onCloseDrawer = { key -> if (owns(row)) onClose(key) },
                         )
+                        }
                     }
                 }
             }

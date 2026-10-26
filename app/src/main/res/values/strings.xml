@@ -129,7 +129,6 @@
     <string name="player_channel_number_none">No channel</string>
     <string name="player_shelf_playing">Playing</string>
     <string name="player_shelf_recording">Recording now</string>
-    <string name="player_info_unavailable_title">Program information unavailable</string>
     <string name="show_epg_menu_enabled">Show Guide menu: On</string>
     <string name="show_epg_menu_disabled">Show Guide menu: Off</string>
     <string name="port_htsp">HTSP port</string>
