@@ -484,6 +484,7 @@ fun RecordingPlayerScreen(
         } else when (currentBackAction()) {
             PlayerBackAction.DISMISS_CONFIRMATION -> Unit
             PlayerBackAction.CLOSE_INFO -> closeInfo()
+            PlayerBackAction.CLOSE_SCHEDULE -> Unit // Only the live player has a schedule.
             PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
                 quickList.restoreStart()
                 closeQuickList()

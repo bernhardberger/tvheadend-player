@@ -885,4 +885,14 @@
     <string name="error_305_reason">This recording can be played once it’s finished.</string>
     <string name="error_306_title">Can’t play this recording</string>
     <string name="error_306_reason">This device couldn’t play the recording.</string>
+    <string name="channel_schedule">Schedule</string>
+    <string name="channel_schedule_pane">Schedule, %1$s</string>
+    <string name="channel_schedule_loading">Loading schedule</string>
+    <string name="channel_schedule_empty">Tvheadend has no schedule for this channel.</string>
+    <string name="channel_schedule_offline">Showing the last known schedule. Reconnecting…</string>
+    <string name="channel_schedule_today">Today</string>
+    <string name="channel_schedule_tomorrow">Tomorrow</string>
+    <string name="channel_schedule_ended">Ended</string>
+    <string name="channel_schedule_gap">%1$s  No program information until %2$s</string>
+    <string name="channel_schedule_end">No program information after %1$s</string>
 </resources>

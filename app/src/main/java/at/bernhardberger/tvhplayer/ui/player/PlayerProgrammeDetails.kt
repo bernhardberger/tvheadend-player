@@ -67,6 +67,9 @@ internal fun LivePlayerProgrammeDetails(
     onClose: () -> Unit,
     onBackKeyDown: () -> Unit = {},
     framedArt: Boolean = false,
+    onContinueWatching: (() -> Unit)? = null,
+    showContextMenu: Boolean = false,
+    onShowDetails: () -> Unit = {},
 ) {
     // Freeze the watched-position programme at entry; the host refreshes its data by ID.
     val openingEvent = remember { event }
@@ -81,8 +84,8 @@ internal fun LivePlayerProgrammeDetails(
                 observation = observation,
                 currentObservation = currentObservation,
                 nowSecProvider = { latestNow.value },
-                showContextMenu = false,
-                onShowDetails = {},
+                showContextMenu = showContextMenu,
+                onShowDetails = onShowDetails,
                 mutations = mutations,
                 notices = notices,
                 mutationScope = mutationScope,
@@ -93,6 +96,7 @@ internal fun LivePlayerProgrammeDetails(
                 onClose = onClose,
                 settingsStore = settingsStore,
                 retainPlayerSnapshot = true,
+                onContinueWatching = onContinueWatching,
             )
         } else {
             ProgrammeDetailsPage(null, null, channel, nowSec,

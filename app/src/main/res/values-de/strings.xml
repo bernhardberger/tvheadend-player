@@ -717,4 +717,14 @@
     <string name="error_305_reason">Diese Aufnahme kann abgespielt werden, sobald sie fertig ist.</string>
     <string name="error_306_title">Aufnahme kann nicht abgespielt werden</string>
     <string name="error_306_reason">Dieses Gerät konnte die Aufnahme nicht abspielen.</string>
+    <string name="channel_schedule">Programm</string>
+    <string name="channel_schedule_pane">Programm, %1$s</string>
+    <string name="channel_schedule_loading">Programm wird geladen</string>
+    <string name="channel_schedule_empty">Tvheadend hat kein Programm für diesen Sender.</string>
+    <string name="channel_schedule_offline">Zuletzt bekanntes Programm. Verbindung wird wiederhergestellt…</string>
+    <string name="channel_schedule_today">Heute</string>
+    <string name="channel_schedule_tomorrow">Morgen</string>
+    <string name="channel_schedule_ended">Beendet</string>
+    <string name="channel_schedule_gap">%1$s  Keine Programminformationen bis %2$s</string>
+    <string name="channel_schedule_end">Keine Programminformationen nach %1$s</string>
 </resources>

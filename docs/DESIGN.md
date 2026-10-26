@@ -278,6 +278,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Centred prompt/confirmation card | `components/CentredDialog.kt` |
 | Guided step (setup flows) | `components/GuidedStep.kt` — full-screen guidance and step line left, fields or choices right, both a browse column wide with independent scrolling. The actions viewport ends at the 27 dp bottom safe line with a 24 dp fade while content continues below; focused scale stays above the fade. Settings uses the same full-screen viewport. `GuidedStepAction` is the Wide button's look on a clickable `Surface`, because TV Material 1.1's `WideButton` cannot grow to a wrapped or translated subtitle. Busy actions retain native disabled focus, dim their content and replace the icon with a spinner; they do not use the enabled focused fill. |
 | Details page | `components/ProgrammeDetailsPage.kt` |
+| Channel schedule column | `components/ChannelSchedule.kt`; player sheet and navigation in `player/PlayerChannelSchedule.kt` |
 | Quick-zap cards | `player/QuickZapPreview.kt` |
 
 New screens use these shared patterns; a private copy of a size, timing or alpha
@@ -1121,6 +1122,21 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   key and keeps the track. Menu opens the full panel.
 
 ### Context menus and dialogs (accepted 2026-10-15)
+
+The live player's Schedule action opens a 480dp right sheet using the playback
+options frame, without dimming the remaining picture. GUIDE toggles it where
+the activity receives that key; appliance entry routing is unchanged. The
+recordings player has no Schedule action. The reusable column owns no tuning or
+playback: its caller supplies events, viewer position, recording marks and actions.
+Rows keep an 80×45dp artwork slot (quiet surface when absent), the shared playing
+and recording marks, orange viewer progress and cyan on-air progress. Day tabs
+follow focus above one continuous list; gaps and day headings are not focusable.
+OK opens the shared details page; Menu/hold OK opens the shared context menu.
+Back restores the source row, then the Schedule action. A fresh visit starts at
+the viewer's programme. The panel pauses controls auto-hide; channel keys and
+number entry dismiss it. Loading holds focus until rows arrive; empty data offers
+Close; stale data remains visible with Retry. Only history overlapping the known
+timeshift window is listed; this display estimate is not a seek grant.
 
 - **Context menu** (hold OK or Menu on any card; the player's channel rail opens
   the programme details on a held OK instead, see Quick-zap cards): full-screen, opaque app

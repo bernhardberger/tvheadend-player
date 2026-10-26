@@ -32,7 +32,7 @@ private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
 
 /** Actions Back from the rail returns to: every action-row button the rail can be entered from. */
 private val RailReturnActions = setOf(
-    "player-pause", "player-stop", "player-audio", "player-subtitles", "player-info", "player-settings",
+    "player-pause", "player-stop", "player-audio", "player-subtitles", "player-info", "player-schedule", "player-settings",
 )
 
 @Stable
@@ -56,6 +56,68 @@ internal class LivePlayerLayerState(
     var infoOpen by mutableStateOf(false)
         private set
 
+    var scheduleOpen by mutableStateOf(false)
+        private set
+    var scheduleDetails by mutableStateOf<at.bernhardberger.tvheadend.sdk.core.EpgEvent?>(null)
+        private set
+
+    fun showScheduleDetails(event: at.bernhardberger.tvheadend.sdk.core.EpgEvent?) {
+        scheduleDetails = event
+    }
+
+    fun openSchedule() {
+        infoOpen = false
+        recordingConfirmationVisible = false
+        scheduleDetails = null
+        channelDrawerOpen = false
+        optionsPage = null
+        optionsQuickList = false
+        chrome.yieldToLayer(controls = false)
+        scheduleOpen = true
+    }
+
+    fun closeSchedule(showControls: Boolean = true) {
+        scheduleOpen = false
+        scheduleDetails = null
+        if (showControls) {
+            restoreChannelAction = "player-schedule"
+            showControls()
+        } else chrome.hideControls()
+    }
+
+    /** Own GUIDE's whole cycle; navigation in the sheet must not become a player seek/reveal. */
+    fun handleScheduleKey(event: KeyEvent): Boolean? {
+        val code = event.nativeKeyEvent.keyCode
+        if (scheduleOpen && playbackSuppressesRevealingKey(revealingKeyCode, code)) {
+            if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(code)
+            return true
+        }
+        if (code == AndroidKeyEvent.KEYCODE_GUIDE && !infoOpen && optionsPage == null) {
+            if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                beginOpeningKeyCycle(code)
+                if (scheduleOpen) closeSchedule() else openSchedule()
+            }
+            if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(code)
+            return true
+        }
+        if (!scheduleOpen) return null
+        if (at.bernhardberger.tvhplayer.core.ChannelNavigation.digitForKeyCode(code) != null ||
+            at.bernhardberger.tvhplayer.core.ChannelNavigation.directionForKeyCode(code) != null) {
+            if (event.type == KeyEventType.KeyDown) closeSchedule(showControls = false)
+            return null
+        }
+        // Details owns Back (including its nested pages and recording confirmations).
+        if (code == AndroidKeyEvent.KEYCODE_BACK && scheduleDetails == null) {
+            if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+                beginOpeningKeyCycle(code)
+                closeSchedule()
+            }
+            return true
+        }
+        // Let the sheet own navigation/Menu, and leave unhandled system keys (e.g. volume) alone.
+        return false
+    }
+
     var infoFromRail by mutableStateOf(false)
         private set
     /** The rail stays expanded while its page steps down to the schedule and back. */
@@ -75,7 +137,7 @@ internal class LivePlayerLayerState(
         scope = scope,
         autoHideTimeoutMillis = autoHideTimeoutMillis,
         bannerTimeoutMillis = bannerTimeoutMillis,
-        isCovered = { channelDrawerOpen || infoOpen || optionsPage != null },
+        isCovered = { channelDrawerOpen || infoOpen || scheduleOpen || optionsPage != null },
     )
 
     private var lastFocusedAction: String? = null
@@ -101,6 +163,7 @@ internal class LivePlayerLayerState(
     }
 
     fun onChannelTuneRequested() {
+        if (scheduleOpen) closeSchedule(showControls = false)
         if (chrome.hidden) {
             chrome.peekBanner()
             return
@@ -320,6 +383,7 @@ internal class LivePlayerLayerState(
         seekPreviewPhase = seekPreviewPhase,
         controlsVisible = chrome.controlsVisible,
         statsEnabled = statsVisible,
+        scheduleVisible = scheduleOpen,
     )
 
     fun dispose() {

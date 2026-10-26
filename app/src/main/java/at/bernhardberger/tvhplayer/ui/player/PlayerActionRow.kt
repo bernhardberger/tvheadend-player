@@ -61,6 +61,9 @@ internal fun PlayerActionRow(
     pauseUnavailableReason: String? = null,
     onInfo: () -> Unit = {},
     infoFocus: FocusRequester? = null,
+    onSchedule: (() -> Unit)? = null,
+    scheduleAvailable: Boolean = true,
+    scheduleFocus: FocusRequester? = null,
     /** Audio and Subtitles stand beside Info only while their list has a choice to make. */
     tracks: PlayerTrackButtons = PlayerTrackButtons(),
     onTrackList: (PlaybackOptionsPage) -> Unit = {},
@@ -85,6 +88,7 @@ internal fun PlayerActionRow(
                 { onTrackList(PlaybackOptionsPage.SUBTITLES) }, subtitlesFocus, it)
         },
         PlayerAction("player-info", stringResource(R.string.details_program), R.drawable.ic_info, onInfo, infoFocus),
+        onSchedule?.let { PlayerAction("player-schedule", stringResource(R.string.channel_schedule), R.drawable.ic_event_list, it, scheduleFocus) },
         PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
     // Playback actions stand at the start; track lists, details and Settings at the end.
@@ -118,7 +122,7 @@ internal fun PlayerActionRow(
                         ),
                         modifier = actionModifier.size(TvIconButtonSize),
                     ) {
-                        val glyphModifier = if (tag == "player-pause" && pauseUnavailableReason != null) {
+                        val glyphModifier = if (tag == "player-pause" && pauseUnavailableReason != null || tag == "player-schedule" && !scheduleAvailable) {
                             Modifier.graphicsLayer { alpha = PauseUnavailableIconAlpha }
                         } else Modifier
                         Icon(painterResource(icon), contentDescription = label, modifier = glyphModifier.size(IconButtonDefaults.MediumIconSize))

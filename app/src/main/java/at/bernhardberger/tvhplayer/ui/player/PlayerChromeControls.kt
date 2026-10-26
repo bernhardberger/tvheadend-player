@@ -100,6 +100,8 @@ internal fun PlayerChromeControls(
     /** Retained trial caller input; the passive top identity does not handle keys. */
     onChannelZap: ((direction: Int, keyTimeMs: Long, repeat: Boolean) -> Unit)? = null,
     downHint: String? = null,
+    onSchedule: (() -> Unit)? = null,
+    scheduleAvailable: Boolean = true,
     /**
      * The passive top identity, drawn over the header. Legacy focus slots receive no focus target.
      */
@@ -114,6 +116,7 @@ internal fun PlayerChromeControls(
     val restoreFocus = actions.restoreFocus
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
+    val scheduleFocus = remember { FocusRequester() }
     val audioFocus = remember { FocusRequester() }
     val subtitlesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
@@ -170,6 +173,7 @@ internal fun PlayerChromeControls(
             val target = when (restoreFocus) {
                 null -> null
                 "player-info" -> infoFocus
+                "player-schedule" -> scheduleFocus
                 // A track button gone with its choice hands focus to its neighbour, Info.
                 "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
                 "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
@@ -214,6 +218,7 @@ internal fun PlayerChromeControls(
         "player-stop" -> stopFocus
         "player-settings" -> settingsFocus
         "player-info" -> infoFocus
+        "player-schedule" -> scheduleFocus
         "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
         "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> pauseFocus
@@ -403,6 +408,9 @@ internal fun PlayerChromeControls(
             onStop = onStop,
             stopFocus = stopFocus,
             onInfo = onInfo,
+            onSchedule = onSchedule,
+            scheduleAvailable = scheduleAvailable,
+            scheduleFocus = scheduleFocus,
             infoFocus = infoFocus,
             tracks = actions.tracks,
             onTrackList = onTrackList,

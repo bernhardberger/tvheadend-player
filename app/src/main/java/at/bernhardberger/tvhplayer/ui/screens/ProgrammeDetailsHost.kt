@@ -50,6 +50,7 @@ internal fun ProgrammeDetailsHost(
     returnFocusRequester: FocusRequester? = null,
     settingsStore: UiSettingsStore = koinInject(),
     retainPlayerSnapshot: Boolean = false,
+    onContinueWatching: (() -> Unit)? = null,
 ) {
     val closeBehindPlayer = rememberCloseBehindPlayer()
     val entryPending = rememberPlayerEntryPending()
@@ -176,6 +177,10 @@ internal fun ProgrammeDetailsHost(
             goLive?.let { mutationScope.launch { it() } }
         }
         if (action == BrowseContextAction.CONTINUE_WATCHING || action == BrowseContextAction.WATCH_LIVE) {
+            if (retainPlayerSnapshot && onContinueWatching != null) {
+                onContinueWatching()
+                return@action
+            }
             if (retainPlayerSnapshot) closeAnimated() else programme.channelId?.let(currentObservation()::channel)?.let {
                 closeBehindPlayer(close)
                 onPlay(it.id, it.name.orEmpty())

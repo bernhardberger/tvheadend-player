@@ -81,6 +81,8 @@ internal fun PlayerChrome(
     onActionFocused: (String) -> Unit = {},
     /** Opens the Audio or Subtitles quick list from its button, shown per [PlayerChromeActions.tracks]. */
     onTrackList: (PlaybackOptionsPage) -> Unit = {},
+    onSchedule: (() -> Unit)? = null,
+    scheduleAvailable: Boolean = true,
     /** Any control that takes focus, the timeline included: where focus returns after number entry. */
     onControlFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
@@ -167,6 +169,8 @@ internal fun PlayerChrome(
                 onSeek = onSeek,
                 onStop = onStop,
                 onInfo = onInfo,
+                onSchedule = onSchedule,
+                scheduleAvailable = scheduleAvailable,
                 onOptions = onOptions,
                 onTrackList = onTrackList,
                 onInteraction = onInteraction,

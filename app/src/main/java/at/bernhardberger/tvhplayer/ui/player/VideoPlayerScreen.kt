@@ -1320,6 +1320,7 @@ fun VideoPlayerScreen(
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
             PlayerBackAction.CLOSE_INFO ->
                 closeInfo()
+            PlayerBackAction.CLOSE_SCHEDULE -> layerState.closeSchedule()
             PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
                 layerState.quickList.restoreStart()
                 layerState.closeQuickList()
@@ -1374,6 +1375,7 @@ fun VideoPlayerScreen(
             .onPreviewKeyEvent { event ->
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
+                layerState.handleScheduleKey(event)?.let { return@onPreviewKeyEvent it }
                 if (layerState.infoOpen) {
                     if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
                         if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
@@ -1628,7 +1630,7 @@ fun VideoPlayerScreen(
                 tracks = trackButtons,
             ),
             entry = layerState.chrome.controlsEntry,
-            panelOpen = layerState.optionsPage != null || layerState.infoOpen,
+            panelOpen = layerState.optionsPage != null || layerState.infoOpen || layerState.scheduleOpen,
             numberEntryShown = numberEntry.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
@@ -1643,6 +1645,11 @@ fun VideoPlayerScreen(
             onInfo = {
                 openInfo()
             },
+            onSchedule = {
+                if (timelineState.seekPending) timelineState.commitPendingSeek()
+                layerState.openSchedule()
+            },
+            scheduleAvailable = observation.epgSnapshotForDisplay?.events?.any { it.channelId == channelId && it.stop.epochSeconds > nowSec } == true,
             onOptions = {
                 restoreOptionsFocus = false
                 layerState.openOptions()
@@ -1724,6 +1731,12 @@ fun VideoPlayerScreen(
 
             },
         ) { }
+        if (layerState.scheduleOpen) PlayerChannelSchedule(
+            layerState, channelId, currentChannel, observation, { session.observation.value }, nowSec, effectiveTimeshiftState,
+            dvrMutationActions, notices, scope, uiSettingsStore, onReconnect,
+            onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
+            onPlayRecording = onPlayRecording, onShowGuide = onShowGuide,
+        )
         if (layerState.infoOpen && foregroundLayer == PlayerForegroundLayer.INFO) {
             LivePlayerProgrammeDetails(
                 event = detailsBaseEvent, channel = detailsChannel, observation = observation,
