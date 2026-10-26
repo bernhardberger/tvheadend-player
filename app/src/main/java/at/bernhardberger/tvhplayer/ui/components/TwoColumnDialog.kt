@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.activity.compose.BackHandler
-import androidx.annotation.DrawableRes
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -17,7 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.paneTitle
@@ -118,7 +116,7 @@ internal fun TwoColumnDialogButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    @DrawableRes icon: Int? = null,
+    icon: (@Composable () -> Unit)? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     WideButton(onClick = onClick, modifier = modifier.width(TwoColumnActionWidth),
@@ -132,5 +130,5 @@ internal fun TwoColumnDialogButton(
             }
         },
         title = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        icon = icon?.let { resource -> { Icon(painterResource(resource), null, Modifier.size(24.dp)) } })
+        icon = icon)
 }

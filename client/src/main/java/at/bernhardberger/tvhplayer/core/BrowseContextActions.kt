@@ -16,7 +16,8 @@ enum class BrowseContextAction {
 /**
  * One order for every channel and programme menu, so a held OK always lands on Watch.
  * [recordingAdmission] is the SDK's admission of [recording]: an ended programme it admits plays
- * its recording right after Watch, as on the details page.
+ * its recording right after Watch, as on the details page. The [playing] programme or channel
+ * offers Continue watching in place of Watch, and [behindLive] adds Watch live right after it.
  */
 fun channelContextActions(
     event: EpgEvent?,
@@ -24,8 +25,13 @@ fun channelContextActions(
     recording: DvrEntry?,
     recordingAdmission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
+    playing: Boolean = false,
+    behindLive: Boolean = false,
 ): List<BrowseContextAction> = buildList {
-    add(BrowseContextAction.WATCH)
+    if (playing) {
+        add(BrowseContextAction.CONTINUE_WATCHING)
+        if (behindLive) add(BrowseContextAction.WATCH_LIVE)
+    } else add(BrowseContextAction.WATCH)
     if (event != null) {
         val actions = programmeActions(event, nowSec, recording, canModifyRecordings = canModifyRecordings,
             recordingAdmission = recordingAdmission)
@@ -43,22 +49,32 @@ fun channelContextActions(
     add(BrowseContextAction.SHOW_GUIDE)
 }
 
-/** [admission] is the SDK's admission of [entry] from the observation it was read from, null without a session. */
+/**
+ * [admission] is the SDK's admission of [entry] from the observation it was read from, null without a session.
+ * The [playing] recording offers Continue watching in place of Watch, Resume or Play.
+ */
 @OptIn(ExperimentalTvheadendApi::class)
 fun recordingContextActions(
     entry: DvrEntry,
     admission: RecordingPlaybackAdmission?,
     canModifyRecordings: Boolean,
+    playing: Boolean = false,
 ): List<BrowseContextAction> = buildList {
+    if (playing) add(BrowseContextAction.CONTINUE_WATCHING)
     if (recordingPlaybackOffered(admission)) {
         val resumable = offeredResumePosition(admission) != null
-        if (admission is RecordingPlaybackAdmission.Growing) {
-            add(BrowseContextAction.WATCH)
-            if (resumable) add(BrowseContextAction.START_OVER)
-        } else if (resumable) {
-            add(BrowseContextAction.RESUME)
-            add(BrowseContextAction.START_OVER)
-        } else add(BrowseContextAction.PLAY)
+        when {
+            playing -> if (resumable) add(BrowseContextAction.START_OVER)
+            admission is RecordingPlaybackAdmission.Growing -> {
+                add(BrowseContextAction.WATCH)
+                if (resumable) add(BrowseContextAction.START_OVER)
+            }
+            resumable -> {
+                add(BrowseContextAction.RESUME)
+                add(BrowseContextAction.START_OVER)
+            }
+            else -> add(BrowseContextAction.PLAY)
+        }
     }
     add(BrowseContextAction.DETAILS)
     recordingWatchStateAction(entry, admission, canModifyRecordings)?.let(::add)

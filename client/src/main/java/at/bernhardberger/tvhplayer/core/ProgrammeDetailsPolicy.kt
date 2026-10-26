@@ -60,14 +60,9 @@ fun recordingDetailsActions(
     playing: Boolean = false,
     nowSec: Long,
 ): List<BrowseContextAction> = buildList {
-    if (playing) {
-        add(BrowseContextAction.CONTINUE_WATCHING)
-    }
     if (!playing && recording.state == DvrEntryState.SCHEDULED && canWatchChannel) add(BrowseContextAction.WATCH)
-    addAll(recordingContextActions(recording, admission, canModifyRecordings).filter {
-        it != BrowseContextAction.DETAILS && (!playing || it !in listOf(
-            BrowseContextAction.WATCH, BrowseContextAction.RESUME, BrowseContextAction.PLAY))
-    })
+    addAll(recordingContextActions(recording, admission, canModifyRecordings, playing)
+        .filter { it != BrowseContextAction.DETAILS })
     if (canWatchChannel && recording.state in listOf(DvrEntryState.SCHEDULED, DvrEntryState.RECORDING,
             DvrEntryState.RECORDING_ERROR) && recording.stop?.epochSeconds?.let { it > nowSec } == true) {
         add(BrowseContextAction.SHOW_GUIDE)

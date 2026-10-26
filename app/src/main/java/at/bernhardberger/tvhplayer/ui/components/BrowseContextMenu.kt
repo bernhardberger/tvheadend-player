@@ -6,11 +6,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -67,6 +70,7 @@ internal fun BrowseContextMenu(
     programDetailsLabel: Boolean = false,
     backEnabled: Boolean = true,
     recordingState: DvrEntryState? = null,
+    /** The playing item's mark, drawn as Continue watching's icon. */
     playbackIndicator: ChannelPlaybackIndicator = ChannelPlaybackIndicator.NONE,
     artwork: @Composable () -> Unit,
 ) {
@@ -94,10 +98,7 @@ internal fun BrowseContextMenu(
                         color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     if (subtitle.isNotBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(Modifier.heightIn(min = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ChannelPlaybackMarker(playbackIndicator)
-                        RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
-                    }
+                    RecordingBadge(recordingState, Modifier.testTag("browse-context-recording"))
                     if (description.isNotBlank()) Text(description, style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
@@ -115,10 +116,20 @@ internal fun BrowseContextMenu(
                             up = actions.getOrNull(index - 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             down = actions.getOrNull(index + 1)?.let(requesters::get) ?: FocusRequester.Cancel
                             left = FocusRequester.Cancel; right = FocusRequester.Cancel
-                        }, action.icon())
+                        }) {
+                    BrowseContextActionIcon(action, playbackIndicator.takeIf {
+                        action == BrowseContextAction.CONTINUE_WATCHING } ?: ChannelPlaybackIndicator.NONE, 24.dp)
+                }
             }
         }
     }
+}
+
+/** An action's icon; the playing item's [indicator] mark replaces it on the action that returns to that item. */
+@Composable
+internal fun BrowseContextActionIcon(action: BrowseContextAction, indicator: ChannelPlaybackIndicator, size: Dp) {
+    if (indicator.isPlayingItem) ChannelPlaybackMarker(indicator, size = size)
+    else Icon(painterResource(action.icon()), null, Modifier.size(size))
 }
 
 internal fun BrowseContextAction.label(watchChannel: Boolean): Int = when (this) {

@@ -67,6 +67,38 @@ class BrowseContextActionsTest {
             channelContextActions(event, 50, completed, admission(completed), true))
     }
 
+    @Test fun watchedChannelContinuesWatchingFirstAndOffersLiveOnlyBehindLive() {
+        // At the live edge.
+        assertEquals(listOf(CONTINUE_WATCHING, DETAILS, RECORD, SHOW_GUIDE),
+            channelContextActions(event, 150, null, null, true, playing = true))
+        assertEquals(listOf(CONTINUE_WATCHING, SHOW_GUIDE), channelContextActions(null, 150, null, null, true, playing = true))
+        // Behind live.
+        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, DETAILS, RECORD, SHOW_GUIDE),
+            channelContextActions(event, 150, null, null, true, playing = true, behindLive = true))
+        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, SHOW_GUIDE),
+            channelContextActions(null, 150, null, null, true, playing = true, behindLive = true))
+        // An ended programme at the viewer's position still plays its recording after Continue watching.
+        val completed = recording(DvrEntryState.COMPLETED)
+        assertEquals(listOf(CONTINUE_WATCHING, WATCH_LIVE, PLAY, DETAILS, SHOW_GUIDE),
+            channelContextActions(event, 200, completed, admission(completed), true, playing = true, behindLive = true))
+    }
+
+    @Test fun otherChannelsAndProgrammesKeepWatch() {
+        assertEquals(listOf(WATCH, DETAILS, RECORD, SHOW_GUIDE), channelContextActions(event, 150, null, null, true))
+        assertEquals(listOf(WATCH, SHOW_GUIDE), channelContextActions(null, 150, null, null, true))
+    }
+
+    @Test fun playingRecordingContinuesWatchingInPlaceOfPlaybackAndNeverOffersLive() {
+        assertEquals(listOf(CONTINUE_WATCHING, DETAILS, MARK_WATCHED, DELETE),
+            actions(recording(DvrEntryState.COMPLETED), playing = true))
+        assertEquals(listOf(CONTINUE_WATCHING, START_OVER, DETAILS, MARK_WATCHED, DELETE),
+            actions(recording(DvrEntryState.COMPLETED, 20), playing = true))
+        assertEquals(listOf(CONTINUE_WATCHING, START_OVER, DETAILS, STOP),
+            actions(recording(DvrEntryState.RECORDING, 20, listOf(file())), playing = true))
+        assertEquals(listOf(CONTINUE_WATCHING, DETAILS, STOP),
+            actions(recording(DvrEntryState.RECORDING, files = listOf(file())), playing = true))
+    }
+
     @Test fun completedRecordingsOfferResumeOnlyWithProgress() {
         assertEquals(listOf(PLAY, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED)))
         assertEquals(listOf(RESUME, START_OVER, DETAILS, MARK_WATCHED, DELETE), actions(recording(DvrEntryState.COMPLETED, 20)))
@@ -210,6 +242,7 @@ class BrowseContextActionsTest {
         entry: DvrEntry,
         canModify: Boolean = true,
         capability: RecordingProgressCapability = RecordingProgressCapability.SUPPORTED,
+        playing: Boolean = false,
     ) = recordingContextActions(entry, SessionObservation.create(recordingProgressCapability = capability)
-        .recordingPlaybackAdmission(entry), canModify)
+        .recordingPlaybackAdmission(entry), canModify, playing)
 }

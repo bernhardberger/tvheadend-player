@@ -32,7 +32,10 @@ internal fun ProgrammeContextMenu(
     // The recording plays only as details would play it: admitted, with a session and a player route.
     val admission = recording?.takeIf { canPlayRecording && currentSession != null }
         ?.let(observation::recordingPlaybackAdmission)
-    val actions = channelContextActions(event, nowSec, recording, admission, canModify)
+    // Continue watching and Watch live are decided as on the details page.
+    val actions = channelContextActions(event, nowSec, recording, admission, canModify,
+        playing = currentSession != null && programmeWatched(event, nowSec),
+        behindLive = currentSession != null && programmeBehindLive(event))
     val indicator = watchingIndicator(event, nowSec)
     val showGuide = BrowseContextAction.SHOW_GUIDE in programmeDetailsActions(event, nowSec, recording, null,
         canModify, channel != null && currentSession != null)
@@ -47,7 +50,7 @@ internal fun ProgrammeContextMenu(
         watchChannel = !event.isRunning(nowSec), programDetailsLabel = true,
         modifier = modifier, onAction = { onAction(event, it) }, onClose = onClose, backEnabled = backEnabled,
         recordingState = recording?.state,
-        playbackIndicator = indicator,
+        playbackIndicator = channelWatchingIndicator(event.channelId),
         artwork = {
             // The menu shows its pictures with the session it was opened with.
             ProvideArtworkSession(currentSession, observation) {

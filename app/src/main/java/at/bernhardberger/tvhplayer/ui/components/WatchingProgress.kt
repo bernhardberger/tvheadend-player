@@ -69,6 +69,25 @@ internal fun liveViewerPosition(channelId: ChannelId?): LiveViewerPosition? {
 @Composable
 internal fun watchingBehindLive(channelId: ChannelId?): Boolean = liveViewerPosition(channelId)?.behindLive == true
 
+/** Whether going live from [event]'s watched channel is a different place, and a player runtime can take it there. */
+@Composable
+internal fun programmeBehindLive(event: EpgEvent): Boolean = LocalWatchingGoLive.current != null &&
+    event.channelId != null && event.channelId == LocalWatchingChannel.current && watchingBehindLive(event.channelId)
+
+/**
+ * Whether Continue watching returns to [event]: the programme at the viewer's position on the watched
+ * channel, as its marks show it, and while behind live also the programme on air there.
+ */
+@Composable
+internal fun programmeWatched(event: EpgEvent, nowSec: Long): Boolean =
+    watchingIndicator(event, nowSec) != ChannelPlaybackIndicator.NONE || programmeBehindLive(event) && event.isRunning(nowSec)
+
+/** The watched channel's mark wherever its viewer is, for Continue watching on any of its programmes. */
+@Composable
+internal fun channelWatchingIndicator(channelId: ChannelId?): ChannelPlaybackIndicator =
+    if (channelId != null && channelId == LocalWatchingChannel.current) LocalWatchingIndicator.current
+    else ChannelPlaybackIndicator.NONE
+
 /** Until the first sample, or without time-shift, the viewer can only be at live. */
 @Composable
 internal fun liveViewerEpochSec(channelId: ChannelId?, nowSec: Long): Long? {

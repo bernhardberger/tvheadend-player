@@ -99,16 +99,12 @@ internal fun ProgrammeDetailsHost(
     val canModify = capability != null && displayObservation.dvrState is DvrRepositoryState.Current &&
         (displayObservation.sessionState as? SessionState.Ready)?.capabilities?.dvrWrite == CapabilityAccess.ALLOWED
     val currentMutation = currentDvrMutation(pending, sessionObservation, observation)
-    // Playing is the programme at the viewer's position on the watched channel, as its marks show it.
-    // Behind live, the programme on air there also returns to the viewer, and live is offered beside it.
-    val watchingChannel = LocalWatchingChannel.current
+    // Behind live, live is offered beside Continue watching; the menus decide this the same way.
     val goLive = LocalWatchingGoLive.current
     @Composable
-    fun isBehindLive(event: EpgEvent) = capability != null && goLive != null && event.channelId != null &&
-        event.channelId == watchingChannel && watchingBehindLive(event.channelId)
+    fun isBehindLive(event: EpgEvent) = capability != null && programmeBehindLive(event)
     @Composable
-    fun isPlaying(event: EpgEvent) = capability != null && watchingIndicator(event, nowSec) != ChannelPlaybackIndicator.NONE ||
-        isBehindLive(event) && event.isRunning(nowSec)
+    fun isPlaying(event: EpgEvent) = capability != null && programmeWatched(event, nowSec)
     val actions = programmeDetailsActions(event, nowSec, recording,
         recording?.let(displayObservation::recordingPlaybackAdmission), canModify,
         channel != null, liveProgramme = live != null, playing = isPlaying(event), behindLive = isBehindLive(event))
