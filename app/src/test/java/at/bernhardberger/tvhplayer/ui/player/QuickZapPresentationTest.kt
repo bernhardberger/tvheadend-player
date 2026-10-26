@@ -734,6 +734,36 @@ class QuickZapPresentationTest {
         assertEquals(opening, card(9).fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
     }
 
+    @Test fun unvisitedPeekFollowsAPlayingChannelChangeBeforeFirstEntry() {
+        content(peek = true)
+        compose.runOnIdle { playing = ChannelId(9) }
+        compose.waitForIdle()
+        assertTrue(isFocused("player-pause"))
+        card(9).assertDoesNotExist()
+        // Read the passive row's geometry before opening can scroll it.
+        val peeking = compose.onNodeWithTag("player-channel-card-9", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.center.x
+        key(Key.DirectionDown)
+        card(9).assertIsFocused()
+        assertEquals("the peek already shows the entry card at its opening position",
+            peeking, card(9).fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
+        assertEquals(0, picks)
+    }
+
+    @Test fun visitedPeekKeepsItsBrowsingFocusAfterAClosedChannelChange() {
+        playing = ChannelId(1)
+        content(peek = true)
+        key(Key.DirectionDown)
+        key(Key.DirectionRight)
+        card(2).assertIsFocused()
+        key(Key.Back)
+        compose.runOnIdle { playing = ChannelId(9) }
+        compose.waitForIdle()
+        key(Key.DirectionDown)
+        card(2).assertIsFocused()
+        assertEquals(0, picks)
+    }
+
     private fun isFocused(tag: String) = runCatching { compose.onNodeWithTag(tag).assertIsFocused() }.isSuccess
 
     private fun content(

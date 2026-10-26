@@ -95,7 +95,8 @@ fun ChannelDrawer(
     val localListState = rememberLazyListState(initialFirstVisibleItemIndex = ids.indexOf(initialId).coerceAtLeast(0))
     val listState = rememberTabListState(browserState?.listState ?: localListState)
     // A replaced collection (a new session) starts over rather than keep the old one's focus.
-    var focusedId by remember(browserState) { mutableStateOf(initialId) }
+    // Until a card actually takes focus, the peek and first entry follow playback.
+    var focusedId by remember(browserState) { mutableStateOf(browserState?.focusedId) }
     var entered by remember(browserState) { mutableStateOf(false) }
     var focusedCatalog by remember(browserState) { mutableStateOf(emptyList<ChannelId>()) }
     var observedPlayingId by remember { mutableStateOf(playingChannelId) }
@@ -134,7 +135,7 @@ fun ChannelDrawer(
                 snapshotFlow { peek.resting }.first { it }
                 snapshotFlow { listState.layoutInfo }
                     .first { it.totalItemsCount == ids.size && it.visibleItemsInfo.isNotEmpty() }
-                if (browserState == null || listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) {
+                if (focusedId == null || browserState == null || listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) {
                     listState.scrollToItem(ids.indexOf(target))
                 }
             }
@@ -175,8 +176,6 @@ fun ChannelDrawer(
         }
         if (entered && focusedId in ids && focusedCatalog == ids) return@LaunchedEffect
         val target = entryId ?: ids.first()
-        focusedId = target
-        browserState?.focusedId = target
         // Once the rail is laid out, the anchor moves to the start keyline.
         withFrameNanos { }
         snapshotFlow { listState.layoutInfo }
