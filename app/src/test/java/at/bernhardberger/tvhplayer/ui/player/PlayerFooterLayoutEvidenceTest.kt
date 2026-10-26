@@ -665,6 +665,7 @@ class PlayerFooterLayoutEvidenceTest {
     private fun missingEpgAxis(locale: String, fontScale: Float) {
         var paused by mutableStateOf(false)
         var preview by mutableStateOf(false)
+        var settled by mutableStateOf(false)
         var standalone by mutableStateOf(false)
         var pinned by mutableStateOf(false)
         var known by mutableStateOf(true)
@@ -686,7 +687,7 @@ class PlayerFooterLayoutEvidenceTest {
                                 else it.copy(positionKnown = known)
                             },
                             timeshiftPosition = at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(sample),
-                            paused = paused, previewing = preview, onSeekTo = {}, stepDeltaMs = -10_000L,
+                            paused = paused, previewing = preview, onSeekTo = {}, stepDeltaMs = -10_000L, stepSettled = settled,
                             modifier = Modifier.testTag("sampled-seekbar"),
                         )
                     }
@@ -713,8 +714,8 @@ class PlayerFooterLayoutEvidenceTest {
         capture("$locale-font$fontScale-missing-epg-full-preview", focus = "none")
         compose.runOnIdle { standalone = true }
         assertEquals(2f / 3, bounds("player-timeline-fill").width / bounds("player-timeline-track").width, 0.005f)
-        // The step is spoken once stepping rests.
-        compose.mainClock.advanceTimeBy(500)
+        // The step is spoken once it has been dispatched.
+        compose.runOnIdle { settled = true }
         compose.waitForIdle()
         compose.onNodeWithTag("timeshift-seek-preview").assert(androidx.compose.ui.test.SemanticsMatcher("sampled thirty seconds behind") {
             it.config[SemanticsProperties.ContentDescription].joinToString().contains("0:30")
@@ -1075,12 +1076,13 @@ private fun QuickStepBanner(
     decision: TimeshiftSeekDecision,
     modifier: Modifier = Modifier,
     programmeWindow: ProgrammeWindow? = null,
+    settled: Boolean = true,
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     PlayerChrome(
         mode = PlayerChromeMode.BANNER_STEP,
         content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "Documentary", programmeWindow?.event, null, false, 1_800, "")),
-        timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow),
+        timeline = PlayerChromeTimeline.Live(state, nowSec = 1_800, step = decision, programmeWindow = programmeWindow, stepSettled = settled),
         actions = PlayerChromeActions(active = false),
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
         modifier = modifier,

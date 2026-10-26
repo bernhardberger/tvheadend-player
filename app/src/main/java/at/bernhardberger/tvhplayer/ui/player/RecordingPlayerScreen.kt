@@ -656,6 +656,7 @@ fun RecordingPlayerScreen(
                     canSeek = timelineState.canSeek,
                     targetMs = timelineState.pendingTargetMs,
                     originMs = timelineState.pendingOriginMs,
+                    stepSettled = timelineState.seekDispatched,
                     markers = markers,
                     markerRevision = markerRevision,
                     motionKey = recordingId,

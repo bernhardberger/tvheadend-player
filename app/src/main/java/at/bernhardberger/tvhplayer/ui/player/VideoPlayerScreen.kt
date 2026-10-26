@@ -1583,6 +1583,7 @@ fun VideoPlayerScreen(
                 previewing = visibleSeekPreview != null,
                 step = bannerSeekPreview?.decision,
                 stepDeltaMs = visibleSeekPreview?.decision?.deltaMs,
+                stepSettled = visibleSeekPreview?.dispatched == true,
                 liveStart = liveStart,
                 liveAvailable = !channelUnavailable,
                 feedback = timelineState.feedback,

@@ -549,6 +549,10 @@ internal class RecordingTimelinePresentationState(
     val seekPending: Boolean
         get() = pendingTargetMs != null
 
+    /** The pending target's seek has been dispatched; false while stepping still collects. */
+    val seekDispatched: Boolean
+        get() = pendingTargetMs != null && pendingDispatched
+
     fun seekPreviewPhase(controlsVisible: Boolean): PlayerSeekPreviewPhase = when {
         pendingTargetMs == null -> PlayerSeekPreviewPhase.NONE
         pendingDispatched -> PlayerSeekPreviewPhase.DISPATCHED

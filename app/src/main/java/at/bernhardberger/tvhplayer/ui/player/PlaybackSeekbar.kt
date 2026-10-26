@@ -63,6 +63,8 @@ fun PlaybackSeekbar(
     playbackPositionMs: Long? = null,
     /** The pending or dispatched step's net movement since it began; gives the readout its direction. */
     stepDeltaMs: Long? = null,
+    /** The step's seek has been dispatched: only then the step is spoken, once. */
+    stepSettled: Boolean = false,
     /** The state cell, the end after the bar (replacing the end label) and live TV's distance behind live. */
     barStatus: PlayerBarStatus? = null,
     /** The clock time the timeshift buffer starts at; the leading label without programme clocks. */
@@ -147,7 +149,8 @@ fun PlaybackSeekbar(
         else -> null
     }
     // While stepping the spoken state leads with the step (offset and target, as the Banner preview
-    // says it) once stepping rests; until then the last spoken state stays, so a held key is not re-announced.
+    // says it) once the step is dispatched. Until then the spoken value stays as it was just before
+    // the step began, and after it as the last settled step said it, so a held key is not re-announced.
     val stepDescription = when {
         readout == null -> null
         sampledPosition != null -> liveStepDescription(
@@ -162,7 +165,6 @@ fun PlaybackSeekbar(
             stringResource(R.string.recording_known_duration, formatPlaybackDuration(range.displayEndMs)),
         )
     }
-    val settledStep = rememberSettledStep(stepDescription)
     val plainDescription = when {
         sampledPosition?.atLiveEdge == true -> stringResource(
             R.string.player_seekbar_timeshift_live_description,
@@ -186,11 +188,8 @@ fun PlaybackSeekbar(
         )
         else -> error("Unsupported seekbar domain")
     }
-    val description = settledStep ?: plainDescription
-    val positionDescription = if (range.positionEstimated || range.displayEndMs > range.endMs) {
-        "${stringResource(R.string.player_timing_estimated)}. $description"
-    } else description
-    val stateDescription = if (paused) "${stringResource(R.string.player_paused)}. $positionDescription" else positionDescription
+    val estimatedPrefix = stringResource(R.string.player_timing_estimated).takeIf { range.positionEstimated || range.displayEndMs > range.endMs }
+    val pausedPrefix = stringResource(R.string.player_paused).takeIf { paused }
     val positionLabel = when {
         sampledPosition != null -> timeshiftEndpointLabel(
             false, (range.displayEndMs - range.displayStartMs).coerceAtLeast(0),
@@ -240,6 +239,21 @@ fun PlaybackSeekbar(
     val clockLabels = programmeWindow?.let { programmeWindowClockLabels(it) }
     val schedule = schedule?.takeIf { !previewing && programmeWindow == null && range.domain == SeekbarDomain.TIMESHIFT }
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
+    fun spokenValue(description: String): String {
+        val position = if (estimatedPrefix != null) "$estimatedPrefix. $description" else description
+        val state = if (pausedPrefix != null) "$pausedPrefix. $position" else position
+        return programmeWindow?.let {
+            "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $state" +
+                if (!it.targetAvailable) " $unavailableTarget" else ""
+        } ?: state
+    }
+    // The whole value, metadata included, holds still during a burst; the buffer's length is read when the step settles.
+    val spokenDescription = rememberSteppedSpoken(
+        plain = spokenValue(plainDescription),
+        stepKey = readout?.let { "$stepDeltaMs|${it.target}" },
+        settled = stepSettled,
+        stepped = spokenValue(stepDescription ?: plainDescription),
+    )
     val windowFeedback = feedback ?: programmeWindow?.event?.title?.takeIf { previewing && it.isNotBlank() }
         PlayerTimelineBlock(
             progress = schedule?.fraction ?: displayedProgress,
@@ -300,10 +314,7 @@ fun PlaybackSeekbar(
                     }
                 }
                 .semantics {
-                    contentDescription = programmeWindow?.let {
-                        "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $stateDescription" +
-                            if (!it.targetAvailable) " $unavailableTarget" else ""
-                    } ?: stateDescription
+                    contentDescription = spokenDescription
                     progressBarRangeInfo = ProgressBarRangeInfo(accessibilityProgress, 0f..1f)
                     if (!collapsed) customActions = accessibilityActions
                 }

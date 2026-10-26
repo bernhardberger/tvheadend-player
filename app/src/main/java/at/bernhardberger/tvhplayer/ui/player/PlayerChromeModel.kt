@@ -68,6 +68,8 @@ internal sealed interface PlayerChromeTimeline {
         val step: TimeshiftSeekDecision? = null,
         /** The pending or dispatched seek's net movement since its step sequence began. */
         val stepDeltaMs: Long? = null,
+        /** The step's seek has been dispatched: stepping has rested, so its step may be spoken. */
+        val stepSettled: Boolean = false,
         /**
          * A live start that has had no pause or timeshift command since, such as right after a zap: it
          * plays the live edge, whether its timing is known yet or not.
@@ -101,6 +103,8 @@ internal sealed interface PlayerChromeTimeline {
         val targetMs: Long? = null,
         /** Where the pending step started, for the announced delta. */
         val originMs: Long? = null,
+        /** The step's seek has been dispatched: stepping has rested, so its step may be spoken. */
+        val stepSettled: Boolean = false,
         val markers: List<Long> = emptyList(),
         val markerRevision: Long = 0L,
         val motionKey: Any? = null,

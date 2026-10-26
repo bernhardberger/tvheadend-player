@@ -37,6 +37,8 @@ internal fun TimeshiftSeekPreviewTimeline(
     barStatus: PlayerBarStatus? = null,
     /** The wall-clock second now; with [barStatus] the buffer's start clock is the leading label without programme clocks. */
     nowSec: Long? = null,
+    /** The step has been dispatched: only then it is spoken, once, with its final value. */
+    settled: Boolean = false,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -64,14 +66,19 @@ internal fun TimeshiftSeekPreviewTimeline(
     )
     val description = liveStepDescription(decision.deltaMs, readout, targetClock != null, behindLiveLabel, bufferStartDescription)
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
-    val spoken = rememberSettledStep((programmeWindow?.let {
-        "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
-            if (!it.targetAvailable) " $unavailableTarget" else ""
-    } ?: description) + feedback?.let { ". $it" }.orEmpty()).orEmpty()
+    // The buffer's length ticks; it is read when the step settles and does not announce the step again.
+    val spoken = rememberSettledStep(
+        key = "${decision.deltaMs}|${readout.target}|$feedback",
+        settled = settled,
+        text = (programmeWindow?.let {
+            "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
+                if (!it.targetAvailable) " $unavailableTarget" else ""
+        } ?: description) + feedback?.let { ". $it" }.orEmpty(),
+    ).orEmpty()
 
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
         .clearAndSetSemantics {
-            // Spoken once stepping rests, with the final value; the label shows every step.
+            // Spoken once the step is dispatched, with the final value; the label shows every step.
             contentDescription = spoken
             liveRegion = LiveRegionMode.Polite
         }) {

@@ -651,6 +651,7 @@ class PlayerTimelineTruthfulnessTest {
                     originMs = 45_000L,
                     durationMs = C.TIME_UNSET,
                     growing = growing,
+                    stepSettled = true,
                 )
             }
         }
@@ -660,10 +661,12 @@ class PlayerTimelineTruthfulnessTest {
                 "30 seconds forward, target 1:15. Still recording."
             )
 
+        // The recording length is read when the step is spoken; a later change of
+        // the status does not announce the same step again.
         composeRule.runOnIdle { growing = false }
         composeRule.onNodeWithTag("recording-seek-preview")
             .assertContentDescriptionEquals(
-                "30 seconds forward, target 1:15. Duration unavailable."
+                "30 seconds forward, target 1:15. Still recording."
             )
     }
 

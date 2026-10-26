@@ -335,6 +335,7 @@ internal fun PlayerChromeControls(
                 },
                 timeshiftPosition = requireNotNull(timelinePosition),
                 stepDeltaMs = live.stepDeltaMs,
+                stepSettled = live.stepSettled,
                 programmeWindow = programmeWindow,
                 previewing = previewing,
                 collapsed = false,
