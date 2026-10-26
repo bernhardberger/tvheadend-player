@@ -271,6 +271,7 @@ Paths below are relative to `app/src/main/java/at/bernhardberger/tvhplayer/ui/`.
 | Progress bar | `components/ProgressStrip.kt` |
 | Channel title | `components/ChannelTitle.kt` — `channelTitleText` |
 | Picon | `components/PiconBox.kt` — dimmed TV icon while loading, normal-strength TV icon when there is no logo or it fails |
+| Now-playing plate | `player/NowPlayingStrip.kt` — `NowPlayingPlate`: 48×27 picon plate (channel number without a logo) with the 2dp viewer-position strip, shared by the player strip and the rail's playing slot |
 | Image load fade | `../images/TvheadendArtworkLoader.kt` — the shared loader fades every logo and programme picture in over 200 ms when actually loaded; memory-cache hits show at once |
 | Reading box | `components/ProgrammeDetailsLayout.kt` — `ProgrammeDetailsFullDescription` |
 | Context menu | `components/BrowseContextMenu.kt` |
@@ -320,6 +321,7 @@ Component commit model is set by the component:
 |---|---|
 | Page-scope tabs | focus — content below slides with tab direction |
 | Standard navigation drawer | focus — destination changes as focus moves |
+| Drawer playing slot | OK — focusing it never navigates or previews |
 | Lists, grids, choice rows | OK |
 
 Pressed feedback needs the component to receive the key: parents do not consume
@@ -378,6 +380,21 @@ Anatomy per Material for TV / design kit:
   plus the branded wordmark when expanded. It is decorative: non-focusable,
   non-interactive, never first focus, outside Back. The wordmark announces the
   app name once and reveals/hides with the same transitions as item labels.
+- **Playing slot:** while live TV or a recording plays behind browse, the
+  playing channel replaces the brand inside the same 56dp section; nothing else
+  moves and nothing is reserved when nothing plays. Collapsed it shows the
+  now-playing plate on the icon axis with the viewer-position strip; a 20dp disc
+  on the plate's top-right corner marks paused (pause bars) or tuning and
+  reconnecting (spinner). The plate keeps full emphasis in the collapsed rail;
+  only tuning dims the picon and drops the strip; reconnecting freezes it. Expanded adds the title (programme at the viewer
+  position, the recording title, or the channel name without guide data) and
+  `State • Channel`. It is a library drawer item and the first stop above the
+  destinations: Up from the first destination reaches it, Down returns, drawer
+  entry still focuses the current destination. Focusing it does nothing; OK
+  returns to the full-screen player for that target without retuning. It is one
+  merged accessibility node that announces only discrete state changes. When
+  playback stops, ends or fails the brand returns; if the slot had focus, focus
+  moves to the current destination. The *Stop* browse setting never shows it.
 - Destinations (Channels, Guide, Recordings) are centred between the top section
   and the bottom section; Settings is the bottom section. Nothing in the rail
   moves when it expands: rows keep their positions and icons and the brand mark

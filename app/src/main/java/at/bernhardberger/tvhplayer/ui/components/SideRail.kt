@@ -9,15 +9,18 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -28,7 +31,11 @@ import androidx.compose.runtime.IntState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,25 +66,40 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTag
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerState
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.Icon
+import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.NavigationDrawerItemColors
 import androidx.tv.material3.NavigationDrawerItemDefaults
+import androidx.tv.material3.NavigationDrawerScope
 import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
+import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.BuildConfig
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
+import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlate
+import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateHeight
+import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateWidth
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
 import at.bernhardberger.tvhplayer.core.browseShellBackAction
@@ -234,6 +256,11 @@ internal fun SideRail(
     rootBackPriority: Boolean = false,
     connectionDegraded: Boolean = false,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
+    /** What plays behind browse; it takes the mark's place and returns to the player. */
+    nowPlaying: RailNowPlaying? = null,
+    programmeAt: (ChannelId, Long) -> EpgEvent? = { _, _ -> null },
+    onOpenNowPlaying: () -> Unit = {},
+    nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
     val channelsLabel = stringResource(R.string.nav_channels)
@@ -351,6 +378,18 @@ internal fun SideRail(
         }
     }
     SideEffect { onBackHandlerChanged(handleBrowseBack) }
+    val nowPlayingFocus = remember { FocusRequester() }
+    var nowPlayingFocused by remember { mutableStateOf(false) }
+    // Read while composing the slot's removal, before it detaches and drops its focus.
+    val nowPlayingFocusLost = remember(nowPlaying == null) {
+        nowPlaying == null && Snapshot.withoutReadObservation { nowPlayingFocused }
+    }
+    LaunchedEffect(nowPlayingFocusLost) {
+        if (nowPlayingFocusLost) {
+            nowPlayingFocused = false
+            (itemFocus[drawerRoute] ?: itemFocus[items.firstOrNull()?.route])?.requestFocus()
+        }
+    }
 
     BoxWithConstraints(
         modifier = modifier.fillMaxSize(),
@@ -437,7 +476,23 @@ internal fun SideRail(
                         .selectableGroup(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    DrawerBrandHeader(drawerValue)
+                    if (nowPlaying == null) {
+                        DrawerBrandHeader(drawerValue)
+                    } else {
+                        DrawerNowPlaying(
+                            nowPlaying = nowPlaying,
+                            colors = drawerColors,
+                            programmeAt = programmeAt,
+                            nowSecProvider = nowSecProvider,
+                            onOpen = onOpenNowPlaying,
+                            modifier = Modifier
+                                .withinDrawerSheet(fullWidth, visibleWidthPx)
+                                .focusProperties { canFocus = !detailsOpen && !modalOpen }
+                                .focusRequester(nowPlayingFocus)
+                                // Focus only shows where the player is; it never navigates or previews.
+                                .onFocusChanged { nowPlayingFocused = it.isFocused },
+                        )
+                    }
 
                     Spacer(Modifier.weight(1f))
 
@@ -566,6 +621,7 @@ internal fun SideRail(
  * widths on `animateDpAsState`'s default spring, as the library item does, so the
  * mark reveals with the sheet instead of widening it ahead of the items. The mark
  * itself never moves; while the drawer is inactive it is dimmed like the items.
+ * While something plays behind browse, [DrawerNowPlaying] takes its place in the same box.
  */
 @Composable
 private fun DrawerBrandHeader(drawerValue: DrawerValue) {
@@ -616,6 +672,168 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
             )
         }
     }
+}
+
+private val NowPlayingDiscSize = 20.dp
+private val NowPlayingDiscMarkSize = 12.dp
+private val NowPlayingPlateGap = 12.dp
+
+/** The labels start [NowPlayingPlateGap] after the plate, which reaches past the destinations' icons. */
+private val NowPlayingTextIndent =
+    ItemIconCenter + NowPlayingPlateWidth / 2 + NowPlayingPlateGap - ExpandedItemLabelStart
+
+/**
+ * The top section while something plays behind browse: the playing channel's plate on the mark's
+ * axis, and with the drawer open what plays and where the viewer is. It is the first stop above the
+ * destinations and returns to the player; focusing it changes nothing else. The plate keeps full
+ * opacity in the closed rail, as the picture it stands for does.
+ *
+ * Positions are read where they are drawn: the strip and the behind-live line follow the viewer each
+ * second, while the item itself recomposes only when the programme or the state changes.
+ */
+@Composable
+private fun NavigationDrawerScope.DrawerNowPlaying(
+    nowPlaying: RailNowPlaying,
+    colors: NavigationDrawerItemColors,
+    programmeAt: (ChannelId, Long) -> EpgEvent?,
+    nowSecProvider: () -> Long,
+    onOpen: () -> Unit,
+    modifier: Modifier,
+) = HoldWatching(nowPlaying.reconnecting) {
+    // A reconnect keeps the strip and title where the viewer was until playback resumes or ends.
+    val indicator = LocalWatchingIndicator.current
+    val liveChannel = (nowPlaying.target as? AppPlaybackTarget.Live)?.channelId
+    val watchingLive = liveChannel != null && LocalWatchingTarget.current == nowPlaying.target &&
+        indicator.isPlayingItem
+    val livePosition = LocalLivePosition.current
+    // liveViewerPosition's contract, held as state so its per-second samples stay out of this scope.
+    val viewer = remember(livePosition, liveChannel, watchingLive) {
+        derivedStateOf { livePosition?.value?.takeIf { watchingLive && it.channelId == liveChannel } }
+    }
+    val nowSec = rememberDetailsEpochSeconds(nowSecProvider)
+    val currentProgrammeAt by rememberUpdatedState(programmeAt)
+    val programme by remember(viewer, liveChannel, nowSec) {
+        derivedStateOf { liveChannel?.let { currentProgrammeAt(it, viewer.value?.epochSec ?: nowSec) } }
+    }
+    val behindLive by remember(viewer) { derivedStateOf { viewer.value?.behindLive == true } }
+    val status = railPlaybackStatus(nowPlaying, indicator, behindLive)
+    val channel = channelTitleText(nowPlaying.channelNumber, nowPlaying.channelName)
+    val title = nowPlaying.recordingTitle ?: programme?.title
+    val statusLabel = railStatusLabel(status, behindLiveMinutes = null, LocalResources.current)
+    val description = if (title != null) {
+        stringResource(R.string.rail_now_playing_description, title, channel, statusLabel)
+    } else {
+        stringResource(R.string.rail_now_playing_description_channel, channel, statusLabel)
+    }
+    Box(Modifier.height(BrandHeaderHeight).testTag("global-drawer-now-playing")) {
+        NavigationDrawerItem(
+            selected = false,
+            onClick = onOpen,
+            leadingContent = {
+                PinnedRailIcon {
+                    // The plate is wider than an icon and keeps the icons' centre.
+                    Box(Modifier.size(NavigationDrawerItemDefaults.IconSize), contentAlignment = Alignment.Center) {
+                        NowPlayingPlate(
+                            picon = nowPlaying.picon,
+                            channelNumber = nowPlaying.channelNumber?.toString(),
+                            modifier = Modifier
+                                .requiredSize(NowPlayingPlateWidth, NowPlayingPlateHeight)
+                                // Its per-second strip stays out of the announced item.
+                                .clearAndSetSemantics { testTag = "global-drawer-now-playing-plate" },
+                            // A tune has no picture yet; the mark waits at the inactive items' ratio.
+                            contentAlpha = if (status == RailPlaybackStatus.TUNING) inactiveContentAlpha() else 1f,
+                        ) { NowPlayingRailStrip(nowPlaying, programme, status, nowSec) }
+                    }
+                }
+            },
+            supportingContent = {
+                NowPlayingStatusLine(status, viewer, nowSecProvider, channel.takeIf { title != null })
+            },
+            colors = colors,
+            modifier = modifier
+                .height(BrandHeaderHeight)
+                .semantics {
+                    contentDescription = description
+                    liveRegion = LiveRegionMode.Polite
+                }
+                .testTag("global-drawer-now-playing-item"),
+        ) {
+            Text(
+                title ?: channel,
+                Modifier.padding(start = NowPlayingTextIndent).clearAndSetSemantics {},
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        val discMark = when (status) {
+            RailPlaybackStatus.PAUSED -> ChannelPlaybackIndicator.PAUSED
+            RailPlaybackStatus.TUNING, RailPlaybackStatus.RECONNECTING -> ChannelPlaybackIndicator.TUNING
+            else -> null
+        }
+        if (discMark != null) {
+            // Centred on the plate's top trailing corner, above the item so the closed pill cannot clip it;
+            // a focused item raises its own z-index, so the disc stays above that too.
+            Box(
+                Modifier
+                    .zIndex(1f)
+                    .offset(
+                        x = ItemIconCenter + NowPlayingPlateWidth / 2 - NowPlayingDiscSize / 2,
+                        y = (BrandHeaderHeight - NowPlayingPlateHeight - NowPlayingDiscSize) / 2,
+                    )
+                    .size(NowPlayingDiscSize)
+                    .background(TvSurfaceColors.containerHighest, CircleShape)
+                    .clearAndSetSemantics { testTag = "global-drawer-now-playing-disc" },
+                contentAlignment = Alignment.Center,
+            ) {
+                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+                    ChannelPlaybackMarker(discMark, size = NowPlayingDiscMarkSize, announceState = false)
+                }
+            }
+        }
+    }
+}
+
+/** The plate's strip at the viewer's position; a tune has no position yet. */
+@Composable
+private fun BoxScope.NowPlayingRailStrip(
+    nowPlaying: RailNowPlaying,
+    programme: EpgEvent?,
+    status: RailPlaybackStatus,
+    nowSec: Long,
+) {
+    if (status == RailPlaybackStatus.TUNING) return
+    val progress = when (val target = nowPlaying.target) {
+        is AppPlaybackTarget.Recording -> recordingViewerPosition(target.recordingId)?.fraction
+        is AppPlaybackTarget.Live -> programmeProgress(programme, nowSec)
+    } ?: return
+    ProgressStrip(
+        progress = progress,
+        modifier = Modifier
+            .align(Alignment.BottomCenter)
+            .fillMaxWidth(),
+        height = 2.dp,
+        color = progressColor(watching = true),
+    )
+}
+
+/** Line two: the state, and the channel when the title is a programme or recording. */
+@Composable
+private fun NowPlayingStatusLine(
+    status: RailPlaybackStatus,
+    viewer: State<LiveViewerPosition?>,
+    nowSecProvider: () -> Long,
+    channel: String?,
+) {
+    val minutes = if (status == RailPlaybackStatus.BEHIND_LIVE) {
+        railBehindLiveMinutes(viewer.value?.epochSec, nowSecProvider())
+    } else null
+    Text(
+        railStatusLine(status, minutes, channel, LocalResources.current),
+        Modifier.padding(start = NowPlayingTextIndent).clearAndSetSemantics {},
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
 }
 
 private val AppDestination.testTag: String
