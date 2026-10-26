@@ -112,7 +112,7 @@ class ChannelGuideDeviceAcceptanceTest {
 
     @Test
     fun configuredConnectionUsesRedactedFieldPresenceSemantics() {
-        val generalLabel = composeRule.activity.getString(R.string.settings_general_nav)
+        val generalLabel = composeRule.activity.getString(R.string.settings_general)
         val connectionLabel = composeRule.activity.getString(R.string.settings_connection_nav)
 
         enterBrowseShell()
@@ -207,7 +207,7 @@ class ChannelGuideDeviceAcceptanceTest {
         const val DEVICE_TIMEOUT_MILLIS = 30_000L
         const val MAX_BROWSE_BACK_ACTIONS = 2
         const val SETTINGS_NAVIGATION_STEPS = 3
-        const val CONNECTION_NAVIGATION_STEPS = 2
+        const val CONNECTION_NAVIGATION_STEPS = 1
 
         val hasConfiguredFieldValue = SemanticsMatcher("has a configured field value") { node ->
             node.config.contains(SemanticsProperties.EditableText) &&

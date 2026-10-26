@@ -14,15 +14,15 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
-import androidx.compose.ui.test.assertIsNotDisplayed
 import androidx.compose.ui.test.assertIsNotSelected
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
@@ -62,16 +62,11 @@ class SettingsPlayerTest(private val language: String) {
         }
         val context = composeRule.activity.createConfigurationContext(configuration)
         val player = context.getString(R.string.settings_player)
-        val category = context.getString(R.string.settings_player_nav)
         val autoplay = context.getString(R.string.auto_start_playback)
-        val timeshift = context.getString(R.string.timeshift_setting)
-        val refreshRate = context.getString(R.string.refresh_rate_matching_setting)
-        val tunneling = context.getString(R.string.tunneling_setting)
-        val passthrough = context.getString(R.string.audio_passthrough_setting)
-        val audioRows = listOf(R.string.audio_language_first, R.string.audio_format,
-            R.string.audio_description, R.string.subtitle_language).map(context::getString)
-        val keepChannel = context.getString(R.string.keep_channel_setting)
-        val startupBuffer = context.getString(R.string.startup_buffer_setting)
+        val profileRow = context.getString(R.string.profile)
+        val pageRows = listOf(R.string.auto_start_playback, R.string.timeshift_setting, R.string.keep_channel_setting,
+            R.string.profile, R.string.startup_buffer_setting, R.string.refresh_rate_matching_setting,
+            R.string.tunneling_setting).map(context::getString)
         val serverDefault = context.getString(R.string.profile_server_default)
         val profiles = List(24) { index ->
             StreamProfile(
@@ -96,7 +91,6 @@ class SettingsPlayerTest(private val language: String) {
         )
         val selections = mutableListOf<StreamProfileId?>()
         var switchCalls = 0
-        val navigations = mutableListOf<SettingsSection>()
         composeRule.setContent {
             CompositionLocalProvider(
                 LocalContext provides context,
@@ -105,55 +99,51 @@ class SettingsPlayerTest(private val language: String) {
             ) {
                 TVHeadendPlayerTheme {
                     Box(Modifier.size(960.dp, 540.dp)) {
+                        val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
                         SettingsScreenNavigation(
-                            navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name),
+                            navigation = navigation,
                             levels = listOf(settingsRootLevel(), settingsPlayerLevel(
                                 ui = ui,
                                 onAutoStartPlaybackChanged = { switchCalls++ },
                                 onTimeshiftEnabledChanged = { switchCalls++ },
                                 onTunnelingEnabledChanged = { switchCalls++ },
-                                onAudioPassthroughEnabledChanged = { switchCalls++ },
-                                onAudioDescriptionChanged = { switchCalls++ },
-                                onProfileSelected = {
-                                    selections += it
-                                    ui = ui.copy(selectedProfileId = it)
-                                },
-                            )),
+                            ), settingsStreamProfileLevel(ui) {
+                                selections += it
+                                ui = ui.copy(selectedProfileId = it)
+                                navigation.pop()
+                            }),
                         )
                     }
                 }
             }
         }
 
-        val categoryNode = composeRule.onNode(hasText(category) and hasClickAction())
+        val categoryNode = composeRule.onNode(hasText(player) and hasClickAction())
         val heading = composeRule.onNode(hasText(player) and !hasClickAction())
         categoryNode.assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         val headingBounds = heading.fetchSemanticsNode().boundsInRoot
-        composeRule.onNodeWithText(autoplay).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
-        composeRule.onNodeWithText(profiles.last().name).assertIsNotDisplayed()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(refreshRate).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(tunneling).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
-        audioRows.forEach { label ->
+        focused(autoplay).assertIsDisplayed()
+        pageRows.drop(1).forEach { label ->
             press(Key.DirectionDown)
-            composeRule.onNodeWithText(label).assertIsFocused().assertIsDisplayed()
+            focused(label).assertIsDisplayed()
         }
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(keepChannel).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(startupBuffer).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionDown)
-        composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsNotSelected()
+        pageRows.dropLast(1).asReversed().forEach { label ->
+            press(Key.DirectionUp)
+            focused(label).assertIsDisplayed()
+        }
+
+        // The profile row opens its own page on the saved profile.
+        repeat(pageRows.indexOf(profileRow)) { press(Key.DirectionDown) }
+        focused(profileRow).assertExists()
+        press(Key.DirectionCenter)
+        focused(profiles.first().name).assertIsSelected()
+        press(Key.DirectionUp)
+        focused(serverDefault).assertIsNotSelected()
 
         // Assert every choice, not just a jump/scroll directly to the last profile.
         profiles.forEachIndexed { index, profile ->
             press(Key.DirectionDown)
-            val row = composeRule.onNodeWithText(profile.name).assertIsFocused().assertIsDisplayed()
+            val row = focused(profile.name).assertIsDisplayed()
             if (index == 0) row.assertIsSelected() else row.assertIsNotSelected()
         }
         composeRule.runOnIdle {
@@ -161,51 +151,26 @@ class SettingsPlayerTest(private val language: String) {
             assertEquals(0, switchCalls)
         }
         press(Key.DirectionCenter)
-        composeRule.onNodeWithText(profiles.last().name).assertIsFocused().assertIsSelected()
+        focused(profileRow).assert(hasText(profiles.last().name)).assertIsDisplayed()
         heading.assertIsDisplayed()
         assertEquals(headingBounds, heading.fetchSemanticsNode().boundsInRoot)
 
-        profiles.dropLast(1).asReversed().forEach { profile ->
-            press(Key.DirectionUp)
-            composeRule.onNodeWithText(profile.name)
-                .assertIsFocused().assertIsDisplayed().assertIsNotSelected()
-        }
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(serverDefault).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(startupBuffer).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(keepChannel).assertIsFocused().assertIsDisplayed()
-        audioRows.asReversed().forEach { label ->
-            press(Key.DirectionUp)
-            composeRule.onNodeWithText(label).assertIsFocused().assertIsDisplayed()
-        }
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(passthrough).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(tunneling).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(refreshRate).assertIsFocused().assertIsDisplayed()
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(timeshift).assertIsFocused().assertIsDisplayed()
-
-        press(Key.DirectionUp)
-        composeRule.onNodeWithText(autoplay).assertIsFocused().assertIsDisplayed()
-
-        // Left must also leave the scrolled bottom through the existing category owner.
-        repeat(profiles.size + 6 + audioRows.size + 1) { press(Key.DirectionDown) }
-        composeRule.onNodeWithText(profiles.last().name)
-            .assertIsFocused().assertIsDisplayed().assertIsSelected()
+        press(Key.DirectionCenter)
+        focused(profiles.last().name).assertIsDisplayed().assertIsSelected()
+        // Left leaves the scrolled bottom the same way Back does, then the page through the category owner.
+        press(Key.DirectionLeft)
+        focused(profileRow).assertExists()
         press(Key.DirectionLeft)
         categoryNode.assertIsFocused()
         press(Key.DirectionRight)
-        composeRule.onNodeWithText(autoplay).assertIsFocused().assertIsDisplayed()
+        focused(autoplay).assertIsDisplayed()
         composeRule.runOnIdle {
             assertEquals(listOf(profiles.last().id), selections)
             assertEquals(0, switchCalls)
-            assertEquals(emptyList<SettingsSection>(), navigations)
         }
     }
+
+    private fun focused(label: String) = composeRule.onNode(isFocused() and hasText(label))
 
     private fun press(key: Key) {
         composeRule.onRoot().performKeyInput { pressKey(key) }

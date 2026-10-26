@@ -479,6 +479,12 @@ Accepted 2026-09-15; static design in Penpot page
   descriptions of a submenu. Section headings group rows. Every row that opens
   a level ends in a chevron, with or without a leading icon, as Recordings
   folders do (revised 2026-10-23).
+- Row titles wrap to a second line before they ellipsize. A choice is a row
+  that opens its own level, with the current value as its second line; help for
+  each option is that option's second line, and a switch's explanation is its
+  own second line. On the root, only Connection shows a value: the first line of
+  its overview status. A choice that cannot apply yet stays focusable but
+  disabled, never opens, and says why as its second line (revised 2026-10-26).
 - Up/Down browse; Right/OK enter a level; Left/Back return one level and restore
   the parent's item and viewport. Holding Left repeats that one level per key
   repeat, as AOSP TvSettings does (held Left at the root goes on to the drawer);

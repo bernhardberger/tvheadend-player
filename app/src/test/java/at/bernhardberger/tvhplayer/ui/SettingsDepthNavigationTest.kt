@@ -255,10 +255,141 @@ class SettingsDepthNavigationTest {
             }
         }
         compose.runOnIdle {
-            val sections = listOf(SettingsSection.GENERAL, SettingsSection.CHANNEL_TAGS,
-                SettingsSection.CONNECTION, SettingsSection.PLAYER).map { it.name }
+            val sections = listOf(SettingsSection.GENERAL, SettingsSection.CONNECTION,
+                SettingsSection.CHANNEL_TAGS, SettingsSection.PLAYER, SettingsSection.AUDIO).map { it.name }
             assertEquals(sections + ABOUT_LEVEL, play.rows.map { it.item.id })
             assertEquals(sections + SettingsSection.APPLIANCE.name + ABOUT_LEVEL, appliance.rows.map { it.item.id })
+        }
+    }
+
+    /** A Settings link names its section; the root opens with that section's row focused, wherever it sits now. */
+    @Test fun everySectionLinkFocusesItsOwnRootRow() {
+        var section by mutableStateOf(SettingsSection.GENERAL)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                key(section) {
+                    SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, section.name),
+                        listOf(settingsRootLevel(applianceBuild = true)))
+                }
+            }
+        }
+        val labels = mapOf(SettingsSection.GENERAL to "General", SettingsSection.CONNECTION to "Connection",
+            SettingsSection.CHANNEL_TAGS to "Channel groups", SettingsSection.PLAYER to "Playback",
+            SettingsSection.AUDIO to "Audio & subtitles", SettingsSection.APPLIANCE to "Appliance")
+        assertEquals(SettingsSection.entries.toSet(), labels.keys)
+        for ((linked, label) in labels) {
+            compose.runOnIdle { section = linked }
+            compose.waitForIdle()
+            compose.onNode(isFocused() and hasText(label)).assertExists()
+        }
+    }
+
+    @Test fun connectionRootRowShowsOnlyTheStatusTitle() {
+        lateinit var status: ConnectionOverviewStatus
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                status = connectionOverviewStatus(
+                    at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult.anonymous("offline.invalid", 9982),
+                    at.bernhardberger.tvhplayer.viewmodels.AppConnectionPresentation(at.bernhardberger.tvhplayer.core.ConnectionUiState.Error(
+                        at.bernhardberger.tvhplayer.data.ConnectionFailureKind.UNREACHABLE,
+                        at.bernhardberger.tvheadend.sdk.core.SessionRecoveryDisposition.EXPLICIT_RETRY)))
+                SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name),
+                    listOf(settingsRootLevel(applianceBuild = false, connectionStatus = status.title)))
+            }
+        }
+        val reason = requireNotNull(status.reason) // The overview page shows both lines.
+        compose.onNode(isFocused() and hasText("Connection") and hasText(status.title)).assertExists()
+        compose.onNodeWithText(reason).assertDoesNotExist()
+        // No other root row carries a value.
+        compose.onNodeWithText("General").assert(hasText("General") and !hasText(status.title))
+    }
+
+    @Test fun keepTunedWaitsForTimeshiftAndNeverOpensWhileOff() {
+        var ui by mutableStateOf(SettingsPlayerUiState(timeshiftEnabled = false, keepChannelMinutes = 10))
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                    settingsPlayerLevel(ui, { ui = ui.copy(timeshiftEnabled = it) }),
+                    settingsKeepChannelLevel(ui.keepChannelMinutes) { ui = ui.copy(keepChannelMinutes = it); navigation.pop() }))
+            }
+        }
+        val keep = "Keep paused TV tuned"
+        press(Key.DirectionCenter)
+        press(Key.DirectionDown)
+        press(Key.DirectionDown)
+        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Pause and rewind live TV” is on."))
+            .assertIsNotEnabled()
+        press(Key.DirectionCenter)
+        press(Key.DirectionRight)
+        compose.onNode(isFocused() and hasText(keep)).assertExists()
+        assertEquals(SettingsSection.PLAYER.name, navigation.stack.active.levelId)
+        press(Key.DirectionUp)
+        press(Key.DirectionCenter)
+        press(Key.DirectionDown)
+        compose.onNode(isFocused() and hasText(keep) and hasText("10 minutes")).assertIsEnabled()
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("10 minutes")).assertIsSelected()
+        compose.onNodeWithText("It keeps a tuner busy meanwhile.", substring = true).assertIsDisplayed()
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText(keep) and hasText("20 minutes")).assertExists()
+    }
+
+    @Test fun streamProfileRowOpensItsChoicePageOnTheSavedProfile() {
+        val observation = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(
+            at.bernhardberger.tvheadend.sdk.core.SessionState.Ready(at.bernhardberger.tvheadend.sdk.core.ServerCapabilities.create(
+                streaming = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
+                dvrWrite = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED)),
+            at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.ChannelCatalog.create()),
+            at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create()),
+            at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.DvrSnapshot.create()))
+        val profiles = listOf("htsp", "pass", "webtv-h264").mapIndexed { index, name ->
+            at.bernhardberger.tvheadend.sdk.core.StreamProfile(
+                at.bernhardberger.tvheadend.sdk.core.StreamProfileId((index + 1).toString().padStart(32, '0')), name, "")
+        }
+        val available = StreamProfilesResult.Available.create(profiles, requireNotNull(observation.currentSession))
+        var ui by mutableStateOf(SettingsPlayerUiState(connected = true, profiles = available, selectedProfileId = profiles[1].id))
+        val picks = mutableListOf<at.bernhardberger.tvheadend.sdk.core.StreamProfileId?>()
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false), settingsPlayerLevel(ui, {}),
+                    settingsStreamProfileLevel(ui) { picks += it; ui = ui.copy(selectedProfileId = it); navigation.pop() }))
+            }
+        }
+        press(Key.DirectionCenter)
+        repeat(3) { press(Key.DirectionDown) }
+        val row = "Stream profile"
+        compose.onNode(isFocused() and hasText(row) and hasText("pass")).assertIsEnabled()
+        press(Key.DirectionCenter)
+        assertEquals(STREAM_PROFILE_LEVEL, navigation.stack.active.levelId)
+        compose.onNode(isFocused() and hasText("pass")).assertIsSelected()
+        compose.onNodeWithText("How Tvheadend prepares the stream for this TV.").assertIsDisplayed()
+        // Back leaves without choosing.
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText(row)).assertExists()
+        assertEquals(emptyList<Any?>(), picks)
+        press(Key.DirectionCenter)
+        press(Key.DirectionUp)
+        press(Key.DirectionUp)
+        compose.onNode(isFocused() and hasText("Server default")).assertIsNotSelected()
+        press(Key.DirectionCenter)
+        assertEquals(listOf(null), picks)
+        compose.onNode(isFocused() and hasText(row) and hasText("Server default")).assertExists()
+
+        // Without a server list the row says why and stays closed, even through Right.
+        for ((profilesState, connected, why) in listOf(
+            Triple(StreamProfilesResult.Failed(TvheadendFailure.NOT_READY), false, "Not connected"),
+            Triple(StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED), true, "Stream profiles aren’t available."),
+        )) {
+            compose.runOnIdle { ui = ui.copy(profiles = profilesState, connected = connected) }
+            compose.onNode(isFocused() and hasText(row) and hasText(why)).assertIsNotEnabled()
+            press(Key.DirectionCenter)
+            press(Key.DirectionRight)
+            assertEquals(SettingsSection.PLAYER.name, navigation.stack.active.levelId)
         }
     }
 
@@ -272,7 +403,7 @@ class SettingsDepthNavigationTest {
                 val scope = rememberCoroutineScope()
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
                 val player = settingsPlayerLevel(SettingsPlayerUiState(autoStartPlayback = settings.autoStartPlayback),
-                    {}, {}, {}, onAutoStartPlaybackChanged = { enabled ->
+                    {}, onAutoStartPlaybackChanged = { enabled ->
                         scope.launch { store.setAutoStartPlayback(enabled) }
                     })
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild), player))
@@ -288,7 +419,7 @@ class SettingsDepthNavigationTest {
             compose.waitUntil { runBlocking { store.settings.first().autoStartPlayback } }
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
             press(Key.Back)
-            compose.onNodeWithText("Player").assertIsFocused()
+            compose.onNode(isFocused() and hasText("Playback") and hasClickAction()).assertExists()
             press(Key.DirectionCenter)
             compose.onNodeWithText(autoplay).assertIsFocused().assertIsOn()
             press(Key.DirectionCenter)
@@ -581,7 +712,7 @@ class SettingsDepthNavigationTest {
         assertFalse(showGuide)
         press(Key.DirectionDown)
         compose.onNodeWithText("Clear cache").assertIsFocused()
-        compose.onNodeWithText("0.0 MB").assertExists()
+        compose.onNodeWithText("0.0 MB in use").assertExists()
         press(Key.DirectionCenter)
         assertEquals(1, clearCalls)
         press(Key.DirectionLeft)
@@ -746,6 +877,7 @@ class SettingsDepthNavigationTest {
                                 { retries++ }, { toggles++ }),
                             settingsPlayerLevel(SettingsPlayerUiState(profiles = StreamProfilesResult.Failed(TvheadendFailure.ACCESS_DENIED)),
                                 { settingsActions++ }, { settingsActions++ }, { settingsActions++ }),
+                            settingsAudioLevel(SettingsPlayerUiState(), { settingsActions++ }, { settingsActions++ }),
                             settingsApplianceLevel(false, { settingsActions++ }),
                         ), initialFocusEnabled = ready && !drawerActive, contentPadding = padding)
                     }
@@ -768,8 +900,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionCenter)
         assertEquals(0, toggles)
         press(Key.Back)
-        press(Key.DirectionDown) // Connection; never activates an editor from focus.
-        press(Key.DirectionDown) // Player.
+        press(Key.DirectionDown) // Playback; never activates an editor from focus.
         press(Key.DirectionCenter)
         capture("player-unavailable")
         press(Key.DirectionDown)
@@ -777,12 +908,19 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionCenter)
         assertEquals(1, settingsActions)
         press(Key.Back)
-        press(Key.DirectionDown)
+        press(Key.DirectionDown) // Audio & subtitles.
         press(Key.DirectionCenter)
-        capture("appliance-accessibility")
+        repeat(2) { press(Key.DirectionDown) } // Audio passthrough.
         assertEquals(1, settingsActions)
         press(Key.DirectionCenter)
         assertEquals(2, settingsActions)
+        press(Key.Back)
+        press(Key.DirectionDown) // Appliance.
+        press(Key.DirectionCenter)
+        capture("appliance-accessibility")
+        assertEquals(2, settingsActions)
+        press(Key.DirectionCenter)
+        assertEquals(3, settingsActions)
     }
 
     private fun capture(name: String) {

@@ -59,6 +59,7 @@ internal enum class SettingsSection {
     CHANNEL_TAGS,
     CONNECTION,
     PLAYER,
+    AUDIO,
     APPLIANCE,
 }
 

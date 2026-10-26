@@ -47,7 +47,7 @@
     <string name="context_delete_all">Alle löschen</string>
     <string name="stats_video_buffers">Videopuffer</string>
     <string name="stats_video_buffers_value">Angezeigt %1$d • Verworfen %2$d • Übersprungen %3$d</string>
-    <string name="audio_subtitles_section">Ton &amp; Untertitel</string>
+    <string name="settings_audio_nav">Ton &amp; Untertitel</string>
     <string name="audio_language_first">Audiosprache</string>
     <string name="audio_language_second">Zweite Audiosprache</string>
     <string name="audio_language_third">Dritte Audiosprache</string>
@@ -64,6 +64,7 @@
     <string name="audio_format_dolby_help">E-AC-3 und AC-3 in der gewählten Sprache bevorzugen.</string>
     <string name="audio_format_stereo_help">AAC und MPEG-Audio bevorzugen, ohne Kanalbegrenzung.</string>
     <string name="audio_description">Audiodeskription</string>
+    <string name="audio_description_description">Bevorzugt Tonspuren mit Bildbeschreibung, wenn vorhanden.</string>
     <string name="subtitle_follow_system">Untertiteleinstellungen des Systems verwenden</string>
     <string name="player_status_rec">REC</string>
     <string name="setup_connection">Verbindung einrichten</string>
@@ -79,11 +80,10 @@
     <string name="cache_notice_cleared">Cache geleert</string>
     <string name="cache_notice_failed">Cache konnte nicht geleert werden. Versuche es erneut.</string>
     <string name="settings_app_language">App-Sprache</string>
-    <string name="cache_usage">%1$s MB</string>
+    <string name="cache_usage">%1$s MB belegt</string>
     <string name="settings_unavailable">Einstellungen nicht verfügbar</string>
     <string name="timeshift_seek_waiting">Sprung angefordert. Warten auf die Wiedergabeposition</string>
     <string name="connection_refreshing_channels">Senderinformationen werden aktualisiert…</string>
-    <string name="settings_storage">Speicher</string>
     <string name="clear_cache">Cache leeren</string>
     <string name="cache_clearing">Cache wird geleert…</string>
     <string name="channel_list">Senderliste</string>
@@ -109,11 +109,9 @@
     <string name="select_channel_hint">Wähle links einen Sender aus, um Details anzuzeigen.</string>
 
     <string name="settings_general">Allgemein</string>
-    <string name="settings_general_nav">Allgemein</string>
-    <string name="settings_navigation">Navigation</string>
     <string name="settings_channel_tags_nav">Sendergruppen</string>
     <string name="settings_channel_tags_last_enabled">Erforderlich – mindestens eine Gruppe muss aktiv bleiben.</string>
-    <string name="show_epg_menu">Programmführer-Menü</string>
+    <string name="show_epg_menu">Programmführer im Seitenmenü zeigen</string>
     <string name="show_epg_menu_description">Programmführer in der Hauptnavigation anzeigen.</string>
     <string name="player_info">Info</string>
     <string name="player_channel_number_none">Kein Sender</string>
@@ -177,8 +175,6 @@
 
     <string name="settings_player">Wiedergabe</string>
     <string name="settings_connection_nav">Verbindung</string>
-    <string name="settings_player_nav">Wiedergabe</string>
-    <string name="settings_appliance_nav">TV-Start</string>
     <string name="language_follow_system">System folgen</string>
     <string name="language_german">Deutsch</string>
     <string name="language_english">Englisch</string>
@@ -205,6 +201,10 @@
     <string name="clock_format_12_hour">12 Stunden (8:15\u00A0PM)</string>
     <string name="clock_format_24_hour">24 Stunden (20:15)</string>
     <string name="profile">Streamprofil</string>
+    <string name="stream_profile_description">Wie Tvheadend den Stream für diesen Fernseher aufbereitet.</string>
+    <string name="settings_section_streaming">Streaming</string>
+    <string name="settings_section_picture">Bild</string>
+    <string name="settings_section_experimental">Experimentell</string>
     <string name="profile_server_default">Serverstandard</string>
     <string name="profile_direct_streaming">Direktes Streaming</string>
     <string name="stream_profiles_unavailable">Streamprofile sind nicht verfügbar.</string>
@@ -212,7 +212,6 @@
     <string name="subtitle_language">Untertitelsprache</string>
 
     <string name="settings_appliance">TV-Start</string>
-    <string name="appliance_section_app_open">App-Start</string>
     <string name="appliance_section_accessibility">Bedienungshilfen-Dienst</string>
     <string name="auto_start_playback">Wiedergabe beim Öffnen der App starten</string>
     <string name="auto_start_playback_description">Spielt nach einem neuen App-Start den letzten Sender ab. Dadurch wird der Bedienungshilfen-Dienst nicht aktiviert.</string>
@@ -514,18 +513,20 @@
     <string name="player_paused">Pausiert</string>
     <string name="player_buffer_summary">%1$s verfügbar</string>
     <string name="player_current_broadcast">Aktuelle Sendung</string>
-    <string name="timeshift_setting">Timeshift</string>
+    <string name="timeshift_setting">Live-TV pausieren und zurückspulen</string>
     <string name="timeshift_setting_description">Tvheadend Player erlauben, für Live-TV einen Timeshift-Puffer von deinem Server anzufordern.</string>
     <string name="refresh_rate_matching_setting">Bildwiederholrate anpassen</string>
     <string name="frame_rate_switching_always">Immer</string>
     <string name="frame_rate_switching_seamless_only">Nur wenn nahtlos</string>
     <string name="frame_rate_switching_off">Aus</string>
-    <string name="frame_rate_switching_description">Immer schaltet den Fernseher auf die Bildrate des Videos um, auch wenn das Bild dabei kurz schwarz wird.</string>
+    <string name="frame_rate_switching_always_help">Schaltet den Fernseher auf die Bildrate des Videos um, auch wenn das Bild dabei kurz schwarz wird.</string>
+    <string name="frame_rate_switching_seamless_help">Schaltet nur um, wenn der Fernseher das ohne schwarzes Bild kann.</string>
+    <string name="frame_rate_switching_off_help">Behält den aktuellen Anzeigemodus des Fernsehers bei.</string>
     <string name="audio_passthrough_setting">Audio-Passthrough</string>
-    <string name="audio_passthrough_description">Kann den Ton kurz unterbrechen.</string>
+    <string name="audio_passthrough_description">Gibt Surround-Ton unverändert an eine Soundbar oder einen Receiver weiter. Kann den Ton kurz unterbrechen.</string>
     <string name="audio_passthrough_failed">Modus konnte nicht übernommen werden.</string>
     <string name="refresh_rate_matching_setting_description">Android darf die Bildwiederholrate des Displays an das Video anpassen, wenn dies unterstützt wird.</string>
-    <string name="tunneling_setting">Tunnel-Wiedergabe (experimentell)</string>
+    <string name="tunneling_setting">Tunnel-Wiedergabe</string>
     <string name="tunneling_setting_description">Leitet das Video direkt an den Fernseher, wenn der Decoder das unterstützt. Kann das Bild kurz unterbrechen.</string>
     <string name="play">Abspielen</string>
     <string name="play_recording">Aufnahme abspielen</string>
@@ -535,6 +536,7 @@
     <string name="connection_loading_channels">Sender werden geladen\u2026</string>
     <string name="retry">Erneut versuchen</string>
     <string name="settings_channel_groups_loading">Sendergruppen werden geladen…</string>
+    <string name="settings_channel_groups_description">Wähle, welche Gruppen unter Sender und im Programmführer erscheinen.</string>
     <string name="channel_settings_load_failed">Die Kanaleinstellungen konnten nicht geladen werden.</string>
     <string name="channel_settings_save_failed">Deine Kanaleinstellungen sind aktiv, konnten aber nicht gespeichert werden.</string>
     <string name="recording_marker_label">Marke %1$d • %2$s</string>
@@ -542,8 +544,10 @@
     <string name="recording_marker_previous">Vorherige Marke</string>
     <string name="recording_marker_start">Anfang der Aufnahme</string>
     <string name="recording_marker_next">Nächste Marke</string>
-    <string name="keep_channel_setting">Sender nach Verlassen der App beibehalten</string>
+    <string name="keep_channel_setting">Pausierten Sender beibehalten</string>
     <string name="keep_channel_off">Aus</string>
+    <string name="keep_channel_description">Wenn du die App verlässt, während Live-TV pausiert ist, bleibt der Sender so lange eingestellt, damit du weiterschauen kannst. Solange ist ein Tuner belegt.</string>
+    <string name="keep_channel_needs_timeshift">Verfügbar, wenn „%1$s“ eingeschaltet ist.</string>
     <string name="startup_buffer_setting">Startpuffer</string>
     <string name="startup_buffer_automatic">Automatisch • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>

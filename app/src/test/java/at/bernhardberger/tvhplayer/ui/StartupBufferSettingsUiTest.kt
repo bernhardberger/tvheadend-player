@@ -90,17 +90,18 @@ class StartupBufferSettingsUiTest {
             }
         }
         key(Key.DirectionCenter)
-        // The row sits right after "Keep channel", so Down reaches it from the first player row.
+        // Long titles wrap to a second line instead of being cut off.
+        val timeshift = if (german) "Live-TV pausieren und zurückspulen" else "Pause and rewind live TV"
+        assertFalse("Timeshift title is cut off", overflows(timeshift))
+        // The row sits right after "Stream profile", so Down reaches it from the first player row.
         var downs = 0
         while (focusedRows(title).isEmpty()) {
             check(++downs < 20) { "Start-up buffer row not reachable" }
             key(Key.DirectionDown)
         }
         key(Key.DirectionUp)
-        val keepChannel = if (german) "Sender nach Verlassen der App beibehalten" else "Keep channel after leaving the app"
-        compose.onNode(isFocused() and hasText(keepChannel)).assertExists()
-        // The long title wraps to a second line instead of being cut off.
-        assertFalse("Keep channel title is cut off", overflows(keepChannel))
+        // Unavailable while disconnected, the profile row still takes focus and shows why.
+        compose.onNode(isFocused() and hasText(if (german) "Streamprofil" else "Stream profile")).assertIsNotEnabled()
         assertFalse("Start-up buffer title is cut off", overflows(title))
         key(Key.DirectionDown)
         compose.onNode(isFocused() and hasText(title) and hasText(automatic)).assertExists()

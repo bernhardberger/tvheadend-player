@@ -29,6 +29,7 @@ class AppNavigationTest {
                 SettingsSection.CHANNEL_TAGS,
                 SettingsSection.CONNECTION,
                 SettingsSection.PLAYER,
+                SettingsSection.AUDIO,
                 SettingsSection.APPLIANCE,
             ),
             SettingsSection.entries.toSet(),
