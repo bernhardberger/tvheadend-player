@@ -242,6 +242,28 @@ class PlaybackOptionsRemoteKeyTest {
     }
 
     @Test
+    fun guideLeavesThePreviewSessionIntactAndBackRestoresItsOriginalTrack() {
+        show(start = { it.withOverride("main") })
+        val start = player.parameters
+        press(Key.MediaAudioTrack)
+        press(Key.DirectionDown)
+        advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
+        assertEquals(listOf("second"), player.audioOverrides())
+
+        press(Key.Guide)
+        assertFalse(layerState.scheduleOpen)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
+        assertTrue(layerState.optionsQuickList)
+        compose.onNodeWithTag(SECOND_ROW).assertIsFocused()
+        assertEquals(listOf("second"), player.audioOverrides())
+
+        press(Key.Back)
+        assertNull(layerState.optionsPage)
+        assertEquals(start, player.parameters)
+        assertEquals(listOf("main"), player.audioOverrides())
+    }
+
+    @Test
     fun theListClosesFiveSecondsAfterTheLastKeyAndKeepsWhatPlays() {
         show()
         press(Key.MediaAudioTrack)
@@ -553,6 +575,7 @@ class PlaybackOptionsRemoteKeyTest {
                         .onPreviewKeyEvent { event ->
                             val foregroundLayer = if (recovery) PlayerForegroundLayer.RECOVERY
                                 else playerForegroundLayer(state.foregroundContext())
+                            state.handleScheduleKey(event, foregroundLayer)?.let { return@onPreviewKeyEvent it }
                             state.handleOverlayKey(
                                 event = event,
                                 foregroundLayer = foregroundLayer,

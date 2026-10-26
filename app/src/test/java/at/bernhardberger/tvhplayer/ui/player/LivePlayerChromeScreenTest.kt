@@ -1478,8 +1478,64 @@ class LivePlayerChromeScreenTest {
                 exists("channel-schedule-panel") || railOpen())
             key(Key.Back)
             assertEquals("origin restored for $shortcut", controls, exists("player-pause"))
-            if (controls) key(Key.Back)
+            if (!controls) key(Key.DirectionDown)
+            compose.onNodeWithTag(if (controls && shortcut == Key.Info) "player-info" else "player-pause").assertIsFocused()
+            key(Key.Back)
         }
+    }
+
+    @Test fun bareInfoCoveredByGuideOrSelfClosingLeavesNoReturnFocus() {
+        screen()
+        key(Key.Info)
+        key(Key.Guide)
+        key(Key.Back)
+        assertTrue(exists("programme-details-page"))
+        key(Key.Back)
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        key(Key.Back)
+        key(Key.Info)
+        key(Key.DirectionCenter) // Continue watching closes Info through its callback.
+        assertFalse(exists("programme-details-page"))
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+    }
+
+    @Test fun guideFromControlsRestoresTheFocusedButton() {
+        screen()
+        key(Key.DirectionDown)
+        for (button in listOf("player-pause", "player-info", "player-settings", "player-schedule")) {
+            compose.onNodeWithTag(button).performSemanticsAction(SemanticsActions.RequestFocus)
+            settleFrames()
+            key(Key.Guide)
+            assertTrue(exists("channel-schedule-panel"))
+            key(Key.Back)
+            compose.onNodeWithTag(button).assertIsFocused()
+        }
+    }
+
+    @Test fun guideCancelsNumberEntryBeforeItsTimeoutCanTune() {
+        screen()
+        session.publish(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(
+                Channel.create(ChannelId(1), name = "Channel 1", number = 1),
+                Channel.create(ChannelId(2), name = "Channel 2", number = 2),
+                Channel.create(ChannelId(3), name = "Channel 20", number = 20),
+            ))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events = emptyList())),
+        ))
+        settleFrames()
+        val target = runtime.activeTarget.value
+        press(Key.Two) // A valid match with a longer candidate waits before tuning channel 2.
+        assertTrue(compose.onAllNodesWithText("2").fetchSemanticsNodes().isNotEmpty())
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), target)
+        assertEquals(target, runtime.activeTarget.value)
+        press(Key.Guide)
+        repeat(4) { settle() }
+        assertTrue(exists("channel-schedule-panel"))
+        assertTrue(compose.onAllNodesWithText("2").fetchSemanticsNodes().isEmpty())
+        assertEquals(target, runtime.activeTarget.value)
     }
 
     @Test fun playerInfoOffersCancelAfterContinueWatchingWhenAlreadyScheduled() {

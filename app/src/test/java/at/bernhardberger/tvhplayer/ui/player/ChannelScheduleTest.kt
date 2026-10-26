@@ -33,9 +33,10 @@ class ChannelScheduleTest {
         assertNull(scheduleInitialEvent(emptyList(), 25, 25))
     }
 
-    @Test fun guideOwnsTheCycleAndBackRestoresScheduleAction() = runTest {
+    @Test fun guideOwnsTheCycleAndBackRestoresInvokingAction() = runTest {
         val layers = LivePlayerLayerState(this, autoHideTimeoutMillis = 5000)
         layers.showControls()
+        layers.onActionFocused("player-settings")
         assertTrue(layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))!!)
         assertTrue(layers.scheduleOpen)
         assertTrue(layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true, 1))!!)
@@ -46,7 +47,7 @@ class ChannelScheduleTest {
         assertEquals(PlayerBackAction.CLOSE_SCHEDULE, playerBackAction(PlayerSurface.LIVE, PlayerForegroundLayer.SCHEDULE))
         layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_BACK, true))
         assertFalse(layers.scheduleOpen)
-        assertEquals("player-schedule", layers.restoreChannelAction)
+        assertEquals("player-settings", layers.restoreChannelAction)
         assertTrue(layers.chrome.controlsVisible)
         layers.dispose()
     }
@@ -97,7 +98,7 @@ class ChannelScheduleTest {
         layers.dispose()
     }
 
-    @Test fun guideFromInfoOrOptionsReturnsToTheCoveredLayer() = runTest {
+    @Test fun guideFromInfoReturnsToTheCoveredLayerButOptionsRemainModal() = runTest {
         val layers = LivePlayerLayerState(this, 5000)
         layers.openInfo(fromKey = true)
         layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))
@@ -106,13 +107,18 @@ class ChannelScheduleTest {
         layers.closeSchedule()
         assertTrue(layers.infoOpen)
         layers.closeInfo()
-        layers.openOptions()
         layers.endOpeningKeyCycle(AndroidKeyEvent.KEYCODE_GUIDE)
-        layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))
-        assertTrue(layers.scheduleOpen)
-        assertNull(layers.optionsPage)
-        layers.closeSchedule()
-        assertEquals(PlaybackOptionsPage.ROOT, layers.optionsPage)
+        for (page in PlaybackOptionsPage.entries) for (quick in listOf(false, true)) {
+            if (quick && page !in listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES)) continue
+            if (quick) layers.showQuickList(page) else layers.showOptionsPage(page)
+            for (event in listOf(key(AndroidKeyEvent.KEYCODE_GUIDE, true),
+                    key(AndroidKeyEvent.KEYCODE_GUIDE, true, 1), key(AndroidKeyEvent.KEYCODE_GUIDE, false))) {
+                assertEquals(true, layers.handleScheduleKey(event) { error("Modal GUIDE must not prepare Schedule") })
+                assertFalse(layers.scheduleOpen)
+                assertEquals(page, layers.optionsPage)
+                assertEquals(quick, layers.optionsQuickList)
+            }
+        }
         layers.dispose()
     }
 

@@ -1126,7 +1126,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 
 The live player's Schedule action opens a 480dp right sheet using the playback
 options frame, without dimming the remaining picture. GUIDE toggles it where
-the activity receives that key; appliance entry routing is unchanged. The
+the activity receives that key, except while a modal playback options sheet or
+quick list is open: GUIDE is consumed without interrupting its preview/undo
+session. Appliance entry routing is unchanged. The
 recordings player has no Schedule action. The reusable column owns no tuning or
 playback: its caller supplies events, viewer position, recording marks and actions.
 Rows keep an 80×45dp artwork slot (lighter sheet surface with a centred channel

@@ -67,8 +67,7 @@ internal class LivePlayerLayerState(
 
     private var scheduleReturnControls = true
     private var scheduleReturnLayer = PlayerForegroundLayer.CONTROLS
-    private var scheduleReturnOptions: PlaybackOptionsPage? = null
-    private var scheduleReturnQuickList = false
+    private var scheduleReturnAction = "player-schedule"
     private var infoReturnControls = true
     private var railReturnControls = true
 
@@ -76,8 +75,8 @@ internal class LivePlayerLayerState(
         scheduleReturnControls = !fromKey || chrome.controlsVisible
         scheduleReturnLayer = if (fromKey) at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext())
             else PlayerForegroundLayer.CONTROLS
-        scheduleReturnOptions = optionsPage
-        scheduleReturnQuickList = optionsQuickList
+        scheduleReturnAction = if (fromKey && chrome.controlsVisible) lastFocusedAction ?: "player-pause"
+            else "player-schedule"
         infoOpen = false
         recordingConfirmationVisible = false
         scheduleDetails = null
@@ -94,16 +93,10 @@ internal class LivePlayerLayerState(
         if (showControls == null) when (scheduleReturnLayer) {
             PlayerForegroundLayer.INFO -> { infoOpen = true; return }
             PlayerForegroundLayer.CHANNEL_DRAWER -> { channelDrawerOpen = true; return }
-            PlayerForegroundLayer.OPTIONS_QUICK_LIST, PlayerForegroundLayer.OPTIONS_DETAIL, PlayerForegroundLayer.OPTIONS_ROOT -> {
-                optionsPage = scheduleReturnOptions
-                optionsQuickList = scheduleReturnQuickList
-                chrome.yieldToLayer(controls = scheduleReturnControls)
-                return
-            }
             else -> Unit
         }
         if (showControls ?: scheduleReturnControls) {
-            restoreChannelAction = "player-schedule"
+            restoreChannelAction = scheduleReturnAction
             this.showControls()
         } else { restoreChannelAction = null; chrome.hideControls() }
     }
@@ -120,6 +113,8 @@ internal class LivePlayerLayerState(
             return true
         }
         if (code == AndroidKeyEvent.KEYCODE_GUIDE) {
+            // Options own a preview/undo session; do not dispose it to cover it with Schedule.
+            if (optionsPage != null) return true
             if (foregroundLayer in setOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR,
                     PlayerForegroundLayer.CONFIRMATION)) return true
             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {

@@ -797,7 +797,7 @@ fun VideoPlayerScreen(
 
     fun openInfo(fromKey: Boolean = false) {
         infoRailChannelId = null
-        infoReturnAction = "player-info"
+        infoReturnAction = if (fromKey && !layerState.chrome.controlsVisible) null else "player-info"
         restoreInfoFocus = false
         layerState.openInfo(fromKey)
     }
@@ -816,7 +816,7 @@ fun VideoPlayerScreen(
         val returnToRail = infoRailChannelId != null
         layerState.closeInfo(returnToRail = returnToRail)
         infoRailChannelId = null
-        infoReturnAction = if (returnToRail) null else "player-info"
+        infoReturnAction = if (returnToRail || !layerState.chrome.controlsVisible) null else "player-info"
         restoreInfoFocus = !returnToRail && layerState.chrome.controlsVisible
     }
 
