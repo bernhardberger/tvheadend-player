@@ -416,9 +416,11 @@ class PlayerChromeTimelineRowTest {
         EpgEvent.create(EventId(7), ChannelId(1), Instant.fromEpochSeconds(now - 3_600), Instant.fromEpochSeconds(now + 1_800), title = title),
         Instant.fromEpochSeconds(now), 0.5f, 0f, 1f, 1f, true,
     )
-    private fun burstStep(deltaMs: Long, title: String, settled: Boolean) = live(
+    /** Every queued step is its own, as the seek state makes it: a fresh identity per call. */
+    private fun burstStep(deltaMs: Long, title: String, settled: Boolean, stepId: Any = SeekStepId()) = live(
         burstBuffer.copy(positionMs = deltaMs), committedState = burstBuffer, previewing = true,
         step = TimeshiftSeekDecision(deltaMs, deltaMs, false), stepSettled = settled, programmeWindow = window(title),
+        stepId = stepId,
     )
 
     @Test fun theFocusedSeekbarKeepsItsWholeSpokenValueStillDuringAHeldBurst() {
@@ -440,9 +442,38 @@ class PlayerChromeTimelineRowTest {
             restFor(100)
             assertEquals("the last settled value stays until the next settles", settled, spoken("player-seekbar", merged = true))
         }
+        compose.runOnIdle { timeline = burstStep(-150_000, "Epsilon", settled = true) }
+        restFor(16)
+        val next = spoken("player-seekbar", merged = true)
+        assertTrue(next, next.startsWith("Epsilon. ") && next.contains("2 minutes 30 seconds back, target ${formatClock(now - 150)}"))
         compose.runOnIdle { timeline = live(burstBuffer, programmeWindow = window("Known")) }
         restFor(16)
         assertEquals("the step is over", before, spoken("player-seekbar", merged = true))
+    }
+
+    @Test fun aNewStepKeepsThePreviousSettledStepsWordsButOnlyAcknowledgesItself() {
+        val acknowledged = mutableListOf<Any>()
+        val first = SeekStepId()
+        val second = SeekStepId()
+        var timeline by mutableStateOf(live(burstBuffer, programmeWindow = window("Known")))
+        chromeOf(PlayerChromeMode.CONTROLS) {
+            val shown = timeline
+            shown.copy(onStepAnnounced = { acknowledged += checkNotNull(shown.stepId) })
+        }
+        compose.runOnIdle { timeline = burstStep(-30_000, "Alpha", settled = true, stepId = first) }
+        restFor(STEP_ANNOUNCEMENT_HOLD_MS + 100)
+        val said = spoken("player-seekbar", merged = true)
+        assertTrue(said, said.startsWith("Alpha. ") && said.contains("30 seconds back"))
+        assertEquals(listOf<Any>(first), acknowledged)
+        compose.runOnIdle { timeline = burstStep(-60_000, "Beta", settled = false, stepId = second) }
+        restFor(STEP_ANNOUNCEMENT_HOLD_MS + 100)
+        assertEquals("the pending step does not say the older state", said, spoken("player-seekbar", merged = true))
+        assertEquals("the pending step acknowledges nothing", listOf<Any>(first), acknowledged)
+        compose.runOnIdle { timeline = burstStep(-60_000, "Beta", settled = true, stepId = second) }
+        restFor(STEP_ANNOUNCEMENT_HOLD_MS + 100)
+        val then = spoken("player-seekbar", merged = true)
+        assertTrue(then, then.startsWith("Beta. ") && then.contains("1 minute back"))
+        assertEquals("the second step acknowledges itself, once", listOf<Any>(first, second), acknowledged)
     }
 
     @Test fun theFocusedSeekbarSpeaksALiveStepWithAnHourOffset() {
@@ -576,10 +607,11 @@ class PlayerChromeTimelineRowTest {
         liveAvailable: Boolean = true,
         stepSettled: Boolean = false,
         programmeWindow: ProgrammeWindow? = null,
+        stepId: Any? = null,
     ) = PlayerChromeTimeline.Live(
         timeshift = timeshift, nowSec = now, committedTimeshift = committedState, committedWindow = committedWindow,
         programmeWindow = programmeWindow, previewing = previewing, step = step, stepDeltaMs = step?.deltaMs,
-        stepSettled = stepSettled, liveAvailable = liveAvailable,
+        stepSettled = stepSettled, stepId = stepId, liveAvailable = liveAvailable,
     )
 
     private fun chrome(mode: PlayerChromeMode, timeline: PlayerChromeTimeline.Live) = chromeOf(mode) { timeline }

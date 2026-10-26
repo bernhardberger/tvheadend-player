@@ -359,6 +359,37 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
     }
 
+    @Test fun aNewStepKeepsTheSettledStepsWordsOnTheFocusedSeekbarUntilItSettles() {
+        var target by mutableStateOf(630_000L)
+        var settled by mutableStateOf(true)
+        var stepId by mutableStateOf(SeekStepId())
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(
+                    mode = PlayerChromeMode.CONTROLS, positionMs = 600_000L, durationMs = 3_600_000L,
+                    targetMs = target, originMs = 600_000L, stepSettled = settled, stepId = stepId,
+                )
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        fun seekbar() = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].joinToString()
+        val first = seekbar()
+        assertEquals("30 seconds forward, target 0:10:30. Total 1:00:00.", first)
+        // The next step of the burst is queued: its own identity, not yet dispatched.
+        compose.runOnIdle {
+            target = 690_000L
+            settled = false
+            stepId = SeekStepId()
+        }
+        settle()
+        assertEquals("the older step's words stay until the new one settles", first, seekbar())
+        compose.runOnIdle { settled = true }
+        settle()
+        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", seekbar())
+    }
+
     @Test fun upFromTheSeekbarStaysAtTheTopEdgeAndTheBarRowHasNoStatusSlot() {
         compose.setContent { TVHeadendPlayerTheme { RecordingChromeFixture() } }
         compose.mainClock.autoAdvance = false

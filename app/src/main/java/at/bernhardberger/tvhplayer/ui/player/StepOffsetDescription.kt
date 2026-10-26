@@ -58,7 +58,7 @@ internal fun rememberSettledStep(
         when {
             stepKey == null -> announcement = null
             // The report is the one of this step, not of a later one that starts within the hold.
-            settled -> announcement = Announcement(stepIdentity, latest, publish)
+            settled -> announcement = Announcement(latest, publish)
         }
     }
     LaunchedEffect(announcement) {
@@ -69,11 +69,12 @@ internal fun rememberSettledStep(
             it.onPublished()
         }
     }
-    return if (key == null) null else announcement?.takeIf { it.identity == identity }?.text
+    // A step after a settled one keeps that one's words until its own announcement replaces them.
+    return if (key == null) null else announcement?.text
 }
 
 /** One announcement of one step; a repeat of the same words is still a new one. */
-private class Announcement(val identity: Any?, val text: String, val onPublished: () -> Unit)
+private class Announcement(val text: String, val onPublished: () -> Unit)
 
 /**
  * How long a finished step's preview waits, once its announcement is in the semantics, for the
