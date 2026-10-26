@@ -27,7 +27,10 @@ accepted German and human corrections; do not regenerate them for style.
    Android 13+ shows and the in-app picker. Hebrew resources go in `values-iw`,
    listed as `he`. Until a person has reviewed the language, set
    `<bool name="language_machine_translated">true</bool>` in its folder; Settings →
-   About then shows the machine-translated notice.
+   About then shows the machine-translated notice. When the first language with a
+   script, region or Hebrew tag ships, build the release APK and check that its
+   locale config and packaged resources contain that language and nothing else
+   new, for example with `aapt2 dump resources`.
 
 ## Drafting instructions
 

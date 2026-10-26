@@ -22,6 +22,8 @@ value class AppLanguage(val languageTag: String) {
     fun nativeName(): String = LocaleDisplayNames
         .getInstance(locale, DisplayContext.CAPITALIZATION_FOR_UI_LIST_OR_MENU)
         .localeDisplayName(locale)
+        // Older ICU data lacks menu capitalization for some languages ("français").
+        .replaceFirstChar { it.titlecase(locale.toLocale()) }
 
     /** The application locale to apply for this entry on a system whose first locale is [system]. */
     fun applicationLocaleTag(system: Locale): String = when {
@@ -42,14 +44,17 @@ value class AppLanguage(val languageTag: String) {
         /** The shipped languages from the build's list, in picker order. */
         val shipped: List<AppLanguage> = BuildConfig.APP_LANGUAGES.map(::AppLanguage)
 
-        /** The picker entry for the stored application locales, or [SYSTEM] when none of [choices] matches. */
+        /**
+         * The picker entry for the stored application locales: [SYSTEM] when none is stored, and the stored
+         * locale itself when none of [choices] matches it, such as a language a later build no longer ships.
+         */
         fun fromLanguageTags(languageTags: String, choices: List<AppLanguage> = shipped): AppLanguage {
             val first = languageTags.substringBefore(',')
             if (first.isEmpty()) return SYSTEM
             val stored = ULocale.addLikelySubtags(ULocale.forLanguageTag(first))
             return choices.firstOrNull { it.hasRegion && ULocale.addLikelySubtags(it.locale).sameRegionAs(stored) }
                 ?: choices.firstOrNull { !it.followsSystem && !it.hasRegion && it.sameLanguage(stored) }
-                ?: SYSTEM
+                ?: AppLanguage(first)
         }
 
         private fun ULocale.sameRegionAs(other: ULocale) =

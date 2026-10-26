@@ -143,6 +143,9 @@ android {
         buildConfig = true
         compose = true
     }
+    // Keep every shipped language in the base APK: the in-app picker can choose one that is not the
+    // device's language, and Play would otherwise install only the device language's split.
+    bundle.language.enableSplit = false
     testOptions.unitTests.isIncludeAndroidResources = true
     sourceSets.getByName("profile").kotlin.srcDir("src/release/java")
     sourceSets.getByName("profileServer").kotlin.srcDir("src/release/java")

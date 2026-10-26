@@ -1,7 +1,9 @@
 package at.bernhardberger.tvhplayer.settings
 
 import android.app.Application
+import at.bernhardberger.tvhplayer.BuildConfig
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -15,7 +17,8 @@ class AppLanguageTest {
 
     @Test
     fun pickerLists_theBuildsLanguages_withPseudoLocalesInDebug() {
-        assertEquals(listOf("de", "en", "en-XA", "ar-XB"), AppLanguage.shipped.map { it.languageTag })
+        val pseudoLocales = if (BuildConfig.BUILD_TYPE == "debug") listOf("en-XA", "ar-XB") else emptyList()
+        assertEquals(listOf("de", "en") + pseudoLocales, AppLanguage.shipped.map { it.languageTag })
     }
 
     @Test
@@ -52,7 +55,12 @@ class AppLanguageTest {
         assertEquals(AppLanguage("de-DE"), AppLanguage.fromLanguageTags("de", choices))
         assertEquals(AppLanguage("en"), AppLanguage.fromLanguageTags("en-GB,de", choices))
         assertEquals(AppLanguage("fr"), AppLanguage.fromLanguageTags("fr-CA", choices))
-        assertEquals(AppLanguage.SYSTEM, AppLanguage.fromLanguageTags("de-CH", choices))
-        assertEquals(AppLanguage.SYSTEM, AppLanguage.fromLanguageTags("it-IT", choices))
+    }
+
+    @Test
+    fun storedLocaleNoLongerListed_staysItsOwnEntry_soFollowSystemCanClearIt() {
+        assertEquals(AppLanguage("de-CH"), AppLanguage.fromLanguageTags("de-CH", choices))
+        assertEquals(AppLanguage("it-IT"), AppLanguage.fromLanguageTags("it-IT,en", choices))
+        assertNotEquals(AppLanguage.SYSTEM, AppLanguage.fromLanguageTags("it-IT", choices))
     }
 }
