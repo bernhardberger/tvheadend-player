@@ -47,14 +47,14 @@ class SettingsAboutTest {
 
     private var sessionState by mutableStateOf<SessionState>(SessionState.Disconnected)
 
-    private fun show(fontScale: Float = 1f) {
+    private fun show(fontScale: Float = 1f, machineTranslated: Boolean = false) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL),
-                            listOf(settingsRootLevel(false)) + settingsAboutLevels(sessionState))
+                            listOf(settingsRootLevel(false)) + settingsAboutLevels(sessionState, machineTranslated = machineTranslated))
                     }
                 }
             }
@@ -78,7 +78,8 @@ class SettingsAboutTest {
         compose.onNodeWithText("About").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Version", substring = true).assertIsFocused()
-        compose.onAllNodesWithText("Translator credits").assertCountEquals(0)
+        compose.onAllNodesWithText("TRANSLATION").assertCountEquals(0)
+        compose.onAllNodesWithText("Machine-translated").assertCountEquals(0)
         press(Key.DirectionDown)
         compose.onNodeWithText("Not connected", substring = true).assertIsFocused()
         press(Key.DirectionDown)
@@ -106,6 +107,15 @@ class SettingsAboutTest {
         compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()
         press(Key.Back)
         compose.onNodeWithText("About").assertIsFocused()
+    }
+
+    @Test fun machineTranslatedLanguageShowsItsNoticeUnderTranslation() {
+        show(machineTranslated = true)
+        press(Key.DirectionCenter)
+        repeat(4) { press(Key.DirectionDown) }
+        compose.onNodeWithText("Machine-translated", substring = true).assertIsFocused()
+        compose.onNodeWithText("TRANSLATION").assertIsDisplayed()
+        compose.onNodeWithText("Nobody has checked this translation yet", substring = true).assertIsDisplayed()
     }
 
     @Test @Category(VisualCapture::class)

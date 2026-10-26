@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.*
 import androidx.compose.ui.state.ToggleableState
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
@@ -62,8 +63,8 @@ internal fun settingsLevel(
 
 internal fun settingsRow(
     id: String,
-    title: String,
-    supporting: String? = null,
+    title: CharSequence,
+    supporting: CharSequence? = null,
     child: String? = null,
     section: String? = null,
     icon: Int? = null,
@@ -96,8 +97,8 @@ internal fun settingsRow(
             selected = selected == true,
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
-            headlineContent = { Text(title, style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
-            supportingContent = supporting?.let { { Text(it) } },
+            headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },
+            supportingContent = supporting?.let { { Text(it.annotated()) } },
             leadingContent = icon?.let { { Icon(painterResource(it), null, Modifier.size(ListItemDefaults.IconSize)) } },
             trailingContent = when {
                 busy -> ({ androidx.compose.material3.CircularProgressIndicator(
@@ -133,3 +134,6 @@ internal fun settingsRow(
         )
     }
 }
+
+/** Row text keeps its spans (such as a language name's own locale); plain strings pass through unchanged. */
+private fun CharSequence.annotated() = this as? AnnotatedString ?: AnnotatedString(toString())

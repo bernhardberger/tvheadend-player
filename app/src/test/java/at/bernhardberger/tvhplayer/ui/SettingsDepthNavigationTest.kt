@@ -20,6 +20,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -555,12 +556,12 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionRight)
         compose.onNodeWithText("Follow system").assertIsFocused()
         press(Key.DirectionDown)
-        compose.onNodeWithText("German").assertIsFocused()
+        compose.onNodeWithText("Deutsch").assertIsFocused()
         assertEquals(0, languageCalls)
         capture("language-choices")
         press(Key.DirectionCenter)
         compose.onNodeWithText("App language").assertIsFocused()
-        compose.onNodeWithText("German").assertExists()
+        compose.onNodeWithText("Deutsch").assertExists()
         assertEquals(1, languageCalls)
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("App language").assertIsFocused()
@@ -594,6 +595,30 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionRight)
         compose.onNodeWithText("General").assertIsFocused()
         assertEquals(1, navigation.stack.frames.size)
+    }
+
+    @Test fun storedLanguageNoLongerShippedSelectsNoRowAndFollowSystemClearsIt() {
+        var selected: AppLanguage? = null
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
+                SettingsScreenNavigation(navigation,
+                    listOf(settingsRootLevel()) + settingsGeneralLevels(
+                        UiSettings(), AppLanguage("it-IT"), CacheStatistics.EMPTY, CacheClearState.IDLE,
+                        { navigation.pop(); selected = it }, {}, {}))
+            }
+        }
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("App language").assertIsFocused()
+        compose.onNodeWithText("Italiano (Italia)").assertExists()
+        press(Key.DirectionRight)
+        compose.onNodeWithText("Follow system").assertIsFocused()
+        compose.onAllNodes(isSelected()).assertCountEquals(0)
+        val deutsch = compose.onNodeWithText("Deutsch", useUnmergedTree = true).fetchSemanticsNode()
+            .config[SemanticsProperties.Text].single()
+        assertEquals("de", deutsch.spanStyles.single().item.localeList?.first()?.toLanguageTag())
+        press(Key.DirectionCenter)
+        assertEquals(AppLanguage.SYSTEM, selected)
     }
 
     @Test fun fourNestedLevelsConsumeHeldEntryAndPopRestoreScrolledParent() {
@@ -701,7 +726,7 @@ class SettingsDepthNavigationTest {
                         SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) + settingsGeneralLevels(
-                                UiSettings(), AppLanguage.GERMAN, CacheStatistics.EMPTY, clearState, {}, {},
+                                UiSettings(), AppLanguage("de"), CacheStatistics.EMPTY, clearState, {}, {},
                                 { calls++; clearState = CacheClearState.CLEARING }),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
                         }

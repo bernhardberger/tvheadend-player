@@ -8,11 +8,14 @@ import org.gradle.api.artifacts.result.ResolvedDependencyResult
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.FileSystemOperations
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.PathSensitive
 import org.gradle.api.tasks.PathSensitivity
 import org.gradle.api.tasks.TaskAction
+import java.util.Locale
 import javax.inject.Inject
 
 plugins {
@@ -55,6 +58,28 @@ tasks.withType<Test>().configureEach {
     }
 }
 
+// The languages the app ships, in language-picker order (alphabetical by native name). This one
+// list keeps only these translations of the app and its libraries, writes the locale config that
+// Android 13+ offers in its per-app language settings, and fills the in-app picker. A bare
+// language follows the system's region; a tag with a region is an entry of its own.
+val appLanguages = listOf("de", "en")
+// Debug builds add Android's pseudo-locales: en-XA for long text, ar-XB for right-to-left.
+val pseudoLocales = listOf("en-XA", "ar-XB")
+fun javaStringArray(values: List<String>) = values.joinToString(prefix = "{", postfix = "}") { "\"$it\"" }
+// aapt2 filters by resource qualifier (de, en-rXA, b+zh+Hans), matching folder names literally; a
+// regional entry also keeps its language's folder. Hebrew resources live in values-iw, the legacy
+// code Android's own resources use.
+fun resourceLocaleFilters(tags: List<String>) = tags.flatMap { tag ->
+    val locale = Locale.forLanguageTag(tag)
+    val code = if (locale.language == "he") "iw" else locale.language
+    val language = if (locale.script.isEmpty()) code else "b+$code+${locale.script}"
+    when {
+        locale.country.isEmpty() -> listOf(language)
+        locale.script.isEmpty() -> listOf(language, "$language-r${locale.country}")
+        else -> listOf(language, "$language+${locale.country}")
+    }
+}.distinct()
+
 android {
     testBuildType = if (providers.gradleProperty("tvhplayer.profileTests").orNull == "true") "profile" else "debug"
     namespace = "at.bernhardberger.tvhplayer"
@@ -70,6 +95,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("boolean", "PROFILE_TRACE", "false")
         buildConfigField("boolean", "PROGRAMME_WINDOW_B", providers.gradleProperty("player.programmeWindowB").orElse("true").map { it.toBooleanStrict().toString() }.get())
+        buildConfigField("String[]", "APP_LANGUAGES", javaStringArray(appLanguages))
     }
 
     flavorDimensions += "distribution"
@@ -86,6 +112,10 @@ android {
     }
 
     buildTypes {
+        debug {
+            isPseudoLocalesEnabled = true
+            buildConfigField("String[]", "APP_LANGUAGES", javaStringArray(appLanguages + pseudoLocales))
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(
@@ -113,6 +143,9 @@ android {
         buildConfig = true
         compose = true
     }
+    // Keep every shipped language in the base APK: the in-app picker can choose one that is not the
+    // device's language, and Play would otherwise install only the device language's split.
+    bundle.language.enableSplit = false
     testOptions.unitTests.isIncludeAndroidResources = true
     sourceSets.getByName("profile").kotlin.srcDir("src/release/java")
     sourceSets.getByName("profileServer").kotlin.srcDir("src/release/java")
@@ -147,7 +180,39 @@ abstract class GenerateAboutLegalAssets : DefaultTask() {
     }
 }
 
+// Android's own locale-config generation lists resource folders only, so it can name neither a
+// region without overrides (de-AT) nor a pseudo-locale.
+abstract class GenerateAppLocaleConfig : DefaultTask() {
+    @get:Input
+    abstract val languageTags: ListProperty<String>
+
+    @get:OutputDirectory
+    abstract val outputDirectory: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val file = outputDirectory.file("xml/locales_config.xml").get().asFile
+        file.parentFile.mkdirs()
+        file.writeText(buildString {
+            appendLine("""<?xml version="1.0" encoding="utf-8"?>""")
+            appendLine("""<locale-config xmlns:android="http://schemas.android.com/apk/res/android">""")
+            languageTags.get().forEach { appendLine("""    <locale android:name="$it" />""") }
+            appendLine("</locale-config>")
+        })
+    }
+}
+
 androidComponents.onVariants { variant ->
+    val variantLanguages = if (variant.buildType == "debug") appLanguages + pseudoLocales else appLanguages
+    variant.androidResources.localeFilters.set(resourceLocaleFilters(appLanguages) +
+        if (variant.buildType == "debug") pseudoLocales.map { it.replace("-", "-r") } else emptyList())
+    val localeConfig = tasks.register<GenerateAppLocaleConfig>(
+        "generate${variant.name.replaceFirstChar { it.uppercase() }}AppLocaleConfig",
+    ) {
+        languageTags.set(variantLanguages)
+    }
+    variant.sources.res?.addGeneratedSourceDirectory(localeConfig, GenerateAppLocaleConfig::outputDirectory)
+
     val aboutLegalAssets = tasks.register<GenerateAboutLegalAssets>(
         "generate${variant.name.replaceFirstChar { it.uppercase() }}AboutLegalAssets",
     ) {
