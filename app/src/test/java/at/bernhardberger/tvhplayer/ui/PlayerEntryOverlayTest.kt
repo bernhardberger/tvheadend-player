@@ -99,11 +99,13 @@ import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -144,6 +146,7 @@ class PlayerEntryOverlayTest {
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var playerSettings: PlayerSettingsStore
     private var playerVisible = false
+    private var beforeSettingsRead: suspend () -> Unit = {}
     private val loadGate = CountDownLatch(1)
 
     @After fun after() {
@@ -196,14 +199,93 @@ class PlayerEntryOverlayTest {
     @Test fun liveSoundOnlyKeepsTheTargetAndReturnsWithoutRebinding() = browseLive(WarmPlaybackMode.AUDIO_ONLY)
     @Test fun liveOffStopsAndLaterSelectionStartsAgain() = browseLive(WarmPlaybackMode.OFF)
 
-    private fun browseLive(mode: WarmPlaybackMode) {
-        app(programme = true, mode = mode)
+    @Test fun immediateSameChannelReturnWaitsForTheAcceptedStopEvenAfterAModeChange() {
+        app(programme = true, mode = WarmPlaybackMode.OFF)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        try {
+            // The runtime reads settings under its command serializer; hold that real command.
+            beforeSettingsRead = { if (entered.complete(Unit)) release.await() }
+            compose.runOnIdle { scope.launch { playerSettings.setKeepChannelMinutes(30) } }
+            compose.waitUntil(10_000) { entered.isCompleted }
+            leavePlayer()
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+            settle()
+            assertTrue("entry waits rather than adopting the half-stopped target", !playerVisible)
+            compose.runOnIdle { scope.launch { playerSettings.setWarmPlaybackMode(WarmPlaybackMode.ON) } }
+            settle()
+        } finally {
+            beforeSettingsRead = {}
+            release.complete(Unit)
+        }
+        compose.waitUntil(10_000) { playerVisible && session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK } > bindings }
+        settle()
+        assertEquals(bindings + 1, session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK })
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+    }
+
+    @Test fun soundOnlyBrowseEntryFadesTheCoverWithThePage() = soundOnlyEntry("browse")
+    @Test fun soundOnlyDetailsEntryFadesTheCoverWithThePage() = soundOnlyEntry("details")
+    @Test fun soundOnlyContextMenuEntryFadesTheCoverWithThePage() = soundOnlyEntry("menu")
+
+    private fun soundOnlyEntry(from: String) {
+        app(programme = true, mode = WarmPlaybackMode.AUDIO_ONLY, syntheticVideo = true)
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        leavePlayer()
+        if (from != "browse") {
+            key(Key.Menu)
+            if (from == "details") {
+                compose.onNode(hasText("Program details") and hasClickAction())
+                    .performSemanticsAction(SemanticsActions.OnClick)
+                settle()
+            }
+        }
+        val before = frame("sound-only-$from-before")
+        compose.mainClock.autoAdvance = false
+        val action = when (from) {
+            "browse" -> hasTestTag("channel-row-1")
+            "details" -> hasTestTag("details-watch")
+            else -> hasText("Watch") and hasClickAction() and hasAnyAncestor(hasTestTag("browse-context-menu"))
+        }
+        compose.onNode(action).performSemanticsAction(SemanticsActions.OnClick)
+        val frameCount = (PlayerMotion.DestinationMs + 100) / 16
+        val frames = (1..frameCount).map {
+            compose.mainClock.advanceTimeByFrame()
+            if (it == 1) compose.runOnIdle { assertTrue("sample the actual player-entry frame", playerVisible) }
+            frame(when (it) {
+                1 -> "sound-only-$from-first"
+                10 -> "sound-only-$from-fading"
+                frameCount -> "sound-only-$from-player"
+                else -> null
+            })
+        }
+        assertTrue("the first frame keeps the picture covered", before.indices.all { kotlin.math.abs(before[it] - frames.first()[it]) < 2f })
+        assertTrue("the picture is revealed as browse leaves", before.indices.any { kotlin.math.abs(before[it] - frames.last()[it]) > 40f })
+        compose.mainClock.autoAdvance = true
+        settle()
+        assertTrue(playerVisible)
+    }
+
+    private fun browseLive(mode: WarmPlaybackMode) {
+        val layout = if (mode == WarmPlaybackMode.AUDIO_ONLY) ChannelsLayout.IMMERSIVE else ChannelsLayout.LIST
+        val entryTag = if (layout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
+        app(programme = true, mode = mode, channelsLayout = layout)
+        compose.onNodeWithTag(entryTag).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
         settle()
         val epoch = runtime.videoPresentation.value.epoch
         val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
         leavePlayer()
+        if (mode == WarmPlaybackMode.AUDIO_ONLY) {
+            compose.onNodeWithTag("channels-immersive-background", useUnmergedTree = true).assertExists()
+        }
         compose.runOnIdle {
             assertEquals(if (mode == WarmPlaybackMode.OFF) null else AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
         }
@@ -213,7 +295,7 @@ class PlayerEntryOverlayTest {
             settle()
             assertEquals(null, runtime.activeTarget.value)
         }
-        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.onNodeWithTag(entryTag).performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
         settle()
         compose.runOnIdle {
@@ -364,7 +446,8 @@ class PlayerEntryOverlayTest {
         }
     }
 
-    private fun app(programme: Boolean, recordings: Boolean = false, mode: WarmPlaybackMode = WarmPlaybackMode.ON) {
+    private fun app(programme: Boolean, recordings: Boolean = false, mode: WarmPlaybackMode = WarmPlaybackMode.ON,
+        syntheticVideo: Boolean = false, channelsLayout: ChannelsLayout = ChannelsLayout.LIST) {
         // The app reads the wall clock to find the programme on air, so it spans every time.
         val event = EpgEvent.create(EventId(1), ChannelId(1), AIRS_FROM, AIRS_UNTIL, title = "Ridge Light")
         val entries = if (recordings) listOf(7L, 8L).map { id -> DvrEntry.create(
@@ -380,7 +463,7 @@ class PlayerEntryOverlayTest {
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)),
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )).apply { scriptLivePlaybackSuccess(); if (recordings) scriptRecordingPlaybackSuccess() }
-        val settings = PlayerSettingsStore(InMemoryData())
+        val settings = PlayerSettingsStore(InMemoryData { beforeSettingsRead() })
         playerSettings = settings
         runBlocking { settings.setWarmPlaybackMode(mode) }
         val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
@@ -407,8 +490,7 @@ class PlayerEntryOverlayTest {
             single { profiles }
             single { settings }
             single { ChannelTagSettingsStore(InMemoryData()) }
-            // These journeys walk the list's rows.
-            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(ChannelsLayout.LIST)) } } }
+            single { UiSettingsStore(InMemoryData()).apply { runBlocking { setChannelsView(ChannelsView(channelsLayout)) } } }
             single { LastPlayedChannelStore(context) }
             single { ChannelSelectionStore() }
             single { GuidePositionStore() }
@@ -432,20 +514,22 @@ class PlayerEntryOverlayTest {
                         applianceLaunchRequests = ApplianceLaunchRequests(),
                         onPlayerVisibilityChanged = { playerVisible = it },
                         onRequestExit = {},
+                        debugVideoBackdropVisible = syntheticVideo,
                     )
                 }
             }
             }
         }
+        val entryTag = if (channelsLayout == ChannelsLayout.LIST) "channel-row-1" else "channel-card-1"
         compose.waitUntil(15_000) {
-            compose.onAllNodes(hasTestTag("channel-row-1")).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodes(hasTestTag(entryTag)).fetchSemanticsNodes().isNotEmpty()
         }
         settle()
         compose.waitUntil(10_000) { compose.onAllNodes(isFocused()).fetchSemanticsNodes().isNotEmpty() }
         if (compose.onAllNodes(hasTestTag("nav-channels") and isFocused()).fetchSemanticsNodes().isNotEmpty()) {
             key(Key.DirectionRight)
         }
-        compose.onNodeWithTag("channel-row-1").assertExists()
+        compose.onNodeWithTag(entryTag).assertExists()
         settle()
     }
 
@@ -475,9 +559,15 @@ class PlayerEntryOverlayTest {
     }
 
     /** The luminance drawn now, every fourth pixel each way. */
-    private fun frame(): FloatArray = compose.runOnIdle {
+    private fun frame(captureName: String? = null): FloatArray = compose.runOnIdle {
         val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(bitmap))
+        if (captureName != null) {
+            val directory = java.io.File("build/outputs/warm-choice-review").apply { mkdirs() }
+            java.io.File(directory, "$captureName.png").outputStream().use {
+                check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
+            }
+        }
         val values = ArrayList<Float>()
         for (y in 0 until bitmap.height step 4) {
             for (x in 0 until bitmap.width step 4) {
@@ -530,9 +620,12 @@ class PlayerEntryOverlayTest {
         val AIRS_UNTIL = Instant.parse("2100-01-01T00:00:00Z")
     }
 
-    private class InMemoryData : DataStore<Preferences> {
+    private class InMemoryData(private val beforeRead: suspend () -> Unit = {}) : DataStore<Preferences> {
         val state = MutableStateFlow(emptyPreferences())
-        override val data: Flow<Preferences> get() = state
+        override val data: Flow<Preferences> get() = kotlinx.coroutines.flow.flow {
+            beforeRead()
+            emitAll(state)
+        }
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
             transform(state.value).also { state.value = it }
     }

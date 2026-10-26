@@ -13,10 +13,18 @@ class PlaybackSurfacePolicyTest {
             assertTrue(shouldMountPersistentPlayerSurface(hasActivePlayback = true, isPlayerRoute = false))
             assertEquals(mode == WarmPlaybackMode.ON, shouldShowWarmPlaybackScrim(true, false, mode))
             assertEquals(mode == WarmPlaybackMode.OFF, shouldStopPlaybackWhileBrowsing(false, mode))
+            assertEquals(mode != WarmPlaybackMode.ON, shouldCoverWarmPlayback(false, mode))
+            assertFalse(shouldCoverWarmPlayback(true, mode))
             assertFalse(shouldStopPlaybackWhileBrowsing(true, mode))
             assertFalse(shouldShowWarmPlaybackScrim(true, true, mode))
             assertFalse(shouldShowWarmPlaybackScrim(false, false, mode))
         }
+    }
+    @Test fun loadingPreferencesCoverBrowseWithoutScrimOrStop() {
+        assertTrue(shouldCoverWarmPlayback(false, null))
+        assertFalse(shouldCoverWarmPlayback(true, null))
+        assertFalse(shouldShowWarmPlaybackScrim(true, false, null))
+        assertFalse(shouldStopPlaybackWhileBrowsing(false, null))
     }
     @Test
     fun `only visible foreground playing video keeps the screen awake`() {

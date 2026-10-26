@@ -978,14 +978,20 @@ class ProgrammeDetailsPageTest {
     }
 
     @Test fun soundOnlyKeepsTheProgrammeArtworkWhilePlaybackContinues() {
-        show(warm = at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim(
-            true, false, at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.AUDIO_ONLY))
+        val mode = androidx.compose.runtime.mutableStateOf(at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.ON)
+        show(warmMode = mode)
+        compose.onNodeWithTag("details-hero").assertDoesNotExist()
+        compose.runOnIdle { mode.value = at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.AUDIO_ONLY }
+        compose.waitForIdle()
         compose.onNodeWithTag("details-hero").assertExists()
     }
 
     @Test fun stoppedBrowseUsesTheProgrammeArtwork() {
-        show(warm = at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim(
-            false, false, at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.OFF))
+        val mode = androidx.compose.runtime.mutableStateOf(at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.ON)
+        show(warmMode = mode)
+        compose.onNodeWithTag("details-hero").assertDoesNotExist()
+        compose.runOnIdle { mode.value = at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.OFF }
+        compose.waitForIdle()
         compose.onNodeWithTag("details-hero").assertExists()
     }
 
@@ -1309,7 +1315,8 @@ class ProgrammeDetailsPageTest {
         factsOnly: Boolean = false, longTitle: Boolean = false, noDescription: Boolean = false, heroVariant: Int? = null,
         withRating: Boolean = false, longSynopsis: Boolean = false, todayCard: Boolean = false, longFacts: Boolean = false, runningCard: Boolean = false,
         warm: Boolean = false, longMeta: Boolean = false, longSubtitle: Boolean = false, pastYear: Boolean = false,
-        recordingFacts: Boolean = false, cast: Boolean = false, stoppedEarly: Boolean = false) {
+        recordingFacts: Boolean = false, cast: Boolean = false, stoppedEarly: Boolean = false,
+        warmMode: androidx.compose.runtime.State<at.bernhardberger.tvhplayer.settings.WarmPlaybackMode>? = null) {
         val subtitle = if (longSubtitle && recordingFacts) "An extraordinary journey through the snowy mountains of the north, along the coast and across the wide valleys in the changing light of a long winter."
             else if (longSubtitle) "Eine außergewöhnliche Reise durch die verschneiten Berge des Nordens, entlang der Küste und über die weiten Täler im wechselnden Licht des langen Winters." else event.subtitle
         val shown = when {
@@ -1370,7 +1377,9 @@ class ProgrammeDetailsPageTest {
         val now = start.epochSeconds + if (future) -60 else 480
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale),
-                at.bernhardberger.tvhplayer.ui.LocalWarmPlayback provides warm) {
+                at.bernhardberger.tvhplayer.ui.LocalWarmPlayback provides (warmMode?.let {
+                    at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim(true, false, it.value)
+                } ?: warm)) {
                 TVHeadendPlayerTheme {
                     back = requireNotNull(androidx.activity.compose.LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     view = LocalView.current

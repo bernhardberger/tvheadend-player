@@ -70,6 +70,7 @@ import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
 import at.bernhardberger.tvhplayer.core.shouldStopPlaybackWhileBrowsing
+import at.bernhardberger.tvhplayer.core.shouldCoverWarmPlayback
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
@@ -169,6 +170,7 @@ internal fun MainNavigationShell(
     rail: @Composable () -> Unit,
     fullScreen: @Composable () -> Unit,
     motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
+    coverBrowse: Boolean = false,
 ) {
     AnimatedContent(
         targetState = showRail,
@@ -186,7 +188,15 @@ internal fun MainNavigationShell(
         SideEffect { backOwner.navigationEventDispatcher.isEnabled = !exiting }
         CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides backOwner) {
             // A move reversed mid-fade leaves this shell's entry focus spent: its frame restores it.
-            PlayerMotionFrame(leaving = exiting, restoreFocusOnReturn = true) { if (railShown) rail() else fullScreen() }
+            PlayerMotionFrame(leaving = exiting, restoreFocusOnReturn = true) {
+                if (railShown) {
+                    // The cover belongs to browse, including its outgoing overlays and fade.
+                    Box(Modifier.fillMaxSize()) {
+                        if (coverBrowse) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+                        rail()
+                    }
+                } else fullScreen()
+            }
         }
     }
 }
@@ -217,7 +227,6 @@ internal fun MainStartupComposition(
     modifier: Modifier = Modifier,
     loadingTiming: MainStartupLoadingTiming = remember { MainStartupLoadingTiming() },
     showWarmPlaybackScrim: Boolean = false,
-    coverWarmPlayback: Boolean = false,
     warmPlaybackScrimAlpha: Float = WarmPlaybackScrimAlpha,
     persistentSurface: @Composable BoxScope.() -> Unit = {},
     navigation: @Composable BoxScope.(AppNavKey, Boolean) -> Unit = { _, _ -> },
@@ -291,8 +300,6 @@ internal fun MainStartupComposition(
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
         .semantics { testTagsAsResourceId = true }) {
         persistentSurface()
-        // Keep the surface attached and decoding for instant return, but draw ordinary browse art.
-        if (coverWarmPlayback) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
         if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
         val startDestination = state.navigationStartDestination
         if (state.navigationAllowed && startDestination != null) {
@@ -335,14 +342,6 @@ internal const val StartupRevealMs = 500
 
 /** True only when the live or recording picture is shown behind browse under [WarmPlaybackScrim]. */
 internal val LocalWarmPlayback = compositionLocalOf { false }
-
-/** Route/setting changes own the stop, not target changes: a browse selection starts before entry. */
-@Composable
-internal fun BrowsePlaybackEffect(isPlayer: Boolean, mode: WarmPlaybackMode, runtime: AppPlaybackRuntime) {
-    LaunchedEffect(isPlayer, mode, runtime) {
-        if (shouldStopPlaybackWhileBrowsing(isPlayer, mode)) runtime.stop()
-    }
-}
 
 @Composable
 internal fun WarmPlaybackScrim(
@@ -557,6 +556,7 @@ fun AppRoot(
     val playbackRuntime: AppPlaybackRuntime = koinInject()
     val tvheadendSession: TvheadendSession = koinInject()
     val playbackSelectionScope = rememberCoroutineScope()
+    var browseStop by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val playerEntry = remember { PlayerEntryHandoff() }
     val playbackOrchestrator = remember { AppRootPlaybackOrchestrator() }
     val playerSettingsStore: PlayerSettingsStore = koinInject()
@@ -614,8 +614,13 @@ fun AppRoot(
 
     val isPlayer = currentDestination is LivePlayerKey ||
         currentDestination is RecordingPlayerKey
-    if (currentDestination != null) {
-        warmPlaybackMode?.let { BrowsePlaybackEffect(isPlayer, it, playbackRuntime) }
+    LaunchedEffect(currentDestination != null, isPlayer, warmPlaybackMode, playbackRuntime) {
+        if (currentDestination != null && shouldStopPlaybackWhileBrowsing(isPlayer, warmPlaybackMode)) {
+            // An accepted stop outlives route/setting changes; entry waits before reading the target.
+            browseStop = playbackSelectionScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                withContext(NonCancellable) { playbackRuntime.stop() }
+            }
+        }
     }
     // Warm live playback behind browse has no player screen to retune it after a reconnect;
     // a channel paused there is stopped, since the restart ended what its Pause held.
@@ -783,6 +788,8 @@ fun AppRoot(
             }
             BackAction.RETURN_TO_PARENT -> Unit
             BackAction.RETURN_TO_PLAYER -> {
+                // A target being explicitly stopped is no longer a warm-return candidate.
+                if (browseStop?.isCompleted == false) return@rootBack
                 when (
                     val playerTarget = playbackOrchestrator.consumeWarmPlayerTarget(
                         activeChannelId = activeChannelId,
@@ -824,9 +831,10 @@ fun AppRoot(
         val selection = currentLivePlaybackSelection(tvheadendSession.observation.value, channelId)
         val viewingIntent = playbackRuntime.notePlaybackIntent()
         playerEntry.request(playbackSelectionScope) {
+            browseStop?.join()
             val target = playbackOrchestrator.requestLivePlayer(
-                activeChannelId = activeChannelId,
-                activeRecordingId = activeRecordingId,
+                activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
+                activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
                 requestedChannelId = channelId,
                 requestedChannelName = name,
                 viewingIntent = viewingIntent,
@@ -886,9 +894,10 @@ fun AppRoot(
                             onPlay = requestLivePlayer,
                             onPlayRecording = { selection ->
                                 playerEntry.request(playbackSelectionScope) {
+                                    browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = activeChannelId,
-                                        activeRecordingId = activeRecordingId,
+                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
+                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
                                         requestedRecordingId = selection.recordingId,
                                         startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
                                     ) ?: return@request
@@ -919,9 +928,10 @@ fun AppRoot(
                             onPlayRecording = { playbackSelection ->
                                 val recordingId = playbackSelection.recordingId
                                 playerEntry.request(playbackSelectionScope) {
+                                    browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = activeChannelId,
-                                        activeRecordingId = activeRecordingId,
+                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
+                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
                                         requestedRecordingId = recordingId,
                                         startPlayback = {
                                             playbackRuntime.playRecording(
@@ -955,7 +965,7 @@ fun AppRoot(
                             onReturnToRecording = { id, beforeRequest ->
                                 val currentTarget = playbackRuntime.activeTarget.value
                                 val currentSelection = playbackRuntime.recordingSelection.value
-                                val stillWarm = warmRecordingId(currentTarget, currentSelection,
+                                val stillWarm = browseStop?.isCompleted != false && warmRecordingId(currentTarget, currentSelection,
                                     tvheadendSession.observation.value.currentSession) == id
                                 if (stillWarm) {
                                     beforeRequest()
@@ -987,9 +997,10 @@ fun AppRoot(
                             onPlayRecording = { playbackSelection, intent ->
                                 val recordingId = playbackSelection.recordingId
                                 playerEntry.request(playbackSelectionScope) {
+                                    browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId = activeChannelId,
-                                        activeRecordingId = activeRecordingId,
+                                        activeChannelId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
+                                        activeRecordingId = (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
                                         requestedRecordingId = recordingId,
                                         startPlayback = {
                                             playbackRuntime.playRecording(
@@ -1027,8 +1038,11 @@ fun AppRoot(
                         LivePlayerRouteContent(
                             onPlayRecording = { selection ->
                                 playerEntry.request(playbackSelectionScope) {
+                                    browseStop?.join()
                                     val target = playbackOrchestrator.requestRecordingPlayer(
-                                        activeChannelId, activeRecordingId, selection.recordingId,
+                                        (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Live)?.channelId,
+                                        (playbackRuntime.activeTarget.value as? AppPlaybackTarget.Recording)?.recordingId,
+                                        selection.recordingId,
                                         startPlayback = { playbackRuntime.playRecording(selection, RecordingPlaybackStart.START_OVER) },
                                     ) ?: return@request
                                     backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.START_OVER))
@@ -1193,10 +1207,8 @@ fun AppRoot(
         showWarmPlaybackScrim = shouldShowWarmPlaybackScrim(
             hasActivePlayback = playbackState !is AppPlaybackState.Idle,
             isPlayerRoute = isPlayer,
-            // Until preferences load, cover the picture rather than flash a disabled backdrop.
-            mode = warmPlaybackMode ?: WarmPlaybackMode.AUDIO_ONLY,
+            mode = warmPlaybackMode,
         ),
-        coverWarmPlayback = !isPlayer && warmPlaybackMode != WarmPlaybackMode.ON,
         notices = { at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost() },
         persistentSurface = {
             if (shouldMountPersistentPlayerSurface(
@@ -1225,6 +1237,8 @@ fun AppRoot(
         navigation = { _, contentAllowed ->
             MainNavigationShell(
                 showRail = showRail,
+                // Use the browse role, not the live destination: the outgoing shell still covers video.
+                coverBrowse = shouldCoverWarmPlayback(isPlayerRoute = false, mode = warmPlaybackMode),
                 // The startup screen and its reveal own the way into an autoplay.
                 motionEnabled = !applianceLaunchActive && ValueAnimator.areAnimatorsEnabled(),
                 rail = {

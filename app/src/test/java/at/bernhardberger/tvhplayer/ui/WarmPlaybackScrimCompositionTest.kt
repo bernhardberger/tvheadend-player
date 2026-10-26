@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import at.bernhardberger.tvhplayer.core.MainStartupPresentation
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
+import at.bernhardberger.tvhplayer.core.shouldCoverWarmPlayback
 import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -45,6 +46,10 @@ class WarmPlaybackScrimCompositionTest {
 
     @Test fun offCoversThePictureWhileTheStopCompletes() {
         verify(true, false, 0xFF111416.toInt(), 0, "shell-off", WarmPlaybackMode.OFF)
+    }
+
+    @Test fun loadingPreferencesCoverThePictureWithoutAWarmScrim() {
+        verify(true, false, 0xFF111416.toInt(), 0, "shell-loading-preferences", null)
     }
 
     @Test fun returningFromSoundOnlyRevealsThePlayerWithoutTheBrowseCover() {
@@ -109,7 +114,7 @@ class WarmPlaybackScrimCompositionTest {
         expectedPixel: Int,
         expectedScrims: Int,
         captureName: String,
-        mode: WarmPlaybackMode = WarmPlaybackMode.ON,
+        mode: WarmPlaybackMode? = WarmPlaybackMode.ON,
     ) {
         lateinit var view: View
         compose.setContent {
@@ -120,7 +125,6 @@ class WarmPlaybackScrimCompositionTest {
                         SettingsKey(SettingsSection.GENERAL), true),
                     onBack = {}, onAction = {}, registerActivityKeyContract = { {} },
                     showWarmPlaybackScrim = shouldShowWarmPlaybackScrim(hasActivePlayback, isPlayerRoute, mode),
-                    coverWarmPlayback = !isPlayerRoute && mode != WarmPlaybackMode.ON,
                     persistentSurface = {
                         if (shouldMountPersistentPlayerSurface(hasActivePlayback, isPlayerRoute)) {
                             Box(Modifier.fillMaxSize().background(Color.White))
@@ -128,7 +132,12 @@ class WarmPlaybackScrimCompositionTest {
                     },
                     navigation = { _, _ ->
                         assertEquals(shouldShowWarmPlaybackScrim(hasActivePlayback, isPlayerRoute, mode), LocalWarmPlayback.current)
-                        Box(Modifier.align(Alignment.TopStart).size(32.dp).background(Color.Red))
+                        MainNavigationShell(
+                            showRail = !isPlayerRoute,
+                            coverBrowse = shouldCoverWarmPlayback(false, mode),
+                            rail = { Box(Modifier.size(32.dp).background(Color.Red)) },
+                            fullScreen = { Box(Modifier.size(32.dp).background(Color.Red)) },
+                        )
                     },
                     notices = {
                         Box(Modifier.align(Alignment.BottomEnd).size(32.dp).background(Color.Green))

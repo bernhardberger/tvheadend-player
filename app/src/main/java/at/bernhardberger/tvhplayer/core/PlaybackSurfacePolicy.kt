@@ -10,10 +10,13 @@ fun shouldMountPersistentPlayerSurface(
 fun shouldShowWarmPlaybackScrim(
     hasActivePlayback: Boolean,
     isPlayerRoute: Boolean,
-    mode: WarmPlaybackMode = WarmPlaybackMode.ON,
+    mode: WarmPlaybackMode? = WarmPlaybackMode.ON,
 ): Boolean = hasActivePlayback && !isPlayerRoute && mode == WarmPlaybackMode.ON
 
-fun shouldStopPlaybackWhileBrowsing(isPlayerRoute: Boolean, mode: WarmPlaybackMode): Boolean =
+fun shouldCoverWarmPlayback(isPlayerRoute: Boolean, mode: WarmPlaybackMode?): Boolean =
+    !isPlayerRoute && mode != WarmPlaybackMode.ON
+
+fun shouldStopPlaybackWhileBrowsing(isPlayerRoute: Boolean, mode: WarmPlaybackMode?): Boolean =
     !isPlayerRoute && mode == WarmPlaybackMode.OFF
 
 fun shouldKeepPlaybackScreenOn(
