@@ -10,7 +10,14 @@
     <string name="about_license">GNU General Public License v3</string>
     <string name="about_attribution">Based on TVHStream by Preclikos</string>
     <string name="about_notices">Notices and third-party libraries</string>
-    <string name="about_translators">Translator credits</string>
+    <!-- Section heading in Settings → About above the translation status and translator credits. -->
+    <string name="about_translation">Translation</string>
+    <!-- Shown only in machine-drafted languages. Max 40 characters. -->
+    <string name="about_machine_translated">Machine-translated</string>
+    <!-- Supporting line under about_machine_translated. -->
+    <string name="about_machine_translated_details">Nobody has checked this translation yet. Please report mistakes as GitHub issues for Tvheadend Player.</string>
+    <!-- True in each machine-drafted language's folder until a person has reviewed that language. -->
+    <bool name="language_machine_translated">false</bool>
     <!-- One entry per language: language name followed by contributor names. -->
     <string-array name="about_translator_credits" translatable="false" />
 </resources>

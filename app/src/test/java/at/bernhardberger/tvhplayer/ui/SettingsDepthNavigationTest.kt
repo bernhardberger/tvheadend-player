@@ -555,12 +555,12 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionRight)
         compose.onNodeWithText("Follow system").assertIsFocused()
         press(Key.DirectionDown)
-        compose.onNodeWithText("German").assertIsFocused()
+        compose.onNodeWithText("Deutsch").assertIsFocused()
         assertEquals(0, languageCalls)
         capture("language-choices")
         press(Key.DirectionCenter)
         compose.onNodeWithText("App language").assertIsFocused()
-        compose.onNodeWithText("German").assertExists()
+        compose.onNodeWithText("Deutsch").assertExists()
         assertEquals(1, languageCalls)
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("App language").assertIsFocused()
@@ -701,7 +701,7 @@ class SettingsDepthNavigationTest {
                         SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation, listOf(settingsRootLevel()) + settingsGeneralLevels(
-                                UiSettings(), AppLanguage.GERMAN, CacheStatistics.EMPTY, clearState, {}, {},
+                                UiSettings(), AppLanguage("de"), CacheStatistics.EMPTY, clearState, {}, {},
                                 { calls++; clearState = CacheClearState.CLEARING }),
                                 initialFocusEnabled = !drawerActive, contentPadding = padding)
                         }

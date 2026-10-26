@@ -180,8 +180,6 @@
     <string name="settings_player_nav">Wiedergabe</string>
     <string name="settings_appliance_nav">TV-Start</string>
     <string name="language_follow_system">System folgen</string>
-    <string name="language_german">Deutsch</string>
-    <string name="language_english">Englisch</string>
     <string name="settings_clock_format">Uhrzeitformat</string>
     <string name="channels_layout_list">Liste</string>
     <string name="channels_layout_grid">Raster</string>

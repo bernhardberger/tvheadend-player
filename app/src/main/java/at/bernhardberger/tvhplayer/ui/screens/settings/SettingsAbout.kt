@@ -15,6 +15,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.booleanResource
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
@@ -37,6 +38,7 @@ internal const val ABOUT_LEVEL = "settings-about"
 internal fun settingsAboutLevels(
     sessionState: SessionState,
     applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
+    machineTranslated: Boolean = booleanResource(R.bool.language_machine_translated),
 ): List<DepthLevel> {
     val credits = stringArrayResource(R.array.about_translator_credits).filter { it.isNotBlank() }
     // The reader is a dialog over Settings; the rows stay list items with the details page's read-more arrow.
@@ -53,12 +55,18 @@ internal fun settingsAboutLevels(
             onClick = { reading = license to "LICENSE" }),
         settingsRow("notices", notices, supporting = stringResource(R.string.about_attribution), titleMaxLines = 3,
             trailingIcon = R.drawable.ic_arrow_forward, onClick = { reading = notices to "NOTICE.md" }),
-    ) + credits.mapIndexed { index, credit ->
+    )
+    // One Translation group: the machine-translated notice first when this language has one, then the credits.
+    val translation = stringResource(R.string.about_translation)
+    val translationRows = listOfNotNull(if (machineTranslated) {
+        settingsRow("machine-translated", stringResource(R.string.about_machine_translated),
+            supporting = stringResource(R.string.about_machine_translated_details), section = translation)
+    } else null) + credits.mapIndexed { index, credit ->
         settingsRow("translator-$index", credit, titleMaxLines = Int.MAX_VALUE,
-            section = if (index == 0) stringResource(R.string.about_translators) else null)
+            section = if (index == 0 && !machineTranslated) translation else null)
     }
     return listOf(
-        settingsLevel(ABOUT_LEVEL, stringResource(R.string.settings_about), rows),
+        settingsLevel(ABOUT_LEVEL, stringResource(R.string.settings_about), rows + translationRows),
     )
 }
 

@@ -3,7 +3,9 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.core.app.LocaleManagerCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
@@ -21,6 +23,7 @@ import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import java.util.Locale
 
 internal const val LANGUAGE_LEVEL = "app-language"
 internal const val CLOCK_FORMAT_LEVEL = "clock-format"
@@ -36,13 +39,16 @@ internal fun settingsGeneralLevels(
     val statistics by storageViewModel.statistics.collectAsStateWithLifecycle()
     val clearState by storageViewModel.clearState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     return settingsGeneralLevels(
         settings, selectedLanguage, statistics, clearState,
         onSelectLanguage = { language ->
             // Save the parent identity/viewport BEFORE AppCompat recreates the activity.
             navigation.pop()
             if (language != selectedLanguage) {
-                AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(language.languageTag))
+                val system = LocaleManagerCompat.getSystemLocales(context)[0] ?: Locale.getDefault()
+                AppCompatDelegate.setApplicationLocales(
+                    LocaleListCompat.forLanguageTags(language.applicationLocaleTag(system)))
             }
         },
         onToggleEpg = { scope.launch { settingsStore.setShowEpgMenu(!settings.showEpgMenu) } },
@@ -72,11 +78,8 @@ internal fun settingsGeneralLevels(
         ClockFormat.TWENTY_FOUR_HOUR to stringResource(R.string.clock_format_24_hour),
     )
     val clockFormatTitle = stringResource(R.string.settings_clock_format)
-    val languages = listOf(
-        AppLanguage.SYSTEM to stringResource(R.string.language_follow_system),
-        AppLanguage.GERMAN to stringResource(R.string.language_german),
-        AppLanguage.ENGLISH to stringResource(R.string.language_english),
-    )
+    val languages = listOf(AppLanguage.SYSTEM to stringResource(R.string.language_follow_system)) +
+        AppLanguage.shipped.map { it to it.nativeName() }
     val languageTitle = stringResource(R.string.settings_app_language)
     val announcement = when (clearState) {
         CacheClearState.IDLE -> null
@@ -99,10 +102,12 @@ internal fun settingsGeneralLevels(
                 onClick = { if (clearState != CacheClearState.CLEARING) onClearCache() }),
         )),
         settingsLevel(LANGUAGE_LEVEL, languageTitle, languages.map { (language, label) ->
-            settingsRow(language.name, label, selected = language == selectedLanguage, onClick = { onSelectLanguage(language) })
-        }, initialItemId = selectedLanguage.name),
+            settingsRow(language.rowId, label, selected = language == selectedLanguage, onClick = { onSelectLanguage(language) })
+        }, initialItemId = selectedLanguage.rowId),
         settingsLevel(CLOCK_FORMAT_LEVEL, clockFormatTitle, clockFormats.map { (format, label) ->
             settingsRow(format.name, label, selected = format == settings.clockFormat, onClick = { onSelectClockFormat(format) })
         }, initialItemId = settings.clockFormat.name),
     )
 }
+
+private val AppLanguage.rowId: String get() = languageTag.ifEmpty { "system" }
