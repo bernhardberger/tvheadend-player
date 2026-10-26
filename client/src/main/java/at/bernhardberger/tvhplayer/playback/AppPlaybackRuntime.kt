@@ -1642,9 +1642,10 @@ class AppPlaybackRuntime(
 
     /**
      * Plays muted until the video decoder renders a further frame, the SDK confirms the rendered
-     * picture, [PAUSED_SEEK_NUDGE_MILLIS] pass, or a newer command arrives; then pauses again (the
-     * source it played, never a replacement) and restores the volume as it was. It holds the command lock throughout, so a newer command runs
-     * only after the player is paused and audible again: no stale pause or volume reaches it.
+     * picture, [PAUSED_SEEK_NUDGE_MILLIS] pass, or a newer command arrives; then pauses again
+     * (unless the target departed, so a withdrawal's replacement is never paused) and restores the
+     * volume as it was. It holds the command lock throughout, so a newer command runs only after
+     * the player is paused and audible again: no stale pause or volume reaches it.
      */
     @OptIn(ExperimentalTvheadendApi::class)
     private suspend fun refreshPausedSeekPictureLocked(
@@ -1656,7 +1657,8 @@ class AppPlaybackRuntime(
         val counters = player.videoDecoderCounters
         counters?.ensureUpdated()
         val renderedBefore = counters?.renderedOutputBufferCount ?: 0
-        // The SDK can replace the source itself (a restarted segment): its replacement is not ours to pause.
+        // The SDK can replace the source of the same target itself (a restarted segment): that ends
+        // the refresh, and the viewer's paused target stays paused.
         val item = player.currentMediaItem
         val volume = player.volume
         val deadline = elapsedRealtime() + PAUSED_SEEK_NUDGE_MILLIS
@@ -1685,7 +1687,7 @@ class AppPlaybackRuntime(
                 delay(MOTION_POLL_MILLIS)
             }
         } finally {
-            if (player.currentMediaItem === item) player.pause()
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) player.pause()
             player.volume = volume
             // Cleared after the pause, so the paused controls never see a play in between.
             pausedSeekNudging = false

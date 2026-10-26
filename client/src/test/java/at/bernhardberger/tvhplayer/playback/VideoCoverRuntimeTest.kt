@@ -1277,7 +1277,7 @@ class VideoCoverRuntimeTest {
         }
     }
 
-    @Test fun aSourceReplacedDuringAPausedSeekRefreshEndsItWithoutPausingTheReplacement() {
+    @Test fun aSourceReplacedDuringAPausedSeekRefreshEndsItAndTheViewerStaysPaused() {
         val trace = NudgeTrace()
         exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
             pausedTunneledTimeshift()
@@ -1288,8 +1288,8 @@ class VideoCoverRuntimeTest {
             forcedMediaItem = androidx.media3.common.MediaItem.fromUri("replacement")
             advance(MOTION_POLL_MILLIS)
             await { !runtime.livePause.value.pausedSeekRefresh }
-            assertEquals(0, pauses)
-            assertTrue(player.playWhenReady)
+            assertEquals(1, pauses)
+            assertFalse(player.playWhenReady)
             assertEquals(listOf(0f, 0.37f), volumeWrites)
             assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
         }
