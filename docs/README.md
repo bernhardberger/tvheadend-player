@@ -40,6 +40,8 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | Document | Scope and lifecycle |
 |---|---|
 | `roadmap-1.0.md` | Internal, preliminary working plan (not a promise): milestone order from the current Player to a signed 1.0; links the plans that own each step. Archive at 1.0. |
+| `translations-plan.md` | Approved language slate and staged translation rollout; implementation status is separate from release acceptance. |
+| `translations/README.md` | Translation drafting, review and source-delta maintenance workflow. |
 | `ux-inventory-1.0.md` | Per-screen UX inventory (current state, unfinished parts, nits, gaps, questions) feeding the roadmap's UX rework packages. Owner-corrected 2026-10-12; per-screen questions remain open. |
 | `programme-window-prototype.md` | Programme-window Player prototype behavior, interaction checks and current experiment boundaries. |
 | `defect-ledger.md` | Open and closed defects from the post-SDK-refactor player stabilisation. Read when working on live-player performance or interaction defects; close rows only with the named evidence. |

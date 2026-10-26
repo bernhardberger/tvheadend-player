@@ -1,0 +1,16 @@
+source,context,de,provenance
+Channel,TV service rather than a frequency,Sender,existing app nav_channels
+Guide,Electronic program guide,Programmführer,existing app nav_epg
+Recording,Recorded TV program,Aufnahme,existing app nav_recordings (plural Aufnahmen)
+Record,Action to schedule or start recording,Aufnehmen,existing app record
+Watch,Action to start playback,Ansehen,existing app context_watch
+Retention,How long a recording is kept,Aufbewahrung,existing app details_retention
+Missed,Recording that did not take place,Verpasst,existing app recording_state_missed
+Completed,Recording state,Abgeschlossen,existing app recording_state_completed
+Live,At the live edge,Live,existing app timeshift_live
+Tuning,Switching to a selected channel; never channel scanning,,semantic guidance; wording needs review
+Timeshift,Pause or rewind live TV within the available buffer,,semantic guidance
+Mux,Broadcast multiplex carrying several services,,semantic guidance; keep distinct from Channel
+Cancel,Cancel a future scheduled recording,,semantic guidance; not Stop or Delete
+Stop,End an active recording and retain what was recorded,,semantic guidance; not Cancel or Delete
+Delete,Remove a recording and its file,,semantic guidance; destructive action
