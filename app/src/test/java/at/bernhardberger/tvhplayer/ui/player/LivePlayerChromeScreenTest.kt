@@ -1501,6 +1501,19 @@ class LivePlayerChromeScreenTest {
         compose.onNodeWithTag("player-pause").assertIsFocused()
     }
 
+    @Test fun infoUnderAGuideClosedByAZapLeavesNoReturnFocus() {
+        screen()
+        key(Key.DirectionDown)
+        key(Key.Info)
+        key(Key.Guide)
+        assertTrue(exists("channel-schedule-panel"))
+        key(Key.ChannelUp)
+        assertFalse(exists("channel-schedule-panel"))
+        assertFalse(exists("programme-details-page"))
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+    }
+
     @Test fun guideFromControlsRestoresTheFocusedButton() {
         screen()
         key(Key.DirectionDown)

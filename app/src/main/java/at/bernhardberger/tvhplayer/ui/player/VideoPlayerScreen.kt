@@ -805,6 +805,8 @@ fun VideoPlayerScreen(
     fun prepareSchedule() {
         if (timelineState.seekPending) timelineState.commitPendingSeek()
         channelNumberInput = ""
+        // A zap can close the schedule past a covered Info; closeInfo() sets the target again on a real return.
+        infoReturnAction = null
     }
 
     fun dismissRecordingDialog() {
