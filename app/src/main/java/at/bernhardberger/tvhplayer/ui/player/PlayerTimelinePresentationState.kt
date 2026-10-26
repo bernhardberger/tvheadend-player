@@ -67,6 +67,9 @@ private class LiveTimelineSourceGeneration(
     var seekFeedbackJob: Job? = null
     var seekToken = 0
     var previewDismissalEpoch = 0L
+    /** The step whose announcement the screen reported, and the finished step waiting for it. */
+    var announcedToken = 0
+    var clearWhenAnnounced: Int? = null
     var seekQueuedAtMs = 0L
     var commitRequested = false
     var positionSampleEpoch = 0L
@@ -183,7 +186,21 @@ internal class LiveTimelinePresentationState(
             result.playbackSeek === pending.acceptedSeek
         ) {
             // Correlated Player-position evidence, not a decoded/displayed frame acknowledgement.
-            clearPreview(generation)
+            // The finished step is still to be spoken: its preview goes once that has been
+            // announced, or after a grace period if nothing shows it.
+            if (generation.announcedToken == pending.token) clearPreview(generation)
+            else if (generation.clearWhenAnnounced != pending.token) {
+                generation.clearWhenAnnounced = pending.token
+                generation.seekFeedbackJob?.cancel()
+                generation.seekFeedbackJob = scope.launch {
+                    delay(TIMESHIFT_SEEK_FEEDBACK_MS)
+                    if (generation === sourceGeneration && generation.preview?.token == pending.token) {
+                        generation.seekFeedbackJob = null
+                        clearPreview(generation)
+                    }
+                    releaseGenerationIfInactive(generation)
+                }
+            }
         }
         if (!result.available || generation.historyStartTimeline?.describesSameSegment(result.timeline) != true) {
             generation.historyStartTimeline = result.timeline?.takeIf {
@@ -406,6 +423,16 @@ internal class LiveTimelinePresentationState(
         clearPreview(sourceGeneration)
     }
 
+    /**
+     * The screen has put the spoken value of step [token] in front of the accessibility bridge. A
+     * finished step's preview, kept for that, goes now.
+     */
+    fun stepAnnounced(token: Int) {
+        val generation = sourceGeneration
+        generation.announcedToken = token
+        if (generation.clearWhenAnnounced == token && generation.preview?.token == token) clearPreview(generation)
+    }
+
     fun commitPendingSeek() {
         val generation = sourceGeneration
         if (disposed || generation.seekQueue.pendingDeltaMs == 0L) return
@@ -458,6 +485,7 @@ internal class LiveTimelinePresentationState(
         generation.previewDismissalEpoch++
         generation.seekFeedbackJob?.cancel()
         generation.seekFeedbackJob = null
+        generation.clearWhenAnnounced = null
         generation.preview = null
         if (!generation.seekQueue.dispatchInFlight) {
             generation.selectionTimeline = null

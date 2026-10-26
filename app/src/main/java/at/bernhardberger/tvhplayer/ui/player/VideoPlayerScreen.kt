@@ -516,6 +516,10 @@ fun VideoPlayerScreen(
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
     val visibleSeekPreview = timelineState.previewForTimeline(effectiveTimeshiftState.timeline)
+    val previewToken = visibleSeekPreview?.token
+    val onStepAnnounced = remember(timelineState, previewToken) {
+        { previewToken?.let(timelineState::stepAnnounced); Unit }
+    }
     val nowSec = timelineState.nowEpochSec
     var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
 
@@ -1584,6 +1588,7 @@ fun VideoPlayerScreen(
                 step = bannerSeekPreview?.decision,
                 stepDeltaMs = visibleSeekPreview?.decision?.deltaMs,
                 stepSettled = visibleSeekPreview?.dispatched == true,
+                onStepAnnounced = onStepAnnounced,
                 liveStart = liveStart,
                 liveAvailable = !channelUnavailable,
                 feedback = timelineState.feedback,

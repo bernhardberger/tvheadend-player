@@ -1,3 +1,5 @@
+@file:OptIn(at.bernhardberger.tvheadend.sdk.core.TvheadendTestingApi::class, kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
@@ -16,14 +18,23 @@ import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
+import at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekToken
+import at.bernhardberger.tvheadend.sdk.media3.testing.TimeshiftTestFixture
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.playback.toAppPresentation
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.common.formatClock
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.advanceTimeBy
+import kotlinx.coroutines.test.runCurrent
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -277,6 +288,82 @@ class PlayerChromeTimelineRowTest {
         compose.runOnIdle { feedback = "Seek failed" }
         restFor(16)
         assertEquals("$said. Seek failed", spoken("timeshift-seek-preview"))
+    }
+
+    @Test fun aStepWhoseOffsetTheServerRefinesAfterTheDispatchIsAnnouncedOnce() {
+        var decision by mutableStateOf(TimeshiftSeekDecision(-30_000, -30_000, false))
+        var state by mutableStateOf(atEdge.copy(timingKnown = true))
+        var announcements = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TimeshiftSeekPreviewTimeline(state, decision, nowSec = now, settled = true, onAnnounced = { announcements++ })
+            }
+        }
+        restFor(2_000)
+        val said = spoken("timeshift-seek-preview")
+        assertTrue(said, said.startsWith("30 seconds back, target"))
+        assertEquals(1, announcements)
+        // The resolved answer rewrites the offset by a few hundred milliseconds while the buffer ticks.
+        compose.runOnIdle {
+            decision = TimeshiftSeekDecision(-30_400, -30_400, false)
+            state = state.copy(bufferStartMs = -660_000)
+        }
+        restFor(2_000)
+        compose.runOnIdle { decision = TimeshiftSeekDecision(-29_700, -29_700, false) }
+        restFor(2_000)
+        assertEquals(said, spoken("timeshift-seek-preview"))
+        assertEquals("the same step is not announced again", 1, announcements)
+    }
+
+    @Test fun aSuccessfulStepWhoseDispatchAndCompletionLandBeforeTheNextCompositionIsAnnouncedOnce() {
+        val fixture = TimeshiftTestFixture(600.seconds).apply { updateHistory(start = 0.seconds, end = 600.seconds) }
+        fun at(positionMs: Long, seek: TimeshiftSeekToken? = null) =
+            fixture.state.value.toAppPresentation(
+                if (seek == null) fixture.playbackPosition(positionMs.milliseconds) else fixture.playbackPosition(positionMs.milliseconds, seek),
+            )
+        // The state runs on its own scheduler, so the test decides when a frame is composed.
+        val states = TestScope()
+        val owner = LiveTimelinePresentationState(states, { 0L }, { states.testScheduler.currentTime })
+        val accepted = fixture.completed(readerReached = null)
+        var announcements = 0
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                owner.preview?.let { preview ->
+                    TimeshiftSeekPreviewTimeline(
+                        at(540_000L), preview.decision, nowSec = now, settled = preview.dispatched,
+                        onAnnounced = { announcements++; owner.stepAnnounced(preview.token) },
+                    )
+                }
+            }
+        }
+        restFor(100)
+        compose.runOnIdle {
+            owner.queueRelativeSeek(at(540_000L), -30_000L, "unavailable", "expired", "replaced", "uncertain") { accepted }
+        }
+        restFor(100)
+        assertEquals("a pending step announces nothing", "", spoken("timeshift-seek-preview"))
+        compose.runOnIdle {
+            states.advanceTimeBy(400L)
+            states.runCurrent()
+            assertTrue(requireNotNull(owner.preview).dispatched)
+            assertNotNull(owner.preview?.acceptedSeek)
+            // The correlated Player evidence of the completed seek arrives in the same frame.
+            val evidence = at(510_000L, accepted.seek)
+            assertEquals(evidence, runBlocking { owner.sampleTimeshiftPresentation { evidence } })
+            assertNotNull("the finished step is kept to be announced", owner.preview)
+        }
+        restFor(16)
+        val said = spoken("timeshift-seek-preview")
+        assertTrue(said, said.startsWith("30 seconds back, target"))
+        restFor(STEP_ANNOUNCEMENT_HOLD_MS + 100)
+        assertEquals(1, announcements)
+        assertNull("announced, the preview is retired", owner.preview)
+        restFor(2_000)
+        assertFalse(exists("timeshift-seek-preview"))
+        assertEquals(1, announcements)
+        owner.dispose()
     }
 
     private val burstBuffer = atEdge.copy(timingKnown = true)

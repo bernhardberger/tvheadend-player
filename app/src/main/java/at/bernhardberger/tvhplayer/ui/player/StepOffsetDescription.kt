@@ -8,6 +8,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import at.bernhardberger.tvhplayer.R
@@ -16,27 +17,60 @@ import at.bernhardberger.tvhplayer.core.StepReadout
 /**
  * The spoken step: [text] once the step has settled, else what was spoken last (null before the
  * first). The visible label follows every step; this follows the settled one, so a held key is
- * announced once, with its final value. [key] identifies what is announced (offset, target and
- * feedback); [text] is read when the key settles, so a part that keeps changing, a growing
- * buffer's length, is filled in then and does not announce the same step again. A null [key] ends
- * the stepping at once.
+ * announced once, with its final value. [key] identifies the step (its offset and target as
+ * spoken) and is held from the moment [settled] turns true: the server's resolved answer
+ * refines the offset after the dispatch by a few hundred milliseconds, which is the same step.
+ * [change] is what may announce a settled step again, its feedback. [text] is read when the
+ * step settles or [change] changes, so a part that keeps changing, a growing buffer's length,
+ * is filled in then and does not announce the same step again. A null [key] ends the stepping
+ * at once.
  *
  * [settled] is the seek state's own: the step has been dispatched, by the debounce running out or
  * by the key being released. It is not a timer of this composition, which a quick completion
- * removing the preview could cut short.
+ * removing the preview could cut short. [onPublished] reports back, a moment after the spoken
+ * value is in the semantics, that the announcement has been made, so the seek state keeps a
+ * preview that a successful completion has already finished until then.
  */
 @Composable
-internal fun rememberSettledStep(key: String?, settled: Boolean, text: String): String? {
+internal fun rememberSettledStep(
+    key: String?,
+    settled: Boolean,
+    text: String,
+    change: String = "",
+    onPublished: () -> Unit = {},
+): String? {
     val latest by rememberUpdatedState(text)
-    var spoken by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(key, settled) {
+    val publish by rememberUpdatedState(onPublished)
+    val held = remember { SpokenBeforeStep("") }
+    if (!settled || key == null || held.key == null) held.key = key
+    val stepKey = held.key
+    var announcement by remember { mutableStateOf<Announcement?>(null) }
+    LaunchedEffect(stepKey, settled, change) {
         when {
-            key == null -> spoken = null
-            settled -> spoken = latest
+            stepKey == null -> announcement = null
+            // The report is the one of this step, not of a later one that starts within the hold.
+            settled -> announcement = Announcement(latest, publish)
         }
     }
-    return if (key == null) null else spoken
+    LaunchedEffect(announcement) {
+        announcement?.let {
+            // The accessibility bridge reads the semantics on its own cadence; the node has to be
+            // there for it.
+            delay(STEP_ANNOUNCEMENT_HOLD_MS)
+            it.onPublished()
+        }
+    }
+    return if (key == null) null else announcement?.text
 }
+
+/** One announcement; a repeat of the same words is still a new one. */
+private class Announcement(val text: String, val onPublished: () -> Unit)
+
+/**
+ * How long a finished step's preview waits, once its announcement is in the semantics, for the
+ * accessibility bridge to pick it up before the seek state may retire the preview.
+ */
+internal const val STEP_ANNOUNCEMENT_HOLD_MS = 200L
 
 /**
  * The value a focused bar speaks: [plain] outside a step; during one, the [stepped] value of the
@@ -44,8 +78,14 @@ internal fun rememberSettledStep(key: String?, settled: Boolean, text: String): 
  * just before the step began. Nothing moves with the step mid-burst, programme metadata included.
  */
 @Composable
-internal fun rememberSteppedSpoken(plain: String, stepKey: String?, settled: Boolean, stepped: String): String {
-    val settledStep = rememberSettledStep(stepKey, settled, stepped)
+internal fun rememberSteppedSpoken(
+    plain: String,
+    stepKey: String?,
+    settled: Boolean,
+    stepped: String,
+    onPublished: () -> Unit = {},
+): String {
+    val settledStep = rememberSettledStep(stepKey, settled, stepped, onPublished = onPublished)
     val before = remember { SpokenBeforeStep(plain) }
     SideEffect { if (stepKey == null) before.value = plain }
     return when {
@@ -54,7 +94,7 @@ internal fun rememberSteppedSpoken(plain: String, stepKey: String?, settled: Boo
     }
 }
 
-private class SpokenBeforeStep(var value: String)
+private class SpokenBeforeStep(var value: String, var key: String? = null)
 
 /**
  * A live step as spoken: offset, target, the distance behind live when the target is a clock time
