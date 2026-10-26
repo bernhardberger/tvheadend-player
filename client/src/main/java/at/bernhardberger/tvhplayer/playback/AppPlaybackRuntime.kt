@@ -1610,13 +1610,15 @@ class AppPlaybackRuntime(
         if (!player.trackSelectionParameters.tunnelingRequested || player.playWhenReady) return
         val epoch = activeTargetEpoch ?: return
         val intent = playbackRequests.get()
+        val item = player.currentMediaItem
         scope.launch {
             targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
                 // The decoder may have rendered the new picture while the refresh waited its turn.
-                if (!pausedSeekSuperseded(arrival, intent, epoch) && !player.playWhenReady &&
+                if (!pausedSeekSuperseded(arrival, intent, epoch) && player.currentMediaItem === item &&
+                    !player.playWhenReady &&
                     latestConfirmation() != PausedSeekConfirmation.FRAME_RENDERED
                 ) {
-                    refreshPausedSeekPictureLocked(arrival, intent, epoch, latestConfirmation)
+                    refreshPausedSeekPictureLocked(arrival, intent, epoch, item, latestConfirmation)
                 }
             }
         }
@@ -1652,6 +1654,7 @@ class AppPlaybackRuntime(
         arrival: Long,
         intent: Long,
         epoch: Long,
+        item: MediaItem?,
         latestConfirmation: () -> PausedSeekConfirmation?,
     ) {
         val counters = player.videoDecoderCounters
@@ -1659,7 +1662,6 @@ class AppPlaybackRuntime(
         val renderedBefore = counters?.renderedOutputBufferCount ?: 0
         // The SDK can replace the source of the same target itself (a restarted segment): that ends
         // the refresh, and the viewer's paused target stays paused.
-        val item = player.currentMediaItem
         val volume = player.volume
         val deadline = elapsedRealtime() + PAUSED_SEEK_NUDGE_MILLIS
         // Published before the play: the viewer's paused controls must not show it.

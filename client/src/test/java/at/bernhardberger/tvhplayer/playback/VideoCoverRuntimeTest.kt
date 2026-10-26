@@ -1277,6 +1277,27 @@ class VideoCoverRuntimeTest {
         }
     }
 
+    @Test fun aSourceReplacedBeforeAQueuedPausedSeekRefreshDoesNotPlay() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            var plays = 0
+            beforePlay = { plays++ }
+            var latest: PausedSeekConfirmation? = PausedSeekConfirmation.KEY_FRAME_QUEUED
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED, latestConfirmation = { latest })
+            // The SDK replaces the same target's source and clears its confirmation before the refresh runs.
+            forcedMediaItem = androidx.media3.common.MediaItem.fromUri("replacement")
+            latest = null
+            settle()
+            assertEquals(0, plays)
+            assertFalse(player.playWhenReady)
+            assertFalse(runtime.livePause.value.pausedSeekRefresh)
+            assertEquals(0.37f, player.volume)
+            assertEquals(emptyList<Float>(), volumeWrites)
+            assertEquals(emptyList<PausedSeekNudgePhase>(), trace.phases)
+        }
+    }
+
     @Test fun aSourceReplacedDuringAPausedSeekRefreshEndsItAndTheViewerStaysPaused() {
         val trace = NudgeTrace()
         exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
