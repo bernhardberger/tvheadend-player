@@ -48,6 +48,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.recordingContextActions
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.*
@@ -120,6 +121,8 @@ class WatchingProgressTest {
     private val livePosition = mutableStateOf<LiveViewerPosition?>(LiveViewerPosition(channel.id, now))
     private val indicator = mutableStateOf(ChannelPlaybackIndicator.PLAYING)
     private val target = mutableStateOf<AppPlaybackTarget?>(AppPlaybackTarget.Live(channel.id))
+    /** A player runtime that can go live; absent unless a test provides it. */
+    private val goLive = mutableStateOf<(suspend () -> Unit)?>(null)
 
     @Before fun prepare() {
         Locale.setDefault(Locale.US)
@@ -168,7 +171,46 @@ class WatchingProgressTest {
         compose.onNodeWithTag("channel-paused-indicator", useUnmergedTree = true).assertExists()
         assertOrangeProgress()
     }
-    @Test fun contextMenuMarksThePlayingProgramme() { show("menu"); marker().assertExists() }
+    @Test fun contextMenuDrawsTheMarkAsContinueWatchingsIcon() {
+        show("menu")
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        compose.onNodeWithText("Watch").assertDoesNotExist()
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        // The only mark is the button's icon; the item column beside it draws none.
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
+        assertMarkInside("Continue watching")
+        compose.runOnIdle { indicator.value = ChannelPlaybackIndicator.PAUSED }
+        assertMarkInside("Continue watching", "channel-paused-indicator")
+    }
+    @Test fun contextMenuOffersLiveOnlyBehindLive() {
+        goLive.value = {}
+        livePosition.value = LiveViewerPosition(channel.id, now - 600, behindLive = true)
+        show("menu")
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        compose.onNodeWithText("Watch live").assertExists()
+        assertMarkInside("Continue watching")
+        compose.runOnIdle { livePosition.value = LiveViewerPosition(channel.id, now, behindLive = false) }
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        compose.onNodeWithText("Continue watching").assertExists()
+    }
+    @Test fun contextMenuOnAirProgrammeContinuesWatchingWhileTheViewerIsInAnEarlierOne() {
+        goLive.value = {}
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 600)
+        show("menu")
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        compose.onNodeWithText("Watch live").assertExists()
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
+        assertMarkInside("Continue watching")
+    }
+    @Test fun contextMenuOfAnotherChannelKeepsWatch() {
+        goLive.value = {}
+        target.value = AppPlaybackTarget.Live(ChannelId(99))
+        show("menu")
+        compose.onNodeWithText("Watch").assertIsFocused()
+        compose.onNodeWithText("Continue watching").assertDoesNotExist()
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        marker().assertDoesNotExist()
+    }
     @Test fun detailsMarkBelongsToTheActionTarget() {
         show("mixed")
         compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(1)
@@ -608,6 +650,41 @@ class WatchingProgressTest {
     }
     @Test @Category(VisualCapture::class) fun programmePlayingCapture() = captureSurface("programme", "details-watch")
     @Test @Category(VisualCapture::class) fun menuPlayingCapture() = captureSurface("menu")
+    @Test @Category(VisualCapture::class) fun channelMenuLiveEdgeCapture() {
+        goLive.value = {}
+        livePosition.value = LiveViewerPosition(channel.id, now, behindLive = false)
+        show("menu")
+        save("menu-continue-live-edge")
+    }
+    @Test @Category(VisualCapture::class) fun channelMenuBehindLiveCapture() {
+        goLive.value = {}
+        livePosition.value = LiveViewerPosition(channel.id, now - 600)
+        show("menu")
+        save("menu-continue-behind-live")
+    }
+    @Test @Category(VisualCapture::class) fun guideMenuViewerProgrammeCapture() {
+        // From the Guide, the earlier programme the paused viewer is in.
+        goLive.value = {}
+        indicator.value = ChannelPlaybackIndicator.PAUSED
+        livePosition.value = LiveViewerPosition(channel.id, start.epochSeconds - 600)
+        show("menu-previous")
+        save("menu-continue-guide-viewer-programme")
+    }
+    @Test @Category(VisualCapture::class) fun playingRecordingMenuCapture() {
+        show("recording-menu")
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        save("menu-continue-recording")
+    }
+    @Test @Category(VisualCapture::class) fun detailsContinueBehindLiveCapture() {
+        goLive.value = {}
+        livePosition.value = LiveViewerPosition(channel.id, now - 600)
+        show("programme-continue")
+        save("details-continue-behind-live")
+    }
+    @Test @Category(VisualCapture::class) fun recordingDetailsContinueCapture() {
+        show("recording-continue")
+        save("details-continue-recording")
+    }
     @Test @Category(VisualCapture::class) fun zapPlayingCapture() = captureSurface("zap")
     @Test @Category(VisualCapture::class) fun recordingRowPlayingCapture() = captureSurface("row", "recording-list-entry-1")
     @Test @Category(VisualCapture::class) fun recordingDetailsPlayingCapture() = captureSurface("recording", "details-resume")
@@ -627,6 +704,12 @@ class WatchingProgressTest {
     }
 
     private fun marker() = compose.onNodeWithTag("channel-playing-indicator", useUnmergedTree = true)
+    private fun assertMarkInside(label: String, tag: String = "channel-playing-indicator") {
+        val button = compose.onNodeWithText(label).fetchSemanticsNode().boundsInRoot
+        val mark = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertTrue("$tag $mark is not inside $label $button", mark.left >= button.left &&
+            mark.right <= button.right && mark.top >= button.top && mark.bottom <= button.bottom)
+    }
     private fun progress(value: Float) = compose.onNodeWithTag("details-progress", useUnmergedTree = true)
         .assert(SemanticsMatcher.expectValue(SemanticsProperties.ProgressBarRangeInfo, ProgressBarRangeInfo(value, 0f..1f)))
     private fun progressBar() = compose.onNode(SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo),
@@ -665,9 +748,10 @@ class WatchingProgressTest {
     }
 
     private fun show(surface: String, picon: ArtworkId? = channel.icon) {
-        if (surface == "recording" || surface == "row") target.value = AppPlaybackTarget.Recording(recording.id)
+        if (surface in listOf("recording", "row", "recording-menu", "recording-continue"))
+            target.value = AppPlaybackTarget.Recording(recording.id)
         compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(2f, 1f),
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f), LocalWatchingGoLive provides goLive.value,
                 LocalWatchingTarget provides target.value,
                 LocalWatchingChannel provides (target.value as? AppPlaybackTarget.Live)?.channelId,
                 LocalWatchingIndicator provides indicator.value, LocalRecordingPosition provides position,
@@ -692,8 +776,25 @@ class WatchingProgressTest {
                                     recording.takeIf { surface == "recording" }, channel, now,
                                     listOf(if (surface == "recording") BrowseContextAction.RESUME else BrowseContextAction.WATCH,
                                         BrowseContextAction.SHOW_GUIDE), {}, {})
-                                "menu" -> ProgrammeContextMenu(event, channel, null, now, false,
+                                "menu", "menu-previous" -> ProgrammeContextMenu(
+                                    if (surface == "menu") event else previousEvent, channel, null, now, false,
                                     observation.currentSession, observation, false, { _, _ -> }, {})
+                                // As the Recordings screen opens it for the playing recording.
+                                "recording-menu" -> BrowseContextMenu(recording.title.orEmpty(), channel.name.orEmpty(),
+                                    "", "Tue 15 Sep · 19:00 – 21:00",
+                                    recordingContextActions(recording, SessionObservation.create(recordingProgressCapability =
+                                        RecordingProgressCapability.SUPPORTED).recordingPlaybackAdmission(recording), true,
+                                        playing = true), {}, {}, summary = event.summary.orEmpty(),
+                                    recordingState = recording.state, playbackIndicator = watchingIndicator(recording.id)) {
+                                    ProgrammeArtwork(recording.image, channel.icon, recordingViewerPosition(recording.id)?.fraction,
+                                        Modifier.fillMaxSize(), progressColor = progressColor(true))
+                                }
+                                "programme-continue" -> ProgrammeDetailsPage(event, null, channel, now,
+                                    listOf(BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.WATCH_LIVE,
+                                        BrowseContextAction.RECORD, BrowseContextAction.SHOW_GUIDE), {}, {})
+                                "recording-continue" -> ProgrammeDetailsPage(null, recording, channel, now,
+                                    listOf(BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.START_OVER,
+                                        BrowseContextAction.MARK_WATCHED, BrowseContextAction.DELETE), {}, {})
                                 "zap", "zap-no-history", "zap-gap" -> NowPlayingStrip(channel.id, "101", channel.name.orEmpty(), picon,
                                     event.takeUnless { surface == "zap-gap" }, now,
                                     Modifier.padding(48.dp), indicator.value,

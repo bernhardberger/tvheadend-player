@@ -355,20 +355,22 @@ internal fun RecordingsScreenContent(
         }
     }
 
-    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true) {
+    // [beforePlay] runs only when the recording plays, before the request; a menu stays up through it.
+    fun openRecording(entry: DvrEntry, returnIfPlaying: Boolean = true, beforePlay: () -> Unit = { showContextMenu = false }) {
         if (returnIfPlaying && entry.id == playingRecordingId && onReturnToRecording(entry.id, {})) return
         val current = latestObservationProvider()
         val capability = current.currentSession
         val action = at.bernhardberger.tvhplayer.core.recordingOpenAction(
             capability?.let { current.recordingPlaybackAdmission(entry) })
-        showContextMenu = false
         if (capability != null && (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.START_OVER ||
                 action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME)) {
+            beforePlay()
             onPlayRecording(RecordingPlaybackSelection(capability, entry.id),
                 if (action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME) RecordingPlaybackStart.RESUME
                 else RecordingPlaybackStart.START_OVER)
             return
         }
+        showContextMenu = false
         showResumeChoice = action == at.bernhardberger.tvhplayer.core.RecordingOpenAction.RESUME_CHOICE
         contentFocusOwned = false
         detailsInitialAction = null
@@ -953,6 +955,22 @@ internal fun RecordingsScreenContent(
         } else {
         val closeBehindPlayer = rememberCloseBehindPlayer()
         val entryPending = at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending()
+        // The menu and details return to the playing recording the same way.
+        val continueWatching = {
+            val leaveBehindPlayer = {
+                closeBehindPlayer {
+                    showContextMenu = false
+                    detailsEntry = null
+                    detailsObservation = null
+                    detailsInitialAction = null
+                    requestContentFocus = true
+                }
+            }
+            // Register only after warm validation, but before the request makes the handoff pending.
+            val returned = onReturnToRecording(opened.id, leaveBehindPlayer)
+            // A player that went since composition starts again; the menu or details stays until it shows.
+            if (!returned) openRecording(opened, returnIfPlaying = false, beforePlay = leaveBehindPlayer)
+        }
         val visibility = remember { MutableTransitionState(false).apply { targetState = true } }
         val closing = !visibility.targetState
         BackHandler(enabled = backEnabled && closing) { }
@@ -999,17 +1017,23 @@ internal fun RecordingsScreenContent(
             actions = recordingContextActions(opened, canModifyRecordings = selectedCapability != null &&
                 (observation.sessionState as? at.bernhardberger.tvheadend.sdk.core.SessionState.Ready)
                     ?.capabilities?.dvrWrite == at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-                admission = openedAdmission),
+                admission = openedAdmission, playing = selectedCapability != null && opened.id ==
+                    at.bernhardberger.tvhplayer.ui.warmRecordingId(
+                        at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget.current,
+                        at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection.current,
+                        observation.currentSession)),
             onClose = { visibility.targetState = false },
             onAction = { action ->
                 val playing = selectedCapability?.takeIf { action in listOf(BrowseContextAction.WATCH,
-                    BrowseContextAction.PLAY, BrowseContextAction.RESUME, BrowseContextAction.START_OVER) }
+                    BrowseContextAction.PLAY, BrowseContextAction.RESUME, BrowseContextAction.START_OVER,
+                    BrowseContextAction.CONTINUE_WATCHING) }
                 // Playback keeps the menu up until the player has replaced browse.
                 if (playing == null) {
                     menuConsumed = action != BrowseContextAction.DETAILS
                     showContextMenu = action in listOf(BrowseContextAction.STOP, BrowseContextAction.CANCEL, BrowseContextAction.DELETE)
                 }
                 when (action) {
+                    BrowseContextAction.CONTINUE_WATCHING -> playing?.let { continueWatching() }
                     BrowseContextAction.WATCH, BrowseContextAction.PLAY,
                     BrowseContextAction.RESUME, BrowseContextAction.START_OVER -> playing?.let {
                         closeBehindPlayer {
@@ -1102,13 +1126,7 @@ internal fun RecordingsScreenContent(
                 closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
                 watch(id, name)
             } },
-            onContinueWatching = {
-                val returned = onReturnToRecording(opened.id) {
-                    // Register only after warm validation, but before the request makes the handoff pending.
-                    closeBehindPlayer { detailsEntry = null; detailsObservation = null; requestContentFocus = true }
-                }
-                if (!returned) openRecording(opened, returnIfPlaying = false)
-            },
+            onContinueWatching = continueWatching,
             onClose = { visibility.targetState = false },
         )
         }

@@ -63,6 +63,8 @@ class BrowseContextMenuScreenTest {
     private var guideProgramme: EpgEvent? = null
     private var start: RecordingPlaybackStart? = null
     private var watchedChannel: ChannelId? = null
+    private var playedChannel: ChannelId? = null
+    private var goLives = 0
     private val playerEntry = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
 
     /** Starts a player request that stays pending, as while the player is still opening. */
@@ -360,6 +362,58 @@ class BrowseContextMenuScreenTest {
         compose.onNodeWithTag("centred-dialog-card").assertDoesNotExist()
         compose.onNodeWithText(watch).assertIsFocused()
         assertEquals(1, plays)
+    }
+
+    @Test fun programmeMenuWatchLiveGoesLiveOnTheWatchedChannel() = watchLiveFromMenu(noProgramme = false)
+    @Test fun channelMenuWatchLiveGoesLiveOnTheWatchedChannel() = watchLiveFromMenu(noProgramme = true)
+
+    private fun watchLiveFromMenu(noProgramme: Boolean) {
+        show(recordings = false, noProgramme = noProgramme, watching = true, behindLive = true)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Continue watching").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithText("Watch live").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle {
+            assertEquals(1, goLives)
+            assertEquals(1, plays)
+            assertEquals(ChannelId(1), playedChannel)
+        }
+    }
+
+    @Test fun programmeMenuContinueWatchingReturnsWithoutGoingLive() = continueFromMenu(noProgramme = false)
+    @Test fun channelMenuContinueWatchingReturnsWithoutGoingLive() = continueFromMenu(noProgramme = true)
+
+    private fun continueFromMenu(noProgramme: Boolean) {
+        show(recordings = false, noProgramme = noProgramme, watching = true, behindLive = true)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Continue watching").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        // The watched channel's own request returns to its player; nothing goes live or starts a recording.
+        compose.runOnIdle {
+            assertEquals(0, goLives)
+            assertEquals(1, plays)
+            assertEquals(ChannelId(1), playedChannel)
+            assertEquals(null, start)
+        }
+    }
+
+    @Test fun programmeMenuFromAGoneSessionDropsContinueAndLive() = staleSessionMenu(noProgramme = false)
+    @Test fun channelMenuFromAGoneSessionDropsContinueAndLive() = staleSessionMenu(noProgramme = true)
+
+    private fun staleSessionMenu(noProgramme: Boolean) {
+        val session = show(recordings = false, noProgramme = noProgramme, watching = true, behindLive = true)
+        compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        compose.onNodeWithText("Watch live").assertExists()
+        compose.mainClock.autoAdvance = false
+        compose.runOnIdle { session.replaceGeneration(session.observation.value) }
+        // The first frame with the new session, before the menu's close takes effect.
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("Continue watching").assertDoesNotExist()
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithText("Continue watching").assertDoesNotExist()
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        assertEquals(0, goLives)
     }
 
     @Test fun channelMenuRestoresOriginOnlyAfterExitAndConsumesKeysWhileClosing() {
@@ -1264,7 +1318,8 @@ class BrowseContextMenuScreenTest {
         description: String? = null, episodeSubtitle: String? = null, unknownDuration: Boolean = false,
         fixedNow: Long? = null, profiles: Boolean = false, scopeTabs: Boolean = false,
         offline: Boolean = false, guideDetails: Boolean = false, entryHandoff: Boolean = false,
-        rootArtwork: FakeTvheadendSession? = null): FakeTvheadendSession {
+        rootArtwork: FakeTvheadendSession? = null, watching: Boolean = false,
+        behindLive: Boolean = false): FakeTvheadendSession {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
         check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
@@ -1334,8 +1389,22 @@ class BrowseContextMenuScreenTest {
                     back = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
                     view = LocalView.current
                     val observation = session.observation.collectAsState().value
+                    // Watching: channel 1 plays, at live or rewound ten minutes, and the player runtime can go live.
+                    val livePosition = androidx.compose.runtime.remember {
+                        androidx.compose.runtime.mutableStateOf(at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition(
+                            channel.id, now.epochSeconds - if (behindLive) 600 else 0, behindLive))
+                    }
                     androidx.compose.runtime.CompositionLocalProvider(
-                        at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff provides playerEntry.takeIf { entryHandoff }) {
+                        at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff provides playerEntry.takeIf { entryHandoff },
+                        at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel provides channel.id.takeIf { watching },
+                        at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget provides
+                            at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(channel.id).takeIf { watching },
+                        at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides if (watching)
+                            at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.PLAYING
+                            else at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.NONE,
+                        at.bernhardberger.tvhplayer.ui.components.LocalLivePosition provides livePosition.takeIf { watching },
+                        at.bernhardberger.tvhplayer.ui.components.LocalWatchingGoLive provides
+                            (suspend { goLives++; Unit }).takeIf { watching }) {
                     Box(Modifier.fillMaxSize().background(androidx.tv.material3.MaterialTheme.colorScheme.background)) {
                         val content: @androidx.compose.runtime.Composable (Boolean) -> Unit = { drawerActive ->
                         layering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
@@ -1361,7 +1430,8 @@ class BrowseContextMenuScreenTest {
                             observation = observation, tagNotice = false, selectedId = { channel.id },
                             playingChannelId = null, connectionUiState = ConnectionUiState.Ready,
                             onSelectChannel = {}, onSelectTag = {}, onDismissTagNotice = {},
-                            onRetryConnection = {}, onOpenConnectionSettings = {}, onPlay = { _, _ -> plays++; requestPlayer() },
+                            onRetryConnection = {}, onOpenConnectionSettings = {},
+                            onPlay = { id, _ -> plays++; playedChannel = id; requestPlayer() },
                             onShowGuide = { channelId, programme -> guideRequest = channelId; guideProgramme = programme },
                             onPlayRecording = { plays++; start = RecordingPlaybackStart.START_OVER; requestPlayer() },
                         )

@@ -7,6 +7,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.testTag
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.BrowseContextAction
+import at.bernhardberger.tvhplayer.core.channelContextActions
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.rememberCloseBehindPlayer
@@ -15,10 +16,12 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import at.bernhardberger.tvhplayer.ui.components.BrowseContextMenu
 import at.bernhardberger.tvhplayer.ui.components.ProgrammeArtwork
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
-import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
-import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingGoLive
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.channelWatchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.watchingBehindLive
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Composable
@@ -56,28 +59,37 @@ internal fun ChannelContextMenu(
             mutationScope = mutationScope, mutationInFlight = mutationInFlight,
             onPlay = onPlay, onPlayRecording = onPlayRecording, onShowGuide = onShowGuide, onClose = onClose,
             returnFocusRequester = returnFocusRequester)
-    } else BrowseContextMenu(
-        title = at.bernhardberger.tvhplayer.ui.components.channelTitleText(channel.number, channel.name.orEmpty()),
-        channel = "", episode = "", time = "", watchChannel = true,
-        actions = listOf(BrowseContextAction.WATCH, BrowseContextAction.SHOW_GUIDE),
-        playbackIndicator = if (LocalWatchingChannel.current == channelId) LocalWatchingIndicator.current
-            else ChannelPlaybackIndicator.NONE,
-        onClose = onClose,
-        modifier = Modifier.onPreviewKeyEvent { entryPending() },
-        onAction = { action ->
-            when (action) {
-                BrowseContextAction.WATCH -> {
-                    closeBehindPlayer(onClose)
-                    onPlay(channelId, channel.name.orEmpty())
+    } else {
+        // Without a programme the watched channel still returns to its viewer, and to live beside it,
+        // while the session it opened with lasts; opened before Ready it keeps plain Watch.
+        val indicator = channelWatchingIndicator(channelId)
+        val goLive = LocalWatchingGoLive.current
+        val playing = capability != null && indicator != ChannelPlaybackIndicator.NONE
+        val behindLive = playing && goLive != null && watchingBehindLive(channelId)
+        BrowseContextMenu(
+            title = at.bernhardberger.tvhplayer.ui.components.channelTitleText(channel.number, channel.name.orEmpty()),
+            channel = "", episode = "", time = "", watchChannel = true,
+            actions = channelContextActions(null, nowSecProvider(), null, null, false, playing, behindLive),
+            playbackIndicator = indicator,
+            onClose = onClose,
+            modifier = Modifier.onPreviewKeyEvent { entryPending() },
+            onAction = { action ->
+                when (action) {
+                    BrowseContextAction.WATCH, BrowseContextAction.CONTINUE_WATCHING, BrowseContextAction.WATCH_LIVE -> {
+                        // The jump outlives this menu; the player's own command queue orders it.
+                        if (action == BrowseContextAction.WATCH_LIVE) goLive?.let { mutationScope.launch { it() } }
+                        closeBehindPlayer(onClose)
+                        onPlay(channelId, channel.name.orEmpty())
+                    }
+                    BrowseContextAction.SHOW_GUIDE -> { onClose(); onShowGuide(channelId, null) }
+                    else -> Unit
                 }
-                BrowseContextAction.SHOW_GUIDE -> { onClose(); onShowGuide(channelId, null) }
-                else -> Unit
-            }
-        },
-        artwork = {
-            ProvideArtworkSession(capability, observation) {
-                ProgrammeArtwork(null, channel.icon, null, Modifier.fillMaxSize().testTag("browse-context-picon"))
-            }
-        },
-    )
+            },
+            artwork = {
+                ProvideArtworkSession(capability, observation) {
+                    ProgrammeArtwork(null, channel.icon, null, Modifier.fillMaxSize().testTag("browse-context-picon"))
+                }
+            },
+        )
+    }
 }

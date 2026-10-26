@@ -13,6 +13,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -124,6 +125,42 @@ class InProgressRecordingResumeTest {
         compose.onNodeWithTag("details-watch").assertIsFocused()
             .performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+    }
+
+    @Test fun playingRecordingMenuContinuesWatchingInPlaceOfWatchAndNeverOffersLive() {
+        var returns = 0
+        val starts = openDetails(754L, menuOnly = true, warm = true, onReturn = { returns++; true })
+        compose.onNodeWithText("Continue watching").assertIsFocused()
+        compose.onNodeWithText("Watch").assertDoesNotExist()
+        compose.onNodeWithText("Resume").assertDoesNotExist()
+        compose.onNodeWithText("Watch live").assertDoesNotExist()
+        compose.onNodeWithText("Start over").assertExists()
+        // The playing mark is the button's icon, and the only one in the menu; the list beneath keeps its own.
+        val menuMark = hasTestTag("channel-playing-indicator") and hasAnyAncestor(hasTestTag("browse-context-menu"))
+        compose.onAllNodes(menuMark, useUnmergedTree = true).assertCountEquals(1)
+        compose.onNode(menuMark, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot.let { mark ->
+            val button = compose.onNodeWithText("Continue watching").fetchSemanticsNode().boundsInRoot
+            assertTrue("$mark inside $button", mark.left >= button.left && mark.right <= button.right &&
+                mark.top >= button.top && mark.bottom <= button.bottom)
+        }
+        compose.onNodeWithText("Continue watching").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(1, returns); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
+    }
+
+    @Test fun menuContinueWhosePlayerWentResumesWithoutFlippingToDetails() {
+        var returns = 0
+        val starts = openDetails(754L, menuOnly = true, warm = true, onReturn = { returns++; false })
+        compose.onNodeWithText("Continue watching").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, returns); assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+    }
+
+    @Test fun recordingMenuFromAnotherSessionKeepsWatch() {
+        openDetails(754L, menuOnly = true, warm = true, staleSession = true)
+        compose.onNodeWithText("Watch").assertIsFocused()
+        compose.onNodeWithText("Continue watching").assertDoesNotExist()
     }
 
     @Test
@@ -265,6 +302,9 @@ class InProgressRecordingResumeTest {
                     at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Recording(DvrEntryId(1)).takeIf { warm },
                 at.bernhardberger.tvhplayer.ui.components.LocalRecordingPlaybackSelection provides
                     at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection(playbackSession, DvrEntryId(1)).takeIf { warm },
+                at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides if (warm)
+                    at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.PLAYING
+                    else at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator.NONE,
             ) {
             TVHeadendPlayerTheme {
                 if (fromPlayer) at.bernhardberger.tvhplayer.ui.player.RecordingPlayerDetails(

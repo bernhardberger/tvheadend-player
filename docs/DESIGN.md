@@ -550,8 +550,9 @@ tuner loss and interruption are failures, limit expiry is informational.
   the system animator duration scale is zero. Pause and tuning keep their own marks.
   Recording and playing markers are separate data states shown by badge/icon,
   never by overloading focus or selection styling.
-  On the playing item's details page it replaces the play icon, without changing
-  the action or button colour. Recording list rows show it independently of selection.
+  In context menus and on details pages it is the icon of Continue watching, without
+  changing the action or button colour; menus draw no separate mark beside the title.
+  Recording list rows show it independently of selection.
 - Passive on-air progress on cards and rows is cyan and has no terminal marker
   that implies completion; watched progress (resume position) is orange, per the
   progress-colour rule in §2. The interactive playback timeline is a separate
@@ -1081,7 +1082,11 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   surface (Channels, Guide, airings): Watch, Details, the recording action,
   Show in Guide, so a held OK always lands on the same action. An ended
   programme whose recording the SDK admits for playback adds Play recording
-  right after Watch, as on its details page. An action that
+  right after Watch, as on its details page. On the watched channel, the
+  programme at the viewer's position, and while behind live also the one on
+  air, offer Continue watching in Watch's place, with Watch live right after
+  it while behind live; a playing recording's menu offers Continue watching in
+  place of Watch, Resume or Play, and never Watch live. An action that
   needs a confirmation closes the menu for good; Keep, Cancel and Back return focus to the originating card. Details
   opened from a menu return to the card on Back, never to the menu.
 - **Prompts and confirmations** (resume or start over; cancel, stop or delete a

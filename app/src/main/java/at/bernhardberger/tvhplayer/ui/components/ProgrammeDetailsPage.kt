@@ -1131,13 +1131,12 @@ private fun DetailsActions(
                     val indicator = when (action) {
                         BrowseContextAction.WATCH -> watchingIndicator(event, nowSec)
                         BrowseContextAction.PLAY, BrowseContextAction.RESUME -> watchingIndicator(recording?.id)
+                        // Behind live this can be the programme on air, not the one at the viewer's position.
                         BrowseContextAction.CONTINUE_WATCHING -> if (event == null) watchingIndicator(recording?.id)
-                            else watchingIndicator(event, nowSec)
+                            else channelWatchingIndicator(event.channelId)
                         else -> ChannelPlaybackIndicator.NONE
                     }
-                    if (indicator.isPlayingItem) {
-                        ChannelPlaybackMarker(indicator, size = ButtonDefaults.IconSize)
-                    } else Icon(painterResource(action.icon()), null, Modifier.size(ButtonDefaults.IconSize))
+                    BrowseContextActionIcon(action, indicator, ButtonDefaults.IconSize)
                     Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                     Text(stringResource(action.label(action == BrowseContextAction.WATCH &&
                         (event == null && recording?.state == DvrEntryState.SCHEDULED ||
