@@ -292,7 +292,9 @@ fun EpgGridScreen(
         .coerceAtLeast(1.dp)
     val timelineWidthPx = with(density) { timelineWidth.toPx() }
     // With the headline shown, the headline and grid sit lower so the bottom row shows it is cut.
-    val headlineDrop = guideHeadlineDrop(
+    // Computed where it is used: a value of this body costs registers in its one generated method.
+    @Composable
+    fun headlineDrop(): Dp = guideHeadlineDrop(
         viewportHeight = maxHeight,
         contentTop = contentPadding.calculateTopPadding(),
         gridTopPadding = guideTimelineContentPadding(contentPadding, layoutDirection).calculateTopPadding(),
@@ -1802,7 +1804,7 @@ fun EpgGridScreen(
                                 scopeObservation = channelScopeState.observation,
                                 loading = true,
                                 nowSec = nowSecProvider,
-                                modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop),
+                                modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop()),
                             )
                         }
                     } else null,
@@ -1847,7 +1849,7 @@ fun EpgGridScreen(
                 scopeObservation = channelScopeState.observation,
                 nowSec = nowSecProvider,
                 logoTop = contentPadding.calculateTopPadding() + guideHeaderMinHeight(),
-                headlineDrop = headlineDrop,
+                headlineDrop = headlineDrop(),
                 endInset = max(endPadding, TvBrowseTrailingInset),
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = browseAlpha() },
             )
@@ -1936,7 +1938,7 @@ fun EpgGridScreen(
                     scopeObservation = channelScopeState.observation,
                     loading = connectionUiState.awaitsGuide(observation.epgState),
                     nowSec = nowSecProvider,
-                    modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop),
+                    modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop()),
                 )
             } else {
                 Spacer(Modifier.height(guideHeaderRulerClearance()))
