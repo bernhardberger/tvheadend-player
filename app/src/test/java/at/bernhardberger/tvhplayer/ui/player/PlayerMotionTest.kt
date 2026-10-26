@@ -566,7 +566,7 @@ class PlayerMotionTest {
                         assertEquals("$expected typed=$typed frame $frame: the identity stayed in place", identity,
                             compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
                     } else {
-                        compose.onNodeWithTag("player-header").assertDoesNotExist()
+                        compose.onNodeWithTag("player-header", useUnmergedTree = true).assertDoesNotExist()
                     }
                 }
                 assertEquals(typed, compose.onAllNodes(hasText("1") and hasAnyAncestor(hasTestTag("number")))
@@ -760,8 +760,9 @@ class PlayerMotionTest {
         fetchSemanticsNode().config.getOrNull(SemanticsProperties.Focused) == true
 
     private fun headerTop(): Float =
-        // The header slot fills the chrome, so its entry offset leaves the screen: read it unclipped.
-        compose.onNodeWithTag("player-header").fetchSemanticsNode().positionInRoot.y
+        // The header slot fills the chrome, so its entry offset leaves the screen: read it unclipped. Number entry
+        // clears the covered chrome's semantics, so read the unmerged tree.
+        compose.onNodeWithTag("player-header", useUnmergedTree = true).fetchSemanticsNode().positionInRoot.y
 
     @Composable
     private fun liveControls(

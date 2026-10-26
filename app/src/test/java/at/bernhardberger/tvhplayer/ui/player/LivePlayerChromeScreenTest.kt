@@ -9,7 +9,9 @@ package at.bernhardberger.tvhplayer.ui.player
 import android.app.Application
 import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
@@ -29,6 +31,7 @@ import org.robolectric.annotation.GraphicsMode
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
@@ -590,12 +593,14 @@ class LivePlayerChromeScreenTest {
                 settleFrames()
                 assertTrue("$tag took focus under the entry: ${focused()}", focused().none { it in controls })
             }
+            assertEquals("an accessibility service finds nothing to act on", emptyList<String>(), actionable())
             assertTrue("the entry is still up", compose.onAllNodesWithText("9").fetchSemanticsNodes().isNotEmpty())
             assertEquals("no control acted", emptyList<Boolean>(), pauses)
             assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
             if (cancel) key(Key.Back) else repeat(2) { settle() }
             assertTrue("the entry left", compose.onAllNodesWithText("9").fetchSemanticsNodes().isEmpty())
             assertEquals("focus returned to the timeline (cancel=$cancel)", listOf("player-seekbar"), focused())
+            assertTrue("the actions are back: ${actionable()}", actionable().containsAll(controls - "player-seekbar"))
         }
     }
 
@@ -704,6 +709,42 @@ class LivePlayerChromeScreenTest {
         liveChrome(behindLiveMs = 0, state = PlayerStateCell.PAUSED)
         assertFalse(exists("player-state"))
         compose.onNodeWithTag("player-pause").assertContentDescriptionEquals("Play")
+    }
+
+    @Test fun numberEntryLeavesTheCoveredControlsNoAccessibilityActions() {
+        var entry by mutableStateOf(false)
+        val calls = mutableListOf<String>()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                PlayerChrome(
+                    mode = PlayerChromeMode.CONTROLS,
+                    content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 1, "One", null, null, false, 1_800, "Programme"), state = PlayerStateCell.PAUSED),
+                    timeline = PlayerChromeTimeline.Live(
+                        at.bernhardberger.tvhplayer.playback.AppTimeshiftState(available = true, bufferStartMs = -600_000,
+                            positionMs = -60_000, liveEdgeMs = 0, timingKnown = true, paused = true),
+                        nowSec = 1_800,
+                    ),
+                    actions = PlayerChromeActions(active = !entry, paused = true),
+                    onTogglePause = { calls += "pause" }, onSeek = { calls += "seek" }, onStop = { calls += "stop" },
+                    onInfo = { calls += "info" }, onOptions = { calls += "options" }, onInteraction = {},
+                    numberEntryShown = entry,
+                )
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        val seekActions = SemanticsMatcher.keyIsDefined(SemanticsActions.CustomActions) and hasTestTag("player-seekbar")
+        assertTrue("seekable: the timeline offers its seek actions", compose.onAllNodes(seekActions).fetchSemanticsNodes().isNotEmpty())
+        val offered = actionable()
+        compose.runOnIdle { entry = true }
+        settle()
+        assertEquals("covered, the controls offer nothing to act on", emptyList<String>(), actionable())
+        assertFalse("nor can their seek actions be reached", exists("player-seekbar") &&
+            compose.onAllNodes(seekActions).fetchSemanticsNodes().isNotEmpty())
+        compose.runOnIdle { entry = false }
+        settle()
+        assertEquals("the same actions return", offered, actionable())
+        assertEquals("nothing acted", emptyList<String>(), calls)
     }
 
     /** The live chrome's controls [behindLiveMs] behind the live edge with known timing. */
@@ -1894,6 +1935,11 @@ class LivePlayerChromeScreenTest {
 
     private fun exists(tag: String) =
         compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** Tags of the nodes an accessibility service can activate, adjust or run custom actions on. */
+    private fun actionable(): List<String> = compose.onAllNodes(SemanticsMatcher("actionable") { node ->
+        listOf(SemanticsActions.OnClick, SemanticsActions.CustomActions, SemanticsActions.SetProgress).any { it in node.config }
+    }).fetchSemanticsNodes().map { it.config.getOrNull(SemanticsProperties.TestTag) ?: "untagged ${it.id}" }
 
     private fun focused(): List<String> =
         compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
