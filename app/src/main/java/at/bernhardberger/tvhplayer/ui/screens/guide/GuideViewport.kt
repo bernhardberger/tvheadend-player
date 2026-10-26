@@ -60,6 +60,21 @@ internal fun guideVisibleWindowSec(trackWidthPx: Float, timeLabelWidthPx: Int, d
 /** How much of the programme on air must be readable for it to keep the window around now. */
 private const val GuideOnAirReadableSec = 1800L
 
+/** Whole seconds clear of the physical edge insets, shared by focus selection and scrolling. */
+internal fun guideReadableTimeRange(
+    windowStartSec: Long,
+    windowDurationSec: Long,
+    trackWidthPx: Float,
+    leftInsetPx: Float,
+    rightInsetPx: Float,
+): LongRange {
+    if (trackWidthPx <= leftInsetPx + rightInsetPx) return windowStartSec until windowStartSec + windowDurationSec
+    val secondsPerPixel = windowDurationSec.toDouble() / trackWidthPx
+    val start = windowStartSec + ceil(leftInsetPx * secondsPerPixel).toLong()
+    val end = windowStartSec + floor((trackWidthPx - rightInsetPx) * secondsPerPixel).toLong()
+    return start until maxOf(start + 1, end)
+}
+
 /** Move the existing time window, not the cells, to keep a focused cell clear of the insets. */
 internal fun guideFocusWindowStart(
     eventStartSec: Long,
@@ -74,9 +89,9 @@ internal fun guideFocusWindowStart(
     nowSec: Long? = null,
 ): Long {
     if (trackWidthPx <= leftInsetPx + rightInsetPx) return windowStartSec
-    val secondsPerPixel = windowDurationSec.toDouble() / trackWidthPx
-    val leftReserve = ceil(leftInsetPx * secondsPerPixel).toLong()
-    val rightLimit = floor((trackWidthPx - rightInsetPx) * secondsPerPixel).toLong()
+    val readable = guideReadableTimeRange(windowStartSec, windowDurationSec, trackWidthPx, leftInsetPx, rightInsetPx)
+    val leftReserve = readable.first - windowStartSec
+    val rightLimit = readable.last + 1 - windowStartSec
     // A programme longer than the readable viewport cannot fit in one time window.
     // Its visible fragment is clipped to that viewport, never stretched or overlapped.
     if (eventEndSec - eventStartSec > rightLimit - leftReserve &&

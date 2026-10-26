@@ -1136,6 +1136,86 @@ class GuideVisualLayoutTest {
         assertNoPlayback()
     }
 
+    @Test fun verticalMoveUsesReadableTimeWithoutMovingTheWindow() {
+        fun programme(id: Long, channel: Long, startMinute: Long, endMinute: Long, name: String) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + startMinute * 60),
+                Instant.fromEpochSeconds(hour + endMinute * 60), title = name)
+        show(events = listOf(
+            programme(110, 1, -60, 30, "Long current programme"),
+            programme(111, 1, 30, 90, "Next programme"),
+            programme(210, 2, -75, -20, "Hidden earlier programme"),
+            programme(211, 2, -20, 40, "Readable adjacent programme"),
+        ), history = false)
+        key(Key.DirectionDown)
+        focused("Long current programme")
+        key(Key.DirectionRight)
+        focused("Next programme")
+        key(Key.DirectionLeft)
+        focused("Long current programme")
+        val window = checkNotNull(position.position.value).windowStartSec
+        assertEquals(hour - 1800, window)
+        key(Key.DirectionDown)
+        focused("Readable adjacent programme")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertReadableFocus()
+        capture("guide-vertical-readable-anchor", 1f, LayoutDirection.Ltr).recycle()
+        key(Key.DirectionUp)
+        focused("Long current programme")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+    }
+
+    @Test fun verticalMoveClipsShortOffAirProgrammeAtTheRightEdge() {
+        show(events = listOf(
+            EpgEvent.create(EventId(110), ChannelId(1), Instant.fromEpochSeconds(hour),
+                Instant.fromEpochSeconds(hour + 3600), title = "Current programme"),
+            EpgEvent.create(EventId(111), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
+                Instant.fromEpochSeconds(hour + 7200), title = "Future programme"),
+            EpgEvent.create(EventId(211), ChannelId(2), Instant.fromEpochSeconds(hour + 1800),
+                Instant.fromEpochSeconds(hour + 9600), title = "Crossing right edge"),
+        ))
+        key(Key.DirectionDown)
+        focused("Current programme")
+        key(Key.DirectionRight)
+        focused("Future programme")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Crossing right edge")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertReadableFocus()
+        val focus = compose.onNode(hasText("Crossing right edge") and isFocused()).fetchSemanticsNode().boundsInRoot
+        assertEquals(bounds("epg-time-ruler").right - 8f, focus.right, 1f)
+    }
+
+    @Test fun downDuringWindowIndexPreparationIsConsumedWithoutMoving() {
+        show()
+        key(Key.DirectionDown)
+        focused(title(1, 0))
+        key(Key.DirectionRight)
+        focused(title(1, 1))
+        val release = java.util.concurrent.CountDownLatch(1)
+        val held = java.util.concurrent.CountDownLatch(1)
+        val dispatcher = Class.forName("at.bernhardberger.tvhplayer.ui.components.BrowsePreparationKt")
+            .getDeclaredField("preparationDispatcher").apply { isAccessible = true }
+            .get(null) as kotlinx.coroutines.CoroutineDispatcher
+        try {
+            dispatcher.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
+                held.countDown()
+                check(release.await(30, java.util.concurrent.TimeUnit.SECONDS))
+            }
+            assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            key(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
+            val before = position.position.value
+            key(Key.DirectionDown)
+            assertEquals(before, position.position.value)
+            release.countDown()
+            focused(title(1, 2))
+            key(Key.DirectionDown)
+            focused(title(2, 2))
+        } finally {
+            release.countDown()
+        }
+    }
+
     @Test fun aTripToTheRailKeepsTheAnchorOfTheProgrammeItReturnsTo() {
         // Channel 1 runs one programme from 20:00 to 22:00 at the earliest edge; channel 2 is hourly.
         show(history = false, longProgramme = true, longProgrammeHours = 2, longProgrammeSuccessor = true)
@@ -1260,6 +1340,44 @@ class GuideVisualLayoutTest {
 
     @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
     fun enlargedRtlHistoryEdgeKeepsNativeFocusInsidePhysicalSafeArea() = terminalRtlHistory(scale = 1.3f, hours = 2, name = "guide-history-rtl-large")
+
+    @Test @Config(qualifiers = "ar-ldrtl-w960dp-h540dp-land-mdpi")
+    fun boundedHistoryLeftKeepsFullCellWhileVerticalMovesClipItsLeadingEdge() {
+        Locale.setDefault(Locale.forLanguageTag("ar"))
+        val firstHour = hour - 6 * 3600
+        position.save(GuidePosition(ChannelId(1), EventId(111), firstHour + 3600, firstHour, 0))
+        show(direction = LayoutDirection.Rtl, history = false, eventHour = firstHour, entryCoverage = false,
+            playerReturn = savedTimelineReturn())
+        key(Key.DirectionDown)
+        focused(title(1, 1))
+        key(Key.DirectionLeft)
+        focused(title(1, 0))
+        val ruler = bounds("epg-time-ruler")
+        val horizontal = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+        assertEquals(firstHour, checkNotNull(position.position.value).windowStartSec)
+        assertEquals("Left at the history bound retains the complete cell", ruler.width / 3, horizontal.width, 1f)
+        assertEquals(ruler.left, horizontal.left, 1f)
+
+        key(Key.DirectionDown)
+        focused(title(2, 0))
+        val vertical = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+        assertEquals("Down must not shift the bounded window", firstHour, checkNotNull(position.position.value).windowStartSec)
+        assertEquals("The vertical target clears the readable-start reserve", ruler.left + 8f, vertical.left, 1f)
+        assertEquals(horizontal.right, vertical.right, 1f)
+        assertEquals(horizontal.width - 8f, vertical.width, 1f)
+
+        key(Key.DirectionUp)
+        focused(title(1, 0))
+        assertEquals(vertical.left, compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.left, 1f)
+        key(Key.DirectionRight)
+        focused(title(1, 1))
+        key(Key.DirectionLeft)
+        focused(title(1, 0))
+        assertEquals("Left drops vertical clipping again", horizontal,
+            compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot)
+        assertEquals(firstHour, checkNotNull(position.position.value).windowStartSec)
+        assertNoPlayback()
+    }
 
     private fun terminalRtlHistory(scale: Float, hours: Int, name: String) {
         Locale.setDefault(Locale.forLanguageTag("ar"))
@@ -2526,7 +2644,7 @@ class GuideVisualLayoutTest {
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
         initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
         playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
-        lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null) {
+        lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -2552,7 +2670,7 @@ class GuideVisualLayoutTest {
                     if (groupWithoutFirst) listOf(ChannelTag.create(ChannelTagId(2), name = "News",
                         channelIds = channels.drop(1).map { it.id })) else emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(
-                events = channels.filterNot { it.id == ChannelId(3) }.flatMap { ch ->
+                events = events ?: channels.filterNot { it.id == ChannelId(3) }.flatMap { ch ->
                     if (longProgramme && ch.id == ChannelId(1)) {
                         listOf(event(ch, 0)) + if (longProgrammeSuccessor) listOf(event(ch, longProgrammeHours)) else emptyList()
                     } else (0..lastOffset).map { event(ch, it) }

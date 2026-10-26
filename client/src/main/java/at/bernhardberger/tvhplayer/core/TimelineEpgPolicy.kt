@@ -274,6 +274,7 @@ fun moveTimelineEpgFocus(
     direction: EpgFocusDirection,
     visibleChannelRange: IntRange = rows.indices,
     anchorSec: Long? = null,
+    readableRangeSec: LongRange? = null,
 ): TimelineEpgFocusMove {
     val row = rows.getOrNull(current.channelIndex)
         ?: return TimelineEpgFocusMove(current)
@@ -294,12 +295,12 @@ fun moveTimelineEpgFocus(
     val step = if (direction == EpgFocusDirection.UP) -1 else 1
     val channelIndex = generateSequence(current.channelIndex + step) { it + step }
         .takeWhile { it in rows.indices }
-        .firstOrNull { rows[it].events.isNotEmpty() }
+        .firstOrNull { timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec) != null }
     if (channelIndex == null && direction == EpgFocusDirection.UP) {
         return TimelineEpgFocusMove(current, focusHeader = true)
     }
     channelIndex ?: return TimelineEpgFocusMove(current)
-    val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds)
+    val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec)
         ?: return TimelineEpgFocusMove(current)
 
     return TimelineEpgFocusMove(
@@ -361,6 +362,7 @@ fun timelinePageFocusTarget(
     direction: Int,
     searchChannelIds: Set<ChannelId>? = null,
     anchorSec: Long? = null,
+    readableRangeSec: LongRange? = null,
 ): EpgFocusTarget? {
     val currentEvent = rows.getOrNull(current.channelIndex)
         ?.events
@@ -371,23 +373,28 @@ fun timelinePageFocusTarget(
     val targetIndex = generateSequence(startIndex) { it + step }
         .takeWhile { it in rows.indices }
         .firstOrNull {
-            rows[it].events.isNotEmpty() &&
+            timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec) != null &&
                 (searchChannelIds == null || rows[it].channelId in searchChannelIds)
         }
         ?: return null
-    val targetEvent = timelineEventAt(rows[targetIndex].events, anchorSec ?: currentEvent.start.epochSeconds)
+    val targetEvent = timelineEventAt(rows[targetIndex].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec)
         ?: return null
     return EpgFocusTarget(targetIndex, targetEvent.id)
 }
 
 /** The programme on air at [anchorSec]; across an EPG gap the nearest one, the later on a tie. */
-fun timelineEventAt(events: List<EpgEventEntry>, anchorSec: Long): EpgEventEntry? =
-    events.minWithOrNull(
+fun timelineEventAt(events: List<EpgEventEntry>, anchorSec: Long, readableRangeSec: LongRange? = null): EpgEventEntry? {
+    if (readableRangeSec?.isEmpty() == true) return null
+    val anchor = readableRangeSec?.let { anchorSec.coerceIn(it) } ?: anchorSec
+    return events.asSequence().filter {
+        readableRangeSec == null || (it.stop.epochSeconds > readableRangeSec.first && it.start.epochSeconds <= readableRangeSec.last)
+    }.minWithOrNull(
         compareBy<EpgEventEntry>(
-            { maxOf(it.start.epochSeconds - anchorSec, anchorSec - it.stop.epochSeconds + 1, 0L) },
+            { maxOf(it.start.epochSeconds - anchor, anchor - it.stop.epochSeconds + 1, 0L) },
             { -it.start.epochSeconds },
         ),
     )
+}
 
 /** Logical leading-edge pixels work identically with relative placement in LTR and RTL. */
 fun shouldComposeTimelineCell(

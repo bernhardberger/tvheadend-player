@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusInsets
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideReadableTimeRange
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideInnerContinuation
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -13,6 +15,20 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class GuideTimelinePaddingTest {
+    @Test fun readableSecondsRoundInsideBothPhysicalInsets() {
+        assertEquals(1601L..11713L, guideReadableTimeRange(1000, 10800, 1007f, 56f, 8f))
+        assertEquals(1086L..11198L, guideReadableTimeRange(1000, 10800, 1007f, 8f, 56f))
+        val range = guideReadableTimeRange(1000, 10800, 1007f, 56f, 8f)
+        assertEquals(1000L, guideFocusWindowStart(range.first, range.last + 1, 1000, 10800,
+            1007f, 56f, 8f, 0, 20000))
+        assertEquals(999L, guideFocusWindowStart(range.first - 1, range.last, 1000, 10800,
+            1007f, 56f, 8f, 0, 20000))
+    }
+
+    @Test fun unmeasuredTrackUsesTheWindowUntilGeometryArrives() {
+        assertEquals(1000L..11799L, guideReadableTimeRange(1000, 10800, 0f, 56f, 8f))
+    }
+
     @Test
     fun timelineRetainsLeadingInsetAndUsesEdgeToEdgeViewport() {
         val padding = guideTimelineContentPadding(

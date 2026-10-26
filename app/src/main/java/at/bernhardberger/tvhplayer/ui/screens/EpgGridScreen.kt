@@ -158,6 +158,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideReadableTimeRange
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusInsets
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -210,7 +211,7 @@ private data class ChannelFocusRequest(
 )
 
 /** The time Up and Down keep while [target] stays focused; any other focus change drops it. */
-private data class GuideFocusAnchor(val target: EpgFocusTarget, val sec: Long)
+private data class GuideFocusAnchor(val target: EpgFocusTarget, val sec: Long, val keepWindow: Boolean)
 
 private data class WindowFocusRequest(
     val preferredChannelId: ChannelId,
@@ -611,7 +612,13 @@ fun EpgGridScreen(
     val (focusStartInset, focusEndInset) = guideFocusInsets(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)
     val terminalReserve = guideTerminalViewportReserve(earlierContent, laterContent, layoutDirection == LayoutDirection.Rtl)
     val focusTrackWidthPx = timelineWidthPx - with(density) { terminalReserve.roundToPx() }
-    fun focusWindowFor(event: EpgEventEntry): Long = guideFocusWindowStart(
+    val readableTimeRange = guideReadableTimeRange(
+        windowStartSec, visibleWindowSec, focusTrackWidthPx,
+        with(density) { focusStartInset.toPx() }, with(density) { focusEndInset.toPx() },
+    )
+    fun focusWindowFor(event: EpgEventEntry): Long = if (
+        focusAnchor?.let { it.keepWindow && it.target == selectedTarget && it.target.eventId == event.id } == true
+    ) windowStartSec else guideFocusWindowStart(
         event.start.epochSeconds, event.stop.epochSeconds, windowStartSec, visibleWindowSec,
         focusTrackWidthPx, with(density) { focusStartInset.toPx() }, with(density) { focusEndInset.toPx() },
         windowBounds.earliestStartSec, windowBounds.latestStartSec, nowSecProvider(),
@@ -809,16 +816,16 @@ fun EpgGridScreen(
             coverageSettled = ::pageCoverageSettled,
         )
 
-    /** Up and Down keep this time, inside the window on screen; a new focus starts it at the programme's visible start. */
+    /** Up and Down keep this time inside the readable track, never in an edge reserve. */
     fun anchorSecFor(current: EpgFocusTarget): Long =
-        focusAnchor?.takeIf { it.target == current }?.sec?.coerceIn(windowStartSec, windowEndSec - 1)
+        (focusAnchor?.takeIf { it.target == current }?.sec
             ?: focusRows.getOrNull(current.channelIndex)?.events?.firstOrNull { it.id == current.eventId }
-                ?.let { maxOf(it.start.epochSeconds, windowStartSec) }
-            ?: windowStartSec
+                ?.let { maxOf(it.start.epochSeconds, readableTimeRange.first) }
+            ?: readableTimeRange.first).coerceIn(readableTimeRange)
 
-    fun selectAnchored(target: EpgFocusTarget, anchorSec: Long) {
+    fun selectAnchored(target: EpgFocusTarget, anchorSec: Long, keepWindow: Boolean = true) {
         selectedTarget = target
-        focusAnchor = GuideFocusAnchor(target, anchorSec)
+        focusAnchor = GuideFocusAnchor(target, anchorSec.coerceIn(readableTimeRange), keepWindow)
     }
 
     /** Left, Right and time jumps start a new anchor, even when they land on the anchored programme again. */
@@ -833,7 +840,7 @@ fun EpgGridScreen(
         val event = target?.let { focusRows.getOrNull(it.channelIndex)?.events?.firstOrNull { e -> e.id == it.eventId } }
         if (target != null && event != null && nowSec in windowStartSec until windowEndSec &&
             nowSec in event.start.epochSeconds until event.stop.epochSeconds
-        ) selectAnchored(target, nowSec) else selectUnanchored(target)
+        ) selectAnchored(target, nowSec, keepWindow = false) else selectUnanchored(target)
     }
 
     fun requestChannelFocus(
@@ -1326,6 +1333,7 @@ fun EpgGridScreen(
                 direction = request.direction,
                 searchChannelIds = request.coverageRequest.generations.keys,
                 anchorSec = request.anchorSec,
+                readableRangeSec = readableTimeRange,
             )
         }
         val through = KotlinInstant.fromEpochSeconds(request.throughSec)
@@ -1413,6 +1421,7 @@ fun EpgGridScreen(
     }
 
     fun pageColumns(direction: Int) {
+        if (!indexCurrent) return
         if (channels.isEmpty()) return
         channelFocusRequest?.takeIf { it.direction == -direction }?.let {
             if (!restoreChannelFocusOrigin(it)) return
@@ -1448,6 +1457,7 @@ fun EpgGridScreen(
             direction = direction,
             searchChannelIds = targetPageIds,
             anchorSec = anchorSec,
+            readableRangeSec = readableTimeRange,
         )
         if (target == null) return
         selectAnchored(target, anchorSec)
@@ -1531,6 +1541,7 @@ fun EpgGridScreen(
     BackHandler(enabled = programmeBackEnabled) { if (!backToNow()) backToRail() }
 
     fun moveFocus(direction: EpgFocusDirection): Boolean {
+        if (!indexCurrent) return true
         if (channelViewModel.scope.value != channelScopeState) return true
         when (guidePendingNavigationAction(
             direction = direction,
@@ -1574,6 +1585,7 @@ fun EpgGridScreen(
             direction = direction,
             visibleChannelRange = visibleRange,
             anchorSec = anchorSec,
+            readableRangeSec = readableTimeRange,
         )
         when {
             move.focusHeader -> {
@@ -1960,6 +1972,7 @@ fun EpgGridScreen(
                         },
                         { channelId -> coverageByChannel[channelId] },
                         earlierContent, laterContent, view.rows, genre, view.genreColors,
+                        clipSelectedToViewport = { focusAnchor?.let { it.keepWindow && it.target == selectedTarget } == true },
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),

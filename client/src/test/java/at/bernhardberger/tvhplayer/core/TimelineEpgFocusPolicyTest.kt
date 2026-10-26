@@ -11,6 +11,37 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test fun verticalMovesClampAnchorsAndExcludeReserveOnlyProgrammes() {
+        val readable = 40 * 60L until 170 * 60L
+        val rows = listOf(
+            row(1, event(11, 0, 90)),
+            row(2, event(21, -15, 40), event(22, 40, 100), event(23, 170, 200)),
+        )
+        for (anchor in listOf(30 * 60L, 40 * 60L)) {
+            assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+                anchorSec = anchor, readableRangeSec = readable).target)
+            assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
+                anchorSec = anchor, readableRangeSec = readable))
+        }
+        assertEquals(EventId(22), timelineEventAt(rows[1].events, 200 * 60L, readable)?.id)
+        // Boundary overlap is half-open: neither an event ending at readStart nor one starting at readEnd counts.
+        assertNull(timelineEventAt(listOf(event(21, 0, 40), event(23, 170, 200)), 30 * 60L, readable))
+    }
+
+    @Test fun verticalMovesSkipUnreadableRowsAndStopWhenNoneRemain() {
+        val readable = 40 * 60L until 170 * 60L
+        val rows = listOf(row(1, event(11, 0, 90)), row(2, event(21, 0, 40)), row(3, event(31, 30, 50)))
+        assertEquals(focus(2, 31), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable).target)
+        assertEquals(focus(2, 31), timelinePageFocusTarget(rows, focus(0, 11), 1, 1, readableRangeSec = readable))
+        assertEquals(focus(0, 11), moveTimelineEpgFocus(rows.take(2), focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable).target)
+        assertNull(timelinePageFocusTarget(rows.take(2), focus(0, 11), 1, 1, readableRangeSec = readable))
+        assertEquals(focus(0, 11), moveTimelineEpgFocus(rows, focus(2, 31), EpgFocusDirection.UP,
+            readableRangeSec = readable).target)
+        assertEquals(focus(0, 11), timelinePageFocusTarget(rows, focus(2, 31), 1, -1, readableRangeSec = readable))
+    }
+
     @Test
     fun viewportEligibilityKeepsPartialCellsAndExcludesWhollyClippedCells() {
         val clippedCells = listOf(990 to 310, 1135 to 165, 1083 to 217, 1010 to 290, 1038 to 262)

@@ -321,6 +321,7 @@ internal fun TimelineChannelRow(
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
     coverage: EpgCoverage? = null,
+    clipSelectedToViewport: Boolean = false,
 ) {
     val nowSec = nowSecProvider()
     // One state for the row's cells outside the chosen genre.
@@ -381,11 +382,12 @@ internal fun TimelineChannelRow(
                 val fullStart = maxWidth * span.startFraction
                 val fullEnd = maxWidth * span.endFraction
                 val readableWidth = (maxWidth - focusStartInset - focusEndInset).coerceAtLeast(0.dp)
-                val oversized = isFocusTarget && (fullEnd - fullStart > readableWidth || event.id == onAirId)
-                // Only oversized programmes and the programme on air use a readable fragment. Normal
-                // cells retain their full time allocation; the shared terminal viewport reserves the edge.
-                val start = if (oversized) maxOf(fullStart, focusStartInset) else fullStart
-                val end = if (oversized) minOf(fullEnd, maxWidth - focusEndInset) else fullEnd
+                val clipFocus = isFocusTarget &&
+                    (clipSelectedToViewport || fullEnd - fullStart > readableWidth || event.id == onAirId)
+                // Vertical navigation keeps the time window, even for a short off-air programme
+                // crossing an edge. Its focused fragment stays clear of both reserves.
+                val start = if (clipFocus) maxOf(fullStart, focusStartInset) else fullStart
+                val end = if (clipFocus) minOf(fullEnd, maxWidth - focusEndInset) else fullEnd
                 val width = (end - start).coerceAtLeast(0.dp)
                 if (!shouldComposeTimelineCell(
                         // Shell clipping is logical-leading; the time axis is physical.
