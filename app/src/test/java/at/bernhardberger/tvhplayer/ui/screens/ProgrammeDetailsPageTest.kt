@@ -557,6 +557,140 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-card-${airings[2].id.value}").assertIsFocused()
     }
 
+    private fun pageScrollValue() = compose.onNodeWithTag("details-page-scroll", useUnmergedTree = true)
+        .fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange].value()
+    private fun airingsHeadingTop() = compose.onNodeWithText("Other airings of Ridge Light").getUnclippedBoundsInRoot().top.value
+    private fun factsHeadingTop() = compose.onNodeWithText("Details").getUnclippedBoundsInRoot().top.value
+
+    // The credits are part of the facts, so the cast needs no stop of its own.
+    @Test fun everySectionMoveEndsWithItsHeadingAtTheKeyline() {
+        show(cast = true)
+        repeat(2) {
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            compose.onNodeWithTag("details-card-2").assertIsFocused()
+            Assert.assertEquals(160f, airingsHeadingTop(), .5f)
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+            compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+            Assert.assertEquals(160f, factsHeadingTop(), .5f)
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            compose.onNodeWithTag("details-card-2").assertIsFocused()
+            Assert.assertEquals(160f, airingsHeadingTop(), .5f)
+            compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
+            compose.onNodeWithTag("details-watch").assertIsFocused()
+            Assert.assertEquals(0f, pageScrollValue(), 0f)
+        }
+    }
+
+    // The airings row's text shrinks while the page scrolls to the facts: aimed at where the facts
+    // end up, the heading rises straight to the keyline instead of overshooting and swinging back.
+    @Test fun factsHeadingRisesToTheKeylineWithoutPassingIt() {
+        show(cast = true)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        assertFactsHeadingRisesStraightToTheKeyline()
+    }
+    @Test fun factsHeadingRisesStraightToTheKeylineOnAPageReturnedToAtTheAirings() {
+        show(cast = true, returnToCard = airings[2].id)
+        compose.onNodeWithTag("details-card-${airings[2].id.value}").assertIsFocused()
+        assertFactsHeadingRisesStraightToTheKeyline()
+    }
+    private fun assertFactsHeadingRisesStraightToTheKeyline() {
+        compose.mainClock.autoAdvance = false
+        val tops = mutableListOf(factsHeadingTop())
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        repeat((RowChangeMs + 64) / 16) {
+            compose.mainClock.advanceTimeByFrame()
+            tops += factsHeadingTop()
+        }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+        Assert.assertTrue("the heading must move: $tops", tops.first() > 160f + 20f)
+        Assert.assertTrue("never past the keyline: $tops", tops.all { it >= 160f - .5f })
+        Assert.assertTrue("never back down: $tops", tops.zipWithNext().all { (a, b) -> b <= a + .5f })
+        Assert.assertEquals(160f, factsHeadingTop(), .5f)
+    }
+
+    // One scroll of our own per section change, with the rows' shared motion: calmer than the
+    // standard spring, which has all but arrived two thirds of the way through it.
+    @Test fun sectionScrollTakesTheRowChangeMotion() {
+        show(cast = true)
+        compose.mainClock.autoAdvance = false
+        val start = pageScrollValue()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(RowChangeMs * 2L / 3)
+        val twoThirds = pageScrollValue()
+        compose.mainClock.advanceTimeBy(RowChangeMs / 3L + 32)
+        val settled = pageScrollValue()
+        compose.mainClock.advanceTimeBy(1000)
+        Assert.assertEquals("settled once the motion's time is up", pageScrollValue(), settled, 0f)
+        Assert.assertTrue("still moving at two thirds: $start < $twoThirds < $settled",
+            twoThirds > start && settled - twoThirds > 4f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun movesWithinARowDoNotScrollThePage() {
+        show(cast = true)
+        fun assertStill(key: Key, leaving: String) {
+            val before = pageScrollValue()
+            compose.mainClock.autoAdvance = false
+            compose.onRoot().performKeyInput { pressKey(key) }
+            val values = (1..(RowChangeMs + 64) / 16).map { compose.mainClock.advanceTimeByFrame(); pageScrollValue() }
+            compose.mainClock.autoAdvance = true
+            compose.onNodeWithTag(leaving).assertIsNotFocused()
+            Assert.assertTrue("$key must not scroll the page: $before $values", values.all { it == before })
+        }
+        assertStill(Key.DirectionRight, "details-watch")
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionLeft) }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        assertStill(Key.DirectionRight, "details-card-2")
+        assertStill(Key.DirectionRight, "details-card-3")
+        assertStill(Key.DirectionLeft, "details-card-4")
+    }
+
+    // A section change while the page still moves to the last one takes over: one move from where
+    // the page is, ending when its own motion does.
+    private fun pressDuringTheMove(first: Key, second: Key): List<Float> {
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(first) }
+        compose.mainClock.advanceTimeBy(96)
+        compose.onRoot().performKeyInput { pressKey(second) }
+        val values = (1..(RowChangeMs + 200) / 16).map { compose.mainClock.advanceTimeByFrame(); pageScrollValue() }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        Assert.assertTrue("still within $RowChangeMs ms of the second key: $values",
+            values.drop(RowChangeMs / 16).all { it == values.last() })
+        return values
+    }
+    @Test fun aSectionChangeDuringTheMoveTakesItOver() {
+        show(cast = true)
+        pressDuringTheMove(Key.DirectionDown, Key.DirectionDown)
+        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+        Assert.assertEquals(160f, factsHeadingTop(), .5f)
+    }
+    @Test fun goingBackDuringTheMoveReturnsToTheAirings() {
+        show(cast = true)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        pressDuringTheMove(Key.DirectionDown, Key.DirectionUp)
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        Assert.assertEquals(160f, airingsHeadingTop(), .5f)
+    }
+
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun airingsToFactsScrollCaptures() {
+        show(cast = true)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.mainClock.advanceTimeBy(RowChangeMs / 2L)
+        capture("airings-to-facts-mid-move", "details-scroll-pace", settle = false)
+        capture("airings-to-facts-settled", "details-scroll-pace")
+        compose.mainClock.autoAdvance = true
+    }
+
     @Test fun aboutPrecedesAiringsAndRowScrollsToTheScreenEdge() {
         var opened: EpgEvent? = null
         show(onRelated = { opened = it }, realRail = true)
@@ -1261,8 +1395,8 @@ class ProgrammeDetailsPageTest {
         compose.waitForIdle()
     }
 
-    private fun capture(name: String, folder: String = "u15-about") {
-        val bitmap = snapshot()
+    private fun capture(name: String, folder: String = "u15-about", settle: Boolean = true) {
+        val bitmap = snapshot(settle)
         val directory = File("build/outputs/$folder").apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
