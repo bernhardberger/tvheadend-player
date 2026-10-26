@@ -147,6 +147,16 @@ class InProgressRecordingResumeTest {
         compose.runOnIdle { assertEquals(1, returns); assertEquals(emptyList<RecordingPlaybackStart>(), starts) }
     }
 
+    @Test fun menuContinueWhosePlayerWentResumesWithoutFlippingToDetails() {
+        var returns = 0
+        val starts = openDetails(754L, menuOnly = true, warm = true, onReturn = { returns++; false })
+        compose.onNodeWithText("Continue watching").performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(1, returns); assertEquals(listOf(RecordingPlaybackStart.RESUME), starts) }
+    }
+
     @Test fun recordingMenuFromAnotherSessionKeepsWatch() {
         openDetails(754L, menuOnly = true, warm = true, staleSession = true)
         compose.onNodeWithText("Watch").assertIsFocused()

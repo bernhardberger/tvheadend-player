@@ -60,10 +60,11 @@ internal fun ChannelContextMenu(
             onPlay = onPlay, onPlayRecording = onPlayRecording, onShowGuide = onShowGuide, onClose = onClose,
             returnFocusRequester = returnFocusRequester)
     } else {
-        // Without a programme the watched channel still returns to its viewer, and to live beside it.
+        // Without a programme the watched channel still returns to its viewer, and to live beside it,
+        // while the session it opened with lasts; opened before Ready it keeps plain Watch.
         val indicator = channelWatchingIndicator(channelId)
         val goLive = LocalWatchingGoLive.current
-        val playing = indicator != ChannelPlaybackIndicator.NONE
+        val playing = capability != null && indicator != ChannelPlaybackIndicator.NONE
         val behindLive = playing && goLive != null && watchingBehindLive(channelId)
         BrowseContextMenu(
             title = at.bernhardberger.tvhplayer.ui.components.channelTitleText(channel.number, channel.name.orEmpty()),
