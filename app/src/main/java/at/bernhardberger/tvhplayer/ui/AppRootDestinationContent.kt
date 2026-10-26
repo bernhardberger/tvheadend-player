@@ -27,6 +27,7 @@ import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.ui.components.ContentContainer
 import at.bernhardberger.tvhplayer.ui.player.RecordingPlayerScreen
+import at.bernhardberger.tvhplayer.ui.player.TargetAspect
 import at.bernhardberger.tvhplayer.ui.player.VideoPlayerScreen
 import at.bernhardberger.tvhplayer.ui.screens.ChannelsScreen
 import at.bernhardberger.tvhplayer.ui.screens.EpgGridScreen
@@ -203,6 +204,7 @@ internal fun SettingsRouteContent(
 @Composable
 internal fun LivePlayerRouteContent(
     channelsVm: ChannelsViewModel,
+    targetAspect: TargetAspect,
     contentAllowed: Boolean,
     channelId: ChannelId,
     channelName: String,
@@ -221,6 +223,7 @@ internal fun LivePlayerRouteContent(
     ) {
         VideoPlayerScreen(
             channelsVm = channelsVm,
+            targetAspect = targetAspect,
             channelId = channelId,
             channelName = channelName,
             onReconnect = onReconnect,
@@ -257,6 +260,7 @@ internal fun BrowsingScopeContent(
 
 @Composable
 internal fun RecordingPlayerRouteContent(
+    targetAspect: TargetAspect,
     contentAllowed: Boolean,
     recordingId: DvrEntryId,
     playbackStart: RecordingPlaybackStart,
@@ -269,6 +273,7 @@ internal fun RecordingPlayerRouteContent(
     if (contentAllowed) {
         RecordingPlayerScreen(
             onShowGuide = onShowGuide,
+            targetAspect = targetAspect,
             recordingId = recordingId,
             playbackStart = playbackStart,
             connectionState = connectionState,

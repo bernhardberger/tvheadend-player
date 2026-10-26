@@ -77,7 +77,6 @@ import at.bernhardberger.tvhplayer.ui.startup.rememberColdStart
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
-import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.ServerSettings
@@ -93,6 +92,7 @@ import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotionFrame
 import at.bernhardberger.tvhplayer.ui.player.PlayerVideoSurface
 import at.bernhardberger.tvhplayer.ui.player.leaving
+import at.bernhardberger.tvhplayer.ui.player.rememberTargetAspect
 import at.bernhardberger.tvhplayer.ui.player.rememberVideoCoverFadeMillis
 import at.bernhardberger.tvhplayer.ui.screens.OnboardingScreen
 import at.bernhardberger.tvhplayer.ui.screens.PlayerReturnFocus
@@ -555,9 +555,10 @@ fun AppRoot(
     val recordingSelection by playbackRuntime.recordingSelection.collectAsStateWithLifecycle()
     val playbackObservation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val warmRecordingId = warmRecordingId(activeTarget, recordingSelection, playbackObservation.currentSession)
-    val playerSettings by playerSettingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings()
-    )
+    // Created once here: the surface and both player screens read this one value.
+    val targetAspect = rememberTargetAspect(activeTarget, playerSettingsStore) {
+        playbackObservation.dvrEntry(it)?.channelId
+    }
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     LaunchedEffect(uiSettings.clockFormat) { AppClock.format = uiSettings.clockFormat }
@@ -1020,6 +1021,7 @@ fun AppRoot(
                                 navigateTopLevel(GuideKey)
                             },
                             channelsVm = channelsVm,
+                            targetAspect = targetAspect,
                             contentAllowed = contentAllowed,
                             channelId = ChannelId(destination.channelId),
                             channelName = destination.channelName,
@@ -1082,6 +1084,7 @@ fun AppRoot(
                                     programme?.id, programme?.start?.epochSeconds)
                                 navigateTopLevel(GuideKey)
                             },
+                            targetAspect = targetAspect,
                             contentAllowed = contentAllowed,
                             recordingId = DvrEntryId(destination.recordingId),
                             playbackStart = destination.start.toPlaybackStart(),
@@ -1182,7 +1185,7 @@ fun AppRoot(
                 val requestedFrameRate by playbackRuntime.frameRate.requested.collectAsStateWithLifecycle()
                 PlayerVideoSurface(
                     player = playbackRuntime.player,
-                    aspectRatio = playerSettings.aspectRatio,
+                    aspectRatio = targetAspect.mode,
                     videoVisible = videoPresentation.visible,
                     debugVideoBackdropVisible = debugVideoBackdropVisible,
                     modifier = Modifier.fillMaxSize(),

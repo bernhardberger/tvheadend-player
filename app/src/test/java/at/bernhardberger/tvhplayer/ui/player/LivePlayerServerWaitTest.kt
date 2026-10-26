@@ -64,6 +64,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -359,7 +360,7 @@ class LivePlayerServerWaitTest {
                 TVHeadendPlayerTheme { ProvideAppArtwork(session) {
                     Box(Modifier.onKeyEvent { unconsumed++; false }) {
                         if (visible.collectAsState().value) {
-                            VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
+                            VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                                 channels, session, ChannelId(1), "Name 1", {},
                                 { closes++ }, runtime, notices = notices, uiSettingsStore = UiSettingsStore(data),
                                 connectionUiState = connection.value)

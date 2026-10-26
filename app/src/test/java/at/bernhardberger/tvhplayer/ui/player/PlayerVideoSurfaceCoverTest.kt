@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +17,17 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerView
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import org.junit.After
@@ -31,7 +41,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
+@Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h600dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerVideoSurfaceCoverTest {
     @get:Rule val compose = createComposeRule()
@@ -53,6 +63,57 @@ class PlayerVideoSurfaceCoverTest {
         visible.value = false
         compose.waitForIdle()
         compose.onNodeWithTag("video-cover").assertIsDisplayed()
+    }
+
+    @Test fun autoLaysAnSdBroadcastPictureOutAtItsNominalShapeAndOtherPicturesAtTheirOwn() {
+        var report: (VideoSize) -> Unit = {}
+        var size = VideoSize.UNKNOWN
+        val reporting = object : ForwardingPlayer(player) {
+            override fun getVideoSize() = size
+            override fun addListener(listener: Player.Listener) {
+                report = listener::onVideoSizeChanged
+                super.addListener(listener)
+            }
+        }
+        compose.setContent {
+            view = LocalView.current
+            PlayerVideoSurface(reporting, AspectRatioMode.FIT, videoVisible = true)
+        }
+        // The window is 960x600, not 16:9: a snapped 960x540 frame differs from the full screen, and
+        // only RESIZE_MODE_FILL stretches the picture over that frame (FIT would pillarbox it again).
+        fun show(next: VideoSize): DpRect {
+            compose.runOnIdle { size = next; report(next) }
+            compose.waitForIdle()
+            return compose.onNodeWithTag("video-surface").getBoundsInRoot()
+        }
+
+        // 720x576 with 16:11 pixels measures 1.82:1 but is 16:9.
+        val wide = show(VideoSize(720, 576, 0, 16f / 11f))
+        assertEquals(960f, wide.width.value, 0.5f)
+        assertEquals(540f, wide.height.value, 0.5f)
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_FILL, playerView().resizeMode)
+        // 12:11 pixels are a 4:3 programme: pillarboxed to 800x600.
+        val standard = show(VideoSize(720, 576, 0, 12f / 11f))
+        assertEquals(800f, standard.width.value, 0.5f)
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_FILL, playerView().resizeMode)
+        // HD and unknown sizes keep the screen-filling fit.
+        val hd = show(VideoSize(1920, 1080, 0, 1f))
+        assertEquals(960f, hd.width.value, 0.5f)
+        assertEquals(600f, hd.height.value, 0.5f)
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_FIT, playerView().resizeMode)
+        assertEquals(600f, show(VideoSize.UNKNOWN).height.value, 0.5f)
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_FIT, playerView().resizeMode)
+    }
+
+    private fun playerView(): PlayerView = compose.runOnIdle {
+        fun find(group: ViewGroup): PlayerView? = (0 until group.childCount).firstNotNullOfOrNull {
+            when (val child = group.getChildAt(it)) {
+                is PlayerView -> child
+                is ViewGroup -> find(child)
+                else -> null
+            }
+        }
+        find(view as ViewGroup)!!
     }
 
     @Test fun theCoverClearsOverTheEntryDurationAndFasterOnAZap() {

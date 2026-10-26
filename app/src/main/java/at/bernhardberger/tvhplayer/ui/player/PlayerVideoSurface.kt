@@ -29,6 +29,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -75,6 +76,21 @@ fun PlayerVideoSurface(
             lifecycle.removeObserver(lifecycleObserver)
         }
     }
+    var videoSize by remember(player) { mutableStateOf(player.videoSize) }
+    DisposableEffect(player) {
+        val sizeListener = object : Player.Listener {
+            override fun onVideoSizeChanged(size: VideoSize) {
+                videoSize = size
+            }
+        }
+        player.addListener(sizeListener)
+        videoSize = player.videoSize
+        onDispose { player.removeListener(sizeListener) }
+    }
+    // Null fills the screen and lets the view fit the picture; a ratio lays the surface out at it.
+    val frameAspect = surfaceFrameAspect(
+        aspectRatio, videoSize.width, videoSize.height, videoSize.pixelWidthHeightRatio,
+    )
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = { context ->
@@ -96,19 +112,14 @@ fun PlayerVideoSurface(
                 view.keepScreenOn = keepScreenOn
                 surfaceFrameRate.request(frameRate)
                 view.alpha = if (videoVisible) 1f else 0f
-                view.resizeMode = when (aspectRatio) {
-                    AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                    AspectRatioMode.FORCE_16_9,
-                    AspectRatioMode.FORCE_4_3 -> AspectRatioFrameLayout.RESIZE_MODE_FILL
+                view.resizeMode = if (frameAspect == null) {
+                    AspectRatioFrameLayout.RESIZE_MODE_FIT
+                } else {
+                    AspectRatioFrameLayout.RESIZE_MODE_FILL
                 }
             },
-            modifier = Modifier.then(
-                when (aspectRatio) {
-                    AspectRatioMode.FIT -> Modifier.fillMaxSize()
-                    AspectRatioMode.FORCE_16_9 -> Modifier.aspectRatio(16f / 9f)
-                    AspectRatioMode.FORCE_4_3 -> Modifier.aspectRatio(4f / 3f)
-                }
-            ),
+            modifier = (if (frameAspect == null) Modifier.fillMaxSize() else Modifier.aspectRatio(frameAspect))
+                .testTag("video-surface"),
             onRelease = { view ->
                 view.player = null
                 view.keepScreenOn = false

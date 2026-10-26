@@ -80,6 +80,7 @@ import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -670,7 +671,7 @@ class RecordingPlayerChromeScreenTest {
                         playbackStart = RecordingPlaybackStart.START_OVER,
                         tvheadendSession = session,
                         session = runtime,
-                        settingsStore = settings,
+                        targetAspect = TargetAspect(AspectRatioMode.FIT) {},
                         connectionState = ConnectionState.Connected,
                         onReconnect = {},
                         onClose = onClose,
