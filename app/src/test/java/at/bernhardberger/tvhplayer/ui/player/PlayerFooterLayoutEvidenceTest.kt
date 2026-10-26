@@ -686,7 +686,7 @@ class PlayerFooterLayoutEvidenceTest {
                                 else it.copy(positionKnown = known)
                             },
                             timeshiftPosition = at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation(sample),
-                            paused = paused, previewing = preview, onSeekTo = {},
+                            paused = paused, previewing = preview, onSeekTo = {}, stepDeltaMs = -10_000L,
                             modifier = Modifier.testTag("sampled-seekbar"),
                         )
                     }

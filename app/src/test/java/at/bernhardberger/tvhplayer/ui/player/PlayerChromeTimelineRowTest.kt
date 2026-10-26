@@ -10,6 +10,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
@@ -102,6 +103,41 @@ class PlayerChromeTimelineRowTest {
         assertFalse(exists("timeshift-preview-live"))
         assertTrue(exists("timeshift-preview-behind"))
         assertTrue(texts("−0:06"))
+    }
+
+    @Test fun aLiveStepBackLeadsWithTheOffsetAndShowsTheTargetClockSmall() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TimeshiftSeekPreviewTimeline(atEdge.copy(timingKnown = true), TimeshiftSeekDecision(-180_000, -180_000, false), nowSec = now)
+            }
+        }
+        compose.waitForIdle()
+        assertTrue(texts("−3:00"))
+        assertEquals(formatClock(now - 180), targetPosition())
+    }
+
+    @Test fun aLiveStepForwardFromTheBufferLeadsWithThePlusOffsetAndTheTargetClock() {
+        val earlier = atEdge.copy(timingKnown = true, positionMs = -300_000)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TimeshiftSeekPreviewTimeline(earlier, TimeshiftSeekDecision(-120_000, 180_000, false), nowSec = now)
+            }
+        }
+        compose.waitForIdle()
+        assertTrue(texts("+3:00"))
+        assertEquals(formatClock(now - 120), targetPosition())
+        assertTrue(exists("timeshift-preview-ahead"))
+    }
+
+    @Test fun aLiveStepWithoutKnownTimingShowsTheDistanceBehindLiveAsTheTarget() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                TimeshiftSeekPreviewTimeline(atEdge.copy(timingKnown = false), TimeshiftSeekDecision(-180_000, -180_000, false), nowSec = now)
+            }
+        }
+        compose.waitForIdle()
+        assertTrue(texts("−3:00"))
+        assertEquals("−3:00", targetPosition())
     }
 
     @Test fun theSeekbarReadoutAgreesWithTheVerifiedEdgeToo() {
@@ -230,6 +266,9 @@ class PlayerChromeTimelineRowTest {
         assertTrue(exists("timeshift-preview-live"))
         assertFalse(exists("timeshift-preview-ahead"))
     }
+
+    private fun targetPosition(): String = compose.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
+        .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text }
 
     private fun live(
         timeshift: AppTimeshiftState = atEdge,

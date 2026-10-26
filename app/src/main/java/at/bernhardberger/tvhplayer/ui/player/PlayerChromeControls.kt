@@ -340,6 +340,7 @@ internal fun PlayerChromeControls(
                 collapsed = false,
                 barStatus = barStatus,
                 timeshiftStartLabel = timeshiftStartClock(live.timeshift, live.nowSec),
+                nowSec = live.nowSec.takeIf { timeshiftState.available && timeshiftState.timingKnown },
                 feedback = seekFeedback,
                 feedbackIsError = timeshiftFeedbackIsError || previewing && programmeWindow?.targetAvailable == false,
                 paused = paused,

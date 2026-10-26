@@ -414,7 +414,7 @@ class PlayerTimelineTruthfulnessTest {
         assertTrue(preview.bottom <= viewport.bottom)
         composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true)
             .assertIsDisplayed()
-        composeRule.onNodeWithText("−0:30", useUnmergedTree = true).assertDoesNotExist()
+        composeRule.onNodeWithText("−0:30", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("−2:00", useUnmergedTree = true).assertIsDisplayed()
         composeRule.onNodeWithText("15:00 available", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag(
@@ -425,7 +425,7 @@ class PlayerTimelineTruthfulnessTest {
             .assertDoesNotExist()
         composeRule.onNodeWithTag("timeshift-seek-preview")
             .assertContentDescriptionEquals(
-                "Seek target −2:00. Cumulative change −0:30. " +
+                "30 seconds back, target −2:00. " +
                     "2:00 behind live. Buffer starts 15:00 behind live."
             )
     }
@@ -657,13 +657,13 @@ class PlayerTimelineTruthfulnessTest {
 
         composeRule.onNodeWithTag("recording-seek-preview")
             .assertContentDescriptionEquals(
-                "Seek target 1:15. Cumulative change +0:30. Still recording."
+                "30 seconds forward, target 1:15. Still recording."
             )
 
         composeRule.runOnIdle { growing = false }
         composeRule.onNodeWithTag("recording-seek-preview")
             .assertContentDescriptionEquals(
-                "Seek target 1:15. Cumulative change +0:30. Duration unavailable."
+                "30 seconds forward, target 1:15. Duration unavailable."
             )
     }
 

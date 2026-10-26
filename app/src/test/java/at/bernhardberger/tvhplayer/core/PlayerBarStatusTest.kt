@@ -107,20 +107,34 @@ class PlayerBarStatusTest {
         assertEquals(PlayerEndAnnouncement.LIVE, recordingBarEnd(59_000L, 60_000L, growing = true)?.announcement)
     }
 
-    @Test fun theStepReadoutShowsTheTargetsDistanceOrLiveAtTheEdge() {
-        assertEquals(StepReadout("−3:53"), liveStepReadout(233_000L, "Live"))
-        assertEquals(StepReadout("Live", atLive = true), liveStepReadout(0L, "Live"))
-        assertEquals(StepReadout("Live", atLive = true), liveStepReadout(TIMESHIFT_LIVE_EDGE_TOLERANCE_MS, "Live"))
-        assertEquals(StepReadout("−0:06"), liveStepReadout(TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1_000L, "Live"))
+    @Test fun theLiveStepReadoutLeadsWithTheOffsetAndShowsTheTargetsClockOrLiveAtTheEdge() {
+        assertEquals(StepReadout("−3:00", target = "20:43"), liveStepReadout(-180_000L, 233_000L, "Live", "20:43"))
+        // Without a clock the target's distance behind live stands in.
+        assertEquals(StepReadout("−3:00", target = "−3:53"), liveStepReadout(-180_000L, 233_000L, "Live", null))
+        assertEquals(StepReadout("+0:40", atLive = true, target = "Live"), liveStepReadout(40_000L, 0L, "Live", "21:00"))
+        assertEquals(
+            StepReadout("+0:30", atLive = true, target = "Live"),
+            liveStepReadout(30_000L, TIMESHIFT_LIVE_EDGE_TOLERANCE_MS, "Live", "21:00"),
+        )
+        assertEquals(
+            StepReadout("+0:30", target = "21:00"),
+            liveStepReadout(30_000L, TIMESHIFT_LIVE_EDGE_TOLERANCE_MS + 1_000L, "Live", "21:00"),
+        )
     }
 
-    @Test fun aRecordingsStepReadoutShowsTheTargetPositionAndLiveOnlyAtAGrowingHead() {
-        assertEquals(StepReadout("0:16:55"), recordingStepReadout(1_015_000L, 4_350_000L, growing = false, liveLabel = "Live"))
-        assertEquals(StepReadout("0:16:55"), recordingStepReadout(1_015_000L, 4_350_000L, growing = true, liveLabel = "Live"))
+    @Test fun theLiveTargetClockIsTheLiveEdgeClockMinusTheDistanceBehind() {
+        assertEquals(1_000L - 233L, liveTargetClockSec(1_000L, 233_999L))
+        assertEquals(1_000L, liveTargetClockSec(1_000L, 0L))
+        assertNull(liveTargetClockSec(null, 233_000L))
+    }
+
+    @Test fun aRecordingsStepReadoutLeadsWithTheOffsetAndShowsTheTargetPositionOrLiveOnlyAtAGrowingHead() {
+        assertEquals(StepReadout("+3:00", target = "0:16:55"), recordingStepReadout(180_000L, 1_015_000L, 4_350_000L, growing = false, liveLabel = "Live"))
+        assertEquals(StepReadout("−1:30", target = "0:16:55"), recordingStepReadout(-90_000L, 1_015_000L, 4_350_000L, growing = true, liveLabel = "Live"))
         // A finished recording's end is not live.
-        assertEquals(StepReadout("1:12:30"), recordingStepReadout(4_350_000L, 4_350_000L, growing = false, liveLabel = "Live"))
-        assertEquals(StepReadout("Live", atLive = true), recordingStepReadout(4_350_000L, 4_350_000L, growing = true, liveLabel = "Live"))
-        assertEquals(StepReadout("Live", atLive = true), recordingStepReadout(4_346_000L, 4_350_000L, growing = true, liveLabel = "Live"))
+        assertEquals(StepReadout("+1:02:00", target = "1:12:30"), recordingStepReadout(3_720_000L, 4_350_000L, 4_350_000L, growing = false, liveLabel = "Live"))
+        assertEquals(StepReadout("+0:30", atLive = true, target = "Live"), recordingStepReadout(30_000L, 4_350_000L, 4_350_000L, growing = true, liveLabel = "Live"))
+        assertEquals(StepReadout("+0:30", atLive = true, target = "Live"), recordingStepReadout(30_000L, 4_346_000L, 4_350_000L, growing = true, liveLabel = "Live"))
     }
 
     @Test fun theElapsedLabelPadsToTheLengthsHourFormat() {

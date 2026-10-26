@@ -178,7 +178,7 @@ class RecordingPlayerChromeScreenTest {
         playing()
         repeat(8) { settle() }
         assertFalse("the entry Banner timed out", exists("player-banner"))
-        for ((step, target) in listOf(Key.MediaRewind to "Seek target 0:09:30", Key.MediaFastForward to "Seek target 0:10:30")) {
+        for ((step, target) in listOf(Key.MediaRewind to "30 seconds back, target 0:09:30", Key.MediaFastForward to "30 seconds forward, target 0:10:30")) {
             positionMs = 600_000L
             settle()
             compose.onRoot().performKeyInput { pressKey(step) }
@@ -189,6 +189,29 @@ class RecordingPlayerChromeScreenTest {
             repeat(8) { settle() }
             assertFalse("the Banner hides again", exists("player-banner"))
         }
+    }
+
+    @Test fun steppingAgainAccumulatesTheOffsetFromWhereSteppingStartedAndNamesTheTarget() {
+        screen()
+        playing()
+        repeat(8) { settle() }
+        positionMs = 600_000L
+        settle()
+        compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue(texts("+0:30"))
+        compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue("the label reads the offset from the start", texts("+1:00"))
+        assertEquals("0:11:00", compose.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
+        assertTrue(description("recording-seek-preview").startsWith("1 minute forward, target 0:11:00"))
+        compose.onRoot().performKeyInput { pressKey(Key.MediaRewind) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue("stepping back reduces the offset", texts("+0:30"))
     }
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
@@ -291,7 +314,7 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the step previews in the Banner", exists("player-banner"))
         assertFalse(exists("player-actions"))
         assertFalse("no focusable seekbar in the Banner", exists("player-seekbar"))
-        assertEquals("Seek target 0:09:30. Cumulative change −0:30. Total 1:00:00.",
+        assertEquals("30 seconds back, target 0:09:30. Total 1:00:00.",
             description("recording-seek-preview"))
     }
 

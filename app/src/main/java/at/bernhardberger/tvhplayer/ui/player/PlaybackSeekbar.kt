@@ -31,10 +31,12 @@ import at.bernhardberger.tvhplayer.core.SeekbarRange
 import at.bernhardberger.tvhplayer.core.TimeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.liveStepReadout
+import at.bernhardberger.tvhplayer.core.liveTargetClockSec
 import at.bernhardberger.tvhplayer.core.recordingElapsedLabel
 import at.bernhardberger.tvhplayer.core.recordingStepReadout
 import at.bernhardberger.tvhplayer.core.seekbarScrub
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 
 /** Focusable seekbar for timeshift and recording playback. */
 @Composable
@@ -65,6 +67,8 @@ fun PlaybackSeekbar(
     barStatus: PlayerBarStatus? = null,
     /** The clock time the timeshift buffer starts at; the leading label without programme clocks. */
     timeshiftStartLabel: String? = null,
+    /** The wall-clock second of the live edge, to give a live step's target its clock time; null without known timing. */
+    nowSec: Long? = null,
     /** A growing recording: its head is the live edge. */
     growing: Boolean = false,
     /**
@@ -179,8 +183,12 @@ fun PlaybackSeekbar(
     val liveLabel = stringResource(R.string.timeshift_live)
     val readout = when {
         !previewing -> null
-        sampledPosition != null -> liveStepReadout(sampledPosition.behindLiveMs, liveLabel)
-        range.domain == SeekbarDomain.RECORDING -> recordingStepReadout(range.positionMs, range.endMs, growing, liveLabel)
+        sampledPosition != null -> liveStepReadout(
+            stepDeltaMs ?: 0L, sampledPosition.behindLiveMs, liveLabel,
+            liveTargetClockSec(nowSec, sampledPosition.behindLiveMs)?.let(::formatClock),
+        )
+        range.domain == SeekbarDomain.RECORDING ->
+            recordingStepReadout(stepDeltaMs ?: 0L, range.positionMs, range.endMs, growing, liveLabel)
         else -> null
     }
     val seekBackLabel = stringResource(R.string.seek_back_30)
@@ -254,6 +262,7 @@ fun PlaybackSeekbar(
             feedbackIsError = feedbackIsError,
             previewLabel = readout?.text,
             previewAtLive = readout?.atLive == true,
+            previewTarget = readout?.target,
             previewDirection = stepDeltaMs?.takeIf { previewing }?.let(::stepDirection),
             timelineModifier = modifier
                 .fillMaxWidth()

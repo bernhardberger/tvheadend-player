@@ -12,13 +12,14 @@ import androidx.compose.ui.semantics.liveRegion
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
-import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.stepDirection
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.liveStepReadout
+import at.bernhardberger.tvhplayer.core.liveTargetClockSec
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 
 /**
  * The seek preview's timeline: target, delta and programme of a pending or dispatched step.
@@ -51,9 +52,10 @@ internal fun TimeshiftSeekPreviewTimeline(
             formatPlaybackDuration(positionPresentation.behindLiveMs),
         )
     }
-    val readout = liveStepReadout(positionPresentation.behindLiveMs, liveLabel)
-    val targetLabel = readout.text
-    val deltaLabel = formatPlaybackDelta(decision.deltaMs)
+    val targetClock = liveTargetClockSec(
+        nowSec?.takeIf { targetState.available && targetState.timingKnown }, positionPresentation.behindLiveMs,
+    )?.let(::formatClock)
+    val readout = liveStepReadout(decision.deltaMs, positionPresentation.behindLiveMs, liveLabel, targetClock)
     val bufferStartDescription = stringResource(
         R.string.timeshift_buffer_start_description,
         formatPlaybackDuration(
@@ -62,8 +64,8 @@ internal fun TimeshiftSeekPreviewTimeline(
     )
     val description = stringResource(
         R.string.timeshift_seek_preview_description,
-        targetLabel,
-        deltaLabel,
+        stepOffsetDescription(decision.deltaMs),
+        requireNotNull(readout.target),
         behindLiveLabel,
         bufferStartDescription,
     )
@@ -97,7 +99,8 @@ internal fun TimeshiftSeekPreviewTimeline(
         status = barStatus,
         leadingLabelTestTag = "timeshift-preview-buffer-start",
         trailingLabelTestTag = "timeshift-preview-position",
-        previewLabel = targetLabel,
+        previewLabel = readout.text,
+        previewTarget = readout.target,
         previewAtLive = readout.atLive,
         previewDirection = stepDirection(decision.deltaMs),
         feedback = feedback ?: programmeWindow?.let { if (!it.targetAvailable) unavailableTarget else it.event?.title?.takeIf { titleAsFeedback } },

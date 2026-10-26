@@ -65,6 +65,7 @@ import at.bernhardberger.tvhplayer.ui.TvOverlayStatusRowHeight
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvhplayer.ui.TvOverlayGhostFillAlpha
+import at.bernhardberger.tvhplayer.ui.TvOverlayTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTextTertiaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBarFocusedHeight
 import at.bernhardberger.tvhplayer.ui.TvOverlayTimelineBarHeight
@@ -137,7 +138,8 @@ private fun LayoutCoordinates.unclippedBoundsInRoot(): Rect = findRootCoordinate
  * (the Banner's preview) it rests on the bar row's top. It takes the bar row's width and no height:
  * it paints above the row, over whatever sits there.
  * [direction] leads it with ⏪ or ⏩: where the target lies from the playback position. At the live
- * edge ([atLive]) it leads with ▶ instead.
+ * edge ([atLive]) it leads with ▶ instead. [label] is the step's offset; [target], its absolute place,
+ * follows it smaller.
  */
 @Composable
 private fun TimelineTargetLabel(
@@ -146,6 +148,7 @@ private fun TimelineTargetLabel(
     available: Boolean = true,
     direction: StepDirection? = null,
     atLive: Boolean = false,
+    target: String? = null,
     thumbDrawn: Boolean = false,
     cover: ReadoutCover,
 ) {
@@ -187,6 +190,13 @@ private fun TimelineTargetLabel(
                 .testTag(if (direction == StepDirection.BEHIND) "timeshift-preview-behind" else "timeshift-preview-ahead"),
         )
         Text(text = label, style = MaterialTheme.typography.labelLarge, color = color, maxLines = 1)
+        if (target != null) Text(
+            text = target,
+            style = MaterialTheme.typography.labelSmall,
+            color = color.copy(alpha = color.alpha * TvOverlayTextSecondaryAlpha),
+            maxLines = 1,
+            modifier = Modifier.testTag("timeshift-preview-target-position"),
+        )
     }
 }
 
@@ -425,6 +435,8 @@ fun PlayerTimelineBlock(
     previewDirection: StepDirection? = null,
     /** The step readout's target is the live edge: it leads with ▶ instead of a direction. */
     previewAtLive: Boolean = false,
+    /** The target's absolute place, small beside [previewLabel]'s offset. */
+    previewTarget: String? = null,
     fillColor: Color = MaterialTheme.colorScheme.tertiary,
     showTrack: Boolean = true,
     timelineModifier: Modifier = Modifier,
@@ -487,7 +499,7 @@ fun PlayerTimelineBlock(
             )
             trackOverlay?.invoke(this)
             if (previewLabel != null && !collapsed) {
-                TimelineTargetLabel(previewLabel, previewProgress, previewAvailable, previewDirection, previewAtLive,
+                TimelineTargetLabel(previewLabel, previewProgress, previewAvailable, previewDirection, previewAtLive, previewTarget,
                     thumbDrawn = tone == PlayerTimelineTone.ACTIVE && progress != null, cover = readoutCover)
             }
         }
