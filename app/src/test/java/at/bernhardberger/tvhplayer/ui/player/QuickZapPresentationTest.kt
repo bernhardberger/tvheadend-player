@@ -709,6 +709,52 @@ class QuickZapPresentationTest {
         compose.mainClock.autoAdvance = true
     }
 
+    @Test fun detachedRailIsBuiltOnceAndOutlivesHiddenControls() {
+        var controls by mutableStateOf(false)
+        var built = 0
+        var disposed = 0
+        var draws = 0
+        compose.setContent {
+            view = LocalView.current
+            // Open, so the probe draws without a channel row to peek with.
+            val rail = rememberQuickZapRail(expanded = true, detached = true)
+            Box(Modifier.fillMaxSize()) {
+                PlayerControlsLayer(visible = controls, modalVisible = false) {
+                    QuickZapControls(rail, peek = null, controls = {})
+                }
+                QuickZapRail(rail, preview = {}, visible = controls, channelContent = {
+                    androidx.compose.runtime.DisposableEffect(Unit) {
+                        built++
+                        onDispose { disposed++ }
+                    }
+                    Box(Modifier.fillMaxWidth().height(100.dp).drawBehind { draws++ })
+                })
+            }
+        }
+        fun draw() {
+            compose.waitForIdle()
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            bitmap.recycle()
+        }
+        draw()
+        assertEquals("not built behind the player before the controls first show", 0, built)
+        compose.runOnIdle { controls = true }
+        draw()
+        assertEquals(1, built)
+        assertTrue("the rail draws with the controls", draws > 0)
+        compose.runOnIdle { controls = false }
+        compose.mainClock.advanceTimeBy(1_000)
+        draw()
+        val hiddenDraws = draws
+        draw()
+        assertEquals("the hidden rail does not draw", hiddenDraws, draws)
+        compose.runOnIdle { controls = true }
+        draw()
+        assertEquals("the next reveal reuses the rail", 1 to 0, built to disposed)
+        assertTrue(draws > hiddenDraws)
+    }
+
     @Test fun closedRailPeeksThePlayingCardAtTheBottomEdgeAndRisesFromThere() {
         // Far enough along that the peek has to scroll to it, as the open rail does.
         playing = ChannelId(9)

@@ -27,6 +27,9 @@ internal enum class PlayerControlsEntry { TRAVEL, FADE, FROM_BANNER }
 /** The entry style of the current show, fixed when the show began. */
 internal val LocalPlayerControlsEntry = compositionLocalOf { PlayerControlsEntry.TRAVEL }
 
+/** The controls layer's alpha as drawn, for what draws apart from the layer but in step with it. */
+internal val LocalPlayerControlsAlpha = staticCompositionLocalOf<() -> Float> { { 1f } }
+
 /**
  * Stays composed across a modal so the controls can hand over to it: they leave
  * quickly under an opening panel and return once it closes. Auto-hide and Back
@@ -70,12 +73,15 @@ internal fun PlayerControlsLayer(
         androidx.compose.runtime.DisposableEffect(viewport) {
             onDispose { viewport?.alpha = { 0f } }
         }
+        // Entering, the layer draws at its appear alpha; leaving, at the exit fade, which runs with [fade].
+        val layerAlpha = remember { { if (transition.targetState == EnterExitState.Visible) appear.value else fade.value } }
         PlayerMotionFrame(leaving = leaving, modifier = Modifier.graphicsLayer {
             if (transition.targetState == EnterExitState.Visible) alpha = appear.value
         }) {
             CompositionLocalProvider(
                 LocalPlayerControlsMotion provides this,
                 LocalPlayerControlsEntry provides showEntry,
+                LocalPlayerControlsAlpha provides layerAlpha,
             ) { content() }
         }
     }

@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,6 +20,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -44,6 +45,7 @@ import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 /**
  * One motion value coordinates the departing footer and the rail rising beneath it, as one
  * vertical step. The rail rests where the footer was; the page scrim follows the same value.
+ * The rail and the controls in one composition, such as a controls layer's decoration.
  */
 @Composable
 internal fun QuickZapPresentation(
@@ -61,36 +63,102 @@ internal fun QuickZapPresentation(
      */
     peek: (() -> Float)? = null,
 ) {
-    val expansion = animateFloatAsState(
-        if (expanded) 1f else 0f,
-        animationSpec = if (expanded) {
-            tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
+    val rail = rememberQuickZapRail(expanded)
+    Box(Modifier.fillMaxSize()) {
+        QuickZapControls(rail, peek, controls)
+        QuickZapRail(rail, channelContent, preview, trayBleeds, header, peeks = peek != null)
+    }
+}
+
+/**
+ * The rail's motion and placement, shared by the controls it displaces ([QuickZapControls]) and
+ * the rail itself ([QuickZapRail]).
+ *
+ * A [detached] rail is composed apart from the controls, outside their layer, so the closed rail's
+ * cards outlive a hidden layer instead of being built again inside every reveal's first frame.
+ * While the controls are composed it draws at their layer's alpha; without them it stands hidden,
+ * takes no focus and is not read out.
+ */
+internal class QuickZapRailState(
+    expandedState: State<Boolean>,
+    internal val expansion: State<Float>,
+    resting: State<Boolean>,
+    internal val detached: Boolean,
+) {
+    val expanded by expandedState
+    internal val peek = ChannelPeek(resting)
+    internal var viewportHeight by mutableIntStateOf(0)
+    internal var railHeight by mutableIntStateOf(0)
+
+    /** The controls are composed: entering, up, or leaving. */
+    internal var hosted by mutableStateOf(!detached)
+    /** The action row's emphasis, set by the controls; read only while drawing. */
+    internal var emphasis by mutableStateOf<() -> Float>({ 1f })
+    /** The controls layer's alpha, set by the controls; read only while drawing. */
+    internal var layerAlpha by mutableStateOf<() -> Float>({ 1f })
+}
+
+@Composable
+internal fun rememberQuickZapRail(expanded: Boolean, detached: Boolean = false): QuickZapRailState {
+    val expandedState = rememberUpdatedState(expanded)
+    val expansion = remember { Animatable(if (expanded) 1f else 0f) }
+    val rail = remember {
+        QuickZapRailState(expandedState, expansion.asState(),
+            derivedStateOf { !expandedState.value && expansion.value == 0f }, detached)
+    }
+    LaunchedEffect(expanded, rail.hosted) {
+        val target = if (expanded) 1f else 0f
+        // Away from the controls the rail stands as a rail composed with them would begin.
+        if (!rail.hosted || expansion.value == target) {
+            expansion.snapTo(target)
         } else {
-            tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedAccelerate)
-        },
-        label = "quick-zap-expansion",
-    )
-    val revealed by remember(expansion) { derivedStateOf { expansion.value == 1f } }
-    val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
-    val currentExpanded by rememberUpdatedState(expanded)
-    val resting = remember(expansion) { derivedStateOf { !currentExpanded && expansion.value == 0f } }
-    val channelPeek = if (peek != null) remember(resting) { ChannelPeek(resting) } else null
+            expansion.animateTo(target, if (expanded) {
+                tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
+            } else {
+                tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedAccelerate)
+            })
+        }
+    }
+    return rail
+}
+
+/**
+ * [nowSec] while the controls are composed; otherwise the time they last showed, so a hidden
+ * detached rail's cards do not recompose every second.
+ */
+@Composable
+internal fun QuickZapRailState.clock(nowSec: Long): Long {
+    val shownAt = remember { longArrayOf(nowSec) }
+    if (hosted) shownAt[0] = nowSec
+    return shownAt[0]
+}
+
+/** The controls beneath the rail, in their layer: their footer gives way as the rail rises. */
+@Composable
+internal fun QuickZapControls(
+    rail: QuickZapRailState,
+    /** As [QuickZapPresentation]'s peek: the action row's emphasis, or null where the rail does not peek. */
+    peek: (() -> Float)?,
+    controls: @Composable () -> Unit,
+) {
     // The schedule header peeks only once the rail stands, and leaves before it folds away.
     val railPeek = LocalPlayerRailPeek.current
     LaunchedEffect(railPeek) { railPeek?.targetState = false }
-    var viewportHeight by remember { mutableIntStateOf(0) }
-    var railHeight by remember { mutableIntStateOf(0) }
-    val pageProgress = LocalPlayerPageProgress.current
-    val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
     val viewport = LocalPlayerPageScrim.current
     val scrim = viewport ?: remember { PlayerPageScrim().apply { alpha = { 1f } } }
+    val layerAlpha = LocalPlayerControlsAlpha.current
     SideEffect {
         // The denser rail scrim starts at the rail's top.
-        scrim.previewTop = { (viewportHeight - railHeight).toFloat() }
-        scrim.expansion = expansion::value
+        scrim.previewTop = { (rail.viewportHeight - rail.railHeight).toFloat() }
+        scrim.expansion = rail.expansion::value
+        rail.emphasis = peek ?: { 1f }
+        rail.layerAlpha = layerAlpha
+        rail.hosted = true
     }
     DisposableEffect(scrim) { onDispose { scrim.expansion = { 0f } } }
-    Box(Modifier.fillMaxSize().clipToBounds().onSizeChanged { viewportHeight = it.height }) {
+    DisposableEffect(rail) { onDispose { rail.hosted = false } }
+    val expanded = rail.expanded
+    Box(Modifier.fillMaxSize().clipToBounds()) {
         if (viewport == null) Box(Modifier.matchParentSize().playerScrim(scrim))
         Box(
             Modifier.fillMaxSize()
@@ -100,68 +168,112 @@ internal fun QuickZapPresentation(
                 .testTag("player-zap-controls"),
         ) {
             // The footer gives way to the rail; the header (clock, top scrim) stays.
-            CompositionLocalProvider(LocalRailExpansion provides expansion::value,
+            CompositionLocalProvider(LocalRailExpansion provides rail.expansion::value,
                 LocalPlayerPageScrim provides scrim,
-                LocalChannelPeekLift provides if (channelPeek != null) ChannelPeekFooterLift else 0.dp) { controls() }
+                LocalChannelPeekLift provides if (peek != null) ChannelPeekFooterLift else 0.dp) { controls() }
         }
-        if (!shown && !expanded && channelPeek == null) return@Box
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .then(if (trayBleeds) Modifier.padding(top = TvGridVerticalMargin + TvBrowseHeaderHeight) else Modifier)
-                .onSizeChanged { railHeight = it.height }
-                .graphicsLayer {
-                    val e = expansion.value
-                    val cardsTop = channelPeek?.cardsTop ?: Float.NaN
-                    translationY = if (cardsTop.isNaN()) {
-                        size.height * (1f - e)
-                    } else {
-                        // Rises from where the cards peek, their top just above the bottom edge.
-                        lerp(size.height - cardsTop - ChannelPeekDepth.toPx(), 0f, e)
-                    }
-                    if (peek != null) alpha = lerp(ChannelPeekAlpha * peek(), 1f, e)
-                }
-                .then(if (channelPeek == null) Modifier else Modifier
-                    .onGloballyPositioned { channelPeek.layer = it; channelPeek.update() }
-                    // Only the cards peek: what stands above them is uncovered as the rail rises.
-                    .drawWithContent {
-                        val cardsTop = channelPeek.cardsTop
+    }
+}
+
+/**
+ * The rail above the controls: the closed rail's peeking cards, and the open rail with its preview
+ * and header.
+ *
+ * @param peeks the closed rail's cards peek at the bottom edge at the controls' emphasis, and rise
+ * from there when it opens; otherwise the closed rail stays out of the composition.
+ * @param visible for a [detached][QuickZapRailState.detached] rail: the controls are up, rather
+ * than away or leaving, so it may take focus and be read out.
+ */
+@Composable
+internal fun QuickZapRail(
+    rail: QuickZapRailState,
+    channelContent: @Composable () -> Unit,
+    preview: @Composable () -> Unit,
+    /** The tray continues off the screen's bottom edge, in as much room as the page header leaves it. */
+    trayBleeds: Boolean = false,
+    /** Centred in the page's top band while the rail is open. */
+    header: (@Composable () -> Unit)? = null,
+    peeks: Boolean = false,
+    visible: Boolean = true,
+) {
+    val expanded = rail.expanded
+    val expansion = rail.expansion
+    val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
+    val channelPeek = rail.peek.takeIf { peeks }
+    val pageProgress = LocalPlayerPageProgress.current
+    val leavingPage by remember(pageProgress) { derivedStateOf { (pageProgress?.invoke() ?: 0f) > 0f } }
+    // Leaves with the controls, as the content of their layer does.
+    val leaving = rail.detached && rail.hosted && !visible
+    val active = rail.hosted && !leaving
+    // Built with the controls' first show, not with the player behind its startup cover.
+    val built = remember { booleanArrayOf(false) }
+    if (rail.hosted) built[0] = true
+    Box(
+        Modifier.fillMaxSize().clipToBounds().onSizeChanged { rail.viewportHeight = it.height }
+            .then(if (rail.detached) Modifier
+                .graphicsLayer { alpha = if (rail.hosted) rail.layerAlpha() else 0f }
+                .drawWithContent { if (rail.hosted) drawContent() } else Modifier),
+    ) {
+        if (!built[0] || !shown && !expanded && channelPeek == null) return@Box
+        PlayerMotionFrame(leaving = leaving, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxWidth()
+                    .then(if (trayBleeds) Modifier.padding(top = TvGridVerticalMargin + TvBrowseHeaderHeight) else Modifier)
+                    .onSizeChanged { rail.railHeight = it.height }
+                    .graphicsLayer {
                         val e = expansion.value
-                        if (e < 1f && !cardsTop.isNaN()) {
-                            clipRect(left = -size.width, top = cardsTop * (1f - e),
-                                right = size.width * 2f, bottom = size.height * 2f) {
-                                this@drawWithContent.drawContent()
-                            }
-                        } else if (!cardsTop.isNaN() || e > 0f) {
-                            drawContent()
+                        val cardsTop = channelPeek?.cardsTop ?: Float.NaN
+                        translationY = if (cardsTop.isNaN()) {
+                            size.height * (1f - e)
+                        } else {
+                            // Rises from where the cards peek, their top just above the bottom edge.
+                            lerp(size.height - cardsTop - ChannelPeekDepth.toPx(), 0f, e)
                         }
-                    })
-                .padding(bottom = if (trayBleeds) 0.dp else TvGridVerticalMargin),
-        ) {
-            Box(
-                Modifier.fillMaxWidth()
-                    .padding(bottom = PlayerChromeTokens.previewCardGap)
-                    .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
-                        dy = (-120).dp, entering = false) else Modifier)
-                    .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
-                    .then(if (channelPeek != null) Modifier.graphicsLayer { alpha = expansion.value } else Modifier)
-                    .testTag("player-zap-preview-slot"),
-                contentAlignment = Alignment.BottomStart,
+                        if (peeks) alpha = lerp(ChannelPeekAlpha * rail.emphasis(), 1f, e)
+                    }
+                    .then(if (channelPeek == null) Modifier else Modifier
+                        .onGloballyPositioned { channelPeek.layer = it; channelPeek.update() }
+                        // Only the cards peek: what stands above them is uncovered as the rail rises.
+                        .drawWithContent {
+                            val cardsTop = channelPeek.cardsTop
+                            val e = expansion.value
+                            if (e < 1f && !cardsTop.isNaN()) {
+                                clipRect(left = -size.width, top = cardsTop * (1f - e),
+                                    right = size.width * 2f, bottom = size.height * 2f) {
+                                    this@drawWithContent.drawContent()
+                                }
+                            } else if (!cardsTop.isNaN() || e > 0f) {
+                                drawContent()
+                            }
+                        })
+                    .padding(bottom = if (trayBleeds) 0.dp else TvGridVerticalMargin),
             ) {
-                // Not while only peeking: a held preview of the last card would cross-fade in as the rail rises.
-                if (expanded || shown) preview()
+                Box(
+                    Modifier.fillMaxWidth()
+                        .padding(bottom = PlayerChromeTokens.previewCardGap)
+                        .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
+                            dy = (-120).dp, entering = false) else Modifier)
+                        .then(if (expanded && active) Modifier else Modifier.clearAndSetSemantics { })
+                        .then(if (channelPeek != null) Modifier.graphicsLayer { alpha = expansion.value } else Modifier)
+                        .testTag("player-zap-preview-slot"),
+                    contentAlignment = Alignment.BottomStart,
+                ) {
+                    // Not while only peeking: a held preview of the last card would cross-fade in as the rail rises.
+                    if (expanded || shown) preview()
+                }
+                // Leaves entirely above the viewport, further and so faster than the headline rising beneath it.
+                Box(
+                    Modifier.fillMaxWidth()
+                        .then(if (trayBleeds) Modifier.weight(1f, fill = false) else Modifier)
+                        .then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
+                            entering = false, alphaWindow = 60..260,
+                            dyPx = { rail.viewportHeight.toFloat() * -1f }) else Modifier)
+                        .testTag("player-zap-tray")
+                        // The closed rail only peeks: it takes no focus and is not read out.
+                        .focusProperties { if (!expanded || !active) canFocus = false }
+                        .then(if (expanded && active) Modifier else Modifier.clearAndSetSemantics { }),
+                ) { CompositionLocalProvider(LocalChannelPeek provides channelPeek) { channelContent() } }
             }
-            // Leaves entirely above the viewport, further and so faster than the headline rising beneath it.
-            Box(
-                Modifier.fillMaxWidth()
-                    .then(if (trayBleeds) Modifier.weight(1f, fill = false) else Modifier)
-                    .then(if (leavingPage) Modifier.pageMotion(60..360, BrowseMotionPolicy.pageEmphasized,
-                        entering = false, alphaWindow = 60..260,
-                        dyPx = { viewportHeight.toFloat() * -1f }) else Modifier)
-                    .testTag("player-zap-tray")
-                    // The closed rail only peeks: it takes no focus and is not read out.
-                    .focusProperties { if (!expanded) canFocus = false }
-                    .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { }),
-            ) { CompositionLocalProvider(LocalChannelPeek provides channelPeek) { channelContent() } }
         }
         if (header != null) Box(
             Modifier.align(Alignment.TopCenter)
@@ -169,7 +281,7 @@ internal fun QuickZapPresentation(
                 .graphicsLayer { alpha = expansion.value }
                 .then(if (leavingPage) Modifier.pageMotion(0..200, BrowseMotionPolicy.pageAccelerate,
                     entering = false) else Modifier)
-                .then(if (expanded) Modifier else Modifier.clearAndSetSemantics { })
+                .then(if (expanded && active) Modifier else Modifier.clearAndSetSemantics { })
                 .testTag("player-zap-header"),
             contentAlignment = Alignment.Center,
         ) { header() }
