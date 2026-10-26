@@ -875,6 +875,7 @@ class LivePlayerChromeScreenTest {
 
     @Test fun playerInfoContainsProgrammeActionsAndBackReturnsDirectlyToControls() {
         screen()
+        key(Key.DirectionDown)
         key(Key.Info)
         assertTrue(exists("programme-details-page"))
         assertEquals(listOf("details-continue_watching"), focused())
@@ -963,12 +964,13 @@ class LivePlayerChromeScreenTest {
         assertEquals("Ended programme", texts("details-title"))
         session.publish(observation(now, listOf(nextProgramme), missingRequestedChannel = true))
         repeat(2) { settle() }
-        assertEquals(listOf("player-info"), focused())
+        assertFalse(exists("player-actions"))
         assertFalse(exists("programme-details-page"))
     }
 
     @Test fun withoutEpgInfoKeepsContinueWatchingFocusedAndBackReturnsToInfo() {
         screen(epg = false)
+        key(Key.DirectionDown)
         key(Key.Info)
         assertTrue(exists("programme-details-page"))
         assertEquals(listOf("details-continue_watching"), focused())
@@ -1103,6 +1105,7 @@ class LivePlayerChromeScreenTest {
             assertTrue(exists("programme-details-page"))
             key(Key.Back)
             assertFalse(exists("programme-details-page"))
+            key(Key.DirectionDown)
             val staleControls = identityDescription()
             for (stale in listOf("lines", "Video", "Audio")) {
                 assertFalse("B's controls '$staleControls' show no stale '$stale'", staleControls.contains(stale))
@@ -1432,7 +1435,51 @@ class LivePlayerChromeScreenTest {
         assertFalse(exists("details-tab-1"))
         key(Key.Back)
         assertFalse(exists("programme-details-page"))
-        assertEquals(listOf("player-info"), focused())
+        assertFalse(exists("player-pause"))
+    }
+
+    @Test fun scheduleFollowsTunedChannelAndContainsPlaybackKeys() {
+        screen()
+        val now = System.currentTimeMillis() / 1000
+        session.publish(observation(now, listOf(
+            EpgEvent.create(EventId(11), ChannelId(1), Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Channel A"),
+            EpgEvent.create(EventId(21), ChannelId(2), Instant.fromEpochSeconds(now - 60), Instant.fromEpochSeconds(now + 600), title = "Channel B"))))
+        settle()
+        key(Key.ChannelUp)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        key(Key.Guide)
+        compose.onNodeWithTag("schedule-row-21").assertIsFocused()
+        compose.onNodeWithTag("schedule-row-11").assertDoesNotExist()
+        val playing = player.playWhenReady
+        listOf(Key.MediaPlayPause, Key.MediaStop, Key.MediaRewind, Key.MediaFastForward).forEach(::key)
+        assertEquals(playing, player.playWhenReady)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
+        compose.onNodeWithTag("schedule-row-21").assertIsFocused()
+        key(Key.Back)
+        assertFalse(exists("channel-schedule-panel"))
+        assertFalse(exists("player-pause"))
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-schedule").performSemanticsAction(SemanticsActions.RequestFocus)
+        key(Key.DirectionCenter)
+        compose.onNodeWithTag("schedule-row-21").assertIsFocused()
+        key(Key.Back)
+        compose.onNodeWithTag("player-schedule").assertIsFocused()
+    }
+
+    @Test fun remoteOverlayBackReturnsToItsBareOrControlsOrigin() {
+        screen()
+        val shortcuts = listOf(Key.Info, Key.Guide,
+            Key(android.view.KeyEvent.KEYCODE_TV_CONTENTS_MENU),
+            Key(android.view.KeyEvent.KEYCODE_TV_NUMBER_ENTRY), Key(android.view.KeyEvent.KEYCODE_BOOKMARK))
+        for (shortcut in shortcuts) for (controls in listOf(false, true)) {
+            if (controls) key(Key.DirectionDown)
+            key(shortcut)
+            assertTrue("overlay opened for $shortcut", exists("programme-details-page") ||
+                exists("channel-schedule-panel") || railOpen())
+            key(Key.Back)
+            assertEquals("origin restored for $shortcut", controls, exists("player-pause"))
+            if (controls) key(Key.Back)
+        }
     }
 
     @Test fun playerInfoOffersCancelAfterContinueWatchingWhenAlreadyScheduled() {
@@ -1484,6 +1531,7 @@ class LivePlayerChromeScreenTest {
             key(Key.DirectionRight)
             key(Key.DirectionRight)
             key(Key.DirectionRight)
+            key(Key.DirectionRight)
             assertEquals(listOf("player-settings"), focused())
             key(Key.DirectionDown)
             assertEquals("browser opens on the playing channel", listOf("player-channel-card-1"), focused())
@@ -1501,6 +1549,7 @@ class LivePlayerChromeScreenTest {
             key(close)
             assertFalse(railOpen())
             assertEquals(listOf("player-settings"), focused())
+            key(Key.DirectionLeft)
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
             key(Key.DirectionLeft)
@@ -1725,7 +1774,7 @@ class LivePlayerChromeScreenTest {
         assertEquals(Notice.DvrActionFailed(DvrMutationKind.SCHEDULE, DvrMutationFeedback.PERMISSION_DENIED),
             notices.state.value.pending.single().notice)
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
-        assertEquals(listOf("player-info"), focused())
+        assertFalse(exists("player-actions"))
     }
 
     @Test fun playerInfoRecordResultAfterCloseDoesNotAffectReopenedProgramme() {

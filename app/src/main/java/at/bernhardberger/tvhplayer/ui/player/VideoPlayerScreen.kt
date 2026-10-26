@@ -795,11 +795,16 @@ fun VideoPlayerScreen(
         }
     }
 
-    fun openInfo() {
+    fun openInfo(fromKey: Boolean = false) {
         infoRailChannelId = null
         infoReturnAction = "player-info"
         restoreInfoFocus = false
-        layerState.openInfo()
+        layerState.openInfo(fromKey)
+    }
+
+    fun prepareSchedule() {
+        if (timelineState.seekPending) timelineState.commitPendingSeek()
+        channelNumberInput = ""
     }
 
     fun dismissRecordingDialog() {
@@ -812,7 +817,7 @@ fun VideoPlayerScreen(
         layerState.closeInfo(returnToRail = returnToRail)
         infoRailChannelId = null
         infoReturnAction = if (returnToRail) null else "player-info"
-        restoreInfoFocus = !returnToRail
+        restoreInfoFocus = !returnToRail && layerState.chrome.controlsVisible
     }
 
     /**
@@ -830,7 +835,7 @@ fun VideoPlayerScreen(
             .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
     }
 
-    fun openChannelDrawer() {
+    fun openChannelDrawer(fromKey: Boolean = false) {
         // The rail reopens on its remembered card; preview that card from the first frame. A card
         // gone from its row reopens the row on its first card, as the rail itself does.
         val row = channelBrowser.row.takeIf { it == PlayerChannelRow.ON_NOW || recentChannels.isNotEmpty() }
@@ -841,7 +846,7 @@ fun VideoPlayerScreen(
             visibleChannels = channels,
             currentFocusId = currentChannelId,
         )
-        layerState.openChannelDrawer()
+        layerState.openChannelDrawer(fromKey)
     }
 
     fun queueTimeshiftSeek(deltaMs: Long) {
@@ -1375,7 +1380,7 @@ fun VideoPlayerScreen(
             .onPreviewKeyEvent { event ->
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
-                layerState.handleScheduleKey(event)?.let { return@onPreviewKeyEvent it }
+                layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }
                 if (layerState.infoOpen) {
                     if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
                         if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
@@ -1520,11 +1525,11 @@ fun VideoPlayerScreen(
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_CHANNELS -> {
-                        openChannelDrawer()
+                        openChannelDrawer(fromKey = true)
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_INFO -> {
-                        openInfo()
+                        openInfo(fromKey = true)
                         return@onPreviewKeyEvent true
                     }
                     // Options keys are decided before the overlays above can claim them.
@@ -1646,10 +1651,10 @@ fun VideoPlayerScreen(
                 openInfo()
             },
             onSchedule = {
-                if (timelineState.seekPending) timelineState.commitPendingSeek()
+                prepareSchedule()
                 layerState.openSchedule()
             },
-            scheduleAvailable = observation.epgSnapshotForDisplay?.events?.any { it.channelId == channelId && it.stop.epochSeconds > nowSec } == true,
+            scheduleAvailable = rememberScheduleAvailable(observation, currentChannelId, nowSec),
             onOptions = {
                 restoreOptionsFocus = false
                 layerState.openOptions()
@@ -1732,10 +1737,11 @@ fun VideoPlayerScreen(
             },
         ) { }
         if (layerState.scheduleOpen) PlayerChannelSchedule(
-            layerState, channelId, currentChannel, observation, { session.observation.value }, nowSec, effectiveTimeshiftState,
+            layerState, currentChannelId, currentChannel, observation, { session.observation.value }, nowSec, effectiveTimeshiftState,
             dvrMutationActions, notices, scope, uiSettingsStore, onReconnect,
             onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
             onPlayRecording = onPlayRecording, onShowGuide = onShowGuide,
+            connectionUiState = connectionUiState,
         )
         if (layerState.infoOpen && foregroundLayer == PlayerForegroundLayer.INFO) {
             LivePlayerProgrammeDetails(

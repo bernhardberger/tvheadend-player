@@ -24,12 +24,14 @@ import androidx.tv.material3.*
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
-import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatDayHeader
-import at.bernhardberger.tvhplayer.ui.common.formatDayMonth
+import at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes
+import at.bernhardberger.tvhplayer.ui.common.formatWholeHours
+import androidx.compose.ui.platform.LocalContext
+import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import coil3.compose.AsyncImage
 import java.time.Instant
 import java.time.ZoneId
@@ -50,8 +52,9 @@ internal fun ChannelSchedule(
 ) {
     val zone = ZoneId.systemDefault()
     val locale = LocalConfiguration.current.locales[0]
-    fun date(event: EpgEvent) = Instant.ofEpochSecond(event.start.epochSeconds).atZone(zone).toLocalDate()
-    val days = remember(events, zone) { events.map(::date).distinct() }
+    val today = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
+    fun date(event: EpgEvent) = scheduleEventDay(event, today, zone)
+    val days = remember(events, zone, today) { events.map(::date).distinct() }
     val initialIndex = events.indexOfFirst { it.id == initialEvent?.id }.coerceAtLeast(0)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
     val scope = rememberCoroutineScope()
@@ -60,15 +63,21 @@ internal fun ChannelSchedule(
     val emptyFocus = remember { FocusRequester() }
     var selectedDay by remember { mutableStateOf(initialEvent?.let(::date)) }
     var entered by remember { mutableStateOf(false) }
+    var focusedEvent by remember { mutableStateOf<EpgEvent?>(null) }
+    var rowOwnsFocus by remember { mutableStateOf(false) }
     val channelName = channel?.name ?: stringResource(R.string.epg_search_unknown_channel)
     val title = stringResource(R.string.channel_schedule_pane, channelName)
-    LaunchedEffect(loading, events.isEmpty()) {
-        if (events.isEmpty() || !entered) {
+    // Decide before removal lets Compose move focus to the tab as a fallback.
+    val removed = focusedEvent?.takeIf { old -> rowOwnsFocus && events.none { it.id == old.id } }
+    LaunchedEffect(loading, events) {
+        if (events.isEmpty() || !entered || removed != null) {
             withFrameNanos { }
             if (events.isNotEmpty()) {
-                listState.scrollToItem(initialIndex)
+                val target = removed?.let { old -> events.firstOrNull { it.start >= old.stop }
+                    ?: scheduleInitialEvent(events, viewerSec, nowSec) } ?: events[initialIndex]
+                listState.scrollToItem(events.indexOf(target))
                 withFrameNanos { }
-                entered = rowFocus[events[initialIndex].id]?.requestFocus() == true
+                entered = rowFocus[target.id]?.requestFocus() == true
             } else { entered = false; emptyFocus.requestFocus() }
         }
     }
@@ -82,11 +91,11 @@ internal fun ChannelSchedule(
                 style = MaterialTheme.typography.titleMedium)
             Text(formatClock(nowSec), style = MaterialTheme.typography.bodyMedium)
         }
-        if (offline) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+        if (offline) Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).semantics { liveRegion = LiveRegionMode.Polite },
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.channel_schedule_offline), Modifier.weight(1f),
                 style = MaterialTheme.typography.bodySmall)
-            Button(onClick = onRetry) { Text(stringResource(R.string.retry)) }
+            Button(onClick = onRetry, modifier = Modifier.onFocusChanged { if (it.isFocused) rowOwnsFocus = false }) { Text(stringResource(R.string.retry)) }
         }
         if (events.isEmpty()) {
             Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -103,7 +112,6 @@ internal fun ChannelSchedule(
                 }
             }
         } else {
-            val today = Instant.ofEpochSecond(nowSec).atZone(zone).toLocalDate()
             AppTabRow(days.indexOf(selectedDay).coerceAtLeast(0), AppTabStyle.Section,
                 selectedTabFocus = selectedTabFocus,
                 onMoveToContent = {
@@ -120,7 +128,8 @@ internal fun ChannelSchedule(
                     val target = if (day == today) scheduleInitialEvent(events.filter { date(it) == day }, viewerSec, nowSec)
                         else events.firstOrNull { date(it) == day }
                     AppTab(selected = selectedDay == day,
-                        onFocus = {
+                         onFocus = {
+                                rowOwnsFocus = false
                                 selectedDay = day
                                 target?.let { event -> scope.launch { listState.scrollToItem(events.indexOf(event)) } }
                         }, first = index == 0, last = index == days.lastIndex,
@@ -132,21 +141,25 @@ internal fun ChannelSchedule(
                         })
                 }
             }
-            LazyColumn(state = listState, modifier = Modifier.weight(1f).testTag("channel-schedule-list"),
+            LazyColumn(state = listState, modifier = Modifier.weight(1f).listEdgeFades(listState, topFade = false).testTag("channel-schedule-list"),
                 verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 itemsIndexed(events, key = { _, event -> event.id.value }) { index, event ->
                     val day = date(event)
                     val previous = events.getOrNull(index - 1)
-                    if (previous == null || date(previous) != day) Text(
-                        formatDayHeader(day, locale),
+                    val gaps = previous?.let { scheduleGaps(it.stop.epochSeconds, event.start.epochSeconds, zone) }.orEmpty()
+                    var headingDay = previous?.let(::date)
+                    gaps.forEach { gap ->
+                        if (headingDay != gap.day) Text(formatDayHeader(gap.day, locale),
+                            Modifier.padding(12.dp).semantics { heading() }, style = MaterialTheme.typography.labelMedium)
+                        headingDay = gap.day
+                        Text(stringResource(R.string.channel_schedule_gap, formatHm(gap.start), formatHm(gap.stop)),
+                            Modifier.padding(start = 104.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    }
+                    if (headingDay != day) Text(formatDayHeader(day, locale),
                         Modifier.padding(12.dp).semantics { heading() }, style = MaterialTheme.typography.labelMedium)
-                    if (previous != null && previous.stop < event.start) Text(
-                        stringResource(R.string.channel_schedule_gap,
-                            (if (date(previous) != day) "${formatDayMonth(date(previous), locale)} " else "") + formatHm(previous.stop.epochSeconds),
-                            formatHm(event.start.epochSeconds)),
-                        Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall)
                     ChannelScheduleRow(event, nowSec, viewerSec, recording(event), onClick = { onOpen(event) },
-                        onContextMenu = onContextMenu?.let { open -> { open(event) } },
+                         onContextMenu = onContextMenu?.let { open -> { open(event) } }, channel = channel,
                          modifier = Modifier.focusRequester(rowFocus.getValue(event.id))
                              .onPreviewKeyEvent { key ->
                                  if (index == events.lastIndex && key.key == Key.DirectionDown) {
@@ -159,11 +172,12 @@ internal fun ChannelSchedule(
                                  if (index == 0) up = selectedTabFocus
                                  if (index == events.lastIndex) down = FocusRequester.Cancel
                             }
-                            .onFocusChanged { if (it.isFocused) { selectedDay = day; onFocused(event) } })
+                             .onFocusChanged { if (it.isFocused) { rowOwnsFocus = true; focusedEvent = event; selectedDay = day; onFocused(event) } })
                 }
                 item { Text(stringResource(R.string.channel_schedule_end,
-                    days.last().format(DateTimeFormatter.ofPattern("EEE d", locale))),
-                    Modifier.padding(12.dp), style = MaterialTheme.typography.bodySmall) }
+                    formatDayHeader(days.last(), locale)),
+                    Modifier.padding(start = 104.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall) }
             }
         }
     }
@@ -174,6 +188,7 @@ private fun ChannelScheduleRow(
     event: EpgEvent, nowSec: Long, viewerSec: Long?, recording: DvrEntryState?,
     onClick: () -> Unit, modifier: Modifier = Modifier,
     onContextMenu: (() -> Unit)? = null,
+    channel: Channel? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onContextMenu)
     val start = event.start.epochSeconds
@@ -194,9 +209,10 @@ private fun ChannelScheduleRow(
         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             val session = LocalArtworkContext.current.currentSession
-            Box(Modifier.size(80.dp, 45.dp).clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerLowest)) {
+            Box(Modifier.size(80.dp, 45.dp).clip(MaterialTheme.shapes.small).background(TvSurfaceColors.containerHighest), contentAlignment = Alignment.Center) {
                 if (event.image != null && session != null) AsyncImage(AppArtworkSource(session, event.image!!), null,
                     modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                else PiconBox(channel?.icon, Modifier.width(48.dp).height(27.dp))
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -207,8 +223,12 @@ private fun ChannelScheduleRow(
                     if (recording == DvrEntryState.SCHEDULED) ScheduledIndicator() else RecordingBadge(recording, label = false, compact = true)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val behind = if (watched && viewerSec != null && nowSec - viewerSec > 5)
-                        stringResource(R.string.timeshift_behind_live, formatPlaybackDuration((nowSec - viewerSec) * 1000)) else ""
+                    val resources = LocalContext.current.resources
+                    val behind = if (watched && viewerSec != null && nowSec - viewerSec > 5) {
+                        val minutes = (nowSec - viewerSec) / 60
+                        stringResource(R.string.timeshift_behind_live, if (minutes >= 60 && minutes % 60 == 0L)
+                            formatWholeHours(minutes / 60, resources) else formatDurationMinutes(minutes, resources, spoken = true))
+                    } else ""
                     Text(listOf(stringResource(R.string.recordings_until, formatHm(stop)), state, behind).filter { it.isNotEmpty() }.joinToString(" · "),
                         Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall)
@@ -216,9 +236,27 @@ private fun ChannelScheduleRow(
                 if (onAir || watched) ProgressStrip(
                     (((if (watched) viewerSec!! else nowSec) - start).toFloat() / (stop - start)).coerceIn(0f, 1f),
                     Modifier.fillMaxWidth(), height = 3.dp,
+                    trackColor = LocalContentColor.current.copy(alpha = TvTrackAlpha),
                     color = if (watched) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.secondary)
             }
         }
+    }
+}
+
+internal fun scheduleEventDay(event: EpgEvent, today: java.time.LocalDate, zone: ZoneId): java.time.LocalDate {
+    val start = Instant.ofEpochSecond(event.start.epochSeconds).atZone(zone).toLocalDate()
+    return if (start < today && event.stop.epochSeconds > today.atStartOfDay(zone).toEpochSecond()) today else start
+}
+
+internal data class ScheduleGap(val day: java.time.LocalDate, val start: Long, val stop: Long)
+
+internal fun scheduleGaps(start: Long, stop: Long, zone: ZoneId): List<ScheduleGap> = buildList {
+    var from = start
+    while (from < stop) {
+        val day = Instant.ofEpochSecond(from).atZone(zone).toLocalDate()
+        val until = minOf(stop, day.plusDays(1).atStartOfDay(zone).toEpochSecond())
+        add(ScheduleGap(day, from, until))
+        from = until
     }
 }
 

@@ -5,6 +5,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.ConnectionUiState
+import at.bernhardberger.tvhplayer.core.toConnectionUiState
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
@@ -24,14 +26,19 @@ internal fun PlayerChannelSchedule(
     onPlay: (ChannelId, String) -> Unit,
     onPlayRecording: ((RecordingPlaybackSelection) -> Unit)?,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
+    connectionUiState: ConnectionUiState? = null,
 ) {
     val historyStart = scheduleHistoryStart(timeshift)
     val snapshot = observation.epgSnapshotForDisplay
-    val events = remember(snapshot, channelId, nowSec, historyStart) {
-        channelScheduleEvents(snapshot?.events.orEmpty(), channelId, nowSec, historyStart)
+    val channelEvents = remember(snapshot, channelId) {
+        channelScheduleEvents(snapshot?.events.orEmpty(), channelId, Long.MIN_VALUE, null)
     }
+    val events = remember(channelEvents, nowSec, historyStart) {
+        channelEvents.filter { it.stop.epochSeconds > (historyStart ?: nowSec) }
+    }
+    val connection = connectionUiState ?: observation.sessionState.toConnectionUiState()
     val viewerSec = liveViewerEpochSec(channelId, nowSec).takeIf { channelWatchingIndicator(channelId).isPlayingItem }
-    var focused by remember { mutableStateOf(scheduleInitialEvent(events, viewerSec, nowSec)) }
+    var focused by remember(channelId) { mutableStateOf(scheduleInitialEvent(events, viewerSec, nowSec)) }
     var contextMenu by remember { mutableStateOf(false) }
     val details = layers.scheduleDetails
     if (details != null) {
@@ -47,12 +54,11 @@ internal fun PlayerChannelSchedule(
             onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) },
             framedArt = details.id != scheduleInitialEvent(events, viewerSec, nowSec)?.id)
     } else ProvideArtworkSession(observation.currentSession, observation) {
-        PlaybackOptionsOverlayFrame(paneTitle = stringResource(R.string.channel_schedule_pane,
-            channel?.name ?: stringResource(R.string.epg_search_unknown_channel)),
+        PlaybackOptionsOverlayFrame(
             panelTag = "channel-schedule-panel", panelWidth = 480.dp, showScrim = false) {
             ChannelSchedule(channel, events, nowSec, viewerSec,
-                loading = observation.epgState is EpgRepositoryState.Synchronizing || observation.epgState is EpgRepositoryState.Empty,
-                offline = observation.epgState is EpgRepositoryState.Stale,
+                 loading = scheduleLoading(connection, observation.epgState),
+                 offline = scheduleOffline(connection, observation.epgState),
                 recording = { observation.dvrEntryForEvent(it)?.state },
                 onOpen = { contextMenu = false; layers.showScheduleDetails(it) },
                 onContextMenu = { contextMenu = true; layers.showScheduleDetails(it) },
@@ -60,4 +66,14 @@ internal fun PlayerChannelSchedule(
                 initialEvent = focused ?: scheduleInitialEvent(events, viewerSec, nowSec), onFocused = { focused = it })
         }
     }
+}
+
+@Composable
+internal fun rememberScheduleAvailable(observation: SessionObservation, channelId: ChannelId, nowSec: Long): Boolean {
+    val snapshot = observation.epgSnapshotForDisplay
+    val end = remember(snapshot, channelId) {
+        snapshot?.events?.asSequence()?.filter { it.channelId == channelId && it.stop > it.start }
+            ?.maxOfOrNull { it.stop.epochSeconds }
+    }
+    return end != null && end > nowSec
 }

@@ -1096,8 +1096,9 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   at either screen edge, while focused cards stay inside the safe area with room
   for native focus scale.
 - Selecting another channel keeps the tray, focused card and scroll position.
-  Back, Up from the first row, or selecting the confirmed playing channel returns to player controls
-  and restores the invoking action. The tray does not auto-hide during zapping.
+  Back, Up from the first row, or selecting the confirmed playing channel returns
+  to its origin: bare picture for a remote shortcut used there, otherwise player
+  controls and the invoking action. The tray does not auto-hide during zapping.
 - A confirmed external change while the tray is open (a completed numeric tune)
   never moves browse focus; it reanchors the tray when it closes. Digits,
   unconfirmed tunes and re-confirmation of the same channel do not reanchor.
@@ -1128,11 +1129,15 @@ options frame, without dimming the remaining picture. GUIDE toggles it where
 the activity receives that key; appliance entry routing is unchanged. The
 recordings player has no Schedule action. The reusable column owns no tuning or
 playback: its caller supplies events, viewer position, recording marks and actions.
-Rows keep an 80×45dp artwork slot (quiet surface when absent), the shared playing
+Rows keep an 80×45dp artwork slot (lighter sheet surface with a centred channel
+logo when absent), the shared playing
 and recording marks, orange viewer progress and cyan on-air progress. Day tabs
 follow focus above one continuous list; gaps and day headings are not focusable.
 OK opens the shared details page; Menu/hold OK opens the shared context menu.
-Back restores the source row, then the Schedule action. A fresh visit starts at
+Back restores the source row, then the Schedule action for button entry. Remote
+INFO, channel-rail shortcuts and GUIDE return to the layer from which they opened:
+bare picture stays bare; visible controls return with a fresh auto-hide timeout.
+A fresh visit starts at
 the viewer's programme. The panel pauses controls auto-hide; channel keys and
 number entry dismiss it. Loading holds focus until rows arrive; empty data offers
 Close; stale data remains visible with Retry. Only history overlapping the known

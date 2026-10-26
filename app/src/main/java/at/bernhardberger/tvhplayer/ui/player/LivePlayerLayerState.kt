@@ -65,7 +65,19 @@ internal class LivePlayerLayerState(
         scheduleDetails = event
     }
 
-    fun openSchedule() {
+    private var scheduleReturnControls = true
+    private var scheduleReturnLayer = PlayerForegroundLayer.CONTROLS
+    private var scheduleReturnOptions: PlaybackOptionsPage? = null
+    private var scheduleReturnQuickList = false
+    private var infoReturnControls = true
+    private var railReturnControls = true
+
+    fun openSchedule(fromKey: Boolean = false) {
+        scheduleReturnControls = !fromKey || chrome.controlsVisible
+        scheduleReturnLayer = if (fromKey) at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext())
+            else PlayerForegroundLayer.CONTROLS
+        scheduleReturnOptions = optionsPage
+        scheduleReturnQuickList = optionsQuickList
         infoOpen = false
         recordingConfirmationVisible = false
         scheduleDetails = null
@@ -76,26 +88,46 @@ internal class LivePlayerLayerState(
         scheduleOpen = true
     }
 
-    fun closeSchedule(showControls: Boolean = true) {
+    fun closeSchedule(showControls: Boolean? = null) {
         scheduleOpen = false
         scheduleDetails = null
-        if (showControls) {
+        if (showControls == null) when (scheduleReturnLayer) {
+            PlayerForegroundLayer.INFO -> { infoOpen = true; return }
+            PlayerForegroundLayer.CHANNEL_DRAWER -> { channelDrawerOpen = true; return }
+            PlayerForegroundLayer.OPTIONS_QUICK_LIST, PlayerForegroundLayer.OPTIONS_DETAIL, PlayerForegroundLayer.OPTIONS_ROOT -> {
+                optionsPage = scheduleReturnOptions
+                optionsQuickList = scheduleReturnQuickList
+                chrome.yieldToLayer(controls = scheduleReturnControls)
+                return
+            }
+            else -> Unit
+        }
+        if (showControls ?: scheduleReturnControls) {
             restoreChannelAction = "player-schedule"
-            showControls()
-        } else chrome.hideControls()
+            this.showControls()
+        } else { restoreChannelAction = null; chrome.hideControls() }
     }
 
     /** Own GUIDE's whole cycle; navigation in the sheet must not become a player seek/reveal. */
-    fun handleScheduleKey(event: KeyEvent): Boolean? {
+    fun handleScheduleKey(
+        event: KeyEvent,
+        foregroundLayer: PlayerForegroundLayer = at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext()),
+        prepare: () -> Unit = {},
+    ): Boolean? {
         val code = event.nativeKeyEvent.keyCode
         if (scheduleOpen && playbackSuppressesRevealingKey(revealingKeyCode, code)) {
             if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(code)
             return true
         }
-        if (code == AndroidKeyEvent.KEYCODE_GUIDE && !infoOpen && optionsPage == null) {
+        if (code == AndroidKeyEvent.KEYCODE_GUIDE) {
+            if (foregroundLayer in setOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR,
+                    PlayerForegroundLayer.CONFIRMATION)) return true
             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
                 beginOpeningKeyCycle(code)
-                if (scheduleOpen) closeSchedule() else openSchedule()
+                if (scheduleOpen) closeSchedule() else {
+                    prepare()
+                    openSchedule(fromKey = true)
+                }
             }
             if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(code)
             return true
@@ -114,8 +146,15 @@ internal class LivePlayerLayerState(
             }
             return true
         }
-        // Let the sheet own navigation/Menu, and leave unhandled system keys (e.g. volume) alone.
-        return false
+        // Like Info, the sheet owns navigation and suppresses playback/options shortcuts.
+        return when (code) {
+            AndroidKeyEvent.KEYCODE_DPAD_UP, AndroidKeyEvent.KEYCODE_DPAD_DOWN,
+            AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT,
+            AndroidKeyEvent.KEYCODE_DPAD_CENTER, AndroidKeyEvent.KEYCODE_ENTER,
+            AndroidKeyEvent.KEYCODE_NUMPAD_ENTER, AndroidKeyEvent.KEYCODE_BACK,
+            AndroidKeyEvent.KEYCODE_MENU -> false
+            else -> true
+        }
     }
 
     var infoFromRail by mutableStateOf(false)
@@ -158,8 +197,11 @@ internal class LivePlayerLayerState(
     }
 
     fun dismissChannelDrawer() {
-        restoreChannelAction = channelDrawerReturnAction ?: "player-pause"
-        showControls()
+        channelDrawerOpen = false
+        if (railReturnControls) {
+            restoreChannelAction = channelDrawerReturnAction ?: "player-pause"
+            showControls()
+        } else chrome.hideControls()
     }
 
     fun onChannelTuneRequested() {
@@ -188,7 +230,8 @@ internal class LivePlayerLayerState(
         chrome.showControls()
     }
 
-    fun openInfo() {
+    fun openInfo(fromKey: Boolean = false) {
+        infoReturnControls = !fromKey || chrome.controlsVisible
         infoFromRail = channelDrawerOpen
         chrome.yieldToLayer(controls = false)
         channelDrawerOpen = false
@@ -205,7 +248,7 @@ internal class LivePlayerLayerState(
             // Resume the same rail visit, including its original controls focus target.
             channelDrawerOpen = true
             chrome.yieldToLayer(controls = false)
-        } else showControls()
+        } else if (infoReturnControls) showControls() else chrome.hideControls()
     }
 
     fun showRecordingConfirmation() {
@@ -339,7 +382,8 @@ internal class LivePlayerLayerState(
         optionsQuickList = false
     }
 
-    fun openChannelDrawer() {
+    fun openChannelDrawer(fromKey: Boolean = false) {
+        railReturnControls = !fromKey || chrome.controlsVisible
         channelDrawerReturnAction = lastFocusedAction.takeIf { chrome.controlsVisible }
         restoreChannelAction = null
         chrome.yieldToLayer(controls = false)

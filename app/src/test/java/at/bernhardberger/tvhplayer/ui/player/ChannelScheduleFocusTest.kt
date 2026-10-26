@@ -74,6 +74,51 @@ class ChannelScheduleFocusTest {
         } } }
     }
 
+    @Test fun endedLiveRowMovesToNextWithoutStealingOrdinaryUpdates() {
+        var now by mutableStateOf(NOW)
+        var source by mutableStateOf(events)
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, channelScheduleEvents(source, ChannelId(1), now, null), now, null,
+                false, false, { null }, {}, {}, {})
+        } } }
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+        compose.runOnIdle { source = events + event(5, NOW + 90000, NOW + 93600) }
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+        compose.runOnIdle { now = NOW + 1800 }
+        compose.onNodeWithTag("schedule-row-3").assertIsFocused()
+    }
+
+    @Test fun historyBoundaryEvictsFocusedEndedProgrammeToNextRow() {
+        var history by mutableStateOf(NOW - 5400)
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, channelScheduleEvents(events, ChannelId(1), NOW, history), NOW, NOW - 3600,
+                false, false, { null }, {}, {}, {})
+        } } }
+        compose.onNodeWithTag("schedule-row-1").assertIsFocused()
+        compose.runOnIdle { history = NOW - 1800 }
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+    }
+
+    @Test fun midnightProgrammeStartsOnTodayAndTodayDownReturnsToIt() {
+        val zone = java.time.ZoneId.systemDefault()
+        val today = java.time.LocalDate.of(2026, 9, 13)
+        val midnight = today.atStartOfDay(zone).toEpochSecond()
+        val across = listOf(event(1, midnight - 3600, midnight + 3600), event(2, midnight + 3600, midnight + 7200))
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, across, midnight + 600, midnight + 600, false, false, { null }, {}, {}, {})
+        } } }
+        compose.onNodeWithTag("schedule-row-1").assertIsFocused()
+        compose.onNodeWithText("Today").assertIsSelected()
+        compose.onNodeWithTag("schedule-row-1").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithText("Today").assertIsFocused()
+        compose.onNodeWithText("Today").performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("schedule-row-1").assertIsFocused()
+        val gap = scheduleGaps(midnight - 600, midnight + 600, zone)
+        assertEquals(listOf(today.minusDays(1), today), gap.map { it.day })
+        assertEquals(midnight, gap[0].stop)
+        assertEquals(midnight, gap[1].start)
+    }
+
     companion object {
         const val NOW = 1789246200L
         val events = listOf(

@@ -35,6 +35,7 @@ class ChannelScheduleTest {
 
     @Test fun guideOwnsTheCycleAndBackRestoresScheduleAction() = runTest {
         val layers = LivePlayerLayerState(this, autoHideTimeoutMillis = 5000)
+        layers.showControls()
         assertTrue(layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))!!)
         assertTrue(layers.scheduleOpen)
         assertTrue(layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true, 1))!!)
@@ -58,7 +59,7 @@ class ChannelScheduleTest {
         layers.showScheduleDetails(null)
         assertTrue(layers.scheduleOpen)
         assertEquals(false, layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_MENU, true)))
-        assertEquals(false, layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_VOLUME_UP, true)))
+        assertEquals(true, layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_VOLUME_UP, true)))
         assertNull(layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_CHANNEL_UP, true)))
         assertFalse(layers.scheduleOpen)
         layers.openSchedule()
@@ -72,6 +73,96 @@ class ChannelScheduleTest {
 
     private fun key(code: Int, down: Boolean, repeat: Int = 0) = KeyEvent(
         AndroidKeyEvent(0, 0, if (down) AndroidKeyEvent.ACTION_DOWN else AndroidKeyEvent.ACTION_UP, code, repeat))
+
+    @Test fun readyEmptyIsFinalAndDisconnectedEmptyOffersRetry() {
+        assertFalse(scheduleLoading(ConnectionUiState.Ready, EpgRepositoryState.Empty))
+        assertFalse(scheduleOffline(ConnectionUiState.Ready, EpgRepositoryState.Empty))
+        assertTrue(scheduleLoading(ConnectionUiState.Connecting, EpgRepositoryState.Empty))
+        assertTrue(scheduleOffline(ConnectionUiState.Reconnecting, EpgRepositoryState.Empty))
+        assertFalse(scheduleLoading(ConnectionUiState.Reconnecting, EpgRepositoryState.Empty))
+        assertTrue(scheduleOffline(ConnectionUiState.CredentialUnavailable, EpgRepositoryState.Empty))
+    }
+
+    @Test fun guidePreparesOnceAndNeverOpensOverRecoveryOrConfirmation() = runTest {
+        val layers = LivePlayerLayerState(this, 5000)
+        var prepared = 0
+        for (layer in listOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR, PlayerForegroundLayer.CONFIRMATION)) {
+            assertTrue(layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true), layer) { prepared++ }!!)
+            assertFalse(layers.scheduleOpen)
+        }
+        layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true)) { prepared++ }
+        layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true, 1)) { prepared++ }
+        layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, false)) { prepared++ }
+        assertEquals(1, prepared)
+        layers.dispose()
+    }
+
+    @Test fun guideFromInfoOrOptionsReturnsToTheCoveredLayer() = runTest {
+        val layers = LivePlayerLayerState(this, 5000)
+        layers.openInfo(fromKey = true)
+        layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))
+        assertTrue(layers.scheduleOpen)
+        assertFalse(layers.infoOpen)
+        layers.closeSchedule()
+        assertTrue(layers.infoOpen)
+        layers.closeInfo()
+        layers.openOptions()
+        layers.endOpeningKeyCycle(AndroidKeyEvent.KEYCODE_GUIDE)
+        layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))
+        assertTrue(layers.scheduleOpen)
+        assertNull(layers.optionsPage)
+        layers.closeSchedule()
+        assertEquals(PlaybackOptionsPage.ROOT, layers.optionsPage)
+        layers.dispose()
+    }
+
+    @Test fun sheetKeysNeverReachPlaybackSeekOrReveal() = runTest {
+        val layers = LivePlayerLayerState(this, 5000)
+        layers.openSchedule()
+        for (code in listOf(AndroidKeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, AndroidKeyEvent.KEYCODE_MEDIA_STOP,
+                AndroidKeyEvent.KEYCODE_MEDIA_AUDIO_TRACK, AndroidKeyEvent.KEYCODE_CAPTIONS,
+                AndroidKeyEvent.KEYCODE_MEDIA_FAST_FORWARD, AndroidKeyEvent.KEYCODE_MEDIA_REWIND)) {
+            for (down in listOf(true, false)) assertEquals(true, layers.handleScheduleKey(key(code, down)))
+        }
+        for (code in listOf(AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT)) {
+            assertEquals(false, layers.handleScheduleKey(key(code, true)))
+        }
+        assertTrue(layers.scheduleOpen)
+        assertFalse(layers.chrome.controlsVisible)
+        layers.dispose()
+    }
+
+    @Test fun remoteOverlayBackPreservesBareOrControlsOriginAndRestartsTimer() = runTest {
+        for (controls in listOf(false, true)) {
+            for (code in listOf(AndroidKeyEvent.KEYCODE_INFO, AndroidKeyEvent.KEYCODE_GUIDE,
+                    AndroidKeyEvent.KEYCODE_TV_CONTENTS_MENU, AndroidKeyEvent.KEYCODE_TV_NUMBER_ENTRY,
+                    AndroidKeyEvent.KEYCODE_BOOKMARK)) {
+                val layers = LivePlayerLayerState(this, 5000)
+                if (controls) layers.showControls()
+                layers.chrome.updateAutoHideEligibility(true)
+                when (code) {
+                    AndroidKeyEvent.KEYCODE_INFO -> layers.openInfo(fromKey = true)
+                    AndroidKeyEvent.KEYCODE_GUIDE -> layers.openSchedule(fromKey = true)
+                    else -> layers.openChannelDrawer(fromKey = true)
+                }
+                testScheduler.advanceTimeBy(6000)
+                when (code) {
+                    AndroidKeyEvent.KEYCODE_INFO -> layers.closeInfo()
+                    AndroidKeyEvent.KEYCODE_GUIDE -> layers.closeSchedule()
+                    else -> layers.dismissChannelDrawer()
+                }
+                assertEquals("key=$code", controls, layers.chrome.controlsVisible)
+                if (controls) {
+                    layers.chrome.updateAutoHideEligibility(true)
+                    testScheduler.advanceTimeBy(4999)
+                    assertTrue(layers.chrome.controlsVisible)
+                    testScheduler.advanceTimeBy(2)
+                    assertFalse(layers.chrome.controlsVisible)
+                }
+                layers.dispose()
+            }
+        }
+    }
 
     private fun event(id: Int, start: Long, stop: Long) = EpgEvent.create(EventId(id.toLong()), ChannelId(1),
         Instant.fromEpochSeconds(start), Instant.fromEpochSeconds(stop), title = "Programme $id")

@@ -96,6 +96,15 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("details-continue_watching").assertDoesNotExist()
     }
 
+    @Test fun browseHostContinueWatchingUsesPlayerCallbackWithoutRetuning() {
+        var continued = 0
+        show(recording = false, browse = true, onContinueWatching = { continued++ })
+        open()
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        settle()
+        assertEquals(1, continued)
+    }
+
     @Test fun behindLiveDetailsOfferWatchLiveWhichReturnsToLiveAndCloses() {
         var goLive = 0
         show(recording = false, behindLiveAt = 1_500L, onGoLive = { goLive++ })
@@ -179,7 +188,8 @@ class PlayerProgrammeDetailsTest {
         onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> }, behindLiveAt: Long? = null,
         onGoLive: (suspend () -> Unit)? = null,
         onPlay: (ChannelId, String) -> Unit = { _, _ -> error("Unexpected playback command") },
-        entryHandoff: at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff? = null) {
+        entryHandoff: at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff? = null,
+        onContinueWatching: (() -> Unit)? = null) {
         val entry = DvrEntry.create(DvrEntryId(1), title = "Recorded program", description = "Recording synopsis",
             eventId = watched.id.takeIf { withRecording },
             state = DvrEntryState.COMPLETED.takeIf { withRecording })
@@ -241,7 +251,8 @@ class PlayerProgrammeDetailsTest {
                         showContextMenu = false, onShowDetails = {}, mutations = mutations, notices = notices,
                         mutationScope = scope, mutationInFlight = remember { mutableStateOf(null) },
                         onPlay = onPlay, onPlayRecording = {},
-                        onClose = close, settingsStore = settings, onShowGuide = onShowGuide,
+                         onClose = close, settingsStore = settings, onShowGuide = onShowGuide,
+                         onContinueWatching = onContinueWatching, retainPlayerSnapshot = onContinueWatching != null,
                     ) else LivePlayerProgrammeDetails(watched, channel, observation, { observation }, nowSec,
                         mutations, notices, scope, settings,
                         onPlay = { _, _ -> error("Unexpected playback command") },
