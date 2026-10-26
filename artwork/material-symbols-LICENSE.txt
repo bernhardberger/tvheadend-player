@@ -13,6 +13,12 @@ FILL0, weight400, grade0, optical size24 from this same revision:
   symbols/android/settings_accessibility/materialsymbolsoutlined/settings_accessibility_24px.xml
 `ic_edit.xml` uses the Rounded unfilled export at the same revision. Both retain
 24dp dimensions and theme-controlled tint; no vector-level tint is retained.
+The player's track buttons and the Audio & subtitles settings row use Material
+Symbols Outlined, FILL0, weight400, grade0, optical size24, taken from the
+repository's master branch on 2026-10-26:
+  symbols/android/music_note/materialsymbolsoutlined/music_note_24px.xml (`ic_audiotrack.xml`)
+  symbols/android/subtitles/materialsymbolsoutlined/subtitles_24px.xml (`ic_subtitles.xml`)
+Both keep 24dp dimensions and theme-controlled tint.
 
 Source paths:
   symbols/android/{symbol}/materialsymbolsrounded/{symbol}_fill1_24px.xml (filled)
