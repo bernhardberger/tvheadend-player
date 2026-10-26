@@ -132,6 +132,7 @@ import at.bernhardberger.tvhplayer.playback.PlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
 import at.bernhardberger.tvhplayer.playback.currentLivePlaybackSelection
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -1990,7 +1991,7 @@ class LivePlayerChromeScreenTest {
                     // The app root shows the player inside the runtime's watching state.
                     TVHeadendPlayerTheme { ProvideWatchingProgress(runtime) {
                         view = LocalView.current
-                        VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), settings,
+                        VideoPlayerScreen(video, ChannelSelectionStore(), LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                             channels, screenSession, ChannelId(1), "Name 1", {}, onClose, runtime,
                             contentAllowed = contentAllowed(), notices = notices, uiSettingsStore = uiSettings,
                             startupTarget = if (startupEnabled()) ApplianceLaunchTarget(ApplianceLaunchRequest(startupRequestId()), ChannelId(1), "Name 1") else null,

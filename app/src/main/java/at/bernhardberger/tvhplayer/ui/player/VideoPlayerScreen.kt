@@ -120,7 +120,6 @@ import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
@@ -331,7 +330,7 @@ fun VideoPlayerScreen(
     videoPlayerViewModel: VideoPlayerViewModel = koinViewModel(),
     selection: ChannelSelectionStore = koinInject(),
     lastPlayedChannelStore: LastPlayedChannelStore = koinInject(),
-    settingsStore: PlayerSettingsStore = koinInject(),
+    targetAspect: TargetAspect,
     channelsVm: ChannelsViewModel,
     session: TvheadendSession = koinInject(),
     channelId: ChannelId,
@@ -516,8 +515,6 @@ fun VideoPlayerScreen(
         { previewId?.let(timelineState::stepAnnounced); Unit }
     }
     val nowSec = timelineState.nowEpochSec
-    // The mode of the playing channel, the one the surface in AppRoot shows.
-    val targetAspect = rememberTargetAspect(activeTarget, observation, settingsStore)
     val aspectRatio = targetAspect.mode
 
     fun dispatchTimeshiftCommand(

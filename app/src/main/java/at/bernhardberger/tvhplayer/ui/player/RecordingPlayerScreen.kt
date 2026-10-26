@@ -81,7 +81,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
-import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
 import at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent
@@ -101,7 +100,7 @@ fun RecordingPlayerScreen(
     playbackStart: RecordingPlaybackStart = RecordingPlaybackStart.RESUME,
     tvheadendSession: TvheadendSession = koinInject(),
     session: AppPlaybackRuntime = koinInject(),
-    settingsStore: PlayerSettingsStore = koinInject(),
+    targetAspect: TargetAspect,
     connectionState: ConnectionState,
     onReconnect: () -> Unit,
     onClose: () -> Unit,
@@ -211,8 +210,6 @@ fun RecordingPlayerScreen(
     var restoreInfoActionFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
     var infoOpen by remember { mutableStateOf(false) }
-    // The mode of the recording's channel, the one the surface in AppRoot shows.
-    val targetAspect = rememberTargetAspect(activeTarget, observation, settingsStore)
     val aspectRatio = targetAspect.mode
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
     // The Banner and the controls; the info panel and the options cover them.

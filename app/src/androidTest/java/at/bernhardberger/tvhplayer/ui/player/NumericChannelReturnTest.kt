@@ -21,6 +21,7 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.ControlledAudioPlayer
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
@@ -95,7 +96,7 @@ class NumericChannelReturnTest(private val tagged: Boolean, private val completi
         try {
             composeRule.setContent {
                 if (visible.value) TVHeadendPlayerTheme {
-                    VideoPlayerScreen(video, selection, LastPlayedChannelStore(context), settings,
+                    VideoPlayerScreen(video, selection, LastPlayedChannelStore(context), TargetAspect(AspectRatioMode.FIT) {},
                         catalog, session, ChannelId(1), "Offline 1", {}, {}, runtime)
                 }
             }

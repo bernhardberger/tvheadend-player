@@ -2,12 +2,13 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
-import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.ChannelAspects
@@ -60,27 +61,36 @@ internal fun aspectChannel(target: AppPlaybackTarget?, recordingChannel: (DvrEnt
     }
 
 /** The display mode in effect for the playing target and the way to change it for its channel. */
-internal class TargetAspect(val mode: AspectRatioMode, val select: (AspectRatioMode) -> Unit)
+class TargetAspect(val mode: AspectRatioMode, val select: (AspectRatioMode) -> Unit)
 
 /**
- * One source for the video surface and the options that change it: both read the stored mode of the
- * playing target's channel, so a zap brings the new channel's mode with its picture. Without a
- * channel the mode is Auto and a selection has nothing to store.
+ * The single source of the display mode, created once in AppRoot and handed to the video surface
+ * and to both player screens (options, stats), so they always read the same value. It is the
+ * stored mode of the playing target's channel, so a zap brings the new channel's mode with its
+ * picture. A selection with nothing to store it under (a recording without a channel, or no
+ * server identity yet) is held in memory for the current target only, and is dropped when the
+ * target changes.
  */
 @Composable
 internal fun rememberTargetAspect(
     target: AppPlaybackTarget?,
-    observation: SessionObservation,
     store: PlayerSettingsStore,
+    recordingChannel: (DvrEntryId) -> ChannelId?,
 ): TargetAspect {
     val scope = rememberCoroutineScope()
     val aspects by store.channelAspects.choices.collectAsStateWithLifecycle(ChannelAspects.None)
-    val channel = aspectChannel(target) { observation.dvrEntry(it)?.channelId }
-    val select = remember(store, scope, channel) {
+    val channel = aspectChannel(target, recordingChannel)
+    var unsaved by remember(target) { mutableStateOf<AspectRatioMode?>(null) }
+    val select = remember(store, scope, target, channel) {
         { mode: AspectRatioMode ->
-            if (channel != null) scope.launch { store.channelAspects.set(channel, mode) }
+            if (target != null) {
+                scope.launch {
+                    val stored = channel != null && store.channelAspects.set(channel, mode)
+                    unsaved = if (stored) null else mode
+                }
+            }
             Unit
         }
     }
-    return TargetAspect(aspects.modeFor(channel), select)
+    return TargetAspect(unsaved ?: aspects.modeFor(channel), select)
 }

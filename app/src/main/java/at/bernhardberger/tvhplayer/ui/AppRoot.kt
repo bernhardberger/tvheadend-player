@@ -555,7 +555,10 @@ fun AppRoot(
     val recordingSelection by playbackRuntime.recordingSelection.collectAsStateWithLifecycle()
     val playbackObservation by tvheadendSession.observation.collectAsStateWithLifecycle()
     val warmRecordingId = warmRecordingId(activeTarget, recordingSelection, playbackObservation.currentSession)
-    val targetAspect = rememberTargetAspect(activeTarget, playbackObservation, playerSettingsStore)
+    // Created once here: the surface and both player screens read this one value.
+    val targetAspect = rememberTargetAspect(activeTarget, playerSettingsStore) {
+        playbackObservation.dvrEntry(it)?.channelId
+    }
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
     LaunchedEffect(uiSettings.clockFormat) { AppClock.format = uiSettings.clockFormat }
@@ -1018,6 +1021,7 @@ fun AppRoot(
                                 navigateTopLevel(GuideKey)
                             },
                             channelsVm = channelsVm,
+                            targetAspect = targetAspect,
                             contentAllowed = contentAllowed,
                             channelId = ChannelId(destination.channelId),
                             channelName = destination.channelName,
@@ -1080,6 +1084,7 @@ fun AppRoot(
                                     programme?.id, programme?.start?.epochSeconds)
                                 navigateTopLevel(GuideKey)
                             },
+                            targetAspect = targetAspect,
                             contentAllowed = contentAllowed,
                             recordingId = DvrEntryId(destination.recordingId),
                             playbackStart = destination.start.toPlaybackStart(),

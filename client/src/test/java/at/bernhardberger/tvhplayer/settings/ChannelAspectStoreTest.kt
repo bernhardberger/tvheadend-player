@@ -12,6 +12,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -71,8 +73,17 @@ class ChannelAspectStoreTest {
     @Test
     fun withoutAServerIdentityNothingIsStoredAndEverythingIsAuto() = runTest {
         val store = ChannelAspectStore(InMemoryPreferencesDataStore())
-        store.set(ChannelId(1), AspectRatioMode.FORCE_16_9)
+        assertFalse(store.set(ChannelId(1), AspectRatioMode.FORCE_16_9))
         assertEquals(AspectRatioMode.FIT, store.choices.first().modeFor(ChannelId(1)))
+    }
+
+    @Test
+    fun aChoiceReportsWhetherItWasStored() = runTest {
+        val data = InMemoryPreferencesDataStore()
+        AudioChoiceStore(data).profileIdentity()
+        val store = ChannelAspectStore(data)
+        assertTrue(store.set(ChannelId(1), AspectRatioMode.FORCE_16_9))
+        assertTrue("forgetting an entry is stored too", store.set(ChannelId(1), AspectRatioMode.FIT))
     }
 
     @Test

@@ -47,14 +47,20 @@ class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
         }
         .distinctUntilChanged()
 
-    /** Remembers [mode] for [channel] of the current server; Auto forgets it. No-op without a server identity. */
-    suspend fun set(channel: ChannelId, mode: AspectRatioMode) {
+    /**
+     * Remembers [mode] for [channel] of the current server; Auto forgets it. Returns false, storing
+     * nothing, while there is no server identity to scope the entry by.
+     */
+    suspend fun set(channel: ChannelId, mode: AspectRatioMode): Boolean {
+        var stored = false
         dataStore.edit { preferences ->
             val profile = AudioChoiceStore.profileIdentityIn(preferences) ?: return@edit
             val others = decode(preferences[key]).filterNot { it.profile == profile && it.channel == channel.value }
             val entries = if (mode == AspectRatioMode.FIT) others else others + Entry(profile, channel.value, mode)
             preferences[key] = Json.encodeToString(entries.takeLast(MAX_ENTRIES))
+            stored = true
         }
+        return stored
     }
 
     private fun decode(value: String?): List<Entry> {
