@@ -6,7 +6,6 @@ import android.graphics.Canvas
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.*
@@ -74,7 +73,7 @@ class SettingsConnectionDepthTest {
                     SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
                         onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                     SettingsWithSetup(navigation, { onSaved ->
-                        SettingsConnection(remember { FocusRequester() }, editor, session, { restores++ }, onSaved = onSaved)
+                        SettingsConnection(editor, session, { restores++ }, onSaved = onSaved)
                     }, contentPadding = padding, initialFocusEnabled = !drawerActive)
                     }
                 }
@@ -113,17 +112,16 @@ class SettingsConnectionDepthTest {
 
     @Composable
     private fun Editor.Screen(form: ConnectionFormState, onSaved: () -> Unit = {}) =
-        SettingsConnection(remember { FocusRequester() }, this, session, { restores++ }, form, onSaved)
+        SettingsConnection(this, session, { restores++ }, form, onSaved)
 
     @Test fun overviewDefersTheEditorAndBackUnwindsStepsBeforeReturningToEditAction() {
         val editor = Editor()
         val form = ConnectionFormState()
         lateinit var navigation: DepthNavigationState
-        var current by mutableStateOf(true)
         compose.setContent {
             TVHeadendPlayerTheme {
                 navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
-                SettingsWithSetup(navigation, { onSaved -> editor.Screen(form, onSaved) }, isCurrent = current)
+                SettingsWithSetup(navigation, { onSaved -> editor.Screen(form, onSaved) })
             }
         }
         compose.onNodeWithText("Connection").assertIsFocused()
@@ -157,16 +155,82 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithTag("setup-host").assertIsFocused()
         assertEquals("draft.invalid", form.host)
         assertTrue(setupOpen)
-        // A global destination departure also tears down the live editor immediately.
-        compose.runOnIdle { current = false }
-        compose.waitForIdle()
-        assertEquals("", form.password)
-        compose.runOnIdle { current = true }
         press(Key.Back)
         compose.onNodeWithText("Set up connection").assertIsFocused()
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
         assertEquals(emptyList<FakeSessionCall>(), session.calls)
+    }
+
+    @Test fun leavingSettingsClosesTheSetupLikeBackAndKeepsTheSavedConnection() {
+        val editor = Editor()
+        lateinit var form: ConnectionFormState
+        var current by mutableStateOf(true)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
+                // The form lives inside the setup, as on the screen, so closing the setup drops the draft.
+                SettingsWithSetup(navigation, { onSaved ->
+                    form = rememberConnectionFormState()
+                    editor.Screen(form, onSaved)
+                }, isCurrent = current)
+            }
+        }
+        val saved = editor.serverSettings.value
+        // Each opening shows the saved connection, never a draft: its sign-in, with the password kept out of the form.
+        fun openAndTestDraft() {
+            press(Key.DirectionCenter)
+            compose.onNodeWithTag("setup-continue").assertIsFocused()
+            assertEquals("edit.invalid", form.host)
+            assertEquals("fixture", form.username)
+            assertEquals("", form.password)
+            assertTrue(form.hasSavedPassword)
+            compose.runOnIdle {
+                form.updateHost("draft.invalid")
+                form.updateUsername("draft-user")
+            }
+            val before = session.calls.size
+            press(Key.DirectionCenter)
+            press(Key.DirectionCenter)
+            compose.onNodeWithTag("setup-connecting").assertIsFocused()
+            assertEquals(listOf(FakeSessionCall.DISCONNECT, FakeSessionCall.CONNECT), session.calls.drop(before))
+        }
+        // Another destination becoming current closes the setup at once; returning shows the entry.
+        fun leaveAndReturn() {
+            compose.runOnIdle { current = false }
+            compose.waitForIdle()
+            assertFalse(setupOpen)
+            compose.runOnIdle { current = true }
+            compose.onNodeWithText("Set up connection").assertIsFocused()
+            assertFalse(setupOpen)
+            assertEquals(0, editor.saves)
+            assertEquals(saved, editor.serverSettings.value)
+        }
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Set up connection").assertIsFocused()
+
+        // Leaving while the test runs cancels it, which disconnects the draft and restores the saved connection.
+        openAndTestDraft()
+        leaveAndReturn()
+        assertEquals(1, restores)
+        assertEquals(FakeSessionCall.DISCONNECT, session.calls.last())
+
+        // A passed but unsaved draft is disconnected too, and the saved connection restored.
+        openAndTestDraft()
+        compose.runOnIdle { session.publish(ready()) }
+        compose.onNodeWithTag("setup-start-watching").assertIsFocused()
+        val passed = session.calls.size
+        leaveAndReturn()
+        assertEquals(2, restores)
+        assertEquals(listOf(FakeSessionCall.DISCONNECT), session.calls.drop(passed))
+
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("setup-continue").assertIsFocused()
+        assertEquals("edit.invalid", form.host)
+        assertEquals("fixture", form.username)
+        assertEquals("", form.password)
+        assertTrue(form.hasSavedPassword)
+        assertEquals(3, editor.loads)
     }
 
     @Test fun leftStaysInTheWizardAndBackFromServerReturnsWithoutSaving() {
@@ -292,7 +356,7 @@ class SettingsConnectionDepthTest {
         restoration.setContent {
             TVHeadendPlayerTheme {
                 form = rememberConnectionFormState()
-                SettingsConnection(remember { FocusRequester() }, editor, session, { restores++ }, form)
+                SettingsConnection(editor, session, { restores++ }, form)
             }
         }
         compose.waitForIdle()

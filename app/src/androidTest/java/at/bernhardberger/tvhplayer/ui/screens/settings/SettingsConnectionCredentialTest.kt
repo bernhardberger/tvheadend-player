@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import androidx.activity.ComponentActivity
-import androidx.compose.runtime.remember
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -37,7 +35,6 @@ class SettingsConnectionCredentialTest {
         var saved = 0
         composeRule.setContent {
             SettingsConnection(
-                initialFocusRequester = remember { FocusRequester() },
                 settingsStore = editor,
                 session = session,
                 restoreSaved = {},

@@ -10,8 +10,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalContext
 import at.bernhardberger.tvheadend.sdk.core.ServerProfileReadResult
@@ -29,7 +27,6 @@ import org.koin.compose.koinInject
 
 @Composable
 internal fun SettingsConnection(
-    initialFocusRequester: FocusRequester,
     settingsStore: ConnectionProfileEditor = koinInject<AppProfileOwner>(),
     session: TvheadendSession = koinInject(),
     restoreSaved: suspend () -> Unit = rememberSavedConnectionRestore(session),
@@ -68,7 +65,6 @@ internal fun SettingsConnection(
                     else -> false
                 }
             }
-            .focusRequester(initialFocusRequester)
             .focusGroup(),
     ) {
         ConnectionSetupFlow(state)

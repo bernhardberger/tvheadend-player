@@ -21,6 +21,7 @@ import kotlin.time.Instant
 import org.junit.Rule
 import org.junit.Test
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -107,6 +108,30 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("player-info").assertIsFocused()
     }
 
+    @Test fun browseWatchLiveReturnsToLiveAndPlaysTheChannelBehindWhichTheDetailsClose() {
+        var goLive = 0
+        val plays = mutableListOf<Pair<ChannelId, String>>()
+        val handoff = at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff()
+        show(recording = false, browse = true, behindLiveAt = 1_500L, onGoLive = { goLive++ },
+            onPlay = { id, name -> plays += id to name }, entryHandoff = handoff)
+        // Watch live is offered beside Continue watching, which still takes the opening focus.
+        open()
+        compose.onNodeWithTag("details-watch_live").assertExists()
+        compose.onNodeWithTag("details-watch_live").performSemanticsAction(SemanticsActions.RequestFocus)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
+        settle()
+        assertEquals(1, goLive)
+        assertEquals(listOf(channel.id to "Ridge Earth"), plays)
+        // The page stays up behind the player rather than closing over browse first.
+        assertTrue(handoff.departing)
+        compose.onNodeWithTag("programme-details-page").assertExists()
+        compose.runOnIdle { handoff.runCloses() }
+        settle()
+        compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        assertEquals(1, goLive)
+        assertEquals(1, plays.size)
+    }
+
     @Test fun atLiveDetailsOfferOnlyContinueWatching() {
         show(recording = false, onGoLive = { error("Unexpected go live") })
         open()
@@ -152,7 +177,9 @@ class PlayerProgrammeDetailsTest {
 
     private fun show(recording: Boolean, browse: Boolean = false, warm: Boolean = true, withRecording: Boolean = false,
         onShowGuide: (ChannelId, EpgEvent?) -> Unit = { _, _ -> }, behindLiveAt: Long? = null,
-        onGoLive: (suspend () -> Unit)? = null) {
+        onGoLive: (suspend () -> Unit)? = null,
+        onPlay: (ChannelId, String) -> Unit = { _, _ -> error("Unexpected playback command") },
+        entryHandoff: at.bernhardberger.tvhplayer.ui.PlayerEntryHandoff? = null) {
         val entry = DvrEntry.create(DvrEntryId(1), title = "Recorded program", description = "Recording synopsis",
             eventId = watched.id.takeIf { withRecording },
             state = DvrEntryState.COMPLETED.takeIf { withRecording })
@@ -185,6 +212,7 @@ class PlayerProgrammeDetailsTest {
                 at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator provides
                     (if (warm) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE),
                 at.bernhardberger.tvhplayer.ui.components.LocalWatchingGoLive provides onGoLive,
+                at.bernhardberger.tvhplayer.ui.LocalPlayerEntryHandoff provides entryHandoff,
                 at.bernhardberger.tvhplayer.ui.components.LocalLivePosition provides remember {
                     mutableStateOf(behindLiveAt?.let {
                         at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition(channel.id, it, behindLive = true)
@@ -212,7 +240,7 @@ class PlayerProgrammeDetailsTest {
                         watched, observation, observation, { observation }, { nowSec },
                         showContextMenu = false, onShowDetails = {}, mutations = mutations, notices = notices,
                         mutationScope = scope, mutationInFlight = remember { mutableStateOf(null) },
-                        onPlay = { _, _ -> error("Unexpected playback command") }, onPlayRecording = {},
+                        onPlay = onPlay, onPlayRecording = {},
                         onClose = close, settingsStore = settings, onShowGuide = onShowGuide,
                     ) else LivePlayerProgrammeDetails(watched, channel, observation, { observation }, nowSec,
                         mutations, notices, scope, settings,

@@ -6,7 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.runtime.*
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -65,7 +64,7 @@ internal fun SettingsScreen(
         if (applianceBuild) listOf(settingsApplianceLevel()) else emptyList()
     SettingsScreenNavigation(navigation, levels, initialFocusEnabled, contentPadding, backEnabled, isCurrent,
         setup = if (setupOpen) {
-            { SettingsConnection(remember { FocusRequester() }, onSaved = { setupOpen = false }) }
+            { SettingsConnection(onSaved = { setupOpen = false }) }
         } else null,
         onCloseSetup = { setupOpen = false })
 }
@@ -108,7 +107,13 @@ internal fun SettingsScreenNavigation(
     // host so that depth motion stays inside the browse viewport and never paints
     // across the drawer.
     val inset = contentPadding.calculateStartPadding(layoutDirection) + TvBrowseLeadingInset
-    val setupOpen = setup != null
+    // Leaving Settings closes the setup at once, like Back out of it: its disposal cancels a
+    // running test, restores the saved connection and clears what was typed; nothing is saved.
+    // SideEffect, not LaunchedEffect: it closes in this composition, so a Settings page that leaves
+    // composition right after cannot keep its saved setupOpen and reopen the setup on return.
+    val shownSetup = setup?.takeIf { isCurrent }
+    if (setup != null && !isCurrent) SideEffect(onCloseSetup)
+    val setupOpen = shownSetup != null
     val layering = LocalBrowseContentLayering.current
     val pageKey = remember { Any() }
     val opacity = remember { mutableFloatStateOf(1f) }
@@ -137,11 +142,11 @@ internal fun SettingsScreenNavigation(
             isCurrent = isCurrent,
             onRootBack = rootFocus?.let { { it.requestFocus() } },
         )
-        if (setup != null) {
+        if (shownSetup != null) {
             // Registered before the setup's own handler, so its steps go back first.
-            BackHandler(isCurrent && backEnabled, onCloseSetup)
+            BackHandler(backEnabled, onCloseSetup)
             Box(Modifier.browseDetailsViewport().background(MaterialTheme.colorScheme.background).fillMaxSize()) {
-                setup()
+                shownSetup()
             }
         }
     }
