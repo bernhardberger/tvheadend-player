@@ -82,6 +82,7 @@ import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerBackAction
+import at.bernhardberger.tvhplayer.core.playerChromeLayer
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
@@ -407,6 +408,8 @@ fun VideoPlayerScreen(
     var connectionLost by remember { mutableStateOf(false) }
     var screenActive by remember { mutableStateOf(false) }
     var channelNumberInput by remember { mutableStateOf("") }
+    // Whether the entry last cleared was committed to its channel, so it settles into the identity.
+    var channelNumberCommitted by remember { mutableStateOf(false) }
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
@@ -416,6 +419,10 @@ fun VideoPlayerScreen(
     // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
+    // The control focused when number entry took the keys over the controls; focus returns there.
+    var numberEntryReturnAction by remember { mutableStateOf<String?>(null) }
+    // The control last focused in the controls, the live timeline included.
+    var lastChromeControl by remember { mutableStateOf<String?>(null) }
     val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
     val rootFocus = remember { FocusRequester() }
 
@@ -968,9 +975,10 @@ fun VideoPlayerScreen(
             channelNumbers = channelNumbers,
             enteredNumber = channelNumberInput,
         )
+        val channel = channels.firstOrNull { it.id == channelId }
+        channelNumberCommitted = channel != null
         channelNumberInput = ""
 
-        val channel = channels.firstOrNull { it.id == channelId }
         return channel?.let(::tuneChannel) ?: true
     }
 
@@ -988,7 +996,8 @@ fun VideoPlayerScreen(
         val channel = ChannelNavigation.idForNumber(orderedChannelIds, channelNumbers, channelNumberInput)
             ?.let { id -> channels.firstOrNull { it.id == id } }
         when {
-            channel != null -> ChannelNumberTarget.Channel(channel.name.orEmpty(), channel.icon)
+            channel != null -> ChannelNumberTarget.Channel(channel.visibleChannelNumber?.toString().orEmpty(),
+                channel.name.orEmpty(), channel.icon)
             channelNumberUnknown -> ChannelNumberTarget.None
             orderedChannelIds.isEmpty() || ChannelNavigation.canExtendToNumber(
                 orderedChannelIds, channelNumbers, channelNumberInput, channelNumberDigits,
@@ -1125,6 +1134,14 @@ fun VideoPlayerScreen(
     val showDrawer = foregroundContext.channelDrawerVisible
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    val chromeLayer = playerChromeLayer(foregroundContext)
+    // The digits shown in the top identity's place; empty while another layer covers the entry.
+    val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
+    val numberEntryUp = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY
+    LaunchedEffect(numberEntryUp, layerState.chrome.controlsVisible) {
+        if (!layerState.chrome.controlsVisible) numberEntryReturnAction = null
+        else if (numberEntryUp) numberEntryReturnAction = lastChromeControl
+    }
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = layerState.chrome.controlsVisible,
@@ -1435,6 +1452,7 @@ fun VideoPlayerScreen(
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
                     zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     if (event.nativeKeyEvent.repeatCount == 0) {
+                        channelNumberCommitted = false
                         channelNumberInput = ChannelNavigation.appendDigit(
                             channelNumberInput, digit, channelNumberDigits,
                         )
@@ -1565,10 +1583,10 @@ fun VideoPlayerScreen(
             player = { keepControls ->
         PlayerChrome(
             mode = playerChromeMode(
-                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
+                controls = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
                 // A pending or dispatched step holds the Banner up after its own timer ran out.
                 banner = !channelUnavailable && (bannerSeekPreview != null ||
-                    (layerState.chrome.bannerVisible && foregroundLayer == PlayerForegroundLayer.NONE)),
+                    (layerState.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
                 stepPreview = bannerSeekPreview != null,
             ),
             content = chromeContent,
@@ -1598,18 +1616,22 @@ fun VideoPlayerScreen(
                 tuning = compactTuning,
             ),
             actions = PlayerChromeActions(
-                active = layerState.chrome.controlsVisible && layerState.optionsPage == null && !layerState.infoOpen,
+                // Under number entry the controls stay up, but the root takes the keys.
+                active = layerState.chrome.controlsVisible && layerState.optionsPage == null && !layerState.infoOpen &&
+                    !numberEntryUp,
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
                     infoReturnAction != null && !layerState.infoOpen -> infoReturnAction
                     restoreInfoFocus -> "player-info"
                     restoreOptionsFocus -> "player-settings"
+                    numberEntryReturnAction != null -> numberEntryReturnAction
                     else -> layerState.restoreChannelAction
                 },
             ),
             entry = layerState.chrome.controlsEntry,
             panelOpen = layerState.optionsPage != null || layerState.infoOpen,
+            numberEntryShown = numberEntry.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
                 dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
@@ -1629,8 +1651,10 @@ fun VideoPlayerScreen(
             },
             onInteraction = layerState.chrome::onUserInteraction,
             onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
+            onControlFocused = { lastChromeControl = it },
             onFocusRestored = {
                 infoReturnAction = null
+                numberEntryReturnAction = null
                 restoreInfoFocus = false
                 restoreOptionsFocus = false
                 layerState.onChannelActionRestored()
@@ -1760,14 +1784,14 @@ fun VideoPlayerScreen(
             )
         }
 
-        ChannelNumberOverlay(
-            number = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty(),
-            target = channelNumberTarget,
-            maxDigits = channelNumberDigits,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 56.dp, top = 48.dp),
-        )
+        PlayerTopIdentitySlot {
+            ChannelNumberOverlay(
+                number = numberEntry,
+                target = channelNumberTarget,
+                maxDigits = channelNumberDigits,
+                settles = channelNumberCommitted,
+            )
+        }
 
         val unavailableShown = channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)
         PlayerChannelMessage(

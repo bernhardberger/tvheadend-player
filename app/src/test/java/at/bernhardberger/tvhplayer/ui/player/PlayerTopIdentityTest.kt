@@ -18,6 +18,8 @@ import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -60,6 +62,70 @@ class PlayerTopIdentityTest {
         assertEquals("centred on the clock's line", clock.center.y, identity.center.y, 1f)
         assertTrue("it stands in the top band", identity.bottom < 120f)
         assertEquals("centred on the room's header band", TvGridVerticalMargin.value + 20f, identity.center.y, 1f)
+    }
+
+    @Test fun theNumberEntryStandsWhereTheIdentityStandsWithTheChromeShownOrHidden() {
+        chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
+        val identity = bounds(PlayerTopIdentityTag)
+        assertEquals(listOf("Channel 1 One"), identityDescription())
+        for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER, PlayerChromeMode.HIDDEN)) {
+            compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("12", "Twelve", null) }
+            settle()
+            if (mode == PlayerChromeMode.HIDDEN) assertFalse("hidden chrome has no identity", exists(PlayerTopIdentityTag))
+            else assertEquals("$mode: the identity under the entry is not read out", null, identityDescription())
+            val entry = bounds("number-entry")
+            assertEquals("$mode: the entry starts where the identity does", identity.left, entry.left, 0.5f)
+            assertEquals("$mode: the entry stands on the identity's line", identity.top, entry.top, 0.5f)
+            assertEquals("$mode: one line, as the identity", identity.height, entry.height, 0.5f)
+            val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+            assertTrue("$mode: the digits start inside the identity's inset", digits.left >= TvGridHorizontalMargin.value - 0.5f)
+            assertEquals("$mode: the destination shares the line", identity.center.y,
+                compose.onNodeWithText("Twelve").fetchSemanticsNode().boundsInRoot.center.y, 1f)
+            compose.runOnIdle { numberEntry = "" }
+            settle()
+        }
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun atLargerTextTheEntryKeepsTheIdentitysTopEdgeAndHeight() {
+        chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
+        for (scale in listOf(1.3f, 2f)) {
+            compose.runOnIdle { fontScale = scale; shownMode = PlayerChromeMode.CONTROLS; numberEntry = "" }
+            settle()
+            val identity = bounds(PlayerTopIdentityTag)
+            for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER, PlayerChromeMode.HIDDEN)) {
+                compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("12", "Twelve", null) }
+                settle()
+                val entry = bounds("number-entry")
+                assertEquals("$scale $mode: the entry starts where the identity does", identity.left, entry.left, 0.5f)
+                assertEquals("$scale $mode: the entry's top edge is the identity's", identity.top, entry.top, 0.5f)
+                // The digits share the name's style, so the entry is as tall as the identity at every scale.
+                assertEquals("$scale $mode: the entry's height is the identity's", identity.height, entry.height, 0.5f)
+                compose.runOnIdle { numberEntry = "" }
+                settle()
+            }
+        }
+    }
+
+    @Test fun anUnknownOrPendingEntryStandsInPlaceAndTheIdentityReturnsWhenItLeaves() {
+        chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
+        val identity = bounds(PlayerTopIdentityTag)
+        for ((typed, target) in listOf("1" to ChannelNumberTarget.Pending, "999" to ChannelNumberTarget.None)) {
+            compose.runOnIdle { numberEntry = typed; numberTarget = target }
+            settle()
+            assertEquals(identity.left, bounds("number-entry").left, 0.5f)
+            assertEquals(identity.top, bounds("number-entry").top, 0.5f)
+            assertEquals(target == ChannelNumberTarget.None, compose.onAllNodes(hasText(string(R.string.player_channel_number_none)))
+                .fetchSemanticsNodes().isNotEmpty())
+            assertEquals(null, identityDescription())
+            // Timed out or cancelled: the screen clears the digits and the identity comes back.
+            compose.runOnIdle { numberEntry = "" }
+            settle()
+            assertFalse("the entry left", compose.onAllNodes(hasText(typed) and hasAnyAncestor(hasTestTag("number-entry")))
+                .fetchSemanticsNodes().isNotEmpty())
+            assertEquals(listOf("Channel 1 One"), identityDescription())
+            assertEquals("the identity did not move", identity, bounds(PlayerTopIdentityTag))
+        }
     }
 
     @Test fun theBannersIdentityIsPassiveButAccessible() {
@@ -262,6 +328,13 @@ class PlayerTopIdentityTest {
     private var restoreFocus by mutableStateOf<String?>(null)
     private var recentOpen by mutableStateOf(false)
     private var shownMode by mutableStateOf(PlayerChromeMode.CONTROLS)
+    private var numberEntry by mutableStateOf("")
+    private var fontScale by mutableStateOf(1f)
+    private var numberTarget by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+    /** The screen's number entry, drawn over the chrome in the identity's place. */
+    private val numberEntrySlot: @androidx.compose.runtime.Composable () -> Unit = {
+        PlayerTopIdentitySlot { ChannelNumberOverlay(numberEntry, numberTarget, Modifier.testTag("number-entry")) }
+    }
     private var restores = 0
     private var toggles = 0
     private var downs = 0
@@ -288,6 +361,10 @@ class PlayerTopIdentityTest {
         this.timeshift = timeshift
         restoreFocus = restore
         compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, fontScale),
+            ) {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = shownMode,
@@ -306,8 +383,10 @@ class PlayerTopIdentityTest {
                     onRecentPick = { picks += it },
                     recentRowOpen = recentOpen,
                     onRecentRowOpenChange = { recentOpen = it },
+                    numberEntryShown = numberEntry.isNotEmpty(),
                 )
                 extra()
+            }
             }
         }
         compose.mainClock.autoAdvance = false
@@ -315,6 +394,9 @@ class PlayerTopIdentityTest {
     }
 
     private fun string(id: Int) = ApplicationProvider.getApplicationContext<Application>().getString(id)
+
+    private fun identityDescription(): List<String>? = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
+        .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)
 
     private fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
 

@@ -24,6 +24,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -91,6 +93,7 @@ import java.util.TimeZone
 import kotlin.time.Instant
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
@@ -179,14 +182,87 @@ class PlayerChromeCaptureTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun detailsButtonsGermanLargeText() = captures("de", 1.3f, detailsOnly = true)
     @Test fun numberEntry() = numberEntryCaptures("en", 1f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun numberEntryLargeText() = numberEntryCaptures("de", 1.3f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun numberEntryFourDigitsLargeText() = numberEntryCaptures("de", 1.3f, maxDigits = 4)
+    @Test fun numberEntryLargeText() = numberEntryCaptures("en", 1.3f)
+    @Test fun numberEntryFourDigitsLargeText() = numberEntryCaptures("en", 1.3f, maxDigits = 4)
+    @Test fun numberEntryOverControls() = numberEntryOverControlsCaptures("en", 1f)
+
+    /** Typing over shown controls: the top identity gives way to the entry in its place. */
+    private fun numberEntryOverControlsCaptures(locale: String, fontScale: Float) {
+        lateinit var view: View
+        var entry by mutableStateOf<Pair<String, ChannelNumberTarget>>("" to ChannelNumberTarget.Pending)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    // The screen's root, which takes focus from the controls while the entry is up.
+                    val rootFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+                    PlayerRootFocusEffect(
+                        if (entry.first.isEmpty()) at.bernhardberger.tvhplayer.core.PlayerForegroundLayer.CONTROLS
+                        else at.bernhardberger.tvhplayer.core.PlayerForegroundLayer.NUMBER_ENTRY,
+                        rootFocus,
+                    )
+                    Box(Modifier.fillMaxSize().focusRequester(rootFocus).focusable()) {
+                        Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        Controls(
+                            timeshift = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0, timingKnown = true),
+                            behind = false,
+                            paused = false,
+                            content = PlayerChromeContent(
+                                clock = formatClock(NOW),
+                                info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources,
+                                    101, "Ridge Earth HD", programme, next, nextScheduled = true, nowSec = NOW,
+                                    unavailableTitle = "Programme information unavailable"),
+                                state = playerStateCell(false),
+                                recordingNow = false,
+                                picon = LOGO,
+                                artwork = programme.image,
+                            ),
+                            numberEntryShown = entry.first.isNotEmpty(),
+                        )
+                        ProvideArtworkSession(session) { PlayerTopIdentitySlot {
+                            ChannelNumberOverlay(entry.first, entry.second, Modifier.testTag("number-entry"))
+                        } }
+                    }
+                }
+            }
+        }
+        fun capture(name: String) {
+            val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            val directory = File("../captures/number-entry-in-place").apply { mkdirs() }
+            File(directory, "controls-$name-$locale-font$fontScale.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            bitmap.recycle()
+        }
+        repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        val identity = compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        capture("0-identity")
+        for ((name, next) in listOf(
+            "1-pending" to ("1" to ChannelNumberTarget.Pending),
+            "12-matched" to ("12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", SPORT_LOGO)),
+            "999-unknown" to ("999" to ChannelNumberTarget.None),
+        )) {
+            compose.runOnIdle { entry = next }
+            if (next.first == "1") {
+                // Midway through the crossfade: the identity fades out as the entry fades in.
+                repeat(4) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
+                capture("1-crossfade")
+            }
+            repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+            val placed = compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot
+            assertEquals("$name: the entry starts where the identity does", identity.left, placed.left, 0.5f)
+            assertEquals("$name: the entry stands on the identity's line", identity.top, placed.top, 0.5f)
+            assertEquals("$name: the entry is the identity's height", identity.height, placed.height, 0.5f)
+            capture(name)
+        }
+    }
 
     private fun numberEntryCaptures(locale: String, fontScale: Float, maxDigits: Int = 3) {
         lateinit var view: View
-        var entry by mutableStateOf<Pair<String, ChannelNumberTarget>>("0" to ChannelNumberTarget.Pending)
+        var entry by mutableStateOf<Pair<String, ChannelNumberTarget>>("" to ChannelNumberTarget.Pending)
+        var plate by mutableStateOf(ChannelNumberPlateStyle)
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
@@ -194,53 +270,69 @@ class PlayerChromeCaptureTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize()) {
                         Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-                        ProvideArtworkSession(session) { ChannelNumberOverlay(entry.first, entry.second,
-                            Modifier
-                                .align(Alignment.TopStart)
-                                .padding(start = 56.dp, top = 48.dp)
-                                .testTag("number-entry"),
-                            maxDigits = maxDigits) }
+                        // Chrome hidden: the entry alone, in the top identity's place.
+                        ProvideArtworkSession(session) { PlayerTopIdentitySlot { ChannelNumberOverlay(entry.first, entry.second,
+                            Modifier.testTag("number-entry"), maxDigits = maxDigits, plate = plate) } }
                     }
                 }
             }
         }
         var initialHeight: Int? = null
         var panelLeft: Float? = null
-        var digitsCenterX: Float? = null
+        var digitsRight: Float? = null
         var digitsTop: Float? = null
         var withLogoWidth: Int? = null
         val entries = listOf(
             "0" to ChannelNumberTarget.Pending,
-            "1" to ChannelNumberTarget.Channel("Ridge Earth HD", LOGO),
-            "01" to ChannelNumberTarget.Channel("Ridge Earth HD", LOGO),
-            "02" to ChannelNumberTarget.Channel("Ridge Earth HD", null),
-            "12" to ChannelNumberTarget.Channel("Channel without a logo", null),
-            "123" to ChannelNumberTarget.Channel("A very long international channel name HD", null),
+            "1" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", LOGO),
+            "01" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", LOGO),
+            "02" to ChannelNumberTarget.Channel("2", "Ridge Earth HD", null),
+            "12" to ChannelNumberTarget.Channel("12", "Channel without a logo", null),
+            "123" to ChannelNumberTarget.Channel("123", "A very long international channel name HD", null),
             "999" to ChannelNumberTarget.None,
         ) + if (maxDigits == 4) listOf(
-            "1234" to ChannelNumberTarget.Channel("A very long international channel name HD", LOGO),
+            "1234" to ChannelNumberTarget.Channel("1234", "A very long international channel name HD", LOGO),
         ) else emptyList()
-        for (next in entries) {
+        fun capture(name: String) {
+            val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            val directory = File("../captures/number-entry-in-place").apply { mkdirs() }
+            File(directory, "hidden-$name-$locale-font$fontScale-digits$maxDigits.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            bitmap.recycle()
+        }
+        // Each number is its own entry, so its plate is sized for it alone.
+        fun show(next: Pair<String, ChannelNumberTarget>) {
+            compose.runOnIdle { entry = "" to ChannelNumberTarget.Pending }
+            repeat(10) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
             compose.runOnIdle { entry = next }
             repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        }
+        for (next in entries) {
+            show(next)
             val size = compose.onNodeWithTag("number-entry").fetchSemanticsNode().size
             val left = compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot.left
-            val digits = compose.onNodeWithText(next.first).fetchSemanticsNode().boundsInRoot
+            val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
             if (initialHeight == null) {
                 initialHeight = size.height
                 panelLeft = left
-                digitsCenterX = digits.center.x
+                digitsRight = digits.right
                 digitsTop = digits.top
             }
             assertEquals("entry keeps its height: $next", initialHeight, size.height)
             assertEquals("entry keeps its corner anchor: $next", panelLeft!!, left, 0.5f)
-            assertEquals("digits stay centred in the same slot", digitsCenterX!!, digits.center.x, 0.5f)
+            assertEquals("digits end at the same field end", digitsRight!!, digits.right, 0.5f)
             assertEquals("destination never moves the digits vertically", digitsTop!!, digits.top, 0.5f)
-            assertTrue("entry remains compact", size.width <= 840)
-            if (next.first == "1") withLogoWidth = size.width
+            assertTrue("entry stays inside the grid margin", compose.onNodeWithTag("number-entry").fetchSemanticsNode()
+                .boundsInRoot.right <= with(Density(2f)) { (960.dp - TvGridHorizontalMargin).toPx() })
+            if (next.first == "01") withLogoWidth = size.width
             if (next.first == "02") {
-                assertTrue("an absent logo reserves no space", size.width < withLogoWidth!!)
-                compose.onNodeWithTag("channel-number-picon").assertDoesNotExist()
+                assertEquals("an absent logo keeps the chip's place", withLogoWidth, size.width)
+                compose.onNodeWithTag("channel-number-picon", useUnmergedTree = true).assertDoesNotExist()
+                // A logo-less match leaves the chip empty: the number stands once, in the field.
+                assertEquals(1, compose.onAllNodesWithText("02", useUnmergedTree = true).fetchSemanticsNodes().size +
+                    compose.onAllNodesWithText("2", useUnmergedTree = true).fetchSemanticsNodes().size)
             }
             if (next.second == ChannelNumberTarget.Pending) {
                 compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
@@ -252,13 +344,18 @@ class PlayerChromeCaptureTest {
                 // The nested rows can each round their centred placement by half a pixel.
                 assertEquals("number and destination share one line", digits.center.y, name.center.y, 1f)
             }
-            val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-            compose.runOnIdle { view.draw(Canvas(bitmap)) }
-            val directory = File("../captures/number-entry-compact").apply { mkdirs() }
-            File(directory, "compact-${next.first}-$locale-font$fontScale-digits$maxDigits.png").outputStream().use {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-            }
-            bitmap.recycle()
+            capture(next.first)
+        }
+        // The other plates swap only colours: the same entry keeps its layout on each.
+        if (maxDigits != 3) return
+        val matched = "12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", SPORT_LOGO)
+        show(matched)
+        val layout = compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot
+        for (style in ChannelNumberPlate.entries) {
+            compose.runOnIdle { plate = style }
+            show(matched)
+            assertEquals("$style: same layout", layout, compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot)
+            capture("12-plate-${style.name.lowercase()}")
         }
     }
     @Test fun englishLargeText() = captures("en", 1.3f)
@@ -813,6 +910,7 @@ class PlayerChromeCaptureTest {
         recordingChannels: Set<ChannelId> = emptySet(),
         browser: PlayerChannelBrowserState? = null,
         emptyRecent: Boolean = false,
+        numberEntryShown: Boolean = false,
     ) {
         Box(Modifier.fillMaxSize()) {
         val shown = shown ?: if (step != null) window.copy(positionFraction = 0.51f, estimatedPosition = Instant.fromEpochSeconds(NOW - 233)) else window
@@ -830,7 +928,7 @@ class PlayerChromeCaptureTest {
                 stepDeltaMs = step,
                 motionKey = ChannelId(1),
             ),
-            actions = PlayerChromeActions(active = true, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null }),
+            actions = PlayerChromeActions(active = !numberEntryShown, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null }),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             onChannelZap = { _, _, _ -> },
             downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
@@ -842,6 +940,7 @@ class PlayerChromeCaptureTest {
             onRecentPick = {},
             recentRowOpen = recentOpen,
             decorationCoversControls = tray != null,
+            numberEntryShown = numberEntryShown,
             controlsDecoration = { _, controls ->
                 QuickZapPresentation(
                     expanded = tray != null,

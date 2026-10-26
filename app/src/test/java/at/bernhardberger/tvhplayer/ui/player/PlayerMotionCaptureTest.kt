@@ -19,7 +19,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
@@ -32,7 +31,6 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -127,33 +125,45 @@ class PlayerMotionCaptureTest {
     @Test fun numberEntryTransitions() {
         var number by mutableStateOf("")
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+        var settles by mutableStateOf(false)
         show { session ->
             Box(Modifier.fillMaxSize()) {
-                ProvideArtworkSession(session) { ChannelNumberOverlay(number, target,
-                    Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp)) }
+                ProvideArtworkSession(session) {
+                    PlayerTopIdentitySlot { ChannelNumberOverlay(number, target, settles = settles) }
+                }
             }
         }
         compose.mainClock.autoAdvance = false
-        fun change(digits: String, destination: ChannelNumberTarget) = compose.runOnIdle {
+        fun change(digits: String, destination: ChannelNumberTarget, committed: Boolean = false) = compose.runOnIdle {
             number = digits
             target = destination
+            settles = committed
             Snapshot.sendApplyNotifications()
         }
         fun frames(name: String, frames: List<Int>) =
             captureFrames(name, "number-entry-motion", frames, focus = "passive; no focus")
 
         change("1", ChannelNumberTarget.Pending)
-        frames("entry", listOf(3, 5))
-        change("1", ChannelNumberTarget.Channel("Documentary", ArtworkId(1)))
+        frames("entry", listOf(3, 6, 10))
+        change("1", ChannelNumberTarget.Channel("1", "Documentary", ArtworkId(1)))
         frames("destination", listOf(3, 6, 9))
-        change("12", ChannelNumberTarget.Channel("Arts and Culture", null))
-        frames("digits-update", listOf(1, 3, 6))
+        change("12", ChannelNumberTarget.Channel("12", "Arts and Culture", null))
+        frames("digit-push", listOf(1, 3, 6))
+        change("", ChannelNumberTarget.Pending, committed = true)
+        frames("commit", listOf(3, 6, 10))
+        change("12", ChannelNumberTarget.Channel("12", "Arts and Culture", null))
+        compose.mainClock.advanceTimeBy(1_000)
         change("", ChannelNumberTarget.Pending)
-        frames("commit-or-cancel", listOf(3, 5))
+        frames("cancel", listOf(3, 6, 10))
+        // A leading zero settles as the channel's own number.
+        change("01", ChannelNumberTarget.Channel("1", "Documentary", ArtworkId(1)))
+        compose.mainClock.advanceTimeBy(1_000)
+        change("", ChannelNumberTarget.Pending, committed = true)
+        frames("commit-leading-zero", listOf(1, 6, 10))
         change("999", ChannelNumberTarget.None)
         frames("no-channel", listOf(3, 5))
         change("", ChannelNumberTarget.Pending)
-        frames("error-dismissal", listOf(3, 5))
+        frames("no-channel-dismissal", listOf(3, 5))
     }
 
     /** Controls hand over to the options panel: frames 3, 6 and 9 after opening, then settled. */

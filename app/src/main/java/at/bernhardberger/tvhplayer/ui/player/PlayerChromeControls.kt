@@ -57,7 +57,7 @@ import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
  * [PlayerChrome]'s controls: the header and info bar over the focusable timeline and the action row.
  * The header and artwork are passive; details opens from the action row.
  * The bar row's state cell and end and the distance behind live are passive. [decoration] hosts them, such as live's
- * quick-zap rail; while it [covered] them they take no focus.
+ * quick-zap rail; while it or number entry [covered] them they take no focus and expose no semantics.
  */
 @Composable
 internal fun PlayerChromeControls(
@@ -87,6 +87,7 @@ internal fun PlayerChromeControls(
     onCommitSeek: () -> Unit,
     onPauseUnavailable: (reason: String) -> Unit,
     onActionFocused: (String) -> Unit,
+    onControlFocused: (String) -> Unit,
     onFocusRestored: () -> Unit,
     onDownFromActions: () -> Unit,
     covered: Boolean,
@@ -210,7 +211,8 @@ internal fun PlayerChromeControls(
     decoration({ chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
-        modifier = Modifier.onPreviewKeyEvent { event ->
+        // Covered, they also offer an accessibility service nothing to read or act on.
+        modifier = Modifier.then(if (covered) Modifier.clearAndSetSemantics { } else Modifier).onPreviewKeyEvent { event ->
             recording != null && markerNavigation.handle(event, recording.markers, onSeekMarker)
         }.onPreviewKeyEvent { event ->
         if (event.key != relocatingKey) false else {
@@ -228,6 +230,7 @@ internal fun PlayerChromeControls(
                         timelineFocused = it.isFocused
                         if (it.isFocused) {
                             lastFocusedControl = "player-seekbar"
+                            onControlFocused("player-seekbar")
                             // A quick list returns to the recording timeline.
                             if (recording != null) onActionFocused("player-seekbar")
                         }
@@ -387,7 +390,7 @@ internal fun PlayerChromeControls(
             infoFocus = infoFocus,
             onInteraction = onInteraction,
             onActionFocused = {
-                lastFocusedControl = it; lastAction = it; onActionFocused(it)
+                lastFocusedControl = it; lastAction = it; onActionFocused(it); onControlFocused(it)
             },
             onTogglePause = when {
                 pauseUnavailableReason != null -> { { onPauseUnavailable(pauseUnavailableReason) } }
