@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -45,6 +46,9 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
+import at.bernhardberger.tvheadend.sdk.core.DvrEntry
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
+import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -63,7 +67,10 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
+import at.bernhardberger.tvhplayer.core.BrowseContextAction
 import at.bernhardberger.tvhplayer.core.ProgrammeAction
+import at.bernhardberger.tvhplayer.core.programmeDetailsActions
+import at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage
 import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.recordingBarEnd
@@ -270,8 +277,8 @@ class PlayerChromeCaptureTest {
 
     private enum class Scene {
         CONTROLS_LIVE, CONTROLS_NO_LOGO, CONTROLS_BEHIND, CONTROLS_PAUSED, BANNER_TUNING, BANNER_BEHIND, BANNER_STEP, TRAY_ART, TRAY_TEXT,
-        PROGRAMME_INFO, PROGRAMME_INFO_NO_EPG, PROGRAMME_INFO_NO_ART, PROGRAMME_INFO_NO_ART_RECORDING, PROGRAMME_SCHEDULE, PROGRAMME_OPENED,
-        PROGRAMME_MORE_INFO, RAIL_SCHEDULE, RAIL_PROGRAMME_OPENED, RAIL_PEEK, PROGRAMME_CONFIRM_STOP, PROGRAMME_RECORDING_BUSY, PROGRAMME_RECORDING_SCHEDULED,
+        PROGRAMME_INFO_NO_EPG, PROGRAMME_INFO_NO_ART_RECORDING, PROGRAMME_AIRINGS, PROGRAMME_OPENED,
+        PROGRAMME_MORE_INFO, RAIL_PROGRAMME_OPENED, RAIL_PEEK, PROGRAMME_CONFIRM_STOP,
         // English at font scale 1.0 only (EN_ONLY).
         BANNER_LIVE, CONTROLS_BUFFERING, BANNER_PAUSED, BANNER_NO_EPG_BEHIND, HIDDEN_PAUSED, HIDDEN_BUFFERING, STEP_NEAR_END, STEP_NEAR_END_NO_ICON,
         STEP_REACHING_LIVE, RECORDING_BANNER, RECORDING_STEP, RECORDING_CONTROLS, RECORDING_GROWING, RECORDING_HIDDEN_PAUSED,
@@ -314,12 +321,16 @@ class PlayerChromeCaptureTest {
                 }
             }
         }
+        fun press(key: Key) {
+            compose.onRoot().performKeyInput { pressKey(key) }
+            repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        }
         // Recording and state scenes are captured in English at font scale 1.0 only.
         for (next in Scene.entries.filter {
             if (detailsOnly) it in setOf(Scene.INFO_FOCUSED, Scene.RECORDING_INFO_FOCUSED)
             else if (trialOnly) it in setOf(Scene.CONTROLS_LIVE, Scene.INFO_FOCUSED, Scene.BROWSER_NOW,
                 Scene.RECENT_OPEN, Scene.BROWSER_EMPTY, Scene.RAIL_PROGRAMME_OPENED, Scene.RECORDING_CONTROLS)
-            else if (programmeOnly) it in Scene.PROGRAMME_INFO..Scene.PROGRAMME_RECORDING_SCHEDULED
+            else if (programmeOnly) it in Scene.PROGRAMME_INFO_NO_EPG..Scene.PROGRAMME_CONFIRM_STOP
             else it < Scene.BANNER_LIVE || locale == "en" && fontScale == 1f
         }) {
             compose.runOnIdle { scene = next; revealControls = false }
@@ -328,6 +339,13 @@ class PlayerChromeCaptureTest {
             repeat(6) {
                 compose.mainClock.advanceTimeBy(100)
                 compose.waitForIdle()
+            }
+            // The page opens on its actions; these scenes are reached the way the viewer reaches them.
+            if (next == Scene.PROGRAMME_AIRINGS) press(Key.DirectionDown)
+            if (next == Scene.PROGRAMME_MORE_INFO) {
+                press(Key.DirectionUp)
+                compose.onNodeWithTag("details-about-description").assertIsFocused()
+                press(Key.DirectionCenter)
             }
             if (next == Scene.CONTROLS_REVEAL_MID) {
                 // The controls take the Banner over: two frames, then the actions fade in after FastMs
@@ -360,11 +378,20 @@ class PlayerChromeCaptureTest {
                     row.top >= tile.bottom && row.left == bounds("player-info-bar").left && row.right == 2f * (960f - 58f))
                 compose.onNodeWithTag("player-info-artwork", useUnmergedTree = true).assertExists()
             }
-            if (next == Scene.PROGRAMME_SCHEDULE) compose.onNodeWithTag("details-schedule-42").assertIsFocused()
-            if (next == Scene.RAIL_SCHEDULE) compose.onNodeWithTag("details-schedule-52").assertIsFocused()
+            // The player keeps playing under the page: Continue watching leads, and a channel not
+            // playing offers Watch. Both open on that first action.
+            if (next == Scene.PROGRAMME_OPENED || next == Scene.PROGRAMME_INFO_NO_ART_RECORDING) {
+                compose.onNodeWithTag("details-continue_watching").assertIsFocused()
+            }
             if (next == Scene.RAIL_PROGRAMME_OPENED) compose.onNodeWithTag("details-watch").assertIsFocused()
-            if (next == Scene.PROGRAMME_OPENED || next == Scene.RAIL_PROGRAMME_OPENED || next == Scene.RAIL_SCHEDULE) {
+            if (next in PLAYER_PAGES) {
+                // The page is one scrolling column, not tabs; with warm playback the video is its
+                // backdrop, so it draws no art and no logo over it.
+                compose.onNodeWithTag("programme-details-page").assertExists()
                 compose.onNodeWithTag("details-tabs").assertDoesNotExist()
+                listOf("details-hero", "details-hero-blurred", "details-hero-logo", "details-logo-glow").forEach {
+                    compose.onNodeWithTag(it, useUnmergedTree = true).assertDoesNotExist()
+                }
             }
             if (next == Scene.PROGRAMME_CONFIRM_STOP) {
                 compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.keep_recording))
@@ -379,37 +406,37 @@ class PlayerChromeCaptureTest {
                 assertTrue("the recording badge sits in the picture above", recording.bottom < label.top)
                 compose.onNode(hasTestTag("channel-recording-indicator") and card, useUnmergedTree = true).assertDoesNotExist()
             }
-            if (next == Scene.PROGRAMME_MORE_INFO) compose.onNodeWithTag("player-info-reading").assertIsFocused()
-            if (next == Scene.PROGRAMME_SCHEDULE || next == Scene.RAIL_SCHEDULE) {
-                val firstFallback = if (next == Scene.RAIL_SCHEDULE) 53 else 43
-                listOf(firstFallback, firstFallback + 2).forEach { id ->
-                    val row = hasAnyAncestor(hasTestTag("details-schedule-$id"))
-                    val mark = compose.onNode(hasTestTag("programme-fallback-mark") and row, useUnmergedTree = true)
-                        .fetchSemanticsNode().boundsInRoot
-                    val time = compose.onNode(hasTestTag("details-schedule-time") and row, useUnmergedTree = true)
-                        .fetchSemanticsNode().boundsInRoot
-                    assertTrue("the bitmap picon or number leaves the time slot free", mark.bottom + 7f <= time.top)
-                    assertTrue("compact marks fit their 80 × 28dp room", mark.width <= 161f && mark.height <= 57f)
-                }
+            if (next == Scene.PROGRAMME_AIRINGS) {
+                // Down from the actions enters the airings row at its first card, inside the screen.
+                compose.onNodeWithTag("details-card-43").assertIsFocused()
+                val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+                val row = compose.onNodeWithTag("details-airings").fetchSemanticsNode().boundsInRoot
+                val card = compose.onNodeWithTag("details-card-43").fetchSemanticsNode().boundsInRoot
+                assertTrue("the focused card stands inside the screen: $card in $screen",
+                    card.left >= screen.left && card.right <= screen.right && card.top >= screen.top && card.bottom <= screen.bottom)
+                assertTrue("the row holds its cards: $card in $row", card.top >= row.top && card.bottom <= row.bottom)
+                // A card with art embeds its channel's logo on a plate; one without shows the picon alone.
+                compose.onNodeWithTag("details-card-plate-44", useUnmergedTree = true).assertExists()
+                compose.onNodeWithTag("details-card-plate-43", useUnmergedTree = true).assertDoesNotExist()
             }
             if (next == Scene.PROGRAMME_INFO_NO_ART_RECORDING) {
-                val mark = compose.onNodeWithTag("programme-fallback-mark", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val badge = compose.onNodeWithTag("details-recording-badge", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                val progress = compose.onNodeWithTag("details-tile-progress", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertTrue("REC belongs in the facts line, not over the picon", badge.top > progress.bottom)
-                assertTrue("the picon clears the embedded progress", mark.bottom < progress.top)
+                // The running recorded programme shows how far along it is, and offers to stop it.
+                compose.onNodeWithTag("details-timeline", useUnmergedTree = true).assertExists()
+                compose.onNodeWithTag("details-stop").assertExists()
             }
             if (next == Scene.PROGRAMME_MORE_INFO) {
-                val information = compose.onNodeWithTag("details-information").fetchSemanticsNode().boundsInRoot
+                // Reading replaces the page: its heading names the programme above the reader, which
+                // runs margin to margin below it.
+                compose.onNodeWithTag("player-info-reading").assertIsFocused()
+                compose.onNodeWithTag("details-information").assertDoesNotExist()
+                val heading = compose.onNodeWithTag("details-reading-heading", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val reader = compose.onNodeWithTag("details-full-description").fetchSemanticsNode().boundsInRoot
-                assertEquals("one gutter separates identity and reading", 40f, reader.left - information.right, 1f)
-                assertTrue("reading uses the remaining six grid columns", reader.width >= 820f)
-            }
-            if (next == Scene.PROGRAMME_INFO) {
-                compose.onNodeWithTag("live-info-record").assertIsFocused()
+                assertEquals("the reader starts at the heading's edge", heading.left, reader.left, 1f)
+                assertTrue("the reader sits below the heading: $heading vs $reader", reader.top >= heading.bottom)
+                assertTrue("reading uses the full page width: $reader", reader.width >= 1600f)
             }
             if (next == Scene.PROGRAMME_INFO_NO_EPG) {
-                compose.onNodeWithTag("live-info-close").assertIsFocused()
+                compose.onNodeWithTag("details-continue_watching").assertIsFocused()
             }
             // No status slot and no Go live: the state cell lives in the bar row.
             compose.onNodeWithTag("player-status-slot", useUnmergedTree = true).assertDoesNotExist()
@@ -437,41 +464,17 @@ class PlayerChromeCaptureTest {
                 }
                 metadata.recycle()
             }
-            if (next == Scene.PROGRAMME_SCHEDULE) {
-                val mark = compose.onAllNodesWithTag("programme-fallback-mark", useUnmergedTree = true).fetchSemanticsNodes().first().boundsInRoot
-                val badge = compose.onNodeWithTag("recording-badge", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-                assertTrue("the compact picon stays clear of the shared REC badge", mark.right < badge.left)
-                compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
-                compose.mainClock.advanceTimeBy(200)
-                compose.waitForIdle()
-                compose.onNodeWithTag("details-tab-1").assertIsFocused()
-                val tabs = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-                compose.runOnIdle { view.draw(Canvas(tabs)) }
-                File(directory, "programme-schedule-tabs-$locale-font$fontScale.png").outputStream().use {
-                    tabs.compress(Bitmap.CompressFormat.PNG, 100, it)
-                }
-                tabs.recycle()
-                compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-                compose.mainClock.advanceTimeBy(200)
-                compose.waitForIdle()
-                val initialViewport = compose.onNodeWithTag("details-schedule").fetchSemanticsNode().boundsInRoot
-                if (fontScale == 1f) {
-                    val fourth = compose.onNodeWithTag("details-schedule-45").fetchSemanticsNode().boundsInRoot
-                    val fifth = compose.onNodeWithTag("details-schedule-46").fetchSemanticsNode().boundsInRoot
-                    assertTrue("four full rows fit at normal text size", fourth.bottom < initialViewport.bottom - 64f)
-                    assertTrue("part of the fifth row previews below", fifth.top < initialViewport.bottom)
-                }
-                repeat(schedule.lastIndex) {
-                    compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
-                    repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
-                }
-                compose.onNodeWithTag("details-schedule-46").assertIsFocused()
-                val viewport = compose.onNodeWithTag("details-schedule").fetchSemanticsNode().boundsInRoot
-                val focused = compose.onNodeWithTag("details-schedule-46").fetchSemanticsNode().boundsInRoot
-                assertTrue("focused scale and outline stay outside the fades", viewport.bottom - focused.bottom >= 72f && focused.top - viewport.top >= 72f)
+            if (next == Scene.PROGRAMME_AIRINGS) {
+                // Right walks the row to its last card, which scrolls to the text keyline and stays on screen.
+                repeat(related.lastIndex) { press(Key.DirectionRight) }
+                val last = "details-card-${related.last().id.value}"
+                compose.onNodeWithTag(last).assertIsFocused()
+                val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot
+                val focused = compose.onNodeWithTag(last).fetchSemanticsNode().boundsInRoot
+                assertTrue("the last card stays on screen: $focused in $screen", focused.left >= screen.left && focused.right <= screen.right)
                 val scrolled = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
                 compose.runOnIdle { view.draw(Canvas(scrolled)) }
-                File(directory, "programme-schedule-last-$locale-font$fontScale.png").outputStream().use {
+                File(directory, "programme-airings-last-$locale-font$fontScale.png").outputStream().use {
                     scrolled.compress(Bitmap.CompressFormat.PNG, 100, it)
                 }
                 scrolled.recycle()
@@ -573,27 +576,37 @@ class PlayerChromeCaptureTest {
                 ProvideArtworkSession(session) { QuickZapTrayPreview(channels[0], if (scene == Scene.TRAY_ART) programme else programme.copyWithoutImage(),
                     next, NOW, Modifier.padding(horizontal = androidx.compose.ui.unit.Dp(64f))) }
             })
-            Scene.PROGRAMME_INFO, Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_SCHEDULE,
-            Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_SCHEDULE, Scene.RAIL_PROGRAMME_OPENED,
-            Scene.PROGRAMME_CONFIRM_STOP, Scene.PROGRAMME_RECORDING_BUSY, Scene.PROGRAMME_RECORDING_SCHEDULED -> {
-                val rail = scene == Scene.RAIL_SCHEDULE || scene == Scene.RAIL_PROGRAMME_OPENED
+            Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_AIRINGS,
+            Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_PROGRAMME_OPENED, Scene.PROGRAMME_CONFIRM_STOP -> {
+                // The page the player (i) opens for the playing channel, or the rail's for another one.
+                val rail = scene == Scene.RAIL_PROGRAMME_OPENED
+                val recordingNow = scene == Scene.PROGRAMME_INFO_NO_ART_RECORDING || scene == Scene.PROGRAMME_CONFIRM_STOP
                 val shown = when {
                     rail -> trayProgramme
-                    scene == Scene.PROGRAMME_INFO_NO_ART || scene == Scene.PROGRAMME_INFO_NO_ART_RECORDING || scene == Scene.PROGRAMME_SCHEDULE -> programme.copyWithoutImage()
+                    scene == Scene.PROGRAMME_INFO_NO_ART_RECORDING -> programme.copyWithoutImage()
                     scene == Scene.PROGRAMME_MORE_INFO -> richProgramme
                     else -> programme
                 }
-                val entries = if (rail) listOf(shown) + schedule.drop(1).mapIndexed { index, event ->
-                    EpgEvent.create(EventId(53L + index), ChannelId(2), event.start, event.stop,
-                        title = event.title, subtitle = event.subtitle, summary = event.summary, genre = event.genre)
-                } else listOf(shown) + schedule.drop(1)
                 val channel = if (rail) channels[1] else channels[0]
-                val identity = "${channel.number} • ${channel.name}"
-                PlayerDetailsSurface {
-                    at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(
-                        shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG }, null, channel, NOW,
-                        listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
-                }
+                val recording = DvrEntry.create(DvrEntryId(1), eventId = shown.id, channelId = channel.id, channelName = channel.name,
+                    title = shown.title, subtitle = shown.subtitle, start = shown.start, stop = shown.stop,
+                    state = DvrEntryState.RECORDING).takeIf { recordingNow }
+                // The page's actions come from the same policy as the host's.
+                val actions = programmeDetailsActions(shown, NOW, recording, null, canModifyRecordings = true, canWatchChannel = true,
+                    playing = !rail)
+                // A page per scene: the previous scene's section and focus must not carry over.
+                key(scene) { ProvideArtworkSession(session) {
+                    PlayerDetailsSurface {
+                        ProgrammeDetailsPage(
+                            shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG }, recording, channel, NOW,
+                            if (scene == Scene.PROGRAMME_INFO_NO_EPG) listOf(BrowseContextAction.CONTINUE_WATCHING) else actions,
+                            {}, {},
+                            related = if (scene == Scene.PROGRAMME_AIRINGS) related else emptyList(),
+                            // As the host does while a confirmation is pending: the dialog owns focus and Back.
+                            backEnabled = scene != Scene.PROGRAMME_CONFIRM_STOP,
+                            channelOf = { id -> channels.firstOrNull { it.id == id } })
+                    }
+                } }
                 if (scene == Scene.PROGRAMME_CONFIRM_STOP) ConfirmProgrammeActionDialog(
                     action = ProgrammeAction.STOP_RECORDING, programmeTitle = shown.title.orEmpty(), onDismiss = {}, onConfirm = {},
                 )
@@ -843,6 +856,10 @@ class PlayerChromeCaptureTest {
             EpgEvent.create(EventId(46), ChannelId(1), Instant.fromEpochSeconds(START + 255 * 60), Instant.fromEpochSeconds(START + 360 * 60),
                 title = "Northern Lights", genre = "Thriller"),
         )
+        /** The other airings on the page: what follows [programme] on its channel. */
+        val related = schedule.drop(1)
+        val PLAYER_PAGES = setOf(Scene.PROGRAMME_INFO_NO_EPG, Scene.PROGRAMME_INFO_NO_ART_RECORDING, Scene.PROGRAMME_AIRINGS,
+            Scene.PROGRAMME_OPENED, Scene.PROGRAMME_MORE_INFO, Scene.RAIL_PROGRAMME_OPENED, Scene.PROGRAMME_CONFIRM_STOP)
         val trayProgramme = EpgEvent.create(EventId(52), ChannelId(2), Instant.fromEpochSeconds(START), Instant.fromEpochSeconds(START + 90 * 60),
             title = "Harbor Kickoff",
             summary = "Harbor FC empfangen Amber Town unter Flutlicht im städtischen Stadion.",
