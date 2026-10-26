@@ -13,7 +13,6 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
-import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CompletableDeferred
@@ -617,10 +616,8 @@ private class FakeProfiles : ConnectionProfileEditor {
         htspPort: Int,
         username: String,
         password: String,
-        credentialLease: CredentialEditLease,
     ) {
         saved = "$host:$htspPort:$username"
-        credentialLease.release()
     }
 
     override suspend fun clearProfile() = Unit

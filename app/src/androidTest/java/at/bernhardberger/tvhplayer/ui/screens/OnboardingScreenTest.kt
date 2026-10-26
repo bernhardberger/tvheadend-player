@@ -19,7 +19,6 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
-import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
@@ -132,13 +131,11 @@ private class FakeOnboardingConnectionProfileEditor : ConnectionProfileEditor {
         htspPort: Int,
         username: String,
         password: String,
-        credentialLease: CredentialEditLease,
     ) {
         savedHost = host
         savedPort = htspPort
         savedUsername = username
         if (password == FAKE_PASSWORD) passwordSaveCount += 1
-        credentialLease.release()
     }
 
     override suspend fun clearProfile() = Unit

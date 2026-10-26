@@ -23,7 +23,6 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.ConnectionFormFeedback
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
-import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -64,7 +63,6 @@ internal class ConnectionSetupState(
     val mode: SetupMode = SetupMode.FIRST_RUN,
     step: SetupStep = mode.firstStep,
     private val restoreSaved: suspend () -> Unit = {},
-    private val credentialLease: () -> CredentialEditLease = { CredentialEditLease {} },
     /** Runs once the connection is saved; the editor leaves with it. */
     private val onSaved: () -> Unit = {},
     /** True when recreated from saved state, which keeps the address but not the sign-in. */
@@ -303,7 +301,7 @@ internal class ConnectionSetupState(
     }
 
     private suspend fun commit(): Boolean {
-        val saved = form.submit(profiles, credentialLease) == ConnectionFormFeedback.SAVED
+        val saved = form.submit(profiles) == ConnectionFormFeedback.SAVED
         if (saved) {
             accepted = true
             sessionWork?.cancel()
@@ -378,7 +376,6 @@ internal class ConnectionSetupState(
             scope: CoroutineScope,
             mode: SetupMode,
             restoreSaved: suspend () -> Unit,
-            credentialLease: () -> CredentialEditLease,
             onSaved: () -> Unit,
         ): Saver<ConnectionSetupState, Any> = listSaver(
             save = { listOf(it.step.resumable().name) },
@@ -387,7 +384,6 @@ internal class ConnectionSetupState(
                     form, session, profiles, discovery, scope, mode,
                     step = SetupStep.valueOf(it[0]),
                     restoreSaved = restoreSaved,
-                    credentialLease = credentialLease,
                     onSaved = onSaved,
                     restored = true,
                 )
@@ -450,24 +446,20 @@ internal fun rememberConnectionSetupState(
     discovery: () -> Flow<TvheadendDiscoveryState>,
     mode: SetupMode = SetupMode.FIRST_RUN,
     restoreSaved: suspend () -> Unit = {},
-    credentialLease: () -> CredentialEditLease = { CredentialEditLease {} },
     onSaved: () -> Unit = {},
     form: ConnectionFormState = rememberConnectionFormState(),
 ): ConnectionSetupState {
     val scope = rememberCoroutineScope()
     val currentRestoreSaved by rememberUpdatedState(restoreSaved)
-    val currentLease by rememberUpdatedState(credentialLease)
     val currentOnSaved by rememberUpdatedState(onSaved)
     val restore: suspend () -> Unit = { currentRestoreSaved() }
-    val lease = { currentLease() }
     val saved = { currentOnSaved() }
     return rememberSaveable(
-        saver = ConnectionSetupState.saver(form, session, profiles, discovery, scope, mode, restore, lease, saved),
+        saver = ConnectionSetupState.saver(form, session, profiles, discovery, scope, mode, restore, saved),
     ) {
         ConnectionSetupState(
             form, session, profiles, discovery, scope, mode,
             restoreSaved = restore,
-            credentialLease = lease,
             onSaved = saved,
         )
     }

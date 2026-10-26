@@ -32,11 +32,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Process owner for the one persisted server profile and current-generation stream selection. */
-fun interface CredentialEditLease {
-    fun release()
-}
-
 /** Connection-form operations backed by the process-owned SDK profile store. */
 interface ConnectionProfileEditor {
     val serverSettings: Flow<ServerSettings>
@@ -52,7 +47,6 @@ interface ConnectionProfileEditor {
         htspPort: Int,
         username: String,
         password: String,
-        credentialLease: CredentialEditLease,
     )
 
     suspend fun clearProfile()
@@ -148,9 +142,8 @@ class AppProfileOwner(
         htspPort: Int,
         username: String,
         password: String,
-        credentialLease: CredentialEditLease,
     ) {
-        submit(SavePasswordServerCommand(host, htspPort, username, password, credentialLease))
+        submit(SavePasswordServerCommand(host, htspPort, username, password))
     }
 
     override suspend fun clearProfile() {
@@ -403,7 +396,6 @@ private class SavePasswordServerCommand(
     val port: Int,
     username: String,
     password: String,
-    private val credentialLease: CredentialEditLease,
 ) : ServerProfileCommand() {
     var username = username
         private set
@@ -416,7 +408,6 @@ private class SavePasswordServerCommand(
         released = true
         username = ""
         password = ""
-        credentialLease.release()
     }
 }
 

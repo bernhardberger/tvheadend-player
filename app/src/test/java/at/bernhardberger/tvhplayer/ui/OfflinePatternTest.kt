@@ -44,18 +44,18 @@ class OfflinePatternTest {
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                     settingsConnectionOverview("Saved sign-in unavailable", null, null,
                         degraded = true, onRetry = { retries++ }, recoveryRequiresSettings = true),
-                    settingsLevel(CONNECTION_EDITOR, "Edit connection", listOf(settingsRow("editor", "Server")))))
+                    settingsLevel(CONNECTION_EDITOR, "Set up connection", listOf(settingsRow("editor", "Server")))))
             }
         }
         press(Key.DirectionCenter)
         compose.onNodeWithText("Try again").assertDoesNotExist()
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         press(Key.DirectionCenter)
         compose.onNodeWithText("Server").assertIsFocused()
         assertEquals(CONNECTION_EDITOR, navigation.stack.active.levelId)
         assertEquals(0, retries)
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
     }
 
     @Test fun retryStaysFocusedButDoesNotDispatchWhileConnecting() {
@@ -123,7 +123,7 @@ class OfflinePatternTest {
         assertEquals(1, retries)
         compose.runOnIdle { degraded = false }
         compose.onNodeWithText("Try again").assertDoesNotExist()
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         compose.onNodeWithTag("connection-problem-badge", useUnmergedTree = true).assertDoesNotExist()
         compose.onNodeWithTag("nav-settings").assertContentDescriptionEquals("Settings")
         press(Key.Back)

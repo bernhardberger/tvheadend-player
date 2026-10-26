@@ -105,7 +105,7 @@ class SettingsVisualEvidenceTest {
         capture("$prefix-connection-preview")
         press(Key.DirectionCenter)
         compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.connection_try_again)).assertIsFocused()
-        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.edit_connection)).assertIsDisplayed()
+        compose.onNodeWithText(resources.getString(at.bernhardberger.tvhplayer.R.string.setup_connection)).assertIsDisplayed()
         compose.onAllNodes(hasSetTextAction()).assertCountEquals(0)
         capture("$prefix-connection-overview")
         press(Key.Back)

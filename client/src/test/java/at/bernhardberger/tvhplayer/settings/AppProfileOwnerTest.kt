@@ -141,7 +141,7 @@ class AppProfileOwnerTest {
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun cancelledPendingPasswordSaveReleasesCredentialLease() = runTest {
+    fun cancelledPendingPasswordSaveLeavesTheConfigurationAlone() = runTest {
         val session = ProfileSession(
             FakeSessionObservation(currentObservation("server")).observation,
         ) { currentSession ->
@@ -152,28 +152,24 @@ class AppProfileOwnerTest {
             PlayerSettingsStore(InMemoryPreferencesDataStore()),
             StandardTestDispatcher(testScheduler),
         )
-        var leaseReleases = 0
-
         val save = backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) {
             owner.savePasswordServer(
                 host = "tvheadend.invalid",
                 htspPort = 9982,
                 username = "viewer",
                 password = "fake password",
-                credentialLease = CredentialEditLease { leaseReleases += 1 },
             )
         }
         runCurrent()
 
         assertFalse(save.isCompleted)
         save.cancelAndJoin()
-        assertEquals(1, leaseReleases)
         assertEquals(0L, owner.configurationGeneration.value) // An unaccepted command did not replace context.
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     @Test
-    fun failedAcceptedPasswordSaveReleasesCredentialLease() = runTest {
+    fun failedAcceptedPasswordSaveStillAdvancesTheConfiguration() = runTest {
         val session = ProfileSession(
             FakeSessionObservation(currentObservation("server")).observation,
         ) { currentSession ->
@@ -184,8 +180,6 @@ class AppProfileOwnerTest {
             PlayerSettingsStore(InMemoryPreferencesDataStore()),
             StandardTestDispatcher(testScheduler),
         )
-        var leaseReleases = 0
-
         backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
         runCurrent()
         val result = runCatching {
@@ -194,12 +188,10 @@ class AppProfileOwnerTest {
                 htspPort = 9982,
                 username = "viewer",
                 password = "fake password",
-                credentialLease = CredentialEditLease { leaseReleases += 1 },
             )
         }
 
         assertTrue(result.isFailure)
-        assertEquals(1, leaseReleases)
         assertEquals(1L, owner.configurationGeneration.value) // Accepted replacement invalidates old notices even on failure.
     }
 

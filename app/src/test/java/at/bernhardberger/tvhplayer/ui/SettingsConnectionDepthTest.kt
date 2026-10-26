@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import android.view.KeyEvent
-import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.*
 import androidx.compose.ui.focus.FocusRequester
@@ -72,7 +71,7 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithText("Connection").assertIsFocused()
         capture(view, "settings-entry")
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         capture(view, "settings-connection-page")
         press(Key.DirectionCenter)
         press(Key.DirectionDown)
@@ -101,7 +100,7 @@ class SettingsConnectionDepthTest {
         onSaved: () -> Unit = {}) =
         SettingsConnection(requester, this, session, { restores++ }, form, onSaved)
 
-    @Test fun overviewDefersSecureEditorAndBackUnwindsStepsBeforeReturningToEditAction() {
+    @Test fun overviewDefersTheEditorAndBackUnwindsStepsBeforeReturningToEditAction() {
         val editor = Editor()
         val form = ConnectionFormState()
         lateinit var navigation: DepthNavigationState
@@ -119,17 +118,14 @@ class SettingsConnectionDepthTest {
         }
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         assertEquals(0, editor.loads)
-        assertFalse(secure())
         press(Key.DirectionRight) // Dedicated leaf actions do not enter on Right.
         assertEquals(0, editor.loads)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         compose.waitForIdle()
-        assertFalse(secure()) // press alone never enters
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.waitForIdle()
-        assertTrue(secure())
         assertEquals(1, editor.loads)
         // The release that opened the wizard must not also open the keyboard.
         compose.onNodeWithTag("setup-find-server").assertIsFocused()
@@ -150,12 +146,10 @@ class SettingsConnectionDepthTest {
         // A global destination departure also tears down the live editor immediately.
         compose.runOnIdle { current = false }
         compose.waitForIdle()
-        assertFalse(secure())
         assertEquals("", form.password)
         compose.runOnIdle { current = true }
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
-        assertFalse(secure())
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
         assertEquals(emptyList<FakeSessionCall>(), session.calls)
@@ -187,10 +181,9 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithTag("setup-port").assertIsFocused()
         assertTrue(navigation.stack.canPop)
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         compose.onNodeWithTag("nav-settings").assertIsNotFocused()
         assertEquals(2, navigation.stack.frames.size)
-        assertFalse(secure())
         assertEquals("", form.password)
         assertEquals(0, editor.saves)
     }
@@ -203,7 +196,7 @@ class SettingsConnectionDepthTest {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                     settingsConnectionOverview("Connected", "tvheadend.local", 9982),
-                    settingsLevel(CONNECTION_EDITOR, "Connection", listOf(settingsRow("safe", "Edit connection")),
+                    settingsLevel(CONNECTION_EDITOR, "Connection", listOf(settingsRow("safe", "Set up connection")),
                         activeContent = { requester, left -> editor.Screen(form, requester, left) })))
             }
         }
@@ -220,12 +213,10 @@ class SettingsConnectionDepthTest {
         assertEquals(0, editor.saves)
         press(Key.Back)
         press(Key.Back)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
-        assertFalse(secure())
+        compose.onNodeWithText("Set up connection").assertIsFocused()
     }
 
     private fun press(key: Key) = compose.onRoot().performKeyInput { pressKey(key) }
-    private fun secure() = compose.activity.window.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
 
     private class Editor : ConnectionProfileEditor {
         var loads = 0
@@ -237,10 +228,8 @@ class SettingsConnectionDepthTest {
             applyAvailable("edit.invalid", 9982, "fixture", "test-only password")
         }
         override suspend fun saveServer(host: String, htspPort: Int) { saves++ }
-        override suspend fun savePasswordServer(host: String, htspPort: Int, username: String, password: String,
-            credentialLease: CredentialEditLease) {
+        override suspend fun savePasswordServer(host: String, htspPort: Int, username: String, password: String) {
             saves++
-            credentialLease.release()
             if (failSave) throw java.io.IOException("fixture failure")
         }
         override suspend fun clearProfile() = Unit
@@ -255,14 +244,14 @@ class SettingsConnectionDepthTest {
                 navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.CONNECTION.name)
                 SettingsScreenNavigation(navigation, listOf(settingsRootLevel(),
                     settingsConnectionOverview("Connected", "tvheadend.local", 9982),
-                    settingsLevel(CONNECTION_EDITOR, "Connection", listOf(settingsRow("safe", "Edit connection")),
+                    settingsLevel(CONNECTION_EDITOR, "Connection", listOf(settingsRow("safe", "Set up connection")),
                         activeContent = { requester, left -> editor.Screen(form, requester, left, navigation::pop) })))
             }
         }
         assertEquals(0, editor.loads)
         compose.onNodeWithText("Connection").assertIsFocused()
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         val parent = navigation.stack.active
         press(Key.DirectionCenter)
         connect()
@@ -276,11 +265,10 @@ class SettingsConnectionDepthTest {
         compose.onNodeWithTag("setup-start-watching").assertIsFocused()
         editor.failSave = false
         press(Key.DirectionCenter)
-        compose.onNodeWithText("Edit connection").assertIsFocused()
+        compose.onNodeWithText("Set up connection").assertIsFocused()
         assertEquals(2, editor.saves)
         assertEquals(0, restores)
         assertEquals(parent, navigation.stack.active)
-        assertFalse(secure())
         assertEquals("", form.password)
     }
 

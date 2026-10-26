@@ -46,7 +46,7 @@ FOREGROUND_PLAYBACK_LIFECYCLE_TEST = (
 EXTERNAL_TARGET_ACCEPTANCE_ARGUMENT = "tvhplayer.externalTargetAcceptance"
 EXTERNAL_TARGET_ACCEPTANCE_ENABLED = "enabled"
 CONNECTION_CREDENTIAL_TEST = (
-    "at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnectionSecureSurfaceTest"
+    "at.bernhardberger.tvhplayer.ui.screens.settings.SettingsConnectionCredentialTest"
 )
 NAVIGATION_BACK_TESTS = ",".join(
     (

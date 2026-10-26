@@ -66,8 +66,8 @@
     <string name="audio_description">Audiodeskription</string>
     <string name="subtitle_follow_system">Untertiteleinstellungen des Systems verwenden</string>
     <string name="player_status_rec">REC</string>
-    <string name="edit_connection">Verbindung bearbeiten</string>
-    <string name="edit_connection_description">Serveradresse, Port und Konto</string>
+    <string name="setup_connection">Verbindung einrichten</string>
+    <string name="setup_connection_description">Serveradresse, Port und Konto</string>
     <string name="connection_overview_status">Status</string>
     <string name="connection_overview_server">Server</string>
     <string name="connection_overview_connected">Verbunden</string>

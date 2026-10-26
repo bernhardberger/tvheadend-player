@@ -86,7 +86,6 @@ class ConnectionFormStateTest {
     fun editableProfileLoadsSubmitsAndClearsWithinTheFormLifetime() = runTest {
         val editor = FakeConnectionProfileEditor()
         val form = ConnectionFormState()
-        var leaseReleases = 0
 
         form.loadFrom(editor)
 
@@ -103,13 +102,12 @@ class ConnectionFormStateTest {
 
         assertEquals(
             ConnectionFormFeedback.SAVED,
-            form.submit(editor) { CredentialEditLease { leaseReleases += 1 } },
+            form.submit(editor),
         )
         assertEquals(
             SavedPassword(EDITED_HOST, EDITED_PORT, EDITED_USERNAME, EDITED_PASSWORD),
             editor.savedPassword,
         )
-        assertEquals(1, leaseReleases)
 
         form.clearCredentials()
 
@@ -126,7 +124,7 @@ class ConnectionFormStateTest {
         assertEquals("", form.password)
         assertTrue(form.canSubmit)
         assertTrue(form.hasSavedPassword)
-        assertEquals(ConnectionFormFeedback.SAVED, form.submit(editor) { CredentialEditLease {} })
+        assertEquals(ConnectionFormFeedback.SAVED, form.submit(editor))
         assertEquals(SavedPassword(FAKE_HOST, FAKE_PORT, FAKE_USERNAME, FAKE_PASSWORD), editor.savedPassword)
 
         form.updatePassword(EDITED_PASSWORD)
@@ -145,7 +143,7 @@ class ConnectionFormStateTest {
         form.updatePassword("")
         assertTrue(form.hasSavedPassword)
         assertEquals("", form.password)
-        assertEquals(ConnectionFormFeedback.SAVED, form.submit(editor) { CredentialEditLease {} })
+        assertEquals(ConnectionFormFeedback.SAVED, form.submit(editor))
         assertEquals(SavedPassword(FAKE_HOST, FAKE_PORT, FAKE_USERNAME, FAKE_PASSWORD), editor.savedPassword)
         form.clearPassword()
         assertFalse(form.hasSavedPassword)
@@ -153,16 +151,12 @@ class ConnectionFormStateTest {
     }
 
     @Test
-    fun anonymousProfilePrefillsEndpointWithoutAcquiringCredentialLease() = runTest {
+    fun anonymousProfilePrefillsEndpointAndSavesWithoutSignIn() = runTest {
         val editor = FakeConnectionProfileEditor(username = "", password = "")
         val form = ConnectionFormState()
-        var leaseAcquisitions = 0
 
         form.loadFrom(editor)
-        val feedback = form.submit(editor) {
-            leaseAcquisitions += 1
-            CredentialEditLease {}
-        }
+        val feedback = form.submit(editor)
 
         assertEquals(ConnectionFormFeedback.SAVED, feedback)
         assertEquals(FAKE_HOST, form.host)
@@ -170,24 +164,18 @@ class ConnectionFormStateTest {
         assertEquals("", form.username)
         assertEquals("", form.password)
         assertEquals(FAKE_HOST to FAKE_PORT, editor.savedAnonymous)
-        assertEquals(0, leaseAcquisitions)
     }
 
     @Test
     fun invalidSubmissionDoesNotReachTheProfileEditor() = runTest {
         val editor = FakeConnectionProfileEditor()
         val form = ConnectionFormState()
-        var leaseAcquisitions = 0
 
-        val feedback = form.submit(editor) {
-            leaseAcquisitions += 1
-            CredentialEditLease {}
-        }
+        val feedback = form.submit(editor)
 
         assertEquals(ConnectionFormFeedback.INVALID, feedback)
         assertEquals(null, editor.savedAnonymous)
         assertEquals(null, editor.savedPassword)
-        assertEquals(0, leaseAcquisitions)
     }
 
     @Test
@@ -199,7 +187,7 @@ class ConnectionFormStateTest {
 
         assertEquals(
             ConnectionFormFeedback.SAVE_FAILED,
-            form.submit(editor) { CredentialEditLease {} },
+            form.submit(editor),
         )
         assertEquals(ConnectionFormFeedback.SAVE_FAILED, form.feedback)
         assertEquals(FAKE_USERNAME, form.username)
@@ -247,14 +235,9 @@ private class FakeConnectionProfileEditor(
         htspPort: Int,
         username: String,
         password: String,
-        credentialLease: CredentialEditLease,
     ) {
-        if (failOnSave) {
-            credentialLease.release()
-            error("fake save failure")
-        }
+        if (failOnSave) error("fake save failure")
         savedPassword = SavedPassword(host, htspPort, username, password)
-        credentialLease.release()
     }
 
     override suspend fun clearProfile() = Unit

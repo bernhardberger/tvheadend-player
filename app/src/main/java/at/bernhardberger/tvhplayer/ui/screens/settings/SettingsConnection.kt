@@ -1,9 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.screens.settings
 
 import android.view.KeyEvent
-import android.view.Window
-import android.view.WindowManager
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -22,7 +19,6 @@ import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ConnectionFormState
 import at.bernhardberger.tvhplayer.settings.ConnectionProfileEditor
-import at.bernhardberger.tvhplayer.settings.CredentialEditLease
 import at.bernhardberger.tvhplayer.settings.rememberConnectionFormState
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthKeyCycle
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.ConnectionSetupFlow
@@ -30,54 +26,6 @@ import at.bernhardberger.tvhplayer.ui.screens.onboarding.SetupMode
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.discoverServers
 import at.bernhardberger.tvhplayer.ui.screens.onboarding.rememberConnectionSetupState
 import org.koin.compose.koinInject
-import java.util.WeakHashMap
-
-internal object ConnectionSecureWindow {
-    private data class State(
-        var leaseCount: Int,
-        val clearOnFinalRelease: Boolean,
-    )
-
-    private val states = WeakHashMap<Window, State>()
-
-    fun acquire(window: Window?): CredentialEditLease {
-        if (window == null) return CredentialEditLease {}
-
-        synchronized(states) {
-            val existing = states[window]
-            if (existing == null) {
-                val wasSecure = window.hasSecureFlag()
-                if (!wasSecure) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                states[window] = State(leaseCount = 1, clearOnFinalRelease = !wasSecure)
-            } else {
-                existing.leaseCount += 1
-                if (!window.hasSecureFlag()) {
-                    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                }
-            }
-        }
-
-        return object : CredentialEditLease {
-            private var active = true
-
-            override fun release() = synchronized(states) {
-                if (!active) return@synchronized
-                active = false
-                val state = states[window] ?: return@synchronized
-                state.leaseCount -= 1
-                if (state.leaseCount == 0) {
-                    states.remove(window)
-                    if (state.clearOnFinalRelease) {
-                        window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
-                    }
-                }
-            }
-        }
-    }
-
-    private fun Window.hasSecureFlag(): Boolean =
-        attributes.flags and WindowManager.LayoutParams.FLAG_SECURE != 0
-}
 
 @Composable
 internal fun SettingsConnection(
@@ -88,11 +36,6 @@ internal fun SettingsConnection(
     form: ConnectionFormState = rememberConnectionFormState(),
     onSaved: () -> Unit = {},
 ) {
-    val window = LocalActivity.current?.window
-    DisposableEffect(window) {
-        val lease = ConnectionSecureWindow.acquire(window)
-        onDispose(lease::release)
-    }
     val context = LocalContext.current.applicationContext
     val state = rememberConnectionSetupState(
         session = session,
@@ -100,7 +43,6 @@ internal fun SettingsConnection(
         discovery = { discoverServers(context) },
         mode = SetupMode.EDIT,
         restoreSaved = restoreSaved,
-        credentialLease = { ConnectionSecureWindow.acquire(window) },
         onSaved = onSaved,
         form = form,
     )

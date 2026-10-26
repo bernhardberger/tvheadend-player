@@ -120,7 +120,6 @@ internal class ConnectionFormState(
 
     suspend fun submit(
         settingsStore: ConnectionProfileEditor,
-        acquireCredentialLease: () -> CredentialEditLease,
     ): ConnectionFormFeedback {
         val endpointPort = parsedPort
         if (!canSubmit || endpointPort == null) {
@@ -136,7 +135,6 @@ internal class ConnectionFormState(
                     htspPort = endpointPort,
                     username = username,
                     password = effectivePassword,
-                    credentialLease = acquireCredentialLease(),
                 )
             }
         }

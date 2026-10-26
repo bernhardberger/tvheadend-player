@@ -68,8 +68,8 @@ internal fun settingsConnectionLevels(
             connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
                 connection == ConnectionUiState.SyncingChannels,
             recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS),
-        settingsLevel(CONNECTION_EDITOR, stringResource(R.string.edit_connection),
-            listOf(settingsRow("editor-placeholder", stringResource(R.string.edit_connection))),
+        settingsLevel(CONNECTION_EDITOR, stringResource(R.string.setup_connection),
+            listOf(settingsRow("editor-placeholder", stringResource(R.string.setup_connection))),
             activeContent = { requester, _ ->
                 val visit = navigation.stack.visit
                 SettingsConnection(requester, onSaved = {
@@ -111,8 +111,8 @@ internal fun settingsConnectionOverview(
     val showRetry = degraded && !recoveryRequiresSettings
     val retryAction: () -> Unit = { if (!connecting) onRetry() }
     val missing = stringResource(R.string.connection_overview_unavailable)
-    val edit = settingsRow(EDIT_CONNECTION, stringResource(R.string.edit_connection),
-        supporting = stringResource(R.string.edit_connection_description), trailingIcon = R.drawable.ic_edit)
+    val edit = settingsRow(EDIT_CONNECTION, stringResource(R.string.setup_connection),
+        supporting = stringResource(R.string.setup_connection_description), trailingIcon = R.drawable.ic_arrow_forward)
     val retry = settingsRow(RETRY_CONNECTION, stringResource(R.string.connection_try_again),
         supporting = stringResource(if (connecting) R.string.connection_overview_connecting else R.string.connection_retry_description),
         trailingIcon = R.drawable.ic_refresh, onClick = retryAction)

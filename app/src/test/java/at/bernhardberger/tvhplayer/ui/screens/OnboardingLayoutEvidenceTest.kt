@@ -477,7 +477,6 @@ private object FixtureProfiles : ConnectionProfileEditor {
         applyAvailable("192.0.2.10", 9982, "fixture", "test-only password")
     }
     override suspend fun saveServer(host: String, htspPort: Int) = Unit
-    override suspend fun savePasswordServer(host: String, htspPort: Int, username: String, password: String,
-        credentialLease: CredentialEditLease) = credentialLease.release()
+    override suspend fun savePasswordServer(host: String, htspPort: Int, username: String, password: String) = Unit
     override suspend fun clearProfile() = Unit
 }
