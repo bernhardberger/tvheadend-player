@@ -263,6 +263,67 @@ class PlayerVideoSurfaceCoverTest {
         assertEquals(AspectRatioFrameLayout.RESIZE_MODE_FILL, playerView().resizeMode)
     }
 
+    @Test fun tunneledPlaybackFollowsDecodedGeometryAfterRevealAndResetsOnTheNextReveal() {
+        val visible = mutableStateOf(false)
+        val narrow = VideoSize(720, 576, 0, 12f / 11f)
+        val wide = VideoSize(720, 576, 0, 16f / 11f)
+        var size = wide
+        var format = Format.Builder().setWidth(720).setHeight(576)
+            .setPixelWidthHeightRatio(narrow.pixelWidthHeightRatio).build()
+        val listeners = mutableSetOf<Player.Listener>()
+        val formatListeners = mutableSetOf<AnalyticsListener>()
+        val reporting = object : ExoPlayer by player {
+            override fun getVideoSize() = size
+            override fun getVideoFormat() = format
+            override fun isTunnelingEnabled() = true
+            override fun addListener(listener: Player.Listener) { listeners += listener }
+            override fun removeListener(listener: Player.Listener) { listeners -= listener }
+            override fun addAnalyticsListener(listener: AnalyticsListener) { formatListeners += listener }
+            override fun removeAnalyticsListener(listener: AnalyticsListener) { formatListeners -= listener }
+        }
+        compose.setContent {
+            view = LocalView.current
+            PlayerVideoSurface(reporting, AspectRatioMode.FIT, videoVisible = visible.value)
+        }
+        fun reportSize(next: VideoSize) = compose.runOnIdle {
+            size = next
+            listeners.toList().forEach { it.onVideoSizeChanged(next) }
+        }
+        fun reportFormat(next: VideoSize) = compose.runOnIdle {
+            format = format.buildUpon().setPixelWidthHeightRatio(next.pixelWidthHeightRatio).build()
+            val event = AnalyticsListener.EventTime(0, Timeline.EMPTY, 0, null, 0, Timeline.EMPTY, 0, null, 0, 0)
+            formatListeners.toList().forEach { it.onVideoInputFormatChanged(event, format, null) }
+        }
+        fun assertShape(width: Float, height: Float) {
+            val bounds = compose.onNodeWithTag("video-surface").getBoundsInRoot()
+            assertEquals(width, bounds.width.value, 0.5f)
+            assertEquals(height, bounds.height.value, 0.5f)
+            val surface = playerView().videoSurfaceView!!
+            assertEquals(width, surface.width.toFloat(), 0.5f)
+            assertEquals(height, surface.height.toFloat(), 0.5f)
+        }
+        repeat(2) {
+            // Covered callbacks do not establish the decoded size of the next shown target.
+            reportFormat(narrow)
+            reportSize(wide)
+            compose.runOnIdle { visible.value = true }
+            assertShape(800f, 600f)
+            // An unknown post-reveal size must not end the input-format fallback either.
+            reportSize(VideoSize.UNKNOWN)
+            assertShape(800f, 600f)
+            reportSize(narrow)
+            assertShape(800f, 600f)
+            // The renderer reads the upcoming ad's format ahead of the picture on screen.
+            reportFormat(wide)
+            assertShape(800f, 600f)
+            // Only its decoded-size callback may reshape the visible picture.
+            reportSize(wide)
+            assertShape(960f, 540f)
+            compose.runOnIdle { visible.value = false }
+            assertShape(960f, 540f)
+        }
+    }
+
     private fun assertTunneledFallbackShape(
         reportedAtReveal: VideoSize,
         rotationDegrees: Int = 0,
