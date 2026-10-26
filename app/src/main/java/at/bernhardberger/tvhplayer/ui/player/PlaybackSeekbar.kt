@@ -67,6 +67,8 @@ fun PlaybackSeekbar(
     stepSettled: Boolean = false,
     /** The step's announcement has been made; see [rememberSettledStep]. */
     onStepAnnounced: () -> Unit = {},
+    /** The step's identity: the seek state's preview. */
+    stepId: Any? = null,
     /** The state cell, the end after the bar (replacing the end label) and live TV's distance behind live. */
     barStatus: PlayerBarStatus? = null,
     /** The clock time the timeshift buffer starts at; the leading label without programme clocks. */
@@ -252,6 +254,7 @@ fun PlaybackSeekbar(
     // The whole value, metadata included, holds still during a burst; the buffer's length is read when the step settles.
     val spokenDescription = rememberSteppedSpoken(
         plain = spokenValue(plainDescription),
+        stepId = stepId,
         stepKey = readout?.let { "${it.text}|${it.target}" },
         settled = stepSettled,
         onPublished = onStepAnnounced,

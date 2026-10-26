@@ -333,7 +333,7 @@ class PlayerChromeTimelineRowTest {
                 owner.preview?.let { preview ->
                     TimeshiftSeekPreviewTimeline(
                         at(540_000L), preview.decision, nowSec = now, settled = preview.dispatched,
-                        onAnnounced = { announcements++; owner.stepAnnounced(preview.token) },
+                        onAnnounced = { announcements++; owner.stepAnnounced(preview.id) },
                     )
                 }
             }
@@ -363,6 +363,51 @@ class PlayerChromeTimelineRowTest {
         restFor(2_000)
         assertFalse(exists("timeshift-seek-preview"))
         assertEquals(1, announcements)
+        owner.dispose()
+    }
+
+    @Test fun aStepQueuedAndCommittedBetweenTwoCompositionsIsAnnouncedAfreshAndAcknowledgesItself() {
+        val fixture = TimeshiftTestFixture(600.seconds).apply { updateHistory(start = 0.seconds, end = 600.seconds) }
+        val shown = fixture.state.value.toAppPresentation(fixture.playbackPosition(540_000L.milliseconds))
+        val states = TestScope()
+        val owner = LiveTimelinePresentationState(states, { 0L }, { states.testScheduler.currentTime })
+        val acknowledged = mutableListOf<SeekStepId>()
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                owner.preview?.let { preview ->
+                    TimeshiftSeekPreviewTimeline(
+                        shown, preview.decision, nowSec = now, settled = preview.dispatched,
+                        onAnnounced = { acknowledged += preview.id }, stepId = preview.id,
+                    )
+                }
+            }
+        }
+        restFor(100)
+        fun step(deltaMs: Long): SeekStepId {
+            val accepted = fixture.completed(readerReached = null)
+            owner.queueRelativeSeek(shown, deltaMs, "unavailable", "expired", "replaced", "uncertain") { accepted }
+            return requireNotNull(owner.preview).id
+        }
+        lateinit var first: SeekStepId
+        compose.runOnIdle { first = step(-30_000L) }
+        restFor(100)
+        compose.runOnIdle { states.advanceTimeBy(400L); states.runCurrent() }
+        restFor(STEP_ANNOUNCEMENT_HOLD_MS + 100)
+        assertTrue(spoken("timeshift-seek-preview").startsWith("30 seconds back, target"))
+        assertEquals(listOf(first), acknowledged)
+        // Step B is queued and committed before any composition sees it pending: settled in both frames.
+        lateinit var second: SeekStepId
+        compose.runOnIdle {
+            second = step(-30_000L)
+            states.advanceTimeBy(400L)
+            states.runCurrent()
+            assertTrue(requireNotNull(owner.preview).dispatched)
+        }
+        restFor(16)
+        assertTrue(spoken("timeshift-seek-preview"), spoken("timeshift-seek-preview").startsWith("1 minute back, target"))
+        restFor(STEP_ANNOUNCEMENT_HOLD_MS + 100)
+        assertEquals("the second step acknowledges itself, once", listOf(first, second), acknowledged)
         owner.dispose()
     }
 

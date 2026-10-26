@@ -20,6 +20,8 @@ import at.bernhardberger.tvhplayer.core.StepReadout
  * announced once, with its final value. [key] identifies the step (its offset and target as
  * spoken) and is held from the moment [settled] turns true: the server's resolved answer
  * refines the offset after the dispatch by a few hundred milliseconds, which is the same step.
+ * [identity] is the step's own, the preview's, so that a step queued and committed between two
+ * compositions starts afresh instead of lending its predecessor its key and words.
  * [change] is what may announce a settled step again, its feedback. [text] is read when the
  * step settles or [change] changes, so a part that keeps changing, a growing buffer's length,
  * is filled in then and does not announce the same step again. A null [key] ends the stepping
@@ -33,6 +35,7 @@ import at.bernhardberger.tvhplayer.core.StepReadout
  */
 @Composable
 internal fun rememberSettledStep(
+    identity: Any?,
     key: String?,
     settled: Boolean,
     text: String,
@@ -42,14 +45,20 @@ internal fun rememberSettledStep(
     val latest by rememberUpdatedState(text)
     val publish by rememberUpdatedState(onPublished)
     val held = remember { SpokenBeforeStep("") }
-    if (!settled || key == null || held.key == null) held.key = key
+    // A step queued and committed between two compositions is settled in both: only its identity
+    // tells it from the one before, which must not lend it its key, words or acknowledgement.
+    if (!settled || key == null || held.key == null || held.identity != identity) {
+        held.key = key
+        held.identity = identity
+    }
     val stepKey = held.key
+    val stepIdentity = held.identity
     var announcement by remember { mutableStateOf<Announcement?>(null) }
-    LaunchedEffect(stepKey, settled, change) {
+    LaunchedEffect(stepIdentity, stepKey, settled, change) {
         when {
             stepKey == null -> announcement = null
             // The report is the one of this step, not of a later one that starts within the hold.
-            settled -> announcement = Announcement(latest, publish)
+            settled -> announcement = Announcement(stepIdentity, latest, publish)
         }
     }
     LaunchedEffect(announcement) {
@@ -60,11 +69,11 @@ internal fun rememberSettledStep(
             it.onPublished()
         }
     }
-    return if (key == null) null else announcement?.text
+    return if (key == null) null else announcement?.takeIf { it.identity == identity }?.text
 }
 
-/** One announcement; a repeat of the same words is still a new one. */
-private class Announcement(val text: String, val onPublished: () -> Unit)
+/** One announcement of one step; a repeat of the same words is still a new one. */
+private class Announcement(val identity: Any?, val text: String, val onPublished: () -> Unit)
 
 /**
  * How long a finished step's preview waits, once its announcement is in the semantics, for the
@@ -80,12 +89,13 @@ internal const val STEP_ANNOUNCEMENT_HOLD_MS = 200L
 @Composable
 internal fun rememberSteppedSpoken(
     plain: String,
+    stepId: Any?,
     stepKey: String?,
     settled: Boolean,
     stepped: String,
     onPublished: () -> Unit = {},
 ): String {
-    val settledStep = rememberSettledStep(stepKey, settled, stepped, onPublished = onPublished)
+    val settledStep = rememberSettledStep(stepId, stepKey, settled, stepped, onPublished = onPublished)
     val before = remember { SpokenBeforeStep(plain) }
     SideEffect { if (stepKey == null) before.value = plain }
     return when {
@@ -94,7 +104,7 @@ internal fun rememberSteppedSpoken(
     }
 }
 
-private class SpokenBeforeStep(var value: String, var key: String? = null)
+private class SpokenBeforeStep(var value: String, var key: String? = null, var identity: Any? = null)
 
 /**
  * A live step as spoken: offset, target, the distance behind live when the target is a clock time

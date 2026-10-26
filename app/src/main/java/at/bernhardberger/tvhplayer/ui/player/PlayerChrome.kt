@@ -203,6 +203,7 @@ internal fun PlayerChrome(
                             nowSec = timeline.nowSec,
                             settled = timeline.stepSettled,
                             onAnnounced = timeline.onStepAnnounced,
+                            stepId = timeline.stepId,
                         ) else PlayerPresentedLiveTimeline(requireNotNull(liveBar), content.state,
                             feedback = timeline.feedback, feedbackIsError = timeline.feedbackIsError)
                     }

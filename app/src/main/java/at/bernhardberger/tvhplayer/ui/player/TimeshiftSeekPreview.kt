@@ -41,6 +41,8 @@ internal fun TimeshiftSeekPreviewTimeline(
     settled: Boolean = false,
     /** The step's announcement has been made; see [rememberSettledStep]. */
     onAnnounced: () -> Unit = {},
+    /** The step's identity: the seek state's preview. */
+    stepId: Any? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -70,6 +72,7 @@ internal fun TimeshiftSeekPreviewTimeline(
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
     // The buffer's length ticks; it is read when the step settles and does not announce the step again.
     val spoken = rememberSettledStep(
+        identity = stepId,
         key = "${readout.text}|${readout.target}",
         settled = settled,
         change = feedback.orEmpty(),

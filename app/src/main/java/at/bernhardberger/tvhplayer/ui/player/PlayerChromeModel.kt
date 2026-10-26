@@ -72,6 +72,8 @@ internal sealed interface PlayerChromeTimeline {
         val stepSettled: Boolean = false,
         /** The settled step has been announced; the seek state may then retire its finished preview. */
         val onStepAnnounced: () -> Unit = {},
+        /** The step's identity, told from the one before even if no composition saw the pending state between. */
+        val stepId: Any? = null,
         /**
          * A live start that has had no pause or timeshift command since, such as right after a zap: it
          * plays the live edge, whether its timing is known yet or not.
@@ -107,6 +109,8 @@ internal sealed interface PlayerChromeTimeline {
         val originMs: Long? = null,
         /** The step's seek has been dispatched: stepping has rested, so its step may be spoken. */
         val stepSettled: Boolean = false,
+        /** The step's identity, as for the live timeline. */
+        val stepId: Any? = null,
         val markers: List<Long> = emptyList(),
         val markerRevision: Long = 0L,
         val motionKey: Any? = null,

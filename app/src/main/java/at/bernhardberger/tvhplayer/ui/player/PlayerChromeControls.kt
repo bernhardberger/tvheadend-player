@@ -337,6 +337,7 @@ internal fun PlayerChromeControls(
                 stepDeltaMs = live.stepDeltaMs,
                 stepSettled = live.stepSettled,
                 onStepAnnounced = live.onStepAnnounced,
+                stepId = live.stepId,
                 programmeWindow = programmeWindow,
                 previewing = previewing,
                 collapsed = false,

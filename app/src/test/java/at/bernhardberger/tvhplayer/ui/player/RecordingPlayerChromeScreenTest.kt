@@ -336,6 +336,29 @@ class RecordingPlayerChromeScreenTest {
             spokenStep("recording-seek-preview"))
     }
 
+    @Test fun aStepQueuedAndCommittedBetweenTwoCompositionsIsAnnouncedAfresh() {
+        var target by mutableStateOf(630_000L)
+        var stepId by mutableStateOf(SeekStepId())
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(
+                    mode = PlayerChromeMode.BANNER_STEP, positionMs = 600_000L, durationMs = 3_600_000L,
+                    targetMs = target, originMs = 600_000L, stepSettled = true, stepId = stepId,
+                )
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        assertEquals("30 seconds forward, target 0:10:30. Total 1:00:00.", description("recording-seek-preview"))
+        // The next step is queued and dispatched before a composition sees it pending.
+        compose.runOnIdle {
+            target = 690_000L
+            stepId = SeekStepId()
+        }
+        settle()
+        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
+    }
+
     @Test fun upFromTheSeekbarStaysAtTheTopEdgeAndTheBarRowHasNoStatusSlot() {
         compose.setContent { TVHeadendPlayerTheme { RecordingChromeFixture() } }
         compose.mainClock.autoAdvance = false
