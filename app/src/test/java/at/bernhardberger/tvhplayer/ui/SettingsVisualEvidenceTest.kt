@@ -82,7 +82,9 @@ class SettingsVisualEvidenceTest {
                             onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
                             SettingsScreenNavigation(navigation,
                                 // The status page opens only while a retry can fix the connection.
-                                listOf(settingsRootLevel(applianceBuild = true), settingsApplianceLevel(false, { accessibilityCalls++ }),
+                                listOf(settingsRootLevel(applianceBuild = true,
+                                    connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title)),
+                                    settingsApplianceLevel(false, { accessibilityCalls++ }),
                                     settingsConnectionOverview(resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title),
                                         "tvheadend.local", 9982, degraded = true)) +
                                     settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, cacheState,
@@ -115,13 +117,14 @@ class SettingsVisualEvidenceTest {
         assertEquals(130f, activeColumn.left, .5f)
         assertEquals(28f, activeColumn.top, .5f)
         assertEquals(340f, activeColumn.width, .5f)
-        if (fontScale == 1f) assertRowTops(76f, 136f, 196f, 256f, 316f, 376f)
+        if (fontScale == 1f) assertRowTops(76f, 136f, 204f, 264f, 324f, 384f, 444f)
         capture("$prefix-root")
         press(Key.DirectionDown)
         capture("$prefix-root-middle-focus", middleFocus = true)
         press(Key.DirectionUp)
         press(Key.DirectionCenter)
-        if (fontScale == 1f) assertRowTops(76f, 144f, 242f, 324f)
+        // The German Guide toggle title wraps to a second line instead of being cut off.
+        if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 283f else 264f)
         capture("$prefix-general")
         press(Key.DirectionDown)
         capture("$prefix-general-middle-focus", middleFocus = true)
@@ -165,7 +168,7 @@ class SettingsVisualEvidenceTest {
         }
         compose.runOnIdle { cacheState = CacheClearState.IDLE }
         press(Key.Back)
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(5) { press(Key.DirectionDown) } // Connection, Channel groups, Playback, Audio & subtitles, Appliance
         press(Key.DirectionCenter)
         compose.onNodeWithText(accessLabel).assertIsFocused()
         val accessBounds = compose.onNodeWithText(accessLabel).fetchSemanticsNode().boundsInRoot
@@ -195,6 +198,58 @@ class SettingsVisualEvidenceTest {
         assertEquals(1, accessibilityCalls)
         press(Key.Back)
         assertEquals(SETTINGS_ROOT, navigation.stack.active.levelId)
+    }
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishPlaybackPages() {
+        val sdk = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(
+            at.bernhardberger.tvheadend.sdk.core.SessionState.Ready(at.bernhardberger.tvheadend.sdk.core.ServerCapabilities.create(
+                streaming = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
+                dvrWrite = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED)),
+            at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.ChannelCatalog.create()),
+            at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create()),
+            at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.DvrSnapshot.create()))
+        val profiles = listOf("htsp", "pass", "matroska", "webtv-h264-aac-mpegts").mapIndexed { index, name ->
+            at.bernhardberger.tvheadend.sdk.core.StreamProfile(
+                at.bernhardberger.tvheadend.sdk.core.StreamProfileId((index + 1).toString().padStart(32, '0')), name, "")
+        }
+        val ui = at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState(connected = true, audioLanguages = listOf("en"),
+            profiles = at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult.Available.create(profiles, requireNotNull(sdk.currentSession)),
+            selectedProfileId = profiles.first().id)
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    DebugVideoBackdrop(true, Modifier.fillMaxSize())
+                    WarmPlaybackScrim() // This evidence set explicitly models warm playback.
+                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = false, connectionStatus = "Connected"),
+                            settingsPlayerLevel(ui, {}), settingsKeepChannelLevel(ui.keepChannelMinutes) {},
+                            settingsStreamProfileLevel(ui) {},
+                            settingsStartupBufferLevel(ui.startupBufferMillis, ui.startupBufferLearnedMillis) {},
+                            settingsFrameRateLevel(ui.frameRateSwitching) {}, settingsAudioLevel(ui, {})) +
+                            settingsAudioPreferenceLevels(ui, { _, _ -> }, {}, {}),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        press(Key.DirectionCenter)
+        capture("en-font1.0-playback")
+        repeat(3) { press(Key.DirectionDown) }
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("Direct streaming")).assertIsSelected()
+        capture("en-font1.0-stream-profile")
+        press(Key.Back)
+        press(Key.DirectionDown)
+        capture("en-font1.0-playback-middle-focus")
+        press(Key.Back)
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Audio language").assertIsFocused()
+        capture("en-font1.0-audio-subtitles")
     }
 
     private fun press(key: Key) {

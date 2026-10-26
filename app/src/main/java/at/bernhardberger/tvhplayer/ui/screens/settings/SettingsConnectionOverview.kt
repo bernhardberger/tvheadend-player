@@ -44,31 +44,52 @@ internal fun settingsConnectionLevels(
     val profile by owner.serverProfile.collectAsStateWithLifecycle()
     val available = profile as? ServerProfileReadResult.Available
     val connection = presentation.connection
-    val context = LocalContext.current
-    val text = remember(context) { AppErrorText(context) }
-    val failure = connectionOverviewFailure(profile, presentation)
-    val status = if (failure != null) {
-        "${text.title(failure)}\n${text.reason(failure)}"
-    } else {
-        stringResource(when {
-            profile == null -> R.string.connection_overview_loading
-            profile == ServerProfileReadResult.Missing -> R.string.connection_overview_not_configured
-            presentation.degraded && presentation.currentChannelReadiness is CurrentChannelReadiness.Browsable ->
-                R.string.connection_offline_saved
-            connection == ConnectionUiState.SyncingChannels -> R.string.connection_overview_synchronizing
-            connection == ConnectionUiState.Ready -> R.string.connection_overview_connected
-            connection == ConnectionUiState.NeedsConfiguration -> R.string.connection_overview_not_configured
-            else -> R.string.connection_overview_connecting
-        })
-    }
+    val status = connectionOverviewStatus(profile, presentation)
     return listOf(
-        settingsConnectionOverview(status, available?.host, available?.port,
+        settingsConnectionOverview(status.text, available?.host, available?.port,
             degraded = presentation.degraded, onRetry = onRetry,
             connecting = connection == ConnectionUiState.Connecting || connection == ConnectionUiState.Reconnecting ||
                 connection == ConnectionUiState.SyncingChannels,
             recoveryRequiresSettings = connection.primaryRecoveryAction() == ConnectionRecoveryAction.SETTINGS,
             onSetUp = onSetUp),
     )
+}
+
+/** The overview's status: a failure's title and reason, or its own state with no reason. */
+internal class ConnectionOverviewStatus(val title: String, val reason: String? = null) {
+    val text: String get() = if (reason == null) title else "$title\n$reason"
+}
+
+/** Read through [owner], for the root row that shows only the status title. */
+@Composable
+internal fun connectionOverviewStatus(
+    presentation: AppConnectionPresentation,
+    owner: AppProfileOwner = koinInject(),
+): ConnectionOverviewStatus {
+    val profile by owner.serverProfile.collectAsStateWithLifecycle()
+    return connectionOverviewStatus(profile, presentation)
+}
+
+@Composable
+internal fun connectionOverviewStatus(
+    profile: ServerProfileReadResult?,
+    presentation: AppConnectionPresentation,
+): ConnectionOverviewStatus {
+    val connection = presentation.connection
+    val context = LocalContext.current
+    val text = remember(context) { AppErrorText(context) }
+    val failure = connectionOverviewFailure(profile, presentation)
+    if (failure != null) return ConnectionOverviewStatus(text.title(failure), text.reason(failure))
+    return ConnectionOverviewStatus(stringResource(when {
+        profile == null -> R.string.connection_overview_loading
+        profile == ServerProfileReadResult.Missing -> R.string.connection_overview_not_configured
+        presentation.degraded && presentation.currentChannelReadiness is CurrentChannelReadiness.Browsable ->
+            R.string.connection_offline_saved
+        connection == ConnectionUiState.SyncingChannels -> R.string.connection_overview_synchronizing
+        connection == ConnectionUiState.Ready -> R.string.connection_overview_connected
+        connection == ConnectionUiState.NeedsConfiguration -> R.string.connection_overview_not_configured
+        else -> R.string.connection_overview_connecting
+    }))
 }
 
 /**

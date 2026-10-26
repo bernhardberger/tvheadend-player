@@ -107,8 +107,8 @@ class AudioPreferenceUiTest {
                     view = LocalView.current
                     val navigation = rememberDepthNavigationState("root")
                     val levels = listOf(
-                        settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
-                        settingsPlayerLevel(ui, {}, {}, {}, { ui = ui.copy(audioDescription = it) }),
+                        settingsLevel("root", "Settings", listOf(settingsRow("audio", "Open audio", child = SettingsSection.AUDIO.name))),
+                        settingsAudioLevel(ui, {}, { ui = ui.copy(audioDescription = it) }),
                     ) + settingsAudioPreferenceLevels(ui,
                         { slot, language -> selections++; ui = ui.copy(audioLanguages = audioLanguagesWithSlot(ui.audioLanguages, slot, language)); navigation.pop() },
                         { selections++; ui = ui.copy(audioFormat = it); navigation.pop() },
@@ -120,10 +120,10 @@ class AudioPreferenceUiTest {
         val first = if (locale == "de") "Audiosprache" else "Audio language"
         val format = if (locale == "de") "Audioformat" else "Audio format"
         val description = if (locale == "de") "Audiodeskription" else "Audio description"
+        val passthrough = if (locale == "de") "Audio-Passthrough" else "Audio passthrough"
         key(Key.DirectionCenter)
-        repeat(5) { key(Key.DirectionDown) }
-        compose.onNodeWithText(first).assertIsFocused()
-        capture(view, "$locale-player-font$scale")
+        compose.onNodeWithText(first).assertIsFocused() // The page opens on its first row.
+        capture(view, "$locale-audio-page-font$scale")
         key(Key.DirectionCenter)
         compose.onNodeWithText(if (locale == "de") "Englisch" else "English").assertIsFocused().assertIsSelected()
         capture(view, "$locale-language-font$scale")
@@ -148,6 +148,8 @@ class AudioPreferenceUiTest {
         assertEquals(AudioFormatPreference.PREFER_DOLBY, ui.audioFormat)
         compose.onNodeWithText(format).assertIsFocused()
         key(Key.DirectionDown)
+        compose.onNodeWithText(passthrough).assertIsFocused()
+        key(Key.DirectionDown)
         compose.onNodeWithText(description).assertIsFocused().assertIsOff()
         key(Key.DirectionCenter)
         compose.onNodeWithText(description).assertIsFocused().assertIsOn()
@@ -161,8 +163,8 @@ class AudioPreferenceUiTest {
         compose.runOnIdle { ui = ui.copy(audioLanguages = listOf("en", "de", "fr")) }
         key(Key.DirectionUp)
         key(Key.DirectionDown)
-        compose.onNodeWithText(if (locale == "de") "Untertitelsprache" else "Subtitle Language").assertIsFocused()
-        capture(view, "$locale-player-subtitle-default-font$scale")
+        compose.onNodeWithText(if (locale == "de") "Untertitelsprache" else "Subtitle language").assertIsFocused()
+        capture(view, "$locale-audio-page-subtitle-default-font$scale")
         key(Key.DirectionCenter)
         compose.onNodeWithText(if (locale == "de") "Untertiteleinstellungen des Systems verwenden" else "Follow system caption settings")
             .assertIsFocused().assertIsSelected()
@@ -170,10 +172,9 @@ class AudioPreferenceUiTest {
         key(Key.Back)
         key(Key.DirectionUp)
         compose.onNodeWithText(description).assertIsFocused()
-        capture(view, "$locale-player-three-languages-description-font$scale")
-        // The longer player list may scroll the third row out while description has focus; it stays reachable.
-        key(Key.DirectionUp)
-        key(Key.DirectionUp)
+        capture(view, "$locale-audio-page-three-languages-description-font$scale")
+        // The longer list may scroll the third row out while description has focus; it stays reachable.
+        repeat(3) { key(Key.DirectionUp) } // Audio passthrough, Audio format, Third audio language
         compose.onNodeWithText(if (locale == "de") "Dritte Audiosprache" else "Third audio language").assertIsFocused().assertIsDisplayed()
     }
 

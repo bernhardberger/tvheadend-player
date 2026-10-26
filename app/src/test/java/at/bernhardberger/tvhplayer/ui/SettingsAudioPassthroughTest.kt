@@ -19,8 +19,8 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.Density
 import at.bernhardberger.tvhplayer.ui.components.depth.rememberDepthNavigationState
 import at.bernhardberger.tvhplayer.ui.screens.SettingsScreenNavigation
+import at.bernhardberger.tvhplayer.ui.screens.settings.settingsAudioLevel
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsLevel
-import at.bernhardberger.tvhplayer.ui.screens.settings.settingsPlayerLevel
 import at.bernhardberger.tvhplayer.ui.screens.settings.settingsRow
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
 import org.junit.Assert.assertEquals
@@ -56,9 +56,9 @@ class SettingsAudioPassthroughTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize()) {
                         SettingsScreenNavigation(rememberDepthNavigationState("root"), listOf(
-                            settingsLevel("root", "Settings", listOf(settingsRow("player", "Open player", child = SettingsSection.PLAYER.name))),
-                            settingsPlayerLevel(SettingsPlayerUiState(audioPassthroughEnabled = enabled,
-                                audioPassthroughChangeFailed = failed), {}, {}, {
+                            settingsLevel("root", "Settings", listOf(settingsRow("audio", "Open audio", child = SettingsSection.AUDIO.name))),
+                            settingsAudioLevel(SettingsPlayerUiState(audioPassthroughEnabled = enabled,
+                                audioPassthroughChangeFailed = failed), {
                                 changes++
                                 enabled = it
                             }),
@@ -71,9 +71,9 @@ class SettingsAudioPassthroughTest {
             compose.onRoot().performKeyInput { pressKey(key) }
             compose.waitForIdle()
         }
-        compose.onNodeWithText("Open player").assertIsFocused()
+        compose.onNodeWithText("Open audio").assertIsFocused()
         key(Key.DirectionCenter)
-        repeat(4) { key(Key.DirectionDown) }
+        repeat(2) { key(Key.DirectionDown) } // Audio language, Audio format
         compose.onNodeWithText(label).assertIsDisplayed().assertIsFocused().assertIsOn()
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
@@ -98,7 +98,7 @@ class SettingsAudioPassthroughTest {
         compose.onNodeWithText(label).assertIsFocused().assertIsOn()
         assertEquals(4, changes) // The desired mode can be tried again normally.
         key(Key.Back)
-        compose.onNodeWithText("Open player").assertIsFocused()
+        compose.onNodeWithText("Open audio").assertIsFocused()
         assertEquals(4, changes)
     }
 }

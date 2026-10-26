@@ -80,6 +80,10 @@ class FrameRateSettingsUiTest {
         key(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Only if seamless")).assertIsSelected()
         compose.onNode(hasText("Always")).assertIsNotSelected()
+        // Each option carries its own help instead of one description for the page.
+        compose.onNode(isFocused() and hasText("Switches only when the TV can do it without going dark.")).assertExists()
+        compose.onNode(hasText("Always") and hasText("Switches the TV to the video’s frame rate, even if the screen goes dark for a moment."))
+            .assertExists()
 
         // Back leaves without choosing.
         key(Key.Back)

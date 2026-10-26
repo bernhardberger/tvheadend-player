@@ -74,8 +74,8 @@ internal fun settingsRow(
     announcement: String? = null,
     busy: Boolean = false,
     trailingIcon: Int? = null,
-    titleMaxLines: Int = 1,
-    sectionBottomSpacing: androidx.compose.ui.unit.Dp = 0.dp,
+    // Long localized titles wrap to a second line before they ellipsize.
+    titleMaxLines: Int = 2,
     onClick: () -> Unit = {},
 ) = DepthRow(DepthItem(id, child), { if (enabled) onClick() }) { modifier, activate ->
     Column {
@@ -90,7 +90,7 @@ internal fun settingsRow(
             // Announce the untransformed label so TalkBack is unaffected by the casing.
             Text(section.uppercase(LocalConfiguration.current.locales[0]),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = TvSpacing16, top = TvSpacing16, bottom = sectionBottomSpacing)
+                modifier = Modifier.padding(start = TvSpacing16, top = TvSpacing16)
                     .semantics { heading(); contentDescription = section })
         }
         ListItem(

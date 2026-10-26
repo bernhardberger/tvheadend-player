@@ -52,5 +52,5 @@ internal fun settingsChannelTagsLevel(
                     onClick = { onToggle(tag.id) }))
             }
         }
-    })
+    }, description = stringResource(R.string.settings_channel_groups_description))
 }

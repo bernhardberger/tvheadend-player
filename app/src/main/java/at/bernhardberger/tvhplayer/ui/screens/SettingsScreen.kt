@@ -55,8 +55,9 @@ internal fun SettingsScreen(
         scope.launch { settingsStore.setRecordingProfile(id); navigation.pop() }
     }
     val levels = settingsGeneralLevels(navigation) + settingsConnectionLevels(connectionPresentation, onRetry, onSetUp = { setupOpen = true }) + settingsPlayerLevels(navigation) + listOf(
-        settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty()),
+        settingsRootLevel(applianceBuild, recordingLevels.isNotEmpty(), connectionOverviewStatus(connectionPresentation).title),
         settingsKeepChannelLevel(navigation),
+        settingsStreamProfileLevel(navigation),
         settingsFrameRateLevel(navigation),
         settingsStartupBufferLevel(navigation),
         settingsChannelTagsLevel(channelsVm),
@@ -69,22 +70,24 @@ internal fun SettingsScreen(
         onCloseSetup = { setupOpen = false })
 }
 
+/** Connection's row carries the overview's status title, the only value on the root. */
 @Composable
 internal fun settingsRootLevel(
     applianceBuild: Boolean = BuildConfig.APPLIANCE_BUILD,
     showRecordings: Boolean = false,
-): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), listOf(
-    settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general_nav), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune),
-    settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list),
-    settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav),
-        child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud),
-    settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player_nav), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow),
-) + (if (showRecordings) listOf(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
-    icon = R.drawable.ic_fiber_manual_record)) else emptyList()) + (if (applianceBuild) listOf(
-    settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance_nav), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home),
-) else emptyList()) + listOf(
-    settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info),
-))
+    connectionStatus: String? = null,
+): DepthLevel = settingsLevel(SETTINGS_ROOT, stringResource(R.string.nav_settings), buildList {
+    add(settingsRow(SettingsSection.GENERAL.name, stringResource(R.string.settings_general), child = SettingsSection.GENERAL.name, icon = R.drawable.ic_tune))
+    add(settingsRow(SettingsSection.CONNECTION.name, stringResource(R.string.settings_connection_nav), connectionStatus,
+        child = SettingsSection.CONNECTION.name, icon = R.drawable.ic_cloud))
+    add(settingsRow(SettingsSection.CHANNEL_TAGS.name, stringResource(R.string.settings_channel_tags_nav), child = SettingsSection.CHANNEL_TAGS.name, icon = R.drawable.ic_filter_list))
+    add(settingsRow(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), child = SettingsSection.PLAYER.name, icon = R.drawable.ic_play_arrow))
+    add(settingsRow(SettingsSection.AUDIO.name, stringResource(R.string.settings_audio_nav), child = SettingsSection.AUDIO.name, icon = R.drawable.ic_subtitles))
+    if (showRecordings) add(settingsRow(RECORDINGS_LEVEL, stringResource(R.string.nav_recordings), child = RECORDINGS_LEVEL,
+        icon = R.drawable.ic_fiber_manual_record))
+    if (applianceBuild) add(settingsRow(SettingsSection.APPLIANCE.name, stringResource(R.string.settings_appliance), child = SettingsSection.APPLIANCE.name, icon = R.drawable.ic_home))
+    add(settingsRow(ABOUT_LEVEL, stringResource(R.string.settings_about), child = ABOUT_LEVEL, icon = R.drawable.ic_info))
+})
 
 @Composable
 internal fun SettingsScreenNavigation(

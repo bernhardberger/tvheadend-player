@@ -56,7 +56,7 @@ class SettingsKeepChannelTest(private val language: String) {
         val context = composeRule.activity.createConfigurationContext(configuration)
         val heading = context.getString(R.string.keep_channel_setting)
         fun label(minutes: Int) = if (minutes == 0) context.getString(R.string.keep_channel_off)
-            else at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), context.resources)
+            else at.bernhardberger.tvhplayer.ui.common.formatDurationMinutes(minutes.toLong(), context.resources, spoken = true)
         var minutes by mutableStateOf(20)
         val selections = mutableListOf<Int>()
         composeRule.setContent {
@@ -70,7 +70,7 @@ class SettingsKeepChannelTest(private val language: String) {
                         val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
                         SettingsScreenNavigation(navigation, listOf(
                             settingsRootLevel(),
-                            settingsPlayerLevel(SettingsPlayerUiState(keepChannelMinutes = minutes), {}, {}, {}),
+                            settingsPlayerLevel(SettingsPlayerUiState(keepChannelMinutes = minutes), {}),
                             settingsKeepChannelLevel(minutes) {
                                 selections += it
                                 minutes = it
@@ -82,8 +82,8 @@ class SettingsKeepChannelTest(private val language: String) {
             }
         }
         press(Key.DirectionCenter)
-        // Autoplay, four playback switches and four audio-preference rows precede Keep channel.
-        repeat(9) { press(Key.DirectionDown) }
+        // Autoplay and timeshift precede Keep paused TV tuned.
+        repeat(2) { press(Key.DirectionDown) }
         val parent = composeRule.onNode(hasText(heading) and hasClickAction())
         parent.assertIsFocused()
         press(Key.DirectionCenter)
