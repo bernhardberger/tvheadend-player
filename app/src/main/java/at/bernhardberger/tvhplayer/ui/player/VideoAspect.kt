@@ -92,5 +92,7 @@ internal fun rememberTargetAspect(
             Unit
         }
     }
-    return TargetAspect(unsaved ?: aspects.modeFor(channel), select)
+    val mode = unsaved ?: aspects.modeFor(channel)
+    // One instance per (mode, select) so the player screens it is passed to can still skip.
+    return remember(mode, select) { TargetAspect(mode, select) }
 }
