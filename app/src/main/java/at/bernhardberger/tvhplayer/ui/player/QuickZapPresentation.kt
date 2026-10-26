@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -81,11 +82,12 @@ internal fun QuickZapPresentation(
  */
 internal class QuickZapRailState(
     expandedState: State<Boolean>,
-    internal val expansion: State<Float>,
+    internal val expansionAnimation: Animatable<Float, AnimationVector1D>,
     resting: State<Boolean>,
     internal val detached: Boolean,
 ) {
     val expanded by expandedState
+    internal val expansion: State<Float> = expansionAnimation.asState()
     internal val peek = ChannelPeek(resting)
     internal var viewportHeight by mutableIntStateOf(0)
     internal var railHeight by mutableIntStateOf(0)
@@ -102,29 +104,16 @@ internal class QuickZapRailState(
 internal fun rememberQuickZapRail(expanded: Boolean, detached: Boolean = false): QuickZapRailState {
     val expandedState = rememberUpdatedState(expanded)
     val expansion = remember { Animatable(if (expanded) 1f else 0f) }
-    val rail = remember {
-        QuickZapRailState(expandedState, expansion.asState(),
+    return remember {
+        QuickZapRailState(expandedState, expansion,
             derivedStateOf { !expandedState.value && expansion.value == 0f }, detached)
     }
-    LaunchedEffect(expanded, rail.hosted) {
-        val target = if (expanded) 1f else 0f
-        // Away from the controls the rail stands as a rail composed with them would begin.
-        if (!rail.hosted || expansion.value == target) {
-            expansion.snapTo(target)
-        } else {
-            expansion.animateTo(target, if (expanded) {
-                tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
-            } else {
-                tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedAccelerate)
-            })
-        }
-    }
-    return rail
 }
 
 /**
  * [nowSec] while the controls are composed; otherwise the time they last showed, so a hidden
- * detached rail's cards do not recompose every second.
+ * detached rail's cards do not recompose every second. Read it in the rail's content, not
+ * beside the rail, so the controls' show and hide recompose only that content.
  */
 @Composable
 internal fun QuickZapRailState.clock(nowSec: Long): Long {
@@ -198,6 +187,23 @@ internal fun QuickZapRail(
 ) {
     val expanded = rail.expanded
     val expansion = rail.expansion
+    // Taken as this composition sees it: controls composed in the same pass mark the rail hosted
+    // only once that pass applies.
+    val hosted = rail.hosted
+    LaunchedEffect(expanded) {
+        val target = if (expanded) 1f else 0f
+        // Away from the controls, or arriving with them, the rail stands as a rail composed with
+        // them would begin.
+        if (!hosted || expansion.value == target) {
+            rail.expansionAnimation.snapTo(target)
+        } else {
+            rail.expansionAnimation.animateTo(target, if (expanded) {
+                tween(PlayerMotion.PanelMs, easing = PlayerMotion.EmphasizedDecelerate)
+            } else {
+                tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedAccelerate)
+            })
+        }
+    }
     val shown by remember(expansion) { derivedStateOf { expansion.value > 0f } }
     val channelPeek = rail.peek.takeIf { peeks }
     val pageProgress = LocalPlayerPageProgress.current

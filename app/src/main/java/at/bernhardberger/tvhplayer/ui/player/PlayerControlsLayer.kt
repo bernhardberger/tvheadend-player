@@ -2,9 +2,12 @@ package at.bernhardberger.tvhplayer.ui.player
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.runtime.Composable
@@ -51,18 +54,27 @@ internal fun PlayerControlsLayer(
     val showEntry = remember(shown) { entry }
     AnimatedVisibility(
         visible = shown,
-        // The fade in runs below, after the first frames. The exit fades here.
+        // Both fades run below: the fade in after the first frames, the exit with the layer's alpha.
         enter = EnterTransition.None,
-        // An exit accelerates: a decelerating fade drops fast and then lingers faint as a ghost.
-        exit = fadeOut(
-            tween(
-                if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs,
-                easing = PlayerMotion.StandardAccelerate,
-            )
-        ),
+        exit = ExitTransition.None,
         modifier = modifier,
     ) {
         val appear = animateEnterAfterFirstFrames(tween(PlayerMotion.MediumMs, easing = PlayerMotion.EmphasizedDecelerate))
+        // An exit accelerates: a decelerating fade drops fast and then lingers faint as a ghost. A
+        // reveal that interrupts it recovers on a spring, as an AnimatedVisibility fade would.
+        val exitFade = transition.animateFloat(
+            transitionSpec = {
+                if (EnterExitState.Visible isTransitioningTo EnterExitState.PostExit) {
+                    tween(
+                        if (modalVisible) PlayerMotion.FastMs else PlayerMotion.MediumMs,
+                        easing = PlayerMotion.StandardAccelerate,
+                    )
+                } else {
+                    spring(stiffness = Spring.StiffnessMediumLow)
+                }
+            },
+            label = "controls-exit",
+        ) { if (it == EnterExitState.PostExit) 0f else 1f }
         val viewport = LocalPlayerPageScrim.current
         val fade = animateShown(
             tween(PlayerMotion.MediumMs, easing = PlayerMotion.Standard),
@@ -73,11 +85,11 @@ internal fun PlayerControlsLayer(
         androidx.compose.runtime.DisposableEffect(viewport) {
             onDispose { viewport?.alpha = { 0f } }
         }
-        // Entering, the layer draws at its appear alpha; leaving, at the exit fade, which runs with [fade].
-        val layerAlpha = remember { { if (transition.targetState == EnterExitState.Visible) appear.value else fade.value } }
-        PlayerMotionFrame(leaving = leaving, modifier = Modifier.graphicsLayer {
-            if (transition.targetState == EnterExitState.Visible) alpha = appear.value
-        }) {
+        // Entering, the layer draws at its appear alpha; leaving, or recovering from a leave, at its exit fade.
+        val layerAlpha = remember {
+            { exitFade.value * if (transition.targetState == EnterExitState.Visible) appear.value else 1f }
+        }
+        PlayerMotionFrame(leaving = leaving, modifier = Modifier.graphicsLayer { alpha = layerAlpha() }) {
             CompositionLocalProvider(
                 LocalPlayerControlsMotion provides this,
                 LocalPlayerControlsEntry provides showEntry,

@@ -7,6 +7,13 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -753,6 +760,115 @@ class QuickZapPresentationTest {
         draw()
         assertEquals("the next reveal reuses the rail", 1 to 0, built to disposed)
         assertTrue(draws > hiddenDraws)
+    }
+
+    /** A detached rail beside its controls layer, as the player composes them. */
+    private fun detachedRail(
+        controls: () -> Boolean,
+        expanded: () -> Boolean = { true },
+        channelContent: @Composable () -> Unit = {},
+    ): QuickZapRailState {
+        lateinit var rail: QuickZapRailState
+        compose.setContent {
+            view = LocalView.current
+            rail = rememberQuickZapRail(expanded = expanded(), detached = true)
+            Box(Modifier.fillMaxSize()) {
+                PlayerControlsLayer(visible = controls(), modalVisible = false) {
+                    QuickZapControls(rail, peek = null, controls = {})
+                }
+                QuickZapRail(rail, preview = {}, visible = controls(), channelContent = channelContent)
+            }
+        }
+        return rail
+    }
+
+    private fun change(block: () -> Unit) = compose.runOnIdle {
+        block()
+        androidx.compose.runtime.snapshots.Snapshot.sendApplyNotifications()
+    }
+
+    @Test fun detachedRailOpenedTogetherWithTheControlsStandsOpen() {
+        var controls by mutableStateOf(true)
+        var expanded by mutableStateOf(false)
+        val rail = detachedRail({ controls }, { expanded })
+        compose.runOnIdle { controls = false }
+        compose.mainClock.advanceTimeBy(1_000)
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        // A shortcut, such as the contents key, opens the rail from the hidden player.
+        change { controls = true; expanded = true }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        assertEquals("the rail stands open instead of rising from the peek", 1f, rail.expansion.value, 0f)
+        compose.mainClock.autoAdvance = true
+    }
+
+    @Test fun detachedRailReturnsWithTheControlsFromAnInterruptedHide() {
+        var controls by mutableStateOf(true)
+        val rail = detachedRail({ controls })
+        assertEquals(1f, rail.layerAlpha(), 0f)
+        compose.mainClock.autoAdvance = false
+        change { controls = false }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.MediumMs * 3L / 4L)
+        compose.waitForIdle()
+        val leaving = rail.layerAlpha()
+        assertTrue("most of the way out: $leaving", leaving > 0f && leaving < 0.8f)
+        change { controls = true }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        val returning = rail.layerAlpha()
+        assertTrue("recovers from where the hide stopped: $leaving, then $returning", returning < leaving + 0.2f)
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        assertEquals(1f, rail.layerAlpha(), 0.001f)
+    }
+
+    @Test fun detachedRailTakesNoFocusAndIsNotReadOutWhileTheControlsLeaveOrStayAway() {
+        var controls by mutableStateOf(true)
+        val card = FocusRequester()
+        var focused = false
+        var built = 0
+        detachedRail({ controls }) {
+            androidx.compose.runtime.DisposableEffect(Unit) { built++; onDispose { } }
+            Box(
+                Modifier.height(48.dp).fillMaxWidth()
+                    .testTag("rail-card")
+                    .semantics { contentDescription = "Rail card" }
+                    .focusRequester(card)
+                    .onFocusChanged { focused = it.isFocused }
+                    .focusable(),
+            )
+        }
+        fun requestFocus() {
+            compose.runOnIdle { card.requestFocus() }
+            compose.waitForIdle()
+        }
+        requestFocus()
+        assertTrue("the open rail takes focus with the controls up", focused)
+        compose.onNodeWithTag("rail-card").assertExists()
+
+        compose.mainClock.autoAdvance = false
+        change { controls = false }
+        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
+        assertFalse("the leaving rail gives focus up on the first exit frame", focused)
+        compose.onNodeWithTag("rail-card").assertDoesNotExist()
+        requestFocus()
+        assertFalse("and takes none while it leaves", focused)
+
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        requestFocus()
+        assertFalse("the hidden rail takes no focus", focused)
+        compose.onNodeWithTag("rail-card").assertDoesNotExist()
+
+        compose.runOnIdle { controls = true }
+        compose.waitForIdle()
+        compose.onNodeWithTag("rail-card").assertExists()
+        requestFocus()
+        assertTrue("the next reveal's rail takes focus again", focused)
+        assertEquals("and is the same rail", 1, built)
     }
 
     @Test fun closedRailPeeksThePlayingCardAtTheBottomEdgeAndRisesFromThere() {

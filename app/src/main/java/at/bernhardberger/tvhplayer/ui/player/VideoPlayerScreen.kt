@@ -1585,7 +1585,6 @@ fun VideoPlayerScreen(
         val quickZap = rememberQuickZapRail(
             // Keep the departing rail expanded throughout its vertical step.
             expanded = layerState.channelRailPresented, detached = true)
-        val railNowSec = quickZap.clock(nowSec)
         PlayerChrome(
             mode = playerChromeMode(
                 controls = controlsShown,
@@ -1679,6 +1678,8 @@ fun VideoPlayerScreen(
             quickZap,
             // The rows' saved logos are those of the observation their scope was resolved from.
             channelContent = { ProvideArtworkSession(currentSession, channelScope.observation) {
+                // Read in the rail, so the controls' show and hide do not recompose the whole player.
+                val railNowSec = quickZap.clock(nowSec)
                 PlayerChannelBrowser(
                     state = channelBrowser,
                     channels = channels,
