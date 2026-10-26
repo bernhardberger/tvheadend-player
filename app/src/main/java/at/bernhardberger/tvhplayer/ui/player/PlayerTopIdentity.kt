@@ -6,6 +6,7 @@ import at.bernhardberger.tvhplayer.ui.TvTextSecondaryAlpha
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -60,6 +61,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -89,7 +92,8 @@ internal const val PlayerTopIdentityTag = "player-top-identity"
  *
  * While a layer that shows [NowPlayingStrip] opens (the channel rows, or a page such as the
  * programme details), it shrinks towards the strip's size and fades, so the two read as one object
- * and never stand at full strength together.
+ * and never stand at full strength together. While [numberEntryShown] it fades out under the
+ * channel number entry, which stands in its place ([PlayerTopIdentitySlot]), and back once the entry leaves.
  */
 @Composable
 internal fun PlayerTopIdentity(
@@ -113,7 +117,12 @@ internal fun PlayerTopIdentity(
     onRecentDown: () -> Unit = {},
     /** Whether focus is on the identity or inside its recent row. */
     onFocusWithinChanged: (Boolean) -> Unit = {},
+    numberEntryShown: Boolean = false,
 ) {
+    // The same fade as the entry's, so the two cross in place.
+    val present = animateFloatAsState(if (numberEntryShown) 0f else 1f, tween(PlayerMotion.FastMs,
+        easing = if (numberEntryShown) PlayerMotion.StandardAccelerate else PlayerMotion.StandardDecelerate),
+        label = "identity under number entry")
     val rail = LocalRailExpansion.current
     val page = LocalPlayerPageProgress.current
     // 0 at rest, 1 once the strip stands in for the identity.
@@ -133,14 +142,10 @@ internal fun PlayerTopIdentity(
         }
         Layout(
             content = {
-                // The room's header band (or the clock's line, if taller), which the identity is centred on, as the strip is.
-                Box(Modifier.width(0.dp).heightIn(min = TvBrowseHeaderHeight)) {
-                    Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
-                        modifier = Modifier.width(0.dp).clearAndSetSemantics {})
-                }
+                HeaderBandProbe()
                 val identityLayer = Modifier.graphicsLayer {
                     val m = morph()
-                    alpha = 1f - m
+                    alpha = (1f - m) * present.value
                     scaleX = 1f - IdentityMorphShrink * m
                     scaleY = scaleX
                     // The chip's start edge stays where the strip's chip stands.
@@ -148,9 +153,11 @@ internal fun PlayerTopIdentity(
                 }
                 if (focus == null) {
                     val spoken = identitySpoken(content)
-                    Box(identityLayer.testTag(PlayerTopIdentityTag).semantics(mergeDescendants = true) {
-                        contentDescription = spoken
-                    }) {
+                    // Faded out under the entry, it is not read out either; the entry speaks for itself.
+                    Box(identityLayer.testTag(PlayerTopIdentityTag).then(
+                        if (numberEntryShown) Modifier.clearAndSetSemantics {}
+                        else Modifier.semantics(mergeDescendants = true) { contentDescription = spoken },
+                    )) {
                         IdentityContent(content, focused = false)
                     }
                 } else {
@@ -168,17 +175,55 @@ internal fun PlayerTopIdentity(
             val probe = measurables[0].measure(loose)
             val identity = measurables[1].measure(loose)
             val row = measurables[2].measure(loose)
-            val top = TvGridVerticalMargin.roundToPx()
-            val identityX = (TvGridHorizontalMargin - IdentityInset).roundToPx()
-            val identityY = top + (probe.height - identity.height) / 2
-            val rowY = identityY + identity.height + RecentRowGap.roundToPx()
+            val origin = identityOrigin(probe.height, identity.height)
+            val rowY = origin.y + identity.height + RecentRowGap.roundToPx()
             layout(constraints.maxWidth, constraints.maxHeight) {
-                identity.place(identityX, identityY)
+                identity.place(origin)
                 row.place((TvGridHorizontalMargin - RecentOverflow).roundToPx(), rowY)
             }
         }
     }
 }
+
+/**
+ * [content] where [PlayerTopIdentity] stands, whether or not the chrome is up: the channel number
+ * entry takes the identity's place this way and fades in as the identity fades out under it.
+ */
+@Composable
+internal fun PlayerTopIdentitySlot(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    Layout(
+        content = {
+            HeaderBandProbe()
+            Box { content() }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val probe = measurables[0].measure(loose)
+        val slot = measurables[1].measure(loose)
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            slot.place(identityOrigin(probe.height, slot.height))
+        }
+    }
+}
+
+/** The room's header band (or the clock's line, if taller), which the identity is centred on, as the strip is. */
+@Composable
+private fun HeaderBandProbe() {
+    Box(Modifier.width(0.dp).heightIn(min = TvBrowseHeaderHeight)) {
+        Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
+            modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+    }
+}
+
+/** The identity's top start: its content on the grid margin, centred on the [probe][HeaderBandProbe]'s band. */
+private fun Density.identityOrigin(probeHeight: Int, height: Int) = IntOffset(
+    (TvGridHorizontalMargin - IdentityInset).roundToPx(),
+    TvGridVerticalMargin.roundToPx() + (probeHeight - height) / 2,
+)
 
 @Composable
 private fun FocusableIdentity(
@@ -429,13 +474,13 @@ internal data class RecentChannelPeek(
 )
 
 /** The identity's room beside its content: the focus container's padding and the ‹ › lanes. */
-private val IdentityInset = 24.dp
-private val IdentityVerticalPadding = 6.dp
-private val IdentityTextGap = 16.dp
-private val IdentityTextMaxWidth = 480.dp
-private val IdentityShape = RoundedCornerShape(12.dp)
-private val ChipWidth = 64.dp
-private val ChipHeight = 36.dp
+internal val IdentityInset = 24.dp
+internal val IdentityVerticalPadding = 6.dp
+internal val IdentityTextGap = 16.dp
+internal val IdentityTextMaxWidth = 480.dp
+internal val IdentityShape = RoundedCornerShape(12.dp)
+internal val ChipWidth = 64.dp
+internal val ChipHeight = 36.dp
 private const val ArrowAlpha = TvPassiveAlpha
 
 /** The identity's share of the strip's chip: 48dp of 64dp. */

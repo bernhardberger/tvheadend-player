@@ -911,11 +911,15 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   opened it. Down leads to the seekbar, or to Play/Pause where the timeline takes
   no focus; Left, Right and Up lead nowhere. Above a recording's markers, Up from
   the seekbar opens the markers and Up again closes them and moves on to the card.
-- Numeric entry is a compact, single-line badge at the top left (56dp start,
-  48dp top). Digits are centred within a slot sized for at least three digits;
-  a known destination extends the badge with an optional picon and one-line name.
-  Pending input shows only the digit slot. The whole badge fades in and out over
-  100ms, without travel or scale. Destination-width changes settle over 150ms,
+- Numeric entry is a compact, single-line badge in the top identity's place: the
+  same start edge, line and height, and the identity's plate shape. Digits are
+  centred within a slot sized for at least three digits; a known destination
+  extends the badge with an optional picon and one-line name, laid out as the
+  identity lays out its channel. Pending input shows only the digit slot. With
+  the chrome shown, the identity fades out under the entry and returns as it
+  leaves, and is not read out meanwhile; with the chrome hidden the badge stands
+  alone at the same spot. The whole badge fades in and out over 100ms, without
+  travel or scale. Destination-width changes settle over 150ms,
   anchored at the start edge with fixed height; new digits and labels update
   immediately, including during an interrupted transition. Cancel and commit use
   the same exit, retaining the last complete badge while it fades. Tuning never

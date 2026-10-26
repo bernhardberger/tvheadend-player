@@ -509,6 +509,45 @@ class PlayerMotionTest {
         compose.onNodeWithText("Seven").assertDoesNotExist()
     }
 
+    @Test fun theTopIdentityAndTheNumberEntryCrossInPlace() {
+        var number by mutableStateOf("")
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            val content = PlayerChromeContent("", liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, false, 0, "Programme"))
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    PlayerTopIdentity(content, numberEntryShown = number.isNotEmpty())
+                    PlayerTopIdentitySlot { ChannelNumberOverlay(number, ChannelNumberTarget.Pending, Modifier.testTag("number")) }
+                }
+            }
+        }
+        compose.waitForIdle()
+        // The pending entry is only its digit slot, short of the identity's name.
+        val name = compose.onNodeWithTag("player-top-identity-name", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val rest = ink(view, name)
+        assertTrue("the identity is drawn at rest", rest > 0f)
+        compose.mainClock.autoAdvance = false
+
+        change { number = "1" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("1").assertExists()
+        compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
+        val crossing = ink(view, name)
+        assertTrue("the identity fades as the entry comes in: $crossing of $rest", crossing > 0f && crossing < rest)
+        compose.mainClock.advanceTimeBy(200)
+        assertEquals("the identity has given way to the entry", 0f, ink(view, name), rest * 0.01f)
+        assertTrue("the name rests beyond the entry", compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot.right < name.left)
+
+        change { number = "" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
+        val returning = ink(view, name)
+        assertTrue("the identity returns as the entry leaves: $returning of $rest", returning > 0f && returning < rest)
+        compose.mainClock.advanceTimeBy(200)
+        assertEquals("the identity is back", rest, ink(view, name), rest * 0.01f)
+    }
+
     @Test fun recoveryFocusesRetryAsItStartsToAppearAndLetsGoAtOnce() {
         var visible by mutableStateOf(false)
         var retries = 0

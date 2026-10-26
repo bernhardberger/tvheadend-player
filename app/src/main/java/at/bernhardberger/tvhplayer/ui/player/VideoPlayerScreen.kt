@@ -1125,6 +1125,8 @@ fun VideoPlayerScreen(
     val showDrawer = foregroundContext.channelDrawerVisible
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    // The digits shown in the top identity's place; empty while another layer covers the entry.
+    val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = layerState.chrome.controlsVisible,
@@ -1610,6 +1612,7 @@ fun VideoPlayerScreen(
             ),
             entry = layerState.chrome.controlsEntry,
             panelOpen = layerState.optionsPage != null || layerState.infoOpen,
+            numberEntryShown = numberEntry.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
                 dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
@@ -1760,14 +1763,13 @@ fun VideoPlayerScreen(
             )
         }
 
-        ChannelNumberOverlay(
-            number = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty(),
-            target = channelNumberTarget,
-            maxDigits = channelNumberDigits,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 56.dp, top = 48.dp),
-        )
+        PlayerTopIdentitySlot {
+            ChannelNumberOverlay(
+                number = numberEntry,
+                target = channelNumberTarget,
+                maxDigits = channelNumberDigits,
+            )
+        }
 
         val unavailableShown = channelUnavailable && foregroundLayer in setOf(PlayerForegroundLayer.CONTROLS, PlayerForegroundLayer.NONE, PlayerForegroundLayer.CHANNEL_DRAWER)
         PlayerChannelMessage(

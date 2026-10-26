@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -49,8 +50,9 @@ internal sealed interface ChannelNumberTarget {
 private data class ChannelNumberEntry(val number: String, val target: ChannelNumberTarget)
 
 /**
- * A compact number badge that extends to show a known destination on the same line.
- * Only the digit slot reserves width; a pending entry has no destination compartment.
+ * A number badge in the top identity's place and size ([PlayerTopIdentitySlot]): the digits, then a
+ * known destination's picon and name on the same line, as the identity shows its channel. Only the
+ * digit slot reserves width; a pending entry has no destination compartment.
  */
 @Composable
 internal fun ChannelNumberOverlay(
@@ -77,7 +79,8 @@ internal fun ChannelNumberOverlay(
                     containerColor = Color.Black.copy(alpha = TvOverlayBoxAlpha),
                     contentColor = MaterialTheme.colorScheme.onSurface,
                 ),
-                shape = MaterialTheme.shapes.small,
+                // The identity's focus container: the plate reads over video with the chrome hidden.
+                shape = IdentityShape,
             ) {
                 Row(
                     modifier = Modifier
@@ -85,11 +88,12 @@ internal fun ChannelNumberOverlay(
                             animationSpec = tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard),
                             alignment = Alignment.TopStart,
                         )
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                        .padding(horizontal = IdentityInset, vertical = IdentityVerticalPadding),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    val style = MaterialTheme.typography.displaySmall.copy(fontFeatureSettings = "tnum")
-                    Box(contentAlignment = Alignment.Center) {
+                    // At least the identity's chip height, so the badge is the identity's height.
+                    val style = MaterialTheme.typography.headlineMedium.copy(fontFeatureSettings = "tnum")
+                    Box(Modifier.heightIn(min = ChipHeight), contentAlignment = Alignment.Center) {
                         Text(
                             text = "0".repeat(maxDigits.coerceAtLeast(3)),
                             style = style,
@@ -103,7 +107,7 @@ internal fun ChannelNumberOverlay(
                     }
                     if (displayed.target != ChannelNumberTarget.Pending) {
                         ChannelNumberTargetView(displayed.target,
-                            Modifier.padding(start = 16.dp))
+                            Modifier.padding(start = IdentityTextGap))
                     }
                 }
             }
@@ -118,7 +122,7 @@ private fun ChannelNumberTargetView(
 ) {
     val currentSession = LocalArtworkContext.current.currentSession
     Row(
-        modifier = modifier.widthIn(max = 240.dp),
+        modifier = modifier.widthIn(max = ChipWidth + IdentityTextGap + IdentityTextMaxWidth),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val channel = target as? ChannelNumberTarget.Channel
@@ -130,10 +134,12 @@ private fun ChannelNumberTargetView(
                 loading = {},
                 error = {},
                 success = {
+                    // The identity's chip, its logo inset as there.
                     SubcomposeAsyncImageContent(
                         modifier = Modifier
-                            .padding(end = 12.dp)
-                            .size(48.dp, 28.dp)
+                            .padding(end = IdentityTextGap)
+                            .size(ChipWidth, ChipHeight)
+                            .padding(4.dp)
                             .testTag("channel-number-picon"),
                     )
                 },
@@ -145,7 +151,7 @@ private fun ChannelNumberTargetView(
                 ChannelNumberTarget.None -> stringResource(R.string.player_channel_number_none)
                 ChannelNumberTarget.Pending -> ""
             },
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleLarge,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false).testTag("channel-number-target"),

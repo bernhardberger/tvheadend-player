@@ -98,6 +98,8 @@ internal fun PlayerChrome(
     onRecentRowOpenChange: (Boolean) -> Unit = {},
     /** Retained trial caller input; the passive top identity cannot take focus. */
     onChannelCardFocusChanged: (Boolean) -> Unit = {},
+    /** The channel number entry stands in the top identity's place, which gives way to it. */
+    numberEntryShown: Boolean = false,
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
     PlayerControlsLayer(
@@ -171,7 +173,7 @@ internal fun PlayerChrome(
                 onChannelZap = onChannelZap,
                 downHint = downHint,
                 topIdentity = { placed, _, _ ->
-                    PlayerTopIdentity(content, placed)
+                    PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
                 },
             )
         } else {
@@ -180,7 +182,7 @@ internal fun PlayerChrome(
             PlayerOverlayChrome(
                 headerContent = { placed ->
                     header(placed)
-                    PlayerTopIdentity(content, placed)
+                    PlayerTopIdentity(content, placed, numberEntryShown = numberEntryShown)
                 },
                 footerPadding = PaddingValues(start = TvGridHorizontalMargin, end = TvGridHorizontalMargin,
                     top = TvOverlayFooterGradientRunout, bottom = PlayerBannerBottomPadding),
