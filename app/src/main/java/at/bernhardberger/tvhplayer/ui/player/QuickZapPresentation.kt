@@ -77,7 +77,8 @@ internal fun QuickZapPresentation(
         if (viewport == null) Box(Modifier.matchParentSize().playerScrim(scrim))
         Box(
             Modifier.fillMaxSize()
-                .focusProperties { canFocus = !expanded }
+                // Only withdraws focus: as their ancestor, granting it would override what the controls withdraw.
+                .focusProperties { if (expanded) canFocus = false }
                 .then(if (expanded) Modifier.clearAndSetSemantics { } else Modifier)
                 .testTag("player-zap-controls"),
         ) {

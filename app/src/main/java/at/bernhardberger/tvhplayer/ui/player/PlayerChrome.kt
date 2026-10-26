@@ -78,6 +78,8 @@ internal fun PlayerChrome(
     onCommitSeek: () -> Unit = {},
     onPauseUnavailable: (reason: String) -> Unit = {},
     onActionFocused: (String) -> Unit = {},
+    /** Any control that takes focus, the timeline included: where focus returns after number entry. */
+    onControlFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
     /** Down on the action row, which it always consumes. */
     onDownFromActions: () -> Unit = {},
@@ -98,7 +100,10 @@ internal fun PlayerChrome(
     onRecentRowOpenChange: (Boolean) -> Unit = {},
     /** Retained trial caller input; the passive top identity cannot take focus. */
     onChannelCardFocusChanged: (Boolean) -> Unit = {},
-    /** The channel number entry stands in the top identity's place, which gives way to it. */
+    /**
+     * The channel number entry stands in the top identity's place, which gives way to it; the
+     * controls kept up under the entry take no focus.
+     */
     numberEntryShown: Boolean = false,
 ) {
     val liveBar = rememberLiveBarPresentation(timeline as? PlayerChromeTimeline.Live)
@@ -164,9 +169,11 @@ internal fun PlayerChrome(
                 onCommitSeek = onCommitSeek,
                 onPauseUnavailable = onPauseUnavailable,
                 onActionFocused = onActionFocused,
+                onControlFocused = onControlFocused,
                 onFocusRestored = onFocusRestored,
                 onDownFromActions = onDownFromActions,
-                covered = decorationCoversControls,
+                // Number entry owns input: the controls it keeps up take no focus.
+                covered = decorationCoversControls || numberEntryShown,
                 decoration = controlsDecoration,
                 markerNavigation = markerNavigation,
                 onSeekMarker = onSeekMarker,

@@ -87,6 +87,7 @@ internal fun PlayerChromeControls(
     onCommitSeek: () -> Unit,
     onPauseUnavailable: (reason: String) -> Unit,
     onActionFocused: (String) -> Unit,
+    onControlFocused: (String) -> Unit,
     onFocusRestored: () -> Unit,
     onDownFromActions: () -> Unit,
     covered: Boolean,
@@ -228,6 +229,7 @@ internal fun PlayerChromeControls(
                         timelineFocused = it.isFocused
                         if (it.isFocused) {
                             lastFocusedControl = "player-seekbar"
+                            onControlFocused("player-seekbar")
                             // A quick list returns to the recording timeline.
                             if (recording != null) onActionFocused("player-seekbar")
                         }
@@ -387,7 +389,7 @@ internal fun PlayerChromeControls(
             infoFocus = infoFocus,
             onInteraction = onInteraction,
             onActionFocused = {
-                lastFocusedControl = it; lastAction = it; onActionFocused(it)
+                lastFocusedControl = it; lastAction = it; onActionFocused(it); onControlFocused(it)
             },
             onTogglePause = when {
                 pauseUnavailableReason != null -> { { onPauseUnavailable(pauseUnavailableReason) } }

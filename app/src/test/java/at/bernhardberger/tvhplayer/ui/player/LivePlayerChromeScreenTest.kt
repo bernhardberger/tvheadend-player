@@ -566,6 +566,39 @@ class LivePlayerChromeScreenTest {
         assertEquals(listOf("player-stop"), focused())
     }
 
+    @Test fun numberEntryKeepsTheControlsUpWithoutFocusAndReturnsToTheSeekbar() = timeshiftPlaying { pauses ->
+        key(Key.DirectionDown)
+        key(Key.DirectionUp)
+        assertEquals(listOf("player-seekbar"), focused())
+        val controls = setOf("player-seekbar", "player-pause", "player-stop", "player-info", "player-settings")
+        // Back cancels the entry; an unknown number's hold times out. Both clear it the same way.
+        for (cancel in listOf(true, false)) {
+            // Channels 1 to 3: one digit is a complete number, and 9 names none.
+            press(Key.Nine)
+            assertEquals("the digit tuned nothing", AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            for (direction in listOf(Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight)) {
+                press(direction)
+                assertTrue("$direction moved focus into the controls: ${focused()}", focused().none { it in controls })
+                assertTrue("the controls stay up under the entry", exists("player-actions"))
+                assertFalse("$direction opened the channel rail", exists("player-now-playing"))
+            }
+            // Nor can an accessibility service move focus into them.
+            for (tag in controls) {
+                compose.onAllNodes(hasTestTag(tag), useUnmergedTree = true).fetchSemanticsNodes().forEach {
+                    it.config.getOrNull(SemanticsActions.RequestFocus)?.action?.invoke()
+                }
+                settleFrames()
+                assertTrue("$tag took focus under the entry: ${focused()}", focused().none { it in controls })
+            }
+            assertTrue("the entry is still up", compose.onAllNodesWithText("9").fetchSemanticsNodes().isNotEmpty())
+            assertEquals("no control acted", emptyList<Boolean>(), pauses)
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            if (cancel) key(Key.Back) else repeat(2) { settle() }
+            assertTrue("the entry left", compose.onAllNodesWithText("9").fetchSemanticsNodes().isEmpty())
+            assertEquals("focus returned to the timeline (cancel=$cancel)", listOf("player-seekbar"), focused())
+        }
+    }
+
     @Test fun playerBannerStaysWhileTheChannelIsTuning() {
         screen()
         // Well past the Banner's 5 s: no frame was presented, so it stays while tuning.
@@ -1870,6 +1903,14 @@ class LivePlayerChromeScreenTest {
         compose.onRoot().performKeyInput { pressKey(key) }
         settle()
     }
+
+    /** Presses [key] and lets a few frames pass, short of any entry timer. */
+    private fun press(key: Key) {
+        compose.onRoot().performKeyInput { pressKey(key) }
+        settleFrames()
+    }
+
+    private fun settleFrames() = repeat(3) { compose.mainClock.advanceTimeByFrame(); compose.waitForIdle() }
 
     private fun settle() {
         repeat(20) {

@@ -419,6 +419,8 @@ fun VideoPlayerScreen(
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
     // The control focused when number entry took the keys over the controls; focus returns there.
     var numberEntryReturnAction by remember { mutableStateOf<String?>(null) }
+    // The control last focused in the controls, the live timeline included.
+    var lastChromeControl by remember { mutableStateOf<String?>(null) }
     val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
     val rootFocus = remember { FocusRequester() }
 
@@ -1134,7 +1136,7 @@ fun VideoPlayerScreen(
     val numberEntryUp = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY
     LaunchedEffect(numberEntryUp, layerState.chrome.controlsVisible) {
         if (!layerState.chrome.controlsVisible) numberEntryReturnAction = null
-        else if (numberEntryUp) numberEntryReturnAction = lastChromeAction
+        else if (numberEntryUp) numberEntryReturnAction = lastChromeControl
     }
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
@@ -1644,6 +1646,7 @@ fun VideoPlayerScreen(
             },
             onInteraction = layerState.chrome::onUserInteraction,
             onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
+            onControlFocused = { lastChromeControl = it },
             onFocusRestored = {
                 infoReturnAction = null
                 numberEntryReturnAction = null
