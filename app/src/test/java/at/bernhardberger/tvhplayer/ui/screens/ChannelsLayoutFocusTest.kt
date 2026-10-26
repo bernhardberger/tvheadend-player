@@ -59,7 +59,7 @@ class ChannelsLayoutFocusTest {
 
     private val list = ChannelsView(ChannelsLayout.LIST)
     private val grid = ChannelsView(ChannelsLayout.GRID).toggledProgramArt()
-    private val immersive = ChannelsView(ChannelsLayout.IMMERSIVE).toggledProgramArt()
+    private val immersive = ChannelsView(ChannelsLayout.IMMERSIVE)
     private val tagsButton = hasTestTag("channels-tags-button")
     private val viewButton = hasTestTag("channels-view-button")
 
@@ -251,17 +251,24 @@ class ChannelsLayoutFocusTest {
         fixture.key(Key.DirectionUp)
         fixture.awaitFocus(option("layout-immersive"))
         fixture.key(Key.DirectionCenter)
-        compose.onNode(option("program-art")).assertIsOff()
+        // Immersive starts with art and without channel names.
+        compose.onNode(option("program-art")).assertIsOn()
+        compose.onNode(option("channel-names")).assertIsOff()
         repeat(3) { fixture.key(Key.DirectionDown) }
         fixture.awaitFocus(option("program-art"))
         fixture.key(Key.DirectionCenter)
-        compose.onNode(option("program-art")).assertIsOn()
-        fixture.key(Key.DirectionUp)
+        compose.onNode(option("program-art")).assertIsOff()
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(option("channel-names"))
+        fixture.key(Key.DirectionCenter)
+        compose.onNode(option("channel-names")).assertIsOn()
+        repeat(2) { fixture.key(Key.DirectionUp) }
         fixture.awaitFocus(option("layout-grid"))
         fixture.key(Key.DirectionCenter)
-        // Immersive's art does not reach the grid.
+        // Immersive's switches do not reach the grid, which has no channel names switch.
         compose.onNode(option("program-art")).assertIsOff()
-        assertEquals(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.IMMERSIVE)), fixture.channelsView)
+        compose.onNode(option("channel-names")).assertDoesNotExist()
+        assertEquals(ChannelsView(ChannelsLayout.GRID, emptySet(), channelNames = true), fixture.channelsView)
     }
 
     @Test fun cardPictureLeadsWithTheProgrammeAndFallsBackToTheLogo() {
@@ -643,7 +650,7 @@ class ChannelsLayoutFocusTest {
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
     fun immersiveChannelLabelsAreMutedExceptUnderTheFocusedCard() {
-        fixture.show(immersive)
+        fixture.show(immersive.toggledChannelNames())
         fixture.awaitFocus(card(1))
         fun brightest(id: Int) = compose.onNodeWithTag("channels-immersive-$id-identity", useUnmergedTree = true)
             .captureToImage().toPixelMap().let { pixels ->
@@ -674,8 +681,8 @@ class ChannelsLayoutFocusTest {
 
     @Test fun logoCardsMarkThePlayingChannelFocusedOrNot() {
         val playing = hasTestTag("channel-playing-indicator") and hasAnyAncestor(card(1))
-        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
-            warmPlayback = true)
+        fixture.show(ChannelsView(ChannelsLayout.IMMERSIVE, programArt = emptySet()),
+            playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)), warmPlayback = true)
         fixture.awaitFocus(card(1))
         compose.onNode(playing, useUnmergedTree = true).assertExists()
         fixture.key(Key.DirectionRight)
@@ -684,6 +691,27 @@ class ChannelsLayoutFocusTest {
         compose.onNode(hasTestTag("channel-playing-indicator") and hasAnyAncestor(card(2)), useUnmergedTree = true)
             .assertDoesNotExist()
         compose.runOnIdle { fixture.channelsView = ChannelsView(ChannelsLayout.GRID) }
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+    }
+
+    @Test fun immersiveChannelNamesAreOptionalAndThePlayingMarkFindsAPlaceWithoutThem() {
+        // The name line sits below the card's own surface, so the mark is found by itself: only channel 1 plays.
+        val playing = hasTestTag("channel-playing-indicator")
+        fixture.show(immersive, imageLoader = fixture.fixtureArt(), playerReturn = PlayerReturnFocus(ChannelId(1), ChannelId(1)),
+            warmPlayback = true)
+        fixture.awaitFocus(card(1))
+        // By default the picture card's logo plate names the channel and nothing goes below.
+        compose.onNodeWithTag("channels-immersive-1-art-picon", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNodeWithTag("channels-immersive-1-art-playing", useUnmergedTree = true).assertExists()
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        compose.runOnIdle { fixture.channelsView = immersive.toggledChannelNames() }
+        compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
+        compose.onNodeWithTag("channels-immersive-1-art-playing", useUnmergedTree = true).assertDoesNotExist()
+        compose.onNode(playing, useUnmergedTree = true).assertExists()
+        // Logo cards name their channel below too once names are on.
+        compose.runOnIdle { fixture.channelsView = immersive.toggledProgramArt().toggledChannelNames() }
+        compose.onNodeWithTag("channels-immersive-1-identity", useUnmergedTree = true).assertTextEquals("1 Ridge Earth")
         compose.onNode(playing, useUnmergedTree = true).assertExists()
     }
 

@@ -192,6 +192,7 @@
     <string name="channels_view_immersive_options">Immersiv-Optionen</string>
     <string name="channels_view_grid_options">Raster-Optionen</string>
     <string name="channels_view_program_art">Sendungsbilder</string>
+    <string name="channels_view_channel_names">Sendernamen</string>
     <string name="guide_view_rows">Zeilen</string>
     <string name="guide_view_rows_dense">Kompakt</string>
     <string name="guide_view_rows_regular">Normal</string>

@@ -292,6 +292,8 @@ internal class ChannelsImmersiveCards(
     val nowSec: () -> Long,
     val keyline: Dp,
     val programmePicture: Boolean,
+    /** Whether each card's channel is named below it. */
+    val channelNames: Boolean,
     val focusRequesters: Map<ChannelId, FocusRequester>,
     val navigationFocus: FocusRequester?,
     val headerFocus: FocusRequester?,
@@ -421,6 +423,7 @@ private fun ChannelsCardRow(
                     onLongClick = { if (current) cards.onOpenContextMenu(channelId) },
                     programmeLoading = frame.guideLoading,
                     programmePicture = cards.programmePicture,
+                    channelName = cards.channelNames,
                     modifier = Modifier
                         .then(if (requester != null) Modifier.focusRequester(requester) else Modifier)
                         .tabFocus()
@@ -448,8 +451,10 @@ private fun ChannelsCardRow(
 /**
  * A card of the immersive row and the grid, the details page's standard card: the current programme inside
  * its picture, always, as a browse card names what it shows. With [programmePicture] the channel's
- * logo sits in the picture's corner and its name goes below; without a picture the logo stands on its ambient colour above the
- * programme, and without [programmePicture] that logo names the channel, so nothing goes below. While the guide is [programmeLoading], a missing
+ * logo sits in the picture's corner; without a picture the logo stands on its ambient colour above
+ * the programme. With [channelName] the channel's number and name go below, and the playing mark
+ * with them; without, the mark ends the programme line or sits in the picture's other bottom corner.
+ * The grid names picture cards only. While the guide is [programmeLoading], a missing
  * programme line is a [SkeletonLine] rather than "No program information".
  */
 @Composable
@@ -464,6 +469,7 @@ internal fun ChannelsRowCard(
     programmeLoading: Boolean,
     programmePicture: Boolean,
     modifier: Modifier,
+    channelName: Boolean = programmePicture,
     width: Dp = ImmersiveCardWidth,
     tagPrefix: String = "channels-immersive",
 ) {
@@ -518,8 +524,8 @@ internal fun ChannelsRowCard(
                             else -> Text(stringResource(R.string.no_epg), textModifier.testTag("$tag-now"),
                                 maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                        // A logo card has no line below, so the playing mark ends its programme line.
-                        if (!programmePicture) ChannelNowIndicators(
+                        // Without the line below, the playing mark ends the programme line.
+                        if (!channelName) ChannelNowIndicators(
                             playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
                             recordingNow = false, playbackIndicator = playbackIndicator)
                     }
@@ -529,6 +535,19 @@ internal fun ChannelsRowCard(
             if (showsArt && channel.icon != null) ArtworkLogoPlate(channel.icon,
                 Modifier.align(Alignment.BottomStart).padding(ImmersiveCardEmbedInset).testTag("$tag-art-picon"),
                 scale = width / AiringCardWidth)
+            // Without the line below, a picture card's playing mark takes the picture's other bottom corner.
+            if (showsArt && !channelName && playbackIndicator != ChannelPlaybackIndicator.NONE) Box(
+                Modifier.align(Alignment.BottomEnd).padding(ImmersiveCardEmbedInset)
+                    .height(32.dp * (width / AiringCardWidth))
+                    .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
+                    .padding(horizontal = 6.dp).testTag("$tag-art-playing"),
+                contentAlignment = Alignment.Center,
+            ) {
+                CompositionLocalProvider(LocalContentColor provides TvTextColors.primary) {
+                    ChannelNowIndicators(playingNow = playbackIndicator == ChannelPlaybackIndicator.PLAYING,
+                        recordingNow = false, playbackIndicator = playbackIndicator)
+                }
+            }
             // The kit's embed corner holds the recording badge, as on the player's schedule tiles.
             if (recording) RecordingBadge(DvrEntryState.RECORDING, Modifier.align(Alignment.TopEnd).padding(ImmersiveCardEmbedInset),
                 compact = true)
@@ -541,8 +560,7 @@ internal fun ChannelsRowCard(
                 height = 3.dp)
         },
         title = {
-            // The logo card names the channel itself.
-            if (!programmePicture) return@StandardProgrammeCard
+            if (!channelName) return@StandardProgrammeCard
             // Start-aligned like the kit's content block.
             Row(Modifier.fillMaxWidth().padding(top = ImmersiveCardLabelGap), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {

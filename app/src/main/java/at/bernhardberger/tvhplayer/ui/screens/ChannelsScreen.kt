@@ -838,6 +838,7 @@ internal fun ChannelsScreenContent(
                             nowSec = nowSecProvider,
                             keyline = startPadding + TvBrowseLeadingInset,
                             programmePicture = view.showsProgramArt,
+                            channelNames = view.channelNames,
                             focusRequesters = rowFocusRequesters,
                             navigationFocus = navigationFocus,
                             headerFocus = headerEntryFocus,

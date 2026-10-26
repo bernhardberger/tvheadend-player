@@ -31,6 +31,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
         fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
+        val CHANNELS_IMMERSIVE_CHANNEL_NAMES = booleanPreferencesKey("channelsImmersiveChannelNames")
         val GUIDE_ROWS = stringPreferencesKey("guideRows")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
@@ -42,7 +43,9 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
-            channelsView = resolveChannelsView(preferences[Keys.CHANNELS_LAYOUT]) { preferences[Keys.channelsProgramArt(it)] },
+            channelsView = resolveChannelsView(
+                preferences[Keys.CHANNELS_LAYOUT], preferences[Keys.CHANNELS_IMMERSIVE_CHANNEL_NAMES],
+            ) { preferences[Keys.channelsProgramArt(it)] },
             guideView = resolveGuideView(
                 preferences[Keys.GUIDE_ROWS], preferences[Keys.GUIDE_HEADLINE], preferences[Keys.GUIDE_GENRE_COLORS],
             ),
@@ -60,6 +63,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             preferences[Keys.CHANNELS_LAYOUT] = view.layout.name
             ChannelsLayout.entries.filter { it.hasArtSwitch }
                 .forEach { preferences[Keys.channelsProgramArt(it)] = it in view.programArt }
+            preferences[Keys.CHANNELS_IMMERSIVE_CHANNEL_NAMES] = view.channelNames
         }
     }
 
