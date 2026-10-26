@@ -121,11 +121,14 @@ enum class LivePauseAvailability {
  * [pending] is a Pause pressed before the first picture: local only, the server pause waits for it.
  * [selectionPending]: the viewer's latest live channel has not started yet. Pause and Play address
  * that channel ([pending] is then its held Pause), never the target still installed.
+ * [pausedSeekRefresh]: a paused seek plays the player briefly and muted to show its new picture;
+ * the viewer's Pause holds meanwhile, whatever the player reports.
  */
 data class LivePauseState(
     val availability: LivePauseAvailability = LivePauseAvailability.NONE,
     val pending: Boolean = false,
     val selectionPending: Boolean = false,
+    val pausedSeekRefresh: Boolean = false,
 )
 
 /** One-shot: a pending pause was dropped because the channel has no timeshift. Identity is the event. */

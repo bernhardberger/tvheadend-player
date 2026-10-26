@@ -295,9 +295,13 @@ internal fun dispatchTimeshiftPlaybackAction(
 internal fun liveTransportAvailability(state: LivePauseState, installedIsRequested: Boolean): LivePauseAvailability =
     state.availability.takeIf { state.selectionPending || installedIsRequested } ?: LivePauseAvailability.NONE
 
-/** The viewer's Play/Pause intent for live: the pending channel change's, else the installed player's. */
+/**
+ * The viewer's Play/Pause intent for live: the pending channel change's, else the installed
+ * player's, which a paused seek's brief picture refresh does not change.
+ */
 internal fun livePlayWhenReady(state: LivePauseState, playerPlayWhenReady: Boolean): Boolean =
-    if (state.selectionPending) !state.pending else playerPlayWhenReady && !state.pending
+    if (state.selectionPending) !state.pending
+    else playerPlayWhenReady && !state.pending && !state.pausedSeekRefresh
 
 internal suspend fun stopPlaybackAndClose(
     stopPlayback: suspend () -> Unit,
@@ -434,7 +438,7 @@ fun VideoPlayerScreen(
         currentChannelId,
         playingLiveChannelId?.let { at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(it) },
         playbackState,
-        playWhenReady,
+        playWhenReady && !livePauseState.pausedSeekRefresh,
     )
     val timelineState = rememberLiveTimelinePresentationState(player)
     var sampledTimeshiftState by remember { mutableStateOf(AppTimeshiftState()) }

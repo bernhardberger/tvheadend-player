@@ -3,6 +3,7 @@
     kotlinx.coroutines.ExperimentalCoroutinesApi::class,
     at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
     at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi::class,
 )
 
 package at.bernhardberger.tvhplayer.playback
@@ -1035,6 +1036,310 @@ class VideoCoverRuntimeTest {
         val pause = scope.async { runtime.pauseTimeshiftPlayback() }
         await { pause.isCompleted }
         assertEquals(TimeshiftCommandResult.ACCEPTED, pause.await())
+    }
+
+    @Test fun aTunneledPausedSeekWithAQueuedKeyFramePlaysSilentlyUntilAFrameRendersThenPausesAtItsVolume() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            val counters = pausedTunneledTimeshift()
+            val speeds = connection.speeds.toList()
+            val started = scheduler.currentTime
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            assertEquals(0f, player.volume)
+            assertTrue("the viewer's Pause holds", runtime.livePause.value.pausedSeekRefresh)
+            assertEquals(listOf(PausedSeekNudgePhase.START), trace.phases)
+            counters.renderedOutputBufferCount++
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertFalse(player.playWhenReady)
+            assertEquals(0.37f, player.volume)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.SHOWN), trace.phases)
+            assertTrue(scheduler.currentTime - started < PAUSED_SEEK_NUDGE_MILLIS)
+            assertEquals("the server stays paused", speeds, connection.speeds)
+        }
+    }
+
+    @Test fun aPausedSeekWithARenderedOrNoConfirmationOrWithoutTunnelingDoesNotPlay() =
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings()) {
+            pausedTunneledTimeshift()
+            var plays = 0
+            beforePlay = { plays++ }
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.FRAME_RENDERED)
+            runtime.nudgePausedSeek(confirmation = null)
+            // The SDK's own confirmation: the pause cleared it, no seek set one.
+            runtime.nudgePausedSeek()
+            settle()
+            assertEquals(0, plays)
+            settings.setTunnelingEnabled(false)
+            await { !player.trackSelectionParameters.tunnelingRequested }
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            settle()
+            assertEquals(0, plays)
+            assertFalse(player.playWhenReady)
+            assertFalse(runtime.livePause.value.pausedSeekRefresh)
+            assertEquals(emptyList<Float>(), volumeWrites)
+        }
+
+    @Test fun aPausedSeekRefreshWithoutARenderedFramePausesAgainAfterItsBudget() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            advance(PAUSED_SEEK_NUDGE_MILLIS - MOTION_POLL_MILLIS)
+            assertTrue(player.playWhenReady)
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertFalse(player.playWhenReady)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.TIMEOUT), trace.phases)
+        }
+    }
+
+    @Test fun playDuringAPausedSeekRefreshKeepsPlayingWithTheVolumeRestoredOnce() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            val speeds = connection.speeds.toList()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            val resume = scope.async { runtime.resumeTimeshift() }
+            settle()
+            // The refresh sees the newer command at its next look and ends before it runs.
+            advance(MOTION_POLL_MILLIS)
+            await { resume.isCompleted }
+            assertEquals(TimeshiftCommandResult.ACCEPTED, resume.await())
+            assertTrue(player.playWhenReady)
+            assertFalse(runtime.livePause.value.pausedSeekRefresh)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(0.37f, player.volume)
+            assertEquals(speeds + 100, connection.speeds)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
+        }
+    }
+
+    @Test fun onlyTheLatestSeeksRefreshRunsAndANewerCommandEndsIt() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            var plays = 0
+            beforePlay = { plays++ }
+            val gate = CompletableDeferred<Unit>()
+            var held = 0
+            beforeSpeed = { held++; gate.await() }
+            // Server commands stand in for two rapid seeks: each queues its refresh behind it.
+            val first = scope.async { runtime.pauseTimeshift() }
+            await { held == 1 }
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            val second = scope.async { runtime.pauseTimeshift() }
+            settle()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            gate.complete(Unit)
+            await { first.isCompleted && second.isCompleted && plays == 1 }
+            settle()
+            assertEquals(1, plays)
+            assertTrue(runtime.livePause.value.pausedSeekRefresh)
+            beforeSpeed = {}
+            val third = scope.async { runtime.pauseTimeshift() }
+            settle()
+            advance(MOTION_POLL_MILLIS)
+            await { third.isCompleted }
+            assertFalse(player.playWhenReady)
+            assertFalse(runtime.livePause.value.pausedSeekRefresh)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
+        }
+    }
+
+    @Test fun anAudioFocusLossDuringAPausedSeekRefreshEndsIt() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            requireNotNull(focus.callback).invoke(AudioInterruption.TRANSIENT_LOSS)
+            settle()
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertFalse(player.playWhenReady)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
+        }
+    }
+
+    @Test fun backgroundingDuringAPausedSeekRefreshEndsItAndTheViewerStaysPaused() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            runtime.onAppBackgrounded()
+            settle()
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            settle()
+            assertFalse(player.playWhenReady)
+            assertEquals(0.37f, player.volume)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
+        }
+    }
+
+    @Test fun aChannelChangeDuringAPausedSeekRefreshEndsItWithoutPausingTheNewChannel() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            // The selection is noted at once; its install waits for the lock.
+            runtime.notePlaybackIntent().also(runtime::noteLiveSelection)
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
+            live(channel = 2)
+            settle()
+            assertTrue(player.playWhenReady)
+            assertEquals(0.37f, player.volume)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+        }
+    }
+
+    @Test fun aPausedSeekRefreshAskedForWhilePlayingDoesNothing() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            countVideoFrames()
+            requestTunneling()
+            live()
+            assertTrue(player.playWhenReady)
+            var plays = 0
+            beforePlay = { plays++ }
+            var pauses = 0
+            afterPause = { pauses++ }
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            settle()
+            assertEquals(0, plays)
+            assertEquals(0, pauses)
+            assertTrue(player.playWhenReady)
+            assertEquals(emptyList<Float>(), volumeWrites)
+            assertEquals(emptyList<PausedSeekNudgePhase>(), trace.phases)
+        }
+    }
+
+    @Test fun aPausedSeekRenderedWhileItsRefreshWaitedDoesNotPlay() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            var plays = 0
+            beforePlay = { plays++ }
+            var latest: PausedSeekConfirmation? = PausedSeekConfirmation.KEY_FRAME_QUEUED
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED, latestConfirmation = { latest })
+            // The decoder renders the new picture before the queued refresh runs.
+            latest = PausedSeekConfirmation.FRAME_RENDERED
+            settle()
+            assertEquals(0, plays)
+            assertFalse(player.playWhenReady)
+            assertEquals(emptyList<Float>(), volumeWrites)
+            assertEquals(emptyList<PausedSeekNudgePhase>(), trace.phases)
+        }
+    }
+
+    @Test fun aFrameOnFreshVideoCountersShowsThePausedSeekPicture() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            val counters = pausedTunneledTimeshift()
+            counters.renderedOutputBufferCount = 5
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            // A re-enabled video renderer counts afresh: one frame there is the new picture.
+            forcedVideoDecoderCounters = DecoderCounters().also { it.renderedOutputBufferCount = 1 }
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertFalse(player.playWhenReady)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.SHOWN), trace.phases)
+        }
+    }
+
+    @Test fun withoutVideoCountersAPausedSeekRefreshWaitsForItsBudget() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            forcedVideoDecoderCounters = null
+            advance(PAUSED_SEEK_NUDGE_MILLIS - MOTION_POLL_MILLIS)
+            assertTrue(player.playWhenReady)
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertFalse(player.playWhenReady)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.TIMEOUT), trace.phases)
+        }
+    }
+
+    @Test fun aSourceReplacedBeforeAQueuedPausedSeekRefreshDoesNotPlay() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            var plays = 0
+            beforePlay = { plays++ }
+            var latest: PausedSeekConfirmation? = PausedSeekConfirmation.KEY_FRAME_QUEUED
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED, latestConfirmation = { latest })
+            // The SDK replaces the same target's source and clears its confirmation before the refresh runs.
+            forcedMediaItem = androidx.media3.common.MediaItem.fromUri("replacement")
+            latest = null
+            settle()
+            assertEquals(0, plays)
+            assertFalse(player.playWhenReady)
+            assertFalse(runtime.livePause.value.pausedSeekRefresh)
+            assertEquals(0.37f, player.volume)
+            assertEquals(emptyList<Float>(), volumeWrites)
+            assertEquals(emptyList<PausedSeekNudgePhase>(), trace.phases)
+        }
+    }
+
+    @Test fun aSourceReplacedDuringAPausedSeekRefreshEndsItAndTheViewerStaysPaused() {
+        val trace = NudgeTrace()
+        exercise(PlaybackRuntimePolicy.fromPlayerSettings(trace = trace)) {
+            pausedTunneledTimeshift()
+            runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+            await { player.playWhenReady }
+            var pauses = 0
+            afterPause = { pauses++ }
+            forcedMediaItem = androidx.media3.common.MediaItem.fromUri("replacement")
+            advance(MOTION_POLL_MILLIS)
+            await { !runtime.livePause.value.pausedSeekRefresh }
+            assertEquals(1, pauses)
+            assertFalse(player.playWhenReady)
+            assertEquals(listOf(0f, 0.37f), volumeWrites)
+            assertEquals(listOf(PausedSeekNudgePhase.START, PausedSeekNudgePhase.CANCELLED), trace.phases)
+        }
+    }
+
+    private class NudgeTrace : PlaybackTrace {
+        val phases = mutableListOf<PausedSeekNudgePhase>()
+        override val enabled = true
+        override fun pausedSeekNudge(phase: PausedSeekNudgePhase) { phases += phase }
+    }
+
+    /** A tunnelled live target the viewer paused at a volume of their own; counts its video frames. */
+    private suspend fun BackgroundPlaybackRuntimeTest.Fixture.pausedTunneledTimeshift(): DecoderCounters {
+        val counters = countVideoFrames()
+        requestTunneling()
+        live()
+        val pause = scope.async { runtime.pauseTimeshiftPlayback() }
+        await { pause.isCompleted }
+        assertEquals(TimeshiftCommandResult.ACCEPTED, pause.await())
+        assertFalse(player.playWhenReady)
+        runtime.player.volume = 0.37f
+        volumeWrites.clear()
+        return counters
+    }
+
+    /** Advances the runtime's clock, and its delays, by [millis]. */
+    private fun BackgroundPlaybackRuntimeTest.Fixture.advance(millis: Long) {
+        scheduler.advanceTimeBy(millis)
+        scheduler.runCurrent()
     }
 
     /** Runs [action] once, as the next install sets its source on the player. */

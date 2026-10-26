@@ -75,5 +75,11 @@ interface PlaybackTrace {
     /** From now on every live zap stops the old target first, for fresh decoders. */
     fun freshDecoderPerZap() {}
 
+    /** A paused tunnelled seek plays briefly and muted to show its picture: [phase] of that play. */
+    fun pausedSeekNudge(phase: PausedSeekNudgePhase) {}
+
     object None : PlaybackTrace
 }
+
+/** [START]s, then ends once: the picture [SHOWN], the wait timed out, or a newer command [CANCELLED] it. */
+enum class PausedSeekNudgePhase { START, SHOWN, TIMEOUT, CANCELLED }

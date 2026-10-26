@@ -1026,10 +1026,14 @@ class BackgroundPlaybackRuntimeTest {
         /** Position and queued media the runtime reads, for progress the fake stream never makes. */
         var forcedPosition: (() -> Long)? = null
         var forcedBufferedAhead: Long? = null
+        /** The media item the runtime reads, for a source replacement the fake stream never makes. */
+        var forcedMediaItem: androidx.media3.common.MediaItem? = null
         /** How often the runtime read the video decoder counters. */
         var videoDecoderCounterReads = 0
         /** Runs as the runtime asks the player to play, before it plays. */
         var beforePlay: () -> Unit = {}
+        /** Every volume the runtime (or a test through it) set on the player, in order. */
+        val volumeWrites = mutableListOf<Float>()
         /** Runs after the runtime registers a player listener. */
         var onListenerAdded: () -> Unit = {}
         /** The frame metadata listener the runtime installed on the player, if any. */
@@ -1068,6 +1072,7 @@ class BackgroundPlaybackRuntimeTest {
             override fun getCurrentTracks(): androidx.media3.common.Tracks = forcedTracks ?: player.currentTracks
             override fun getCurrentPosition(): Long = forcedPosition?.invoke() ?: player.currentPosition
             override fun getTotalBufferedDuration(): Long = forcedBufferedAhead ?: player.totalBufferedDuration
+            override fun getCurrentMediaItem(): androidx.media3.common.MediaItem? = forcedMediaItem ?: player.currentMediaItem
             override fun getVideoDecoderCounters(): androidx.media3.exoplayer.DecoderCounters? {
                 videoDecoderCounterReads++
                 return forcedVideoDecoderCounters ?: player.videoDecoderCounters
@@ -1075,6 +1080,10 @@ class BackgroundPlaybackRuntimeTest {
             override fun play() {
                 beforePlay()
                 player.play()
+            }
+            override fun setVolume(volume: Float) {
+                volumeWrites += volume
+                player.volume = volume
             }
             override fun pause() {
                 player.pause()

@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -22,6 +23,7 @@ import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackObservation
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackOptions
 import at.bernhardberger.tvheadend.sdk.media3.LivePlaybackTargetResult
 import at.bernhardberger.tvheadend.sdk.media3.LiveTimeshiftState
+import at.bernhardberger.tvheadend.sdk.media3.PausedSeekConfirmation
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopOutcome
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackStopResult
@@ -201,6 +203,7 @@ class AppPlaybackRuntime(
         playStartedTarget = { audioInterruptions.playWithAudioFocusLocked() },
         resumeOwedRecovery = { resumeInterruptedLiveRecoveryLocked() },
         pendingLiveSelectionPlayWhenReady = ::pendingLiveSelectionPlayWhenReady,
+        pausedSeekRefresh = { pausedSeekNudging },
     )
     val livePause = livePauseController.livePause
     val livePauseNotice = livePauseController.livePauseNotice
@@ -311,6 +314,9 @@ class AppPlaybackRuntime(
      */
     @Volatile
     private var freshDecoderPerZap = false
+    /** A paused seek's picture refresh plays the player ([nudgePausedSeekLocked]); written under the serializer. */
+    @Volatile
+    private var pausedSeekNudging = false
     private val audioInterruptions: AudioInterruptionController = AudioInterruptionController(
         player = player,
         coordinator = coordinator,
@@ -361,7 +367,8 @@ class AppPlaybackRuntime(
             if (observation is LivePlaybackObservation.Active && observedEpoch != null) {
                 observation.keptLiveLossNotice()?.let { observedLiveLoss = ObservedLiveLoss(observedEpoch, it) }
             }
-            targetCommands.serialize(onClosed = {}) {
+            // Observations arrive several times a second: they must not end a paused seek's refresh.
+            targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
                 if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
                     withdrawDepartedTargetLocked()
                     return@serialize
@@ -1564,21 +1571,132 @@ class AppPlaybackRuntime(
             }
         }
     }
+    @OptIn(ExperimentalTvheadendApi::class)
     suspend fun seekTimeshift(target: at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentTarget) =
-        targetCommands.serialize(
+        targetCommands.serializeArrival(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
-        ) {
+        ) { arrival ->
             serverSkip({ it.startedServerSkip() }) { coordinator.seekTimeshift(target) }
+                .also { if (it.startedServerSkip()) nudgePausedSeek(arrival) }
         }
 
+    @OptIn(ExperimentalTvheadendApi::class)
     suspend fun seekTimeshift(selection: at.bernhardberger.tvheadend.sdk.media3.TimeshiftSeekSelection) =
-        targetCommands.serialize(
+        targetCommands.serializeArrival(
             onClosed = { at.bernhardberger.tvheadend.sdk.media3.TimeshiftContentSeekResult.Replaced },
-        ) {
+        ) { arrival ->
             presentation.diagnoseSeekLocked(selection) {
                 serverSkip({ it.startedServerSkip() }) { coordinator.seekTimeshift(selection) }
+            }.also { if (it.startedServerSkip()) nudgePausedSeek(arrival) }
+        }
+
+    /**
+     * A tunnelled decoder can hold the first frame of a paused seek until playback starts
+     * ([PausedSeekConfirmation.KEY_FRAME_QUEUED], or a confirmation this app does not know): the
+     * old picture would stay. A brief silent local play shows the new one while the server stays
+     * paused. It queues behind the seek, so the seek returns at once, and runs only while no
+     * command arrived after the seek's [arrival]: of rapid seeks only the last refreshes.
+     * Internal so JVM tests can stand in for a confirmation their fake stream never produces:
+     * [confirmation] as the seek returned, [latestConfirmation] as it is read later.
+     */
+    @OptIn(ExperimentalTvheadendApi::class)
+    internal fun nudgePausedSeek(
+        arrival: Long = targetCommands.arrivalCount,
+        confirmation: PausedSeekConfirmation? = coordinator.pausedSeekConfirmation.value,
+        latestConfirmation: () -> PausedSeekConfirmation? = { coordinator.pausedSeekConfirmation.value },
+    ) {
+        // Read right after the seek returns: the SDK clears it on the next command or once playing.
+        if (confirmation == null || confirmation == PausedSeekConfirmation.FRAME_RENDERED) return
+        if (!player.trackSelectionParameters.tunnelingRequested || player.playWhenReady) return
+        val epoch = activeTargetEpoch ?: return
+        val intent = playbackRequests.get()
+        val item = player.currentMediaItem
+        scope.launch {
+            targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
+                // The decoder may have rendered the new picture while the refresh waited its turn.
+                if (!pausedSeekSuperseded(arrival, intent, epoch) && player.currentMediaItem === item &&
+                    !player.playWhenReady &&
+                    latestConfirmation() != PausedSeekConfirmation.FRAME_RENDERED
+                ) {
+                    refreshPausedSeekPictureLocked(arrival, intent, epoch, item, latestConfirmation)
+                }
             }
         }
+    }
+
+    private fun pausedSeekSuperseded(arrival: Long, intent: Long, epoch: Long): Boolean =
+        !targetCommands.isOpen() || !foreground || arrival != targetCommands.arrivalCount ||
+            intent != playbackRequests.get() || epoch != activeTargetEpoch ||
+            livePlaybackObservation.value == LivePlaybackObservation.Departed ||
+            audioInterruptions.interruption != null || player.playerError != null
+
+    /**
+     * A further frame on the [baseline] counters, or any frame on counters a re-enabled video
+     * renderer started afresh (the identity [PlaybackPresentationPublisher] checks for its first
+     * frame). Without counters the refresh waits for its budget.
+     */
+    private fun pausedSeekFrameRendered(baseline: DecoderCounters?, renderedBefore: Int): Boolean {
+        val current = player.videoDecoderCounters ?: return false
+        current.ensureUpdated()
+        return if (current === baseline) current.renderedOutputBufferCount > renderedBefore
+        else current.renderedOutputBufferCount > 0
+    }
+
+    /**
+     * Plays muted until the video decoder renders a further frame, the SDK confirms the rendered
+     * picture, [PAUSED_SEEK_NUDGE_MILLIS] pass, or a newer command arrives; then pauses again
+     * (unless the target departed, so a withdrawal's replacement is never paused) and restores the
+     * volume as it was. It holds the command lock throughout, so a newer command runs only after
+     * the player is paused and audible again: no stale pause or volume reaches it.
+     */
+    @OptIn(ExperimentalTvheadendApi::class)
+    private suspend fun refreshPausedSeekPictureLocked(
+        arrival: Long,
+        intent: Long,
+        epoch: Long,
+        item: MediaItem?,
+        latestConfirmation: () -> PausedSeekConfirmation?,
+    ) {
+        val counters = player.videoDecoderCounters
+        counters?.ensureUpdated()
+        val renderedBefore = counters?.renderedOutputBufferCount ?: 0
+        // The SDK can replace the source of the same target itself (a restarted segment): that ends
+        // the refresh, and the viewer's paused target stays paused.
+        val volume = player.volume
+        val deadline = elapsedRealtime() + PAUSED_SEEK_NUDGE_MILLIS
+        // Published before the play: the viewer's paused controls must not show it.
+        pausedSeekNudging = true
+        livePauseController.publishLivePause()
+        if (policy.trace.enabled) policy.trace.pausedSeekNudge(PausedSeekNudgePhase.START)
+        var phase = PausedSeekNudgePhase.CANCELLED
+        try {
+            player.volume = 0f
+            player.play()
+            while (true) {
+                if (pausedSeekSuperseded(arrival, intent, epoch) || player.currentMediaItem !== item ||
+                    !player.playWhenReady
+                ) break
+                if (pausedSeekFrameRendered(counters, renderedBefore) ||
+                    latestConfirmation() == PausedSeekConfirmation.FRAME_RENDERED
+                ) {
+                    phase = PausedSeekNudgePhase.SHOWN
+                    break
+                }
+                if (elapsedRealtime() >= deadline) {
+                    phase = PausedSeekNudgePhase.TIMEOUT
+                    break
+                }
+                delay(MOTION_POLL_MILLIS)
+            }
+        } finally {
+            if (livePlaybackObservation.value != LivePlaybackObservation.Departed) player.pause()
+            player.volume = volume
+            // Cleared after the pause, so the paused controls never see a play in between.
+            pausedSeekNudging = false
+            livePauseController.publishLivePause()
+            if (policy.trace.enabled) policy.trace.pausedSeekNudge(phase)
+        }
+    }
 
     /**
      * Samples the presented timeshift position.
@@ -1907,7 +2025,8 @@ class AppPlaybackRuntime(
 
     private fun resumeRecoveryOnPlayerChange() {
         scope.launch {
-            targetCommands.serialize(onClosed = {}) {
+            // A paused seek's refresh changes the play intent itself: this reaction waits for its end.
+            targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
                 resumeBufferRecoveryLocked()
                 resumeInterruptedLiveRecoveryLocked()
             }

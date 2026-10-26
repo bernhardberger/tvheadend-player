@@ -133,7 +133,9 @@ internal fun ProvideWatchingProgress(runtime: AppPlaybackRuntime, content: @Comp
     val recordingSelection by runtime.recordingSelection.collectAsStateWithLifecycle()
     val playback by runtime.state.collectAsStateWithLifecycle()
     val playWhenReady by rememberPlaybackIntent(runtime.player)
-    val indicator = playbackIndicator(target, target, playback, playWhenReady)
+    val livePause by runtime.livePause.collectAsStateWithLifecycle()
+    // A paused seek's brief picture refresh plays the player; the item stays paused.
+    val indicator = playbackIndicator(target, target, playback, playWhenReady && !livePause.pausedSeekRefresh)
     val channel = (target as? AppPlaybackTarget.Live)?.channelId
     val position = remember(runtime, target) { mutableStateOf<RecordingViewerPosition?>(null) }
     val livePosition = remember(runtime, target) { mutableStateOf<LiveViewerPosition?>(null) }
