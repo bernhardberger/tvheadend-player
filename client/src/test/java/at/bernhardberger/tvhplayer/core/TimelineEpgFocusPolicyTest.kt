@@ -11,6 +11,43 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test fun verticalAndPageMovesSkipEdgeSliversButKeepFullyVisibleShortProgrammes() {
+        val readable = 40 * 60L until 170 * 60L
+        val minimum = 12 * 60L
+        val candidates = listOf(event(21, 0, 42), event(22, 42, 43), event(23, 168, 200))
+        for (anchor in listOf(40 * 60L, 169 * 60L)) {
+            for (direction in listOf(EpgFocusDirection.UP, EpgFocusDirection.DOWN)) {
+                val source = row(1, event(11, 40, 170))
+                val destination = row(2, *candidates.toTypedArray())
+                val up = direction == EpgFocusDirection.UP
+                val rows = if (up) listOf(destination, source) else listOf(source, destination)
+                val current = focus(if (up) 1 else 0, 11)
+                val expected = focus(if (up) 0 else 1, 22)
+                assertEquals(expected, moveTimelineEpgFocus(rows, current, direction, anchorSec = anchor,
+                    readableRangeSec = readable, minReadableOverlapSec = minimum).target)
+                assertEquals(expected, timelinePageFocusTarget(rows, current, expected.channelIndex, if (up) -1 else 1,
+                    anchorSec = anchor, readableRangeSec = readable, minReadableOverlapSec = minimum))
+            }
+        }
+        assertTrue(timelineEventIsReadable(event(21, 0, 52), readable, minimum))
+        assertTrue(timelineEventIsReadable(event(21, 158, 200), readable, minimum))
+        assertFalse(timelineEventIsReadable(event(21, 0, 51), readable, minimum))
+        assertFalse(timelineEventIsReadable(event(21, 159, 200), readable, minimum))
+    }
+
+    @Test fun onlySliversInEitherDirectionLeaveFocusInPlace() {
+        val readable = 40 * 60L until 170 * 60L
+        val rows = listOf(row(1, event(11, 0, 41)), row(2, event(21, 60, 100)), row(3, event(31, 169, 200)))
+        val current = focus(1, 21)
+        for (direction in listOf(EpgFocusDirection.UP, EpgFocusDirection.DOWN)) {
+            val move = moveTimelineEpgFocus(rows, current, direction, readableRangeSec = readable, minReadableOverlapSec = 720)
+            assertEquals(current, move.target)
+            assertFalse(move.focusHeader)
+            assertNull(timelinePageFocusTarget(rows, current, if (direction == EpgFocusDirection.UP) 0 else 2,
+                if (direction == EpgFocusDirection.UP) -1 else 1, readableRangeSec = readable, minReadableOverlapSec = 720))
+        }
+    }
+
     @Test fun verticalMovesClampAnchorsAndExcludeReserveOnlyProgrammes() {
         val readable = 40 * 60L until 170 * 60L
         val rows = listOf(

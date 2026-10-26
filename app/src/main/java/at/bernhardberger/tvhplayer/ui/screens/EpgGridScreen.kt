@@ -119,6 +119,7 @@ import at.bernhardberger.tvhplayer.core.resolveGuideWindowFocus
 import at.bernhardberger.tvhplayer.core.shouldWaitForGuideCoverage
 import at.bernhardberger.tvhplayer.core.timelineFrontierFocus
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
+import at.bernhardberger.tvhplayer.core.timelineEventIsReadable
 import at.bernhardberger.tvhplayer.core.timelineProgrammeAcrossGap
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -159,6 +160,8 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.GuideEdgeFade
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideFocusReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideReadableTimeRange
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideMinReadableOverlap
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideMinReadableOverlapSec
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusInsets
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
@@ -616,9 +619,13 @@ fun EpgGridScreen(
         windowStartSec, visibleWindowSec, focusTrackWidthPx,
         with(density) { focusStartInset.toPx() }, with(density) { focusEndInset.toPx() },
     )
-    fun focusWindowFor(event: EpgEventEntry): Long = if (
-        focusAnchor?.let { it.keepWindow && it.target == selectedTarget && it.target.eventId == event.id } == true
-    ) windowStartSec else guideFocusWindowStart(
+    val minReadableOverlapSec = guideMinReadableOverlapSec(
+        visibleWindowSec, focusTrackWidthPx, with(density) { GuideMinReadableOverlap.toPx() },
+    )
+    fun keepAnchoredWindowFor(event: EpgEventEntry): Boolean =
+        focusAnchor?.let { it.keepWindow && it.target == selectedTarget && it.target.eventId == event.id } == true &&
+            timelineEventIsReadable(event, readableTimeRange, minReadableOverlapSec)
+    fun focusWindowFor(event: EpgEventEntry): Long = if (keepAnchoredWindowFor(event)) windowStartSec else guideFocusWindowStart(
         event.start.epochSeconds, event.stop.epochSeconds, windowStartSec, visibleWindowSec,
         focusTrackWidthPx, with(density) { focusStartInset.toPx() }, with(density) { focusEndInset.toPx() },
         windowBounds.earliestStartSec, windowBounds.latestStartSec, nowSecProvider(),
@@ -1165,6 +1172,7 @@ fun EpgGridScreen(
         windowStartSec,
         visibleWindowSec,
         focusTrackWidthPx,
+        minReadableOverlapSec,
         earlierContent,
         laterContent,
         channels,
@@ -1334,6 +1342,7 @@ fun EpgGridScreen(
                 searchChannelIds = request.coverageRequest.generations.keys,
                 anchorSec = request.anchorSec,
                 readableRangeSec = readableTimeRange,
+                minReadableOverlapSec = minReadableOverlapSec,
             )
         }
         val through = KotlinInstant.fromEpochSeconds(request.throughSec)
@@ -1458,6 +1467,7 @@ fun EpgGridScreen(
             searchChannelIds = targetPageIds,
             anchorSec = anchorSec,
             readableRangeSec = readableTimeRange,
+            minReadableOverlapSec = minReadableOverlapSec,
         )
         if (target == null) return
         selectAnchored(target, anchorSec)
@@ -1586,6 +1596,7 @@ fun EpgGridScreen(
             visibleChannelRange = visibleRange,
             anchorSec = anchorSec,
             readableRangeSec = readableTimeRange,
+            minReadableOverlapSec = minReadableOverlapSec,
         )
         when {
             move.focusHeader -> {
@@ -1972,7 +1983,11 @@ fun EpgGridScreen(
                         },
                         { channelId -> coverageByChannel[channelId] },
                         earlierContent, laterContent, view.rows, genre, view.genreColors,
-                        clipSelectedToViewport = { focusAnchor?.let { it.keepWindow && it.target == selectedTarget } == true },
+                        clipSelectedToViewport = {
+                            selectedTarget?.let { target ->
+                                focusRows.getOrNull(target.channelIndex)?.events?.firstOrNull { it.id == target.eventId }
+                            }?.let(::keepAnchoredWindowFor) == true
+                        },
                     )
                 },
                 modifier = Modifier.weight(1f).fillMaxWidth(),

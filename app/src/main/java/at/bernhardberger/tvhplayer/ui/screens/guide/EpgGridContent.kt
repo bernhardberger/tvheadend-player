@@ -382,7 +382,9 @@ internal fun TimelineChannelRow(
                 val fullStart = maxWidth * span.startFraction
                 val fullEnd = maxWidth * span.endFraction
                 val readableWidth = (maxWidth - focusStartInset - focusEndInset).coerceAtLeast(0.dp)
-                val clipFocus = isFocusTarget &&
+                // A changed inset can hide the old fragment before the focus effect repositions
+                // its window. Keep a nonzero cell during that handoff instead of clipping it away.
+                val clipFocus = isFocusTarget && fullEnd > focusStartInset && fullStart < maxWidth - focusEndInset &&
                     (clipSelectedToViewport || fullEnd - fullStart > readableWidth || event.id == onAirId)
                 // Vertical navigation keeps the time window, even for a short off-air programme
                 // crossing an edge. Its focused fragment stays clear of both reserves.

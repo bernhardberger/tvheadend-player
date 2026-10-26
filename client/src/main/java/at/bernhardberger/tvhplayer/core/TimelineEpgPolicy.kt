@@ -275,6 +275,7 @@ fun moveTimelineEpgFocus(
     visibleChannelRange: IntRange = rows.indices,
     anchorSec: Long? = null,
     readableRangeSec: LongRange? = null,
+    minReadableOverlapSec: Long = 1,
 ): TimelineEpgFocusMove {
     val row = rows.getOrNull(current.channelIndex)
         ?: return TimelineEpgFocusMove(current)
@@ -295,12 +296,14 @@ fun moveTimelineEpgFocus(
     val step = if (direction == EpgFocusDirection.UP) -1 else 1
     val channelIndex = generateSequence(current.channelIndex + step) { it + step }
         .takeWhile { it in rows.indices }
-        .firstOrNull { timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec) != null }
+        .firstOrNull { timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds,
+            readableRangeSec, minReadableOverlapSec) != null }
     if (channelIndex == null && direction == EpgFocusDirection.UP) {
-        return TimelineEpgFocusMove(current, focusHeader = true)
+        return TimelineEpgFocusMove(current, focusHeader = rows.take(current.channelIndex).all { it.events.isEmpty() })
     }
     channelIndex ?: return TimelineEpgFocusMove(current)
-    val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec)
+    val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds,
+        readableRangeSec, minReadableOverlapSec)
         ?: return TimelineEpgFocusMove(current)
 
     return TimelineEpgFocusMove(
@@ -363,6 +366,7 @@ fun timelinePageFocusTarget(
     searchChannelIds: Set<ChannelId>? = null,
     anchorSec: Long? = null,
     readableRangeSec: LongRange? = null,
+    minReadableOverlapSec: Long = 1,
 ): EpgFocusTarget? {
     val currentEvent = rows.getOrNull(current.channelIndex)
         ?.events
@@ -373,21 +377,39 @@ fun timelinePageFocusTarget(
     val targetIndex = generateSequence(startIndex) { it + step }
         .takeWhile { it in rows.indices }
         .firstOrNull {
-            timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec) != null &&
+            timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds,
+                readableRangeSec, minReadableOverlapSec) != null &&
                 (searchChannelIds == null || rows[it].channelId in searchChannelIds)
         }
         ?: return null
-    val targetEvent = timelineEventAt(rows[targetIndex].events, anchorSec ?: currentEvent.start.epochSeconds, readableRangeSec)
+    val targetEvent = timelineEventAt(rows[targetIndex].events, anchorSec ?: currentEvent.start.epochSeconds,
+        readableRangeSec, minReadableOverlapSec)
         ?: return null
     return EpgFocusTarget(targetIndex, targetEvent.id)
 }
 
-/** The programme on air at [anchorSec]; across an EPG gap the nearest one, the later on a tie. */
-fun timelineEventAt(events: List<EpgEventEntry>, anchorSec: Long, readableRangeSec: LongRange? = null): EpgEventEntry? {
+/** Fully visible short programmes qualify; edge fragments must meet the readable overlap minimum. */
+fun timelineEventIsReadable(event: EpgEventEntry, readableRangeSec: LongRange, minReadableOverlapSec: Long): Boolean {
+    if (readableRangeSec.isEmpty()) return false
+    val start = event.start.epochSeconds
+    val end = event.stop.epochSeconds
+    if (end <= start) return false
+    val readableEnd = readableRangeSec.last + 1
+    val overlap = minOf(end, readableEnd) - maxOf(start, readableRangeSec.first)
+    return overlap > 0 && ((start >= readableRangeSec.first && end <= readableEnd) || overlap >= minReadableOverlapSec)
+}
+
+/** The qualifying programme on air at [anchorSec]; across a gap the nearest one, the later on a tie. */
+fun timelineEventAt(
+    events: List<EpgEventEntry>,
+    anchorSec: Long,
+    readableRangeSec: LongRange? = null,
+    minReadableOverlapSec: Long = 1,
+): EpgEventEntry? {
     if (readableRangeSec?.isEmpty() == true) return null
     val anchor = readableRangeSec?.let { anchorSec.coerceIn(it) } ?: anchorSec
     return events.asSequence().filter {
-        readableRangeSec == null || (it.stop.epochSeconds > readableRangeSec.first && it.start.epochSeconds <= readableRangeSec.last)
+        readableRangeSec == null || timelineEventIsReadable(it, readableRangeSec, minReadableOverlapSec)
     }.minWithOrNull(
         compareBy<EpgEventEntry>(
             { maxOf(it.start.epochSeconds - anchor, anchor - it.stop.epochSeconds + 1, 0L) },

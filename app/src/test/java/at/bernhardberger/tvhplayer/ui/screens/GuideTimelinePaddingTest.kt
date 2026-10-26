@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusInsets
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideReadableTimeRange
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideMinReadableOverlapSec
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideFocusWindowStart
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideInnerContinuation
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTerminalViewportReserve
@@ -15,6 +16,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class GuideTimelinePaddingTest {
+    @Test fun minimumReadableOverlapUsesTheTracksSecondsPerPixelAndRoundsUp() {
+        assertEquals(515L, guideMinReadableOverlapSec(10800, 1007f, 48f))
+        assertEquals(515L, guideMinReadableOverlapSec(10800, 2014f, 96f))
+        assertEquals(720L, guideMinReadableOverlapSec(10800, 720f, 48f))
+        assertEquals(1L, guideMinReadableOverlapSec(10800, 0f, 48f))
+    }
+
     @Test fun readableSecondsRoundInsideBothPhysicalInsets() {
         assertEquals(1601L..11713L, guideReadableTimeRange(1000, 10800, 1007f, 56f, 8f))
         assertEquals(1086L..11198L, guideReadableTimeRange(1000, 10800, 1007f, 8f, 56f))

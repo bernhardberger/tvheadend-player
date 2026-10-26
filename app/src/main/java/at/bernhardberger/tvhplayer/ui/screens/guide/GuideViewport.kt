@@ -60,6 +60,12 @@ internal fun guideVisibleWindowSec(trackWidthPx: Float, timeLabelWidthPx: Int, d
 /** How much of the programme on air must be readable for it to keep the window around now. */
 private const val GuideOnAirReadableSec = 1800L
 
+internal val GuideMinReadableOverlap = 48.dp
+
+/** Round up so a qualifying edge fragment always spans at least the requested pixels. */
+internal fun guideMinReadableOverlapSec(windowDurationSec: Long, trackWidthPx: Float, overlapPx: Float): Long =
+    if (trackWidthPx <= 0f) 1L else ceil(overlapPx * (windowDurationSec.toDouble() / trackWidthPx)).toLong().coerceAtLeast(1L)
+
 /** Whole seconds clear of the physical edge insets, shared by focus selection and scrolling. */
 internal fun guideReadableTimeRange(
     windowStartSec: Long,

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
@@ -81,6 +82,7 @@ import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -1186,22 +1188,123 @@ class GuideVisualLayoutTest {
         assertEquals(bounds("epg-time-ruler").right - 8f, focus.right, 1f)
     }
 
+    @Test fun verticalMoveSkipsLeftSliverForAShortFullyVisibleNeighbour() {
+        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+                Instant.fromEpochSeconds(hour + end * 60), title = name)
+        show(history = false, events = listOf(
+            programme(110, 1, -60, 30, "Current programme"),
+            programme(210, 2, -60, -14, "Left sliver"),
+            programme(211, 2, -14, -12, "Short visible neighbour"),
+        ))
+        key(Key.DirectionDown)
+        focused("Current programme")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Short visible neighbour")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        val cell = compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot
+        assertTrue("Short fully visible cells qualify below 48dp", cell.width in 1f..47f)
+        assertReadableFocus()
+        capture("guide-left-sliver-skipped", 1f, LayoutDirection.Ltr).recycle()
+    }
+
+    @Test fun verticalMoveSkipsRightSliverForTheFullyVisibleNeighbour() {
+        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+                Instant.fromEpochSeconds(hour + end * 60), title = name)
+        show(events = listOf(
+            programme(110, 1, 0, 60, "Current programme"),
+            programme(111, 1, 146, 147, "Short right anchor"),
+            programme(210, 2, 60, 146, "Visible neighbour"),
+            programme(211, 2, 146, 240, "Right sliver"),
+        ))
+        key(Key.DirectionDown)
+        focused("Current programme")
+        key(Key.DirectionRight)
+        focused("Short right anchor")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Visible neighbour")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertReadableFocus()
+        capture("guide-right-sliver-skipped", 1f, LayoutDirection.Ltr).recycle()
+        key(Key.DirectionUp)
+        focused("Short right anchor")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+    }
+
+    @Test fun earlierContentRepositionsAKeptTargetHiddenByTheNewFade() {
+        val events = listOf(
+            EpgEvent.create(EventId(110), ChannelId(1), Instant.fromEpochSeconds(hour),
+                Instant.fromEpochSeconds(hour + 3600), title = "Current programme"),
+            EpgEvent.create(EventId(210), ChannelId(2), Instant.fromEpochSeconds(hour - 26 * 60),
+                Instant.fromEpochSeconds(hour - 20 * 60), title = "Short edge programme"),
+        )
+        show(history = false, events = events)
+        key(Key.DirectionDown)
+        focused("Current programme")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Short edge programme")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertTrue(compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.width > 0f)
+        val snapshot = checkNotNull(session.observation.value.epgSnapshotForDisplay)
+        val history = EpgEvent.create(EventId(109), ChannelId(1), Instant.fromEpochSeconds(hour - 3600),
+            Instant.fromEpochSeconds(hour - 1800), title = "New earlier history")
+        publishEvents(events, EpgSnapshot.create(events = events, historicalEvents = listOf(history), coverages = snapshot.coverages), true)
+        compose.waitUntil(10_000) { position.position.value?.windowStartSec != window }
+        focused("Short edge programme")
+        assertReadableFocus()
+        assertTrue(compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot.width > 0f)
+        capture("guide-inset-change-readable", 1f, LayoutDirection.Ltr).recycle()
+    }
+
+    @Test fun pageDownAndUpKeepTheTimeWindowForEdgeCrossingProgrammes() {
+        show(events = (1L..12L).flatMap { channel ->
+            if (channel == 1L) listOf(
+                EpgEvent.create(EventId(110), ChannelId(1), Instant.fromEpochSeconds(hour),
+                    Instant.fromEpochSeconds(hour + 3600), title = "Current programme"),
+                EpgEvent.create(EventId(111), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
+                    Instant.fromEpochSeconds(hour + 7200), title = "Future anchor"),
+            ) else listOf(EpgEvent.create(EventId(channel * 100 + 10), ChannelId(channel),
+                Instant.fromEpochSeconds(hour + 1800), Instant.fromEpochSeconds(hour + 9600), title = "Crossing edge $channel"))
+        })
+        key(Key.DirectionDown)
+        focused("Current programme")
+        key(Key.DirectionRight)
+        focused("Future anchor")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.ChannelDown) // The remote's channel keys page the Guide rows.
+        compose.waitUntil(10_000) { position.position.value?.channelId != ChannelId(1) }
+        focused("Crossing edge ${checkNotNull(position.position.value).channelId.value}")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertReadableFocus()
+        key(Key.ChannelUp)
+        focused("Future anchor")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+    }
+
     @Test fun downDuringWindowIndexPreparationIsConsumedWithoutMoving() {
-        show()
+        val release = java.util.concurrent.CountDownLatch(1)
+        val held = java.util.concurrent.CountDownLatch(1)
+        val holdPreparation = mutableStateOf(false)
+        show(preparationBlocker = {
+            if (holdPreparation.value) {
+                // Use the same production preparation lane without depending on its private field.
+                rememberPreparedBrowseData(authority = Unit, input = Unit) {
+                    held.countDown()
+                    check(release.await(30, java.util.concurrent.TimeUnit.SECONDS))
+                }
+            }
+        })
         key(Key.DirectionDown)
         focused(title(1, 0))
         key(Key.DirectionRight)
         focused(title(1, 1))
-        val release = java.util.concurrent.CountDownLatch(1)
-        val held = java.util.concurrent.CountDownLatch(1)
-        val dispatcher = Class.forName("at.bernhardberger.tvhplayer.ui.components.BrowsePreparationKt")
-            .getDeclaredField("preparationDispatcher").apply { isAccessible = true }
-            .get(null) as kotlinx.coroutines.CoroutineDispatcher
         try {
-            dispatcher.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
-                held.countDown()
-                check(release.await(30, java.util.concurrent.TimeUnit.SECONDS))
-            }
+            compose.runOnIdle { holdPreparation.value = true }
+            compose.waitForIdle()
             assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
             key(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
             val before = position.position.value
@@ -2644,7 +2747,8 @@ class GuideVisualLayoutTest {
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
         initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
         playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
-        lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null) {
+        lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null,
+        preparationBlocker: @Composable () -> Unit = {}) {
         val channels = (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
@@ -2742,6 +2846,7 @@ class GuideVisualLayoutTest {
             single<TvheadendSession> { session }
         }
         compose.setContent {
+            preparationBlocker()
             KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
             CompositionLocalProvider(LocalDensity provides Density(1f, scale), LocalLayoutDirection provides direction) {
                 TVHeadendPlayerTheme {
