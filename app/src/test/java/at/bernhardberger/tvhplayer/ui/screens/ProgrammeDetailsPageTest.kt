@@ -649,6 +649,35 @@ class ProgrammeDetailsPageTest {
         assertStill(Key.DirectionLeft, "details-card-4")
     }
 
+    // A section change while the page still moves to the last one takes over: one move from where
+    // the page is, ending when its own motion does.
+    private fun pressDuringTheMove(first: Key, second: Key): List<Float> {
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(first) }
+        compose.mainClock.advanceTimeBy(96)
+        compose.onRoot().performKeyInput { pressKey(second) }
+        val values = (1..(RowChangeMs + 200) / 16).map { compose.mainClock.advanceTimeByFrame(); pageScrollValue() }
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        Assert.assertTrue("still within $RowChangeMs ms of the second key: $values",
+            values.drop(RowChangeMs / 16).all { it == values.last() })
+        return values
+    }
+    @Test fun aSectionChangeDuringTheMoveTakesItOver() {
+        show(cast = true)
+        pressDuringTheMove(Key.DirectionDown, Key.DirectionDown)
+        compose.onNodeWithTag("details-facts-panel").assertIsFocused()
+        Assert.assertEquals(160f, factsHeadingTop(), .5f)
+    }
+    @Test fun goingBackDuringTheMoveReturnsToTheAirings() {
+        show(cast = true)
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        pressDuringTheMove(Key.DirectionDown, Key.DirectionUp)
+        compose.onNodeWithTag("details-card-2").assertIsFocused()
+        Assert.assertEquals(160f, airingsHeadingTop(), .5f)
+    }
+
     @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
     fun airingsToFactsScrollCaptures() {
         show(cast = true)

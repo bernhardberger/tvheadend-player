@@ -218,8 +218,9 @@ internal fun ProgrammeDetailsPage(
     val factsEmphasis = animateFloatAsState(if (focusedSection == DetailsSection.FACTS) 1f else 0f, RowChangeMotion, label = "details-facts")
     // Focus search moves between the sections. The focused item's section comes to the heading
     // keyline, the hero to the page's top, in one calm motion as the airings row's text shrinks or
-    // grows (the hero stands for its About panel too). The facts aim past the text the airings row
-    // is still going to lose, so their heading reaches the keyline without passing it.
+    // grows (the hero stands for its About panel too). Once input focus has left the airings row, the
+    // facts aim past the text the row is still going to lose, so their heading reaches the keyline
+    // without passing it; while the row keeps focus, its text stays.
     val pageSpec = rememberSectionScrollSpec(pageScroll,
         if (returnToCard in ids) DetailsSection.AIRINGS else DetailsSection.ACTIONS, RowChangeMotion,
         sectionAt = { top ->
@@ -228,11 +229,11 @@ internal fun ProgrammeDetailsPage(
                 top < factsTop -> DetailsSection.AIRINGS
                 else -> DetailsSection.FACTS
             }
-        }) {
-        when (it) {
+        }) { target, focused ->
+        when (target) {
             DetailsSection.ACTIONS, DetailsSection.ABOUT -> 0
             DetailsSection.AIRINGS -> heroHeight - headingKeyline
-            DetailsSection.FACTS -> factsTop - airingsText.intValue - headingKeyline
+            DetailsSection.FACTS -> factsTop - (if (focused == DetailsSection.AIRINGS) 0 else airingsText.intValue) - headingKeyline
         }
     }
     val readingTransition = updateTransition(reading, label = "details-reading")
@@ -347,7 +348,8 @@ internal fun ProgrammeDetailsPage(
                     DetailsFirstScreen(screen, ids.isNotEmpty() || importantFacts.isNotEmpty(),
                         if (ids.isNotEmpty()) stringResource(R.string.details_other_airings, title)
                         else stringResource(R.string.details_important_information),
-                        Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }) {
+                        Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }
+                            .scrollSection(pageSpec, DetailsSection.ACTIONS)) {
                         DetailsInformation(event, recording, recordingAdmission, channel, nowSec, besideLogo = glowChannel != null) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
@@ -377,7 +379,8 @@ internal fun ProgrammeDetailsPage(
                     }
                     if (ids.isNotEmpty()) DetailsAirings(related, title, event?.let { detailsSubtitle(it, resources) } ?: recording?.subtitle,
                         nowSec, channelOf, listState, cardFocus, lastCard, section == DetailsSection.AIRINGS, { airingsEmphasis.value },
-                         Modifier.onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS },
+                         Modifier.onFocusChanged { if (it.hasFocus) section = DetailsSection.AIRINGS }
+                             .scrollSection(pageSpec, DetailsSection.AIRINGS),
                         onFocused = { lastCard = it }, onTextHeight = { airingsText.intValue = it },
                         onClick = { if (backEnabled) onRelated(it) },
                         onOpenContextMenu = onRelatedContextMenu?.let { open -> { if (backEnabled) open(it) } },
@@ -385,6 +388,7 @@ internal fun ProgrammeDetailsPage(
                      if (importantFacts.isNotEmpty()) Column(Modifier.fillMaxWidth()
                          .onPlaced { factsTop = it.positionInParent().y.roundToInt() }
                          .padding(start = DetailsKeyline, end = DetailsKeyline, bottom = DetailsSafeEdge)
+                         .scrollSection(pageSpec, DetailsSection.FACTS)
                          .focusRequester(factsFocus).onFocusChanged {
                              if (it.isFocused && section != DetailsSection.FACTS) {
                                  // Entered again, the panel reads from its first facts.
@@ -404,12 +408,15 @@ internal fun ProgrammeDetailsPage(
                               { factsEmphasis.value }, focusOverflow = (-2).dp,
                               bottomSpace = DetailsHeadingContentGap - 9.dp,
                               modifier = Modifier.onSizeChanged { factsHeadingHeight = it.height })
+                           // The facts scroll by their own spec, not the page's.
+                           CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
                            Box(Modifier.heightIn(max = with(density) {
                                (viewport - headingKeyline - factsHeadingHeight).coerceAtLeast(1).toDp() - DetailsSafeEdge
                            }.coerceAtLeast(1.dp)).verticalScroll(factsScroll)
                                .rowContentEmphasis { factsEmphasis.value }) {
                               DetailsAboutFacts(importantFacts, credits.map { it.first }.toSet())
                           }
+                           }
                      } else if (ids.isEmpty()) Spacer(Modifier.height(DetailsSafeEdge))
                      // Room after the last section, so that it reaches the same keyline as the others.
                      if (ids.isNotEmpty() || importantFacts.isNotEmpty())
