@@ -35,6 +35,7 @@ import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertContentDescriptionEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -60,6 +61,7 @@ import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 import java.util.Locale
 import kotlin.time.Instant
 import org.junit.Assert.assertEquals
@@ -70,6 +72,11 @@ import org.junit.Test
 
 @OptIn(ExperimentalTestApi::class)
 class PlayerTimelineTruthfulnessTest {
+    private companion object {
+        /** The live edge's wall clock for the step previews; their target clocks are offsets from it. */
+        const val STEP_NOW_SEC = 1_700_000_000L
+    }
+
     @get:Rule val images = ImageLoaderRule()
     @get:Rule
     val composeRule = createAndroidComposeRule<ComponentActivity>()
@@ -364,7 +371,7 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.runOnIdle { positionMs = -6_000L }
 
         composeRule.onNodeWithTag("player-distance", useUnmergedTree = true)
-            .assert(androidx.compose.ui.test.hasText("−0:06", substring = true)).assertIsDisplayed()
+            .assert(androidx.compose.ui.test.hasText("0:06 behind live")).assertIsDisplayed()
         composeRule.onNodeWithTag("player-go-live").assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar")
             .assertContentDescriptionEquals(
@@ -395,6 +402,7 @@ class PlayerTimelineTruthfulnessTest {
                                 deltaMs = -30_000L,
                                 clamped = false,
                             ),
+                            nowSec = STEP_NOW_SEC,
                             modifier = Modifier.align(Alignment.BottomCenter),
                         )
                     }
@@ -414,8 +422,11 @@ class PlayerTimelineTruthfulnessTest {
         assertTrue(preview.bottom <= viewport.bottom)
         composeRule.onNodeWithTag("timeshift-preview-target", useUnmergedTree = true)
             .assertIsDisplayed()
+        // The main value is the step's offset; the target follows it small, as a clock time.
         composeRule.onNodeWithText("−0:30", useUnmergedTree = true).assertIsDisplayed()
-        composeRule.onNodeWithText("−2:00", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
+            .assertTextEquals(formatClock(STEP_NOW_SEC - 120L))
+            .assertIsDisplayed()
         composeRule.onNodeWithText("15:00 available", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag(
             "timeshift-preview-rewindable-boundary",
@@ -425,8 +436,8 @@ class PlayerTimelineTruthfulnessTest {
             .assertDoesNotExist()
         composeRule.onNodeWithTag("timeshift-seek-preview")
             .assertContentDescriptionEquals(
-                "30 seconds back, target 2:00 behind live. " +
-                    "Buffer starts 15:00 behind live."
+                "30 seconds back, target ${formatClock(STEP_NOW_SEC - 120L)}. " +
+                    "2:00 behind live. Buffer starts 15:00 behind live."
             )
     }
 
@@ -447,11 +458,18 @@ class PlayerTimelineTruthfulnessTest {
                         deltaMs = -100_000L,
                         clamped = false,
                     ),
+                    nowSec = STEP_NOW_SEC,
                 )
             }
         }
 
-        composeRule.onNodeWithText("−33:20", useUnmergedTree = true).assertIsDisplayed()
+        // The offset is the step's own −1:40; the target is 33:20 behind the live edge's
+        // clock, whatever programme the clock falls in.
+        composeRule.onNodeWithText("−1:40", useUnmergedTree = true).assertIsDisplayed()
+        composeRule.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
+            .assertTextEquals(formatClock(STEP_NOW_SEC - 2_000L))
+            .assertIsDisplayed()
+        composeRule.onNodeWithText("−33:20", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithText("Buffer: 1:00:00 ago", useUnmergedTree = true)
             .assertDoesNotExist()
         composeRule.onNodeWithText("0:00", useUnmergedTree = true).assertDoesNotExist()
@@ -605,11 +623,11 @@ class PlayerTimelineTruthfulnessTest {
         composeRule.onNodeWithTag("player-end-clock", useUnmergedTree = true).assertDoesNotExist()
         composeRule.onNodeWithTag("player-seekbar").assertDoesNotExist()
         assertEquals(0, progressSemanticsCount())
-        // The passive timeline takes no focus: Up from the action row reaches the card.
+        // The passive timeline takes no focus: Up from the action row has nowhere to go.
         composeRule.onNodeWithTag("player-settings").requestFocus().performKeyInput {
             pressKey(androidx.compose.ui.input.key.Key.DirectionUp)
         }
-        composeRule.onNodeWithTag("player-identity-card").assertIsFocused()
+        composeRule.onNodeWithTag("player-settings").assertIsFocused()
 
         composeRule.runOnIdle {
             growing = false
