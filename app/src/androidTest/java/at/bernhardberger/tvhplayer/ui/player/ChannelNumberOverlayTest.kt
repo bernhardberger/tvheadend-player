@@ -3,9 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import android.graphics.Bitmap
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.assertIsDisplayed
@@ -13,7 +11,6 @@ import androidx.compose.ui.test.captureToImage
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import java.io.File
@@ -34,8 +31,7 @@ class ChannelNumberOverlayTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize()) {
                     DebugVideoBackdrop(true, Modifier.fillMaxSize())
-                    ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending,
-                        Modifier.align(Alignment.TopStart).padding(start = 56.dp, top = 48.dp))
+                    PlayerTopIdentitySlot { ChannelNumberOverlay(number.value, ChannelNumberTarget.Pending) }
                 }
             }
         }

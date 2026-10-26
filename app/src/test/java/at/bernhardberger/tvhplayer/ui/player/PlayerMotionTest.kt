@@ -40,6 +40,8 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isFocused
 import androidx.compose.ui.test.SemanticsNodeInteraction
@@ -61,6 +63,11 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.EventId
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
+import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
+import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
+import at.bernhardberger.tvhplayer.core.playerChromeLayer
+import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
@@ -509,6 +516,65 @@ class PlayerMotionTest {
         compose.onNodeWithText("Seven").assertDoesNotExist()
     }
 
+    @Test fun numberEntryKeepsTheChromeItInterruptedStillAndNeverRevealsHiddenChrome() {
+        var context by mutableStateOf(PlayerForegroundContext(
+            confirmationVisible = false, infoVisible = false, optionsPage = null, numberEntryVisible = false,
+            channelDrawerVisible = false, recoveryVisible = false, terminalErrorVisible = false,
+            seekPreviewPhase = PlayerSeekPreviewPhase.NONE, controlsVisible = false, statsEnabled = false,
+        ))
+        var bannerVisible by mutableStateOf(false)
+        var mode = PlayerChromeMode.HIDDEN
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize()) {
+                    // The live screen's derivation of the chrome mode and the entry's digits.
+                    val chromeLayer = playerChromeLayer(context)
+                    mode = playerChromeMode(
+                        controls = chromeLayer == PlayerForegroundLayer.CONTROLS,
+                        banner = bannerVisible && chromeLayer == PlayerForegroundLayer.NONE,
+                        stepPreview = false,
+                    )
+                    val number = if (playerForegroundLayer(context) == PlayerForegroundLayer.NUMBER_ENTRY) "1" else ""
+                    liveControls(optionsOpen = number.isNotEmpty(), panelOpen = false, mode = mode,
+                        numberEntryShown = number.isNotEmpty())
+                    PlayerTopIdentitySlot { ChannelNumberOverlay(number, ChannelNumberTarget.Pending, Modifier.testTag("number")) }
+                }
+            }
+        }
+        for ((expected, shown) in listOf(
+            PlayerChromeMode.CONTROLS to { context = context.copy(controlsVisible = true); bannerVisible = false },
+            PlayerChromeMode.BANNER to { context = context.copy(controlsVisible = false); bannerVisible = true },
+            PlayerChromeMode.HIDDEN to { context = context.copy(controlsVisible = false); bannerVisible = false },
+        )) {
+            compose.mainClock.autoAdvance = true
+            change(shown)
+            compose.waitForIdle()
+            assertEquals(expected, mode)
+            val chrome = expected != PlayerChromeMode.HIDDEN
+            val header = if (chrome) headerTop() else null
+            val identity = if (chrome) compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true)
+                .fetchSemanticsNode().boundsInRoot else null
+            compose.mainClock.autoAdvance = false
+            // Typed, then cleared: Back and the digit timer both clear the entry.
+            for (typed in listOf(true, false)) {
+                change { context = context.copy(numberEntryVisible = typed) }
+                repeat(12) { frame ->
+                    compose.mainClock.advanceTimeByFrame()
+                    assertEquals("$expected typed=$typed frame $frame: the entry kept the chrome it found", expected, mode)
+                    if (chrome) {
+                        assertEquals("$expected typed=$typed frame $frame: the chrome did not travel", header!!, headerTop(), 0.5f)
+                        assertEquals("$expected typed=$typed frame $frame: the identity stayed in place", identity,
+                            compose.onNodeWithTag(PlayerTopIdentityTag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot)
+                    } else {
+                        compose.onNodeWithTag("player-header").assertDoesNotExist()
+                    }
+                }
+                assertEquals(typed, compose.onAllNodes(hasText("1") and hasAnyAncestor(hasTestTag("number")))
+                    .fetchSemanticsNodes().isNotEmpty())
+            }
+        }
+    }
+
     @Test fun theTopIdentityAndTheNumberEntryCrossInPlace() {
         var number by mutableStateOf("")
         lateinit var view: View
@@ -715,6 +781,7 @@ class PlayerMotionTest {
         nowEvent: EpgEvent? = null,
         nowSec: Long = 1_800,
         timeshiftState: AppTimeshiftState = AppTimeshiftState(),
+        numberEntryShown: Boolean = false,
     ) {
         PlayerChrome(
             mode = mode,
@@ -737,6 +804,7 @@ class PlayerMotionTest {
             },
             entry = entry,
             panelOpen = panelOpen,
+            numberEntryShown = numberEntryShown,
         )
     }
 

@@ -86,6 +86,28 @@ class PlayerTopIdentityTest {
         }
     }
 
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun atLargerTextTheEntryKeepsTheIdentitysTopEdgeAndGrowsDown() {
+        chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
+        // Android scales large text less than small, so 1.3 can leave the digits within the chip's height.
+        for (scale in listOf(1.3f, 2f)) {
+            compose.runOnIdle { fontScale = scale; shownMode = PlayerChromeMode.CONTROLS; numberEntry = "" }
+            settle()
+            val identity = bounds(PlayerTopIdentityTag)
+            for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER, PlayerChromeMode.HIDDEN)) {
+                compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("Twelve", null) }
+                settle()
+                val entry = bounds("number-entry")
+                assertEquals("$scale $mode: the entry starts where the identity does", identity.left, entry.left, 0.5f)
+                assertEquals("$scale $mode: the entry's top edge is the identity's", identity.top, entry.top, 0.5f)
+                if (scale == 2f) assertTrue("$scale $mode: the larger digits grow the entry down", entry.height > identity.height)
+                else assertTrue("$scale $mode: never shorter than the identity", entry.height >= identity.height - 0.5f)
+                compose.runOnIdle { numberEntry = "" }
+                settle()
+            }
+        }
+    }
+
     @Test fun anUnknownOrPendingEntryStandsInPlaceAndTheIdentityReturnsWhenItLeaves() {
         chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
         val identity = bounds(PlayerTopIdentityTag)
@@ -308,6 +330,7 @@ class PlayerTopIdentityTest {
     private var recentOpen by mutableStateOf(false)
     private var shownMode by mutableStateOf(PlayerChromeMode.CONTROLS)
     private var numberEntry by mutableStateOf("")
+    private var fontScale by mutableStateOf(1f)
     private var numberTarget by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
     /** The screen's number entry, drawn over the chrome in the identity's place. */
     private val numberEntrySlot: @androidx.compose.runtime.Composable () -> Unit = {
@@ -339,6 +362,10 @@ class PlayerTopIdentityTest {
         this.timeshift = timeshift
         restoreFocus = restore
         compose.setContent {
+            val density = androidx.compose.ui.platform.LocalDensity.current
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalDensity provides androidx.compose.ui.unit.Density(density.density, fontScale),
+            ) {
             TVHeadendPlayerTheme {
                 PlayerChrome(
                     mode = shownMode,
@@ -360,6 +387,7 @@ class PlayerTopIdentityTest {
                     numberEntryShown = numberEntry.isNotEmpty(),
                 )
                 extra()
+            }
             }
         }
         compose.mainClock.autoAdvance = false

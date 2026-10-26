@@ -24,6 +24,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -194,7 +196,14 @@ class PlayerChromeCaptureTest {
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
-                    Box(Modifier.fillMaxSize()) {
+                    // The screen's root, which takes focus from the controls while the entry is up.
+                    val rootFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+                    PlayerRootFocusEffect(
+                        if (entry.first.isEmpty()) at.bernhardberger.tvhplayer.core.PlayerForegroundLayer.CONTROLS
+                        else at.bernhardberger.tvhplayer.core.PlayerForegroundLayer.NUMBER_ENTRY,
+                        rootFocus,
+                    )
+                    Box(Modifier.fillMaxSize().focusRequester(rootFocus).focusable()) {
                         Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         Controls(
                             timeshift = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0, liveEdgeMs = 0, timingKnown = true),
@@ -896,7 +905,7 @@ class PlayerChromeCaptureTest {
                 stepDeltaMs = step,
                 motionKey = ChannelId(1),
             ),
-            actions = PlayerChromeActions(active = true, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null }),
+            actions = PlayerChromeActions(active = !numberEntryShown, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null }),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             onChannelZap = { _, _, _ -> },
             downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),

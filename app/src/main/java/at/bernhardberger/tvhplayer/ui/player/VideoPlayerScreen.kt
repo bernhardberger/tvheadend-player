@@ -82,6 +82,7 @@ import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
 import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerBackAction
+import at.bernhardberger.tvhplayer.core.playerChromeLayer
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
 import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
@@ -416,6 +417,8 @@ fun VideoPlayerScreen(
     // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
+    // The control focused when number entry took the keys over the controls; focus returns there.
+    var numberEntryReturnAction by remember { mutableStateOf<String?>(null) }
     val dvrMutationActions = remember(session) { DvrMutationActions(session.dvrRepository) }
     val rootFocus = remember { FocusRequester() }
 
@@ -1125,8 +1128,14 @@ fun VideoPlayerScreen(
     val showDrawer = foregroundContext.channelDrawerVisible
     val seekPreviewPhase = foregroundContext.seekPreviewPhase
     val foregroundLayer = playerForegroundLayer(foregroundContext)
+    val chromeLayer = playerChromeLayer(foregroundContext)
     // The digits shown in the top identity's place; empty while another layer covers the entry.
     val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
+    val numberEntryUp = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY
+    LaunchedEffect(numberEntryUp, layerState.chrome.controlsVisible) {
+        if (!layerState.chrome.controlsVisible) numberEntryReturnAction = null
+        else if (numberEntryUp) numberEntryReturnAction = lastChromeAction
+    }
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = layerState.chrome.controlsVisible,
@@ -1567,10 +1576,10 @@ fun VideoPlayerScreen(
             player = { keepControls ->
         PlayerChrome(
             mode = playerChromeMode(
-                controls = foregroundLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
+                controls = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
                 // A pending or dispatched step holds the Banner up after its own timer ran out.
                 banner = !channelUnavailable && (bannerSeekPreview != null ||
-                    (layerState.chrome.bannerVisible && foregroundLayer == PlayerForegroundLayer.NONE)),
+                    (layerState.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
                 stepPreview = bannerSeekPreview != null,
             ),
             content = chromeContent,
@@ -1600,13 +1609,16 @@ fun VideoPlayerScreen(
                 tuning = compactTuning,
             ),
             actions = PlayerChromeActions(
-                active = layerState.chrome.controlsVisible && layerState.optionsPage == null && !layerState.infoOpen,
+                // Under number entry the controls stay up, but the root takes the keys.
+                active = layerState.chrome.controlsVisible && layerState.optionsPage == null && !layerState.infoOpen &&
+                    !numberEntryUp,
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
                     infoReturnAction != null && !layerState.infoOpen -> infoReturnAction
                     restoreInfoFocus -> "player-info"
                     restoreOptionsFocus -> "player-settings"
+                    numberEntryReturnAction != null -> numberEntryReturnAction
                     else -> layerState.restoreChannelAction
                 },
             ),
@@ -1634,6 +1646,7 @@ fun VideoPlayerScreen(
             onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
             onFocusRestored = {
                 infoReturnAction = null
+                numberEntryReturnAction = null
                 restoreInfoFocus = false
                 restoreOptionsFocus = false
                 layerState.onChannelActionRestored()

@@ -187,7 +187,8 @@ internal fun PlayerTopIdentity(
 
 /**
  * [content] where [PlayerTopIdentity] stands, whether or not the chrome is up: the channel number
- * entry takes the identity's place this way and fades in as the identity fades out under it.
+ * entry takes the identity's place this way and fades in as the identity fades out under it. The
+ * content starts at the identity's top edge; taller content, as at larger font scales, grows down.
  */
 @Composable
 internal fun PlayerTopIdentitySlot(
@@ -197,15 +198,21 @@ internal fun PlayerTopIdentitySlot(
     Layout(
         content = {
             HeaderBandProbe()
+            // The identity's own height: its chip or its name's line, whichever is taller.
+            Box(Modifier.width(0.dp).padding(vertical = IdentityVerticalPadding).heightIn(min = ChipHeight)) {
+                Text("", style = MaterialTheme.typography.titleLarge, maxLines = 1,
+                    modifier = Modifier.width(0.dp).clearAndSetSemantics {})
+            }
             Box { content() }
         },
         modifier = modifier,
     ) { measurables, constraints ->
         val loose = constraints.copy(minWidth = 0, minHeight = 0)
         val probe = measurables[0].measure(loose)
-        val slot = measurables[1].measure(loose)
+        val identity = measurables[1].measure(loose)
+        val slot = measurables[2].measure(loose)
         layout(constraints.maxWidth, constraints.maxHeight) {
-            slot.place(identityOrigin(probe.height, slot.height))
+            slot.place(identityOrigin(probe.height, identity.height))
         }
     }
 }

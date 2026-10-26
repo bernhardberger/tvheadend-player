@@ -78,6 +78,13 @@ fun playerForegroundLayer(context: PlayerForegroundContext): PlayerForegroundLay
     else -> PlayerForegroundLayer.NONE
 }
 
+/**
+ * The layer the chrome follows. Number entry keeps the chrome it interrupted, controls or Banner, so
+ * the top identity gives way to the entry in place; it never reveals hidden chrome.
+ */
+fun playerChromeLayer(context: PlayerForegroundContext): PlayerForegroundLayer =
+    playerForegroundLayer(context.copy(numberEntryVisible = false))
+
 fun playerRootFocusRequired(foregroundLayer: PlayerForegroundLayer): Boolean =
     when (foregroundLayer) {
         PlayerForegroundLayer.NUMBER_ENTRY,

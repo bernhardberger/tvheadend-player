@@ -46,6 +46,37 @@ class PlayerBackPolicyTest {
     }
 
     @Test
+    fun numberEntryKeepsTheChromeLayerItInterrupted() {
+        val watching = PlayerForegroundContext(
+            confirmationVisible = false,
+            infoVisible = false,
+            optionsPage = null,
+            numberEntryVisible = false,
+            channelDrawerVisible = false,
+            recoveryVisible = false,
+            terminalErrorVisible = false,
+            seekPreviewPhase = PlayerSeekPreviewPhase.NONE,
+            controlsVisible = false,
+            statsEnabled = false,
+        )
+        for (before in listOf(
+            watching.copy(controlsVisible = true),
+            watching,
+            watching.copy(statsEnabled = true),
+            watching.copy(channelDrawerVisible = true, controlsVisible = true),
+            watching.copy(recoveryVisible = true, controlsVisible = true),
+        )) {
+            val typing = before.copy(numberEntryVisible = true)
+            assertEquals(PlayerForegroundLayer.NUMBER_ENTRY, playerForegroundLayer(typing))
+            assertEquals(playerForegroundLayer(before), playerChromeLayer(typing))
+            assertEquals(playerForegroundLayer(before), playerChromeLayer(before))
+        }
+        // A layer above the entry still covers the chrome.
+        val info = watching.copy(infoVisible = true, numberEntryVisible = true, controlsVisible = true)
+        assertEquals(PlayerForegroundLayer.INFO, playerChromeLayer(info))
+    }
+
+    @Test
     fun foregroundLayerFollowsTheCompleteVisualPriority() {
         val allVisible = PlayerForegroundContext(
             confirmationVisible = true,
