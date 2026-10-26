@@ -11,6 +11,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.common.Tracks
+import androidx.media3.exoplayer.DecoderCounters
 import androidx.media3.exoplayer.ExoPlayer
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
@@ -1595,12 +1596,14 @@ class AppPlaybackRuntime(
      * old picture would stay. A brief silent local play shows the new one while the server stays
      * paused. It queues behind the seek, so the seek returns at once, and runs only while no
      * command arrived after the seek's [arrival]: of rapid seeks only the last refreshes.
-     * Internal so JVM tests can stand in for a confirmation their fake stream never produces.
+     * Internal so JVM tests can stand in for a confirmation their fake stream never produces:
+     * [confirmation] as the seek returned, [latestConfirmation] as it is read later.
      */
     @OptIn(ExperimentalTvheadendApi::class)
     internal fun nudgePausedSeek(
         arrival: Long = targetCommands.arrivalCount,
         confirmation: PausedSeekConfirmation? = coordinator.pausedSeekConfirmation.value,
+        latestConfirmation: () -> PausedSeekConfirmation? = { coordinator.pausedSeekConfirmation.value },
     ) {
         // Read right after the seek returns: the SDK clears it on the next command or once playing.
         if (confirmation == null || confirmation == PausedSeekConfirmation.FRAME_RENDERED) return
@@ -1609,8 +1612,11 @@ class AppPlaybackRuntime(
         val intent = playbackRequests.get()
         scope.launch {
             targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
-                if (!pausedSeekSuperseded(arrival, intent, epoch) && !player.playWhenReady) {
-                    refreshPausedSeekPictureLocked(arrival, intent, epoch)
+                // The decoder may have rendered the new picture while the refresh waited its turn.
+                if (!pausedSeekSuperseded(arrival, intent, epoch) && !player.playWhenReady &&
+                    latestConfirmation() != PausedSeekConfirmation.FRAME_RENDERED
+                ) {
+                    refreshPausedSeekPictureLocked(arrival, intent, epoch, latestConfirmation)
                 }
             }
         }
@@ -1619,19 +1625,39 @@ class AppPlaybackRuntime(
     private fun pausedSeekSuperseded(arrival: Long, intent: Long, epoch: Long): Boolean =
         !targetCommands.isOpen() || !foreground || arrival != targetCommands.arrivalCount ||
             intent != playbackRequests.get() || epoch != activeTargetEpoch ||
+            livePlaybackObservation.value == LivePlaybackObservation.Departed ||
             audioInterruptions.interruption != null || player.playerError != null
 
     /**
+     * A further frame on the [baseline] counters, or any frame on counters a re-enabled video
+     * renderer started afresh (the identity [PlaybackPresentationPublisher] checks for its first
+     * frame). Without counters the refresh waits for its budget.
+     */
+    private fun pausedSeekFrameRendered(baseline: DecoderCounters?, renderedBefore: Int): Boolean {
+        val current = player.videoDecoderCounters ?: return false
+        current.ensureUpdated()
+        return if (current === baseline) current.renderedOutputBufferCount > renderedBefore
+        else current.renderedOutputBufferCount > 0
+    }
+
+    /**
      * Plays muted until the video decoder renders a further frame, the SDK confirms the rendered
-     * picture, [PAUSED_SEEK_NUDGE_MILLIS] pass, or a newer command arrives; then pauses again and
-     * restores the volume as it was. It holds the command lock throughout, so a newer command runs
+     * picture, [PAUSED_SEEK_NUDGE_MILLIS] pass, or a newer command arrives; then pauses again (the
+     * source it played, never a replacement) and restores the volume as it was. It holds the command lock throughout, so a newer command runs
      * only after the player is paused and audible again: no stale pause or volume reaches it.
      */
     @OptIn(ExperimentalTvheadendApi::class)
-    private suspend fun refreshPausedSeekPictureLocked(arrival: Long, intent: Long, epoch: Long) {
+    private suspend fun refreshPausedSeekPictureLocked(
+        arrival: Long,
+        intent: Long,
+        epoch: Long,
+        latestConfirmation: () -> PausedSeekConfirmation?,
+    ) {
         val counters = player.videoDecoderCounters
         counters?.ensureUpdated()
         val renderedBefore = counters?.renderedOutputBufferCount ?: 0
+        // The SDK can replace the source itself (a restarted segment): its replacement is not ours to pause.
+        val item = player.currentMediaItem
         val volume = player.volume
         val deadline = elapsedRealtime() + PAUSED_SEEK_NUDGE_MILLIS
         // Published before the play: the viewer's paused controls must not show it.
@@ -1643,10 +1669,11 @@ class AppPlaybackRuntime(
             player.volume = 0f
             player.play()
             while (true) {
-                if (pausedSeekSuperseded(arrival, intent, epoch) || !player.playWhenReady) break
-                val rendered = player.videoDecoderCounters?.also { it.ensureUpdated() }?.renderedOutputBufferCount ?: 0
-                if (rendered > renderedBefore ||
-                    coordinator.pausedSeekConfirmation.value == PausedSeekConfirmation.FRAME_RENDERED
+                if (pausedSeekSuperseded(arrival, intent, epoch) || player.currentMediaItem !== item ||
+                    !player.playWhenReady
+                ) break
+                if (pausedSeekFrameRendered(counters, renderedBefore) ||
+                    latestConfirmation() == PausedSeekConfirmation.FRAME_RENDERED
                 ) {
                     phase = PausedSeekNudgePhase.SHOWN
                     break
@@ -1658,7 +1685,7 @@ class AppPlaybackRuntime(
                 delay(MOTION_POLL_MILLIS)
             }
         } finally {
-            player.pause()
+            if (player.currentMediaItem === item) player.pause()
             player.volume = volume
             // Cleared after the pause, so the paused controls never see a play in between.
             pausedSeekNudging = false
