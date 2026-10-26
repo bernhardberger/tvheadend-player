@@ -181,10 +181,8 @@ class PlayerChromeCaptureTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun detailsButtonsGermanLargeText() = captures("de", 1.3f, detailsOnly = true)
     @Test fun numberEntry() = numberEntryCaptures("en", 1f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun numberEntryLargeText() = numberEntryCaptures("de", 1.3f)
-    @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
-    fun numberEntryFourDigitsLargeText() = numberEntryCaptures("de", 1.3f, maxDigits = 4)
+    @Test fun numberEntryLargeText() = numberEntryCaptures("en", 1.3f)
+    @Test fun numberEntryFourDigitsLargeText() = numberEntryCaptures("en", 1.3f, maxDigits = 4)
     @Test fun numberEntryOverControls() = numberEntryOverControlsCaptures("en", 1f)
 
     /** Typing over shown controls: the top identity gives way to the entry in its place. */
@@ -242,7 +240,7 @@ class PlayerChromeCaptureTest {
         capture("0-identity")
         for ((name, next) in listOf(
             "1-pending" to ("1" to ChannelNumberTarget.Pending),
-            "12-matched" to ("12" to ChannelNumberTarget.Channel("Harbor Sport HD", SPORT_LOGO)),
+            "12-matched" to ("12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", SPORT_LOGO)),
             "999-unknown" to ("999" to ChannelNumberTarget.None),
         )) {
             compose.runOnIdle { entry = next }
@@ -262,7 +260,8 @@ class PlayerChromeCaptureTest {
 
     private fun numberEntryCaptures(locale: String, fontScale: Float, maxDigits: Int = 3) {
         lateinit var view: View
-        var entry by mutableStateOf<Pair<String, ChannelNumberTarget>>("0" to ChannelNumberTarget.Pending)
+        var entry by mutableStateOf<Pair<String, ChannelNumberTarget>>("" to ChannelNumberTarget.Pending)
+        var plate by mutableStateOf(ChannelNumberPlateStyle)
         compose.mainClock.autoAdvance = false
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(2f, fontScale)) {
@@ -272,49 +271,65 @@ class PlayerChromeCaptureTest {
                         Image(brightStill.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                         // Chrome hidden: the entry alone, in the top identity's place.
                         ProvideArtworkSession(session) { PlayerTopIdentitySlot { ChannelNumberOverlay(entry.first, entry.second,
-                            Modifier.testTag("number-entry"), maxDigits = maxDigits) } }
+                            Modifier.testTag("number-entry"), maxDigits = maxDigits, plate = plate) } }
                     }
                 }
             }
         }
         var initialHeight: Int? = null
         var panelLeft: Float? = null
-        var digitsCenterX: Float? = null
+        var digitsRight: Float? = null
         var digitsTop: Float? = null
         var withLogoWidth: Int? = null
         val entries = listOf(
             "0" to ChannelNumberTarget.Pending,
-            "1" to ChannelNumberTarget.Channel("Ridge Earth HD", LOGO),
-            "01" to ChannelNumberTarget.Channel("Ridge Earth HD", LOGO),
-            "02" to ChannelNumberTarget.Channel("Ridge Earth HD", null),
-            "12" to ChannelNumberTarget.Channel("Channel without a logo", null),
-            "123" to ChannelNumberTarget.Channel("A very long international channel name HD", null),
+            "1" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", LOGO),
+            "01" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", LOGO),
+            "02" to ChannelNumberTarget.Channel("2", "Ridge Earth HD", null),
+            "12" to ChannelNumberTarget.Channel("12", "Channel without a logo", null),
+            "123" to ChannelNumberTarget.Channel("123", "A very long international channel name HD", null),
             "999" to ChannelNumberTarget.None,
         ) + if (maxDigits == 4) listOf(
-            "1234" to ChannelNumberTarget.Channel("A very long international channel name HD", LOGO),
+            "1234" to ChannelNumberTarget.Channel("1234", "A very long international channel name HD", LOGO),
         ) else emptyList()
-        for (next in entries) {
+        fun capture(name: String) {
+            val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            val directory = File("../captures/number-entry-in-place").apply { mkdirs() }
+            File(directory, "hidden-$name-$locale-font$fontScale-digits$maxDigits.png").outputStream().use {
+                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
+            }
+            bitmap.recycle()
+        }
+        // Each number is its own entry, so its plate is sized for it alone.
+        fun show(next: Pair<String, ChannelNumberTarget>) {
+            compose.runOnIdle { entry = "" to ChannelNumberTarget.Pending }
+            repeat(10) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
             compose.runOnIdle { entry = next }
             repeat(6) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        }
+        for (next in entries) {
+            show(next)
             val size = compose.onNodeWithTag("number-entry").fetchSemanticsNode().size
             val left = compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot.left
-            val digits = compose.onNodeWithText(next.first).fetchSemanticsNode().boundsInRoot
+            val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
             if (initialHeight == null) {
                 initialHeight = size.height
                 panelLeft = left
-                digitsCenterX = digits.center.x
+                digitsRight = digits.right
                 digitsTop = digits.top
             }
             assertEquals("entry keeps its height: $next", initialHeight, size.height)
             assertEquals("entry keeps its corner anchor: $next", panelLeft!!, left, 0.5f)
-            assertEquals("digits stay centred in the same slot", digitsCenterX!!, digits.center.x, 0.5f)
+            assertEquals("digits end at the same field end", digitsRight!!, digits.right, 0.5f)
             assertEquals("destination never moves the digits vertically", digitsTop!!, digits.top, 0.5f)
             assertTrue("entry stays inside the grid margin", compose.onNodeWithTag("number-entry").fetchSemanticsNode()
                 .boundsInRoot.right <= with(Density(2f)) { (960.dp - TvGridHorizontalMargin).toPx() })
-            if (next.first == "1") withLogoWidth = size.width
+            if (next.first == "01") withLogoWidth = size.width
             if (next.first == "02") {
-                assertTrue("an absent logo reserves no space", size.width < withLogoWidth!!)
-                compose.onNodeWithTag("channel-number-picon").assertDoesNotExist()
+                assertEquals("an absent logo keeps the chip's place", withLogoWidth, size.width)
+                compose.onNodeWithTag("channel-number-picon", useUnmergedTree = true).assertDoesNotExist()
+                compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true).assertTextEquals("2")
             }
             if (next.second == ChannelNumberTarget.Pending) {
                 compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
@@ -326,13 +341,18 @@ class PlayerChromeCaptureTest {
                 // The nested rows can each round their centred placement by half a pixel.
                 assertEquals("number and destination share one line", digits.center.y, name.center.y, 1f)
             }
-            val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
-            compose.runOnIdle { view.draw(Canvas(bitmap)) }
-            val directory = File("../captures/number-entry-in-place").apply { mkdirs() }
-            File(directory, "hidden-${next.first}-$locale-font$fontScale-digits$maxDigits.png").outputStream().use {
-                bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)
-            }
-            bitmap.recycle()
+            capture(next.first)
+        }
+        // The other plates swap only colours: the same entry keeps its layout on each.
+        if (maxDigits != 3) return
+        val matched = "12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", SPORT_LOGO)
+        show(matched)
+        val layout = compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot
+        for (style in ChannelNumberPlate.entries) {
+            compose.runOnIdle { plate = style }
+            show(matched)
+            assertEquals("$style: same layout", layout, compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot)
+            capture("12-plate-${style.name.lowercase()}")
         }
     }
     @Test fun englishLargeText() = captures("en", 1.3f)

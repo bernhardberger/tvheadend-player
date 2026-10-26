@@ -119,9 +119,10 @@ internal fun PlayerTopIdentity(
     onFocusWithinChanged: (Boolean) -> Unit = {},
     numberEntryShown: Boolean = false,
 ) {
-    // The same fade as the entry's, so the two cross in place.
-    val present = animateFloatAsState(if (numberEntryShown) 0f else 1f, tween(PlayerMotion.FastMs,
-        easing = if (numberEntryShown) PlayerMotion.StandardAccelerate else PlayerMotion.StandardDecelerate),
+    // Out as the entry's plate grows over it, back in at rest as the entry leaves.
+    val present = animateFloatAsState(if (numberEntryShown) 0f else 1f,
+        if (numberEntryShown) tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate)
+        else tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate),
         label = "identity under number entry")
     val rail = LocalRailExpansion.current
     val page = LocalPlayerPageProgress.current

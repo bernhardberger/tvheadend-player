@@ -408,6 +408,8 @@ fun VideoPlayerScreen(
     var connectionLost by remember { mutableStateOf(false) }
     var screenActive by remember { mutableStateOf(false) }
     var channelNumberInput by remember { mutableStateOf("") }
+    // Whether the entry last cleared was committed to its channel, so it settles into the identity.
+    var channelNumberCommitted by remember { mutableStateOf(false) }
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var restoreOptionsFocus by remember { mutableStateOf(false) }
@@ -973,9 +975,10 @@ fun VideoPlayerScreen(
             channelNumbers = channelNumbers,
             enteredNumber = channelNumberInput,
         )
+        val channel = channels.firstOrNull { it.id == channelId }
+        channelNumberCommitted = channel != null
         channelNumberInput = ""
 
-        val channel = channels.firstOrNull { it.id == channelId }
         return channel?.let(::tuneChannel) ?: true
     }
 
@@ -993,7 +996,8 @@ fun VideoPlayerScreen(
         val channel = ChannelNavigation.idForNumber(orderedChannelIds, channelNumbers, channelNumberInput)
             ?.let { id -> channels.firstOrNull { it.id == id } }
         when {
-            channel != null -> ChannelNumberTarget.Channel(channel.name.orEmpty(), channel.icon)
+            channel != null -> ChannelNumberTarget.Channel(channel.visibleChannelNumber?.toString().orEmpty(),
+                channel.name.orEmpty(), channel.icon)
             channelNumberUnknown -> ChannelNumberTarget.None
             orderedChannelIds.isEmpty() || ChannelNavigation.canExtendToNumber(
                 orderedChannelIds, channelNumbers, channelNumberInput, channelNumberDigits,
@@ -1448,6 +1452,7 @@ fun VideoPlayerScreen(
                 ChannelNavigation.digitForKeyCode(event.nativeKeyEvent.keyCode)?.let { digit ->
                     zapKeyUptime[0] = profileZapKey(event.nativeKeyEvent)
                     if (event.nativeKeyEvent.repeatCount == 0) {
+                        channelNumberCommitted = false
                         channelNumberInput = ChannelNavigation.appendDigit(
                             channelNumberInput, digit, channelNumberDigits,
                         )
@@ -1784,6 +1789,7 @@ fun VideoPlayerScreen(
                 number = numberEntry,
                 target = channelNumberTarget,
                 maxDigits = channelNumberDigits,
+                settles = channelNumberCommitted,
             )
         }
 

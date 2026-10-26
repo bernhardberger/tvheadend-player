@@ -911,23 +911,32 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   opened it. Down leads to the seekbar, or to Play/Pause where the timeline takes
   no focus; Left, Right and Up lead nowhere. Above a recording's markers, Up from
   the seekbar opens the markers and Up again closes them and moves on to the card.
-- Numeric entry is a compact, single-line badge in the top identity's place,
-  with the identity's plate shape. Its start edge and top edge always match the
-  identity's, at every font scale. At font scale 1.0 its height matches too; its
-  larger digits may make it taller at larger scales, and it then grows downward.
-  Digits are centred within a slot sized for at least three digits; a known
-  destination extends the badge with an optional picon and one-line name, laid
-  out as the identity lays out its channel. Pending input shows only the digit
-  slot. Entry keeps the chrome it interrupted: controls or Banner stay up, the
-  identity fades out under the entry, is not read out meanwhile, and fades back
-  in place when the entry leaves, without the chrome travelling. The root takes
-  the keys during entry, and focus then returns to the control that had it.
-  Entry never reveals hidden chrome; the badge then stands alone at the same
-  spot. The whole badge fades in and out over 100ms, without travel or scale. Destination-width changes settle over 150ms,
-  anchored at the start edge with fixed height; new digits and labels update
-  immediately, including during an interrupted transition. Cancel and commit use
-  the same exit, retaining the last complete badge while it fades. Tuning never
-  waits for animation. An unknown number shows `No channel` for two seconds before
+- Numeric entry is a state of the top identity's place: the identity's chip,
+  the typed digits and the destination's name on one line, with the identity's
+  start edge, top edge and height at every font scale (the digits share the
+  name's style). The chip holds an empty tile while pending or for `No channel`,
+  the match's picon, or a logo-less match's own number as the identity shows it.
+  The digits stand right-aligned in a field sized for the lineup's longest number
+  (at least three digits), starting where the identity's text starts; the name
+  follows one space later, one line, ellipsized within the identity's text width.
+  A plate grows out of the content into the identity's bounds (300ms, emphasized
+  decelerate) and never shrinks while the entry is open; its end grows only when
+  the content needs it. The plate is a style that changes only colours: dark
+  (shipping; dense dark panel, tile fades from behind a picon), light (the
+  identity's focus container with a soft shadow) or none. Each new digit pushes
+  the earlier ones start-ward by one digit while it fades in at the end (150ms);
+  a digit during any of this motion carries on from where it stands, never
+  restarting the plate. Destination changes cross-fade in place. Commit slides
+  the number and name into the identity's rest alignment while the plate recedes
+  (200ms); cancel fades the content where it stands while the plate recedes. The
+  entry is announced politely once per change (`12, Harbor Sport HD`,
+  `999, No channel`), not per frame and not while it leaves. Entry keeps the
+  chrome it interrupted: controls or Banner stay up, the identity fades out under
+  the entry, is not read out meanwhile, and fades back in place when the entry
+  leaves, without the chrome travelling. The root takes the keys during entry,
+  and focus then returns to the control that had it. Entry never reveals hidden
+  chrome; the entry then stands alone at the same spot. Tuning never waits for
+  animation. An unknown number shows `No channel` for two seconds before
   dismissal; it has no shake, flash or success-style confirmation.
 - Tuning and buffering show as one thin ring centred over the video, without a
   panel, scrim or text: 44dp, plain white 3dp stroke with no outline, 180 ms fade. It

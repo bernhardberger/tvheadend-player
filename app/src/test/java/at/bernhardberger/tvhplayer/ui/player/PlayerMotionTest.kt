@@ -37,6 +37,7 @@ import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasClickAction
@@ -398,122 +399,247 @@ class PlayerMotionTest {
         assertEquals("the info did not settle one action row higher", bannerTop - drop, tops().single(), 0.5f)
     }
 
-    @Test fun typedDigitsAppearAtOnceInACompactEntry() {
+    @Test fun typedDigitsStandRightAlignedInAFieldThatNeverShifts() {
         var number by mutableStateOf("1")
         var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
-        compose.setContent {
-            val context = LocalContext.current
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number")) }
-        }
+        compose.setContent { TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number")) } }
         compose.waitForIdle()
-        val width = compose.onNodeWithTag("number").fetchSemanticsNode().size.width
+        fun width() = compose.onNodeWithTag("number").fetchSemanticsNode().size.width
+        fun digits(text: String) = compose.onNodeWithTag("channel-number-digits").assertTextEquals(text).fetchSemanticsNode().boundsInRoot
+        val pending = width()
+        val end = digits("1").right
 
-        compose.mainClock.autoAdvance = false
         for (next in listOf("12", "123")) {
             change { number = next }
-            compose.mainClock.advanceTimeByFrame()
-            compose.onNodeWithText(next).assertExists()
+            compose.waitForIdle()
             compose.onNodeWithText(next.dropLast(1)).assertDoesNotExist()
-            assertEquals(width, compose.onNodeWithTag("number").fetchSemanticsNode().size.width)
+            assertEquals("the field is sized for the whole number at once", pending, width())
+            assertEquals("$next grew from the field's end", end, digits(next).right, 0.5f)
         }
-        val digits = compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot
-        // Only a known destination extends the badge; the number stays anchored in its slot.
-        change { target = ChannelNumberTarget.Channel("One", null) }
-        compose.mainClock.advanceTimeByFrame()
+        val settled = digits("123")
+        change { target = ChannelNumberTarget.Channel("123", "One", null) }
+        compose.waitForIdle()
         compose.onNodeWithText("One").assertExists()
-        compose.mainClock.advanceTimeBy(200)
-        assertTrue(compose.onNodeWithTag("number").fetchSemanticsNode().size.width > width)
-        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+        assertTrue("the destination follows the field", width() > pending)
+        assertTrue(compose.onNodeWithText("One").fetchSemanticsNode().boundsInRoot.left > settled.right)
+        assertEquals(settled, digits("123"))
         change { target = ChannelNumberTarget.None }
-        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
         compose.onNodeWithText("No channel").assertExists()
         compose.onNodeWithText("One").assertDoesNotExist()
-        assertTrue(compose.onNodeWithTag("number").fetchSemanticsNode().size.width >= width)
-        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+        assertEquals(settled, digits("123"))
         change { target = ChannelNumberTarget.Pending }
-        compose.mainClock.advanceTimeByFrame()
+        compose.waitForIdle()
         compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
-        compose.mainClock.advanceTimeBy(200)
-        assertEquals("pending has no empty destination compartment", width, compose.onNodeWithTag("number").fetchSemanticsNode().size.width)
+        assertEquals("pending has no destination compartment", pending, width())
     }
 
-    @Test fun numberDestinationResizesWithoutMovingTheDigitsAndCanReverseMidway() {
-        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+    @Test fun eachDigitPushesTheEarlierOnesStartWardAndADigitMidPushCarriesOn() {
+        var number by mutableStateOf("1")
+        lateinit var view: View
         compose.setContent {
-            val context = LocalContext.current
-            TVHeadendPlayerTheme { ChannelNumberOverlay("123", target, Modifier.testTag("number")) }
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    ChannelNumberOverlay(number, ChannelNumberTarget.Pending, Modifier.testTag("number"), plate = ChannelNumberPlate.None)
+                }
+            }
         }
         compose.waitForIdle()
-        fun bounds() = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
-        val compact = bounds()
-        val digits = compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot
+        // Tabular digits: the one digit is one cell wide, at the end of the three-digit field.
+        val one = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+        fun cell(index: Int) = Rect(one.right - (3 - index) * one.width, one.top, one.right - (2 - index) * one.width, one.bottom)
+        val lastAtRest = ink(view, cell(2))
+        assertTrue(lastAtRest > 0f)
+        assertEquals(0f, ink(view, cell(1)))
         compose.mainClock.autoAdvance = false
 
-        change { target = ChannelNumberTarget.Channel("A long channel destination", null) }
+        change { number = "12" }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("A long channel destination").assertExists()
-        compose.mainClock.advanceTimeBy(48)
-        val growing = bounds()
-        compose.mainClock.advanceTimeBy(200)
-        val expanded = bounds()
-        assertTrue("the badge grows gradually", growing.width > compact.width && growing.width < expanded.width)
-        assertEquals(compact.left, growing.left, 0.5f)
-        assertEquals(compact.top, growing.top, 0.5f)
-        assertEquals(compact.height, growing.height, 0.5f)
-        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
+        assertEquals("the earlier digit starts from where it stood", 0f, ink(view, cell(1)), lastAtRest * 0.05f)
+        val arriving = ink(view, cell(2))
+        compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs / 2L)
+        val pushing = ink(view, cell(1))
+        assertTrue("the earlier digit slides start-ward: $pushing", pushing > 0f)
+        assertTrue("the new digit fades in at the end: $arriving", ink(view, cell(2)) > arriving)
 
-        change { target = ChannelNumberTarget.Pending }
+        // A digit mid-push: the earlier digits carry on from where they are; none is lost or snaps home.
+        change { number = "123" }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithTag("channel-number-target").assertDoesNotExist()
-        compose.mainClock.advanceTimeBy(48)
-        val shrinking = bounds()
-        assertTrue("the badge shrinks gradually", shrinking.width > compact.width && shrinking.width < expanded.width)
-
-        change { target = ChannelNumberTarget.None }
-        compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("No channel").assertExists()
-        compose.onNodeWithText("A long channel destination").assertDoesNotExist()
-        compose.mainClock.advanceTimeBy(200)
-        assertEquals(digits, compose.onNodeWithText("123").fetchSemanticsNode().boundsInRoot)
-        assertTrue(bounds().width > compact.width)
-
-        change { target = ChannelNumberTarget.Pending }
-        compose.mainClock.advanceTimeBy(200)
-        assertEquals(compact, bounds())
-    }
-
-    @Test fun numberEntryKeepsItsDestinationWhileLeavingAndReopensWithTheLatestDigits() {
-        var number by mutableStateOf("123")
-        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Channel("One", null))
-        compose.setContent {
-            val context = LocalContext.current
-            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number")) }
-        }
-        compose.waitForIdle()
-        val shown = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
-        compose.mainClock.autoAdvance = false
-
-        change { number = ""; target = ChannelNumberTarget.Pending }
-        compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeBy(32)
         compose.onNodeWithText("123").assertExists()
-        compose.onNodeWithText("One").assertExists()
-        assertEquals("the complete badge fades without first collapsing", shown,
-            compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot)
+        assertEquals("the first digit did not jump to its rest", 0f, ink(view, cell(0)), lastAtRest * 0.05f)
+        assertTrue("the first digit did not restart from the end", ink(view, cell(1)) > 0f)
+        compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs + 100L)
+        for (index in 0..2) assertTrue("cell $index holds its digit", ink(view, cell(index)) > 0f)
+    }
 
-        change { number = "7"; target = ChannelNumberTarget.Channel("Seven", null) }
+    @Test fun aLogoLessDestinationShowsItsNumberInTheChipWithoutMovingAnything() {
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.None)
+        compose.setContent { TVHeadendPlayerTheme { ChannelNumberOverlay("12", target, Modifier.testTag("number")) } }
+        compose.waitForIdle()
+        val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+        val name = compose.onNodeWithTag("channel-number-target").fetchSemanticsNode().boundsInRoot
+        val row = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
+        compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true).assertDoesNotExist()
+
+        change { target = ChannelNumberTarget.Channel("12", "Harbor", null) }
+        compose.waitForIdle()
+        val chip = compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true)
+        chip.assertTextEquals("12")
+        compose.onNodeWithTag("channel-number-picon", useUnmergedTree = true).assertDoesNotExist()
+        // Centred in the chip, as the identity shows a logo-less channel.
+        val chipCenter = with(compose.density) { row.left + (IdentityInset + ChipWidth / 2).toPx() }
+        assertEquals(chipCenter, chip.fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
+        assertEquals(digits, compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot)
+        assertEquals(name.left, compose.onNodeWithText("Harbor").fetchSemanticsNode().boundsInRoot.left, 0.5f)
+        assertEquals(row.height, compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot.height, 0.5f)
+    }
+
+    @Test fun numberEntryIsReadOutPolitelyOncePerChangeAndNotWhileLeaving() {
+        var number by mutableStateOf("1")
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+        compose.setContent { TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number")) } }
+        compose.waitForIdle()
+        fun spoken() = compose.onNodeWithTag("number").fetchSemanticsNode().config
+        assertEquals(LiveRegionMode.Polite, spoken()[SemanticsProperties.LiveRegion])
+        assertEquals(listOf("1"), spoken()[SemanticsProperties.ContentDescription])
+        compose.mainClock.autoAdvance = false
+
+        change { number = "12"; target = ChannelNumberTarget.Channel("12", "Harbor Sport HD", null) }
+        repeat(10) { frame ->
+            compose.mainClock.advanceTimeByFrame()
+            assertEquals("frame $frame: one announcement while the entry moves", listOf("12, Harbor Sport HD"),
+                spoken()[SemanticsProperties.ContentDescription])
+        }
+        // The parts are read only through the entry, never on their own.
+        for (part in listOf("channel-number-digits", "channel-number-chip-number", "channel-number-target")) {
+            assertTrue(part, compose.onNodeWithTag(part, useUnmergedTree = true).fetchSemanticsNode().config
+                .contains(SemanticsProperties.HideFromAccessibility))
+        }
+        change { number = "999"; target = ChannelNumberTarget.None }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("7").assertExists()
-        compose.onNodeWithText("Seven").assertExists()
-        compose.onNodeWithText("123").assertDoesNotExist()
-        compose.onNodeWithText("One").assertDoesNotExist()
-        compose.mainClock.advanceTimeBy(200)
-        compose.onNodeWithText("7").assertExists()
+        assertEquals(listOf("999, No channel"), spoken()[SemanticsProperties.ContentDescription])
 
         change { number = ""; target = ChannelNumberTarget.Pending }
-        compose.mainClock.advanceTimeBy(200)
-        compose.onNodeWithText("7").assertDoesNotExist()
-        compose.onNodeWithText("Seven").assertDoesNotExist()
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("999").assertExists()
+        assertFalse("a leaving entry is silent", spoken().contains(SemanticsProperties.LiveRegion))
+        assertFalse(spoken().contains(SemanticsProperties.ContentDescription))
+    }
+
+    @Test fun plateStylesChangeOnlyColoursNeverTheLayout() {
+        var plate by mutableStateOf(ChannelNumberPlate.Dark)
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    ChannelNumberOverlay("12", ChannelNumberTarget.Channel("12", "Harbor", null), Modifier.testTag("number"), plate = plate)
+                }
+            }
+        }
+        val tags = listOf("number", "channel-number-chip-number", "channel-number-target")
+        val layouts = mutableMapOf<ChannelNumberPlate, List<Rect>>()
+        val gapInk = mutableMapOf<ChannelNumberPlate, Float>()
+        for (style in ChannelNumberPlate.entries) {
+            change { plate = style }
+            compose.waitForIdle()
+            layouts[style] = tags.map { compose.onNodeWithTag(it, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot } +
+                compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+            // Between the chip and the field only the plate draws.
+            val row = layouts.getValue(style).first()
+            val gap = with(compose.density) { row.left + (IdentityInset + ChipWidth).toPx() + 2f }
+            gapInk[style] = ink(view, Rect(gap, row.center.y - 4f, gap + 10f, row.center.y + 4f))
+        }
+        assertEquals(layouts[ChannelNumberPlate.Dark], layouts[ChannelNumberPlate.Light])
+        assertEquals(layouts[ChannelNumberPlate.Dark], layouts[ChannelNumberPlate.None])
+        assertEquals("no plate draws nothing", 0f, gapInk.getValue(ChannelNumberPlate.None))
+        assertTrue("the dark plate draws", gapInk.getValue(ChannelNumberPlate.Dark) > 0f)
+        assertTrue("the light plate is lighter", gapInk.getValue(ChannelNumberPlate.Light) > gapInk.getValue(ChannelNumberPlate.Dark))
+    }
+
+    @Test fun aDigitWhileThePlateGrowsOrLeavesCarriesOnWithoutRestarting() {
+        var number by mutableStateOf("")
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    ChannelNumberOverlay(number, ChannelNumberTarget.Pending, Modifier.testTag("number"))
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        change { number = "1" }
+        compose.mainClock.advanceTimeByFrame()
+        val row = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
+        val gapX = with(compose.density) { row.left + (IdentityInset + ChipWidth).toPx() + 2f }
+        val gap = Rect(gapX, row.center.y - 4f, gapX + 10f, row.center.y + 4f)
+        fun plate() = ink(view, gap)
+
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationMs / 3L)
+        val growing = plate()
+        assertTrue("the plate grows in: $growing", growing > 0f)
+        change { number = "12" }
+        compose.mainClock.advanceTimeByFrame()
+        assertTrue("a digit kept the plate growing", plate() >= growing)
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationMs + 100L)
+        val rest = plate()
+        assertTrue(rest > growing)
+
+        change { number = "" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 3L)
+        val leaving = plate()
+        assertTrue("the plate recedes: $leaving of $rest", leaving < rest)
+        change { number = "5" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("5").assertExists()
+        compose.onNodeWithText("12").assertDoesNotExist()
+        assertTrue("the plate turned back from where it stood", plate() >= leaving * 0.9f)
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationMs + 100L)
+        assertEquals(rest, plate(), rest * 0.01f)
+    }
+
+    @Test fun aCommittedEntrySlidesIntoTheIdentitysAlignmentAndACancelledOneFadesInPlace() {
+        var number by mutableStateOf("12")
+        var settles by mutableStateOf(false)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ChannelNumberOverlay(number, ChannelNumberTarget.Channel("12", "One", null), Modifier.testTag("number"), settles = settles)
+            }
+        }
+        compose.waitForIdle()
+        fun digits() = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+        fun name() = compose.onNodeWithText("One").fetchSemanticsNode().boundsInRoot
+        val restDigits = digits()
+        val restName = name()
+        val advance = restDigits.width / 2
+        compose.mainClock.autoAdvance = false
+
+        // Back or the timeout without a match: the content fades where it is.
+        change { number = "" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
+        assertEquals(restDigits, digits())
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs + 100L)
+        compose.onNodeWithTag("number").assertDoesNotExist()
+
+        compose.mainClock.autoAdvance = true
+        change { number = "12" }
+        compose.waitForIdle()
+        assertEquals(restDigits, digits())
+        compose.mainClock.autoAdvance = false
+        // Committed: the number's start moves onto the field's start (one missing digit) with the name.
+        change { settles = true; number = "" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 2L)
+        val sliding = digits().left
+        assertTrue("the number slides start-ward: $sliding", sliding < restDigits.left - 0.5f && sliding > restDigits.left - advance)
+        assertEquals(restName.left - restDigits.left, name().left - digits().left, 0.5f)
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 2L - 20L)
+        assertEquals(restDigits.left - advance, digits().left, 2f)
     }
 
     @Test fun numberEntryKeepsTheChromeItInterruptedStillAndNeverRevealsHiddenChrome() {
@@ -569,6 +695,8 @@ class PlayerMotionTest {
                         compose.onNodeWithTag("player-header", useUnmergedTree = true).assertDoesNotExist()
                     }
                 }
+                // The plate recedes over its whole exit.
+                if (!typed) compose.mainClock.advanceTimeBy(100)
                 assertEquals(typed, compose.onAllNodes(hasText("1") and hasAnyAncestor(hasTestTag("number")))
                     .fetchSemanticsNodes().isNotEmpty())
             }
@@ -577,6 +705,7 @@ class PlayerMotionTest {
 
     @Test fun theTopIdentityAndTheNumberEntryCrossInPlace() {
         var number by mutableStateOf("")
+        var withEntry by mutableStateOf(false)
         lateinit var view: View
         compose.setContent {
             view = LocalView.current
@@ -584,34 +713,52 @@ class PlayerMotionTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     PlayerTopIdentity(content, numberEntryShown = number.isNotEmpty())
-                    PlayerTopIdentitySlot { ChannelNumberOverlay(number, ChannelNumberTarget.Pending, Modifier.testTag("number")) }
+                    if (withEntry) PlayerTopIdentitySlot {
+                        ChannelNumberOverlay(number, ChannelNumberTarget.Channel("1", "One", null), Modifier.testTag("number"))
+                    }
                 }
             }
         }
         compose.waitForIdle()
-        // The pending entry is only its digit slot, short of the identity's name.
-        val name = compose.onNodeWithTag("player-top-identity-name", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        fun identity(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val bounds = identity(PlayerTopIdentityTag)
+        val chip = identity("player-top-identity-number")
+        val name = identity("player-top-identity-name")
+        // The identity alone, as the entry's plate covers it: it gives way quickly and returns softly.
         val rest = ink(view, name)
         assertTrue("the identity is drawn at rest", rest > 0f)
         compose.mainClock.autoAdvance = false
 
         change { number = "1" }
         compose.mainClock.advanceTimeByFrame()
-        compose.onNodeWithText("1").assertExists()
         compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
         val crossing = ink(view, name)
         assertTrue("the identity fades as the entry comes in: $crossing of $rest", crossing > 0f && crossing < rest)
         compose.mainClock.advanceTimeBy(200)
         assertEquals("the identity has given way to the entry", 0f, ink(view, name), rest * 0.01f)
-        assertTrue("the name rests beyond the entry", compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot.right < name.left)
 
         change { number = "" }
         compose.mainClock.advanceTimeByFrame()
-        compose.mainClock.advanceTimeBy(PlayerMotion.FastMs / 2L)
+        compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs / 2L)
         val returning = ink(view, name)
         assertTrue("the identity returns as the entry leaves: $returning of $rest", returning > 0f && returning < rest)
         compose.mainClock.advanceTimeBy(200)
         assertEquals("the identity is back", rest, ink(view, name), rest * 0.01f)
+
+        // The entry takes the identity's place: same top edge and height, its chip on the identity's chip,
+        // its field starting where the identity's number and name start.
+        compose.mainClock.autoAdvance = true
+        change { withEntry = true; number = "1" }
+        compose.waitForIdle()
+        val entry = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
+        assertEquals(bounds.left, entry.left, 0.5f)
+        assertEquals(bounds.top, entry.top, 0.5f)
+        assertEquals(bounds.height, entry.height, 0.5f)
+        val entryChip = compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        assertEquals(chip.center.x, entryChip.center.x, 0.5f)
+        assertEquals(chip.center.y, entryChip.center.y, 0.5f)
+        assertTrue("the field starts with the identity's text",
+            compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot.left >= name.left - 0.5f)
     }
 
     @Test fun recoveryFocusesRetryAsItStartsToAppearAndLetsGoAtOnce() {

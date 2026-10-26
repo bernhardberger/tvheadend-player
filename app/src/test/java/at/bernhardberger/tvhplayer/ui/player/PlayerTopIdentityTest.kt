@@ -69,7 +69,7 @@ class PlayerTopIdentityTest {
         val identity = bounds(PlayerTopIdentityTag)
         assertEquals(listOf("Channel 1 One"), identityDescription())
         for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER, PlayerChromeMode.HIDDEN)) {
-            compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("Twelve", null) }
+            compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("12", "Twelve", null) }
             settle()
             if (mode == PlayerChromeMode.HIDDEN) assertFalse("hidden chrome has no identity", exists(PlayerTopIdentityTag))
             else assertEquals("$mode: the identity under the entry is not read out", null, identityDescription())
@@ -77,7 +77,7 @@ class PlayerTopIdentityTest {
             assertEquals("$mode: the entry starts where the identity does", identity.left, entry.left, 0.5f)
             assertEquals("$mode: the entry stands on the identity's line", identity.top, entry.top, 0.5f)
             assertEquals("$mode: one line, as the identity", identity.height, entry.height, 0.5f)
-            val digits = compose.onNodeWithText("12").fetchSemanticsNode().boundsInRoot
+            val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
             assertTrue("$mode: the digits start inside the identity's inset", digits.left >= TvGridHorizontalMargin.value - 0.5f)
             assertEquals("$mode: the destination shares the line", identity.center.y,
                 compose.onNodeWithText("Twelve").fetchSemanticsNode().boundsInRoot.center.y, 1f)
@@ -87,21 +87,20 @@ class PlayerTopIdentityTest {
     }
 
     @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
-    fun atLargerTextTheEntryKeepsTheIdentitysTopEdgeAndGrowsDown() {
+    fun atLargerTextTheEntryKeepsTheIdentitysTopEdgeAndHeight() {
         chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
-        // Android scales large text less than small, so 1.3 can leave the digits within the chip's height.
         for (scale in listOf(1.3f, 2f)) {
             compose.runOnIdle { fontScale = scale; shownMode = PlayerChromeMode.CONTROLS; numberEntry = "" }
             settle()
             val identity = bounds(PlayerTopIdentityTag)
             for (mode in listOf(PlayerChromeMode.CONTROLS, PlayerChromeMode.BANNER, PlayerChromeMode.HIDDEN)) {
-                compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("Twelve", null) }
+                compose.runOnIdle { shownMode = mode; numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("12", "Twelve", null) }
                 settle()
                 val entry = bounds("number-entry")
                 assertEquals("$scale $mode: the entry starts where the identity does", identity.left, entry.left, 0.5f)
                 assertEquals("$scale $mode: the entry's top edge is the identity's", identity.top, entry.top, 0.5f)
-                if (scale == 2f) assertTrue("$scale $mode: the larger digits grow the entry down", entry.height > identity.height)
-                else assertTrue("$scale $mode: never shorter than the identity", entry.height >= identity.height - 0.5f)
+                // The digits share the name's style, so the entry is as tall as the identity at every scale.
+                assertEquals("$scale $mode: the entry's height is the identity's", identity.height, entry.height, 0.5f)
                 compose.runOnIdle { numberEntry = "" }
                 settle()
             }
