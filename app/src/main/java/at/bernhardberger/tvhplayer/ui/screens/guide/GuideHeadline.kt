@@ -68,6 +68,7 @@ import at.bernhardberger.tvhplayer.ui.screens.ImmersiveHeroWidth
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -203,14 +204,28 @@ internal val GuideHeadlineRulerGap = 12.dp
 @Composable
 internal fun guideHeadlineDrop(viewportHeight: Dp, contentTop: Dp, gridTopPadding: Dp, rows: GuideRows): Dp {
     val row = guideTimelineRowHeight(rows)
-    val stride = (row + TvSpacing4).value
-    val gridTop = contentTop + guideHeaderMinHeight() + guideHeadlineHeight() + GuideHeadlineRulerGap +
-        guideRulerHeight() + gridTopPadding
     val titleBottom = guideRowTitleBottom(rows)
-    val wanted = titleBottom + (row - titleBottom) / 3
-    val shown = (viewportHeight - gridTop).value.mod(stride)
-    val drop = (shown - wanted.value).mod(stride)
-    return with(LocalDensity.current) { if (drop <= stride / 2) drop.dp.roundToPx().toDp() else 0.dp }
+    val headerMinHeight = guideHeaderMinHeight()
+    val headlineHeight = guideHeadlineHeight()
+    val rulerHeight = guideRulerHeight()
+    // In whole pixels, each part rounded as layout places it, so the limit holds for the drop applied.
+    return with(LocalDensity.current) {
+        val rowPx = row.roundToPx()
+        guideHeadlineDropPx(
+            viewportPx = viewportHeight.roundToPx(),
+            gridTopPx = contentTop.roundToPx() + headerMinHeight.roundToPx() + headlineHeight.roundToPx() +
+                GuideHeadlineRulerGap.roundToPx() + rulerHeight.roundToPx() + gridTopPadding.roundToPx(),
+            stridePx = rowPx + TvSpacing4.roundToPx(),
+            wantedPx = (titleBottom.toPx() + (rowPx - titleBottom.toPx()) / 3).roundToInt(),
+        ).toDp()
+    }
+}
+
+/** [guideHeadlineDrop] in pixels: the drop that brings the cut row to [wantedPx], or 0 past half a stride. */
+internal fun guideHeadlineDropPx(viewportPx: Int, gridTopPx: Int, stridePx: Int, wantedPx: Int): Int {
+    val shown = (viewportPx - gridTopPx).mod(stridePx)
+    val drop = (shown - wantedPx).mod(stridePx)
+    return if (drop <= stridePx / 2) drop else 0
 }
 
 /**
