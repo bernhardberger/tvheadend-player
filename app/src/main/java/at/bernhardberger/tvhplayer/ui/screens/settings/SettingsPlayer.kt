@@ -126,7 +126,7 @@ internal fun settingsStreamProfileLevel(ui: SettingsPlayerUiState, onSelect: (St
     val direct = stringResource(R.string.profile_direct_streaming)
     val profiles = ui.profiles as? StreamProfilesResult.Available
     val rows = if (profiles == null) {
-        listOf(settingsRow("profiles-status", streamProfilesStatus(ui).orEmpty()))
+        listOf(settingsRow("profiles-status", streamProfilesStatus(ui).orEmpty(), enabled = false))
     } else buildList {
         add(settingsRow(STREAM_PROFILE_DEFAULT, stringResource(R.string.profile_server_default),
             selected = ui.selectedProfileId == null, onClick = { onSelect(null) }))

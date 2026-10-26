@@ -368,6 +368,11 @@ class SettingsDepthNavigationTest {
         assertEquals(STREAM_PROFILE_LEVEL, navigation.stack.active.levelId)
         compose.onNode(isFocused() and hasText("pass")).assertIsSelected()
         compose.onNodeWithText("How Tvheadend prepares the stream for this TV.").assertIsDisplayed()
+        // A page left open across a disconnect shows only why, as a row that offers nothing.
+        compose.runOnIdle { ui = ui.copy(profiles = StreamProfilesResult.Failed(TvheadendFailure.NOT_READY), connected = false) }
+        compose.onNodeWithText("Not connected").assertIsNotEnabled()
+        compose.runOnIdle { ui = ui.copy(profiles = available, connected = true) }
+        compose.waitForIdle()
         // Back leaves without choosing.
         press(Key.Back)
         compose.onNode(isFocused() and hasText(row)).assertExists()
