@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
@@ -243,9 +244,10 @@ private fun ChannelNumberDigits(number: String, width: Dp, style: TextStyle) {
     SideEffect { applied.arrivals = arrivals }
     var now by remember { mutableLongStateOf(0L) }
     LaunchedEffect(arrivals) {
+        if (coroutineContext[MotionDurationScale]?.scaleFactor == 0f) arrivals.stamp(now, motionEnabled = false)
         do {
             val time = withFrameMillis { time ->
-                arrivals.stamp(time)
+                arrivals.stamp(time, motionEnabled = coroutineContext[MotionDurationScale]?.scaleFactor != 0f)
                 now = time
                 time
             }
@@ -279,8 +281,10 @@ private class DigitArrivals(val number: String, val at: LongArray) {
         else -> DigitArrivals(number, LongArray((number.length - 1).coerceAtLeast(0)) { Settled })
     }
 
-    fun stamp(time: Long) {
-        for (i in at.indices) if (at[i] == NotYet) at[i] = time
+    fun stamp(time: Long, motionEnabled: Boolean) {
+        // Settle every arrival, including a push interrupted by the newly typed digit.
+        if (!motionEnabled) at.fill(Settled)
+        else for (i in at.indices) if (at[i] == NotYet) at[i] = time
     }
 
     fun settledAt(time: Long) = at.all { progress(time, it) >= 1f }

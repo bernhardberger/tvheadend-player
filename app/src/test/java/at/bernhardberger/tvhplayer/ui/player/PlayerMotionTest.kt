@@ -27,6 +27,7 @@ import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -43,6 +44,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -94,8 +96,10 @@ import kotlin.time.Instant
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@OptIn(ExperimentalTestApi::class)
 class PlayerMotionTest {
-    @get:Rule val compose = createComposeRule()
+    private val motionScale = object : MotionDurationScale { override var scaleFactor = 1f }
+    @get:Rule val compose = createComposeRule(effectContext = motionScale)
 
     @Test fun hidingControlsDropsFocusSemanticsAndKeysOnTheFirstExitFrame() {
         var visible by mutableStateOf(true)
@@ -476,6 +480,54 @@ class PlayerMotionTest {
         assertEquals("nothing spills past the field's end", 0f, ink(view, cell(3)))
         compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs + 100L)
         for (index in 0..2) assertTrue("cell $index holds its digit", ink(view, cell(index)) > 0f)
+    }
+
+    @Test fun reducedMotionSnapsAppendedDigitsToRestOnTheNextFrame() {
+        checkReducedMotionDigitAppend(interrupt = false)
+    }
+
+    @Test fun reducedMotionSnapsAnInterruptedDigitAppendToRestOnTheNextFrame() {
+        checkReducedMotionDigitAppend(interrupt = true)
+    }
+
+    private fun checkReducedMotionDigitAppend(interrupt: Boolean) {
+        var number by mutableStateOf("1")
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    ChannelNumberOverlay(number, ChannelNumberTarget.Pending, plate = ChannelNumberPlate.None)
+                }
+            }
+        }
+        compose.waitForIdle()
+        val one = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+        fun cell(index: Int) = Rect(one.right - (3 - index) * one.width, one.top, one.right - (2 - index) * one.width, one.bottom)
+        val firstAtRest = ink(view, cell(2))
+        assertTrue(firstAtRest > 0f)
+        compose.mainClock.autoAdvance = false
+
+        if (interrupt) {
+            change { number = "12" }
+            compose.mainClock.advanceTimeByFrame()
+            compose.mainClock.advanceTimeBy(48L)
+            val sliding = ink(view, cell(1))
+            assertTrue("the append to interrupt is still sliding: $sliding of $firstAtRest", sliding in 1f..(firstAtRest * 0.95f))
+        }
+        change {
+            motionScale.scaleFactor = 0f
+            number = if (interrupt) "123" else "12"
+        }
+        compose.mainClock.advanceTimeByFrame()
+        val occupied = (3 - number.length)..2
+        val nextFrame = occupied.map { ink(view, cell(it)) }
+        assertEquals("the earlier digit snaps straight to its rest cell", firstAtRest, nextFrame.first(), firstAtRest * 0.01f)
+        assertTrue("every digit is drawn at rest on the next frame: $nextFrame", nextFrame.all { it > 0f })
+        compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs + 100L)
+        occupied.forEachIndexed { index, position ->
+            assertEquals("digit $index did not move after the next frame", nextFrame[index], ink(view, cell(position)), firstAtRest * 0.01f)
+        }
     }
 
     @Test fun aLogoLessMatchShowsItsNumberOnceInTheFieldWithoutMovingAnything() {
