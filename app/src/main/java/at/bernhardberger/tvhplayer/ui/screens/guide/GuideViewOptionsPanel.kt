@@ -51,6 +51,6 @@ internal fun GuideViewOptionsPanel(
 }
 
 private fun GuideRows.label(): Int = when (this) {
-    GuideRows.DENSE -> R.string.guide_view_rows_dense
     GuideRows.REGULAR -> R.string.guide_view_rows_regular
+    GuideRows.DENSE -> R.string.guide_view_rows_dense
 }

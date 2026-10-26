@@ -11,13 +11,12 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
-import at.bernhardberger.tvhplayer.settings.GuideRows
 import androidx.compose.ui.unit.dp
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** The channel column: dense rows carry a smaller logo, so their column is narrower. */
-internal fun guideChannelWidth(rows: GuideRows): Dp = if (rows == GuideRows.DENSE) 104.dp else 124.dp
+/** The channel column, the same in both row densities. */
+internal val GuideChannelWidth = 104.dp
 internal val GuideChannelGap = 8.dp
 internal val GuideEdgeFade = 48.dp
 /** Breathing room between a focused cell and a fade or the edge; the focus ring draws inside the cell. */

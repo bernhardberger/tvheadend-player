@@ -723,10 +723,13 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   clearance above the ruler reserves the now pill's upward overflow plus half
   the header button's growth at TV Material's 1.1 focused scale, rounded up to a
   whole pixel. There is no synopsis, and accessibility reads the
-  headline after the buttons. A 104dp channel column (124dp with
-  Regular rows) and an 8dp gap lead into the
+  headline after the buttons. With the headline shown, headline, ruler and grid
+  drop below the header row by up to half a row, so the row the screen's bottom
+  edge cuts shows its title and a third of the rest
+  (`ui/screens/guide/GuideHeadline.kt` `guideHeadlineDrop`); hidden, they keep
+  their place. A 104dp channel column and an 8dp gap lead into the
   timeline, which extends to the physical edge, with the ruler above the
-  programme rows (`ui/screens/guide/GuideViewport.kt:17-18`). Timeline content continues to the physical
+  programme rows (`ui/screens/guide/GuideViewport.kt` `GuideChannelWidth`, `GuideChannelGap`). Timeline content continues to the physical
   trailing/bottom edges and is simply cut there; only the edge beside the channel
   column (left in LTR, right in RTL) and the top edge under the ruler fade, over a
   local 48dp and only when more content exists there. Headers, controls and scopes remain clear.
@@ -758,10 +761,12 @@ activation, DVR eligibility, confirmations and current-session guards remain.
   data for the channel, no programmes in the window, partial or stale data,
   reconnecting, permission denied, server failure or an empty filter
   (`ui/screens/guide/EpgGridContent.kt:538-552`).
-- Guide's normal native rows are 64dp high, scaled with the font scale and grown
-  to fit the channel header and one programme title and time line
-  (`ui/screens/guide/EpgGridContent.kt:105-120`). The header shows the channel
-  number (`labelMedium`) beside a picon of at most 60×36dp, or beside the
+- Guide rows are dense list items. Regular rows (the default) are 56dp high and
+  show the title and start time; Dense rows (View options) are 40dp high and show
+  only the title, as the ruler and headline carry the time. Both scale with the
+  font scale and grow to fit the channel header and the cell's text
+  (`ui/screens/guide/EpgGridContent.kt` `guideTimelineRowHeight`). The header shows the channel
+  number (`labelMedium`) beside a picon of at most 48×28dp, or beside the
   single-line `titleSmall` name when there is no picon or it failed to load
   (`:380-420`); never all three. Measure both header and programme typography
   when growing lanes; do not shrink fonts or distort logos.

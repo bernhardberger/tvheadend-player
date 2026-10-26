@@ -217,10 +217,9 @@ internal fun GuideTimelineBody(
                 start = timelineContentPadding.calculateStartPadding(layoutDirection),
                 end = timelineContentPadding.calculateEndPadding(layoutDirection),
             ),
-            rows = rows,
         )
         val trackLeftPx = if (layoutDirection == LayoutDirection.Ltr) {
-            with(density) { (startPadding + TvBrowseLeadingInset + guideChannelWidth(rows) + GuideChannelGap).toPx() }
+            with(density) { (startPadding + TvBrowseLeadingInset + GuideChannelWidth + GuideChannelGap).toPx() }
         } else terminalReservePx
         // Now draws outside the faded layer, so it stays solid under the top and inner fades.
         Box(Modifier.weight(1f).fillMaxWidth()

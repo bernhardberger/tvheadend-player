@@ -69,6 +69,7 @@ import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.ChannelTagPreferences
 import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
+import at.bernhardberger.tvhplayer.settings.GuideRows
 import at.bernhardberger.tvhplayer.settings.GuideView
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettings
@@ -92,6 +93,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimePositionPx
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideVisibleWindowSec
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideRowTitleBottom
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimelineRowHeight
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import coil3.ImageLoader
@@ -155,6 +157,9 @@ class GuideVisualLayoutTest {
     private var backgroundColor = 0
     /** [guideHeadlineHeight] at the shown font scale, in px, which the test's density makes dp. */
     private var headlineHeight = 0f
+    /** The shown rows' [guideTimelineRowHeight] and [guideRowTitleBottom], in dp. */
+    private var rowHeight = 0f
+    private var rowTitleBottom = 0f
     private var rulerHeight = 0f
     private var previousRulerHeight = 0f
     private var callsAtEntry = 0
@@ -1537,20 +1542,24 @@ class GuideVisualLayoutTest {
         assertNoPlayback(additionalCoverageCalls = 1)
     }
 
-    @Test fun viewOptionsSwitchBetweenDenseAndRegularRows() {
+    @Test fun viewOptionsSwitchBetweenRegularAndDenseRows() {
         show()
-        assertEquals("Dense rows by default", 56f, bounds("epg-channel-row-1").height, .1f)
+        assertEquals("Regular rows by default", 56f, bounds("epg-channel-row-1").height, .1f)
+        assertTrue("Regular cells show their start time",
+            compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.Enter)
         compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
-        tagFocused("guide-view-rows-dense")
-        key(Key.DirectionDown)
         tagFocused("guide-view-rows-regular")
+        key(Key.DirectionDown)
+        tagFocused("guide-view-rows-dense")
         key(Key.Enter)
-        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height > 60f }
-        assertEquals("Regular rows keep the native list item height", 64f, bounds("epg-channel-row-1").height, .1f)
+        compose.waitUntil(5_000) { bounds("epg-channel-row-1").height < 50f }
+        assertEquals("Dense rows keep the native one-line list item height", 40f, bounds("epg-channel-row-1").height, .1f)
+        compose.onAllNodesWithTag("guide-cell-time", useUnmergedTree = true).assertCountEquals(0)
+        assertEquals(GuideRows.DENSE, runBlocking { uiSettings.settings.first() }.guideView.rows)
         compose.onNodeWithTag("guide-view-panel").assertIsDisplayed()
         key(Key.Back)
         compose.onNodeWithTag("guide-view-panel").assertDoesNotExist()
@@ -1862,7 +1871,7 @@ class GuideVisualLayoutTest {
         }
     }
 
-    @Test fun headlineShowsTheSettledProgrammeAboveAboutFiveRows() {
+    @Test fun headlineShowsTheSettledProgrammeAboveFourAndAHalfRows() {
         show(headline = true)
         // On the header, before the grid has focus: the programme the grid enters.
         headlineTitle(title(1, 0))
@@ -1873,7 +1882,7 @@ class GuideVisualLayoutTest {
         assertTrue("Ruler below the headline: headline=$headline ruler=$ruler", ruler.top >= headline.bottom)
         val first = bounds("epg-channel-row-1").top
         val rows = (540f - first) / (bounds("epg-channel-row-2").top - first)
-        assertEquals("About five rows below the headline", 5f, rows, .15f)
+        assertEquals("Four rows and most of a fifth below the headline", 4.65f, rows, .1f)
         compose.onNodeWithTag("channels-immersive-background").assertExists()
         compose.onNodeWithTag("guide-headline").assert(hasText(title(1, 0), substring = true))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
@@ -1980,11 +1989,12 @@ class GuideVisualLayoutTest {
         show(headline = true)
         headlineTitle(title(1, 0))
         val withHeadline = bounds("epg-time-ruler").top
+        val drop = headlineDrop()
         key(Key.DirectionRight)
         key(Key.DirectionRight)
         tagFocused("channels-view-button")
         key(Key.Enter)
-        tagFocused("guide-view-rows-dense")
+        tagFocused("guide-view-rows-regular")
         key(Key.DirectionDown)
         key(Key.DirectionDown)
         tagFocused("guide-view-headline")
@@ -1995,10 +2005,44 @@ class GuideVisualLayoutTest {
         compose.onNodeWithTag("guide-view-headline").assertIsOff()
         assertEquals("The grid takes the headline's room, retaining header focus clearance",
             bounds("channels-header").bottom + 5f, bounds("epg-time-ruler").top, .1f)
-        assertEquals(headlineHeight + GuideHeadlineRulerGap.value - 5f, withHeadline - bounds("epg-time-ruler").top, .5f)
+        assertEquals(drop + headlineHeight + GuideHeadlineRulerGap.value - 5f, withHeadline - bounds("epg-time-ruler").top, .5f)
         assertFalse("The choice is kept", runBlocking { uiSettings.settings.first() }.guideView.headline)
         key(Key.Back)
         tagFocused("channels-view-button")
+        assertNoPlayback()
+    }
+
+    @Test fun theBottomRowShowsItsTitleAndAThirdOfTheRest() = bottomRowCut(1f, GuideRows.REGULAR)
+
+    @Test fun theBottomRowShowsItsTitleAndAThirdOfTheRestAtLargeText() = bottomRowCut(1.3f, GuideRows.REGULAR)
+
+    @Test fun theBottomDenseRowShowsItsTitleAndAThirdOfTheRest() = bottomRowCut(1f, GuideRows.DENSE)
+
+    @Test fun theBottomDenseRowShowsItsTitleAndAThirdOfTheRestAtLargeText() = bottomRowCut(1.3f, GuideRows.DENSE)
+
+    /**
+     * With the headline shown, the grid moves down so the row the bottom edge cuts shows its title and
+     * a third of the rest, by at most half a row; a row cut above that keeps its place.
+     */
+    private fun bottomRowCut(scale: Float, rows: GuideRows) {
+        show(scale = scale, headline = true, rows = rows)
+        headlineTitle(title(1, 0))
+        val first = bounds("epg-channel-row-1")
+        val stride = bounds("epg-channel-row-2").top - first.top
+        assertEquals("Rows of the chosen density", rowHeight, first.height, .5f)
+        val drop = headlineDrop()
+        val shown = (540f - first.top).mod(stride)
+        val wanted = rowTitleBottom + (rowHeight - rowTitleBottom) / 3
+        val geometry = "drop=$drop shown=$shown wanted=$wanted stride=$stride"
+        assertTrue("Never more than half a row: $geometry", drop in 0f..stride / 2)
+        // What the grid would show unmoved decides whether it moves, and by how much.
+        val unmoved = (540f - (first.top - drop)).mod(stride)
+        val expected = (unmoved - wanted).mod(stride).takeIf { it <= stride / 2 } ?: 0f
+        assertEquals("The drop this geometry calls for: $geometry unmoved=$unmoved", expected, drop, 1f)
+        if (drop > .5f) {
+            assertEquals("The cut row shows its title and a third of the rest: $geometry", wanted, shown, 1f)
+        }
+        capture("guide-bottom-row-${rows.name.lowercase()}-font$scale", scale, LayoutDirection.Ltr).recycle()
         assertNoPlayback()
     }
 
@@ -2008,10 +2052,12 @@ class GuideVisualLayoutTest {
         val header = bounds("channels-header")
         val headline = bounds("guide-headline")
         assertEquals("The headline starts at the header row's start", header.left, headline.left, .5f)
-        assertEquals("The headline starts below the header row", header.bottom, headline.top, .5f)
+        val drop = headlineDrop()
+        assertTrue("The headline starts below the header row, lowered by less than half a row: $drop",
+            drop in 0f..30f)
         assertEquals("The headline keeps its fixed height", headlineHeight, headline.height, .5f)
         assertEquals("Timing anchors the content to the bottom", headline.bottom, bounds("guide-headline-metadata").bottom, .5f)
-        assertEquals(header.bottom + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
+        assertEquals(header.bottom + drop + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
         compose.onNodeWithTag("guide-headline")
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Focused))
         // The buttons keep their keys: Up from the grid reaches the date button, not the headline.
@@ -2057,7 +2103,7 @@ class GuideVisualLayoutTest {
             .getUnclippedBoundsInRoot()
         assertTrue("The channel line starts inside the headline: $channel / $headline", channel.top.value >= headline.top - .5f)
         assertEquals("The headline retains its reservation below the header",
-            bounds("channels-header").bottom + headlineHeight, headline.bottom, .5f)
+            bounds("channels-header").bottom + headlineDrop() + headlineHeight, headline.bottom, .5f)
     }
 
     // The headline stays below the header row for every group name and genre.
@@ -2120,8 +2166,8 @@ class GuideVisualLayoutTest {
         assertTrue("The headline starts below the header row: $geometry", headline.top >= header.bottom - .5f)
         assertTrue("The headline is at most a hero wide", headline.width <= ImmersiveHeroWidth.value + .5f)
         assertEquals("The headline ends where it did below the row: $geometry",
-            header.bottom + headlineHeight, headline.bottom, .5f)
-        assertEquals(header.bottom + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
+            header.bottom + headlineDrop() + headlineHeight, headline.bottom, .5f)
+        assertEquals(header.bottom + headlineDrop() + headlineHeight + GuideHeadlineRulerGap.value, bounds("epg-time-ruler").top, .5f)
         capture("guide-headline-buttons-${Locale.getDefault().language}-font$scale" +
             if (genre == ProgrammeCategory.SPORT) "-short" else "", scale, direction).recycle()
         assertNoPlayback()
@@ -2474,6 +2520,7 @@ class GuideVisualLayoutTest {
         lastOffset: Int = 5, eventHour: Long = hour, historyOffset: Int = -1, longProgramme: Boolean = false,
         longProgrammeHours: Int = 5, longProgrammeSuccessor: Boolean = false, initialCoverage: Boolean = true,
         beforeCoverageBatch: (suspend (List<ChannelId>, Instant) -> Unit)? = null, headline: Boolean = false,
+        rows: GuideRows = GuideRows.REGULAR,
         groupWithoutFirst: Boolean = false, genres: Boolean = false, tags: Boolean = true,
         recordings: List<DvrEntry> = emptyList(), shortSecondMinutes: Int? = null, connecting: Boolean = false,
         entryCoverage: Boolean = true, tagName: String = "Favourites", activeTag: Boolean = false,
@@ -2569,7 +2616,7 @@ class GuideVisualLayoutTest {
         }
         uiSettings = UiSettingsStore(preferences())
         // The grid's geometry without the headline; headline tests keep the default view.
-        if (!headline) runBlocking { uiSettings.setGuideView(GuideView(headline = false)) }
+        if (!headline || rows != GuideRows.REGULAR) runBlocking { uiSettings.setGuideView(GuideView(rows, headline = headline)) }
         val noticeModule = module {
             single { notices }
             single { uiSettings }
@@ -2593,6 +2640,8 @@ class GuideVisualLayoutTest {
                         SideRail(currentRoute = AppDestination.GUIDE, showEpgMenu = true,
                             onRootBack = { navigationRequests++ }, onNavigate = { navigationRequests++ }) { padding, drawer ->
                             val view = uiSettings.settings.collectAsState(UiSettings()).value.guideView
+                            rowHeight = guideTimelineRowHeight(view.rows).value
+                            rowTitleBottom = guideRowTitleBottom(view.rows).value
                             var genre by remember { mutableStateOf(initialGenre) }
                             EpgGridScreen(contentPadding = padding, initialFocusEnabled = !drawer, view = view, channelViewModel = model,
                                 guideActive = guideActive,
@@ -2817,6 +2866,9 @@ class GuideVisualLayoutTest {
         epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
     )).captureCurrentSession())
+
+    /** How far the headline sits below the header row. */
+    private fun headlineDrop(): Float = bounds("guide-headline").top - bounds("channels-header").bottom
 
     private fun bounds(tag: String): Rect = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
     private fun baseline(text: androidx.compose.ui.semantics.SemanticsNode): Float {

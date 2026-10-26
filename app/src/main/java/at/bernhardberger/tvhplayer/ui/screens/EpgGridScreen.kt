@@ -134,10 +134,11 @@ import at.bernhardberger.tvhplayer.ui.tvGenreColors
 import at.bernhardberger.tvhplayer.core.TimelineEpgEventIndex
 import at.bernhardberger.tvhplayer.ui.components.rememberTabContentMotion
 import at.bernhardberger.tvhplayer.ui.components.LocalBrowseNavigationFocus
-import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderMinHeight
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeaderRulerClearance
+import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineDrop
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadline
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuidePreparationSkeleton
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineBackground
@@ -287,9 +288,16 @@ fun EpgGridScreen(
     ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
-    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - guideChannelWidth(view.rows) - GuideChannelGap)
+    val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - GuideChannelWidth - GuideChannelGap)
         .coerceAtLeast(1.dp)
     val timelineWidthPx = with(density) { timelineWidth.toPx() }
+    // With the headline shown, the headline and grid sit lower so the bottom row shows it is cut.
+    val headlineDrop = guideHeadlineDrop(
+        viewportHeight = maxHeight,
+        contentTop = contentPadding.calculateTopPadding(),
+        gridTopPadding = guideTimelineContentPadding(contentPadding, layoutDirection).calculateTopPadding(),
+        rows = view.rows,
+    )
     val timeLabelMeasurer = rememberTextMeasurer()
     val timeLabelWidth = clockWidthSamples(uses24Hour = AppClock.uses24Hour, digit = '0').maxOf {
         timeLabelMeasurer.measure(it, style = MaterialTheme.typography.labelMedium).size.width
@@ -1794,7 +1802,7 @@ fun EpgGridScreen(
                                 scopeObservation = channelScopeState.observation,
                                 loading = true,
                                 nowSec = nowSecProvider,
-                                modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
+                                modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop),
                             )
                         }
                     } else null,
@@ -1839,6 +1847,7 @@ fun EpgGridScreen(
                 scopeObservation = channelScopeState.observation,
                 nowSec = nowSecProvider,
                 logoTop = contentPadding.calculateTopPadding() + guideHeaderMinHeight(),
+                headlineDrop = headlineDrop,
                 endInset = max(endPadding, TvBrowseTrailingInset),
                 modifier = Modifier.fillMaxSize().graphicsLayer { alpha = browseAlpha() },
             )
@@ -1927,7 +1936,7 @@ fun EpgGridScreen(
                     scopeObservation = channelScopeState.observation,
                     loading = connectionUiState.awaitsGuide(observation.epgState),
                     nowSec = nowSecProvider,
-                    modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset),
+                    modifier = Modifier.padding(start = startPadding + TvBrowseLeadingInset, top = headlineDrop),
                 )
             } else {
                 Spacer(Modifier.height(guideHeaderRulerClearance()))

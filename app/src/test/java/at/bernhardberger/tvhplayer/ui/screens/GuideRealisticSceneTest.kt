@@ -509,19 +509,19 @@ class GuideRealisticSceneTest {
         capture("u5-time-panel-times")
     }
 
-    @Test fun u5RegularRowsAreTallerThanDense() {
+    @Test fun u5DenseRowsShowOnlyTitles() {
         showAt("2026-09-15T19:40:00")
         openViewOptions()
         key(Key.DirectionDown)
-        tagFocused("guide-view-rows-regular")
+        tagFocused("guide-view-rows-dense")
         key(Key.Enter)
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("epg-channel-row-1")).fetchSemanticsNodes().any {
-            it.boundsInRoot.height > 60f } }
+            it.boundsInRoot.height < 50f } }
         key(Key.Back)
         tagFocused("channels-view-button")
         key(Key.DirectionDown)
         moveToChannel(11)
-        capture("u5-regular-rows")
+        capture("u5-dense-rows")
     }
 
     @Test fun u5HeadlineOffGivesTheGridTheHeadlinesRoom() {
@@ -942,7 +942,7 @@ class GuideRealisticSceneTest {
         repeat(3) { key(Key.DirectionRight) }
         tagFocused("channels-view-button")
         key(Key.Enter)
-        tagFocused("guide-view-rows-dense")
+        tagFocused("guide-view-rows-regular")
     }
 
     /** Filter button, Sport; the panel closes onto the Filter button. */

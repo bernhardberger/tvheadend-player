@@ -32,7 +32,8 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
         fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
         fun channelsChannelNames(layout: ChannelsLayout) = booleanPreferencesKey("channelsChannelNames${layout.name}")
-        val GUIDE_ROWS = stringPreferencesKey("guideRows")
+        // "guideRows" stored the retired taller rows and named today's Regular rows DENSE.
+        val GUIDE_ROWS = stringPreferencesKey("guideRowDensity")
         val GUIDE_HEADLINE = booleanPreferencesKey("guideHeadline")
         val GUIDE_GENRE_COLORS = booleanPreferencesKey("guideGenreColors")
     }

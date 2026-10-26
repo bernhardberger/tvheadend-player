@@ -39,6 +39,8 @@ import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.settings.GuideRows
+import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.core.EpgFocusColumn
 import at.bernhardberger.tvhplayer.core.EpgFocusTarget
 import at.bernhardberger.tvhplayer.core.programmeAgeRating
@@ -73,6 +75,7 @@ import at.bernhardberger.tvhplayer.ui.screens.ImmersiveHeroWidth
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
+import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 
@@ -147,6 +150,8 @@ internal fun GuideHeadlineBackground(
     logoTop: Dp,
     endInset: Dp,
     modifier: Modifier = Modifier,
+    /** [guideHeadlineDrop]: the picture reaches as far past the headline, which the logo stays above. */
+    headlineDrop: Dp = 0.dp,
 ) {
     // A slow group switch holds the last programme, whose channel the new group may not have.
     val held = programme()?.channel
@@ -163,7 +168,7 @@ internal fun GuideHeadlineBackground(
             endInset = endInset,
             modifier = modifier,
             picture = { id -> programme()?.event?.takeIf { it.channelId == id }?.image },
-            pictureHeight = logoTop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
+            pictureHeight = logoTop + headlineDrop + guideHeadlineHeight() + GuideHeadlineRulerGap + GuideHeadlinePictureReach,
         )
     }
 }
@@ -195,6 +200,40 @@ internal fun guideHeadlineEyebrowHeight(): Dp = with(LocalDensity.current) {
 
 /** The room between the headline and the time ruler below it. */
 internal val GuideHeadlineRulerGap = 12.dp
+
+/**
+ * How far the headline, ruler and grid move down below the header row, so the row the screen's
+ * bottom edge cuts shows its title and a third of the rest. A row that ends flush with the edge, or
+ * a sliver of one, hides that the grid goes on. Never more than half a row: a cut row already
+ * showing less than its title keeps its place rather than giving up most of a row. A notice above
+ * the ruler (channel set unavailable, stale data) is passing and left out, so it shifts the cut.
+ */
+@Composable
+internal fun guideHeadlineDrop(viewportHeight: Dp, contentTop: Dp, gridTopPadding: Dp, rows: GuideRows): Dp {
+    val row = guideTimelineRowHeight(rows)
+    val titleBottom = guideRowTitleBottom(rows)
+    val headerMinHeight = guideHeaderMinHeight()
+    val headlineHeight = guideHeadlineHeight()
+    val rulerHeight = guideRulerHeight()
+    // In whole pixels, each part rounded as layout places it, so the limit holds for the drop applied.
+    return with(LocalDensity.current) {
+        val rowPx = row.roundToPx()
+        guideHeadlineDropPx(
+            viewportPx = viewportHeight.roundToPx(),
+            gridTopPx = contentTop.roundToPx() + headerMinHeight.roundToPx() + headlineHeight.roundToPx() +
+                GuideHeadlineRulerGap.roundToPx() + rulerHeight.roundToPx() + gridTopPadding.roundToPx(),
+            stridePx = rowPx + TvSpacing4.roundToPx(),
+            wantedPx = (titleBottom.toPx() + (rowPx - titleBottom.toPx()) / 3).roundToInt(),
+        ).toDp()
+    }
+}
+
+/** [guideHeadlineDrop] in pixels: the drop that brings the cut row to [wantedPx], or 0 past half a stride. */
+internal fun guideHeadlineDropPx(viewportPx: Int, gridTopPx: Int, stridePx: Int, wantedPx: Int): Int {
+    val shown = (viewportPx - gridTopPx).mod(stridePx)
+    val drop = (shown - wantedPx).mod(stridePx)
+    return if (drop <= stridePx / 2) drop else 0
+}
 
 /**
  * How far the headline's picture reaches below the headline and its gap: over the time ruler and

@@ -75,7 +75,6 @@ import kotlin.math.roundToInt
 import androidx.tv.material3.Border
 import androidx.tv.material3.DenseListItem
 import androidx.tv.material3.Icon
-import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
@@ -110,7 +109,6 @@ import at.bernhardberger.tvhplayer.ui.TvSpacing4
 import at.bernhardberger.tvhplayer.ui.TvSpacing8
 import at.bernhardberger.tvhplayer.ui.TvSpacing12
 import at.bernhardberger.tvhplayer.ui.TvSpacing16
-import at.bernhardberger.tvhplayer.ui.TvSpacing24
 import at.bernhardberger.tvhplayer.ui.TvTrackAlpha
 import at.bernhardberger.tvhplayer.ui.common.AppClock
 import at.bernhardberger.tvhplayer.ui.common.formatClock
@@ -125,37 +123,48 @@ import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
 import at.bernhardberger.tvhplayer.ui.screens.guideEmptyMessageRes
 
-private fun GuideRows.logoWidth(): Dp = if (this == GuideRows.DENSE) 48.dp else 60.dp
-private fun GuideRows.logoHeight(): Dp = if (this == GuideRows.DENSE) 28.dp else 36.dp
-private fun GuideRows.headerHorizontalPadding(): Dp = if (this == GuideRows.DENSE) TvSpacing12 else TvSpacing16
-private fun GuideRows.headerVerticalPadding(): Dp = if (this == GuideRows.DENSE) 4.dp else 6.dp
+private val GuideLogoWidth = 48.dp
+private val GuideLogoHeight = 28.dp
+private val GuideHeaderVerticalPadding = 4.dp
+/** Material for TV's dense list item content padding above and below its text. */
+private val GuideCellVerticalPadding = 10.dp
 
 /**
- * A Guide row's height: Material for TV's two-line list item minimum (dense 56dp, regular 64dp)
- * at the current font scale, grown to fit the channel header and one title and time line with
- * the list item's vertical content padding (dense 10dp, regular 12dp on each side).
+ * A Guide row's height: Material for TV's dense list item minimum (two lines 56dp, one line 40dp)
+ * at the current font scale, grown to fit the channel header and the programme title, with the
+ * start time below it in [GuideRows.REGULAR] rows, inside the list item's vertical content padding.
  */
 @Composable
-internal fun guideTimelineRowHeight(rows: GuideRows = GuideRows.DENSE): Dp = with(LocalDensity.current) {
-    val titleLine = MaterialTheme.typography.titleSmall.lineHeight.toDp()
+internal fun guideTimelineRowHeight(rows: GuideRows = GuideRows.REGULAR): Dp = with(LocalDensity.current) {
     val numberLine = MaterialTheme.typography.labelMedium.lineHeight.toDp()
     val headerContent = maxOf(
-        rows.logoHeight(),
+        GuideLogoHeight,
         numberLine,
-        titleLine,
-    ) + rows.headerVerticalPadding() * 2
-    // One programme title and time line, including native ListItem content padding;
-    // headers either show number/logo or number/name, never all three.
-    val dense = rows == GuideRows.DENSE
+        MaterialTheme.typography.titleSmall.lineHeight.toDp(),
+    ) + GuideHeaderVerticalPadding * 2
+    // Headers either show number/logo or number/name, never all three.
     maxOf(
-        (if (dense) 56.dp else 64.dp) * fontScale,
+        (if (rows == GuideRows.DENSE) 40.dp else 56.dp) * fontScale,
         headerContent,
-        titleLine + MaterialTheme.typography.labelSmall.lineHeight.toDp() + if (dense) 20.dp else TvSpacing24,
+        guideCellTextHeight(rows) + GuideCellVerticalPadding * 2,
     )
 }
 
+/** A cell's text: the title, and in [GuideRows.REGULAR] rows the start time below it. */
 @Composable
-private fun guideRulerHeight(): Dp = with(LocalDensity.current) {
+private fun guideCellTextHeight(rows: GuideRows): Dp = with(LocalDensity.current) {
+    val title = MaterialTheme.typography.titleSmall.lineHeight.toDp()
+    if (rows == GuideRows.DENSE) title else title + MaterialTheme.typography.labelSmall.lineHeight.toDp()
+}
+
+/** How far down a row its title line ends: the cell's text is centred in the row. */
+@Composable
+internal fun guideRowTitleBottom(rows: GuideRows): Dp = with(LocalDensity.current) {
+    (guideTimelineRowHeight(rows) - guideCellTextHeight(rows)) / 2 + MaterialTheme.typography.titleSmall.lineHeight.toDp()
+}
+
+@Composable
+internal fun guideRulerHeight(): Dp = with(LocalDensity.current) {
     MaterialTheme.typography.labelSmall.lineHeight.toDp() + RulerVerticalSpace
 }
 
@@ -178,7 +187,6 @@ internal fun TimelineTimeRuler(
     modifier: Modifier = Modifier,
     earlierContent: Boolean = false,
     laterContent: Boolean = false,
-    rows: GuideRows = GuideRows.DENSE,
 ) {
     val nowSec = nowSecProvider()
     Row(
@@ -188,7 +196,7 @@ internal fun TimelineTimeRuler(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // The channel column needs no heading: the space only aligns the ruler with the track.
-        Spacer(Modifier.width(guideChannelWidth(rows) + GuideChannelGap))
+        Spacer(Modifier.width(GuideChannelWidth + GuideChannelGap))
         BoxWithConstraints(
             modifier = Modifier
                 .weight(1f)
@@ -309,7 +317,7 @@ internal fun TimelineChannelRow(
     focusEndInset: Dp = 0.dp,
     earlierContent: Boolean = false,
     laterContent: Boolean = false,
-    rows: GuideRows = GuideRows.DENSE,
+    rows: GuideRows = GuideRows.REGULAR,
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
     coverage: EpgCoverage? = null,
@@ -337,7 +345,6 @@ internal fun TimelineChannelRow(
             channel = channel,
             number = number,
             selected = selectedEventId != null,
-            rows = rows,
         )
         Spacer(Modifier.width(GuideChannelGap))
         // No track behind the cells: they sit on the page, one 4dp gutter apart, like the channel
@@ -354,7 +361,7 @@ internal fun TimelineChannelRow(
         ) {
             val density = LocalDensity.current
             val visibleTrackWidthPx = visibleRowWidthPx?.minus(
-                with(density) { guideChannelWidth(rows).roundToPx() + GuideChannelGap.roundToPx() },
+                with(density) { GuideChannelWidth.roundToPx() + GuideChannelGap.roundToPx() },
             )
             // The window keeps the programme on air even where it runs past an edge.
             val onAirId by remember(events, nowSecProvider) {
@@ -459,13 +466,12 @@ internal fun TimelineChannelHeader(
     channel: Channel,
     number: Long?,
     selected: Boolean = false,
-    rows: GuideRows = GuideRows.DENSE,
 ) {
     val currentSession = LocalArtworkContext.current.currentSession
     var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
     Surface(
         modifier = Modifier
-            .width(guideChannelWidth(rows))
+            .width(GuideChannelWidth)
             .fillMaxHeight()
             .semantics(mergeDescendants = true) {
                 contentDescription = channelTitleText(number, channel.name.orEmpty())
@@ -485,7 +491,7 @@ internal fun TimelineChannelHeader(
             modifier = Modifier
                 .fillMaxWidth()
                 .fillMaxHeight()
-                .padding(horizontal = rows.headerHorizontalPadding(), vertical = rows.headerVerticalPadding()),
+                .padding(horizontal = TvSpacing12, vertical = GuideHeaderVerticalPadding),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
         ) {
@@ -502,8 +508,8 @@ internal fun TimelineChannelHeader(
                     piconPath = channel.icon,
                     modifier = Modifier
                         .weight(1f, fill = false)
-                        .widthIn(max = rows.logoWidth())
-                        .height(rows.logoHeight())
+                        .widthIn(max = GuideLogoWidth)
+                        .height(GuideLogoHeight)
                         .testTag("epg-channel-picon-${channel.id.value}"),
                     onError = { logoFailed = true },
                 )
@@ -548,7 +554,7 @@ internal fun TimelineProgrammeCell(
     onOpenDetails: () -> Unit,
     modifier: Modifier,
     onOpenContextMenu: (() -> Unit)? = null,
-    rows: GuideRows = GuideRows.DENSE,
+    rows: GuideRows = GuideRows.REGULAR,
     genre: ProgrammeCategory = ProgrammeCategory.ALL,
     genreColors: Boolean = true,
     /** The state a cell outside the chosen [genre] reads, such as "Not Sport". */
@@ -630,7 +636,10 @@ internal fun TimelineProgrammeCell(
                 }
             }
         }
-        val supporting: @Composable () -> Unit = { ProgrammeStartText(start = startTime, modifier = contentAlpha) }
+        // Dense rows leave the start time to the ruler and the headline; the description still reads it.
+        val supporting: (@Composable () -> Unit)? = if (rows == GuideRows.DENSE) null else {
+            { ProgrammeStartText(start = startTime, modifier = contentAlpha) }
+        }
         val cellModifier = Modifier
             .tabFocus()
             .fillMaxSize()
@@ -663,32 +672,18 @@ internal fun TimelineProgrammeCell(
             focusedBorder = ring, pressedBorder = ring, focusedSelectedBorder = ring, pressedSelectedBorder = ring,
         )
         val itemShape = ListItemDefaults.shape(MaterialTheme.shapes.small)
-        when (rows) {
-            GuideRows.DENSE -> DenseListItem(
-                selected = selected,
-                onClick = onOpenDetails,
-                onLongClick = contextMenu.onLongClick,
-                headlineContent = headline,
-                supportingContent = supporting,
-                colors = itemColors,
-                scale = GuideCellScale,
-                border = itemBorder,
-                shape = itemShape,
-                modifier = cellModifier,
-            )
-            GuideRows.REGULAR -> ListItem(
-                selected = selected,
-                onClick = onOpenDetails,
-                onLongClick = contextMenu.onLongClick,
-                headlineContent = headline,
-                supportingContent = supporting,
-                colors = itemColors,
-                scale = GuideCellScale,
-                border = itemBorder,
-                shape = itemShape,
-                modifier = cellModifier,
-            )
-        }
+        DenseListItem(
+            selected = selected,
+            onClick = onOpenDetails,
+            onLongClick = contextMenu.onLongClick,
+            headlineContent = headline,
+            supportingContent = supporting,
+            colors = itemColors,
+            scale = GuideCellScale,
+            border = itemBorder,
+            shape = itemShape,
+            modifier = cellModifier,
+        )
     }
 }
 
@@ -725,7 +720,7 @@ private fun ProgrammeStartText(start: String, modifier: Modifier = Modifier) {
 
 /**
  * A row whose programmes are still loading: passive cells in the grid's cell shape, one per hour
- * of the window, each with a title and a time line. The row says it is loading.
+ * of the window, each with a title line and, in [GuideRows.REGULAR] rows, a time line. The row says it is loading.
  */
 @Composable
 private fun TimelineRowSkeleton(
@@ -739,7 +734,6 @@ private fun TimelineRowSkeleton(
     val description = stringResource(R.string.epg_loading)
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-    val horizontalPadding = if (rows == GuideRows.DENSE) TvSpacing12 else TvSpacing16
     Box(
         modifier
             .semantics { contentDescription = description }
@@ -767,13 +761,15 @@ private fun TimelineRowSkeleton(
                         .fillMaxHeight()
                         .padding(horizontal = TvSpacing4 / 2)
                         .background(TvSurfaceColors.containerHigh.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small)
-                        .padding(horizontal = horizontalPadding),
+                        .padding(horizontal = TvSpacing12),
                 ) {
                     SkeletonLine(
                         style = MaterialTheme.typography.titleSmall,
                         widthFraction = GuideSkeletonTitleFractions[index % GuideSkeletonTitleFractions.size],
                     )
-                    SkeletonLine(style = MaterialTheme.typography.labelSmall, widthFraction = GuideSkeletonTimeFraction)
+                    if (rows == GuideRows.REGULAR) {
+                        SkeletonLine(style = MaterialTheme.typography.labelSmall, widthFraction = GuideSkeletonTimeFraction)
+                    }
                 }
             }
         }
@@ -870,7 +866,6 @@ internal fun GuideSkeletonGrid(
             windowEndSec = windowEndSec,
             nowSecProvider = nowSecProvider,
             modifier = Modifier.padding(start = start, end = end),
-            rows = rows,
         )
         BoxWithConstraints(
             Modifier
@@ -884,7 +879,7 @@ internal fun GuideSkeletonGrid(
                     Row(Modifier.fillMaxWidth().height(rowHeight)) {
                         Box(
                             Modifier
-                                .width(guideChannelWidth(rows))
+                                .width(GuideChannelWidth)
                                 .fillMaxHeight()
                                 .background(TvSurfaceColors.container.copy(alpha = TvPanelDenseAlpha), MaterialTheme.shapes.small),
                         )
