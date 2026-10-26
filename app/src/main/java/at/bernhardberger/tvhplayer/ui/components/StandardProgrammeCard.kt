@@ -14,6 +14,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardContainerColors
 import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.CardDefaults
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import androidx.tv.material3.StandardCardContainer
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
@@ -29,6 +30,8 @@ internal fun StandardProgrammeCard(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
     modifier: Modifier,
+    art: ArtworkId?,
+    picon: ArtworkId?,
     title: @Composable () -> Unit,
     subtitle: @Composable () -> Unit,
     contentColor: CardContainerColors = CardContainerDefaults.contentColor(),
@@ -40,6 +43,7 @@ internal fun StandardProgrammeCard(
             Card(onClick = onClick, onLongClick = onLongClick, interactionSource = interaction,
                 modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f),
                 colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
+                glow = artworkCardGlow(art, picon, interaction),
                 border = embeddedProgressCardBorder()) {
                 Box(Modifier.fillMaxSize(), content = picture)
             }

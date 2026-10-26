@@ -8,6 +8,7 @@ import androidx.compose.animation.togetherWith
 import android.graphics.LinearGradient
 import android.graphics.Shader
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -115,10 +116,13 @@ internal fun CompactZapCard(
     val halo = if (logoOverArt) CompactZapLogoHalo else 0.dp
     val haloPx = with(LocalDensity.current) { halo.roundToPx() }
     val haloTransformation = remember(haloPx) { if (haloPx > 0) LogoHaloTransformation(haloPx, CompactZapLogoHaloAlpha) else null }
+    val interaction = remember { MutableInteractionSource() }
     CompactCard(
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
         border = embeddedProgressCardBorder(),
+        interactionSource = interaction,
+        glow = artworkCardGlow(artwork.takeIf { showArtwork }, channel.icon, interaction),
         // A scrim keeps text legible over artwork; the logo card's text sits on a flat surface.
         // The player rail keeps the kit's.
         scrimBrush = if (showArtwork && !channelLed) CardDefaults.ScrimBrush else SolidColor(Color.Transparent),

@@ -493,6 +493,8 @@ internal fun ChannelsRowCard(
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
         modifier = modifier.then(contextMenu.modifier),
+        art = art.takeIf { showsArt },
+        picon = channel.icon,
         picture = {
             if (artModel != null && !artFailed) AsyncImage(artModel, contentDescription = null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize().testTag("$tag-art"),

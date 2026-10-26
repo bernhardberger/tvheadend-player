@@ -696,6 +696,8 @@ private fun AiringCard(
         onLongClick = contextMenu.onLongClick,
         modifier = modifier.then(contextMenu.modifier)
             .semantics { contentDescription = listOfNotNull(time, spokenEpisode, channelName).joinToString(", ") },
+        art = item.image,
+        picon = channel?.icon,
         picture = {
             ProgrammeArtwork(item.image, channel?.icon, item.progress(nowSec).takeIf { running },
                 Modifier.fillMaxSize(),

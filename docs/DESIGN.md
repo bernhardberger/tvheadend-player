@@ -314,6 +314,12 @@ corners concentric. Native pressed behaviour remains unchanged. The bottom
 progress strip remains in its designed flush, full-width slot; the outline must
 not paint over it. Layout reserves the additional outer extent.
 
+Picture cards add a restrained native focus glow (accepted 2026-10-27), shared
+by Quick Zap, Channels cards and programme airings. Its colour comes from the
+picture shown, or the channel's picon accent on a logo card; without a usable
+colour it stays neutral. The existing outline, scale and pressed treatment stay
+unchanged. Rows, Guide cells and buttons keep their native defaults.
+
 Component commit model is set by the component:
 
 | Component | Commits on |
