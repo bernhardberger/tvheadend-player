@@ -46,8 +46,15 @@ private const val RECORDING_SEEK_FEEDBACK_MIN_MS = 600L
 private const val RECORDING_SEEK_FEEDBACK_POLL_MS = 100L
 private const val RECORDING_SEEK_FEEDBACK_SETTLED_GRACE_MS = 350L
 
+/**
+ * The identity of one queued step: a fresh object each, so unlike a token number it is never equal
+ * to a step of another source generation, and a report about it cannot reach a different step.
+ */
+internal class SeekStepId
+
 internal data class LiveTimeshiftSeekPreview(
     val token: Int,
+    val id: SeekStepId,
     val feedbackToken: Long,
     val decision: TimeshiftSeekDecision,
     val dispatched: Boolean,
@@ -67,6 +74,9 @@ private class LiveTimelineSourceGeneration(
     var seekFeedbackJob: Job? = null
     var seekToken = 0
     var previewDismissalEpoch = 0L
+    /** The step whose announcement the screen reported, and the finished step waiting for it. */
+    var announcedId: SeekStepId? = null
+    var clearWhenAnnounced: SeekStepId? = null
     var seekQueuedAtMs = 0L
     var commitRequested = false
     var positionSampleEpoch = 0L
@@ -183,7 +193,21 @@ internal class LiveTimelinePresentationState(
             result.playbackSeek === pending.acceptedSeek
         ) {
             // Correlated Player-position evidence, not a decoded/displayed frame acknowledgement.
-            clearPreview(generation)
+            // The finished step is still to be spoken: its preview goes once that has been
+            // announced, or after a grace period if nothing shows it.
+            if (generation.announcedId === pending.id) clearPreview(generation)
+            else if (generation.clearWhenAnnounced !== pending.id) {
+                generation.clearWhenAnnounced = pending.id
+                generation.seekFeedbackJob?.cancel()
+                generation.seekFeedbackJob = scope.launch {
+                    delay(TIMESHIFT_SEEK_FEEDBACK_MS)
+                    if (generation === sourceGeneration && generation.preview?.id === pending.id) {
+                        generation.seekFeedbackJob = null
+                        clearPreview(generation)
+                    }
+                    releaseGenerationIfInactive(generation)
+                }
+            }
         }
         if (!result.available || generation.historyStartTimeline?.describesSameSegment(result.timeline) != true) {
             generation.historyStartTimeline = result.timeline?.takeIf {
@@ -263,6 +287,7 @@ internal class LiveTimelinePresentationState(
         generation.seekQueuedAtMs = monotonicTimeMillis()
         generation.preview = LiveTimeshiftSeekPreview(
             token = token,
+            id = SeekStepId(),
             feedbackToken = operationFeedbackToken,
             decision = decision,
             dispatched = false,
@@ -406,6 +431,18 @@ internal class LiveTimelinePresentationState(
         clearPreview(sourceGeneration)
     }
 
+    /**
+     * The screen has put the spoken value of step [id] in front of the accessibility bridge. A
+     * finished step's preview, kept for that, goes now. A report about any other step, one of a
+     * replaced source included, is not about the current one and changes nothing.
+     */
+    fun stepAnnounced(id: SeekStepId) {
+        val generation = sourceGeneration
+        if (generation.preview?.id !== id) return
+        generation.announcedId = id
+        if (generation.clearWhenAnnounced === id) clearPreview(generation)
+    }
+
     fun commitPendingSeek() {
         val generation = sourceGeneration
         if (disposed || generation.seekQueue.pendingDeltaMs == 0L) return
@@ -458,6 +495,7 @@ internal class LiveTimelinePresentationState(
         generation.previewDismissalEpoch++
         generation.seekFeedbackJob?.cancel()
         generation.seekFeedbackJob = null
+        generation.clearWhenAnnounced = null
         generation.preview = null
         if (!generation.seekQueue.dispatchInFlight) {
             generation.selectionTimeline = null
@@ -526,6 +564,10 @@ internal class RecordingTimelinePresentationState(
     private var seekToken = 0
     private var disposed = false
 
+    /** The step being collected or dispatched; every queued step is a new one, also unseen by composition. */
+    var stepId by mutableStateOf<SeekStepId?>(null)
+        private set
+
     /** The shown position: a pending or dispatched seek's target, otherwise the playback position. */
     var positionMs by mutableLongStateOf(0L)
         private set
@@ -549,6 +591,10 @@ internal class RecordingTimelinePresentationState(
     val seekPending: Boolean
         get() = pendingTargetMs != null
 
+    /** The pending target's seek has been dispatched; false while stepping still collects. */
+    val seekDispatched: Boolean
+        get() = pendingTargetMs != null && pendingDispatched
+
     fun seekPreviewPhase(controlsVisible: Boolean): PlayerSeekPreviewPhase = when {
         pendingTargetMs == null -> PlayerSeekPreviewPhase.NONE
         pendingDispatched -> PlayerSeekPreviewPhase.DISPATCHED
@@ -569,6 +615,7 @@ internal class RecordingTimelinePresentationState(
         positionMs = requireNotNull(pendingTargetMs)
         seekToken++
         val token = seekToken
+        stepId = SeekStepId()
         seekJob?.cancel()
         seekJob = scope.launch {
             delay(RECORDING_SEEK_DEBOUNCE_MS)

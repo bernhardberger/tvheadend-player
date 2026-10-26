@@ -20,8 +20,8 @@ import at.bernhardberger.tvhplayer.core.recordingStepReadout
 import at.bernhardberger.tvhplayer.core.SeekbarRange
 import at.bernhardberger.tvhplayer.core.StepDirection
 import at.bernhardberger.tvhplayer.core.stepDirection
-import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
+import at.bernhardberger.tvhplayer.core.formatStepOffset
 import at.bernhardberger.tvhplayer.core.recordingTimelinePresentation
 
 /** The recording's bar at the step's target, or at the playback position; null while the length is unknown. */
@@ -72,22 +72,26 @@ internal fun RecordingBannerTimeline(timeline: PlayerChromeTimeline.Recording, s
         RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.INTERACTIVE, status = recordingBarStatus(timeline, state, range))
         return
     }
-    val readout = range?.let { recordingStepReadout(target, it.endMs, timeline.growing, stringResource(R.string.timeshift_live)) }
-        ?: StepReadout(recordingElapsedLabel(target, null))
-    val targetLabel = readout.text
+    val offsetMs = requireNotNull(timeline.stepDeltaMs)
+    val readout = range?.let { recordingStepReadout(offsetMs, target, it.endMs, timeline.growing, stringResource(R.string.timeshift_live)) }
+        ?: StepReadout(formatStepOffset(offsetMs), target = recordingElapsedLabel(target, null))
     val description = stringResource(
         R.string.recording_seek_preview_description,
-        targetLabel,
-        formatPlaybackDelta(requireNotNull(timeline.stepDeltaMs)),
+        stepOffsetDescription(offsetMs),
+        requireNotNull(readout.target),
         recordingLengthStatus(timeline, range),
     )
+    // A growing recording's length is read when the step settles and does not announce the step again.
+    val spoken = rememberSettledStep(timeline.stepId, "$offsetMs|${readout.target}", timeline.stepSettled, description).orEmpty()
     Column(
         Modifier.fillMaxWidth().testTag("recording-seek-preview").clearAndSetSemantics {
-            contentDescription = description
+            // Spoken once the step is dispatched, with the final value; the label shows every step.
+            contentDescription = spoken
             liveRegion = LiveRegionMode.Polite
         },
     ) {
-        RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.PREVIEW, previewLabel = targetLabel,
+        RecordingTimelineBlock(timeline, range, tone = PlayerTimelineTone.PREVIEW, previewLabel = readout.text,
+            previewTarget = readout.target,
             previewDirection = timeline.stepDeltaMs?.let(::stepDirection), previewAtLive = readout.atLive,
             status = recordingBarStatus(timeline, state, range))
     }
@@ -129,6 +133,8 @@ internal fun RecordingControlsTimeline(
         range = range,
         playbackPositionMs = timeline.positionMs,
         stepDeltaMs = timeline.stepDeltaMs,
+        stepSettled = timeline.stepSettled,
+        stepId = timeline.stepId,
         paused = paused,
         previewing = previewing,
         recordingMarkers = timeline.markers,
@@ -159,6 +165,7 @@ private fun RecordingTimelineBlock(
     previewLabel: String? = null,
     previewDirection: StepDirection? = null,
     previewAtLive: Boolean = false,
+    previewTarget: String? = null,
     status: PlayerBarStatus,
 ) {
     PlayerTimelineBlock(
@@ -172,6 +179,7 @@ private fun RecordingTimelineBlock(
         previewLabel = previewLabel,
         previewDirection = previewDirection,
         previewAtLive = previewAtLive,
+        previewTarget = previewTarget,
         markerFractions = range?.let { r -> timeline.markers.map { it.toFloat() / r.displayEndMs } }.orEmpty(),
         reserveLabelSpace = true,
         progressSemantics = false,

@@ -28,6 +28,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -284,7 +285,120 @@ class PlayerTimelinePresentationStateTest {
         assertEquals(fresh, owner.sampleTimeshiftPresentation { fresh })
         val settled = fixture.state.value.toAppPresentation(fixture.playbackPosition(480.seconds, accepted.seek))
         assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+        // The finished step stays until the screen has announced it.
+        owner.stepAnnounced(requireNotNull(owner.preview).id)
         assertNull(owner.preview)
+        owner.dispose()
+    }
+
+    @Test
+    fun aFinishedStepKeepsItsPreviewUntilItsAnnouncementIsReported() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val accepted = fixture.completed(readerReached = null)
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "expired", "replaced", "uncertain") { accepted }
+        // Dispatch and the correlated completion both land before any composition could see the
+        // dispatched preview.
+        advanceTimeBy(400L)
+        runCurrent()
+        val id = requireNotNull(owner.preview).id
+        assertTrue(requireNotNull(owner.preview).dispatched)
+        val settled = fixture.state.value.toAppPresentation(fixture.playbackPosition(480.seconds, accepted.seek))
+        assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+        assertSame(id, owner.preview?.id)
+        assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+        owner.stepAnnounced(SeekStepId())
+        assertSame(id, owner.preview?.id)
+        owner.stepAnnounced(id)
+        assertNull(owner.preview)
+        owner.dispose()
+    }
+
+    @Test
+    fun aStepAnnouncedBeforeItsCompletionIsRetiredByTheCorrelatedEvidenceAtOnce() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val accepted = fixture.completed(readerReached = null)
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "expired", "replaced", "uncertain") { accepted }
+        advanceTimeBy(400L)
+        runCurrent()
+        owner.stepAnnounced(requireNotNull(owner.preview).id)
+        val settled = fixture.state.value.toAppPresentation(fixture.playbackPosition(480.seconds, accepted.seek))
+        assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+        assertNull(owner.preview)
+        owner.dispose()
+    }
+
+    @Test
+    fun anAcknowledgementOfAReplacedSourcesStepDoesNotAcknowledgeTheNewSourcesStep() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        fun finishedStep(): Pair<SeekStepId, AppTimeshiftState> {
+            val accepted = fixture.completed(readerReached = null)
+            owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+                "unavailable", "expired", "replaced", "uncertain") { accepted }
+            return requireNotNull(owner.preview).id to
+                fixture.state.value.toAppPresentation(fixture.playbackPosition(480.seconds, accepted.seek))
+        }
+        val (oldId, _) = finishedStep()
+        val oldToken = requireNotNull(owner.preview).token
+        owner.invalidateForSourceChange()
+        val (newId, settled) = finishedStep()
+        assertEquals("tokens restart with the source", oldToken, requireNotNull(owner.preview).token)
+        advanceTimeBy(400L)
+        runCurrent()
+        assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+        assertSame(newId, owner.preview?.id)
+        // The old source's callback arrives late, with the same token number.
+        owner.stepAnnounced(oldId)
+        assertSame("the new step waits for its own announcement", newId, owner.preview?.id)
+        assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+        assertSame(newId, owner.preview?.id)
+        owner.stepAnnounced(newId)
+        assertNull(owner.preview)
+        owner.dispose()
+    }
+
+    @Test
+    fun aFinishedStepNobodyAnnouncesStillRetiresAfterAGracePeriod() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        val accepted = fixture.completed(readerReached = null)
+        owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+            "unavailable", "expired", "replaced", "uncertain") { accepted }
+        advanceTimeBy(400L)
+        runCurrent()
+        val settled = fixture.state.value.toAppPresentation(fixture.playbackPosition(480.seconds, accepted.seek))
+        owner.sampleTimeshiftPresentation { settled }
+        advanceTimeBy(900L)
+        runCurrent()
+        // Further evidence does not extend the grace period.
+        owner.sampleTimeshiftPresentation { settled }
+        assertNotNull(owner.preview)
+        advanceTimeBy(100L)
+        runCurrent()
+        assertNull(owner.preview)
+        owner.dispose()
+    }
+
+    @Test
+    fun cancellationAndSourceChangeClearAFinishedStepAtOnce() = runTest {
+        val fixture = fixture()
+        val owner = LiveTimelinePresentationState(this, { 0L }, { testScheduler.currentTime })
+        for (invalidate in listOf<() -> Unit>(owner::cancelPendingSeek, owner::invalidateForSourceChange, owner::dismissDispatchedFeedback)) {
+            val accepted = fixture.completed(readerReached = null)
+            owner.queueRelativeSeek(fixture.presentation(), -30_000L,
+                "unavailable", "expired", "replaced", "uncertain") { accepted }
+            advanceTimeBy(400L)
+            runCurrent()
+            val settled = fixture.state.value.toAppPresentation(fixture.playbackPosition(480.seconds, accepted.seek))
+            owner.sampleTimeshiftPresentation { settled }
+            assertNotNull(owner.preview)
+            invalidate()
+            assertNull(owner.preview)
+        }
         owner.dispose()
     }
 
@@ -720,6 +834,7 @@ class PlayerTimelinePresentationStateTest {
             val settled = fixture.state.value.toAppPresentation(fixture.playbackPosition(target, accepted.seek))
                 .copy(paused = paused)
             assertEquals(settled, owner.sampleTimeshiftPresentation { settled })
+            owner.stepAnnounced(requireNotNull(owner.preview).id)
             assertNull(owner.preview)
             assertNull(owner.feedback)
             assertFalse(owner.feedbackIsError)

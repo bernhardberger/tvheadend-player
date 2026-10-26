@@ -47,13 +47,43 @@ class PlaybackTimeFormatTest {
     }
 
     @Test
-    fun deltaCarriesExplicitSign() {
-        assertEquals("+0:30", formatPlaybackDelta(30_000L))
-        assertEquals("−1:15", formatPlaybackDelta(-75_000L))
+    fun stepOffsetCarriesExplicitSign() {
+        assertEquals("+3:00", formatStepOffset(180_000L))
+        assertEquals("−1:30", formatStepOffset(-90_000L))
+        assertEquals("+0:30", formatStepOffset(30_000L))
     }
 
     @Test
-    fun zeroDeltaIsPositive() {
-        assertEquals("+0:00", formatPlaybackDelta(0L))
+    fun stepOffsetPassesAnHourWithHoursAndMinutesPadded() {
+        assertEquals("+1:02:00", formatStepOffset(3_720_000L))
+        assertEquals("−1:00:05", formatStepOffset(-3_605_000L))
+        assertEquals("+59:59", formatStepOffset(3_599_000L))
+    }
+
+    @Test
+    fun zeroStepOffsetIsUnsigned() {
+        assertEquals("0:00", formatStepOffset(0L))
+        // Under a second moves nowhere, which the label must not claim as a direction.
+        assertEquals("0:00", formatStepOffset(-900L))
+        assertEquals("−0:01", formatStepOffset(-1_000L))
+    }
+
+    @Test
+    fun stepOffsetUsesLatinDigitsInEveryLocaleAndKeepsTheRealMinus() {
+        val previous = Locale.getDefault()
+        try {
+            for (tag in listOf("ar-EG-u-nu-arab", "de-DE", "fa-IR")) {
+                Locale.setDefault(Locale.forLanguageTag(tag))
+                assertEquals(tag, "−1:30", formatStepOffset(-90_000L))
+                assertEquals(tag, "+1:02:00", formatStepOffset(3_720_000L))
+            }
+        } finally {
+            Locale.setDefault(previous)
+        }
+    }
+
+    @Test
+    fun stepOffsetOfTheLowestLongDoesNotOverflow() {
+        assertEquals('−', formatStepOffset(Long.MIN_VALUE).first())
     }
 }

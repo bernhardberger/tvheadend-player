@@ -201,6 +201,9 @@ internal fun PlayerChrome(
                             // The readout shows the target; the distance stays where playback is.
                             barStatus = timeline.barStatus(content.state, window = timeline.programmeWindow),
                             nowSec = timeline.nowSec,
+                            settled = timeline.stepSettled,
+                            onAnnounced = timeline.onStepAnnounced,
+                            stepId = timeline.stepId,
                         ) else PlayerPresentedLiveTimeline(requireNotNull(liveBar), content.state,
                             feedback = timeline.feedback, feedbackIsError = timeline.feedbackIsError)
                     }

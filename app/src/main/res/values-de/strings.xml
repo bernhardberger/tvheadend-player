@@ -463,7 +463,7 @@
     <string name="recording_still_recording">Aufnahme läuft noch</string>
     <string name="recording_duration_unavailable">Dauer nicht verfügbar</string>
     <string name="recording_timeline_status_description">Vergangen: %1$s. %2$s.</string>
-    <string name="recording_seek_preview_description">Sprungziel %1$s. Gesamtänderung %2$s. %3$s.</string>
+    <string name="recording_seek_preview_description">%1$s, Ziel %2$s. %3$s.</string>
     <string name="recording_known_duration">Gesamtdauer %1$s</string>
     <string name="pause">Pause</string>
     <string name="seek_back_30">−30 Sekunden</string>
@@ -474,7 +474,23 @@
     <string name="player_seekbar_recording_description">Wiedergabeposition %1$s von %2$s</string>
     <string name="player_seekbar_timeshift_description">Timeshift-Position %1$s hinter Live. %2$s</string>
     <string name="player_seekbar_timeshift_live_description">Timeshift-Position Live. %1$s</string>
-    <string name="timeshift_seek_preview_description">Sprungziel %1$s. Gesamtänderung %2$s. %3$s. %4$s</string>
+    <string name="timeshift_seek_preview_description">%1$s, Ziel %2$s. %3$s. %4$s</string>
+    <string name="timeshift_seek_preview_short_description">%1$s, Ziel %2$s. %3$s</string>
+    <string name="seek_offset_forward_description">%1$s vor</string>
+    <string name="seek_offset_back_description">%1$s zurück</string>
+    <string name="seek_offset_none_description">Keine Änderung</string>
+    <plurals name="seek_offset_hours">
+        <item quantity="one">%1$d Stunde</item>
+        <item quantity="other">%1$d Stunden</item>
+    </plurals>
+    <plurals name="seek_offset_minutes">
+        <item quantity="one">%1$d Minute</item>
+        <item quantity="other">%1$d Minuten</item>
+    </plurals>
+    <plurals name="seek_offset_seconds">
+        <item quantity="one">%1$d Sekunde</item>
+        <item quantity="other">%1$d Sekunden</item>
+    </plurals>
     <string name="player_on_now">Wird gerade wiedergegeben</string>
     <string name="track_unknown_language">Unbekannte Sprache</string>
     <string name="track_multiple_languages">Mehrsprachig</string>

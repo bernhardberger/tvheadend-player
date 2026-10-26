@@ -95,21 +95,38 @@ fun recordingBarEnd(positionMs: Long, durationMs: Long?, growing: Boolean, lengt
 fun hiddenStatusText(state: PlayerStateCell, end: PlayerBarEnd?, liveLabel: String): String? =
     if (state == PlayerStateCell.PAUSED) end?.distanceText(liveLabel) else null
 
-/** The step readout at a target: [text] is `−3:53`, a position, or `Live` with [atLive] for the play glyph. */
-data class StepReadout(val text: String, val atLive: Boolean = false)
-
-/** Live: the target's distance behind live; within the live-edge tolerance it is the live edge. */
-fun liveStepReadout(behindLiveMs: Long, liveLabel: String): StepReadout =
-    if (behindLiveMs <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS) StepReadout(liveLabel, atLive = true)
-    else StepReadout("−${formatPlaybackDuration(behindLiveMs)}")
+/**
+ * The step readout at a target: [text] is the signed offset from where stepping started (`+3:00`),
+ * [target] the target's absolute place, small beside it (a clock time, a position, or `Live` with
+ * [atLive] for the play glyph).
+ */
+data class StepReadout(val text: String, val atLive: Boolean = false, val target: String? = null)
 
 /**
- * A recording: the target position, or `Live` at a growing recording's head. [endMs] is the
- * recorded length the position label pads to.
+ * The wall-clock second of a position [behindLiveMs] behind the live edge, which lies at [nowSec].
+ * Null without a clock: timing is not known.
  */
-fun recordingStepReadout(targetMs: Long, endMs: Long, growing: Boolean, liveLabel: String): StepReadout =
-    if (growing && endMs - targetMs <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS) StepReadout(liveLabel, atLive = true)
-    else StepReadout(recordingElapsedLabel(targetMs, endMs))
+fun liveTargetClockSec(nowSec: Long?, behindLiveMs: Long): Long? = nowSec?.let { it - behindLiveMs / 1_000L }
+
+/**
+ * Live: the step's [offsetMs]; the target is its clock time ([targetClock], else its distance behind
+ * live), and within the live-edge tolerance it is the live edge.
+ */
+fun liveStepReadout(offsetMs: Long, behindLiveMs: Long, liveLabel: String, targetClock: String?): StepReadout {
+    val offset = formatStepOffset(offsetMs)
+    return if (behindLiveMs <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS) StepReadout(offset, atLive = true, target = liveLabel)
+    else StepReadout(offset, target = targetClock ?: "−${formatPlaybackDuration(behindLiveMs)}")
+}
+
+/**
+ * A recording: the step's [offsetMs]; the target is its position, or `Live` at a growing recording's
+ * head. [endMs] is the recorded length the position label pads to.
+ */
+fun recordingStepReadout(offsetMs: Long, targetMs: Long, endMs: Long, growing: Boolean, liveLabel: String): StepReadout {
+    val offset = formatStepOffset(offsetMs)
+    return if (growing && endMs - targetMs <= TIMESHIFT_LIVE_EDGE_TOLERANCE_MS) StepReadout(offset, atLive = true, target = liveLabel)
+    else StepReadout(offset, target = recordingElapsedLabel(targetMs, endMs))
+}
 
 /** A recording's elapsed position, as long as its length's so the label does not jump at an hour. */
 fun recordingElapsedLabel(positionMs: Long, lengthMs: Long?): String {

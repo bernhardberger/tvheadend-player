@@ -15,13 +15,16 @@ internal fun QuickStepBanner(
     programmeWindow: ProgrammeWindow? = null,
     feedback: String? = null,
     feedbackIsError: Boolean = feedback != null,
+    settled: Boolean = true,
+    /** The wall-clock second of the live edge; the step's target clock is derived from it. */
+    nowSec: Long = 0,
 ) {
     PlayerChrome(
         mode = PlayerChromeMode.BANNER_STEP,
         content = PlayerChromeContent("", liveInfoBarData(androidx.compose.ui.platform.LocalContext.current.resources, 1, "Fixture TV", null, null, false, 0, "")),
         timeline = PlayerChromeTimeline.Live(
-            state, nowSec = 0, step = decision, programmeWindow = programmeWindow,
-            feedback = feedback, feedbackIsError = feedbackIsError,
+            state, nowSec = nowSec, step = decision, programmeWindow = programmeWindow,
+            feedback = feedback, feedbackIsError = feedbackIsError, stepSettled = settled,
         ),
         actions = PlayerChromeActions(active = false),
         onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},

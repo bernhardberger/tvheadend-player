@@ -178,17 +178,58 @@ class RecordingPlayerChromeScreenTest {
         playing()
         repeat(8) { settle() }
         assertFalse("the entry Banner timed out", exists("player-banner"))
-        for ((step, target) in listOf(Key.MediaRewind to "Seek target 0:09:30", Key.MediaFastForward to "Seek target 0:10:30")) {
+        for ((step, target) in listOf(Key.MediaRewind to "30 seconds back, target 0:09:30", Key.MediaFastForward to "30 seconds forward, target 0:10:30")) {
             positionMs = 600_000L
             settle()
             compose.onRoot().performKeyInput { pressKey(step) }
             compose.mainClock.advanceTimeBy(100)
             compose.waitForIdle()
             assertTrue("the step previews in the Banner", exists("player-banner"))
-            assertTrue(description("recording-seek-preview").startsWith(target))
+            assertTrue(spokenStep("recording-seek-preview").startsWith(target))
             repeat(8) { settle() }
             assertFalse("the Banner hides again", exists("player-banner"))
         }
+    }
+
+    @Test fun steppingAgainAccumulatesTheOffsetFromWhereSteppingStartedAndNamesTheTarget() {
+        screen()
+        playing()
+        repeat(8) { settle() }
+        positionMs = 600_000L
+        settle()
+        compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue(texts("+0:30"))
+        compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue("the label reads the offset from the start", texts("+1:00"))
+        assertEquals("0:11:00", compose.onNodeWithTag("timeshift-preview-target-position", useUnmergedTree = true)
+            .fetchSemanticsNode().config[SemanticsProperties.Text].joinToString { it.text })
+        assertTrue(spokenStep("recording-seek-preview").startsWith("1 minute forward, target 0:11:00"))
+        compose.onRoot().performKeyInput { pressKey(Key.MediaRewind) }
+        compose.mainClock.advanceTimeBy(100)
+        compose.waitForIdle()
+        assertTrue("stepping back reduces the offset", texts("+0:30"))
+    }
+
+    @Test fun stepsInQuickSuccessionAreAnnouncedOnceWithTheFinalValue() {
+        screen()
+        playing()
+        repeat(8) { settle() }
+        positionMs = 600_000L
+        settle()
+        repeat(3) {
+            compose.onRoot().performKeyInput { pressKey(Key.MediaFastForward) }
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+            assertEquals("a held key announces nothing while it steps", "", description("recording-seek-preview"))
+        }
+        assertTrue("the label still follows every step", texts("+1:30"))
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
     }
 
     @Test fun aStoppedScreenLeavesNoBannerBehind() {
@@ -291,8 +332,62 @@ class RecordingPlayerChromeScreenTest {
         assertTrue("the step previews in the Banner", exists("player-banner"))
         assertFalse(exists("player-actions"))
         assertFalse("no focusable seekbar in the Banner", exists("player-seekbar"))
-        assertEquals("Seek target 0:09:30. Cumulative change −0:30. Total 1:00:00.",
-            description("recording-seek-preview"))
+        assertEquals("30 seconds back, target 0:09:30. Total 1:00:00.",
+            spokenStep("recording-seek-preview"))
+    }
+
+    @Test fun aStepQueuedAndCommittedBetweenTwoCompositionsIsAnnouncedAfresh() {
+        var target by mutableStateOf(630_000L)
+        var stepId by mutableStateOf(SeekStepId())
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(
+                    mode = PlayerChromeMode.BANNER_STEP, positionMs = 600_000L, durationMs = 3_600_000L,
+                    targetMs = target, originMs = 600_000L, stepSettled = true, stepId = stepId,
+                )
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        assertEquals("30 seconds forward, target 0:10:30. Total 1:00:00.", description("recording-seek-preview"))
+        // The next step is queued and dispatched before a composition sees it pending.
+        compose.runOnIdle {
+            target = 690_000L
+            stepId = SeekStepId()
+        }
+        settle()
+        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", description("recording-seek-preview"))
+    }
+
+    @Test fun aNewStepKeepsTheSettledStepsWordsOnTheFocusedSeekbarUntilItSettles() {
+        var target by mutableStateOf(630_000L)
+        var settled by mutableStateOf(true)
+        var stepId by mutableStateOf(SeekStepId())
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                RecordingChromeFixture(
+                    mode = PlayerChromeMode.CONTROLS, positionMs = 600_000L, durationMs = 3_600_000L,
+                    targetMs = target, originMs = 600_000L, stepSettled = settled, stepId = stepId,
+                )
+            }
+        }
+        compose.mainClock.autoAdvance = false
+        settle()
+        fun seekbar() = compose.onNodeWithTag("player-seekbar").fetchSemanticsNode()
+            .config[SemanticsProperties.ContentDescription].joinToString()
+        val first = seekbar()
+        assertEquals("30 seconds forward, target 0:10:30. Total 1:00:00.", first)
+        // The next step of the burst is queued: its own identity, not yet dispatched.
+        compose.runOnIdle {
+            target = 690_000L
+            settled = false
+            stepId = SeekStepId()
+        }
+        settle()
+        assertEquals("the older step's words stay until the new one settles", first, seekbar())
+        compose.runOnIdle { settled = true }
+        settle()
+        assertEquals("1 minute 30 seconds forward, target 0:11:30. Total 1:00:00.", seekbar())
     }
 
     @Test fun upFromTheSeekbarStaysAtTheTopEdgeAndTheBarRowHasNoStatusSlot() {
@@ -446,6 +541,13 @@ class RecordingPlayerChromeScreenTest {
     private fun description(tag: String): String =
         compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode()
             .config[SemanticsProperties.ContentDescription].joinToString()
+
+    /** The spoken description once stepping has rested past the announcement window. */
+    private fun spokenStep(tag: String): String {
+        compose.mainClock.advanceTimeBy(500)
+        compose.waitForIdle()
+        return description(tag)
+    }
 
     private fun focused(): List<String> =
         compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()

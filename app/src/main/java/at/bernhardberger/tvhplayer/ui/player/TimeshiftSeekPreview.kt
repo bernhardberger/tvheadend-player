@@ -12,13 +12,14 @@ import androidx.compose.ui.semantics.liveRegion
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.playback.TimeshiftSeekDecision
-import at.bernhardberger.tvhplayer.core.formatPlaybackDelta
 import at.bernhardberger.tvhplayer.core.stepDirection
 import at.bernhardberger.tvhplayer.core.formatPlaybackDuration
 import at.bernhardberger.tvhplayer.core.liveStepReadout
+import at.bernhardberger.tvhplayer.core.liveTargetClockSec
 import at.bernhardberger.tvhplayer.core.projectedTimeshiftState
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
+import at.bernhardberger.tvhplayer.ui.common.formatClock
 
 /**
  * The seek preview's timeline: target, delta and programme of a pending or dispatched step.
@@ -36,6 +37,12 @@ internal fun TimeshiftSeekPreviewTimeline(
     barStatus: PlayerBarStatus? = null,
     /** The wall-clock second now; with [barStatus] the buffer's start clock is the leading label without programme clocks. */
     nowSec: Long? = null,
+    /** The step has been dispatched: only then it is spoken, once, with its final value. */
+    settled: Boolean = false,
+    /** The step's announcement has been made; see [rememberSettledStep]. */
+    onAnnounced: () -> Unit = {},
+    /** The step's identity: the seek state's preview. */
+    stepId: Any? = null,
 ) {
     val targetState = projectedTimeshiftState(state, decision.targetMs)
     val range = timeshiftSeekbarRange(targetState)
@@ -51,30 +58,35 @@ internal fun TimeshiftSeekPreviewTimeline(
             formatPlaybackDuration(positionPresentation.behindLiveMs),
         )
     }
-    val readout = liveStepReadout(positionPresentation.behindLiveMs, liveLabel)
-    val targetLabel = readout.text
-    val deltaLabel = formatPlaybackDelta(decision.deltaMs)
+    val targetClock = liveTargetClockSec(
+        nowSec?.takeIf { targetState.available && targetState.timingKnown }, positionPresentation.behindLiveMs,
+    )?.let(::formatClock)
+    val readout = liveStepReadout(decision.deltaMs, positionPresentation.behindLiveMs, liveLabel, targetClock)
     val bufferStartDescription = stringResource(
         R.string.timeshift_buffer_start_description,
         formatPlaybackDuration(
             (targetState.liveEdgeMs - targetState.bufferStartMs).coerceAtLeast(0L)
         ),
     )
-    val description = stringResource(
-        R.string.timeshift_seek_preview_description,
-        targetLabel,
-        deltaLabel,
-        behindLiveLabel,
-        bufferStartDescription,
-    )
+    val description = liveStepDescription(decision.deltaMs, readout, targetClock != null, behindLiveLabel, bufferStartDescription)
     val unavailableTarget = stringResource(R.string.timeshift_target_expired)
+    // The buffer's length ticks; it is read when the step settles and does not announce the step again.
+    val spoken = rememberSettledStep(
+        identity = stepId,
+        key = "${readout.text}|${readout.target}",
+        settled = settled,
+        change = feedback.orEmpty(),
+        onPublished = onAnnounced,
+        text = (programmeWindow?.let {
+            "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
+                if (!it.targetAvailable) " $unavailableTarget" else ""
+        } ?: description) + feedback?.let { ". $it" }.orEmpty(),
+    ).orEmpty()
 
     androidx.compose.foundation.layout.Column(Modifier.fillMaxWidth().testTag("timeshift-seek-preview")
         .clearAndSetSemantics {
-            contentDescription = (programmeWindow?.let {
-                "${it.event?.title?.let { title -> "$title. " }.orEmpty()}${clockLabels?.first} - ${clockLabels?.second}. $description" +
-                    if (!it.targetAvailable) " $unavailableTarget" else ""
-            } ?: description) + feedback?.let { ". $it" }.orEmpty()
+            // Spoken once the step is dispatched, with the final value; the label shows every step.
+            contentDescription = spoken
             liveRegion = LiveRegionMode.Polite
         }) {
     PlayerTimelineBlock(
@@ -97,7 +109,8 @@ internal fun TimeshiftSeekPreviewTimeline(
         status = barStatus,
         leadingLabelTestTag = "timeshift-preview-buffer-start",
         trailingLabelTestTag = "timeshift-preview-position",
-        previewLabel = targetLabel,
+        previewLabel = readout.text,
+        previewTarget = readout.target,
         previewAtLive = readout.atLive,
         previewDirection = stepDirection(decision.deltaMs),
         feedback = feedback ?: programmeWindow?.let { if (!it.targetAvailable) unavailableTarget else it.event?.title?.takeIf { titleAsFeedback } },
