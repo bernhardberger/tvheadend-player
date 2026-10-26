@@ -93,6 +93,7 @@ import java.util.TimeZone
 import kotlin.time.Instant
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
@@ -329,7 +330,9 @@ class PlayerChromeCaptureTest {
             if (next.first == "02") {
                 assertEquals("an absent logo keeps the chip's place", withLogoWidth, size.width)
                 compose.onNodeWithTag("channel-number-picon", useUnmergedTree = true).assertDoesNotExist()
-                compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true).assertTextEquals("2")
+                // A logo-less match leaves the chip empty: the number stands once, in the field.
+                assertEquals(1, compose.onAllNodesWithText("02", useUnmergedTree = true).fetchSemanticsNodes().size +
+                    compose.onAllNodesWithText("2", useUnmergedTree = true).fetchSemanticsNodes().size)
             }
             if (next.second == ChannelNumberTarget.Pending) {
                 compose.onNodeWithTag("channel-number-target").assertDoesNotExist()

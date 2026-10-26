@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.focusable
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Rect
@@ -39,6 +40,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasAnyAncestor
@@ -53,6 +55,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -469,27 +472,41 @@ class PlayerMotionTest {
         compose.onNodeWithText("123").assertExists()
         assertEquals("the first digit did not jump to its rest", 0f, ink(view, cell(0)), lastAtRest * 0.05f)
         assertTrue("the first digit did not restart from the end", ink(view, cell(1)) > 0f)
+        // The fading-in end digit stays in its cell as the next one pushes it, never end-ward past the field.
+        assertEquals("nothing spills past the field's end", 0f, ink(view, cell(3)))
         compose.mainClock.advanceTimeBy(PlayerMotion.ShortMs + 100L)
         for (index in 0..2) assertTrue("cell $index holds its digit", ink(view, cell(index)) > 0f)
     }
 
-    @Test fun aLogoLessDestinationShowsItsNumberInTheChipWithoutMovingAnything() {
-        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.None)
-        compose.setContent { TVHeadendPlayerTheme { ChannelNumberOverlay("12", target, Modifier.testTag("number")) } }
+    @Test fun aLogoLessMatchShowsItsNumberOnceInTheFieldWithoutMovingAnything() {
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Pending)
+        lateinit var view: View
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    ChannelNumberOverlay("12", target, Modifier.testTag("number"), plate = ChannelNumberPlate.None)
+                }
+            }
+        }
         compose.waitForIdle()
+        val row = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
+        val chip = with(compose.density) {
+            Rect(row.left + IdentityInset.toPx(), row.center.y - ChipHeight.toPx() / 2,
+                row.left + (IdentityInset + ChipWidth).toPx(), row.center.y + ChipHeight.toPx() / 2)
+        }
+        assertTrue("an empty tile waits for the match", ink(view, chip) > 0f)
+        change { target = ChannelNumberTarget.None }
+        compose.waitForIdle()
+        assertTrue("no channel keeps the empty tile", ink(view, chip) > 0f)
         val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
         val name = compose.onNodeWithTag("channel-number-target").fetchSemanticsNode().boundsInRoot
-        val row = compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot
-        compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true).assertDoesNotExist()
 
         change { target = ChannelNumberTarget.Channel("12", "Harbor", null) }
         compose.waitForIdle()
-        val chip = compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true)
-        chip.assertTextEquals("12")
         compose.onNodeWithTag("channel-number-picon", useUnmergedTree = true).assertDoesNotExist()
-        // Centred in the chip, as the identity shows a logo-less channel.
-        val chipCenter = with(compose.density) { row.left + (IdentityInset + ChipWidth / 2).toPx() }
-        assertEquals(chipCenter, chip.fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
+        assertEquals("the chip is left empty, without a tile", 0f, ink(view, chip))
+        assertEquals("the number stands once", 1, compose.onAllNodesWithText("12", useUnmergedTree = true).fetchSemanticsNodes().size)
         assertEquals(digits, compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot)
         assertEquals(name.left, compose.onNodeWithText("Harbor").fetchSemanticsNode().boundsInRoot.left, 0.5f)
         assertEquals(row.height, compose.onNodeWithTag("number").fetchSemanticsNode().boundsInRoot.height, 0.5f)
@@ -512,7 +529,7 @@ class PlayerMotionTest {
                 spoken()[SemanticsProperties.ContentDescription])
         }
         // The parts are read only through the entry, never on their own.
-        for (part in listOf("channel-number-digits", "channel-number-chip-number", "channel-number-target")) {
+        for (part in listOf("channel-number-digits", "channel-number-target")) {
             assertTrue(part, compose.onNodeWithTag(part, useUnmergedTree = true).fetchSemanticsNode().config
                 .contains(SemanticsProperties.HideFromAccessibility))
         }
@@ -538,7 +555,7 @@ class PlayerMotionTest {
                 }
             }
         }
-        val tags = listOf("number", "channel-number-chip-number", "channel-number-target")
+        val tags = listOf("number", "channel-number-target")
         val layouts = mutableMapOf<ChannelNumberPlate, List<Rect>>()
         val gapInk = mutableMapOf<ChannelNumberPlate, Float>()
         for (style in ChannelNumberPlate.entries) {
@@ -604,11 +621,10 @@ class PlayerMotionTest {
 
     @Test fun aCommittedEntrySlidesIntoTheIdentitysAlignmentAndACancelledOneFadesInPlace() {
         var number by mutableStateOf("12")
+        var target by mutableStateOf<ChannelNumberTarget>(ChannelNumberTarget.Channel("12", "One", null))
         var settles by mutableStateOf(false)
         compose.setContent {
-            TVHeadendPlayerTheme {
-                ChannelNumberOverlay(number, ChannelNumberTarget.Channel("12", "One", null), Modifier.testTag("number"), settles = settles)
-            }
+            TVHeadendPlayerTheme { ChannelNumberOverlay(number, target, Modifier.testTag("number"), settles = settles) }
         }
         compose.waitForIdle()
         fun digits() = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
@@ -640,6 +656,23 @@ class PlayerMotionTest {
         assertEquals(restName.left - restDigits.left, name().left - digits().left, 0.5f)
         compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs / 2L - 20L)
         assertEquals(restDigits.left - advance, digits().left, 2f)
+        compose.mainClock.advanceTimeBy(100L)
+        compose.onNodeWithTag("number").assertDoesNotExist()
+
+        // A leading zero: "01" settles as channel 1's own number, its name where the identity's name will be.
+        compose.mainClock.autoAdvance = true
+        change { settles = false; target = ChannelNumberTarget.Channel("1", "One", null); number = "01" }
+        compose.waitForIdle()
+        val typed = digits()
+        val space = name().left - typed.right
+        val fieldStart = typed.right - 3 * advance
+        compose.mainClock.autoAdvance = false
+        change { settles = true; number = "" }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithTag("channel-number-digits").assertTextEquals("1")
+        compose.mainClock.advanceTimeBy(PlayerMotion.DestinationExitMs - 20L)
+        assertEquals("the number starts on the field's start", fieldStart, digits().left, 2f)
+        assertEquals("the name one space after it", fieldStart + advance + space, name().left, 2f)
     }
 
     @Test fun numberEntryKeepsTheChromeItInterruptedStillAndNeverRevealsHiddenChrome() {
@@ -707,10 +740,15 @@ class PlayerMotionTest {
         var number by mutableStateOf("")
         var withEntry by mutableStateOf(false)
         lateinit var view: View
+        var fieldWidth = 0
         compose.setContent {
             view = LocalView.current
             val content = PlayerChromeContent("", liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, false, 0, "Programme"))
             TVHeadendPlayerTheme {
+                // The entry's three-digit field, in tabular digits.
+                val measurer = rememberTextMeasurer()
+                val style = MaterialTheme.typography.titleLarge.copy(fontFeatureSettings = "tnum")
+                fieldWidth = measurer.measure("000", style, softWrap = false).size.width
                 Box(Modifier.fillMaxSize().background(Color.Black)) {
                     PlayerTopIdentity(content, numberEntryShown = number.isNotEmpty())
                     if (withEntry) PlayerTopIdentitySlot {
@@ -754,11 +792,9 @@ class PlayerMotionTest {
         assertEquals(bounds.left, entry.left, 0.5f)
         assertEquals(bounds.top, entry.top, 0.5f)
         assertEquals(bounds.height, entry.height, 0.5f)
-        val entryChip = compose.onNodeWithTag("channel-number-chip-number", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
-        assertEquals(chip.center.x, entryChip.center.x, 0.5f)
-        assertEquals(chip.center.y, entryChip.center.y, 0.5f)
-        assertTrue("the field starts with the identity's text",
-            compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot.left >= name.left - 0.5f)
+        val digits = compose.onNodeWithTag("channel-number-digits").fetchSemanticsNode().boundsInRoot
+        assertEquals("the field starts with the identity's text", name.left, digits.right - fieldWidth, 0.5f)
+        assertEquals(chip.center.y, digits.center.y, 0.5f)
     }
 
     @Test fun recoveryFocusesRetryAsItStartsToAppearAndLetsGoAtOnce() {

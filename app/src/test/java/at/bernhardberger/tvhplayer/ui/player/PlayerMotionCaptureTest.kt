@@ -155,6 +155,11 @@ class PlayerMotionCaptureTest {
         compose.mainClock.advanceTimeBy(1_000)
         change("", ChannelNumberTarget.Pending)
         frames("cancel", listOf(3, 6, 10))
+        // A leading zero settles as the channel's own number.
+        change("01", ChannelNumberTarget.Channel("1", "Documentary", ArtworkId(1)))
+        compose.mainClock.advanceTimeBy(1_000)
+        change("", ChannelNumberTarget.Pending, committed = true)
+        frames("commit-leading-zero", listOf(1, 6, 10))
         change("999", ChannelNumberTarget.None)
         frames("no-channel", listOf(3, 5))
         change("", ChannelNumberTarget.Pending)

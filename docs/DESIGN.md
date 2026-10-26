@@ -915,22 +915,25 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   the typed digits and the destination's name on one line, with the identity's
   start edge, top edge and height at every font scale (the digits share the
   name's style). The chip holds an empty tile while pending or for `No channel`,
-  the match's picon, or a logo-less match's own number as the identity shows it.
-  The digits stand right-aligned in a field sized for the lineup's longest number
-  (at least three digits), starting where the identity's text starts; the name
-  follows one space later, one line, ellipsized within the identity's text width.
-  A plate grows out of the content into the identity's bounds (300ms, emphasized
-  decelerate) and never shrinks while the entry is open; its end grows only when
+  and the match's picon; a logo-less match leaves it empty, its number standing
+  once, in the field. The digits stand right-aligned in a field sized for the
+  lineup's longest number (at least three digits), starting where the identity's
+  text starts; the name follows one space later, one line, ellipsized within the
+  identity's text width. A plate grows out of the content into the identity's
+  top edge and height (300ms, emphasized decelerate), as wide as the entry's
+  content; it never shrinks while the entry is open, and its end grows only when
   the content needs it. The plate is a style that changes only colours: dark
   (shipping; dense dark panel, tile fades from behind a picon), light (the
   identity's focus container with a soft shadow) or none. Each new digit pushes
   the earlier ones start-ward by one digit while it fades in at the end (150ms);
-  a digit during any of this motion carries on from where it stands, never
-  restarting the plate. Destination changes cross-fade in place. Commit slides
-  the number and name into the identity's rest alignment while the plate recedes
-  (200ms); cancel fades the content where it stands while the plate recedes. The
-  entry is announced politely once per change (`12, Harbor Sport HD`,
-  `999, No channel`), not per frame and not while it leaves. Entry keeps the
+  each digit keeps its own push and fade, so a digit during any of this motion
+  carries the others on from where they stand, never restarting the plate.
+  Destination changes cross-fade in place. Commit slides the channel's own number
+  (`01` settles as `1`) and the name into the identity's rest alignment while the
+  plate recedes (200ms); cancel fades the content where it stands while the plate
+  recedes. The entry is announced politely once per change
+  (`12, Harbor Sport HD`, `999, No channel`), not per frame and not while it
+  leaves. Entry keeps the
   chrome it interrupted: controls or Banner stay up, the identity fades out under
   the entry, is not read out meanwhile, and fades back in place when the entry
   leaves, without the chrome travelling. The root takes the keys during entry,

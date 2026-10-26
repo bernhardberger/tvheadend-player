@@ -26,9 +26,11 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -74,7 +76,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 /** What the typed digits lead to: the matching channel, none yet, or none at all. */
 @Immutable
 internal sealed interface ChannelNumberTarget {
-    /** The match, with its own [number] for its chip when it has no [picon], as its identity shows it. */
+    /** The match, with its own [number] as its identity shows it: a committed entry settles to it. */
     data class Channel(val number: String, val name: String, val picon: ArtworkId?) : ChannelNumberTarget
     /** Not known yet: more digits may still name a channel, or the list has not loaded. */
     data object Pending : ChannelNumberTarget
@@ -178,7 +180,10 @@ private fun ChannelNumberEntryRow(
     val spaceWidth = remember(measurer, style, density) { measurer.measure("0 0", style).size.width -
         measurer.measure("00", style).size.width }
     val advance = fieldWidth / maxDigits.toFloat()
-    val digits = entry.number.length
+    // Settling, the number becomes the channel's own, as its identity shows it: "01" settles as "1".
+    val number = (entry.target as? ChannelNumberTarget.Channel)?.number
+        ?.takeIf { !shown && settles && it.isNotEmpty() } ?: entry.number
+    val digits = number.length
 
     val noChannel = stringResource(R.string.player_channel_number_none)
     val spoken = when (val target = entry.target) {
@@ -214,11 +219,12 @@ private fun ChannelNumberEntryRow(
                 Modifier
                     .padding(start = IdentityTextGap)
                     .widthIn(max = IdentityTextMaxWidth)
-                    // Into the rest identity's alignment: the number's start on the field's start.
+                    // Into the rest identity's alignment: the number's start on the field's start, the
+                    // name one space after it.
                     .graphicsLayer { translationX = -settle.value * (maxDigits - digits).coerceAtLeast(0) * advance },
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ChannelNumberDigits(entry.number, with(density) { fieldWidth.toDp() }, style)
+                ChannelNumberDigits(number, with(density) { fieldWidth.toDp() }, style)
                 ChannelNumberName(entry.target, Modifier.weight(1f, fill = false).padding(start = with(density) { spaceWidth.toDp() }))
             }
         }
@@ -227,16 +233,24 @@ private fun ChannelNumberEntryRow(
 
 /**
  * The typed digits at the end of their field. A new digit fades in at the end while the earlier
- * ones slide start-ward by one advance; a digit arriving mid-slide continues it from where it is.
+ * ones slide start-ward by one advance; each digit carries its own push and fade, so a digit typed
+ * mid-slide moves every other digit on from where it stands. A new entry starts at rest.
  */
 @Composable
 private fun ChannelNumberDigits(number: String, width: Dp, style: TextStyle) {
-    val count = number.length
-    val shift = animateFloatAsState(count.toFloat(), tween(PlayerMotion.ShortMs, easing = PlayerMotion.Standard),
-        label = "digit push")
-    // The first digit comes in with the entry itself.
-    val arrival = remember(number) { Animatable(if (count > 1) 0f else 1f) }
-    LaunchedEffect(arrival) { arrival.animateTo(1f, tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) }
+    val applied = remember { object { var arrivals = DigitArrivals("", LongArray(0)) } }
+    val arrivals = remember(number) { applied.arrivals.next(number) }
+    SideEffect { applied.arrivals = arrivals }
+    var now by remember { mutableLongStateOf(0L) }
+    LaunchedEffect(arrivals) {
+        do {
+            val time = withFrameMillis { time ->
+                arrivals.stamp(time)
+                now = time
+                time
+            }
+        } while (!arrivals.settledAt(time))
+    }
     Box(Modifier.width(width), contentAlignment = Alignment.CenterEnd) {
         Text(
             text = number,
@@ -245,38 +259,90 @@ private fun ChannelNumberDigits(number: String, width: Dp, style: TextStyle) {
             softWrap = false,
             modifier = Modifier
                 .wrapContentWidth(Alignment.End, unbounded = true)
-                .digitPush(count, shift, arrival::value)
+                .digitPush(arrivals) { now }
                 .testTag("channel-number-digits")
                 .semantics { hideFromAccessibility() },
         )
     }
 }
 
-private fun Modifier.digitPush(count: Int, shift: State<Float>, arrival: () -> Float) = drawWithCache {
+/**
+ * When each digit after the first arrived, in frame milliseconds: [NotYet] until its first frame,
+ * [Settled] when it came with the entry. Digit `i` is pushed by every later digit's arrival.
+ */
+private class DigitArrivals(val number: String, val at: LongArray) {
+    /** Typing one more digit keeps the others' motion; anything else is a new entry at rest. */
+    fun next(number: String): DigitArrivals = when {
+        number == this.number -> this
+        this.number.isNotEmpty() && number.length == this.number.length + 1 && number.startsWith(this.number) ->
+            DigitArrivals(number, at.copyOf(number.length - 1).also { it[it.lastIndex] = NotYet })
+        else -> DigitArrivals(number, LongArray((number.length - 1).coerceAtLeast(0)) { Settled })
+    }
+
+    fun stamp(time: Long) {
+        for (i in at.indices) if (at[i] == NotYet) at[i] = time
+    }
+
+    fun settledAt(time: Long) = at.all { progress(time, it) >= 1f }
+
+    /** Digit [index]'s distance from its rest, in advances toward the field's end. */
+    fun offset(index: Int, time: Long): Float {
+        var offset = 0f
+        for (j in index until at.size) offset += 1f - PlayerMotion.Standard.transform(progress(time, at[j]))
+        return offset
+    }
+
+    fun alpha(index: Int, time: Long): Float =
+        if (index == 0) 1f else PlayerMotion.StandardDecelerate.transform(progress(time, at[index - 1]))
+
+    private fun progress(time: Long, arrival: Long) = ((time - arrival).toFloat() / PlayerMotion.ShortMs).coerceIn(0f, 1f)
+}
+
+private const val NotYet = Long.MAX_VALUE
+private const val Settled = Long.MIN_VALUE / 2
+
+/** Draws each digit in its own cell at its own push and fade, never past the field's end. */
+private fun Modifier.digitPush(arrivals: DigitArrivals, now: () -> Long) = drawWithCache {
+    val count = arrivals.at.size + 1
+    val advance = size.width / count
+    val cells = List(count) { Rect(it * advance, 0f, (it + 1) * advance, size.height) }
     val fade = Paint()
     onDrawWithContent {
-        val advance = size.width / count.coerceAtLeast(1)
-        val last = size.width - advance
-        // The earlier digits still stand where the last push left them; the shift brings them home.
-        val pushed = (count - shift.value).coerceAtLeast(0f) * advance
-        if (count > 1) translate(left = pushed) { clipRect(right = last) { this@onDrawWithContent.drawContent() } }
-        clipRect(left = last) {
-            fade.alpha = arrival()
-            drawIntoCanvas { canvas ->
-                canvas.saveLayer(Rect(last, 0f, size.width, size.height), fade)
-                this@onDrawWithContent.drawContent()
-                canvas.restore()
+        val time = now()
+        clipRect(right = size.width) {
+            for ((index, cell) in cells.withIndex()) {
+                val alpha = arrivals.alpha(index, time)
+                if (alpha <= 0f) continue
+                translate(left = arrivals.offset(index, time) * advance) {
+                    clipRect(cell.left, cell.top, cell.right, cell.bottom) {
+                        if (alpha >= 1f) this@onDrawWithContent.drawContent()
+                        else drawIntoCanvas { canvas ->
+                            fade.alpha = alpha
+                            canvas.saveLayer(cell, fade)
+                            this@onDrawWithContent.drawContent()
+                            canvas.restore()
+                        }
+                    }
+                }
             }
         }
     }
 }
 
-/** The destination's picture slot: an empty tile, the match's picon, or a logo-less match's number. */
+/**
+ * The destination's picture slot: an empty tile until a match, then the match's picon. A logo-less
+ * match leaves it empty; its number stands once, in the field.
+ */
 @Composable
 private fun ChannelNumberChip(target: ChannelNumberTarget, plate: ChannelNumberPlate) {
-    val channel = target as? ChannelNumberTarget.Channel
+    val picon = (target as? ChannelNumberTarget.Channel)?.picon
     val tile by animateFloatAsState(
-        if (channel?.picon == null || plate == ChannelNumberPlate.Light) 1f else 0f,
+        when {
+            target !is ChannelNumberTarget.Channel -> 1f
+            // On the light plate the logo keeps the dark tile under it.
+            picon != null && plate == ChannelNumberPlate.Light -> 1f
+            else -> 0f
+        },
         tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate), label = "chip tile",
     )
     Box(
@@ -288,27 +354,21 @@ private fun ChannelNumberChip(target: ChannelNumberTarget, plate: ChannelNumberP
         contentAlignment = Alignment.Center,
     ) {
         AnimatedContent(
-            targetState = channel,
-            contentKey = { it?.picon ?: it?.number },
+            targetState = picon,
             transitionSpec = {
                 (fadeIn(tween(PlayerMotion.ShortMs, easing = PlayerMotion.StandardDecelerate)) togetherWith
                     fadeOut(tween(PlayerMotion.FastMs, easing = PlayerMotion.StandardAccelerate))).using(null)
             },
             contentAlignment = Alignment.Center,
             label = "chip",
-        ) { shownChannel ->
-            when {
-                shownChannel == null -> Unit
-                shownChannel.picon != null -> PiconBox(
-                    shownChannel.picon,
+        ) { shownPicon ->
+            if (shownPicon != null) {
+                PiconBox(
+                    shownPicon,
                     Modifier.padding(4.dp).testTag("channel-number-picon"),
-                    // On the light plate the logo keeps the dark tile under it.
                     ground = if (plate == ChannelNumberPlate.Light) TvSurfaceColors.containerHighest
                         else MaterialTheme.colorScheme.background,
                 )
-                // As a logo-less channel's identity shows it.
-                else -> Text(shownChannel.number, style = MaterialTheme.typography.labelLarge, maxLines = 1,
-                    modifier = Modifier.testTag("channel-number-chip-number").semantics { hideFromAccessibility() })
             }
         }
     }
