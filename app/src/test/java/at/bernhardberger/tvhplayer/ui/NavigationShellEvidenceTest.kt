@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
@@ -370,6 +371,89 @@ class NavigationShellEvidenceTest {
         assertEquals("Now playing: Northline Tonight, 3 Northline News, Recorded. $select", description())
         assertEquals(LiveRegionMode.Polite, compose.onNodeWithTag("global-drawer-now-playing-item")
             .fetchSemanticsNode().config.getOrNull(SemanticsProperties.LiveRegion))
+    }
+
+    /** Without a position sample the viewer is at the clock; a reconnect holds that clock with the title. */
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun reconnectKeepsTheProgrammeAcrossItsEndUntilPlaybackResumes() {
+        settingsShell(1f)
+        fun description() = compose.onNodeWithTag("global-drawer-now-playing-item")
+            .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.single()
+        fun stripRow(): List<Int> {
+            val plate = bounds("global-drawer-now-playing-plate", unmerged = true)
+            val bitmap = drawShell()
+            return (plate.left.toInt() + 4 until plate.right.toInt() - 4).map { bitmap.getPixel(it, plate.bottom.toInt() - 1) }
+        }
+        fun passMinute() {
+            clock += 60
+            compose.mainClock.advanceTimeBy(61_000)
+            compose.waitForIdle()
+        }
+        val select = "Select to return to the player."
+        playLive()
+        compose.runOnIdle { livePosition.value = null }
+        compose.waitForIdle()
+        compose.runOnIdle {
+            nowPlaying = railNowPlaying(liveTarget, AppPlaybackState.Recovering(
+                PlaybackRecoveryReason.LIVE_ENDED, 0L), fixtureObservation, null, false)
+        }
+        compose.waitForIdle()
+        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.NONE }
+        compose.waitForIdle()
+        val strip = stripRow()
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting. $select", description())
+
+        // The clock passes the programme's end while the reconnect lasts.
+        clock = fixtureStart.epochSeconds + 7200 + 540
+        passMinute()
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting. $select", description())
+        assertEquals(strip, stripRow())
+
+        compose.runOnIdle {
+            nowPlaying = railNowPlaying(liveTarget, AppPlaybackState.Playing, fixtureObservation, null, false)
+            watchingIndicator = ChannelPlaybackIndicator.PLAYING
+        }
+        compose.waitForIdle()
+        assertEquals("Now playing: Ridge Night, 1 Ridge Earth HD, Live. $select", description())
+        assertTrue("the strip moves on with the programme", strip != stripRow())
+    }
+
+    /** A hold that still describes another target lends this slot none of its pause or tune. */
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun heldMarkOfAnotherTargetLeavesTheSlotUnmarked() {
+        settingsShell(1f)
+        playLive()
+        compose.runOnIdle {
+            heldTarget = AppPlaybackTarget.Recording(fixtureRecording.id)
+            watchingIndicator = ChannelPlaybackIndicator.PAUSED
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("global-drawer-now-playing-disc").assertDoesNotExist()
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Live. Select to return to the player.",
+            compose.onNodeWithTag("global-drawer-now-playing-item").fetchSemanticsNode()
+                .config.getOrNull(SemanticsProperties.ContentDescription)?.single())
+
+        compose.runOnIdle { heldTarget = null }
+        compose.waitForIdle()
+        compose.onNodeWithTag("global-drawer-now-playing-disc").assertExists()
+    }
+
+    /** The slot is an action, not a destination: a button, never selected, outside the destinations' count. */
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun slotIsAButtonOutsideTheDestinations() {
+        settingsShell(1f)
+        openDrawer()
+        fun selectable() = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected))
+            .fetchSemanticsNodes().size
+        val destinations = selectable()
+        playLive()
+        compose.onNodeWithTag("global-drawer-now-playing-item")
+            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        assertEquals(destinations, selectable())
     }
 
     /** Collapsed and expanded slot in each main state, over the warm fixture still. */
@@ -726,6 +810,10 @@ class NavigationShellEvidenceTest {
     private val liveTarget = AppPlaybackTarget.Live(ChannelId(1))
     private val fixtureProgramme = EpgEvent.create(EventId(1), liveTarget.channelId, fixtureStart,
         fixtureStart + 7200.seconds, title = "Ridge Light")
+    private val fixtureFollowing = EpgEvent.create(EventId(2), liveTarget.channelId, fixtureStart + 7200.seconds,
+        fixtureStart + 10800.seconds, title = "Ridge Night")
+    /** The wall clock the slot reads; it only moves when a test moves it. */
+    private var clock = fixtureNow
     private val fixtureRecording = DvrEntry.create(DvrEntryId(1), channelId = ChannelId(3), title = "Northline Tonight",
         channelName = "Northline News", start = fixtureStart - 86400.seconds, stop = fixtureStart - 82800.seconds,
         state = DvrEntryState.COMPLETED)
@@ -738,6 +826,8 @@ class NavigationShellEvidenceTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(fixtureRecording))),
     )).observation.value
     private var nowPlaying by mutableStateOf<RailNowPlaying?>(null)
+    /** What the watching locals describe when an entry hold keeps an earlier target; else what plays. */
+    private var heldTarget by mutableStateOf<AppPlaybackTarget?>(null)
     private var watchingIndicator by mutableStateOf(ChannelPlaybackIndicator.PLAYING)
     private var guideData by mutableStateOf(true)
     private val livePosition = mutableStateOf<LiveViewerPosition?>(null)
@@ -776,8 +866,8 @@ class NavigationShellEvidenceTest {
         compose.setContent {
             CompositionLocalProvider(
                 LocalDensity provides Density(1f, fontScale),
-                LocalWatchingTarget provides nowPlaying?.target,
-                LocalWatchingChannel provides (nowPlaying?.target as? AppPlaybackTarget.Live)?.channelId,
+                LocalWatchingTarget provides (heldTarget ?: nowPlaying?.target),
+                LocalWatchingChannel provides ((heldTarget ?: nowPlaying?.target) as? AppPlaybackTarget.Live)?.channelId,
                 LocalWatchingIndicator provides watchingIndicator,
                 LocalLivePosition provides livePosition,
                 LocalRecordingPosition provides recordingPosition,
@@ -798,9 +888,11 @@ class NavigationShellEvidenceTest {
                             onRootBack = {},
                             onNavigate = { navigations += it },
                             nowPlaying = nowPlaying,
-                            programmeAt = { _, at -> fixtureProgramme.takeIf { guideData && it.isRunning(at) } },
+                            programmeAt = { _, at ->
+                                listOf(fixtureProgramme, fixtureFollowing).firstOrNull { guideData && it.isRunning(at) }
+                            },
                             onOpenNowPlaying = { opened++ },
-                            nowSecProvider = { fixtureNow },
+                            nowSecProvider = { clock },
                         ) { padding, drawerActive ->
                             SettingsScreenNavigation(
                                 navigation,

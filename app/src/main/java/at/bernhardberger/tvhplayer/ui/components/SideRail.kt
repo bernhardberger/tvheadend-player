@@ -71,9 +71,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -378,7 +382,6 @@ internal fun SideRail(
         }
     }
     SideEffect { onBackHandlerChanged(handleBrowseBack) }
-    val nowPlayingFocus = remember { FocusRequester() }
     var nowPlayingFocused by remember { mutableStateOf(false) }
     // Read while composing the slot's removal, before it detaches and drops its focus.
     val nowPlayingFocusLost = remember(nowPlaying == null) {
@@ -488,7 +491,6 @@ internal fun SideRail(
                             modifier = Modifier
                                 .withinDrawerSheet(fullWidth, visibleWidthPx)
                                 .focusProperties { canFocus = !detailsOpen && !modalOpen }
-                                .focusRequester(nowPlayingFocus)
                                 // Focus only shows where the player is; it never navigates or previews.
                                 .onFocusChanged { nowPlayingFocused = it.isFocused },
                         )
@@ -701,70 +703,86 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
     modifier: Modifier,
 ) = HoldWatching(nowPlaying.reconnecting) {
     // A reconnect keeps the strip and title where the viewer was until playback resumes or ends.
-    val indicator = LocalWatchingIndicator.current
+    val reconnecting = nowPlaying.reconnecting
+    // A held mark belongs to what played when it was taken; another target's pause or tune is not this one's.
+    val watchingSlot = LocalWatchingTarget.current == nowPlaying.target
+    val indicator = if (watchingSlot) LocalWatchingIndicator.current else ChannelPlaybackIndicator.NONE
     val liveChannel = (nowPlaying.target as? AppPlaybackTarget.Live)?.channelId
-    val watchingLive = liveChannel != null && LocalWatchingTarget.current == nowPlaying.target &&
-        indicator.isPlayingItem
+    val watchingLive = liveChannel != null && indicator.isPlayingItem
     val livePosition = LocalLivePosition.current
     // liveViewerPosition's contract, held as state so its per-second samples stay out of this scope.
     val viewer = remember(livePosition, liveChannel, watchingLive) {
         derivedStateOf { livePosition?.value?.takeIf { watchingLive && it.channelId == liveChannel } }
     }
-    val nowSec = rememberDetailsEpochSeconds(nowSecProvider)
+    // Without a position sample the viewer is at the clock, so a reconnect stops the clock too.
+    val nowSec = heldWhile(reconnecting, rememberDetailsEpochSeconds(nowSecProvider))
     val currentProgrammeAt by rememberUpdatedState(programmeAt)
-    val programme by remember(viewer, liveChannel, nowSec) {
+    val lookedUp by remember(viewer, liveChannel, nowSec) {
         derivedStateOf { liveChannel?.let { currentProgrammeAt(it, viewer.value?.epochSec ?: nowSec) } }
     }
+    val programme = heldWhile(reconnecting, lookedUp)
     val behindLive by remember(viewer) { derivedStateOf { viewer.value?.behindLive == true } }
+    var focused by remember { mutableStateOf(false) }
     val status = railPlaybackStatus(nowPlaying, indicator, behindLive)
     val channel = channelTitleText(nowPlaying.channelNumber, nowPlaying.channelName)
     val title = nowPlaying.recordingTitle ?: programme?.title
+    // A recording whose channel the server no longer names has only its title to show.
+    val lineChannel = channel.takeIf { title != null && it.isNotBlank() }
     val statusLabel = railStatusLabel(status, behindLiveMinutes = null, LocalResources.current)
-    val description = if (title != null) {
-        stringResource(R.string.rail_now_playing_description, title, channel, statusLabel)
+    val description = if (title != null && lineChannel != null) {
+        stringResource(R.string.rail_now_playing_description, title, lineChannel, statusLabel)
     } else {
-        stringResource(R.string.rail_now_playing_description_channel, channel, statusLabel)
+        stringResource(R.string.rail_now_playing_description_channel, title ?: channel, statusLabel)
     }
     Box(Modifier.height(BrandHeaderHeight).testTag("global-drawer-now-playing")) {
-        NavigationDrawerItem(
-            selected = false,
-            onClick = onOpen,
-            leadingContent = {
-                PinnedRailIcon {
-                    // The plate is wider than an icon and keeps the icons' centre.
-                    Box(Modifier.size(NavigationDrawerItemDefaults.IconSize), contentAlignment = Alignment.Center) {
-                        NowPlayingPlate(
-                            picon = nowPlaying.picon,
-                            channelNumber = nowPlaying.channelNumber?.toString(),
-                            modifier = Modifier
-                                .requiredSize(NowPlayingPlateWidth, NowPlayingPlateHeight)
-                                // Its per-second strip stays out of the announced item.
-                                .clearAndSetSemantics { testTag = "global-drawer-now-playing-plate" },
-                            // A tune has no picture yet; the mark waits at the inactive items' ratio.
-                            contentAlpha = if (status == RailPlaybackStatus.TUNING) inactiveContentAlpha() else 1f,
-                        ) { NowPlayingRailStrip(nowPlaying, programme, status, nowSec) }
-                    }
-                }
+        // The library item announces itself as a selectable destination of the drawer's group; the
+        // slot is an action instead, so it states its own button node and stays out of that count.
+        Box(
+            Modifier.clearAndSetSemantics {
+                contentDescription = description
+                role = Role.Button
+                this.focused = focused
+                onClick { onOpen(); true }
+                liveRegion = LiveRegionMode.Polite
+                testTag = "global-drawer-now-playing-item"
             },
-            supportingContent = {
-                NowPlayingStatusLine(status, viewer, nowSecProvider, channel.takeIf { title != null })
-            },
-            colors = colors,
-            modifier = modifier
-                .height(BrandHeaderHeight)
-                .semantics {
-                    contentDescription = description
-                    liveRegion = LiveRegionMode.Polite
-                }
-                .testTag("global-drawer-now-playing-item"),
         ) {
-            Text(
-                title ?: channel,
-                Modifier.padding(start = NowPlayingTextIndent).clearAndSetSemantics {},
-                style = MaterialTheme.typography.titleMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            NavigationDrawerItem(
+                selected = false,
+                onClick = onOpen,
+                leadingContent = {
+                    PinnedRailIcon {
+                        // The plate is wider than an icon and keeps the icons' centre.
+                        Box(Modifier.size(NavigationDrawerItemDefaults.IconSize), contentAlignment = Alignment.Center) {
+                            NowPlayingPlate(
+                                picon = nowPlaying.picon,
+                                channelNumber = nowPlaying.channelNumber?.toString(),
+                                modifier = Modifier
+                                    .requiredSize(NowPlayingPlateWidth, NowPlayingPlateHeight)
+                                    // Its per-second strip stays out of the announced item.
+                                    .clearAndSetSemantics { testTag = "global-drawer-now-playing-plate" },
+                                // A tune has no picture yet; the mark waits at the inactive items' ratio.
+                                contentAlpha = if (status == RailPlaybackStatus.TUNING) inactiveContentAlpha() else 1f,
+                            ) { NowPlayingRailStrip(nowPlaying, programme, status, nowSec) }
+                        }
+                    }
+                },
+                supportingContent = {
+                    NowPlayingStatusLine(status, viewer, nowSecProvider, lineChannel)
+                },
+                colors = colors,
+                modifier = modifier
+                    .height(BrandHeaderHeight)
+                    .onFocusChanged { focused = it.isFocused },
+            ) {
+                Text(
+                    title ?: channel,
+                    Modifier.padding(start = NowPlayingTextIndent),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         val discMark = when (status) {
             RailPlaybackStatus.PAUSED -> ChannelPlaybackIndicator.PAUSED
@@ -834,6 +852,14 @@ private fun NowPlayingStatusLine(
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+/** [value], or while [held] the value it had when the hold began. */
+@Composable
+private fun <T> heldWhile(held: Boolean, value: T): T {
+    var last by remember { mutableStateOf(value) }
+    SideEffect { if (!held) last = value }
+    return if (held) last else value
 }
 
 private val AppDestination.testTag: String

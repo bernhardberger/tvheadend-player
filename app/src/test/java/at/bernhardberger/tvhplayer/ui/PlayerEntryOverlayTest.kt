@@ -1,5 +1,8 @@
 @file:androidx.media3.common.util.UnstableApi
-@file:OptIn(at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class)
+@file:OptIn(
+    at.bernhardberger.tvheadend.sdk.testing.FakePlaybackApi::class,
+    at.bernhardberger.tvheadend.sdk.playback.SubscriptionInfrastructureApi::class,
+)
 
 package at.bernhardberger.tvhplayer.ui
 
@@ -12,6 +15,7 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.requestFocus
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasClickAction
@@ -66,6 +70,7 @@ import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
 import at.bernhardberger.tvheadend.sdk.media3.TvheadendAudioOutputProvider
 import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
+import at.bernhardberger.tvheadend.sdk.playback.SubscriptionOpener
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.media3.createTvheadendPlaybackCoordinator
 import at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore
@@ -102,6 +107,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -229,17 +235,95 @@ class PlayerEntryOverlayTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
     }
 
-    @Test fun soundOnlyBrowseEntryFadesTheCoverWithThePage() = soundOnlyEntry("browse")
-    @Test fun soundOnlyDetailsEntryFadesTheCoverWithThePage() = soundOnlyEntry("details")
-    @Test fun soundOnlyContextMenuEntryFadesTheCoverWithThePage() = soundOnlyEntry("menu")
+    @Test fun railSlotReturnsToTheLivePlayerWithoutRebinding() {
+        app(programme = true, holdLive = true)
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        val epoch = runtime.videoPresentation.value.epoch
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
+        leavePlayer()
+        assertTrue(slotDescription()!!.startsWith("Now playing: Ridge Light, 1 Name 1, "))
+        compose.onNodeWithTag("global-drawer-now-playing-item").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible }
+        settle()
+        compose.onNodeWithTag("player-page-first", useUnmergedTree = true).assertExists()
+        compose.runOnIdle {
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK })
+            assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        }
 
-    private fun soundOnlyEntry(from: String) {
-        app(programme = true, mode = WarmPlaybackMode.AUDIO_ONLY, syntheticVideo = true)
+        // Stopping what plays gives the rail its mark back and leaves nothing to return to.
+        leavePlayer()
+        compose.runOnIdle { scope.launch { runtime.stop() } }
+        compose.waitUntil(10_000) { runtime.activeTarget.value == null }
+        settle()
+        compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
+        compose.onNodeWithTag("global-drawer-brand").assertExists()
+    }
+
+    @Test fun railSlotReturnsToTheWarmRecordingWithoutRebinding() {
+        recordingRow()
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
+        val selection = runtime.recordingSelection.value
+        // These recordings name no channel, so the title stands alone before the state.
+        val description = slotDescription()!!
+        assertTrue(description, description.startsWith("Now playing: Recording 7, ") && ", ," !in description)
+        compose.onNodeWithTag("global-drawer-now-playing-item").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible }
+        settle()
+        compose.onNodeWithTag("player-banner", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        compose.runOnIdle {
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), runtime.activeTarget.value)
+            assertEquals(selection, runtime.recordingSelection.value)
+            assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK })
+        }
+    }
+
+    @Test fun railSlotIsAbsentWhenBrowseStopsPlayback() {
+        app(programme = true, mode = WarmPlaybackMode.OFF)
         compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
         compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
         settle()
         leavePlayer()
-        if (from != "browse") {
+        compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
+        compose.onNodeWithTag("global-drawer-brand").assertExists()
+    }
+
+    @Test fun railSlotTitleFollowsAGuideThatArrivesLater() {
+        app(programme = false, holdLive = true)
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        leavePlayer()
+        assertTrue(slotDescription()!!.startsWith("Now playing: 1 Name 1, "))
+        val previous = session.observation.value
+        session.publish(SessionObservation.create(previous.sessionState, previous.channelState,
+            EpgRepositoryState.Current(EpgSnapshot.create(listOf(
+                EpgEvent.create(EventId(1), ChannelId(1), AIRS_FROM, AIRS_UNTIL, title = "Ridge Light")))),
+            previous.dvrState, recordingProgressCapability = RecordingProgressCapability.SUPPORTED))
+        settle()
+        assertTrue(slotDescription()!!.startsWith("Now playing: Ridge Light, 1 Name 1, "))
+    }
+
+    private fun slotDescription(): String? = compose.onNodeWithTag("global-drawer-now-playing-item")
+        .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.single()
+
+    @Test fun soundOnlyBrowseEntryFadesTheCoverWithThePage() = soundOnlyEntry("browse")
+    @Test fun soundOnlyDetailsEntryFadesTheCoverWithThePage() = soundOnlyEntry("details")
+    @Test fun soundOnlyContextMenuEntryFadesTheCoverWithThePage() = soundOnlyEntry("menu")
+    @Test fun soundOnlyRailSlotEntryFadesTheCoverWithThePage() = soundOnlyEntry("rail")
+
+    private fun soundOnlyEntry(from: String) {
+        // The rail shows only what still plays, so the slot's entry keeps its tune open.
+        app(programme = true, mode = WarmPlaybackMode.AUDIO_ONLY, syntheticVideo = true, holdLive = from == "rail")
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        leavePlayer()
+        if (from == "details" || from == "menu") {
             key(Key.Menu)
             if (from == "details") {
                 compose.onNode(hasText("Program details") and hasClickAction())
@@ -252,6 +336,7 @@ class PlayerEntryOverlayTest {
         val action = when (from) {
             "browse" -> hasTestTag("channel-row-1")
             "details" -> hasTestTag("details-watch")
+            "rail" -> hasTestTag("global-drawer-now-playing-item")
             else -> hasText("Watch") and hasClickAction() and hasAnyAncestor(hasTestTag("browse-context-menu"))
         }
         compose.onNode(action).performSemanticsAction(SemanticsActions.OnClick)
@@ -447,7 +532,7 @@ class PlayerEntryOverlayTest {
     }
 
     private fun app(programme: Boolean, recordings: Boolean = false, mode: WarmPlaybackMode = WarmPlaybackMode.ON,
-        syntheticVideo: Boolean = false, channelsLayout: ChannelsLayout = ChannelsLayout.LIST) {
+        syntheticVideo: Boolean = false, channelsLayout: ChannelsLayout = ChannelsLayout.LIST, holdLive: Boolean = false) {
         // The app reads the wall clock to find the programme on air, so it spans every time.
         val event = EpgEvent.create(EventId(1), ChannelId(1), AIRS_FROM, AIRS_UNTIL, title = "Ridge Light")
         val entries = if (recordings) listOf(7L, 8L).map { id -> DvrEntry.create(
@@ -462,7 +547,12 @@ class PlayerEntryOverlayTest {
             epgState = EpgRepositoryState.Current(EpgSnapshot.create(if (programme) listOf(event) else emptyList())),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries)),
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
-        )).apply { scriptLivePlaybackSuccess(); if (recordings) scriptRecordingPlaybackSuccess() }
+        )).apply {
+            // The fake's stream otherwise fails at once; an unopened subscription keeps the tune going.
+            if (holdLive) scriptLivePlaybackSuccess(SubscriptionOpener { _, _, _ -> awaitCancellation() })
+            else scriptLivePlaybackSuccess()
+            if (recordings) scriptRecordingPlaybackSuccess()
+        }
         val settings = PlayerSettingsStore(InMemoryData { beforeSettingsRead() })
         playerSettings = settings
         runBlocking { settings.setWarmPlaybackMode(mode) }

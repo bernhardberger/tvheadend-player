@@ -391,8 +391,11 @@ Anatomy per Material for TV / design kit:
   `State • Channel`. It is a library drawer item and the first stop above the
   destinations: Up from the first destination reaches it, Down returns, drawer
   entry still focuses the current destination. Focusing it does nothing; OK
-  returns to the full-screen player for that target without retuning. It is one
-  merged accessibility node that announces only discrete state changes. When
+  returns to the full-screen player for that target without retuning. For
+  accessibility it is one button node, never selected and outside the
+  destinations' selectable group, that announces only discrete state changes.
+  A reconnect holds the title and strip where they were until playback
+  resumes. When
   playback stops, ends or fails the brand returns; if the slot had focus, focus
   moves to the current destination. The *Stop* browse setting never shows it.
 - Destinations (Channels, Guide, Recordings) are centred between the top section

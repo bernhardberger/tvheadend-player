@@ -1284,7 +1284,10 @@ fun AppRoot(
                             }
                         },
                         nowPlaying = nowPlaying,
-                        programmeAt = channelsVm::nowEvent,
+                        // Read from the collected observation so a guide that arrives later reaches the slot.
+                        programmeAt = { channelId, atSec ->
+                            playbackObservation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(atSec))
+                        },
                         // The same warm return as Continue watching: the player opens on what plays.
                         onOpenNowPlaying = {
                             when (val target = nowPlaying?.target) {
