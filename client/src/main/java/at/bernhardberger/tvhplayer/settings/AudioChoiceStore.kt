@@ -27,7 +27,13 @@ class AudioChoiceStore(private val dataStore: DataStore<Preferences>) {
     private data class Entry(val profile: String, val channel: Long, val choice: AudioTrackChoice)
 
     private val key = stringPreferencesKey("explicit_audio_choices_v1")
-    private val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
+
+    internal companion object {
+        private val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
+
+        /** The per-server identity [profileIdentity] creates, for other stores that scope choices by server. */
+        fun profileIdentityIn(preferences: Preferences): String? = preferences[profileKey]
+    }
 
     suspend fun profileIdentity(replace: Boolean = false): String {
         val preferences = dataStore.edit {

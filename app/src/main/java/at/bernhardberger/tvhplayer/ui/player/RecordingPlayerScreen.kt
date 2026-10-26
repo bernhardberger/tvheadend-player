@@ -81,7 +81,6 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.playback.currentRecordingPlaybackSelection
-import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.ui.components.TvRecoveryOverlay
@@ -139,9 +138,6 @@ fun RecordingPlayerScreen(
         )
     }
     val diagnostics by session.diagnostics.collectAsStateWithLifecycle()
-    val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings()
-    )
     val retainedSelection = recordingSelection?.takeIf { it.recordingId == recordingId }
     var targetObservation by remember(recordingId, retainedSelection?.currentSession) {
         mutableStateOf(
@@ -215,7 +211,9 @@ fun RecordingPlayerScreen(
     var restoreInfoActionFocus by remember { mutableStateOf(false) }
     var statsVisible by remember { mutableStateOf(false) }
     var infoOpen by remember { mutableStateOf(false) }
-    var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
+    // The mode of the recording's channel, the one the surface in AppRoot shows.
+    val targetAspect = rememberTargetAspect(activeTarget, observation, settingsStore)
+    val aspectRatio = targetAspect.mode
     var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
     // The Banner and the controls; the info panel and the options cover them.
     val chrome = remember(scope) {
@@ -234,10 +232,6 @@ fun RecordingPlayerScreen(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-
-    LaunchedEffect(settings.aspectRatio) {
-        aspectRatio = settings.aspectRatio
     }
 
     DisposableEffect(statsVisible) {
@@ -782,10 +776,7 @@ fun RecordingPlayerScreen(
                 isQuickListTargetCurrent = session::isQuickListTargetCurrent,
                 onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
                 recording = true,
-                onAspectRatioChange = { mode ->
-                    aspectRatio = mode
-                    scope.launch { settingsStore.setAspectRatio(mode) }
-                },
+                onAspectRatioChange = targetAspect.select,
                 onStatsVisibleChange = { statsVisible = it },
             )
         }

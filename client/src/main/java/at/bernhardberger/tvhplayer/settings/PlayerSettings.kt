@@ -76,7 +76,6 @@ data class PlayerSettings(
     val subtitleLanguage: String? = null,
     val audioFormat: AudioFormatPreference = AudioFormatPreference.AUTOMATIC,
     val audioDescription: Boolean = false,
-    val aspectRatio: AspectRatioMode = AspectRatioMode.FIT,
     val timeshiftEnabled: Boolean = true,
     val frameRateSwitching: FrameRateSwitching = FrameRateSwitching.ALWAYS,
     /** Experimental: asks Media3 for tunnelled video when both selected renderers support it. */
@@ -121,6 +120,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
     constructor(context: Context) : this(context.dataStore)
 
     internal val audioChoices = AudioChoiceStore(dataStore)
+    val channelAspects = ChannelAspectStore(dataStore)
 
     private object Keys {
         val PROFILE_UUID = stringPreferencesKey("profileUuid")
@@ -128,7 +128,6 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val AUDIO_FORMAT = stringPreferencesKey("audioFormat")
         val AUDIO_DESCRIPTION = booleanPreferencesKey("audioDescription")
         val SUBTITLE_LANGUAGE = stringPreferencesKey("subtitleLanguage")
-        val ASPECT_RATIO = stringPreferencesKey("aspectRatio")
         val TIMESHIFT_ENABLED = booleanPreferencesKey("timeshiftEnabled")
         val FRAME_RATE_SWITCHING = stringPreferencesKey("frameRateSwitching")
         val TUNNELING_ENABLED = booleanPreferencesKey("tunnelingEnabled")
@@ -191,12 +190,6 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
             } else {
                 preferences[Keys.PROFILE_UUID] = profileId.value
             }
-        }
-    }
-
-    suspend fun setAspectRatio(aspectRatio: AspectRatioMode) {
-        dataStore.edit { p ->
-            p[Keys.ASPECT_RATIO] = aspectRatio.name
         }
     }
 
@@ -284,17 +277,12 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         }
 
         fun decodePlayerSettings(p: Preferences): PlayerSettings {
-            val ar = p[Keys.ASPECT_RATIO]
-            val aspect = runCatching { ar?.let(AspectRatioMode::valueOf) }
-                .getOrNull() ?: AspectRatioMode.FIT
-
             return PlayerSettings(
                 audioLanguages = normalizeAudioLanguages(p[Keys.AUDIO_LANGUAGES]?.split(',').orEmpty()),
                 audioFormat = runCatching { p[Keys.AUDIO_FORMAT]?.let(AudioFormatPreference::valueOf) }
                     .getOrNull() ?: AudioFormatPreference.AUTOMATIC,
                 audioDescription = p[Keys.AUDIO_DESCRIPTION] ?: false,
                 subtitleLanguage = p[Keys.SUBTITLE_LANGUAGE]?.let(::normalizePreferenceLanguage),
-                aspectRatio = aspect,
                 timeshiftEnabled = p[Keys.TIMESHIFT_ENABLED] ?: true,
                 frameRateSwitching = resolveFrameRateSwitching(p[Keys.FRAME_RATE_SWITCHING]),
                 tunnelingEnabled = p[Keys.TUNNELING_ENABLED] ?: false,

@@ -16,7 +16,14 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.DpRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
+import androidx.compose.ui.test.getBoundsInRoot
+import androidx.media3.common.ForwardingPlayer
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
@@ -53,6 +60,32 @@ class PlayerVideoSurfaceCoverTest {
         visible.value = false
         compose.waitForIdle()
         compose.onNodeWithTag("video-cover").assertIsDisplayed()
+    }
+
+    @Test fun autoLaysAnSdBroadcastPictureOutAtItsNominalShapeAndOtherPicturesAtTheirOwn() {
+        var report: (VideoSize) -> Unit = {}
+        var size = VideoSize.UNKNOWN
+        val reporting = object : ForwardingPlayer(player) {
+            override fun getVideoSize() = size
+            override fun addListener(listener: Player.Listener) {
+                report = listener::onVideoSizeChanged
+                super.addListener(listener)
+            }
+        }
+        compose.setContent { PlayerVideoSurface(reporting, AspectRatioMode.FIT, videoVisible = true) }
+        fun show(next: VideoSize): DpRect {
+            compose.runOnIdle { size = next; report(next) }
+            compose.waitForIdle()
+            return compose.onNodeWithTag("video-surface").getBoundsInRoot()
+        }
+
+        // 720x576 with 16:11 pixels measures 1.82:1 but is 16:9 (the 960x540 window is exactly that).
+        assertEquals(540f, show(VideoSize(720, 576, 0, 16f / 11f)).height.value, 0.5f)
+        // 12:11 pixels are a 4:3 programme: pillarboxed to 720x540.
+        assertEquals(720f, show(VideoSize(720, 576, 0, 12f / 11f)).width.value, 0.5f)
+        // HD and unknown sizes keep the screen-filling fit.
+        assertEquals(960f, show(VideoSize(1920, 1080, 0, 1f)).width.value, 0.5f)
+        assertEquals(960f, show(VideoSize.UNKNOWN).width.value, 0.5f)
     }
 
     @Test fun theCoverClearsOverTheEntryDurationAndFasterOnAZap() {

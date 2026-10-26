@@ -120,7 +120,6 @@ import at.bernhardberger.tvhplayer.core.liveBarEnd
 import at.bernhardberger.tvhplayer.core.playerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftPositionPresentation
 import at.bernhardberger.tvhplayer.data.ConnectionState
-import at.bernhardberger.tvhplayer.settings.PlayerSettings
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
@@ -365,10 +364,6 @@ fun VideoPlayerScreen(
     }
     CloseOnSessionStop(playbackRuntime.sessionStops, playerClose)
 
-    val settings by settingsStore.playerSettings.collectAsStateWithLifecycle(
-        initialValue = PlayerSettings()
-    )
-
     val connState by videoPlayerViewModel.connectionState.collectAsStateWithLifecycle()
     val playbackState by videoPlayerViewModel.playbackState.collectAsStateWithLifecycle()
     val activeTarget by videoPlayerViewModel.activeTarget.collectAsStateWithLifecycle()
@@ -521,7 +516,9 @@ fun VideoPlayerScreen(
         { previewId?.let(timelineState::stepAnnounced); Unit }
     }
     val nowSec = timelineState.nowEpochSec
-    var aspectRatio by remember { mutableStateOf(settings.aspectRatio) }
+    // The mode of the playing channel, the one the surface in AppRoot shows.
+    val targetAspect = rememberTargetAspect(activeTarget, observation, settingsStore)
+    val aspectRatio = targetAspect.mode
 
     fun dispatchTimeshiftCommand(
         rollbackPlayWhenReady: Boolean? = null,
@@ -580,10 +577,6 @@ fun VideoPlayerScreen(
                 if (resume) videoPlayerViewModel.resumeTimeshift() else videoPlayerViewModel.pauseTimeshiftPlayback()
             }
         }
-    }
-
-    LaunchedEffect(settings.aspectRatio) {
-        aspectRatio = settings.aspectRatio
     }
 
     // Only Stats for nerds needs full diagnostics.
@@ -1752,10 +1745,7 @@ fun VideoPlayerScreen(
                         videoPlayerViewModel.playingLiveChannelId.value == currentChannelId
                 },
                 onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
-                onAspectRatioChange = { mode ->
-                    aspectRatio = mode
-                    scope.launch { settingsStore.setAspectRatio(mode) }
-                },
+                onAspectRatioChange = targetAspect.select,
                 onStatsVisibleChange = layerState::updateStatsVisibility,
             )
         }
