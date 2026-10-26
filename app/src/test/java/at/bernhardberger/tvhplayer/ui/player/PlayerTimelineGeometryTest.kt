@@ -577,7 +577,7 @@ class PlayerTimelineGeometryTest {
      * without sliding into it; the window takes over at the same fill. The info bar's programme and Next
      * line come from the screen's rule ([displayedProgrammeEvent], [displayedNextEvent]) for the same
      * state and agree with the bar in every frame: the new channel's programme, or without a guide
-     * "Programme information unavailable" (the slot is never programme information), never the previous.
+     * "No program information" (the slot is never programme information), never the previous.
      */
     private fun assertZap(banner: Boolean, epg: Boolean, timeshift: Boolean) {
         val layout = if (banner) "Banner" else "controls"
@@ -593,7 +593,7 @@ class PlayerTimelineGeometryTest {
             else ProgrammeWindow(null, Instant.fromEpochSeconds(zapNow), expected, 0.4f, expected, expected, true,
                 Instant.fromEpochSeconds(1_800), Instant.fromEpochSeconds(3_600))
         val newNext = event(78L, zapNow + 900, zapNow + 4_500).takeIf { epg }
-        val unavailable = "Programme information unavailable"
+        val unavailable = "No program information"
         fun info(timeline: PlayerChromeTimeline.Live, channel: String, next: EpgEvent?) = liveInfoBarData(
             androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources,
             if (channel == "One") 1 else 2, channel,

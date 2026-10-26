@@ -1349,7 +1349,7 @@ fun VideoPlayerScreen(
     }
     if (contentAllowed) PlayerBackHandler(handlePlaybackBack)
 
-    val unavailableTitle = stringResource(R.string.player_info_unavailable_title)
+    val unavailableTitle = stringResource(R.string.no_epg)
     val controlsEvent = infoEvent.takeUnless { channelUnavailable }
     // During a quick step the Next line follows the step's target programme, so the block keeps its height.
     val controlsNext = infoNextEvent.takeUnless { channelUnavailable }
@@ -1581,6 +1581,9 @@ fun VideoPlayerScreen(
             },
             details = null as Unit?,
             player = { keepControls ->
+        // The same availability as the options sheet's quick lists the buttons open.
+        val trackButtons = rememberPlayerTrackButtons(
+            player, available = !channelFailed && playingLiveChannelId == currentChannelId)
         PlayerChrome(
             mode = playerChromeMode(
                 controls = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
@@ -1628,6 +1631,7 @@ fun VideoPlayerScreen(
                     numberEntryReturnAction != null -> numberEntryReturnAction
                     else -> layerState.restoreChannelAction
                 },
+                tracks = trackButtons,
             ),
             entry = layerState.chrome.controlsEntry,
             panelOpen = layerState.optionsPage != null || layerState.infoOpen,
@@ -1649,6 +1653,7 @@ fun VideoPlayerScreen(
                 restoreOptionsFocus = false
                 layerState.openOptions()
             },
+            onTrackList = layerState::showQuickList,
             onInteraction = layerState.chrome::onUserInteraction,
             onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
             onControlFocused = { lastChromeControl = it },
@@ -1663,7 +1668,7 @@ fun VideoPlayerScreen(
             downHint = stringResource(R.string.nav_channels),
             onChannelCardFocusChanged = layerState.chrome::onChannelCardFocusChanged,
             decorationCoversControls = channelRailOpen,
-            controlsDecoration = { _, controls ->
+            controlsDecoration = { actionsAlpha, controls ->
                 QuickZapPresentation(
                     // Keep the departing rail expanded throughout its vertical step.
                     expanded = layerState.channelRailPresented,
@@ -1706,6 +1711,8 @@ fun VideoPlayerScreen(
                             scrolling = channelBrowser.scrolling)
                     },
                     controls = controls,
+                    // Below the controls, the rail's cards hint at what Down opens.
+                    peek = actionsAlpha.takeIf { channels.isNotEmpty() },
                 )
             },
         )
@@ -1733,6 +1740,8 @@ fun VideoPlayerScreen(
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
                 onBackKeyDown = { layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
                 onPlayRecording = onPlayRecording,
+                // Held OK on a rail card: that channel's programme, not the one playing.
+                framedArt = infoRailChannelId != null,
             )
         }
 

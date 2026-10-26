@@ -41,6 +41,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.platform.LocalDensity
@@ -111,6 +112,9 @@ fun ChannelDrawer(
     val bringIntoView = remember(edgeInsetPx) { StartKeylineBringIntoViewSpec(edgeInsetPx) }
     val pageActive = LocalPlayerPageActive.current
     val tabOwner = LocalTabOwner.current
+    val peek = LocalChannelPeek.current
+    val peekAnchor = LocalChannelPeekAnchor.current
+    val cardRoomPx = with(LocalDensity.current) { ChannelCardRoom.toPx() }
     // Capture before disposal can automatically focus a neighbouring lazy item.
     val entryId = focusedId?.takeIf { it in ids }
         ?: playingChannelId?.takeIf { it in ids }
@@ -124,6 +128,16 @@ fun ChannelDrawer(
     LaunchedEffect(ids, active, playingChannelId, pageActive, browserState) {
         if (!ownsInput()) {
             entered = false
+            // Once the closed rail rests, its peeking cards are the ones it opens on.
+            val target = entryId
+            if (!active && peek != null && target != null) {
+                snapshotFlow { peek.resting }.first { it }
+                snapshotFlow { listState.layoutInfo }
+                    .first { it.totalItemsCount == ids.size && it.visibleItemsInfo.isNotEmpty() }
+                if (browserState == null || listState.layoutInfo.visibleItemsInfo.none { it.key == target.value }) {
+                    listState.scrollToItem(ids.indexOf(target))
+                }
+            }
             return@LaunchedEffect
         }
         if (browserState == null && playingChannelId != observedPlayingId) {
@@ -214,7 +228,8 @@ fun ChannelDrawer(
         // Insets belong to list content, not its viewport: adjacent cards travel to the screen edge.
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyRow(
-            modifier = Modifier.overflowingRowViewport(offscreenPx),
+            modifier = Modifier.overflowingRowViewport(offscreenPx)
+                .then(if (peek != null && peekAnchor) Modifier.onGloballyPositioned { peek.cards(it, cardRoomPx) } else Modifier),
             state = listState,
             // Room above and below the cards for the focus scale and border.
             contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = ChannelCardRoom),
@@ -229,7 +244,9 @@ fun ChannelDrawer(
                     number = ChannelNavigation.numberForId(ids, numbers, channel.id),
                     event = nowEvent(channel.id),
                     nowSec = nowSec,
-                    playbackIndicator = playbackIndicator.takeIf { channel.id == playbackChannelId } ?: ChannelPlaybackIndicator.NONE,
+                    // The peek stays still: the sound bars start once the rail opens.
+                    playbackIndicator = playbackIndicator.takeIf { channel.id == playbackChannelId && peek?.resting != true }
+                        ?: ChannelPlaybackIndicator.NONE,
                     recording = channel.id in recordingChannelIds,
                     onClick = {
                         if (ownsInput()) {

@@ -814,7 +814,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 - The page top band shares the clock's center line: passive now-playing strip
   left at the 58dp grid keyline, up affordance centered, clock right. The strip
   always identifies the watched channel, with a small picon, two-line identity
-  and programme text, and programme progress. It stays pinned between rail and
+  and programme text, and programme progress. Without a picon there is no logo
+  slot: the name starts on the keyline and carries the number once. It stays pinned between rail and
   rail schedule; controls-to-details fades it in over 200–400 ms (reversed on Back).
   Program-details tabs start on the 58dp keyline; only their body keeps the 72dp
   content inset (x=130dp). Rail-schedule heading and rows remain at x=58dp.
@@ -835,11 +836,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   presented frame (a positively audio-only service lets its playing state stand in).
 - The wall clock stands alone at the top right over its scrim; there are no status
   tags. The info bar holds the identity card and the programme block.
-- The identity card is a 16:9 TV Material compact card, 160×90dp for every channel
-  and programme. The picon (or the channel name) is centred in it; the channel
-  number stands at its bottom start. Behind them is the channel's own colour or,
-  when the programme has artwork, that picture dimmed so the picon and the number
-  read over any of it.
+- The info bar's artwork tile is 196×110dp (three grid columns), 8dp corners, and
+  takes no focus. It shows the programme's artwork; without one, and while it
+  loads or fails, the picon stands centred on the channel's own colour fading down
+  to the darkest surface, the same ground as the rail preview's hero
+  (`ui/player/ProgrammeHero.kt`). Without a picon the fade is neutral and holds the
+  channel number. A missing programme reads `No program information` here and on
+  the rail's cards.
 - The programme block has four lines that keep their places whether they have
   content or not, so nothing moves between programmes. It is bottom-aligned with
   the fixed-size card and may be slightly taller. The lines are a metadata row
@@ -897,20 +900,23 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   controls it sits 8dp above the thumb and the info bar fades; in the Banner step
   there is no thumb, it rests on the bar row and the info bar stays.
 - There is no Go live control: stepping or scrubbing forward reaches live.
-- The action row is Play/Pause and Stop, with Settings at the right end
-  (`ui/player/PlayerActionRow.kt:63-67`). There is no Record button and no Info
-  button: the identity card opens Info. Controls focus starts on
-  Play/Pause. Seekbar: Left/Right scrub, Down to the last focused action, Up to
-  the card. Actions: Left/Right along the row without wrapping, Up to the seekbar,
-  or to the card where the timeline takes no focus. Center toggles pause on
-  Play/Pause and the seekbar. Where live cannot pause (no grant, timeshift off)
-  Play/Pause is dimmed but focusable and states the reason in the timeline
-  feedback line.
-- The card takes focus in the controls only; in the Banner it is a picture. OK
-  opens Info and closing Info returns focus to the card, also when the INFO key
-  opened it. Down leads to the seekbar, or to Play/Pause where the timeline takes
-  no focus; Left, Right and Up lead nowhere. Above a recording's markers, Up from
-  the seekbar opens the markers and Up again closes them and moves on to the card.
+- The action row is Play/Pause and Stop at the start, the centred `⌄ Channels`
+  hint, and Audio, Subtitles, Info and Settings at the end
+  (`ui/player/PlayerActionRow.kt`). Audio shows only with more than one audio
+  track and Subtitles only with a subtitle track to choose besides Off, as the
+  playback options decide; each opens that short list (§10 Modal side panel),
+  is announced with its name and current choice, and closing the list returns
+  focus to it. Info opens the programme details, and closing them returns focus
+  to Info, also when the INFO key opened them. There is no Record button.
+  Controls focus starts on Play/Pause. Seekbar: Left/Right scrub, Down to the
+  last focused action. Actions: Left/Right along the row without wrapping, Up to
+  the seekbar; in live TV Down opens the channel rail. Center toggles pause on Play/Pause
+  and the seekbar. Where live cannot pause (no grant, timeshift off) Play/Pause
+  is dimmed but focusable and states the reason in the timeline feedback line.
+  Above a recording's markers, Up from the seekbar opens the markers and Up again
+  closes them.
+- The controls leave over 200 ms (standard accelerate), 100 ms when a modal
+  layer replaces them.
 - Numeric entry is a state of the top identity's place: the identity's chip,
   the typed digits and the destination's name on one line, with the identity's
   start edge, top edge and height at every font scale (the digits share the
@@ -1028,15 +1034,18 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 ### Quick-zap cards (accepted 2026-09-21, rail revised 2026-10-10)
 
 - Use the compact channel-card anatomy: 196×110dp at default font scale, a
-  centered picon on a flat surface without the kit's text scrim, the current
+  centered picon on the channel's own colour fading down (the artwork tile's
+  ground; a card without a picon stays neutral, and cards show no programme art)
+  without the kit's text scrim, the current
   programme title (with the playing and recording markers) as the main line,
   `<number> <name> • Nm left` below it, and a 2dp cyan progress strip. Use TV
   Material `CompactCard` indication; card height grows with localized text scale.
 - The rail follows the kit's immersive list: focus stays on the first slot and a
   preview of the focused card stands above the rows, its text on the start
   keyline and the programme artwork trailing on the text's last line. Single
-  Left/Right steps crossfade the preview; while Left/Right is held it is hidden and
-  returns 250 ms after release. Reopening previews the remembered card from the
+  Left/Right steps fade the preview through (out 75 ms standard accelerate, in
+  150 ms emphasized decelerate after 50 ms); while Left/Right is held it is hidden
+  and returns 250 ms after release. The preview always describes the focused card. Reopening previews the remembered card from the
   first frame.
 - Two rows (the current implementation, `ui/player/PlayerChannelBrowser.kt:82-111`,
   and still a trial against an in-place rail; roadmap U1 decides): the first is
@@ -1045,13 +1054,25 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   shrinks to title-small at the passive alpha and its cards dim to 40%; Down and
   Up change rows over 300 ms and each row keeps its card and viewport. Up from the
   first row returns to the controls. The top band's centred up hint names what
-  Up leads to: Back to TV on the first row, the first row's title on Recent.
+  Up leads to: Back to TV on the first row, the first row's title on Recent; the
+  label swaps with the browse fade through (90 ms out, then 210 ms in).
 - Short OK tunes; holding OK opens the programme details as a full-screen
   two-column dialog that fades in and out, without tabs or the up hint, and only
-  Back closes it.
-- While player controls are visible, the upper 24dp of the cards peeks above the
-  bottom screen edge. The peek is passive; Down opens the tray. First entry
-  focuses the playing channel (or a deterministic available fallback).
+  Back closes it. Its second column frames the programme's artwork at the hero's
+  360×202dp, or the channel's colour with its picon, scrolling away with the
+  page; the playing channel's own details draw no art, the video being their
+  backdrop. This is the rail's exemption from the context menu: the dialog already
+  leads with the menu's order (Watch, Record, Show in Guide), so a held OK still
+  lands on Watch.
+- While the controls show, the closed rail peeks: the footer stands 14dp higher
+  and the top 24dp of the cards show at the bottom edge at 60% of the action
+  row's emphasis, under the `⌄ Channels` hint, which stays. The peek fades in
+  with the action row and leaves with the controls; it never shows with the
+  Banner. It shows the cards the rail opens on and is the rail's start position:
+  Down raises those cards and uncovers the row title and preview above them, with
+  no separate sheet. The peek takes no focus, has no semantics and never animates
+  while idle (the playing card's sound bars start once the rail opens). First
+  entry focuses the playing channel (or a deterministic available fallback).
 - Re-entry restores the last browsed card and persistent viewport, keeping a
   middle/right card in its screen position rather than snapping it left. Scroll
   only enough to bring an offscreen target into the safe area. An external channel
@@ -1095,7 +1116,8 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
 
 ### Context menus and dialogs (accepted 2026-10-15)
 
-- **Context menu** (hold OK or Menu on any card): full-screen, opaque app
+- **Context menu** (hold OK or Menu on any card; the player's channel rail opens
+  the programme details on a held OK instead, see Quick-zap cards): full-screen, opaque app
   background, rail hidden. Kit Two Column / JetFit more-options layout: item
   card 268dp left, 268dp WideButton column right, columns top-aligned, the
   container centred. Channel and programme menus share one order on every

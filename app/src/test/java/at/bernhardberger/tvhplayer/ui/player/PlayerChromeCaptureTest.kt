@@ -99,6 +99,8 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.platform.testTag
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -212,7 +214,7 @@ class PlayerChromeCaptureTest {
                                 clock = formatClock(NOW),
                                 info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources,
                                     101, "Ridge Earth HD", programme, next, nextScheduled = true, nowSec = NOW,
-                                    unavailableTitle = "Programme information unavailable"),
+                                    unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
                                 recordingNow = false,
                                 picon = LOGO,
@@ -500,11 +502,26 @@ class PlayerChromeCaptureTest {
                 listOf("details-hero", "details-hero-blurred", "details-hero-logo", "details-logo-glow").forEach {
                     compose.onNodeWithTag(it, useUnmergedTree = true).assertDoesNotExist()
                 }
+                // Only another channel's programme, opened from the rail, frames its picture beside
+                // the page; the playing channel's picture is the video itself.
+                val framed = compose.onNodeWithTag("details-framed-art", useUnmergedTree = true)
+                if (next == Scene.RAIL_PROGRAMME_OPENED) {
+                    val art = framed.assertExists().getBoundsInRoot()
+                    val title = compose.onNodeWithTag("details-title", useUnmergedTree = true).getBoundsInRoot()
+                    assertTrue("the picture stands in the second column, clear of the title",
+                        art.left >= title.right)
+                } else framed.assertDoesNotExist()
             }
             if (next == Scene.PROGRAMME_CONFIRM_STOP) {
                 compose.onNodeWithTag("two-column-first").assertIsFocused().assertTextEquals(ApplicationProvider.getApplicationContext<Application>().getString(at.bernhardberger.tvhplayer.R.string.keep_recording))
             }
             if (next == Scene.RAIL_PEEK) {
+                // The preview describes the focused card, never a neighbour.
+                compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
+                compose.onNode(hasText(programme.title!!) and hasAnyAncestor(hasTestTag("player-zap-preview")),
+                    useUnmergedTree = true).assertExists()
+                compose.onNode(hasText(trayProgramme.title!!) and hasAnyAncestor(hasTestTag("player-zap-preview")),
+                    useUnmergedTree = true).assertDoesNotExist()
                 val card = hasAnyAncestor(hasTestTag("player-channel-card-1"))
                 val label = compose.onNodeWithTag("player-channel-1-now", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
                 val playing = compose.onNode(hasTestTag("channel-playing-indicator") and card, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -628,14 +645,18 @@ class PlayerChromeCaptureTest {
         val content = PlayerChromeContent(
             clock = formatClock(NOW),
             info = liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 101, "Ridge Earth HD", programme.takeUnless { noEpg }, next.takeUnless { noEpg }, nextScheduled = true, nowSec = NOW,
-                unavailableTitle = "Programme information unavailable"),
+                unavailableTitle = "No program information"),
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
             picon = if (scene == Scene.CONTROLS_NO_LOGO) null else LOGO,
             artwork = programme.image.takeUnless { noEpg },
         )
         when (scene) {
-            Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO, Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
+            // As the player shows them: the closed rail peeks under the controls; with a logo the
+            // programme also offers an audio and a subtitle choice beside Info.
+            Scene.CONTROLS_LIVE, Scene.CONTROLS_NO_LOGO -> Controls(timeshift, behind, paused, content, peek = true,
+                tracks = if (scene == Scene.CONTROLS_LIVE) PlayerTrackButtons(audio = "English", subtitles = "Off") else PlayerTrackButtons())
+            Scene.CONTROLS_BEHIND, Scene.CONTROLS_PAUSED, Scene.CONTROLS_BUFFERING ->
                 Controls(timeshift, behind, paused, content)
             Scene.INFO_FOCUSED -> Controls(timeshift, false, false, content, focus = "player-info")
             Scene.BROWSER_NOW, Scene.RECENT_OPEN, Scene.BROWSER_EMPTY -> {
@@ -657,11 +678,9 @@ class PlayerChromeCaptureTest {
                             })
                     }, programme = {})
             }
+            // The preview follows the card the rail reports focused, as the player wires it.
             Scene.RAIL_PEEK -> Controls(timeshift, false, false, content,
-                recordingChannels = if (scene == Scene.RAIL_PEEK) setOf(ChannelId(1)) else emptySet(), tray = {
-                ProvideArtworkSession(session) { QuickZapTrayPreview(channels[1], trayProgramme, null, NOW,
-                    Modifier.padding(horizontal = TvGridHorizontalMargin)) }
-            })
+                recordingChannels = setOf(ChannelId(1)), tray = {}, previewFollowsFocus = true)
             Scene.BANNER_TUNING -> Banner(PlayerChromeMode.BANNER, content,
                 PlayerChromeTimeline.Live(AppTimeshiftState(), NOW, programme, motionKey = ChannelId(1), tuning = true))
             Scene.BANNER_LIVE -> Banner(PlayerChromeMode.BANNER, content, PlayerChromeTimeline.Live(timeshift, NOW, programme,
@@ -728,7 +747,7 @@ class PlayerChromeCaptureTest {
                     playing = !rail)
                 // A page per scene: the previous scene's section and focus must not carry over.
                 key(scene) { ProvideArtworkSession(session) {
-                    PlayerDetailsSurface {
+                    PlayerDetailsSurface(framedArt = rail) {
                         ProgrammeDetailsPage(
                             shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG }, recording, channel, NOW,
                             if (scene == Scene.PROGRAMME_INFO_NO_EPG) listOf(BrowseContextAction.CONTINUE_WATCHING) else actions,
@@ -911,8 +930,15 @@ class PlayerChromeCaptureTest {
         browser: PlayerChannelBrowserState? = null,
         emptyRecent: Boolean = false,
         numberEntryShown: Boolean = false,
+        /** The rail's preview describes the card it reports focused instead of drawing [tray]. */
+        previewFollowsFocus: Boolean = false,
+        /** The closed rail's rows peek under the controls, as the player composes them. */
+        peek: Boolean = false,
+        tracks: PlayerTrackButtons = PlayerTrackButtons(),
     ) {
         Box(Modifier.fillMaxSize()) {
+        var railFocus by remember { mutableStateOf<ChannelId?>(null) }
+        val railEvent = { id: ChannelId -> if (id == ChannelId(1)) programme else if (id == ChannelId(2)) trayProgramme else null }
         val shown = shown ?: if (step != null) window.copy(positionFraction = 0.51f, estimatedPosition = Instant.fromEpochSeconds(NOW - 233)) else window
         ProvideArtworkSession(session) { PlayerChrome(
             mode = PlayerChromeMode.CONTROLS,
@@ -928,7 +954,8 @@ class PlayerChromeCaptureTest {
                 stepDeltaMs = step,
                 motionKey = ChannelId(1),
             ),
-            actions = PlayerChromeActions(active = !numberEntryShown, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null }),
+            actions = PlayerChromeActions(active = !numberEntryShown, paused = paused, restoreFocus = focus ?: "player-seekbar".takeIf { step != null },
+                tracks = tracks),
             onTogglePause = {}, onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
             onChannelZap = { _, _, _ -> },
             downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
@@ -941,22 +968,33 @@ class PlayerChromeCaptureTest {
             recentRowOpen = recentOpen,
             decorationCoversControls = tray != null,
             numberEntryShown = numberEntryShown,
-            controlsDecoration = { _, controls ->
+            controlsDecoration = { actionsAlpha, controls ->
+                val peekRows = remember { PlayerChannelBrowserState() }
                 QuickZapPresentation(
                     expanded = tray != null,
+                    peek = actionsAlpha.takeIf { peek },
                     channelContent = {
-                        if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
+                        if (peek && tray == null && browser == null) ProvideArtworkSession(session) {
+                            PlayerChannelBrowser(peekRows, channels, channels.drop(1), channels[0].id, emptySet(), railEvent,
+                                NOW, false, {}, {}, { _, _, _ -> }, {})
+                        }
+                        else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
                             channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },
                             NOW, true, {}, {}, { _, _, _ -> }, {}) }
                         else if (tray != null) ProvideArtworkSession(session) { ChannelDrawer(
                             channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
-                            recordingChannelIds = recordingChannels, nowEvent = { if (it == ChannelId(1)) programme else if (it == ChannelId(2)) trayProgramme else null },
+                            recordingChannelIds = recordingChannels, nowEvent = railEvent,
                             active = true, nowSec = NOW,
-                            onFocusChannel = {}, onPickChannel = {}, onCloseDrawer = {},
+                            onFocusChannel = { railFocus = it }, onPickChannel = {}, onCloseDrawer = {},
                         ) }
                     },
-                    preview = { tray?.invoke() },
-                    trayBleeds = browser != null && !emptyRecent,
+                    preview = {
+                        if (previewFollowsFocus) ProvideArtworkSession(session) {
+                            QuickZapTrayPreview(channels.firstOrNull { it.id == railFocus }, railFocus?.let(railEvent), null, NOW,
+                                Modifier.padding(horizontal = TvGridHorizontalMargin))
+                        } else tray?.invoke()
+                    },
+                    trayBleeds = browser != null && !emptyRecent || peek,
                     header = browser?.let { { PlayerChannelBrowserHint(it, !emptyRecent, stringResource(R.string.all_channels)) } },
                     controls = controls,
                 )

@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -335,19 +336,24 @@ class PlayerChromeEvidenceTest {
         assertEquals("the text starts a grid gutter after the slot", bar.left + with(compose.density) { (196 + 20).dp.toPx() }, title.left, 0.5f)
     }
 
-    @Test fun topIdentityShowsTheLogoOrTheNumberInItsChipNeverBoth() {
+    /** S3: the name line already carries the number, so a picon-less channel has no chip to repeat it in. */
+    @Test fun topIdentityDropsTheLogoSlotWithoutAPiconAndStartsTheNameOnTheKeyline() {
         var withLogo by mutableStateOf(true)
         compose.setContent { TVHeadendPlayerTheme {
             ProvideArtworkSession(session) { PlayerTopIdentity(PlayerChromeContent("", info(false), picon = if (withLogo) ArtworkId.parse("imagecache/2") else null),
                 Modifier.fillMaxSize()) }
         } }
-        compose.onNodeWithTag("player-top-identity-logo", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-top-identity-number", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-top-identity-name", useUnmergedTree = true).assertExists()
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        val logo = bounds("player-top-identity-logo")
+        val withLogoName = bounds("player-top-identity-name")
+        val withLogoIdentity = bounds(PlayerTopIdentityTag)
+        assertTrue("the name follows the logo", withLogoName.left > logo.right)
         compose.runOnIdle { withLogo = false }
         compose.onNodeWithTag("player-top-identity-logo", useUnmergedTree = true).assertDoesNotExist()
-        compose.onNodeWithTag("player-top-identity-number", useUnmergedTree = true).assertExists()
-        compose.onNodeWithTag("player-top-identity-name", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("player-top-identity-number", useUnmergedTree = true).assertDoesNotExist()
+        val name = bounds("player-top-identity-name")
+        assertEquals("the name starts on the keyline", with(compose.density) { TvGridHorizontalMargin.toPx() }, name.left, 0.5f)
+        assertEquals("the identity keeps its height", withLogoIdentity.height, bounds(PlayerTopIdentityTag).height, 0.5f)
     }
 
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")

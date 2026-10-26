@@ -709,11 +709,37 @@ class QuickZapPresentationTest {
         compose.mainClock.autoAdvance = true
     }
 
+    @Test fun closedRailPeeksThePlayingCardAtTheBottomEdgeAndRisesFromThere() {
+        // Far enough along that the peek has to scroll to it, as the open rail does.
+        playing = ChannelId(9)
+        content(peek = true)
+        val screen = compose.onRoot().fetchSemanticsNode().boundsInRoot.bottom
+        val tray = compose.onNodeWithTag("player-zap-tray", useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
+        // The cards' top, below the row's focus room, stands 24dp above the bottom edge.
+        assertEquals(screen - 24f, tray.top + ChannelCardRoom.value, 1f)
+        // Passive: no card is announced or takes focus; the action row keeps it.
+        card(9).assertDoesNotExist()
+        assertTrue(isFocused("player-pause"))
+        compose.mainClock.autoAdvance = false
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+        // The rail's first frame, before the open rail could scroll to its entry card.
+        compose.mainClock.advanceTimeByFrame()
+        // Centres: the focused card grows about its centre.
+        val opening = compose.onNodeWithTag("player-channel-card-9", useUnmergedTree = true)
+            .fetchSemanticsNode().boundsInRoot.center.x
+        compose.mainClock.autoAdvance = true
+        compose.waitForIdle()
+        card(9).assertIsFocused()
+        // The peeking cards are where the rail starts: it rises without scrolling sideways.
+        assertEquals(opening, card(9).fetchSemanticsNode().boundsInRoot.center.x, 0.5f)
+    }
+
     private fun isFocused(tag: String) = runCatching { compose.onNodeWithTag(tag).assertIsFocused() }.isSuccess
 
     private fun content(
         fontScale: Float = 1f,
         bright: Boolean = false,
+        peek: Boolean = false,
     ) {
         compose.setContent {
             view = LocalView.current
@@ -772,8 +798,9 @@ class QuickZapPresentationTest {
                             onFocusRestored = layers::onChannelActionRestored,
                             onActionFocused = layers::onActionFocused,
                             decorationCoversControls = layers.channelDrawerOpen,
-                            controlsDecoration = { _, controls -> QuickZapPresentation(
+                            controlsDecoration = { actionsAlpha, controls -> QuickZapPresentation(
                                expanded = layers.channelDrawerOpen,
+                              peek = actionsAlpha.takeIf { peek },
                               preview = {},
                               controls = controls,
                               channelContent = {
@@ -782,6 +809,8 @@ class QuickZapPresentationTest {
                                     playbackIndicator = indicator,
                                     recordingChannelIds = setOf(ChannelId(4)), nowEvent = { if (it == ChannelId(5)) null else event(it) },
                                     active = layers.channelDrawerOpen, nowSec = 900,
+                                    // As the player's rows keep it: a list that starts at the first card.
+                                    browserState = if (peek) remember { PlayerChannelCollectionState() } else null,
                                     onFocusChannel = {}, onPickChannel = {
                                         if (it.id == playing) layers.dismissChannelDrawer() else {
                                             if (confirmPicks) playing = it.id

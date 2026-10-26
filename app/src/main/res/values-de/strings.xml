@@ -119,7 +119,6 @@
     <string name="player_channel_number_none">Kein Sender</string>
     <string name="player_shelf_playing">Wiedergabe</string>
     <string name="player_shelf_recording">Aufnahme läuft</string>
-    <string name="player_info_unavailable_title">Programminformationen nicht verfügbar</string>
     <string name="show_epg_menu_enabled">Programmführer-Menü anzeigen: Ein</string>
     <string name="show_epg_menu_disabled">Programmführer-Menü anzeigen: Aus</string>
     <string name="port_htsp">HTSP-Port</string>

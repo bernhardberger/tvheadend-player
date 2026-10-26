@@ -74,6 +74,7 @@ internal fun PlayerOverlayChrome(
     // controls revealed by a zap fade in where they rest.
     val motion = LocalPlayerControlsMotion.current
     val railExpansion = LocalRailExpansion.current
+    val peekLift = LocalChannelPeekLift.current
     val viewport = LocalPlayerPageScrim.current.takeIf { motion != null }
     var footerHeight by remember { mutableIntStateOf(0) }
     SideEffect {
@@ -88,7 +89,8 @@ internal fun PlayerOverlayChrome(
     }
     fun GraphicsLayerScope.riseFromBanner() {
         val drop = bannerDrop()
-        if (drop != 0f) translationY = PlayerBannerDrop.toPx() * drop
+        // Taken over from the Banner, the footer starts where its info rests, below the peek's lift too.
+        if (drop != 0f) translationY = (PlayerBannerDrop + peekLift).toPx() * drop
     }
     Box(modifier = modifier.fillMaxSize()) {
         // The header draws its own top fade; the footer its scrim, in its own bounds.
@@ -101,7 +103,7 @@ internal fun PlayerOverlayChrome(
                 .graphicsLayer {
                     enterFrom(PlayerMotion.ChromeOffset); riseFromBanner(); alpha = 1f - railExpansion()
                     // The footer gives way upward as the rail rises beneath it.
-                    translationY -= RailFooterRise.toPx() * railExpansion()
+                    translationY -= RailFooterRise.toPx() * railExpansion() + peekLift.toPx()
                     // Paint the departing controls, not a footer-sized offscreen texture.
                     compositingStrategy = CompositingStrategy.ModulateAlpha
                 }

@@ -62,7 +62,7 @@ internal val CompactZapCardWidth = 196.dp
  * The compact channel card shared by the player rail and the Channels card layouts.
  * Callers size it: the rail uses [CompactZapCardWidth], a grid fills its column.
  * [programmePicture] leads with the current programme's picture under the kit scrim;
- * without one the card shows the channel logo as the rail does. A grid asks for its rows'
+ * without one the card shows the channel logo on its colour as the rail does. A grid asks for its rows'
  * [preferredHeight]; the card never gets shorter than its text needs. A [channelLed] card names
  * the channel first and starts its programme line with the start time; otherwise the programme
  * leads and time left follows the channel. While the guide is [programmeLoading], a missing
@@ -109,6 +109,9 @@ internal fun CompactZapCard(
     // A channel-led card keeps its logo over the picture, with a halo of its own so it reads
     // without the whole picture darkening.
     val logoOverArt = channelLed && showArtwork
+    // A logo card sits on its channel's colour, as the player's artwork falls back to; without a
+    // logo there is no colour of its own to show, so the rail's card stays neutral.
+    val onAccent = channelLed || channel.icon != null
     val halo = if (logoOverArt) CompactZapLogoHalo else 0.dp
     val haloPx = with(LocalDensity.current) { halo.roundToPx() }
     val haloTransformation = remember(haloPx) { if (haloPx > 0) LogoHaloTransformation(haloPx, CompactZapLogoHaloAlpha) else null }
@@ -126,7 +129,7 @@ internal fun CompactZapCard(
                     model = artworkModel, contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize().testTag("$tag-art"), onError = { artworkFailed = true },
-                ) else if (channelLed) ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
+                ) else if (onAccent) ChannelAccentFill(channel.icon, channel.id, Modifier.fillMaxSize())
                 if (!showArtwork || logoOverArt) Box(
                     // The room reaches into the title's leading, so the logo centres between the card's
                     // top and the title's letters rather than above its line box. The inset keeps a
@@ -148,7 +151,7 @@ internal fun CompactZapCard(
                         // On the logo card's colour it is inked for that colour at its middle.
                         ground = when {
                             logoOverArt -> null
-                            channelLed -> channelAccentGround(channel.icon, channel.id,
+                            onAccent -> channelAccentGround(channel.icon, channel.id,
                                 depth = ((imageHeight - textBlockHeight) / 2 + CompactZapLogoTop) / imageHeight)
                             else -> TvSurfaceColors.containerLowest
                         },

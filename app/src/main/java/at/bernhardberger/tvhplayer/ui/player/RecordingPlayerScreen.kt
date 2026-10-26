@@ -273,6 +273,14 @@ fun RecordingPlayerScreen(
         timelineState.queueSeek(deltaMs)
     }
 
+    // The short list leaves the controls as they are underneath.
+    fun openQuickList(page: PlaybackOptionsPage) {
+        if (!optionsQuickList) quickListReturnControl = lastFocusedControl.takeIf { chrome.controlsVisible }
+        optionsQuickList = true
+        optionsPage = page
+        chrome.yieldToLayer()
+    }
+
     fun openOptionsFromKey(keyCode: Int): Boolean {
         val outcome = playbackOptionsKeyOutcome(
             keyCode = keyCode,
@@ -288,13 +296,7 @@ fun RecordingPlayerScreen(
                 chrome.yieldToLayer(controls = true)
             }
             PlaybackOptionsKeyOutcome.MoveDown -> quickList.moveDown()
-            // The short list leaves the controls as they are underneath.
-            is PlaybackOptionsKeyOutcome.OpenQuickList -> {
-                if (!optionsQuickList) quickListReturnControl = lastFocusedControl.takeIf { chrome.controlsVisible }
-                optionsQuickList = true
-                optionsPage = outcome.page
-                chrome.yieldToLayer()
-            }
+            is PlaybackOptionsKeyOutcome.OpenQuickList -> openQuickList(outcome.page)
         }
         return true
     }
@@ -635,6 +637,9 @@ fun RecordingPlayerScreen(
         if (playbackAvailable) {
             val entry = requireNotNull(entry)
             val channel = entry.channelId?.let { targetObservation?.channel(it) }
+            // The same availability as the options sheet's quick lists the buttons open.
+            val trackButtons = rememberPlayerTrackButtons(
+                player, available = activeTarget == AppPlaybackTarget.Recording(recordingId))
             // The chrome shows its pictures with the session of the recording it plays.
             ProvideArtworkSession(retainedSelection?.currentSession, targetObservation) { PlayerChrome(
                 mode = chromeMode(foregroundLayer),
@@ -671,6 +676,7 @@ fun RecordingPlayerScreen(
                         restoreOptionsFocus -> "player-settings"
                         else -> null
                     },
+                    tracks = trackButtons,
                 ),
                 entry = chrome.controlsEntry,
                 panelOpen = optionsPage != null || infoOpen,
@@ -687,6 +693,10 @@ fun RecordingPlayerScreen(
                     optionsQuickList = false
                     optionsPage = PlaybackOptionsPage.ROOT
                     chrome.yieldToLayer(controls = true)
+                },
+                onTrackList = { page ->
+                    restoreOptionsFocus = false
+                    openQuickList(page)
                 },
                 onInteraction = chrome::onUserInteraction,
                 onCommitSeek = timelineState::commitPendingSeek,

@@ -36,13 +36,14 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.core.timeshiftSeekbarRange
 import at.bernhardberger.tvhplayer.ui.TvOverlayFooterGradientRunout
 import at.bernhardberger.tvhplayer.ui.TvSpacing4
-import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.launch
 
@@ -58,7 +59,7 @@ import kotlinx.coroutines.launch
  *
  * @param panelOpen a panel covers the chrome: the chrome leaves quickly and returns once it closes.
  * @param controlsDecoration hosts the controls, such as live's quick-zap rail; it receives the
- * controls' emphasis alpha. While [decorationCoversControls] the controls take no focus.
+ * action row's emphasis alpha. While [decorationCoversControls] the controls take no focus.
  */
 @Composable
 internal fun PlayerChrome(
@@ -78,6 +79,8 @@ internal fun PlayerChrome(
     onCommitSeek: () -> Unit = {},
     onPauseUnavailable: (reason: String) -> Unit = {},
     onActionFocused: (String) -> Unit = {},
+    /** Opens the Audio or Subtitles quick list from its button, shown per [PlayerChromeActions.tracks]. */
+    onTrackList: (PlaybackOptionsPage) -> Unit = {},
     /** Any control that takes focus, the timeline included: where focus returns after number entry. */
     onControlFocused: (String) -> Unit = {},
     onFocusRestored: () -> Unit = {},
@@ -143,8 +146,8 @@ internal fun PlayerChrome(
                     contentAlpha = contentAlpha,
                     lastLineEndReserve = lastLineEndReserve,
                 ) { faded ->
-                    ProgrammeArtworkTile(content.artwork, content.picon, content.info.channelNumber,
-                         faded)
+                    ProgrammeArtworkTile(content.artwork, content.picon, content.channelId,
+                        content.info.channelNumber, faded)
                 }
                 timelineRow()
             }
@@ -165,6 +168,7 @@ internal fun PlayerChrome(
                 onStop = onStop,
                 onInfo = onInfo,
                 onOptions = onOptions,
+                onTrackList = onTrackList,
                 onInteraction = onInteraction,
                 onCommitSeek = onCommitSeek,
                 onPauseUnavailable = onPauseUnavailable,
@@ -304,13 +308,15 @@ internal fun PlayerPresentedLiveTimeline(
 
 /**
  * The info bar's programme artwork: the programme's 16:9 image, or without it the channel's [picon]
- * (or [channelNumber]) on a plate, so the bar keeps its shape on every channel. It takes no focus and
- * has no description; the info bar speaks for the programme.
+ * (or [channelNumber]) on the channel's own ground, as the details hero falls back to, so the bar
+ * keeps its shape on every channel. It takes no focus and has no description; the info bar speaks
+ * for the programme.
  */
 @Composable
 private fun ProgrammeArtworkTile(
     artwork: ArtworkId?,
     picon: ArtworkId?,
+    channelId: ChannelId?,
     channelNumber: String,
     modifier: Modifier,
 ) {
@@ -319,25 +325,28 @@ private fun ProgrammeArtworkTile(
     var failed by remember(id, currentSession) { mutableStateOf(false) }
     Box(modifier.size(ArtworkTileWidth, ArtworkTileHeight).clip(ArtworkTileShape)
         .focusProperties { canFocus = false }.testTag("player-info-artwork-tile")) {
+        // Under the picture too, so loading shows the same channel ground as a missing picture.
+        ChannelArtworkFallback(picon, channelId, channelNumber)
         if (id != null && currentSession != null && !failed) {
-            Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLow))
             AsyncImage(AppArtworkSource(currentSession, id), null,
                 Modifier.fillMaxSize().testTag("player-info-artwork"), contentScale = ContentScale.Crop, onError = { failed = true })
-        } else ChannelArtworkFallback(picon, channelNumber)
+        }
     }
 }
 
-/** The channel in the artwork's place: its picon, or its number, on the identity chip's plate. */
+/** The channel in the artwork's place: its picon, or its number, on [channelFallbackGround]. */
 @Composable
 private fun ChannelArtworkFallback(
     picon: ArtworkId?,
+    channelId: ChannelId?,
     channelNumber: String,
 ) {
     val currentSession = LocalArtworkContext.current.currentSession
-    Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLowest).testTag("player-info-artwork-fallback"),
+    Box(Modifier.fillMaxSize().background(channelFallbackGround(picon, channelId)).testTag("player-info-artwork-fallback"),
         contentAlignment = Alignment.Center) {
         if (picon != null && currentSession != null) {
-            PiconBox(picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp))
+            // On its own colour's gradient, so no ground to ink it for.
+            PiconBox(picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), ground = null)
         } else Text(channelNumber, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
             color = MaterialTheme.colorScheme.onSurface)
     }

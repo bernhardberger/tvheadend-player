@@ -102,6 +102,7 @@ import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackTrackContentState
 import at.bernhardberger.tvhplayer.core.PlaybackTrackFocusTarget
 import at.bernhardberger.tvhplayer.core.playbackOptionsCategories
+import at.bernhardberger.tvhplayer.core.playbackQuickListOffered
 import at.bernhardberger.tvhplayer.core.playbackTrackContentState
 import at.bernhardberger.tvhplayer.core.playbackTrackFocusTarget
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
@@ -165,71 +166,11 @@ internal fun PlaybackOptionsSheet(
         LaunchedEffect(quickList) { onQuickListClose() }
         return
     }
-    val unknownLanguage = stringResource(R.string.track_unknown_language)
-    val multipleLanguages = stringResource(R.string.track_multiple_languages)
-    val mono = stringResource(R.string.track_mono)
-    val stereo = stringResource(R.string.track_stereo)
-    val surround51 = stringResource(R.string.track_surround_5_1)
-    val surround71 = stringResource(R.string.track_surround_7_1)
-    val channelsTemplate = stringResource(R.string.track_channels_count)
-    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
-    val audioDescription = stringResource(R.string.audio_description)
-    val clearDialogue = stringResource(R.string.track_clear_dialogue)
-    val currentTracks = rememberPlayerTracks(player)
-    val audioChoices = remember(
-        currentTracks,
-        unknownLanguage,
-        multipleLanguages,
-        mono,
-        stereo,
-        surround51,
-        surround71,
-        channelsTemplate,
-        locale,
-        audioDescription,
-        clearDialogue,
-    ) {
-        collectTracks(
-            tracks = currentTracks,
-            trackType = C.TRACK_TYPE_AUDIO,
-            unknownLanguageLabel = unknownLanguage,
-            multipleLanguagesLabel = multipleLanguages,
-            monoLabel = mono,
-            stereoLabel = stereo,
-            surround51Label = surround51,
-            surround71Label = surround71,
-            channelsLabel = { count -> channelsTemplate.format(locale, count) },
-            audioDescriptionLabel = audioDescription,
-            clearDialogueLabel = clearDialogue,
-        )
-    }
-    val subtitleChoices = remember(
-        currentTracks,
-        unknownLanguage,
-        multipleLanguages,
-        mono,
-        stereo,
-        surround51,
-        surround71,
-        channelsTemplate,
-        locale,
-    ) {
-        collectTracks(
-            tracks = currentTracks,
-            trackType = C.TRACK_TYPE_TEXT,
-            unknownLanguageLabel = unknownLanguage,
-            multipleLanguagesLabel = multipleLanguages,
-            monoLabel = mono,
-            stereoLabel = stereo,
-            surround51Label = surround51,
-            surround71Label = surround71,
-            channelsLabel = { count -> channelsTemplate.format(locale, count) },
-        )
-    }
-    val audioTracks = remember(audioChoices) { audioChoices.map(UiTrack::toPlaybackOptionTrack) }
-    val subtitleTracks = remember(subtitleChoices) {
-        subtitleChoices.map(UiTrack::toPlaybackOptionTrack)
-    }
+    val choices = rememberPlaybackTrackChoices(player)
+    val audioChoices = choices.audio
+    val subtitleChoices = choices.subtitles
+    val audioTracks = choices.audioTracks
+    val subtitleTracks = choices.subtitleTracks
 
     PlaybackOptionsSheetContent(
         page = page,
@@ -280,6 +221,82 @@ internal fun PlaybackOptionsSheet(
             }
         },
         recording = recording,
+    )
+}
+
+/** The player's audio and subtitle tracks, labelled as the options lists show them. */
+internal class PlaybackTrackChoices(val audio: List<UiTrack>, val subtitles: List<UiTrack>) {
+    val audioTracks = audio.map(UiTrack::toPlaybackOptionTrack)
+    val subtitleTracks = subtitles.map(UiTrack::toPlaybackOptionTrack)
+}
+
+@Composable
+internal fun rememberPlaybackTrackChoices(player: Player): PlaybackTrackChoices {
+    val unknownLanguage = stringResource(R.string.track_unknown_language)
+    val multipleLanguages = stringResource(R.string.track_multiple_languages)
+    val mono = stringResource(R.string.track_mono)
+    val stereo = stringResource(R.string.track_stereo)
+    val surround51 = stringResource(R.string.track_surround_5_1)
+    val surround71 = stringResource(R.string.track_surround_7_1)
+    val channelsTemplate = stringResource(R.string.track_channels_count)
+    val locale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    val audioDescription = stringResource(R.string.audio_description)
+    val clearDialogue = stringResource(R.string.track_clear_dialogue)
+    val currentTracks = rememberPlayerTracks(player)
+    return remember(
+        currentTracks,
+        unknownLanguage,
+        multipleLanguages,
+        mono,
+        stereo,
+        surround51,
+        surround71,
+        channelsTemplate,
+        locale,
+        audioDescription,
+        clearDialogue,
+    ) {
+        PlaybackTrackChoices(
+            audio = collectTracks(
+                tracks = currentTracks,
+                trackType = C.TRACK_TYPE_AUDIO,
+                unknownLanguageLabel = unknownLanguage,
+                multipleLanguagesLabel = multipleLanguages,
+                monoLabel = mono,
+                stereoLabel = stereo,
+                surround51Label = surround51,
+                surround71Label = surround71,
+                channelsLabel = { count -> channelsTemplate.format(locale, count) },
+                audioDescriptionLabel = audioDescription,
+                clearDialogueLabel = clearDialogue,
+            ),
+            subtitles = collectTracks(
+                tracks = currentTracks,
+                trackType = C.TRACK_TYPE_TEXT,
+                unknownLanguageLabel = unknownLanguage,
+                multipleLanguagesLabel = multipleLanguages,
+                monoLabel = mono,
+                stereoLabel = stereo,
+                surround51Label = surround51,
+                surround71Label = surround71,
+                channelsLabel = { count -> channelsTemplate.format(locale, count) },
+            ),
+        )
+    }
+}
+
+/** The action row's track buttons, while their quick lists can open over what plays. */
+@Composable
+internal fun rememberPlayerTrackButtons(player: Player, available: Boolean): PlayerTrackButtons {
+    val choices = rememberPlaybackTrackChoices(player)
+    val unselected = stringResource(R.string.audio_track_unselected)
+    val off = stringResource(R.string.subtitles_off)
+    if (!available) return PlayerTrackButtons()
+    return PlayerTrackButtons(
+        audio = choices.audioTracks.takeIf { playbackQuickListOffered(PlaybackOptionsPage.AUDIO, it.size) }
+            ?.let { tracks -> tracks.firstOrNull(PlaybackOptionTrack::selected)?.label ?: unselected },
+        subtitles = choices.subtitleTracks.takeIf { playbackQuickListOffered(PlaybackOptionsPage.SUBTITLES, it.size) }
+            ?.let { tracks -> tracks.firstOrNull(PlaybackOptionTrack::selected)?.label ?: off },
     )
 }
 

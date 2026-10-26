@@ -28,6 +28,7 @@ import androidx.tv.material3.IconButton
 import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvhplayer.R
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.ui.TvOverlayActionGap
 
 /** Material disabled content alpha, used for a pause control that stays focusable. */
@@ -39,6 +40,8 @@ private data class PlayerAction(
     @DrawableRes val icon: Int,
     val onClick: (() -> Unit)?,
     val focus: FocusRequester?,
+    /** The current choice a track button announces after its label. */
+    val state: String? = null,
 )
 
 @Composable
@@ -58,18 +61,34 @@ internal fun PlayerActionRow(
     pauseUnavailableReason: String? = null,
     onInfo: () -> Unit = {},
     infoFocus: FocusRequester? = null,
+    /** Audio and Subtitles stand beside Info only while their list has a choice to make. */
+    tracks: PlayerTrackButtons = PlayerTrackButtons(),
+    onTrackList: (PlaybackOptionsPage) -> Unit = {},
+    audioFocus: FocusRequester? = null,
+    subtitlesFocus: FocusRequester? = null,
 ) {
     val playPause = stringResource(if (paused) R.string.play else R.string.pause)
     val settings = stringResource(R.string.nav_settings)
     val stop = stringResource(R.string.stop_playback)
-    val actions = listOf(
+    val audio = stringResource(R.string.audio_quick_list)
+    val subtitles = stringResource(R.string.subtitles)
+    val actions = listOfNotNull(
         PlayerAction("player-pause", playPause,
             if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause, onTogglePause, pauseFocus),
         PlayerAction("player-stop", stop, R.drawable.ic_stop, onStop, stopFocus),
+        tracks.audio?.let {
+            PlayerAction("player-audio", audio, R.drawable.ic_audiotrack,
+                { onTrackList(PlaybackOptionsPage.AUDIO) }, audioFocus, it)
+        },
+        tracks.subtitles?.let {
+            PlayerAction("player-subtitles", subtitles, R.drawable.ic_subtitles,
+                { onTrackList(PlaybackOptionsPage.SUBTITLES) }, subtitlesFocus, it)
+        },
         PlayerAction("player-info", stringResource(R.string.details_program), R.drawable.ic_info, onInfo, infoFocus),
         PlayerAction("player-settings", settings, R.drawable.ic_settings, onSettings, settingsFocus),
     )
-    // Playback actions stand at the start; details and Settings at the end.
+    // Playback actions stand at the start; track lists, details and Settings at the end.
+    val endStart = actions[2].tag
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -77,9 +96,9 @@ internal fun PlayerActionRow(
         horizontalArrangement = Arrangement.spacedBy(TvOverlayActionGap),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        actions.forEach { (tag, label, icon, action, focus) ->
+        actions.forEach { (tag, label, icon, action, focus, state) ->
             key(tag) {
-                if (tag == "player-info") Spacer(Modifier.weight(1f))
+                if (tag == endStart) Spacer(Modifier.weight(1f))
                 if (action != null) {
                     val actionModifier = Modifier
                         .testTag(tag)
@@ -90,6 +109,7 @@ internal fun PlayerActionRow(
                                 stateDescription = pauseUnavailableReason
                             }
                         } else Modifier)
+                        .then(if (state != null) Modifier.semantics { stateDescription = state } else Modifier)
                     IconButton(
                         onClick = { onInteraction(); action() },
                         colors = IconButtonDefaults.colors(

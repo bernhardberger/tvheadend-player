@@ -23,7 +23,7 @@ internal fun playerChromeAlpha(timelineFocused: Boolean, previewing: Boolean): F
 internal fun rememberPlayerChromeAlpha(timelineFocused: Boolean, previewing: Boolean): State<Float> =
     animateFloatAsState(
         playerChromeAlpha(timelineFocused, previewing),
-        animationSpec = tween(PlayerMotion.EmphasisMs),
+        animationSpec = tween(PlayerMotion.EmphasisMs, easing = PlayerMotion.Standard),
         label = "player-surrounding-chrome",
     )
 

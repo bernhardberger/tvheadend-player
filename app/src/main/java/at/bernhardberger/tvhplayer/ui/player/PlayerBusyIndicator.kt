@@ -35,14 +35,18 @@ internal fun PlayerBusyIndicator(
     cover: AppVideoPresentation? = null,
 ) {
     val quiet by rememberBusyRingQuiet(cover)
-    val ringAlpha by animateFloatAsState(if (quiet) 0f else 1f, tween(180), label = "busyRingAlpha")
+    val ringAlpha by animateFloatAsState(
+        if (quiet) 0f else 1f,
+        tween(180, easing = PlayerMotion.Standard),
+        label = "busyRingAlpha",
+    )
     val description = status?.let {
         stringResource(if (it == PlayerBusyStatus.TUNING) R.string.player_tuning else R.string.player_buffering)
     }
     AnimatedVisibility(
         visible = status != null,
-        enter = fadeIn(tween(180)),
-        exit = fadeOut(tween(180)),
+        enter = fadeIn(tween(180, easing = PlayerMotion.Standard)),
+        exit = fadeOut(tween(180, easing = PlayerMotion.Standard)),
         modifier = modifier,
     ) {
         // Only this stable node speaks. The primitive's progress semantics are cleared, so neither

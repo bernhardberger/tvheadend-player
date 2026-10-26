@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.tv.material3.LocalContentColor
 import at.bernhardberger.tvhplayer.ui.TvTextTertiaryAlpha
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.graphicsLayer
@@ -83,6 +84,8 @@ internal fun PlayerChromeControls(
     onStop: () -> Unit,
     onInfo: () -> Unit,
     onOptions: () -> Unit,
+    /** Opens the Audio or Subtitles quick list from its action-row button. */
+    onTrackList: (PlaybackOptionsPage) -> Unit,
     onInteraction: () -> Unit,
     onCommitSeek: () -> Unit,
     onPauseUnavailable: (reason: String) -> Unit,
@@ -111,6 +114,8 @@ internal fun PlayerChromeControls(
     val restoreFocus = actions.restoreFocus
     val pauseFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
+    val audioFocus = remember { FocusRequester() }
+    val subtitlesFocus = remember { FocusRequester() }
     val settingsFocus = remember { FocusRequester() }
     val timelineFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
@@ -160,6 +165,9 @@ internal fun PlayerChromeControls(
             val target = when (restoreFocus) {
                 null -> null
                 "player-info" -> infoFocus
+                // A track button gone with its choice hands focus to its neighbour, Info.
+                "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
+                "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
                 "player-settings" -> settingsFocus
                 "player-stop" -> stopFocus
                 "player-seekbar" -> timelineFocus.takeIf { timelineFocusable }
@@ -201,6 +209,8 @@ internal fun PlayerChromeControls(
         "player-stop" -> stopFocus
         "player-settings" -> settingsFocus
         "player-info" -> infoFocus
+        "player-audio" -> if (actions.tracks.audio != null) audioFocus else infoFocus
+        "player-subtitles" -> if (actions.tracks.subtitles != null) subtitlesFocus else infoFocus
         else -> pauseFocus
     }
     val belowIdentity = if (timelineFocusable) timelineFocus else actionFocus
@@ -208,7 +218,8 @@ internal fun PlayerChromeControls(
         relocatingKey = Key.DirectionDown
         belowIdentity.requestFocus()
     }
-    decoration({ chromeAlpha.value }) {
+    // The decoration follows the action row, which fades in last when taken over from the Banner.
+    decoration({ actionsAlpha() * chromeAlpha.value }) {
     PlayerOverlayChrome(
         bannerDrop = bannerDrop,
         // Covered, they also offer an accessibility service nothing to read or act on.
@@ -388,6 +399,10 @@ internal fun PlayerChromeControls(
             stopFocus = stopFocus,
             onInfo = onInfo,
             infoFocus = infoFocus,
+            tracks = actions.tracks,
+            onTrackList = onTrackList,
+            audioFocus = audioFocus,
+            subtitlesFocus = subtitlesFocus,
             onInteraction = onInteraction,
             onActionFocused = {
                 lastFocusedControl = it; lastAction = it; onActionFocused(it); onControlFocused(it)

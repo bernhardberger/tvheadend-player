@@ -37,7 +37,7 @@ fun ProgrammeHero(
     recordingBadge: Boolean = false,
 ) {
     val currentSession = LocalArtworkContext.current.currentSession
-    val accent = rememberChannelAccent(picon, channelId)
+    val ground = channelFallbackGround(picon, channelId)
     val artwork = image
     BoxWithConstraints(modifier.size(PlayerChromeTokens.heroWidth, PlayerChromeTokens.heroHeight)
         .clearAndSetSemantics {}) {
@@ -50,10 +50,8 @@ fun ProgrammeHero(
             maxWidth - if (endRoom > 0.dp) endRoom + 12.dp else 44.dp)
         val markHeight = minOf(if (compact) 28.dp else PlayerChromeTokens.identityHeight, maxHeight - bottomRoom)
         val fallback: @Composable () -> Unit = {
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(
-                if (picon != null) accent.copy(alpha = 0.48f) else TvSurfaceColors.containerLow,
-                TvSurfaceColors.containerLowest,
-            ))).padding(bottom = bottomRoom, end = endRoom), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxSize().background(ground).padding(bottom = bottomRoom, end = endRoom),
+                contentAlignment = Alignment.Center) {
                 Box(Modifier.size(markWidth, markHeight).testTag("programme-fallback-mark"), contentAlignment = Alignment.Center) {
                     if (picon != null && currentSession != null) {
                         // On its own colour's gradient, so no ground to ink it for.
@@ -71,4 +69,17 @@ fun ProgrammeHero(
                 loading = { fallback() }, error = { fallback() })
         } else fallback()
     }
+}
+
+/**
+ * What a missing programme picture falls back to: the channel's own colour from its [picon] fading
+ * down to the darkest surface, or without a picon (or a known channel) a neutral fade. The hero and
+ * the player's artwork tile share it, so the details page and the info bar agree.
+ */
+@Composable
+internal fun channelFallbackGround(picon: ArtworkId?, channelId: ChannelId?): Brush {
+    val top = if (picon != null && channelId != null) {
+        rememberChannelAccent(picon, channelId).copy(alpha = 0.48f)
+    } else TvSurfaceColors.containerLow
+    return Brush.verticalGradient(listOf(top, TvSurfaceColors.containerLowest))
 }

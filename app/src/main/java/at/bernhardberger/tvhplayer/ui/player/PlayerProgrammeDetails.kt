@@ -18,9 +18,22 @@ import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import kotlinx.coroutines.CoroutineScope
 
-/** The browse details surface over the existing player, without a playback request. */
+/**
+ * Whether a details page over the player shows its programme's picture framed in its second
+ * column: true for a programme other than the one the video is showing.
+ */
+internal val LocalPlayerDetailsFramedArt = compositionLocalOf { false }
+
+/**
+ * The browse details surface over the existing player, without a playback request. [framedArt]
+ * frames the programme's picture beside the page, for a channel opened from the rail.
+ */
 @Composable
-internal fun PlayerDetailsSurface(onBackKeyDown: () -> Unit = {}, content: @Composable () -> Unit) {
+internal fun PlayerDetailsSurface(
+    onBackKeyDown: () -> Unit = {},
+    framedArt: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
     Box(Modifier.fillMaxSize().onPreviewKeyEvent { key ->
         if (key.key != Key.Back) false else {
@@ -32,7 +45,8 @@ internal fun PlayerDetailsSurface(onBackKeyDown: () -> Unit = {}, content: @Comp
         }
     }) {
         WarmPlaybackScrim()
-        CompositionLocalProvider(LocalWarmPlayback provides true, content = content)
+        CompositionLocalProvider(LocalWarmPlayback provides true, LocalPlayerDetailsFramedArt provides framedArt,
+            content = content)
     }
 }
 
@@ -52,13 +66,14 @@ internal fun LivePlayerProgrammeDetails(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onClose: () -> Unit,
     onBackKeyDown: () -> Unit = {},
+    framedArt: Boolean = false,
 ) {
     // Freeze the watched-position programme at entry; the host refreshes its data by ID.
     val openingEvent = remember { event }
     val openingObservation = remember { observation }
     val latestNow = rememberUpdatedState(nowSec)
     val inFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
-    PlayerDetailsSurface(onBackKeyDown) {
+    PlayerDetailsSurface(onBackKeyDown, framedArt) {
         if (openingEvent != null) {
             ProgrammeDetailsHost(
                 openingEvent = openingEvent,
