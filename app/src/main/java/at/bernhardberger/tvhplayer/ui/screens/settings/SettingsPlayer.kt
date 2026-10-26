@@ -11,6 +11,7 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.streamProfilePresentation
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_FIXED_MILLIS
 import at.bernhardberger.tvhplayer.ui.SettingsSection
@@ -21,6 +22,34 @@ import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import org.koin.androidx.compose.koinViewModel
 
 internal const val KEEP_CHANNEL_LEVEL = "keep-channel"
+
+internal const val WARM_PLAYBACK_LEVEL = "warm-playback"
+
+@Composable
+internal fun settingsWarmPlaybackLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
+    val ui by vm.ui.collectAsStateWithLifecycle()
+    return settingsWarmPlaybackLevel(ui.warmPlaybackMode) { mode ->
+        vm.onWarmPlaybackModeChanged(mode)
+        navigation.pop()
+    }
+}
+
+@Composable
+internal fun settingsWarmPlaybackLevel(mode: WarmPlaybackMode, onSelect: (WarmPlaybackMode) -> Unit): DepthLevel =
+    settingsLevel(WARM_PLAYBACK_LEVEL, stringResource(R.string.warm_playback_setting), WarmPlaybackMode.entries.map { value ->
+        settingsRow(value.name, warmPlaybackLabel(value), supporting = stringResource(when (value) {
+            WarmPlaybackMode.ON -> R.string.warm_playback_on_help
+            WarmPlaybackMode.AUDIO_ONLY -> R.string.warm_playback_audio_help
+            WarmPlaybackMode.OFF -> R.string.warm_playback_off_help
+        }), selected = mode == value, onClick = { onSelect(value) })
+    }, initialItemId = mode.name)
+
+@Composable
+private fun warmPlaybackLabel(mode: WarmPlaybackMode): String = stringResource(when (mode) {
+    WarmPlaybackMode.ON -> R.string.warm_playback_on
+    WarmPlaybackMode.AUDIO_ONLY -> R.string.warm_playback_audio
+    WarmPlaybackMode.OFF -> R.string.warm_playback_off
+})
 
 @Composable
 internal fun settingsKeepChannelLevel(navigation: DepthNavigationState, vm: SettingsPlayerViewModel = koinViewModel()): DepthLevel {
@@ -184,6 +213,8 @@ internal fun settingsPlayerLevel(
     return settingsLevel(SettingsSection.PLAYER.name, stringResource(R.string.settings_player), listOf(
         settingsRow("autoplay", stringResource(R.string.auto_start_playback), checked = ui.autoStartPlayback,
             onClick = { onAutoStartPlaybackChanged(!ui.autoStartPlayback) }),
+        settingsRow(WARM_PLAYBACK_LEVEL, stringResource(R.string.warm_playback_setting),
+            warmPlaybackLabel(ui.warmPlaybackMode), child = WARM_PLAYBACK_LEVEL),
         settingsRow("timeshift", stringResource(R.string.timeshift_setting), checked = ui.timeshiftEnabled,
             onClick = { onTimeshiftEnabledChanged(!ui.timeshiftEnabled) }),
         // Only a paused timeshift channel is kept tuned, so without timeshift the row has no effect.

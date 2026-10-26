@@ -21,6 +21,25 @@ import org.junit.Test
 
 class PlayerSettingsStoreTest {
     @Test
+    fun warmPlaybackDefaultsOnAndPersistsEveryChoice() = runTest {
+        val dataStore = InMemoryPreferencesDataStore()
+        val store = PlayerSettingsStore(dataStore)
+        assertEquals(WarmPlaybackMode.ON, store.playerSettings.first().warmPlaybackMode)
+        for (mode in WarmPlaybackMode.entries) {
+            store.setWarmPlaybackMode(mode)
+            assertEquals(mode, PlayerSettingsStore(dataStore).playerSettings.first().warmPlaybackMode)
+        }
+    }
+
+    @Test
+    fun unknownWarmPlaybackValueUsesOn() = runTest {
+        val store = PlayerSettingsStore(InMemoryPreferencesDataStore(preferencesOf(
+            stringPreferencesKey("warmPlaybackMode") to "unknown",
+        )))
+        assertEquals(WarmPlaybackMode.ON, store.playerSettings.first().warmPlaybackMode)
+    }
+
+    @Test
     fun keepChannelDefaultsToTwentyAndPersistsEveryChoice() = runTest {
         val dataStore = InMemoryPreferencesDataStore()
         val store = PlayerSettingsStore(dataStore)

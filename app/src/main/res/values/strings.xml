@@ -1,4 +1,11 @@
 <resources>
+    <string name="warm_playback_setting">While browsing</string>
+    <string name="warm_playback_on">Show picture</string>
+    <string name="warm_playback_audio">Sound only</string>
+    <string name="warm_playback_off">Stop</string>
+    <string name="warm_playback_on_help">Keep playing with the picture behind menus.</string>
+    <string name="warm_playback_audio_help">Keep playing with sound but no picture behind menus.</string>
+    <string name="warm_playback_off_help">Stop playback when you leave the player.</string>
     <!-- Notes above strings are for translators. "Max N" is a rough character budget for the
          TV layout, not a hard limit; docs/translations/README.md has the full workflow. -->
     <string name="player_continue_watching">Continue watching</string>

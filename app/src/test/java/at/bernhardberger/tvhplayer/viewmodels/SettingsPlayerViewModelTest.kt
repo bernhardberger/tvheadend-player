@@ -55,6 +55,12 @@ class SettingsPlayerViewModelTest {
             val model = SettingsPlayerViewModel(settings, runtime, session, profiles, uiSettings)
             models.put("player", model)
 
+            for (mode in at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.entries) {
+                model.onWarmPlaybackModeChanged(mode)
+                model.ui.first { it.warmPlaybackMode == mode }
+                assertEquals(mode, settings.playerSettings.first().warmPlaybackMode)
+            }
+
             for (enabled in listOf(true, false)) {
                 model.onAutoStartPlaybackChanged(enabled)
                 model.ui.first { it.autoStartPlayback == enabled }

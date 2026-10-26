@@ -53,6 +53,57 @@ class SettingsVisualEvidenceTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var view: View
 
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun warmPlaybackChoice() {
+        var mode by mutableStateOf(at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.ON)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    val navigation = rememberDepthNavigationState(SettingsSection.PLAYER.name, WARM_PLAYBACK_LEVEL)
+                    Box(Modifier.fillMaxSize().background(androidx.tv.material3.MaterialTheme.colorScheme.background)) {
+                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                            onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                            SettingsScreenNavigation(navigation, listOf(
+                                settingsPlayerLevel(at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState(warmPlaybackMode = mode), {}),
+                                settingsWarmPlaybackLevel(mode) { mode = it; navigation.pop() }),
+                                initialFocusEnabled = !drawerActive, contentPadding = padding)
+                        }
+                    }
+                }
+            }
+        }
+        fun save(name: String) {
+            compose.mainClock.advanceTimeBy(1000)
+            compose.waitForIdle()
+            compose.runOnIdle {
+                val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                view.draw(Canvas(bitmap))
+                val file = File("../build/review/warm-choice/$name.png").apply { parentFile.mkdirs() }
+                file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                bitmap.recycle()
+            }
+        }
+        compose.onNode(isFocused() and hasText("While browsing")).assertExists()
+        save("en-font1.0-playback-row")
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Show picture").assertIsFocused().assertIsSelected()
+        save("en-font1.0-choice-on")
+        press(Key.DirectionDown)
+        save("en-font1.0-choice-sound-focus")
+        press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Sound only").assertIsFocused().assertIsSelected()
+        save("en-font1.0-choice-sound-selected")
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Stop").assertIsFocused().assertIsSelected()
+        save("en-font1.0-choice-stop-selected")
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText("While browsing") and hasText("Stop")).assertExists()
+        save("en-font1.0-playback-row-restored")
+    }
+
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishNormal() = captureStates("en", 1f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun germanNormal() = captureStates("de", 1f)
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishEnlarged() = captureStates("en", 1.3f)
@@ -238,7 +289,7 @@ class SettingsVisualEvidenceTest {
         }
         press(Key.DirectionCenter)
         capture("en-font1.0-playback")
-        repeat(3) { press(Key.DirectionDown) }
+        repeat(4) { press(Key.DirectionDown) }
         press(Key.DirectionCenter)
         compose.onNode(isFocused() and hasText("Direct streaming")).assertIsSelected()
         capture("en-font1.0-stream-profile")

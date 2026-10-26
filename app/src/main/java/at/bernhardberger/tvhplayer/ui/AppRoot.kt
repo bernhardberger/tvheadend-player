@@ -69,6 +69,8 @@ import at.bernhardberger.tvhplayer.core.RecordingFinishedAction
 import at.bernhardberger.tvhplayer.core.recordingFinishedAction
 import at.bernhardberger.tvhplayer.core.shouldMountPersistentPlayerSurface
 import at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim
+import at.bernhardberger.tvhplayer.core.shouldStopPlaybackWhileBrowsing
+import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.data.ConnectionState
 import at.bernhardberger.tvhplayer.playback.SurfaceFrameRateRequest
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
@@ -215,6 +217,7 @@ internal fun MainStartupComposition(
     modifier: Modifier = Modifier,
     loadingTiming: MainStartupLoadingTiming = remember { MainStartupLoadingTiming() },
     showWarmPlaybackScrim: Boolean = false,
+    coverWarmPlayback: Boolean = false,
     warmPlaybackScrimAlpha: Float = WarmPlaybackScrimAlpha,
     persistentSurface: @Composable BoxScope.() -> Unit = {},
     navigation: @Composable BoxScope.(AppNavKey, Boolean) -> Unit = { _, _ -> },
@@ -288,6 +291,8 @@ internal fun MainStartupComposition(
     Box(modifier = modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
         .semantics { testTagsAsResourceId = true }) {
         persistentSurface()
+        // Keep the surface attached and decoding for instant return, but draw ordinary browse art.
+        if (coverWarmPlayback) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
         if (showWarmPlaybackScrim) WarmPlaybackScrim(targetAlpha = warmPlaybackScrimAlpha)
         val startDestination = state.navigationStartDestination
         if (state.navigationAllowed && startDestination != null) {
@@ -328,8 +333,16 @@ internal fun MainStartupComposition(
  */
 internal const val StartupRevealMs = 500
 
-/** True while live playback continues behind the browse screens under [WarmPlaybackScrim]. */
+/** True only when the live or recording picture is shown behind browse under [WarmPlaybackScrim]. */
 internal val LocalWarmPlayback = compositionLocalOf { false }
+
+/** Route/setting changes own the stop, not target changes: a browse selection starts before entry. */
+@Composable
+internal fun BrowsePlaybackEffect(isPlayer: Boolean, mode: WarmPlaybackMode, runtime: AppPlaybackRuntime) {
+    LaunchedEffect(isPlayer, mode, runtime) {
+        if (shouldStopPlaybackWhileBrowsing(isPlayer, mode)) runtime.stop()
+    }
+}
 
 @Composable
 internal fun WarmPlaybackScrim(
@@ -547,6 +560,9 @@ fun AppRoot(
     val playerEntry = remember { PlayerEntryHandoff() }
     val playbackOrchestrator = remember { AppRootPlaybackOrchestrator() }
     val playerSettingsStore: PlayerSettingsStore = koinInject()
+    val warmPlaybackMode by remember(playerSettingsStore) {
+        playerSettingsStore.playerSettings.map { it.warmPlaybackMode }.distinctUntilChanged()
+    }.collectAsStateWithLifecycle<WarmPlaybackMode?>(initialValue = null)
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
     val activeTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
     val videoPresentation by playbackRuntime.videoPresentation.collectAsStateWithLifecycle()
@@ -598,10 +614,13 @@ fun AppRoot(
 
     val isPlayer = currentDestination is LivePlayerKey ||
         currentDestination is RecordingPlayerKey
+    if (currentDestination != null) {
+        warmPlaybackMode?.let { BrowsePlaybackEffect(isPlayer, it, playbackRuntime) }
+    }
     // Warm live playback behind browse has no player screen to retune it after a reconnect;
     // a channel paused there is stopped, since the restart ended what its Pause held.
-    LaunchedEffect(isPlayer, activeChannelId) {
-        if (isPlayer || activeChannelId == null) return@LaunchedEffect
+    LaunchedEffect(isPlayer, activeChannelId, warmPlaybackMode) {
+        if (isPlayer || activeChannelId == null || warmPlaybackMode == null || warmPlaybackMode == WarmPlaybackMode.OFF) return@LaunchedEffect
         tvheadendSession.observation.map { it.currentSession }.distinctUntilChanged { old, new -> old === new }
             .filterNotNull().collect {
                 // Opening the player right after the reconnect must not abandon the retune halfway.
@@ -1174,7 +1193,10 @@ fun AppRoot(
         showWarmPlaybackScrim = shouldShowWarmPlaybackScrim(
             hasActivePlayback = playbackState !is AppPlaybackState.Idle,
             isPlayerRoute = isPlayer,
+            // Until preferences load, cover the picture rather than flash a disabled backdrop.
+            mode = warmPlaybackMode ?: WarmPlaybackMode.AUDIO_ONLY,
         ),
+        coverWarmPlayback = !isPlayer && warmPlaybackMode != WarmPlaybackMode.ON,
         notices = { at.bernhardberger.tvhplayer.ui.notifications.AppShellNoticeHost() },
         persistentSurface = {
             if (shouldMountPersistentPlayerSurface(

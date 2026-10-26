@@ -977,6 +977,18 @@ class ProgrammeDetailsPageTest {
         compose.onNodeWithTag("details-logo-glow").assertDoesNotExist()
     }
 
+    @Test fun soundOnlyKeepsTheProgrammeArtworkWhilePlaybackContinues() {
+        show(warm = at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim(
+            true, false, at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.AUDIO_ONLY))
+        compose.onNodeWithTag("details-hero").assertExists()
+    }
+
+    @Test fun stoppedBrowseUsesTheProgrammeArtwork() {
+        show(warm = at.bernhardberger.tvhplayer.core.shouldShowWarmPlaybackScrim(
+            false, false, at.bernhardberger.tvhplayer.settings.WarmPlaybackMode.OFF))
+        compose.onNodeWithTag("details-hero").assertExists()
+    }
+
     @Test fun withoutArtTheLogosGlowTurnsIntoAnEvenTintWhileTheLogoScrollsAway() {
         show(future = true)
         fun logoTop() = compose.onNodeWithTag("details-hero-logo", useUnmergedTree = true)

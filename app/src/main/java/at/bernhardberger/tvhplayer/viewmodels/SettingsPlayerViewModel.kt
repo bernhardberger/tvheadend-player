@@ -14,6 +14,7 @@ import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.settings.AudioFormatPreference
 import at.bernhardberger.tvhplayer.settings.FrameRateSwitching
+import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.STARTUP_BUFFER_AUTOMATIC
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -35,6 +36,7 @@ data class SettingsPlayerUiState(
     val audioPassthroughEnabled: Boolean = true,
     val audioPassthroughChangeFailed: Boolean = false,
     val keepChannelMinutes: Int = 20,
+    val warmPlaybackMode: WarmPlaybackMode = WarmPlaybackMode.ON,
     val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
     /** Level Automatic currently uses for this server. */
     val startupBufferLearnedMillis: Int = 500,
@@ -68,6 +70,7 @@ class SettingsPlayerViewModel(
             audioPassthroughEnabled = settings.audioPassthroughEnabled,
             audioPassthroughChangeFailed = audioPassthroughChangeFailed,
             keepChannelMinutes = settings.keepChannelMinutes,
+            warmPlaybackMode = settings.warmPlaybackMode,
             startupBufferMillis = settings.startupBufferMillis,
         )
     }.combine(
@@ -129,6 +132,10 @@ class SettingsPlayerViewModel(
 
     fun onKeepChannelMinutesChanged(minutes: Int) {
         viewModelScope.launch { settingsStore.setKeepChannelMinutes(minutes) }
+    }
+
+    fun onWarmPlaybackModeChanged(mode: WarmPlaybackMode) {
+        viewModelScope.launch { settingsStore.setWarmPlaybackMode(mode) }
     }
 
     fun onStartupBufferMillisChanged(millis: Int) {

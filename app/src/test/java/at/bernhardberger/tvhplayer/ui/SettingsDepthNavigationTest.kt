@@ -31,6 +31,7 @@ import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvheadend.sdk.core.DvrConfigId
 import at.bernhardberger.tvheadend.sdk.core.DvrConfiguration
 import at.bernhardberger.tvhplayer.settings.AppLanguage
+import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.ClockFormat
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
@@ -66,6 +67,39 @@ import java.io.File
 class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var captureView: View
+
+    @Test fun browsingChoiceUsesCurrentSelectionCommitsOnlyOnOkAndRestoresParent() {
+        var mode by mutableStateOf(WarmPlaybackMode.ON)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                val navigation = rememberDepthNavigationState(SettingsSection.PLAYER.name, WARM_PLAYBACK_LEVEL)
+                SettingsScreenNavigation(navigation, listOf(
+                    settingsPlayerLevel(SettingsPlayerUiState(warmPlaybackMode = mode), {}),
+                    settingsWarmPlaybackLevel(mode) { mode = it; navigation.pop() }))
+            }
+        }
+        compose.onNode(isFocused() and hasText("While browsing") and hasText("Show picture")).assertExists()
+        press(Key.DirectionRight)
+        compose.onNodeWithText("Show picture").assertIsFocused().assertIsSelected()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Sound only").assertIsFocused().assertIsNotSelected()
+        assertEquals(WarmPlaybackMode.ON, mode)
+        press(Key.Back)
+        compose.onNode(isFocused() and hasText("While browsing")).assertExists()
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Show picture").assertIsFocused()
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        compose.onNode(isFocused() and hasText("While browsing") and hasText("Sound only")).assertExists()
+        assertEquals(WarmPlaybackMode.AUDIO_ONLY, mode)
+        press(Key.DirectionCenter)
+        compose.onNodeWithText("Sound only").assertIsFocused().assertIsSelected()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Stop").assertIsFocused()
+        press(Key.DirectionCenter)
+        assertEquals(WarmPlaybackMode.OFF, mode)
+        compose.onNode(isFocused() and hasText("While browsing") and hasText("Stop")).assertExists()
+    }
 
     @Test fun recordingsLevelNeedsAProfileChoiceOrRecordingSpace() {
         val profile = at.bernhardberger.tvheadend.sdk.core.DvrConfiguration(
@@ -320,6 +354,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionCenter)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
+        press(Key.DirectionDown)
         compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Pause and rewind live TV” is on."))
             .assertIsNotEnabled()
         press(Key.DirectionCenter)
@@ -362,7 +397,7 @@ class SettingsDepthNavigationTest {
             }
         }
         press(Key.DirectionCenter)
-        repeat(3) { press(Key.DirectionDown) }
+        repeat(4) { press(Key.DirectionDown) }
         val row = "Stream profile"
         compose.onNode(isFocused() and hasText(row) and hasText("pass")).assertIsEnabled()
         press(Key.DirectionCenter)
@@ -933,6 +968,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionDown) // Playback; never activates an editor from focus.
         press(Key.DirectionCenter)
         capture("player-unavailable")
+        press(Key.DirectionDown) // While browsing is a choice page, not a toggle.
         press(Key.DirectionDown)
         assertEquals(0, settingsActions)
         press(Key.DirectionCenter)

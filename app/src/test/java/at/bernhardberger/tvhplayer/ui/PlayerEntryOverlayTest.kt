@@ -85,6 +85,7 @@ import at.bernhardberger.tvhplayer.settings.ChannelTagSettingsStore
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import at.bernhardberger.tvhplayer.settings.WarmPlaybackMode
 import at.bernhardberger.tvhplayer.settings.ServerSettings
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
@@ -141,6 +142,8 @@ class PlayerEntryOverlayTest {
     private lateinit var view: View
     private lateinit var session: FakeTvheadendSession
     private lateinit var runtime: AppPlaybackRuntime
+    private lateinit var playerSettings: PlayerSettingsStore
+    private var playerVisible = false
     private val loadGate = CountDownLatch(1)
 
     @After fun after() {
@@ -183,6 +186,80 @@ class PlayerEntryOverlayTest {
                 .single()
             assertEquals(recordingPlayerKey(DvrEntryId(7), RecordingPlaybackStart.RESUME), stack.last())
         }
+        leavePlayer()
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), runtime.activeTarget.value)
+        assertEquals(selection, runtime.recordingSelection.value)
+        assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK })
+    }
+
+    @Test fun liveOnKeepsTheTargetAndReturnsWithoutRebinding() = browseLive(WarmPlaybackMode.ON)
+    @Test fun liveSoundOnlyKeepsTheTargetAndReturnsWithoutRebinding() = browseLive(WarmPlaybackMode.AUDIO_ONLY)
+    @Test fun liveOffStopsAndLaterSelectionStartsAgain() = browseLive(WarmPlaybackMode.OFF)
+
+    private fun browseLive(mode: WarmPlaybackMode) {
+        app(programme = true, mode = mode)
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        val epoch = runtime.videoPresentation.value.epoch
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
+        leavePlayer()
+        compose.runOnIdle {
+            assertEquals(if (mode == WarmPlaybackMode.OFF) null else AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        }
+        // A settings change or ordinary foreground cycle must not resurrect an explicit browse stop.
+        if (mode == WarmPlaybackMode.OFF) {
+            compose.runOnIdle { runtime.onAppBackgrounded(); runtime.onAppForegrounded() }
+            settle()
+            assertEquals(null, runtime.activeTarget.value)
+        }
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        compose.runOnIdle {
+            assertEquals(bindings + if (mode == WarmPlaybackMode.OFF) 1 else 0,
+                session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK })
+            if (mode != WarmPlaybackMode.OFF) assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        }
+    }
+
+    @Test fun recordingSoundOnlyKeepsTheTargetAndOffStopsWhileBrowsing() {
+        recordingRow()
+        val target = runtime.activeTarget.value
+        val selection = runtime.recordingSelection.value
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
+        compose.runOnIdle { scope.launch { playerSettings.setWarmPlaybackMode(WarmPlaybackMode.AUDIO_ONLY) } }
+        settle()
+        assertEquals(target, runtime.activeTarget.value)
+        compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible }
+        settle()
+        assertEquals(selection, runtime.recordingSelection.value)
+        assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK })
+        leavePlayer()
+        assertEquals(target, runtime.activeTarget.value)
+        compose.runOnIdle { scope.launch { playerSettings.setWarmPlaybackMode(WarmPlaybackMode.OFF) } }
+        compose.waitUntil(10_000) { runtime.activeTarget.value == null }
+        compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        settle()
+        compose.onNodeWithTag("recording-resume").assertExists()
+    }
+
+    @Test fun recordingOffStopsWhenLeavingThePlayer() {
+        recordingRow()
+        compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible }
+        compose.runOnIdle { scope.launch { playerSettings.setWarmPlaybackMode(WarmPlaybackMode.OFF) } }
+        settle()
+        assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), runtime.activeTarget.value)
+        leavePlayer()
+        compose.waitUntil(10_000) { runtime.activeTarget.value == null }
+    }
+
+    private fun leavePlayer() {
+        repeat(3) { if (playerVisible) key(Key.Back) }
+        compose.waitUntil(10_000) { !playerVisible }
+        settle()
     }
 
     @Test fun recordingStoppedAfterRenderingUsesTheNormalResumeChoice() = staleRecordingReturn(replace = false)
@@ -287,7 +364,7 @@ class PlayerEntryOverlayTest {
         }
     }
 
-    private fun app(programme: Boolean, recordings: Boolean = false) {
+    private fun app(programme: Boolean, recordings: Boolean = false, mode: WarmPlaybackMode = WarmPlaybackMode.ON) {
         // The app reads the wall clock to find the programme on air, so it spans every time.
         val event = EpgEvent.create(EventId(1), ChannelId(1), AIRS_FROM, AIRS_UNTIL, title = "Ridge Light")
         val entries = if (recordings) listOf(7L, 8L).map { id -> DvrEntry.create(
@@ -304,6 +381,8 @@ class PlayerEntryOverlayTest {
             recordingProgressCapability = RecordingProgressCapability.SUPPORTED,
         )).apply { scriptLivePlaybackSuccess(); if (recordings) scriptRecordingPlaybackSuccess() }
         val settings = PlayerSettingsStore(InMemoryData())
+        playerSettings = settings
+        runBlocking { settings.setWarmPlaybackMode(mode) }
         val profiles = AppProfileOwner(session, FakeServerProfileStore(ServerProfileReadResult.anonymous("offline.invalid", 9982)),
             settings, Dispatchers.IO, readProfileForEditing = { ServerProfileEditReadResult.Missing })
         scope.launch { profiles.run() }
@@ -351,7 +430,7 @@ class PlayerEntryOverlayTest {
                         startupState = MainStartupState.Ready(server, autoStartPlayback = false),
                         runtimeServerSettings = server,
                         applianceLaunchRequests = ApplianceLaunchRequests(),
-                        onPlayerVisibilityChanged = {},
+                        onPlayerVisibilityChanged = { playerVisible = it },
                         onRequestExit = {},
                     )
                 }

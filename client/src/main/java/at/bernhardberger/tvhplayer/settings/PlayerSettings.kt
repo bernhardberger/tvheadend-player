@@ -17,6 +17,9 @@ import kotlinx.coroutines.flow.map
 enum class AspectRatioMode { FIT, FORCE_16_9, FORCE_4_3 }
 enum class AudioFormatPreference { AUTOMATIC, PREFER_DOLBY, PREFER_STEREO }
 
+/** Presentation while browsing; AUDIO_ONLY keeps the same player and video decoding. */
+enum class WarmPlaybackMode { ON, AUDIO_ONLY, OFF }
+
 /** Whether the TV switches to the video's frame rate: Always may blank the screen briefly. */
 enum class FrameRateSwitching { ALWAYS, SEAMLESS_ONLY, OFF }
 
@@ -82,6 +85,7 @@ data class PlayerSettings(
     val tunnelingEnabled: Boolean = false,
     val audioPassthroughEnabled: Boolean = true,
     val keepChannelMinutes: Int = 20,
+    val warmPlaybackMode: WarmPlaybackMode = WarmPlaybackMode.ON,
     /** Live start-up buffer in milliseconds; [STARTUP_BUFFER_AUTOMATIC] learns it per server. */
     val startupBufferMillis: Int = STARTUP_BUFFER_AUTOMATIC,
 )
@@ -133,6 +137,7 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         val TUNNELING_ENABLED = booleanPreferencesKey("tunnelingEnabled")
         val AUDIO_PASSTHROUGH_ENABLED = booleanPreferencesKey("audioPassthroughEnabled")
         val KEEP_CHANNEL_MINUTES = intPreferencesKey("keepChannelMinutes")
+        val WARM_PLAYBACK_MODE = stringPreferencesKey("warmPlaybackMode")
         val STARTUP_BUFFER_MILLIS = intPreferencesKey("startupBufferMillis")
         val STARTUP_BUFFER_LEARNED_PROFILE = stringPreferencesKey("startupBufferLearnedProfile")
         val STARTUP_BUFFER_LEARNED_MILLIS = intPreferencesKey("startupBufferLearnedMillis")
@@ -216,6 +221,10 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { it[Keys.KEEP_CHANNEL_MINUTES] = minutes }
     }
 
+    suspend fun setWarmPlaybackMode(mode: WarmPlaybackMode) {
+        dataStore.edit { it[Keys.WARM_PLAYBACK_MODE] = mode.name }
+    }
+
     suspend fun setStartupBufferMillis(millis: Int) {
         require(millis == STARTUP_BUFFER_AUTOMATIC || millis in STARTUP_BUFFER_FIXED_MILLIS)
         dataStore.edit { it[Keys.STARTUP_BUFFER_MILLIS] = millis }
@@ -288,6 +297,8 @@ class PlayerSettingsStore(private val dataStore: DataStore<Preferences>) {
                 tunnelingEnabled = p[Keys.TUNNELING_ENABLED] ?: false,
                 audioPassthroughEnabled = p[Keys.AUDIO_PASSTHROUGH_ENABLED] ?: true,
                 keepChannelMinutes = p[Keys.KEEP_CHANNEL_MINUTES]?.takeIf { it in listOf(0, 10, 20, 30) } ?: 20,
+                warmPlaybackMode = WarmPlaybackMode.entries.firstOrNull { it.name == p[Keys.WARM_PLAYBACK_MODE] }
+                    ?: WarmPlaybackMode.ON,
                 startupBufferMillis = p[Keys.STARTUP_BUFFER_MILLIS]
                     ?.takeIf { it == STARTUP_BUFFER_AUTOMATIC || it in STARTUP_BUFFER_FIXED_MILLIS }
                     ?: STARTUP_BUFFER_AUTOMATIC,
