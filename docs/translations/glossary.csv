@@ -1,16 +1,599 @@
-source,context,de,provenance
-Channel,TV service rather than a frequency,Sender,existing app nav_channels
-Guide,Electronic program guide,Programmführer,existing app nav_epg
-Recording,Recorded TV program,Aufnahme,existing app nav_recordings (plural Aufnahmen)
-Record,Action to schedule or start recording,Aufnehmen,existing app record
-Watch,Action to start playback,Ansehen,existing app context_watch
-Retention,How long a recording is kept,Aufbewahrung,existing app details_retention
-Missed,Recording that did not take place,Verpasst,existing app recording_state_missed
-Completed,Recording state,Abgeschlossen,existing app recording_state_completed
-Live,At the live edge,Live,existing app timeshift_live
-Tuning,Switching to a selected channel; never channel scanning,,semantic guidance; wording needs review
-Timeshift,Pause or rewind live TV within the available buffer,,semantic guidance
-Mux,Broadcast multiplex carrying several services,,semantic guidance; keep distinct from Channel
-Cancel,Cancel a future scheduled recording,,semantic guidance; not Stop or Delete
-Stop,End an active recording and retain what was recorded,,semantic guidance; not Cancel or Delete
-Delete,Remove a recording and its file,,semantic guidance; destructive action
+source,target,language,context,provenance
+Channel,Sender,de,TV service rather than a frequency,app values-de nav_channels; tvheadend web UI: Kanal (differs)
+Channel,Chaînes,fr,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Chaine (differs)
+Channel,Canales,es,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Canal (differs)
+Channel,Canali,it,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Canale (differs)
+Channel,Zenders,nl,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanaal (differs)
+Channel,Canais,pt-BR,TV service rather than a frequency,round-1 draft nav_channels (plural label)
+Channel,Canais,pt-PT,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Canal (differs)
+Channel,Kanaler,sv,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanal (differs)
+Channel,Kanaler,da,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanal (differs)
+Channel,Kanaler,nb,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanal (differs)
+Channel,Kanavat,fi,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanava (differs)
+Channel,Kanály,cs,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Program (differs)
+Channel,Kanały,pl,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanał (differs)
+Channel,Csatornák,hu,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Csatorna (differs)
+Channel,Kanali,hr,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Program (differs)
+Channel,Canale,ro,TV service rather than a frequency,round-1 draft nav_channels (plural label)
+Channel,Κανάλια,el,TV service rather than a frequency,round-1 draft nav_channels (plural label)
+Channel,Каналы,ru,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Канал (differs)
+Channel,Канали,uk,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Канал (differs)
+Channel,Kanallar,tr,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: Kanal (differs)
+Channel,频道,zh-Hans,TV service rather than a frequency,round-1 draft nav_channels; tvheadend web UI: 频道
+Channel,頻道,zh-Hant,TV service rather than a frequency,round-1 draft nav_channels
+Channel,チャンネル,ja,TV service rather than a frequency,round-1 draft nav_channels
+Channel,채널,ko,TV service rather than a frequency,round-1 draft nav_channels; tvheadend web UI: 채널
+Channel,القنوات,ar,TV service rather than a frequency,round-1 draft nav_channels (plural label)
+Channel,ערוצים,he,TV service rather than a frequency,round-1 draft nav_channels (plural label); tvheadend web UI: ערוץ (differs)
+Guide,Programmführer,de,Electronic program guide,app values-de nav_epg; tvheadend web UI: Electronic Program Guide (differs)
+Guide,Guide,fr,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Guide de Programme Electronique (differs)
+Guide,Guía,es,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Guía
+Guide,Guida,it,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Guida elettronica dei programmi (differs)
+Guide,Tv-gids,nl,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Electronische Programma Gids (differs)
+Guide,Guia,pt-BR,Electronic program guide,round-1 draft nav_epg
+Guide,Guia,pt-PT,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Programação Televisiva (differs)
+Guide,Tv-guide,sv,Electronic program guide,round-1 draft nav_epg
+Guide,Tv-guide,da,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Elektronisk Program Guide (differs)
+Guide,TV-guide,nb,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Elektronisk Program Guide (differs)
+Guide,Ohjelmaopas,fi,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Ohjelmaopas (EPG) (differs)
+Guide,Program,cs,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Elektronický průvodce programem (differs)
+Guide,Program TV,pl,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Przewodnik (EPG) (differs)
+Guide,Műsorújság,hu,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Elektronikus műsor újság (differs)
+Guide,TV vodič,hr,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Elektronski programski vodič (differs)
+Guide,Ghid TV,ro,Electronic program guide,round-1 draft nav_epg
+Guide,Οδηγός,el,Electronic program guide,round-1 draft nav_epg
+Guide,Телепрограмма,ru,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Электронный Программный Гид (differs)
+Guide,Телепрограма,uk,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Програма телепередач (differs)
+Guide,Rehber,tr,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: Elektronik Program Rehberi (differs)
+Guide,节目指南,zh-Hans,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: 电子节目指南 (differs)
+Guide,節目表,zh-Hant,Electronic program guide,round-1 draft nav_epg
+Guide,番組表,ja,Electronic program guide,round-1 draft nav_epg
+Guide,편성표,ko,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: 전자 프로그램 가이드 (differs)
+Guide,دليل البرامج,ar,Electronic program guide,round-1 draft nav_epg
+Guide,מדריך,he,Electronic program guide,round-1 draft nav_epg; tvheadend web UI: מדריך שידורים (differs)
+Recording,Aufnahme,de,Recorded TV program,app values-de nav_recordings (plural Aufnahmen); tvheadend web UI: Aufnahme
+Recording,Enregistrements,fr,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Enregistrement en cours (differs)
+Recording,Grabaciones,es,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Grabaciones
+Recording,Registrazioni,it,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Registrazione (differs)
+Recording,Opnamen,nl,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Opname (differs)
+Recording,Gravações,pt-BR,Recorded TV program,round-1 draft nav_recordings (plural label)
+Recording,Gravações,pt-PT,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: A Gravar (differs)
+Recording,Inspelningar,sv,Recorded TV program,round-1 draft nav_recordings (plural label)
+Recording,Optagelser,da,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Optager (differs)
+Recording,Opptak,nb,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Opptak
+Recording,Tallenteet,fi,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Tallennetaan (differs)
+Recording,Nahrávky,cs,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Nahrávání (differs)
+Recording,Nagrania,pl,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Nagrywanie (differs)
+Recording,Felvételek,hu,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Felvétel (differs)
+Recording,Snimke,hr,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Snimanje (differs)
+Recording,Înregistrări,ro,Recorded TV program,round-1 draft nav_recordings (plural label)
+Recording,Εγγραφές,el,Recorded TV program,round-1 draft nav_recordings (plural label)
+Recording,Записи,ru,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Запись (differs)
+Recording,Записи,uk,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Запис (differs)
+Recording,Kayıtlar,tr,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: Kayıt (differs)
+Recording,录制,zh-Hans,Recorded TV program,round-1 draft nav_recordings; tvheadend web UI: 录像 (differs)
+Recording,錄影,zh-Hant,Recorded TV program,round-1 draft nav_recordings
+Recording,録画,ja,Recorded TV program,round-1 draft nav_recordings
+Recording,녹화,ko,Recorded TV program,round-1 draft nav_recordings; tvheadend web UI: 녹화
+Recording,التسجيلات,ar,Recorded TV program,round-1 draft nav_recordings (plural label)
+Recording,הקלטות,he,Recorded TV program,round-1 draft nav_recordings (plural label); tvheadend web UI: הקלטה (differs)
+Record,Aufnehmen,de,Action to schedule or start recording,app values-de record
+Record,Enregistrer,fr,Action to schedule or start recording,round-1 draft record; tvheadend web UI: Enregistrer
+Record,Grabar,es,Action to schedule or start recording,round-1 draft record
+Record,Registra,it,Action to schedule or start recording,round-1 draft record
+Record,Opnemen,nl,Action to schedule or start recording,round-1 draft record
+Record,Gravar,pt-BR,Action to schedule or start recording,round-1 draft record
+Record,Gravar,pt-PT,Action to schedule or start recording,round-1 draft record
+Record,Spela in,sv,Action to schedule or start recording,round-1 draft record
+Record,Optag,da,Action to schedule or start recording,round-1 draft record
+Record,Ta opp,nb,Action to schedule or start recording,round-1 draft record
+Record,Tallenna,fi,Action to schedule or start recording,round-1 draft record
+Record,Nahrát,cs,Action to schedule or start recording,round-1 draft record
+Record,Nagraj,pl,Action to schedule or start recording,round-1 draft record; tvheadend web UI: Nagraj
+Record,Felvétel,hu,Action to schedule or start recording,round-1 draft record
+Record,Snimi,hr,Action to schedule or start recording,round-1 draft record
+Record,Înregistrează,ro,Action to schedule or start recording,round-1 draft record
+Record,Εγγραφή,el,Action to schedule or start recording,round-1 draft record
+Record,Записать,ru,Action to schedule or start recording,round-1 draft record
+Record,Записати,uk,Action to schedule or start recording,round-1 draft record
+Record,Kaydet,tr,Action to schedule or start recording,round-1 draft record
+Record,录制,zh-Hans,Action to schedule or start recording,round-1 draft record; tvheadend web UI: 录制
+Record,錄影,zh-Hant,Action to schedule or start recording,round-1 draft record
+Record,録画,ja,Action to schedule or start recording,round-1 draft record
+Record,녹화,ko,Action to schedule or start recording,round-1 draft record
+Record,تسجيل,ar,Action to schedule or start recording,round-1 draft record
+Record,הקלטה,he,Action to schedule or start recording,round-1 draft record
+Watch,Ansehen,de,Action to start playback,app values-de context_watch
+Watch,Regarder,fr,Action to start playback,round-1 draft context_watch
+Watch,Ver,es,Action to start playback,round-1 draft context_watch
+Watch,Guarda,it,Action to start playback,round-1 draft context_watch
+Watch,Kijken,nl,Action to start playback,round-1 draft context_watch
+Watch,Assistir,pt-BR,Action to start playback,round-1 draft context_watch
+Watch,Ver,pt-PT,Action to start playback,round-1 draft context_watch
+Watch,Titta,sv,Action to start playback,round-1 draft context_watch
+Watch,Se,da,Action to start playback,round-1 draft context_watch
+Watch,Se,nb,Action to start playback,round-1 draft context_watch
+Watch,Katso,fi,Action to start playback,round-1 draft context_watch
+Watch,Sledovat,cs,Action to start playback,round-1 draft context_watch
+Watch,Oglądaj,pl,Action to start playback,round-1 draft context_watch
+Watch,Megnézés,hu,Action to start playback,round-1 draft context_watch
+Watch,Gledaj,hr,Action to start playback,round-1 draft context_watch
+Watch,Vizionează,ro,Action to start playback,round-1 draft context_watch
+Watch,Προβολή,el,Action to start playback,round-1 draft context_watch
+Watch,Смотреть,ru,Action to start playback,round-1 draft context_watch
+Watch,Дивитися,uk,Action to start playback,round-1 draft context_watch
+Watch,İzle,tr,Action to start playback,round-1 draft context_watch
+Watch,观看,zh-Hans,Action to start playback,round-1 draft context_watch
+Watch,觀看,zh-Hant,Action to start playback,round-1 draft context_watch
+Watch,視聴,ja,Action to start playback,round-1 draft context_watch
+Watch,시청,ko,Action to start playback,round-1 draft context_watch
+Watch,مشاهدة,ar,Action to start playback,round-1 draft context_watch
+Watch,צפייה,he,Action to start playback,round-1 draft context_watch
+Retention,Aufbewahrung,de,How long a recording is kept,app values-de details_retention
+Retention,Conservation,fr,How long a recording is kept,round-1 draft details_retention
+Retention,Conservación,es,How long a recording is kept,round-1 draft details_retention
+Retention,Conservazione,it,How long a recording is kept,round-1 draft details_retention
+Retention,Bewaartermijn,nl,How long a recording is kept,round-1 draft details_retention
+Retention,Retenção,pt-BR,How long a recording is kept,round-1 draft details_retention
+Retention,Conservação,pt-PT,How long a recording is kept,round-1 draft details_retention
+Retention,Lagringstid,sv,How long a recording is kept,round-1 draft details_retention
+Retention,Opbevaringstid,da,How long a recording is kept,round-1 draft details_retention
+Retention,Lagringstid,nb,How long a recording is kept,round-1 draft details_retention
+Retention,Säilytysaika,fi,How long a recording is kept,round-1 draft details_retention
+Retention,Doba uchování,cs,How long a recording is kept,round-1 draft details_retention
+Retention,Przechowywanie,pl,How long a recording is kept,round-1 draft details_retention
+Retention,Megőrzési idő,hu,How long a recording is kept,round-1 draft details_retention
+Retention,Čuvanje,hr,How long a recording is kept,round-1 draft details_retention
+Retention,Păstrare,ro,How long a recording is kept,round-1 draft details_retention
+Retention,Διατήρηση,el,How long a recording is kept,round-1 draft details_retention
+Retention,Срок хранения,ru,How long a recording is kept,round-1 draft details_retention
+Retention,Термін зберігання,uk,How long a recording is kept,round-1 draft details_retention
+Retention,Saklama süresi,tr,How long a recording is kept,round-1 draft details_retention
+Retention,保留期限,zh-Hans,How long a recording is kept,round-1 draft details_retention
+Retention,保留期限,zh-Hant,How long a recording is kept,round-1 draft details_retention
+Retention,保存期間,ja,How long a recording is kept,round-1 draft details_retention
+Retention,보관 기간,ko,How long a recording is kept,round-1 draft details_retention
+Retention,مدة الاحتفاظ,ar,How long a recording is kept,round-1 draft details_retention
+Retention,משך שמירה,he,How long a recording is kept,round-1 draft details_retention
+Missed,Verpasst,de,Recording that did not take place,app values-de recording_state_missed
+Missed,Manqué,fr,Recording that did not take place,round-1 draft recording_state_missed
+Missed,No realizada,es,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Mancata,it,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Gemist,nl,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Não realizada,pt-BR,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Não realizada,pt-PT,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Missad,sv,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Ikke optaget,da,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Ikke tatt opp,nb,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Jäi tallentamatta,fi,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Nenahráno,cs,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Pominięte,pl,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Elmaradt,hu,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Propušteno,hr,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Ratată,ro,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Δεν πραγματοποιήθηκε,el,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Пропущена,ru,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Пропущено,uk,Recording that did not take place,round-1 draft recording_state_missed
+Missed,Kaçırıldı,tr,Recording that did not take place,round-1 draft recording_state_missed
+Missed,漏录,zh-Hans,Recording that did not take place,round-1 draft recording_state_missed
+Missed,漏錄,zh-Hant,Recording that did not take place,round-1 draft recording_state_missed
+Missed,録画されず,ja,Recording that did not take place,round-1 draft recording_state_missed
+Missed,녹화 누락,ko,Recording that did not take place,round-1 draft recording_state_missed
+Missed,تسجيل فائت,ar,Recording that did not take place,round-1 draft recording_state_missed
+Missed,ההקלטה הוחמצה,he,Recording that did not take place,round-1 draft recording_state_missed
+Completed,Abgeschlossen,de,Recording state,app values-de recording_state_completed
+Completed,Terminé,fr,Recording state,round-1 draft recording_state_completed
+Completed,Completada,es,Recording state,round-1 draft recording_state_completed
+Completed,Completata,it,Recording state,round-1 draft recording_state_completed
+Completed,Voltooid,nl,Recording state,round-1 draft recording_state_completed
+Completed,Concluída,pt-BR,Recording state,round-1 draft recording_state_completed
+Completed,Concluída,pt-PT,Recording state,round-1 draft recording_state_completed
+Completed,Slutförd,sv,Recording state,round-1 draft recording_state_completed
+Completed,Fuldført,da,Recording state,round-1 draft recording_state_completed
+Completed,Fullført,nb,Recording state,round-1 draft recording_state_completed
+Completed,Valmis,fi,Recording state,round-1 draft recording_state_completed
+Completed,Dokončeno,cs,Recording state,round-1 draft recording_state_completed
+Completed,Zakończone,pl,Recording state,round-1 draft recording_state_completed
+Completed,Befejezve,hu,Recording state,round-1 draft recording_state_completed
+Completed,Dovršeno,hr,Recording state,round-1 draft recording_state_completed
+Completed,Finalizată,ro,Recording state,round-1 draft recording_state_completed
+Completed,Ολοκληρωμένη,el,Recording state,round-1 draft recording_state_completed
+Completed,Завершена,ru,Recording state,round-1 draft recording_state_completed
+Completed,Завершено,uk,Recording state,round-1 draft recording_state_completed
+Completed,Tamamlandı,tr,Recording state,round-1 draft recording_state_completed
+Completed,已完成,zh-Hans,Recording state,round-1 draft recording_state_completed
+Completed,已完成,zh-Hant,Recording state,round-1 draft recording_state_completed
+Completed,完了,ja,Recording state,round-1 draft recording_state_completed
+Completed,완료,ko,Recording state,round-1 draft recording_state_completed
+Completed,مكتمل,ar,Recording state,round-1 draft recording_state_completed
+Completed,הושלמה,he,Recording state,round-1 draft recording_state_completed
+Live,Live,de,At the live edge,app values-de timeshift_live
+Live,Direct,fr,At the live edge,round-1 draft timeshift_live
+Live,Directo,es,At the live edge,round-1 draft timeshift_live
+Live,Diretta,it,At the live edge,round-1 draft timeshift_live
+Live,Live,nl,At the live edge,round-1 draft timeshift_live
+Live,Ao vivo,pt-BR,At the live edge,round-1 draft timeshift_live
+Live,Em direto,pt-PT,At the live edge,round-1 draft timeshift_live
+Live,Direkt,sv,At the live edge,round-1 draft timeshift_live
+Live,Live,da,At the live edge,round-1 draft timeshift_live
+Live,Direkte,nb,At the live edge,round-1 draft timeshift_live
+Live,Suora,fi,At the live edge,round-1 draft timeshift_live
+Live,Živě,cs,At the live edge,round-1 draft timeshift_live
+Live,Na żywo,pl,At the live edge,round-1 draft timeshift_live
+Live,Élő,hu,At the live edge,round-1 draft timeshift_live
+Live,Uživo,hr,At the live edge,round-1 draft timeshift_live
+Live,În direct,ro,At the live edge,round-1 draft timeshift_live
+Live,Ζωντανά,el,At the live edge,round-1 draft timeshift_live
+Live,В эфире,ru,At the live edge,round-1 draft timeshift_live
+Live,В ефірі,uk,At the live edge,round-1 draft timeshift_live
+Live,Canlı,tr,At the live edge,round-1 draft timeshift_live
+Live,直播,zh-Hans,At the live edge,round-1 draft timeshift_live
+Live,直播,zh-Hant,At the live edge,round-1 draft timeshift_live
+Live,ライブ,ja,At the live edge,round-1 draft timeshift_live
+Live,실시간,ko,At the live edge,round-1 draft timeshift_live
+Live,مباشر,ar,At the live edge,round-1 draft timeshift_live
+Live,שידור חי,he,At the live edge,round-1 draft timeshift_live
+Tuning,Sender wird eingestellt,de,Switching to a selected channel; never channel scanning,app values-de player_tuning
+Tuning,Changement de chaîne,fr,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Cambiando canal,es,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Cambio canale,it,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Zender afstemmen,nl,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Sintonizando,pt-BR,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,A sintonizar,pt-PT,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Byter kanal,sv,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Skifter kanal,da,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Bytter kanal,nb,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Vaihdetaan kanavaa,fi,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Přepínání,cs,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Przełączanie,pl,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Csatornaváltás,hu,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Prebacivanje,hr,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Se schimbă canalul,ro,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Αλλαγή καναλιού,el,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Переключение,ru,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Перемикання,uk,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,Kanal değiştiriliyor,tr,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,正在调谐,zh-Hans,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,正在調諧,zh-Hant,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,チャンネル切り替え中,ja,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,채널 전환 중,ko,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,جارٍ تبديل القناة,ar,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Tuning,מעבר ערוץ,he,Switching to a selected channel; never channel scanning,round-1 draft player_tuning
+Timeshift,Timeshift,de,Pause or rewind live TV within the available buffer,app values-de timeshift_setting; tvheadend web UI: Timeshift
+Timeshift,Lecture différée,fr,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Timeshift (differs)
+Timeshift,Reproducción en diferido,es,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Cambio de hora (differs)
+Timeshift,Riproduzione differita,it,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Timeshift (differs)
+Timeshift,Timeshift,nl,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Tijdverschuiving (differs)
+Timeshift,Timeshift,pt-BR,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,Timeshift,pt-PT,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Timeshift
+Timeshift,Tidsförskjutning,sv,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,Tidsforskydning,da,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Tidsforskydning
+Timeshift,Tidsforskyvning,nb,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Timeshift (differs)
+Timeshift,Ajansiirto,fi,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,Časový posun,cs,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Timeshift (differs)
+Timeshift,Przesunięcie w czasie,pl,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Funkcja Timeshift (differs)
+Timeshift,Időeltolás,hu,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Időeltolás
+Timeshift,Vremenski pomak,hr,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Premotavanje (differs)
+Timeshift,Redare decalată,ro,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,Χρονική μετατόπιση,el,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,Отложенный просмотр,ru,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Таймшифт (differs)
+Timeshift,Відкладений перегляд,uk,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Зсув часу (differs)
+Timeshift,Zaman kaydırma,tr,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,时移,zh-Hans,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: 时移
+Timeshift,時移,zh-Hant,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,タイムシフト,ja,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,타임시프트,ko,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: 타임시프트
+Timeshift,الإزاحة الزمنية,ar,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting
+Timeshift,השהיית שידור חי,he,Pause or rewind live TV within the available buffer,round-1 draft timeshift_setting; tvheadend web UI: Timeshift (differs)
+Mux,,de,Broadcast multiplex carrying several services; keep distinct from Channel,no standalone app string yet; tvheadend web UI: Mux
+Mux,multiplex,fr,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes fr; tvheadend web UI: Transpondeur (differs)
+Mux,múltiplex,es,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes es; tvheadend web UI: Mux (differs)
+Mux,multiplex,it,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes it; tvheadend web UI: Mux (differs)
+Mux,multiplex,nl,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes nl; tvheadend web UI: Mux (differs)
+Mux,multiplex,pt-BR,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes pt-BR
+Mux,multiplex,pt-PT,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes pt-PT; tvheadend web UI: Mux (differs)
+Mux,multiplex,sv,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes sv
+Mux,multiplex,da,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes da; tvheadend web UI: Mux (differs)
+Mux,multipleks,nb,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes nb; tvheadend web UI: Mux (differs)
+Mux,kanavanippu,fi,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes fi; tvheadend web UI: Nippu (differs)
+Mux,multiplex,cs,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes cs; tvheadend web UI: Mux (differs)
+Mux,multipleks,pl,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes pl; tvheadend web UI: Multiplekser (differs)
+Mux,multiplex,hu,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes hu; tvheadend web UI: Mux (differs)
+Mux,multipleks,hr,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes hr; tvheadend web UI: Multipleks
+Mux,multiplex,ro,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes ro
+Mux,πολυπλεξία,el,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes el
+Mux,мультиплекс,ru,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes ru; tvheadend web UI: Мукс (differs)
+Mux,мультиплекс,uk,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes uk; tvheadend web UI: Мультиплекс
+Mux,çoklayıcı,tr,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes tr
+Mux,复用流,zh-Hans,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes zh-Hans; tvheadend web UI: 复用器 (differs)
+Mux,多工串流,zh-Hant,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes zh-Hant
+Mux,マルチプレックス,ja,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes ja
+Mux,멀티플렉스,ko,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes ko; tvheadend web UI: 먹스 (differs)
+Mux,مُجمّع البث,ar,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes ar
+Mux,מקבץ שידור,he,Broadcast multiplex carrying several services; keep distinct from Channel,round-1 notes he; tvheadend web UI: מוקס (differs)
+Cancel,Aufnahme abbrechen,de,Cancel a future scheduled recording; not Stop or Delete,app values-de cancel_recording; tvheadend web UI: Abbrechen (differs)
+Cancel,Annuler l’enregistrement,fr,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Annuler (differs)
+Cancel,Cancelar grabación,es,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Cancelar (differs)
+Cancel,Annulla registrazione,it,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Annulla (differs)
+Cancel,Opname annuleren,nl,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Annuleren (differs)
+Cancel,Cancelar gravação,pt-BR,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,Cancelar gravação,pt-PT,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Cancelar (differs)
+Cancel,Avboka inspelning,sv,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,Annuller optagelse,da,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Afbryd (differs)
+Cancel,Avlys opptak,nb,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Avbryt (differs)
+Cancel,Peru tallennus,fi,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Peruuta (differs)
+Cancel,Zrušit nahrávání,cs,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Zruš (differs)
+Cancel,Anuluj nagrywanie,pl,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Anuluj (differs)
+Cancel,Felvétel lemondása,hu,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Mégse (differs)
+Cancel,Otkaži snimanje,hr,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Odustani (differs)
+Cancel,Anulează înregistrarea,ro,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,Ακύρωση εγγραφής,el,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,Отменить запись,ru,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Отмена (differs)
+Cancel,Скасувати запис,uk,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: Відмінити (differs)
+Cancel,Kaydı iptal et,tr,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: İptal (differs)
+Cancel,取消录制,zh-Hans,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: 取消 (differs)
+Cancel,取消錄影,zh-Hant,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,録画予約を取り消す,ja,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,녹화 예약 취소,ko,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: 취소 (differs)
+Cancel,إلغاء التسجيل المجدول,ar,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording
+Cancel,ביטול ההקלטה המתוזמנת,he,Cancel a future scheduled recording; not Stop or Delete,round-1 draft cancel_recording; tvheadend web UI: ביטול (differs)
+Stop,Aufnahme beenden,de,End an active recording and retain what was recorded; not Cancel or Delete,app values-de stop_recording; tvheadend web UI: Stop (differs)
+Stop,Arrêter l’enregistrement,fr,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Stop (differs)
+Stop,Detener grabación,es,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Parar (differs)
+Stop,Interrompi registrazione,it,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Ferma (differs)
+Stop,Opname stoppen,nl,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Stop (differs)
+Stop,Parar gravação,pt-BR,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording
+Stop,Parar gravação,pt-PT,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Parar (differs)
+Stop,Stoppa inspelning,sv,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Stoppa (differs)
+Stop,Stop optagelse,da,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Stop (differs)
+Stop,Stopp opptak,nb,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Stopp (differs)
+Stop,Pysäytä tallennus,fi,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Pysäytä (differs)
+Stop,Zastavit nahrávání,cs,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Zastavit (differs)
+Stop,Zatrzymaj nagrywanie,pl,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Zatrzymaj (differs)
+Stop,Felvétel leállítása,hu,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Leállítás (differs)
+Stop,Zaustavi snimanje,hr,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Zaustavi (differs)
+Stop,Oprește înregistrarea,ro,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording
+Stop,Διακοπή εγγραφής,el,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording
+Stop,Остановить запись,ru,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Стоп (differs)
+Stop,Зупинити запис,uk,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Зупинити (differs)
+Stop,Kaydı durdur,tr,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: Dur (differs)
+Stop,停止录制,zh-Hans,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: 停止 (differs)
+Stop,停止錄影,zh-Hant,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording
+Stop,録画を停止,ja,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording
+Stop,녹화 중지,ko,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: 정지 (differs)
+Stop,إيقاف التسجيل,ar,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording
+Stop,עצירת ההקלטה,he,End an active recording and retain what was recorded; not Cancel or Delete,round-1 draft stop_recording; tvheadend web UI: עצירה (differs)
+Delete,Löschen,de,Remove a recording and its file; destructive action,app values-de context_delete; tvheadend web UI: Löschen
+Delete,Supprimer,fr,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Supprimer
+Delete,Eliminar,es,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Eliminar
+Delete,Elimina,it,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Cancella (differs)
+Delete,Verwijderen,nl,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Verwijder (differs)
+Delete,Excluir,pt-BR,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,Eliminar,pt-PT,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Apagar (differs)
+Delete,Radera,sv,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,Slet,da,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Slet
+Delete,Slett,nb,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Slett
+Delete,Poista,fi,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Poista
+Delete,Smazat,cs,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Vymazat (differs)
+Delete,Usuń,pl,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Usuń
+Delete,Törlés,hu,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Törlés
+Delete,Izbriši,hr,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Obriši (differs)
+Delete,Șterge,ro,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,Διαγραφή,el,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,Удалить,ru,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Удалить
+Delete,Видалити,uk,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Вилучити (differs)
+Delete,Sil,tr,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: Sil
+Delete,删除,zh-Hans,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: 删除
+Delete,刪除,zh-Hant,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,削除,ja,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,삭제,ko,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: 삭제
+Delete,حذف,ar,Remove a recording and its file; destructive action,round-1 draft context_delete
+Delete,מחיקה,he,Remove a recording and its file; destructive action,round-1 draft context_delete; tvheadend web UI: מחיקה
+Channel tag,,de,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Kanal-Tag
+Channel tag,,fr,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Etiquette de la chaine
+Channel tag,,es,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Categoría del canal
+Channel tag,,it,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Etichetta del canale
+Channel tag,,nl,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Kanaallabel
+Channel tag,etiquetas,pt-BR,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,round-1 notes pt-BR
+Channel tag,etiquetas,pt-PT,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,round-1 notes pt-PT; tvheadend web UI: Etiqueta do canal (differs)
+Channel tag,,sv,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Kanal tagg
+Channel tag,,da,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Kanal gruppe
+Channel tag,kanaletikett,nb,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,round-1 notes nb
+Channel tag,kanavatunniste,fi,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,round-1 notes fi; tvheadend web UI: Kanavan nimi (differs)
+Channel tag,,cs,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Štítek programu
+Channel tag,,pl,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Tag kanału
+Channel tag,,hu,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Csatorna-cimke
+Channel tag,,hr,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Oznaka programa
+Channel tag,,ro,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet
+Channel tag,,el,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet
+Channel tag,,ru,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Тег канала
+Channel tag,,uk,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: Мітка каналу
+Channel tag,kanal etiketi,tr,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,round-1 notes tr; tvheadend web UI: Kanal etiketi
+Channel tag,,zh-Hans,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: 频道标签
+Channel tag,,zh-Hant,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet
+Channel tag,,ja,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet
+Channel tag,,ko,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: 채널 태그
+Channel tag,,ar,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet
+Channel tag,,he,Tvheadend channel tag used to filter the channel list; the settings screen calls them channel groups,no standalone app string yet; tvheadend web UI: תגית ערוץ
+Go live,,de,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,fr,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,es,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,it,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,nl,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,pt-BR,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,pt-PT,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,sv,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,da,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,nb,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,fi,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,cs,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,pl,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,hu,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,hr,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,ro,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,el,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,ru,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,uk,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,tr,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,zh-Hans,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,zh-Hant,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,ja,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,ko,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,ar,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Go live,,he,Jump from a timeshifted position back to the live edge; no standalone app string yet,no standalone app string yet
+Live TV,,de,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,fr,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,es,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,it,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,nl,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,pt-BR,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,pt-PT,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,sv,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,da,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,nb,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,fi,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,cs,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,pl,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,hu,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,hr,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,ro,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,el,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,ru,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,uk,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,tr,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,zh-Hans,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,zh-Hant,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,ja,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,ko,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,ar,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Live TV,,he,"Live television playback, as opposed to recordings; no standalone app string yet",no standalone app string yet
+Upcoming,Geplant und aktiv,de,Recordings scheduled for later; the app labels the group with active recordings,app values-de recordings_upcoming_active
+Upcoming,À venir et en cours,fr,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Próximas y en curso,es,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,In arrivo e in corso,it,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Gepland en bezig,nl,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Futuras e em andamento,pt-BR,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Agendadas e em curso,pt-PT,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Kommande och pågående,sv,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Kommende og aktive,da,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Kommende og aktive,nb,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Tulevat ja käynnissä olevat,fi,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Nadcházející a probíhající,cs,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Nadchodzące i aktywne,pl,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Közelgő és aktív,hu,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Nadolazeće i aktivne,hr,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Viitoare și active,ro,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Προσεχείς και ενεργές,el,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Предстоящие и текущие,ru,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Майбутні й поточні,uk,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,Yaklaşan ve etkin,tr,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,即将录制及录制中,zh-Hans,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,即將錄影及錄影中,zh-Hant,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,予約済みと録画中,ja,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,예정 및 진행 중,ko,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,قادمة وجارية,ar,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Upcoming,קרובות ופעילות,he,Recordings scheduled for later; the app labels the group with active recordings,round-1 draft recordings_upcoming_active
+Series,,de,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,fr,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,es,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,it,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,nl,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,pt-BR,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,pt-PT,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,sv,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,da,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,nb,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,fi,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,cs,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,pl,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,hu,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,hr,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,ro,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,el,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,ru,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,uk,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,tr,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,zh-Hans,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,zh-Hant,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,ja,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,ko,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,ar,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Series,,he,Recording rule covering every episode of a series; no standalone app string yet,no standalone app string yet
+Episode,Folge,de,"One programme of a series, shown in programme details",app values-de details_episode; tvheadend web UI: Episode (differs)
+Episode,Épisode,fr,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episode (differs)
+Episode,Episodio,es,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episodio
+Episode,Episodio,it,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episodio
+Episode,Aflevering,nl,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Aflevering
+Episode,Episódio,pt-BR,"One programme of a series, shown in programme details",round-1 draft details_episode
+Episode,Episódio,pt-PT,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episódio
+Episode,Avsnitt,sv,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Avsnitt
+Episode,Afsnit,da,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episode (differs)
+Episode,Episode,nb,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episode
+Episode,Jakso,fi,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Jakso
+Episode,Epizoda,cs,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Episoda (differs)
+Episode,Odcinek,pl,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Odcinek
+Episode,Epizód,hu,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Epizód
+Episode,Epizoda,hr,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Epizoda
+Episode,Episod,ro,"One programme of a series, shown in programme details",round-1 draft details_episode
+Episode,Επεισόδιο,el,"One programme of a series, shown in programme details",round-1 draft details_episode
+Episode,Серия,ru,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Эпизод (differs)
+Episode,Серія,uk,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Епізод (differs)
+Episode,Bölüm,tr,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: Bölüm
+Episode,集,zh-Hans,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: 剧集 (differs)
+Episode,集,zh-Hant,"One programme of a series, shown in programme details",round-1 draft details_episode
+Episode,エピソード,ja,"One programme of a series, shown in programme details",round-1 draft details_episode
+Episode,에피소드,ko,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: 에피소드
+Episode,الحلقة,ar,"One programme of a series, shown in programme details",round-1 draft details_episode
+Episode,פרק,he,"One programme of a series, shown in programme details",round-1 draft details_episode; tvheadend web UI: פרק
+Server,Server,de,The household Tvheadend server,app values-de connection_overview_server; tvheadend web UI: Server
+Server,Serveur,fr,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Serveur
+Server,Servidor,es,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Servidor
+Server,Server,it,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Server
+Server,Server,nl,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Server
+Server,Servidor,pt-BR,The household Tvheadend server,round-1 draft connection_overview_server
+Server,Servidor,pt-PT,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Servidor
+Server,Server,sv,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Server
+Server,Server,da,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Server
+Server,Server,nb,The household Tvheadend server,round-1 draft connection_overview_server
+Server,Palvelin,fi,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Palvelin
+Server,Server,cs,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Server
+Server,Serwer,pl,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Serwer
+Server,Szerver,hu,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Szerver
+Server,Poslužitelj,hr,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Poslužitelj
+Server,Server,ro,The household Tvheadend server,round-1 draft connection_overview_server
+Server,Διακομιστής,el,The household Tvheadend server,round-1 draft connection_overview_server
+Server,Сервер,ru,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Сервер
+Server,Сервер,uk,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: Сервер
+Server,Sunucu,tr,The household Tvheadend server,round-1 draft connection_overview_server
+Server,服务器,zh-Hans,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: 服务器
+Server,伺服器,zh-Hant,The household Tvheadend server,round-1 draft connection_overview_server
+Server,サーバー,ja,The household Tvheadend server,round-1 draft connection_overview_server
+Server,서버,ko,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: 서버
+Server,الخادم,ar,The household Tvheadend server,round-1 draft connection_overview_server
+Server,שרת,he,The household Tvheadend server,round-1 draft connection_overview_server; tvheadend web UI: שרת
+Profile,Streamprofil,de,Stream profile: the Tvheadend setting that selects the stream format,app values-de profile; tvheadend web UI: Streamprofil
+Profile,Profil de flux,fr,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Profil du flux (differs)
+Profile,Perfil de transmisión,es,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Perfil de Retransmisión (differs)
+Profile,Profilo di streaming,it,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Profilo dello stream (differs)
+Profile,Streamprofiel,nl,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Stream profiel (differs)
+Profile,Perfil de transmissão,pt-BR,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile
+Profile,Perfil de transmissão,pt-PT,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Perfil de Transmissão
+Profile,Strömprofil,sv,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Strömprofil
+Profile,Streamprofil,da,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Strømprofil (differs)
+Profile,Strømmeprofil,nb,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Strømmningsprofil (differs)
+Profile,Suoratoistoprofiili,fi,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Profiili (differs)
+Profile,Profil streamu,cs,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Profil streamu
+Profile,Profil strumienia,pl,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Profil strumienia
+Profile,Adatfolyamprofil,hu,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Stream-profil (differs)
+Profile,Profil toka,hr,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Profil strujanja (differs)
+Profile,Profil de flux,ro,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile
+Profile,Προφίλ ροής,el,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile
+Profile,Профиль потока,ru,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Профиль Потока
+Profile,Профіль потоку,uk,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Профіль потоку
+Profile,Akış profili,tr,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: Akış Profili
+Profile,流配置,zh-Hans,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: 流 配置方案 (differs)
+Profile,串流設定檔,zh-Hant,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile
+Profile,ストリームプロファイル,ja,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile
+Profile,스트림 프로필,ko,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: 스트림 프로필
+Profile,ملف البث,ar,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile
+Profile,פרופיל הזרמה,he,Stream profile: the Tvheadend setting that selects the stream format,round-1 draft profile; tvheadend web UI: פרופיל הזרמה

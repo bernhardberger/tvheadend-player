@@ -22,6 +22,12 @@ accepted German and human corrections; do not regenerate them for style.
    findings individually; a model suggestion is not permission to rewrite text.
 6. Integrate accepted drafts, run Android lint and compilation, then verify
    long text, CJK and RTL captures. Complete physical-TV acceptance separately.
+7. To ship a language, add its tag to `appLanguages` in `app/build.gradle.kts`.
+   That list alone decides which translations the APK keeps, the locale config
+   Android 13+ shows and the in-app picker. Hebrew resources go in `values-iw`,
+   listed as `he`. Until a person has reviewed the language, set
+   `<bool name="language_machine_translated">true</bool>` in its folder; Settings →
+   About then shows the machine-translated notice.
 
 ## Drafting instructions
 
