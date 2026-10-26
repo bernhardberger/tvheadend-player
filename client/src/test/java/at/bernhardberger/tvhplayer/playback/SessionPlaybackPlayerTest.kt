@@ -180,6 +180,31 @@ class SessionPlaybackPlayerTest {
         assertFalse(player.playWhenReady)
     }
 
+    @OptIn(ExperimentalTvheadendApi::class)
+    @Test fun sessionKeepsReportingPauseWhileAPausedSeekRefreshesItsPicture() = exercise {
+        settings.setTunnelingEnabled(true)
+        await { player.trackSelectionParameters.tunnelingRequested }
+        live(true)
+        wrapper.pause()
+        await { connection.speeds == listOf(0) && !player.playWhenReady && !wrapper.playWhenReady }
+        val reported = mutableListOf<Boolean>()
+        wrapper.addListener(object : Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { reported += playWhenReady }
+        })
+        runtime.nudgePausedSeek(confirmation = PausedSeekConfirmation.KEY_FRAME_QUEUED)
+        await { player.playWhenReady }
+        settle()
+        assertFalse(wrapper.playWhenReady)
+        // The fake stream renders no frame: the refresh ends after its budget on the runtime's clock.
+        shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(PAUSED_SEEK_NUDGE_MILLIS))
+        await { !runtime.livePause.value.pausedSeekRefresh }
+        settle()
+        assertFalse(player.playWhenReady)
+        assertFalse(wrapper.playWhenReady)
+        assertEquals(emptyList<Boolean>(), reported)
+        assertEquals(listOf(0), connection.speeds)
+    }
+
     @Test fun sessionReportsTheViewersIntentWhileAChannelChangeIsPending() = exercise {
         live(true)
         val intent = runtime.notePlaybackIntent().also(runtime::noteLiveSelection)

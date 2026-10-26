@@ -3,6 +3,7 @@
 package at.bernhardberger.tvhplayer.playback
 
 import at.bernhardberger.tvheadend.sdk.media3.PlaybackTargetResult
+import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -11,12 +12,38 @@ internal class PlaybackTargetCommandSerialization {
     private val accessLock = Any()
     @Volatile
     private var closed = false
+    private val arrivals = AtomicLong()
 
+    /**
+     * Commands counted on arrival, before they wait for the lock: a running command that yields to
+     * any newer one (a paused seek's picture refresh) compares it with its own arrival.
+     */
+    val arrivalCount: Long get() = arrivals.get()
+
+    /**
+     * [countsAsArrival] false: reactions to server observations and player events, which a brief
+     * local play itself causes, wait their turn without ending a yielding command.
+     */
     suspend fun <T> serialize(
         onClosed: () -> T,
+        countsAsArrival: Boolean = true,
         command: suspend () -> T,
-    ): T = mutex.withLock {
-        if (closed) onClosed() else command()
+    ): T {
+        if (countsAsArrival) arrivals.incrementAndGet()
+        return mutex.withLock {
+            if (closed) onClosed() else command()
+        }
+    }
+
+    /** A counted command that knows its own arrival, to tell later whether a newer one followed. */
+    suspend fun <T> serializeArrival(
+        onClosed: () -> T,
+        command: suspend (arrival: Long) -> T,
+    ): T {
+        val arrival = arrivals.incrementAndGet()
+        return mutex.withLock {
+            if (closed) onClosed() else command(arrival)
+        }
     }
 
     suspend fun <Request, Result> retryRecording(

@@ -1030,6 +1030,8 @@ class BackgroundPlaybackRuntimeTest {
         var videoDecoderCounterReads = 0
         /** Runs as the runtime asks the player to play, before it plays. */
         var beforePlay: () -> Unit = {}
+        /** Every volume the runtime (or a test through it) set on the player, in order. */
+        val volumeWrites = mutableListOf<Float>()
         /** Runs after the runtime registers a player listener. */
         var onListenerAdded: () -> Unit = {}
         /** The frame metadata listener the runtime installed on the player, if any. */
@@ -1075,6 +1077,10 @@ class BackgroundPlaybackRuntimeTest {
             override fun play() {
                 beforePlay()
                 player.play()
+            }
+            override fun setVolume(volume: Float) {
+                volumeWrites += volume
+                player.volume = volume
             }
             override fun pause() {
                 player.pause()

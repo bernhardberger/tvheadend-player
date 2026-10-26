@@ -107,6 +107,9 @@ class SessionPlaybackPlayer(private val runtime: AppPlaybackRuntime) : Forwardin
                 // A pending channel change: Play/Pause address that channel, not the installed player.
                 if (livePause.selectionPending) {
                     setPlayWhenReady(!livePause.pending, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
+                } else if (livePause.pausedSeekRefresh) {
+                    // A paused seek plays briefly to show its picture: controllers still see Pause.
+                    setPlayWhenReady(false, Player.PLAY_WHEN_READY_CHANGE_REASON_USER_REQUEST)
                 }
             }
             .setPlaylist(listOf(item))

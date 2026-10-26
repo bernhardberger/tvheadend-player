@@ -23,6 +23,12 @@ import kotlinx.coroutines.launch
 internal const val FIRST_PICTURE_BUDGET_MILLIS = 10_000L
 
 /**
+ * How long a paused seek plays muted at most to show its new picture ([AppPlaybackRuntime.nudgePausedSeek]):
+ * a tunnelled decoder renders its queued key frame within a few frames of playing.
+ */
+internal const val PAUSED_SEEK_NUDGE_MILLIS = 500L
+
+/**
  * [AppPlaybackRuntime]'s live Pause: whether Pause is available for the active live target, and a
  * Pause pressed before the timeshift grant is known, until it is resolved or dropped. The runtime
  * owns the lock, the active target and its epoch, the playback state and the audio interruption.
@@ -45,6 +51,8 @@ internal class LivePauseController(
     private val resumeOwedRecovery: () -> Unit,
     /** The viewer's pending live selection: null without one, else whether it should play. */
     private val pendingLiveSelectionPlayWhenReady: () -> Boolean?,
+    /** A paused seek plays locally to show its picture ([LivePauseState.pausedSeekRefresh]). */
+    private val pausedSeekRefresh: () -> Boolean,
 ) {
     /**
      * A Pause pressed before the timeshift grant is known, for one live target epoch.
@@ -141,6 +149,7 @@ internal class LivePauseController(
             } else availability,
             pending = selectionPlayWhenReady?.not() ?: (epoch != null && pendingLivePause?.epoch == epoch),
             selectionPending = selectionPlayWhenReady != null,
+            pausedSeekRefresh = pausedSeekRefresh(),
         )
     }
 

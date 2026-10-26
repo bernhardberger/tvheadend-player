@@ -4,6 +4,7 @@ package at.bernhardberger.tvhplayer.profiling
 
 import androidx.media3.common.Format
 import at.bernhardberger.tvhplayer.client.BuildConfig
+import at.bernhardberger.tvhplayer.playback.PausedSeekNudgePhase
 import at.bernhardberger.tvhplayer.playback.PlaybackStall
 import at.bernhardberger.tvhplayer.playback.PlaybackTrace
 
@@ -45,5 +46,9 @@ object ProfilePlaybackTrace : PlaybackTrace {
 
     override fun freshDecoderPerZap() {
         profileTrace("P44:zap:fresh-decoder:on") {}
+    }
+
+    override fun pausedSeekNudge(phase: PausedSeekNudgePhase) {
+        profileTrace("P44:seek:nudge:${phase.name.lowercase()}") {}
     }
 }

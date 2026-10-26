@@ -209,5 +209,7 @@ class TimeshiftCommandFeedbackTest {
         assertTrue(livePlayWhenReady(installed, playerPlayWhenReady = true))
         assertFalse(livePlayWhenReady(installed.copy(pending = true), playerPlayWhenReady = true))
         assertFalse(livePlayWhenReady(installed, playerPlayWhenReady = false))
+        // A paused seek's brief local play to show its picture is no Play.
+        assertFalse(livePlayWhenReady(installed.copy(pausedSeekRefresh = true), playerPlayWhenReady = true))
     }
 }
