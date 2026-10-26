@@ -3,6 +3,9 @@ package at.bernhardberger.tvhplayer.ui.player
 import android.app.Application
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.preferencesOf
 import androidx.datastore.preferences.core.stringPreferencesKey
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -11,6 +14,7 @@ import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
@@ -120,6 +124,49 @@ class TargetAspectTest {
         assertEquals(AspectRatioMode.FIT, stored(store, one))
 
         switchTo(AppPlaybackTarget.Live(two))
+        assertEquals(AspectRatioMode.FIT, mode())
+    }
+
+    @Test fun aDelayedChoiceCannotWriteIntoAReplacementProfileOrChangeItsDisplayedMode() {
+        val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
+        val data = InMemoryPreferencesDataStore(preferencesOf(profileKey to "original"))
+        val entered = CompletableDeferred<Unit>()
+        val release = CompletableDeferred<Unit>()
+        val finished = CompletableDeferred<Unit>()
+        val delayed = object : DataStore<Preferences> by data {
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                entered.complete(Unit)
+                release.await()
+                return data.updateData(transform).also { finished.complete(Unit) }
+            }
+        }
+        val store = PlayerSettingsStore(delayed)
+        show(store)
+        compose.runOnIdle { aspect.select(AspectRatioMode.FORCE_4_3) }
+        compose.waitUntil { entered.isCompleted }
+
+        runBlocking { data.edit { it[profileKey] = "replacement" } }
+        compose.waitForIdle()
+        release.complete(Unit)
+        compose.waitUntil { finished.isCompleted }
+        compose.waitForIdle()
+
+        assertEquals("new profile's same-numbered channel is untouched", AspectRatioMode.FIT, stored(store, one))
+        assertEquals("old completion cannot become a new temporary choice", AspectRatioMode.FIT, mode())
+        runBlocking { data.edit { it[profileKey] = "original" } }
+        assertEquals("a write for a replaced identity is dropped", AspectRatioMode.FIT, stored(store, one))
+    }
+
+    @Test fun aTemporaryRecordingChoiceDoesNotFollowTheTargetIntoAnotherProfile() {
+        val profileKey = stringPreferencesKey("explicit_audio_profile_v1")
+        val data = InMemoryPreferencesDataStore(preferencesOf(profileKey to "original"))
+        val store = PlayerSettingsStore(data)
+        show(store)
+        switchTo(AppPlaybackTarget.Recording(withoutChannel))
+        choose(AspectRatioMode.FORCE_4_3)
+
+        runBlocking { data.edit { it[profileKey] = "replacement" } }
+        compose.waitUntil { compose.runOnIdle { aspect.mode == AspectRatioMode.FIT } }
         assertEquals(AspectRatioMode.FIT, mode())
     }
 }

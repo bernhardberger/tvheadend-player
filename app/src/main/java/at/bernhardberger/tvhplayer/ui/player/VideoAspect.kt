@@ -68,8 +68,8 @@ class TargetAspect(val mode: AspectRatioMode, val select: (AspectRatioMode) -> U
  * and to both player screens (options, stats), so they always read the same value. It is the
  * stored mode of the playing target's channel, so a zap brings the new channel's mode with its
  * picture. A selection with nothing to store it under (a recording without a channel, or no
- * server identity yet) is held in memory for the current target only, and is dropped when the
- * target changes.
+ * server identity yet) is held in memory for the current profile and target only, and is dropped
+ * when either changes.
  */
 @Composable
 internal fun rememberTargetAspect(
@@ -80,12 +80,13 @@ internal fun rememberTargetAspect(
     val scope = rememberCoroutineScope()
     val aspects by store.channelAspects.choices.collectAsStateWithLifecycle(ChannelAspects.None)
     val channel = aspectChannel(target, recordingChannel)
-    var unsaved by remember(target) { mutableStateOf<AspectRatioMode?>(null) }
-    val select = remember(store, scope, target, channel) {
+    val profile = aspects.profile
+    var unsaved by remember(store, profile, target) { mutableStateOf<AspectRatioMode?>(null) }
+    val select = remember(store, scope, profile, target, channel) {
         { mode: AspectRatioMode ->
             if (target != null) {
                 scope.launch {
-                    val stored = channel != null && store.channelAspects.set(channel, mode)
+                    val stored = channel != null && store.channelAspects.set(profile, channel, mode)
                     unsaved = if (stored) null else mode
                 }
             }

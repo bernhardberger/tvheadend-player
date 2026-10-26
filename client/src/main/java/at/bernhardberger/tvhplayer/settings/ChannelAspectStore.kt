@@ -17,12 +17,12 @@ import kotlinx.serialization.json.Json
  * The remembered display modes of the current server's channels. A channel without an entry,
  * and any lookup before the server identity exists, uses [AspectRatioMode.FIT] (Auto).
  */
-data class ChannelAspects internal constructor(private val modes: Map<Long, AspectRatioMode>) {
+data class ChannelAspects internal constructor(val profile: String?, private val modes: Map<Long, AspectRatioMode>) {
     fun modeFor(channel: ChannelId?): AspectRatioMode =
         channel?.let { modes[it.value] } ?: AspectRatioMode.FIT
 
     companion object {
-        val None = ChannelAspects(emptyMap())
+        val None = ChannelAspects(null, emptyMap())
     }
 }
 
@@ -37,24 +37,26 @@ class ChannelAspectStore(private val dataStore: DataStore<Preferences>) {
 
     private val key = stringPreferencesKey("channel_aspect_modes_v1")
 
-    /** Re-emits only when the current server's modes change. */
+    /** Re-emits only when the server identity or its modes change. */
     val choices: Flow<ChannelAspects> = dataStore.data
         .map { preferences ->
             val profile = AudioChoiceStore.profileIdentityIn(preferences) ?: return@map ChannelAspects.None
             ChannelAspects(
+                profile,
                 decode(preferences[key]).filter { it.profile == profile }.associate { it.channel to it.mode },
             )
         }
         .distinctUntilChanged()
 
     /**
-     * Remembers [mode] for [channel] of the current server; Auto forgets it. Returns false, storing
-     * nothing, while there is no server identity to scope the entry by.
+     * Remembers [mode] for [channel] in the [profile] captured with the choice; Auto forgets it.
+     * Returns false, storing nothing, if that identity is absent or has since been replaced.
      */
-    suspend fun set(channel: ChannelId, mode: AspectRatioMode): Boolean {
+    suspend fun set(profile: String?, channel: ChannelId, mode: AspectRatioMode): Boolean {
+        if (profile == null) return false
         var stored = false
         dataStore.edit { preferences ->
-            val profile = AudioChoiceStore.profileIdentityIn(preferences) ?: return@edit
+            if (AudioChoiceStore.profileIdentityIn(preferences) != profile) return@edit
             val others = decode(preferences[key]).filterNot { it.profile == profile && it.channel == channel.value }
             val entries = if (mode == AspectRatioMode.FIT) others else others + Entry(profile, channel.value, mode)
             preferences[key] = Json.encodeToString(entries.takeLast(MAX_ENTRIES))
