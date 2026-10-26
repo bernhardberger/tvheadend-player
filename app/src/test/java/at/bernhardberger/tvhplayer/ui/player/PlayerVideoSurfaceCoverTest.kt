@@ -116,6 +116,99 @@ class PlayerVideoSurfaceCoverTest {
         find(view as ViewGroup)!!
     }
 
+    @Test fun zapKeepsThePresentedShapeUntilTheNextPictureIsRevealed() {
+        val visible = mutableStateOf(true)
+        val mode = mutableStateOf(AspectRatioMode.FORCE_4_3)
+        var size = VideoSize(720, 576, 0, 16f / 11f)
+        val listeners = mutableSetOf<Player.Listener>()
+        val reporting = object : ForwardingPlayer(player) {
+            override fun getVideoSize() = size
+            override fun addListener(listener: Player.Listener) { listeners += listener }
+            override fun removeListener(listener: Player.Listener) { listeners -= listener }
+        }
+        compose.setContent {
+            view = LocalView.current
+            PlayerVideoSurface(reporting, mode.value, videoVisible = visible.value)
+        }
+        fun assertShape(width: Float, height: Float, resize: Int) {
+            val bounds = compose.onNodeWithTag("video-surface").getBoundsInRoot()
+            assertEquals(width, bounds.width.value, 0.5f)
+            assertEquals(height, bounds.height.value, 0.5f)
+            assertEquals(resize, playerView().resizeMode)
+        }
+        fun report(next: VideoSize) = compose.runOnIdle {
+            size = next
+            listeners.toList().forEach { it.onVideoSizeChanged(next) }
+        }
+        val fit = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        val fill = AspectRatioFrameLayout.RESIZE_MODE_FILL
+        var previous = Triple(800f, 600f, fill)
+        // Live and recordings use this same surface contract. Include both directions, Fit SD
+        // snapping, forced modes, and a same-size target (no size callback on its reveal).
+        val pictures = listOf(
+            Triple(AspectRatioMode.FIT, VideoSize(1920, 1080), Triple(960f, 600f, fit)),
+            Triple(AspectRatioMode.FIT, VideoSize(720, 576, 0, 16f / 11f), Triple(960f, 540f, fill)),
+            Triple(AspectRatioMode.FORCE_4_3, VideoSize(1920, 1080), Triple(800f, 600f, fill)),
+            Triple(AspectRatioMode.FORCE_16_9, VideoSize(1920, 1080), Triple(960f, 540f, fill)),
+            Triple(AspectRatioMode.FIT, VideoSize(720, 576, 0, 12f / 11f), Triple(800f, 600f, fill)),
+        )
+        for ((nextMode, nextSize, expected) in pictures) {
+            compose.runOnIdle { visible.value = false }
+            compose.runOnIdle { mode.value = nextMode }
+            assertShape(previous.first, previous.second, previous.third)
+            compose.onNodeWithTag("video-cover").assertIsDisplayed()
+            if (size != nextSize) {
+                report(VideoSize.UNKNOWN)
+                assertShape(previous.first, previous.second, previous.third)
+                report(nextSize)
+                assertShape(previous.first, previous.second, previous.third)
+            }
+            // The publisher has accepted the new target's picture; commit its mode and size in
+            // this composition, even when animations are disabled and the cover clears at once.
+            compose.runOnIdle { visible.value = true }
+            assertShape(expected.first, expected.second, expected.third)
+            compose.onNodeWithTag("video-cover").assertDoesNotExist()
+            report(nextSize)
+            assertShape(expected.first, expected.second, expected.third)
+            previous = expected
+        }
+        // A Playback options change on the already visible picture must not wait for a frame.
+        compose.runOnIdle { mode.value = AspectRatioMode.FORCE_16_9 }
+        assertShape(960f, 540f, fill)
+        compose.runOnIdle { mode.value = AspectRatioMode.FIT }
+        assertShape(800f, 600f, fill)
+    }
+
+    @Test fun revealSamplesTheCurrentPictureAfterSkippedTargetsAndCoalescedSizeEvents() {
+        val visible = mutableStateOf(true)
+        val mode = mutableStateOf(AspectRatioMode.FIT)
+        var size = VideoSize(720, 576, 0, 12f / 11f)
+        val reporting = object : ForwardingPlayer(player) {
+            override fun getVideoSize() = size
+        }
+        compose.setContent {
+            view = LocalView.current
+            PlayerVideoSurface(reporting, mode.value, videoVisible = visible.value)
+        }
+        fun width() = compose.onNodeWithTag("video-surface").getBoundsInRoot().width.value
+        assertEquals(800f, width(), 0.5f)
+        compose.runOnIdle { visible.value = false; mode.value = AspectRatioMode.FORCE_16_9 }
+        assertEquals(800f, width(), 0.5f)
+        // A second target replaces the first before either picture was presented. The view must
+        // not commit the skipped mode or require a size callback after composition catches up.
+        compose.runOnIdle { mode.value = AspectRatioMode.FIT; size = VideoSize(1920, 1080) }
+        assertEquals(800f, width(), 0.5f)
+        compose.runOnIdle { visible.value = true }
+        assertEquals(960f, width(), 0.5f)
+        assertEquals(AspectRatioFrameLayout.RESIZE_MODE_FIT, playerView().resizeMode)
+        // Failed install / recovery can re-present the same target without a mode or size event.
+        compose.runOnIdle { visible.value = false }
+        assertEquals(960f, width(), 0.5f)
+        compose.runOnIdle { visible.value = true }
+        assertEquals(960f, width(), 0.5f)
+        compose.onNodeWithTag("video-cover").assertDoesNotExist()
+    }
+
     @Test fun theCoverClearsOverTheEntryDurationAndFasterOnAZap() {
         val visible = mutableStateOf(false)
         val fade = mutableStateOf(PlayerMotion.EntryPictureMs)

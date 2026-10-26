@@ -87,10 +87,19 @@ fun PlayerVideoSurface(
         videoSize = player.videoSize
         onDispose { player.removeListener(sizeListener) }
     }
+    // The target's mode changes before its picture arrives. Size callbacks (including UNKNOWN
+    // during replacement) are not target-scoped, so neither may reshape the retained picture.
+    // Use the existing presentation reveal as the commit point, without changing its cover rules.
+    // Re-read the player there too: a same-size target need not send another size callback.
+    val pictureSize = remember(player, videoSize, videoVisible) { player.videoSize }
+    var presentedFrameAspect by remember(player) { mutableStateOf<Float?>(null) }
     // Null fills the screen and lets the view fit the picture; a ratio lays the surface out at it.
-    val frameAspect = surfaceFrameAspect(
-        aspectRatio, videoSize.width, videoSize.height, videoSize.pixelWidthHeightRatio,
-    )
+    val frameAspect = if (videoVisible) {
+        surfaceFrameAspect(aspectRatio, pictureSize.width, pictureSize.height, pictureSize.pixelWidthHeightRatio)
+    } else {
+        presentedFrameAspect
+    }
+    SideEffect { if (videoVisible) presentedFrameAspect = frameAspect }
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = { context ->
