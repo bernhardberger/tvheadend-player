@@ -35,17 +35,27 @@ class TimelineEpgFocusPolicyTest {
         assertFalse(timelineEventIsReadable(event(21, 159, 200), readable, minimum))
     }
 
-    @Test fun onlySliversInEitherDirectionLeaveFocusInPlace() {
+    @Test fun onlySliversAboveFocusTheHeaderWhileOnlySliversBelowLeaveFocusInPlace() {
         val readable = 40 * 60L until 170 * 60L
         val rows = listOf(row(1, event(11, 0, 41)), row(2, event(21, 60, 100)), row(3, event(31, 169, 200)))
         val current = focus(1, 21)
         for (direction in listOf(EpgFocusDirection.UP, EpgFocusDirection.DOWN)) {
             val move = moveTimelineEpgFocus(rows, current, direction, readableRangeSec = readable, minReadableOverlapSec = 720)
             assertEquals(current, move.target)
-            assertFalse(move.focusHeader)
+            assertEquals(direction == EpgFocusDirection.UP, move.focusHeader)
             assertNull(timelinePageFocusTarget(rows, current, if (direction == EpgFocusDirection.UP) 0 else 2,
                 if (direction == EpgFocusDirection.UP) -1 else 1, readableRangeSec = readable, minReadableOverlapSec = 720))
         }
+    }
+
+    @Test fun programmesAboveOnlyOutsideTheWindowFocusTheHeader() {
+        val readable = 40 * 60L until 170 * 60L
+        val rows = listOf(row(1, event(11, 0, 40), event(12, 170, 200)), row(2, event(21, 60, 100)))
+        val current = focus(1, 21)
+        val move = moveTimelineEpgFocus(rows, current, EpgFocusDirection.UP,
+            readableRangeSec = readable, minReadableOverlapSec = 720)
+        assertEquals(current, move.target)
+        assertTrue(move.focusHeader)
     }
 
     @Test fun verticalMovesClampAnchorsAndExcludeReserveOnlyProgrammes() {

@@ -299,7 +299,7 @@ fun moveTimelineEpgFocus(
         .firstOrNull { timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds,
             readableRangeSec, minReadableOverlapSec) != null }
     if (channelIndex == null && direction == EpgFocusDirection.UP) {
-        return TimelineEpgFocusMove(current, focusHeader = rows.take(current.channelIndex).all { it.events.isEmpty() })
+        return TimelineEpgFocusMove(current, focusHeader = true)
     }
     channelIndex ?: return TimelineEpgFocusMove(current)
     val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds,
