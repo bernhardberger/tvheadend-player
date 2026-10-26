@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -74,12 +75,13 @@ fun ProgrammeHero(
 /**
  * What a missing programme picture falls back to: the channel's own colour from its [picon] fading
  * down to the darkest surface, or without a picon (or a known channel) a neutral fade. The hero and
- * the player's artwork tile share it, so the details page and the info bar agree.
+ * the player's artwork tile share it, so the details page and the info bar agree. It is opaque, so
+ * the video never shows through the tile.
  */
 @Composable
 internal fun channelFallbackGround(picon: ArtworkId?, channelId: ChannelId?): Brush {
     val top = if (picon != null && channelId != null) {
-        rememberChannelAccent(picon, channelId).copy(alpha = 0.48f)
+        rememberChannelAccent(picon, channelId).copy(alpha = 0.48f).compositeOver(TvSurfaceColors.containerLowest)
     } else TvSurfaceColors.containerLow
     return Brush.verticalGradient(listOf(top, TvSurfaceColors.containerLowest))
 }
