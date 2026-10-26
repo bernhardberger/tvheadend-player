@@ -1,9 +1,12 @@
 package at.bernhardberger.tvhplayer.settings
 
-/** How tall the Guide's channel rows are, in View options order. */
+/**
+ * The Guide's row density, in View options order: [REGULAR] rows carry a title and a start time,
+ * [DENSE] rows only the title, so more channels fit.
+ */
 enum class GuideRows {
-    DENSE,
     REGULAR,
+    DENSE,
 }
 
 /**
@@ -11,7 +14,7 @@ enum class GuideRows {
  * and [genreColors] tints programmes by their genre code.
  */
 data class GuideView(
-    val rows: GuideRows = GuideRows.DENSE,
+    val rows: GuideRows = GuideRows.REGULAR,
     val headline: Boolean = true,
     val genreColors: Boolean = true,
 )

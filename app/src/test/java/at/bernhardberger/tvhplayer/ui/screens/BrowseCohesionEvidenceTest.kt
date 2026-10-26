@@ -284,9 +284,9 @@ class BrowseCohesionEvidenceTest {
         assertEquals(0f, art.top.value, .5f)
         assertEquals(116f, (art.bottom - headline.bottom).value, .5f)
         assertEquals(16f / 9f, (art.right - art.left) / (art.bottom - art.top), .01f)
-        // The headline sits below the buttons, anchored to the ruler gap.
+        // The headline sits below the buttons, lowered less than half a row so the bottom row shows it is cut.
         val header = compose.onNodeWithTag("channels-header", useUnmergedTree = true).getUnclippedBoundsInRoot()
-        assertEquals(header.bottom.value, headline.top.value, .5f)
+        assertTrue("headline=$headline header=$header", (headline.top - header.bottom).value in 0f..30f)
         assertEquals(header.left.value, headline.left.value, .5f)
         val timing = compose.onNodeWithTag("guide-headline-metadata", useUnmergedTree = true).getUnclippedBoundsInRoot()
         assertEquals(headline.bottom.value, timing.bottom.value, .5f)

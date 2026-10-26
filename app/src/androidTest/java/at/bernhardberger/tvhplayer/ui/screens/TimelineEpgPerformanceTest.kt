@@ -44,7 +44,7 @@ import at.bernhardberger.tvhplayer.ui.screens.guide.ConfirmProgrammeActionDialog
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelHeader
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineChannelRow
 import at.bernhardberger.tvhplayer.ui.screens.guide.TimelineProgrammeCell
-import at.bernhardberger.tvhplayer.ui.screens.guide.guideChannelWidth
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelWidth
 import at.bernhardberger.tvhplayer.ui.screens.guide.GuideChannelGap
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideTimelineRowHeight
 import org.junit.Assert.assertTrue
@@ -129,7 +129,7 @@ class TimelineEpgPerformanceTest {
     private fun checkClippedCells(direction: LayoutDirection) {
         val channel = Channel.create(ChannelId(1), name = "Channel", number = 1)
         val events = listOf(event(1, 0, 3600), event(2, 3600, 7200), event(3, 7200, 10800))
-        val lead = guideChannelWidth(at.bernhardberger.tvhplayer.settings.GuideRows.DENSE) + GuideChannelGap
+        val lead = GuideChannelWidth + GuideChannelGap
         val visibleWidth = mutableStateOf(lead + 300.dp) // Current header/gap + 300dp of the 600dp track.
         val selected = mutableStateOf<EpgFocusTarget?>(null)
         composeRule.setContent {
@@ -208,7 +208,7 @@ class TimelineEpgPerformanceTest {
             TVHeadendPlayerTheme {
                 LazyColumn(Modifier.testTag("timeline-rows")) {
                     items(channels, key = { it.id.value }) { channel ->
-                        Box(Modifier.width(guideChannelWidth(at.bernhardberger.tvhplayer.settings.GuideRows.DENSE)).height(guideTimelineRowHeight())) {
+                        Box(Modifier.width(GuideChannelWidth).height(guideTimelineRowHeight())) {
                             TimelineChannelHeader(
                                 channel = channel,
                                 number = channel.number,
