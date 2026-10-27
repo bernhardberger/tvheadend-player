@@ -262,20 +262,30 @@ private fun rememberScheduleTimeWidth(): Dp {
     }
 }
 
-/** A programme row's height with its progress strip, at the current font scale. */
+/**
+ * A running programme's row at the current font scale: the list item's padding around the taller
+ * of its picture and its two measured lines with the progress strip.
+ */
 @Composable
-private fun rememberScheduleRowHeight(): Dp {
+internal fun rememberScheduleRowHeight(): Dp {
+    val measurer = rememberTextMeasurer()
     val typography = MaterialTheme.typography
     val density = LocalDensity.current
-    return remember(typography, density) {
+    return remember(measurer, typography, density) {
         with(density) {
-            ScheduleRowVerticalPadding * 2 + typography.titleMedium.lineHeight.toDp() +
-                typography.bodyMedium.lineHeight.toDp() + ScheduleProgressGap + ChannelRowProgressHeight
+            val lines = measurer.measure("0", typography.titleMedium).size.height +
+                measurer.measure("0", typography.bodyMedium).size.height
+            ScheduleRowVerticalPadding * 2 +
+                maxOf(ScheduleArtworkSize.height, lines.toDp() + ScheduleProgressGap + ChannelRowProgressHeight)
         }
     }
 }
 
-/** The TV list item's own vertical content padding, which the library keeps internal. */
+/**
+ * androidx.tv:tv-material's ListItem content padding above and below its content. The library keeps
+ * `ListItemDefaults.ContentPadding` internal, so this copies it; ChannelScheduleFocusTest measures a
+ * real row against [rememberScheduleRowHeight] and fails when a library update changes it.
+ */
 private val ScheduleRowVerticalPadding = 12.dp
 
 /** A day's start in the continuous list: its date as a quiet heading over a divider. */
