@@ -726,13 +726,14 @@ class SettingsDepthNavigationTest {
         capture("general-language")
         press(Key.DirectionRight)
         compose.onNodeWithText("Follow system").assertIsFocused()
-        press(Key.DirectionDown)
-        compose.onNodeWithText("Deutsch").assertIsFocused()
+        // The picker follows the build's list: Čeština, Dansk, then Deutsch (Deutschland).
+        repeat(3) { press(Key.DirectionDown) }
+        compose.onNodeWithText("Deutsch (Deutschland)").assertIsFocused()
         assertEquals(0, languageCalls)
         capture("language-choices")
         press(Key.DirectionCenter)
         compose.onNodeWithText("App language").assertIsFocused()
-        compose.onNodeWithText("Deutsch").assertExists()
+        compose.onNodeWithText("Deutsch (Deutschland)").assertExists()
         assertEquals(1, languageCalls)
         restoration.emulateSavedInstanceStateRestore()
         compose.onNodeWithText("App language").assertIsFocused()
@@ -775,19 +776,20 @@ class SettingsDepthNavigationTest {
                 val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
                 SettingsScreenNavigation(navigation,
                     listOf(settingsRootLevel()) + settingsGeneralLevels(
-                        UiSettings(), AppLanguage("it-IT"), CacheStatistics.EMPTY, CacheClearState.IDLE,
+                        // Arabic has resources but is left out of the 0.3.0 picker.
+                        UiSettings(), AppLanguage("ar"), CacheStatistics.EMPTY, CacheClearState.IDLE,
                         { navigation.pop(); selected = it }, {}, {}))
             }
         }
         press(Key.DirectionCenter)
         compose.onNodeWithText("App language").assertIsFocused()
-        compose.onNodeWithText("Italiano (Italia)").assertExists()
+        compose.onNodeWithText(AppLanguage("ar").nativeName()).assertExists()
         press(Key.DirectionRight)
         compose.onNodeWithText("Follow system").assertIsFocused()
         compose.onAllNodes(isSelected()).assertCountEquals(0)
-        val deutsch = compose.onNodeWithText("Deutsch", useUnmergedTree = true).fetchSemanticsNode()
+        val deutsch = compose.onNodeWithText("Deutsch (Deutschland)", useUnmergedTree = true).fetchSemanticsNode()
             .config[SemanticsProperties.Text].single()
-        assertEquals("de", deutsch.spanStyles.single().item.localeList?.first()?.toLanguageTag())
+        assertEquals("de-DE", deutsch.spanStyles.single().item.localeList?.first()?.toLanguageTag())
         press(Key.DirectionCenter)
         assertEquals(AppLanguage.SYSTEM, selected)
     }
