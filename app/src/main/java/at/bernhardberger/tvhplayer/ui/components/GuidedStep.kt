@@ -41,6 +41,7 @@ import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.ClickableSurfaceDefaults
@@ -118,8 +119,11 @@ fun GuidedStepGuidance(
     meta: String? = null,
 ) {
     if (stepper != null) {
-        stepper()
-        Spacer(Modifier.height(20.dp))
+        val lineHeight = with(LocalDensity.current) { MaterialTheme.typography.bodySmall.lineHeight.toDp() }
+        // Use the existing step-line + gap band for a second line without moving the heading.
+        Box(Modifier.height(maxOf(maxOf(18.dp, lineHeight) + 20.dp, lineHeight * 2))) {
+            stepper()
+        }
     }
     if (lead != null) {
         lead()
@@ -188,6 +192,8 @@ fun GuidedStepper(
             )
             Text(
                 text = label,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = if (index == current) FontWeight.Medium else FontWeight.Normal,
                 color = when {
@@ -195,7 +201,7 @@ fun GuidedStepper(
                     index < current -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextSecondaryAlpha)
                     else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = TvTextTertiaryAlpha)
                 },
-                modifier = Modifier.padding(start = 6.dp),
+                modifier = Modifier.weight(1f, fill = false).padding(start = 6.dp),
             )
         }
     }

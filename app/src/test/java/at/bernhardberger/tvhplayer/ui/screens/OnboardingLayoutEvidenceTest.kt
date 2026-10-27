@@ -6,6 +6,8 @@ import android.graphics.Canvas
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
@@ -15,6 +17,11 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.text.TextLayoutResult
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepGuidance
+import at.bernhardberger.tvhplayer.ui.components.GuidedStepper
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
@@ -50,6 +57,34 @@ class OnboardingLayoutEvidenceTest {
     private val session = FakeTvheadendSession()
     private val discovery = MutableStateFlow(discovering())
     private var captureScale = 1f
+
+    @Test fun longStepLabelsShareWidthAndDoNotMoveTheHeading() {
+        val short = listOf("Server", "Account", "Connect")
+        val long = listOf("A much longer server label", "A much longer account label", "A much longer connection label")
+        var labels by mutableStateOf(short)
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f)) {
+                TVHeadendPlayerTheme {
+                    Column(Modifier.width(340.dp)) {
+                        GuidedStepGuidance("Heading", "Explanation", stepper = { GuidedStepper(labels, 1) })
+                    }
+                }
+            }
+        }
+        val headingTop = compose.onNodeWithText("Heading").fetchSemanticsNode().boundsInRoot.top
+        compose.runOnIdle { labels = long }
+        long.forEach { label ->
+            val node = compose.onNodeWithText(label, useUnmergedTree = true).fetchSemanticsNode()
+            assertTrue("every label has at least 60dp", node.boundsInRoot.width >= 60f)
+            val results = mutableListOf<TextLayoutResult>()
+            node.config[SemanticsActions.GetTextLayoutResult].action!!(results)
+            assertEquals(2, results.single().lineCount)
+            assertTrue(results.single().isLineEllipsized(1))
+        }
+        assertEquals(headingTop, compose.onNodeWithText("Heading").fetchSemanticsNode().boundsInRoot.top, 0.5f)
+        compose.runOnIdle { labels = listOf("Server", "Konto", "Verbinden") }
+        assertEquals(headingTop, compose.onNodeWithText("Heading").fetchSemanticsNode().boundsInRoot.top, 0.5f)
+    }
 
     @Test fun serverAccountAndConnectAreThreeSeparateScreens() {
         show(form = ConnectionFormState(host = "192.0.2.10"))
@@ -379,6 +414,30 @@ class OnboardingLayoutEvidenceTest {
     }
 
     @Test @Category(VisualCapture::class)
+    @Config(qualifiers = "en-rXA-w960dp-h540dp-land-xhdpi")
+    fun captureLongStepLabelsPseudoEnglish() = captureLongStepLabels("en-XA")
+
+    @Test @Category(VisualCapture::class)
+    @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
+    fun captureLongStepLabelsGerman() = captureLongStepLabels("de")
+
+    private fun captureLongStepLabels(locale: String) {
+        show(density = 2f)
+        assertEquals(1920, view.width)
+        assertEquals(1080, view.height)
+        capture("$locale-font1.0-server-searching")
+        discovery.value = discovering(SERVER)
+        compose.waitForIdle()
+        capture("$locale-font1.0-server-results")
+        compose.runOnIdle { state.continueFromAddress() }
+        compose.onNodeWithTag("setup-host").assertIsFocused()
+        capture("$locale-font1.0-server-validation")
+        compose.runOnIdle { state.chooseServer(SERVER) }
+        compose.onNodeWithTag("setup-username").assertIsFocused()
+        capture("$locale-font1.0-account")
+    }
+
+    @Test @Category(VisualCapture::class)
     fun captureThreeServersWithContinueFocused() {
         show()
         discovery.value = discovering(SERVER, SECOND_SERVER, THIRD_SERVER)
@@ -461,12 +520,12 @@ class OnboardingLayoutEvidenceTest {
     private fun showEdit() = show(mode = SetupMode.EDIT)
 
     private fun show(step: SetupStep = SetupStep.ADDRESS, form: ConnectionFormState = ConnectionFormState(),
-        mode: SetupMode = SetupMode.FIRST_RUN, scale: Float = 1f) {
+        mode: SetupMode = SetupMode.FIRST_RUN, scale: Float = 1f, density: Float = 1f) {
         captureScale = scale
         compose.setContent {
             view = LocalView.current
             val scope = rememberCoroutineScope()
-            CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
+            CompositionLocalProvider(LocalDensity provides Density(density, scale)) {
                 TVHeadendPlayerTheme {
                     Surface(modifier = Modifier.fillMaxSize(), colors = SurfaceDefaults.colors(
                         containerColor = MaterialTheme.colorScheme.background,
@@ -497,7 +556,7 @@ class OnboardingLayoutEvidenceTest {
             File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             PseudoLocaleEvidence.mirror("onboarding", name, bitmap, view, captureScale, "mdpi 1.0", focus ?: "none",
                 "step=${state.step}; mode=${state.mode}; production ConnectionSetupFlow; fictional offline discovery data")
-            File(directory, "$name.txt").writeText("canvas=960x540dp; locale=${view.resources.configuration.locales[0].language}; fontScale=$captureScale; focus=$focus; step=${state.step}; mode=${state.mode}; production composables, fictional offline data")
+            File(directory, "$name.txt").writeText("canvas=960x540dp; pixels=${view.width}x${view.height}; locale=${view.resources.configuration.locales[0].toLanguageTag()}; fontScale=$captureScale; focus=$focus; step=${state.step}; mode=${state.mode}; production composables, fictional offline data")
             bitmap.recycle()
         }
     }
