@@ -65,7 +65,7 @@ tasks.withType<Test>().configureEach {
 val appLanguages = listOf(
     "cs", "da", "de-DE", "de-AT", "de-CH", "en-GB", "en-US", "es", "fr", "hr",
     "it", "hu", "nl", "nb", "pl", "pt-BR", "pt-PT", "ro", "fi", "sv", "tr",
-    "el", "ru", "uk", "he", "ar", "zh-Hans", "zh-Hant", "ja", "ko",
+    "el", "ru", "uk", "zh-Hans", "zh-Hant", "ja", "ko",
 )
 // Debug builds add Android's pseudo-locales: en-XA for long text, ar-XB for right-to-left.
 val pseudoLocales = listOf("en-XA", "ar-XB")

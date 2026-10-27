@@ -1,5 +1,9 @@
 # Arabic
 
+Status: deferred to a later release; not shipped in 0.3.0. The reviewed resources
+remain in `values-ar`, but the build filters them out. RTL layout and physical-TV
+acceptance remain open.
+
 ## Register
 
 Modern Standard Arabic. Gender-neutral: nominal labels and impersonal guidance (يمكن, يلزم); no masculine imperatives.

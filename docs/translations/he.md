@@ -1,12 +1,16 @@
 # Hebrew
 
+Status: deferred to a later release; not shipped in 0.3.0. The reviewed resources
+remain in `values-iw`, but the build filters them out. RTL layout and physical-TV
+acceptance remain open.
+
 ## Register
 
 Gender-neutral: nominal actions and impersonal guidance (יש, אפשר); no masculine reader imperatives.
 
 ## Typography
 
-- Android folder: `values-iw`, the legacy code Android's own resources use. The shipped-language list names it `he`; the build maps it to `iw`.
+- Android folder: `values-iw`, the legacy code Android's own resources use. When shipping is enabled, the language tag is `he`; the build maps it to `iw`.
 - Right-to-left; no bidi controls and no placeholder reversal. `select_channel_hint` keeps the source "left".
 - Clock example keeps `\u00A0`; ellipses use U+2026.
 

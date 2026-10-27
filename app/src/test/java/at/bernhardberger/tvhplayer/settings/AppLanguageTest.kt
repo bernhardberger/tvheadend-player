@@ -26,7 +26,7 @@ class AppLanguageTest {
     fun pickerLists_theBuildsLanguages_withPseudoLocalesInDebug() {
         val pseudoLocales = if (BuildConfig.BUILD_TYPE == "debug") listOf("en-XA", "ar-XB") else emptyList()
         assertEquals(SHIPPED_TAGS + pseudoLocales, AppLanguage.shipped.map { it.languageTag })
-        assertEquals(30, SHIPPED_TAGS.size)
+        assertEquals(28, SHIPPED_TAGS.size)
         assertEquals(SHIPPED_TAGS.size, SHIPPED_TAGS.toSet().size)
     }
 
@@ -78,11 +78,9 @@ class AppLanguageTest {
         assertEquals(AppLanguage("zh-Hans"), AppLanguage.fromLanguageTags("zh-Hans-CN", shipped))
         assertEquals(AppLanguage("zh-Hans"), AppLanguage.fromLanguageTags("zh-CN", shipped))
         assertEquals(AppLanguage("zh-Hant"), AppLanguage.fromLanguageTags("zh-TW", shipped))
-        assertEquals(AppLanguage("he"), AppLanguage.fromLanguageTags("he-IL", shipped))
-        // Whatever tag the platform stores for the Hebrew application locale.
-        assertEquals(AppLanguage("he"), AppLanguage.fromLanguageTags(Locale.forLanguageTag("he-IL").toLanguageTag(), shipped))
-        assertEquals(AppLanguage("he"), AppLanguage.fromLanguageTags(Locale("iw", "IL").toLanguageTag(), shipped))
-        assertEquals(AppLanguage("ar"), AppLanguage.fromLanguageTags("ar-SA", shipped))
+        // Hebrew and Arabic are not shipped, so a stored tag stays its own entry.
+        assertEquals(AppLanguage("he-IL"), AppLanguage.fromLanguageTags("he-IL", shipped))
+        assertEquals(AppLanguage("ar-SA"), AppLanguage.fromLanguageTags("ar-SA", shipped))
         assertEquals(AppLanguage("pt-PT"), AppLanguage.fromLanguageTags("pt-PT", shipped))
         assertEquals(AppLanguage("pt-BR"), AppLanguage.fromLanguageTags("pt-BR,en", shipped))
         assertEquals(AppLanguage("de-CH"), AppLanguage.fromLanguageTags("de-CH", shipped))
@@ -113,10 +111,10 @@ class AppLanguageTest {
             Configuration().apply { setLocales(LocaleList(Locale.forLanguageTag(tag))) },
         ).resources.getBoolean(R.bool.language_machine_translated)
         val machine = listOf(
-            "ar", "cs", "da", "el", "es", "fi", "fr", "he", "hr", "hu", "it", "ja", "ko", "nb", "nl", "pl",
+            "cs", "da", "el", "es", "fi", "fr", "hr", "hu", "it", "ja", "ko", "nb", "nl", "pl",
             "pt-BR", "pt-PT", "ro", "ru", "sv", "tr", "uk", "zh-Hans", "zh-Hant",
         )
-        assertEquals(25, machine.size)
+        assertEquals(23, machine.size)
         // The two regional overrides are machine-drafted too, so they carry the notice themselves.
         (machine + listOf("en-GB", "de-CH")).forEach { assertTrue("$it carries the notice", flagged(it)) }
         // Source English, the reviewed German and its inherited regions carry none.
@@ -136,13 +134,6 @@ class AppLanguageTest {
         assertEquals(text("zh-Hant"), text("zh-Hant-TW"))
         assertEquals(text("zh-Hant"), text("zh-Hant-HK"))
         listOf("zh-Hans", "zh-Hant", "ja", "ko").forEach { assertNotEquals("$it must not fall back to English", english, text(it)) }
-        // Hebrew resources live in the legacy iw folder; the modern and legacy codes meet the same strings.
-        val hebrew = text("he")
-        assertNotEquals(english, hebrew)
-        assertEquals(hebrew, text("he-IL"))
-        assertEquals(hebrew, app.createConfigurationContext(
-            Configuration().apply { setLocales(LocaleList(Locale("iw", "IL"))) },
-        ).getString(R.string.clear_cache))
         // Portuguese keeps its two regions apart from each other and from English.
         assertNotEquals(text("pt-BR"), english)
         assertNotEquals(text("pt-PT"), english)
@@ -206,7 +197,7 @@ class AppLanguageTest {
         val SHIPPED_TAGS = listOf(
             "cs", "da", "de-DE", "de-AT", "de-CH", "en-GB", "en-US", "es", "fr", "hr",
             "it", "hu", "nl", "nb", "pl", "pt-BR", "pt-PT", "ro", "fi", "sv", "tr",
-            "el", "ru", "uk", "he", "ar", "zh-Hans", "zh-Hant", "ja", "ko",
+            "el", "ru", "uk", "zh-Hans", "zh-Hant", "ja", "ko",
         )
     }
 }

@@ -4,6 +4,12 @@ The [approved plan](../translations-plan.md) defines the release slate. English
 resources in `app/src/main/res/values/strings.xml` are the source of truth. Keep
 accepted German and human corrections; do not regenerate them for style.
 
+Arabic and Hebrew are deferred to a later release and are not shipped in 0.3.0.
+Their reviewed resources remain in `values-ar` and `values-iw`, but are excluded
+from `appLanguages` and filtered out of the APK. The release has 28 language-picker
+entries. Debug builds retain `en-XA` and `ar-XB` for long-text and RTL checks;
+these pseudo-locales are not shipped in release builds.
+
 ## Preparing a translation round
 
 1. Start from current local `main` after fetching remotes. Coordinate pending
