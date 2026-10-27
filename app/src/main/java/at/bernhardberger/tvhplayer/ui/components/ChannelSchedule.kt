@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
@@ -15,6 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
@@ -77,6 +83,7 @@ internal fun ChannelSchedule(
     onFocused: (EpgEvent) -> Unit = {},
     onContextMenu: ((EpgEvent) -> Unit)? = null,
     viewerBehindMs: Long? = null,
+    onBackKeyDown: () -> Unit = {},
 ) {
     val zone = ZoneId.systemDefault()
     val locale = LocalConfiguration.current.locales[0]
@@ -94,7 +101,14 @@ internal fun ChannelSchedule(
     var selectedDay by remember { mutableStateOf(initialEvent?.let(::date)) }
     var entered by remember { mutableStateOf(false) }
     var focusedEvent by remember { mutableStateOf<EpgEvent?>(null) }
+    var openingEventId by remember { mutableStateOf<EventId?>(null) }
     var rowOwnsFocus by remember { mutableStateOf(false) }
+    fun back() {
+        if (rowOwnsFocus && openingEventId != null && focusedEvent?.id != openingEventId && events.isNotEmpty()) {
+            selectedTabFocus.requestFocus()
+        } else onClose()
+    }
+    BackHandler(onBack = ::back)
     val channelName = channel?.name ?: stringResource(R.string.epg_search_unknown_channel)
     val title = stringResource(R.string.channel_schedule_pane, channelName)
     val timeWidth = rememberScheduleTimeWidth()
@@ -117,13 +131,22 @@ internal fun ChannelSchedule(
             if (events.isNotEmpty()) {
                 val target = removed?.let { old -> events.firstOrNull { it.start >= old.stop }
                     ?: scheduleInitialEvent(events, viewerSec, nowSec) } ?: events[initialIndex]
+                // Loading and automatic expiry are not browsing away from the opening row.
+                if (!entered || (removed != null && removed.id == openingEventId)) openingEventId = target.id
                 scrollToRow(events.indexOf(target))
                 withFrameNanos { }
                 entered = rowFocus[target.id]?.requestFocus() == true
             } else { entered = false; emptyFocus.requestFocus() }
         }
     }
-    Column(modifier.focusGroup().semantics { paneTitle = title }, verticalArrangement = Arrangement.spacedBy(TvSpacing12)) {
+    Column(modifier.focusGroup().onPreviewKeyEvent { event ->
+        if (event.key != Key.Back) return@onPreviewKeyEvent false
+        if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
+            onBackKeyDown()
+            back()
+        }
+        true
+    }.semantics { paneTitle = title }, verticalArrangement = Arrangement.spacedBy(TvSpacing12)) {
         // The options sheet's header: its title on the rows' text keyline, the clock as its quiet value.
         Row(Modifier.fillMaxWidth().padding(start = ScheduleTextKeyline, end = ScheduleTextKeyline, top = PlaybackPanelHeaderTop),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(TvSpacing12)) {
@@ -189,8 +212,11 @@ internal fun ChannelSchedule(
                     AppTab(selected = selectedDay == day,
                          onFocus = {
                                 rowOwnsFocus = false
-                                selectedDay = day
-                                target?.let { event -> scope.launch { scrollToRow(events.indexOf(event)) } }
+                                // Returning to the selected tab leaves the list where the viewer was.
+                                if (selectedDay != day) {
+                                    selectedDay = day
+                                    target?.let { event -> scope.launch { scrollToRow(events.indexOf(event)) } }
+                                }
                         }, first = index == 0, last = index == days.lastIndex,
                         modifier = Modifier.bringIntoViewRequester(tabInView.getValue(day)).testTag("schedule-tab-$day"),
                         label = when (day) {
