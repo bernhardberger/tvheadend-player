@@ -344,8 +344,8 @@ class QuickZapPresentationTest {
                     }
                     assertTrue("ring missing at $degrees degrees", ring.isNotEmpty())
                     val gap = ring.first() - radius
-                    assertEquals("$state native radius=$radius corner=$dx,$dy angle=$degrees inner gap", .5f, gap, .4f)
-                    assertEquals("$state centered 3dp stroke at $degrees degrees", 3f, ring.last() - ring.first(), .5f)
+                    assertEquals("$state native radius=$radius corner=$dx,$dy angle=$degrees inner gap", 3f, gap, .4f)
+                    assertEquals("$state centered 2.5dp stroke at $degrees degrees", 2.5f, ring.last() - ring.first(), .5f)
                     gap
                 }
             }
@@ -358,10 +358,10 @@ class QuickZapPresentationTest {
             capture("$prefix-native-corner-$state", 2, fontScale)
             File("../artifacts/quick-zap/$prefix-native-corner-$state-geometry.txt").writeText(
                 "nativeRadiusMeasuredDp=$radius\nscale=$scale\ninnerGapsDp=$gaps\n" +
-                    "supersampling=4x production view draw; native shape and scale unmodified\n",
+                    "supersampling=4x production view draw; native shape, shared focused scale\n",
             )
         }
-        verify("focused", 1.1f)
+        verify("focused", 1.05f)
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         compose.waitForIdle()
         verify("pressed", 1f)
@@ -500,7 +500,7 @@ class QuickZapPresentationTest {
         val bounds = card(2).fetchSemanticsNode().boundsInRoot
         val scale = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot.width / bounds.width
-        val outlineTop = bounds.center.y - (bounds.height / 2f + 2f) * scale
+        val outlineTop = bounds.center.y - (bounds.height / 2f + 4.25f) * scale
         assertEquals(focusColor, pixel(bounds.center.x, outlineTop))
         assertEquals(0xFFE1E2E5.toInt(), focusColor)
     }

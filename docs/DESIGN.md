@@ -306,14 +306,31 @@ Any different treatment is a **global** decision recorded here and applied once
 (theme or shared defaults helper), never per screen. Until then, a per-call-site
 override is a defect.
 
+All focusable cards use the single `TvCardFocusedScale` token in `ui/TvLayout.kt`
+(1.05×), including the compact channel cards, standard programme cards, recent
+channel tiles and details reading panels. `StandardCardContainer` delegates focus
+to its image card. Unfocused and pressed scales stay native. Native list rows
+(Channels and Recordings), unscaled Guide cells and schedule rows, and the
+unscaled player identity are not cards. Buttons keep their native focus growth;
+this includes the WideButton-style `GuidedStepAction` surface at 1.1×.
+
 Embedded-progress cards use the shared `embeddedProgressCardBorder` treatment
-(revised 2026-09-22): retain the native 3dp focused outline, shape and scale,
+(revised 2026-10-27): use a 2.5dp focused outline with the native shape,
 use `onSurface` for its colour to match native focused buttons, and move its path
-2dp **outside** the card. The outline radius includes that offset: TV Material
-1.1.0's native 8dp card radius becomes 10dp on the expanded path, keeping the
-corners concentric. Native pressed behaviour remains unchanged. The bottom
-progress strip remains in its designed flush, full-width slot; the outline must
+4.25dp **outside** the card, leaving a 3dp gap inside the centred stroke. The
+outline radius includes that offset: TV Material 1.1.0's native 8dp card radius
+becomes 12.25dp on the expanded path, keeping the corners concentric. The shared
+card focus scale gives a subtler lift toward the Google TV Home reference.
+The bottom progress strip
+remains in its designed flush, full-width slot; the outline must
 not paint over it. Layout reserves the additional outer extent.
+
+Picture cards add a restrained native focus glow (accepted 2026-10-27), shared
+by Quick Zap, Channels cards and programme airings. Its colour comes from the
+picture shown, or the channel's picon accent on a logo card; without a usable
+colour it stays neutral. Use a broad, soft 24dp native glow at 0.45 alpha, with
+the shared outline and scale above; native pressed treatment stays unchanged.
+Rows, Guide cells and buttons keep their native defaults.
 
 Component commit model is set by the component:
 

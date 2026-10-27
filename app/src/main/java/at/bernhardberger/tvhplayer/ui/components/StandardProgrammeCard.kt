@@ -14,6 +14,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardContainerColors
 import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.CardDefaults
+import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import androidx.tv.material3.StandardCardContainer
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
@@ -29,6 +30,8 @@ internal fun StandardProgrammeCard(
     onClick: () -> Unit,
     onLongClick: (() -> Unit)?,
     modifier: Modifier,
+    art: ArtworkId?,
+    picon: ArtworkId?,
     title: @Composable () -> Unit,
     subtitle: @Composable () -> Unit,
     contentColor: CardContainerColors = CardContainerDefaults.contentColor(),
@@ -40,6 +43,8 @@ internal fun StandardProgrammeCard(
             Card(onClick = onClick, onLongClick = onLongClick, interactionSource = interaction,
                 modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f),
                 colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
+                glow = artworkCardGlow(art, picon, interaction),
+                scale = EmbeddedProgressCardScale,
                 border = embeddedProgressCardBorder()) {
                 Box(Modifier.fillMaxSize(), content = picture)
             }
@@ -50,5 +55,5 @@ internal fun StandardProgrammeCard(
     )
 }
 
-// Native 1.1 focus scale on a 220dp card adds ~6dp below it, plus the outline.
+// Shared 1.05 focus scale plus the outline stays clear of the text below the picture.
 internal val StandardCardTextGap = 16.dp

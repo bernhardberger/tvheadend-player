@@ -14,6 +14,9 @@ val TvSpacing48 = 48.dp
 val TvSpacing56 = 56.dp
 val TvSpacing80 = 80.dp
 
+/** Shared focus growth for all cards, including cards built from clickable TV Material surfaces. */
+internal const val TvCardFocusedScale = 1.05f
+
 /** Minimum title/action slot height shared by peer top-level browse destinations. */
 val TvBrowseHeaderHeight = 40.dp
 
