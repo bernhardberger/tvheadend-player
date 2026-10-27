@@ -11,7 +11,14 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
 import android.view.View
+import androidx.compose.foundation.layout.Box
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
@@ -152,6 +159,7 @@ class PlayerEntryOverlayTest {
     private lateinit var runtime: AppPlaybackRuntime
     private lateinit var playerSettings: PlayerSettingsStore
     private var playerVisible = false
+    private var unconsumedCenterUps = 0
     private var beforeSettingsRead: suspend () -> Unit = {}
     private val loadGate = CountDownLatch(1)
 
@@ -262,6 +270,97 @@ class PlayerEntryOverlayTest {
         compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
         compose.onNodeWithTag("global-drawer-brand").assertExists()
     }
+
+    // The slot is reached and pressed with the remote; leaving the player returns like any other entry.
+    @Test fun railSlotOnTheRemoteReturnsToThePlayerAndBackToThePlayingChannel() {
+        app(programme = true, holdLive = true)
+        compose.onNodeWithTag("channel-row-1").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible && runtime.activeTarget.value != null }
+        settle()
+        val epoch = runtime.videoPresentation.value.epoch
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
+        val backsToLeave = leavePlayer()
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+
+        unconsumedCenterUps = 0
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        settle()
+        assertTrue("the drawer item activates on release, not on press", !playerVisible)
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        compose.waitUntil(10_000) { playerVisible }
+        settle()
+        compose.onNodeWithTag("player-page-first", useUnmergedTree = true).assertExists()
+        assertEquals(0, unconsumedCenterUps)
+        assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.runOnIdle {
+            assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+            assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK })
+            assertEquals(epoch, runtime.videoPresentation.value.epoch)
+        }
+
+        // Back does not depend on the way in: Channels again, drawer closed, on the playing channel.
+        assertEquals(backsToLeave, leavePlayer())
+        assertEquals(80f, drawerWidth(), .5f)
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+    }
+
+    // A recording player's exit only pops back to the destination that was showing. Up from
+    // Recordings to the slot has already switched the shell to Channels, so Back lands there.
+    @Test fun railSlotOnTheRemoteReturnsToTheRecordingAndBackToTheChannelsTheDrawerSwitchedTo() {
+        recordingRow()
+        val bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
+        val selection = runtime.recordingSelection.value
+        compose.onNodeWithTag("recording-list-entry-7").performSemanticsAction(SemanticsActions.OnClick)
+        compose.waitUntil(10_000) { playerVisible }
+        settle()
+        val backsToLeave = leavePlayer()
+        compose.onNodeWithTag("recording-list-entry-7").assertIsFocused()
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        // The slot is the first stop above the destinations, so Up passes Guide and Channels first,
+        // and the open drawer switches to each destination it focuses on the way.
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+        assertEquals(ChannelsKey, shellStack().last())
+
+        unconsumedCenterUps = 0
+        compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+        settle()
+        assertTrue("the drawer item activates on release, not on press", !playerVisible)
+        compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        compose.waitUntil(10_000) { playerVisible }
+        settle()
+        compose.onNodeWithTag("player-banner", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("recording-resume").assertDoesNotExist()
+        assertEquals(0, unconsumedCenterUps)
+        assertEquals(0, compose.onAllNodes(hasTestTag("player-actions"), useUnmergedTree = true).fetchSemanticsNodes().size)
+        compose.runOnIdle {
+            assertEquals(AppPlaybackTarget.Recording(DvrEntryId(7)), runtime.activeTarget.value)
+            assertEquals(selection, runtime.recordingSelection.value)
+            assertEquals(bindings, session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK })
+        }
+
+        assertEquals(backsToLeave, leavePlayer())
+        assertEquals(listOf(RecordingsKey, GuideKey, ChannelsKey), shellStack())
+        assertEquals(80f, drawerWidth(), .5f)
+        compose.onNodeWithTag("recording-list-entry-7").assertDoesNotExist()
+        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+    }
+
+    private fun shellStack(): List<AppNavKey> = compose.runOnIdle {
+        savedState.performSave().values.flatten().filterIsInstance<android.os.Bundle>()
+            .mapNotNull { runCatching { decodeFromSavedState(serializer<NavBackStack<AppNavKey>>(), it) }.getOrNull() }
+            .single().toList()
+    }
+
+    private fun drawerWidth() = compose.onNodeWithTag("global-drawer-surface").fetchSemanticsNode().boundsInRoot.width
 
     @Test fun railSlotReturnsToTheWarmRecordingWithoutRebinding() {
         recordingRow()
@@ -423,10 +522,13 @@ class PlayerEntryOverlayTest {
         compose.waitUntil(10_000) { runtime.activeTarget.value == null }
     }
 
-    private fun leavePlayer() {
-        repeat(3) { if (playerVisible) key(Key.Back) }
+    /** Presses Back until the player is gone and answers how many it took. */
+    private fun leavePlayer(): Int {
+        var backs = 0
+        repeat(3) { if (playerVisible) { key(Key.Back); backs++ } }
         compose.waitUntil(10_000) { !playerVisible }
         settle()
+        return backs
     }
 
     @Test fun recordingStoppedAfterRenderingUsesTheNormalResumeChoice() = staleRecordingReturn(replace = false)
@@ -598,14 +700,19 @@ class PlayerEntryOverlayTest {
             CompositionLocalProvider(LocalSaveableStateRegistry provides savedState) {
             KoinIsolatedContext(koinApplication { modules(dependencies) }) {
                 TVHeadendPlayerTheme {
-                    AppRoot(
-                        startupState = MainStartupState.Ready(server, autoStartPlayback = false),
-                        runtimeServerSettings = server,
-                        applianceLaunchRequests = ApplianceLaunchRequests(),
-                        onPlayerVisibilityChanged = { playerVisible = it },
-                        onRequestExit = {},
-                        debugVideoBackdropVisible = syntheticVideo,
-                    )
+                    Box(Modifier.onKeyEvent {
+                        if (it.key == Key.DirectionCenter && it.type == KeyEventType.KeyUp) unconsumedCenterUps++
+                        false
+                    }) {
+                        AppRoot(
+                            startupState = MainStartupState.Ready(server, autoStartPlayback = false),
+                            runtimeServerSettings = server,
+                            applianceLaunchRequests = ApplianceLaunchRequests(),
+                            onPlayerVisibilityChanged = { playerVisible = it },
+                            onRequestExit = {},
+                            debugVideoBackdropVisible = syntheticVideo,
+                        )
+                    }
                 }
             }
             }
