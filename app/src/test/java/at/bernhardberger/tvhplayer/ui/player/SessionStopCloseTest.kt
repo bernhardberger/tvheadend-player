@@ -155,12 +155,12 @@ class SessionStopCloseTest {
                 Modifier
                     .fillMaxSize()
                     .onPreviewKeyEvent { event ->
-                        if (handlePlayerStopKeyWithoutTarget(event, hasActiveTarget, state::beginOpeningKeyCycle,
+                        if (handlePlayerStopKeyWithoutTarget(event, hasActiveTarget, state.core::beginOpeningKeyCycle,
                                 stopAndClose)
                         ) {
                             return@onPreviewKeyEvent true
                         }
-                        state.handleOverlayKey(
+                        state.core.handleOverlayKey(
                             event = event,
                             keyContext = PlayerKeyContext(PlayerSurface.LIVE, controlsVisible = false,
                                 seekbarFocused = false, timeshiftAvailable = false),

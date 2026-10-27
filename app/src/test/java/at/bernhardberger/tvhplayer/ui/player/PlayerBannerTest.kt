@@ -28,22 +28,22 @@ class PlayerBannerTest {
     @Test
     fun zapWithHiddenControlsShowsTheBannerUntilTheChannelsFrame() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
-        state.chrome.onBannerFramePresented(true)
+        state.core.chrome.onBannerFramePresented(true)
         advanceTimeBy(6_000L)
         runCurrent()
-        assertFalse(state.chrome.bannerVisible)
+        assertFalse(state.core.chrome.bannerVisible)
 
         state.onChannelTuneRequested()
-        state.chrome.onBannerFramePresented(false)
-        assertTrue(state.chrome.bannerVisible)
-        assertFalse(state.chrome.controlsVisible)
+        state.core.chrome.onBannerFramePresented(false)
+        assertTrue(state.core.chrome.bannerVisible)
+        assertFalse(state.core.chrome.controlsVisible)
         advanceTimeBy(20_000L)
         runCurrent()
-        assertTrue(state.chrome.bannerVisible)
-        state.chrome.onBannerFramePresented(true)
+        assertTrue(state.core.chrome.bannerVisible)
+        state.core.chrome.onBannerFramePresented(true)
         advanceTimeBy(5_001L)
         runCurrent()
-        assertFalse(state.chrome.bannerVisible)
+        assertFalse(state.core.chrome.bannerVisible)
         state.dispose()
     }
 
@@ -51,10 +51,10 @@ class PlayerBannerTest {
     fun zapWithVisibleControlsKeepsTheControls() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.showControls()
-        assertFalse(state.chrome.bannerVisible)
+        assertFalse(state.core.chrome.bannerVisible)
         state.onChannelTuneRequested()
-        assertTrue(state.chrome.controlsVisible)
-        assertFalse(state.chrome.bannerVisible)
+        assertTrue(state.core.chrome.controlsVisible)
+        assertFalse(state.core.chrome.bannerVisible)
         state.dispose()
     }
 
@@ -62,31 +62,31 @@ class PlayerBannerTest {
     fun okAndPanelsReplaceTheBannerAndBackHidesIt() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.showControls()
-        assertFalse(state.chrome.bannerVisible)
-        assertTrue(state.chrome.controlsVisible)
+        assertFalse(state.core.chrome.bannerVisible)
+        assertTrue(state.core.chrome.controlsVisible)
         // The controls take the Banner's content over; with the Banner gone a reveal travels in.
-        assertEquals(PlayerControlsEntry.FROM_BANNER, state.chrome.controlsEntry)
-        state.chrome.hideControls()
+        assertEquals(PlayerControlsEntry.FROM_BANNER, state.core.chrome.controlsEntry)
+        state.core.chrome.hideControls()
         state.showControls()
-        assertEquals(PlayerControlsEntry.TRAVEL, state.chrome.controlsEntry)
+        assertEquals(PlayerControlsEntry.TRAVEL, state.core.chrome.controlsEntry)
 
-        state.chrome.hideControls()
+        state.core.chrome.hideControls()
         state.onChannelTuneRequested()
         state.openInfo()
-        assertFalse(state.chrome.bannerVisible)
+        assertFalse(state.core.chrome.bannerVisible)
 
         state.closeInfo()
-        state.chrome.hideControls()
+        state.core.chrome.hideControls()
         state.onChannelTuneRequested()
-        state.showOptionsPage(PlaybackOptionsPage.ROOT)
-        assertFalse(state.chrome.bannerVisible)
+        state.core.showOptionsPage(PlaybackOptionsPage.ROOT)
+        assertFalse(state.core.chrome.bannerVisible)
 
-        state.closeOptions()
-        state.chrome.hideControls()
+        state.core.closeOptions()
+        state.core.chrome.hideControls()
         state.onChannelTuneRequested()
-        state.chrome.hideBanner()
-        assertFalse(state.chrome.bannerVisible)
-        assertFalse(state.chrome.controlsVisible)
+        state.core.chrome.hideBanner()
+        assertFalse(state.core.chrome.bannerVisible)
+        assertFalse(state.core.chrome.controlsVisible)
         state.dispose()
     }
 
@@ -94,30 +94,30 @@ class PlayerBannerTest {
     fun failedTuneReplacesTheBannerWithTheCentreMessage() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.onChannelUnavailable()
-        assertFalse(state.chrome.bannerVisible)
-        assertFalse(state.chrome.controlsVisible)
+        assertFalse(state.core.chrome.bannerVisible)
+        assertFalse(state.core.chrome.controlsVisible)
         state.dispose()
     }
 
     @Test
     fun programmeChangeShowsTheBannerForFiveSecondsOnlyWithChromeHidden() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
-        state.chrome.onBannerFramePresented(true)
+        state.core.chrome.onBannerFramePresented(true)
         advanceTimeBy(5_001L)
         runCurrent()
         state.onProgrammeChanged()
-        assertTrue(state.chrome.bannerVisible)
+        assertTrue(state.core.chrome.bannerVisible)
         advanceTimeBy(5_001L)
         runCurrent()
-        assertFalse(state.chrome.bannerVisible)
+        assertFalse(state.core.chrome.bannerVisible)
 
         state.showControls()
         state.onProgrammeChanged()
-        assertFalse(state.chrome.bannerVisible)
-        state.chrome.hideControls()
+        assertFalse(state.core.chrome.bannerVisible)
+        state.core.chrome.hideControls()
         state.openInfo()
         state.onProgrammeChanged()
-        assertFalse(state.chrome.bannerVisible)
+        assertFalse(state.core.chrome.bannerVisible)
         state.dispose()
     }
 
@@ -183,24 +183,24 @@ class PlayerBannerTest {
     @Test
     fun aStopCancelsTheBannerAndItsTimerSoNoStaleBannerReturns() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
-        state.chrome.onBannerFramePresented(true)
+        state.core.chrome.onBannerFramePresented(true)
         advanceTimeBy(3_000L)
         runCurrent()
         // The screen stops: the Banner goes and its timer with it.
-        state.chrome.hideBanner()
-        state.chrome.onBannerFramePresented(false)
-        assertFalse(state.chrome.bannerVisible)
+        state.core.chrome.hideBanner()
+        state.core.chrome.onBannerFramePresented(false)
+        assertFalse(state.core.chrome.bannerVisible)
         // Return and retune: a fresh Banner waits for the new frame; no old timer cuts it short.
         state.onChannelTuneRequested()
-        assertTrue(state.chrome.bannerVisible)
+        assertTrue(state.core.chrome.bannerVisible)
         advanceTimeBy(10_000L)
         runCurrent()
-        assertTrue("no stale timer: the Banner waits for this tune's frame", state.chrome.bannerVisible)
-        state.chrome.onBannerFramePresented(true)
+        assertTrue("no stale timer: the Banner waits for this tune's frame", state.core.chrome.bannerVisible)
+        state.core.chrome.onBannerFramePresented(true)
         advanceTimeBy(5_001L)
         runCurrent()
-        assertFalse(state.chrome.bannerVisible)
-        assertFalse(state.chrome.controlsVisible)
+        assertFalse(state.core.chrome.bannerVisible)
+        assertFalse(state.core.chrome.controlsVisible)
         state.dispose()
     }
 

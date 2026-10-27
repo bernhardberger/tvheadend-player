@@ -119,8 +119,8 @@ internal class LivePlayerServerWaitState(
         val native = event.nativeKeyEvent
         if (native.keyCode == AndroidKeyEvent.KEYCODE_BACK) return false
         when (native.action) {
-            AndroidKeyEvent.ACTION_DOWN -> if (native.repeatCount == 0) layerState.beginOpeningKeyCycle(native.keyCode)
-            AndroidKeyEvent.ACTION_UP -> layerState.endOpeningKeyCycle(native.keyCode)
+            AndroidKeyEvent.ACTION_DOWN -> if (native.repeatCount == 0) layerState.core.beginOpeningKeyCycle(native.keyCode)
+            AndroidKeyEvent.ACTION_UP -> layerState.core.endOpeningKeyCycle(native.keyCode)
         }
         return true
     }

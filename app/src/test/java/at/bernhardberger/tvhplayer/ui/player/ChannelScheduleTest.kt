@@ -49,14 +49,14 @@ class ChannelScheduleTest {
         // The panel decides whether Back returns to its day tab or closes it.
         assertEquals(false, layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_BACK, true)))
         assertTrue(layers.scheduleOpen)
-        layers.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK)
+        layers.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK)
         assertEquals(true, layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_BACK, true, 1)))
         assertEquals(true, layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_BACK, false)))
-        assertNull(layers.revealingKeyCode)
+        assertNull(layers.core.revealingKeyCode)
         layers.closeSchedule()
         assertFalse(layers.scheduleOpen)
-        assertEquals("player-settings", layers.restoreChannelAction)
-        assertTrue(layers.chrome.controlsVisible)
+        assertEquals("player-settings", layers.core.restoreControl)
+        assertTrue(layers.core.chrome.controlsVisible)
         layers.dispose()
     }
 
@@ -126,20 +126,20 @@ class ChannelScheduleTest {
         layers.openInfo(fromKey = true)
         layers.handleScheduleKey(key(AndroidKeyEvent.KEYCODE_GUIDE, true))
         assertTrue(layers.scheduleOpen)
-        assertFalse(layers.infoOpen)
+        assertFalse(layers.core.infoOpen)
         layers.closeSchedule()
-        assertTrue(layers.infoOpen)
+        assertTrue(layers.core.infoOpen)
         layers.closeInfo()
-        layers.endOpeningKeyCycle(AndroidKeyEvent.KEYCODE_GUIDE)
+        layers.core.endOpeningKeyCycle(AndroidKeyEvent.KEYCODE_GUIDE)
         for (page in PlaybackOptionsPage.entries) for (quick in listOf(false, true)) {
             if (quick && page !in listOf(PlaybackOptionsPage.AUDIO, PlaybackOptionsPage.SUBTITLES)) continue
-            if (quick) layers.showQuickList(page) else layers.showOptionsPage(page)
+            if (quick) layers.core.showQuickList(page) else layers.core.showOptionsPage(page)
             for (event in listOf(key(AndroidKeyEvent.KEYCODE_GUIDE, true),
                     key(AndroidKeyEvent.KEYCODE_GUIDE, true, 1), key(AndroidKeyEvent.KEYCODE_GUIDE, false))) {
                 assertEquals(true, layers.handleScheduleKey(event) { error("Modal GUIDE must not prepare Schedule") })
                 assertFalse(layers.scheduleOpen)
-                assertEquals(page, layers.optionsPage)
-                assertEquals(quick, layers.optionsQuickList)
+                assertEquals(page, layers.core.optionsPage)
+                assertEquals(quick, layers.core.optionsQuickList)
             }
         }
         layers.dispose()
@@ -157,7 +157,7 @@ class ChannelScheduleTest {
             assertEquals(false, layers.handleScheduleKey(key(code, true)))
         }
         assertTrue(layers.scheduleOpen)
-        assertFalse(layers.chrome.controlsVisible)
+        assertFalse(layers.core.chrome.controlsVisible)
         layers.dispose()
     }
 
@@ -168,7 +168,7 @@ class ChannelScheduleTest {
                     AndroidKeyEvent.KEYCODE_BOOKMARK)) {
                 val layers = LivePlayerLayerState(this, 5000)
                 if (controls) layers.showControls()
-                layers.chrome.updateAutoHideEligibility(true)
+                layers.core.chrome.updateAutoHideEligibility(true)
                 when (code) {
                     AndroidKeyEvent.KEYCODE_INFO -> layers.openInfo(fromKey = true)
                     AndroidKeyEvent.KEYCODE_GUIDE -> layers.openSchedule(fromKey = true)
@@ -180,13 +180,13 @@ class ChannelScheduleTest {
                     AndroidKeyEvent.KEYCODE_GUIDE -> layers.closeSchedule()
                     else -> layers.dismissChannelDrawer()
                 }
-                assertEquals("key=$code", controls, layers.chrome.controlsVisible)
+                assertEquals("key=$code", controls, layers.core.chrome.controlsVisible)
                 if (controls) {
-                    layers.chrome.updateAutoHideEligibility(true)
+                    layers.core.chrome.updateAutoHideEligibility(true)
                     testScheduler.advanceTimeBy(4999)
-                    assertTrue(layers.chrome.controlsVisible)
+                    assertTrue(layers.core.chrome.controlsVisible)
                     testScheduler.advanceTimeBy(2)
-                    assertFalse(layers.chrome.controlsVisible)
+                    assertFalse(layers.core.chrome.controlsVisible)
                 }
                 layers.dispose()
             }

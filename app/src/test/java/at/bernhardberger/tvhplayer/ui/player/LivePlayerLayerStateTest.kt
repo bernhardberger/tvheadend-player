@@ -24,49 +24,49 @@ class LivePlayerLayerStateTest {
         state.showControls()
         state.onActionFocused("player-settings")
         state.openChannelDrawer()
-        state.chrome.updateAutoHideEligibility(false)
+        state.core.chrome.updateAutoHideEligibility(false)
         repeat(3) { state.onChannelTuneRequested() }
         advanceTimeBy(20_000L)
         runCurrent()
         assertTrue(state.channelDrawerOpen)
-        assertFalse(state.chrome.controlsVisible)
+        assertFalse(state.core.chrome.controlsVisible)
         state.dismissChannelDrawer()
         assertFalse(state.channelDrawerOpen)
-        assertTrue(state.chrome.controlsVisible)
-        assertEquals("player-settings", state.restoreChannelAction)
+        assertTrue(state.core.chrome.controlsVisible)
+        assertEquals("player-settings", state.core.restoreControl)
         // A zap on the hidden player shows the Banner, not the controls.
-        state.chrome.hideControls()
+        state.core.chrome.hideControls()
         state.onChannelTuneRequested()
-        assertTrue(state.chrome.bannerVisible)
-        assertFalse(state.chrome.controlsVisible)
+        assertTrue(state.core.chrome.bannerVisible)
+        assertFalse(state.core.chrome.controlsVisible)
     }
 
     @Test
     fun controlsRecordWhetherAZapOrTheViewerRevealedThem() = runTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.showControls()
-        assertEquals(PlayerControlsEntry.FROM_BANNER, state.chrome.controlsEntry)
+        assertEquals(PlayerControlsEntry.FROM_BANNER, state.core.chrome.controlsEntry)
         state.onChannelTuneRequested()
-        assertTrue(state.chrome.controlsVisible)
-        assertEquals(PlayerControlsEntry.FADE, state.chrome.controlsEntry)
-        state.chrome.hideControls()
+        assertTrue(state.core.chrome.controlsVisible)
+        assertEquals(PlayerControlsEntry.FADE, state.core.chrome.controlsEntry)
+        state.core.chrome.hideControls()
         state.showControls()
-        assertEquals(PlayerControlsEntry.TRAVEL, state.chrome.controlsEntry)
+        assertEquals(PlayerControlsEntry.TRAVEL, state.core.chrome.controlsEntry)
 
         // Controls returning from the tray, options or info still move in as before.
         state.onChannelTuneRequested()
         state.openChannelDrawer()
         state.onChannelTuneRequested()
-        assertEquals(PlayerControlsEntry.TRAVEL, state.chrome.controlsEntry)
+        assertEquals(PlayerControlsEntry.TRAVEL, state.core.chrome.controlsEntry)
         state.dismissChannelDrawer()
-        assertEquals(PlayerControlsEntry.TRAVEL, state.chrome.controlsEntry)
+        assertEquals(PlayerControlsEntry.TRAVEL, state.core.chrome.controlsEntry)
         for (open in listOf(
-            { state.showOptionsPage(PlaybackOptionsPage.ROOT) },
+            { state.core.showOptionsPage(PlaybackOptionsPage.ROOT) },
             { state.openInfo() },
         )) {
             state.onChannelTuneRequested()
             open()
-            assertEquals(PlayerControlsEntry.TRAVEL, state.chrome.controlsEntry)
+            assertEquals(PlayerControlsEntry.TRAVEL, state.core.chrome.controlsEntry)
         }
         advanceTimeBy(20_000L)
         runCurrent()
@@ -79,25 +79,25 @@ class LivePlayerLayerStateTest {
             state.showControls()
             state.onActionFocused(action)
             state.openChannelDrawer()
-            state.beginOpeningKeyCycle(19)
+            state.core.beginOpeningKeyCycle(19)
             state.dismissChannelDrawer()
             assertEquals(PlayerForegroundLayer.CONTROLS, playerForegroundLayer(state.foregroundContext()))
-            assertEquals(action, state.restoreChannelAction)
-            assertEquals(19, state.revealingKeyCode)
-            state.onChannelActionRestored()
-            assertNull(state.restoreChannelAction)
-            state.endOpeningKeyCycle(19)
+            assertEquals(action, state.core.restoreControl)
+            assertEquals(19, state.core.revealingKeyCode)
+            state.core.onFocusRestored()
+            assertNull(state.core.restoreControl)
+            state.core.endOpeningKeyCycle(19)
         }
         state.onActionFocused("player-settings")
-        state.chrome.hideControls()
+        state.core.chrome.hideControls()
         state.openChannelDrawer()
         state.dismissChannelDrawer()
-        assertEquals("player-pause", state.restoreChannelAction)
-        state.onChannelActionRestored()
+        assertEquals("player-pause", state.core.restoreControl)
+        state.core.onFocusRestored()
         state.openChannelDrawer()
         state.closeChannelDrawer()
-        assertFalse(state.chrome.controlsVisible)
-        assertNull(state.restoreChannelAction)
+        assertFalse(state.core.chrome.controlsVisible)
+        assertNull(state.core.restoreControl)
     }
 
     @Test
@@ -105,16 +105,10 @@ class LivePlayerLayerStateTest {
         val state = LivePlayerLayerState(this, 5_000L)
         state.showControls()
         state.onActionFocused("player-stop")
-        state.showQuickList(PlaybackOptionsPage.AUDIO)
-        state.closeQuickList()
-        assertEquals("player-stop", state.restoreChannelAction)
-        state.onChannelActionRestored()
-
-        // Focus on a control that has no restore target leaves nothing to restore.
-        state.onActionFocused("player-seekbar")
-        state.showQuickList(PlaybackOptionsPage.SUBTITLES)
-        state.closeQuickList()
-        assertNull(state.restoreChannelAction)
+        state.core.showQuickList(PlaybackOptionsPage.AUDIO)
+        state.core.closeQuickList()
+        assertEquals("player-stop", state.core.restoreControl)
+        state.core.onFocusRestored()
         state.dispose()
     }
 
@@ -126,23 +120,23 @@ class LivePlayerLayerStateTest {
         )
 
         state.openChannelDrawer()
-        assertFalse(state.chrome.controlsVisible)
+        assertFalse(state.core.chrome.controlsVisible)
         assertTrue(state.channelDrawerOpen)
 
-        state.showOptionsPage(PlaybackOptionsPage.AUDIO)
-        assertTrue(state.chrome.controlsVisible)
+        state.core.showOptionsPage(PlaybackOptionsPage.AUDIO)
+        assertTrue(state.core.chrome.controlsVisible)
         assertFalse(state.channelDrawerOpen)
-        assertEquals(PlaybackOptionsPage.AUDIO, state.optionsPage)
+        assertEquals(PlaybackOptionsPage.AUDIO, state.core.optionsPage)
 
         state.openInfo()
-        assertFalse(state.chrome.controlsVisible)
-        assertNull(state.optionsPage)
+        assertFalse(state.core.chrome.controlsVisible)
+        assertNull(state.core.optionsPage)
         assertFalse(state.channelDrawerOpen)
-        assertTrue(state.infoOpen)
+        assertTrue(state.core.infoOpen)
 
-        state.openOptions()
-        assertFalse(state.infoOpen)
-        assertEquals(PlaybackOptionsPage.ROOT, state.optionsPage)
+        state.core.openOptions()
+        assertFalse(state.core.infoOpen)
+        assertEquals(PlaybackOptionsPage.ROOT, state.core.optionsPage)
 
         state.openInfo()
 
@@ -164,7 +158,7 @@ class LivePlayerLayerStateTest {
             playerForegroundLayer(state.foregroundContext()),
         )
 
-        state.chrome.hideControls()
+        state.core.chrome.hideControls()
         assertEquals(
             PlayerForegroundLayer.NONE,
             playerForegroundLayer(state.foregroundContext()),
@@ -178,14 +172,14 @@ class LivePlayerLayerStateTest {
             autoHideTimeoutMillis = 5_000L,
         )
 
-        state.beginOpeningKeyCycle(keyCode = 23)
-        assertEquals(23, state.revealingKeyCode)
+        state.core.beginOpeningKeyCycle(keyCode = 23)
+        assertEquals(23, state.core.revealingKeyCode)
 
-        state.endOpeningKeyCycle(keyCode = 24)
-        assertEquals(23, state.revealingKeyCode)
+        state.core.endOpeningKeyCycle(keyCode = 24)
+        assertEquals(23, state.core.revealingKeyCode)
 
-        state.endOpeningKeyCycle(keyCode = 23)
-        assertNull(state.revealingKeyCode)
+        state.core.endOpeningKeyCycle(keyCode = 23)
+        assertNull(state.core.revealingKeyCode)
     }
 
     @Test
@@ -193,59 +187,59 @@ class LivePlayerLayerStateTest {
         val state = LivePlayerLayerState(this, 5_000L)
         fun keyContext() = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
-            controlsVisible = state.chrome.controlsVisible,
+            controlsVisible = state.core.chrome.controlsVisible,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            optionsOpen = state.optionsPage != null,
-            statsOpen = state.statsVisible,
-            infoOpen = state.infoOpen,
+            optionsOpen = state.core.optionsPage != null,
+            statsOpen = state.core.statsVisible,
+            infoOpen = state.core.infoOpen,
             drawerOpen = state.channelDrawerOpen,
             confirmationOpen =
                 playerForegroundLayer(state.foregroundContext()) == PlayerForegroundLayer.CONFIRMATION,
         )
 
         state.openInfo()
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MENU))
-        assertFalse(state.infoOpen)
-        assertEquals(PlaybackOptionsPage.ROOT, state.optionsPage)
-        assertFalse(state.optionsQuickList)
-        assertEquals(KeyEvent.KEYCODE_MENU, state.revealingKeyCode)
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MENU))
+        assertFalse(state.core.infoOpen)
+        assertEquals(PlaybackOptionsPage.ROOT, state.core.optionsPage)
+        assertFalse(state.core.optionsQuickList)
+        assertEquals(KeyEvent.KEYCODE_MENU, state.core.revealingKeyCode)
         assertEquals(PlayerForegroundLayer.OPTIONS_ROOT, playerForegroundLayer(state.foregroundContext()))
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_MENU)
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_MENU)
 
-        state.closeOptions()
+        state.core.closeOptions()
         state.openChannelDrawer()
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
         assertFalse(state.channelDrawerOpen)
-        assertEquals(PlaybackOptionsPage.AUDIO, state.optionsPage)
-        assertTrue(state.optionsQuickList)
+        assertEquals(PlaybackOptionsPage.AUDIO, state.core.optionsPage)
+        assertTrue(state.core.optionsQuickList)
         assertEquals(PlayerForegroundLayer.OPTIONS_QUICK_LIST, playerForegroundLayer(state.foregroundContext()))
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
 
-        state.closeQuickList()
-        state.chrome.hideControls()
-        state.updateStatsVisibility(true)
+        state.core.closeQuickList()
+        state.core.chrome.hideControls()
+        state.core.updateStatsVisibility(true)
         assertEquals(PlayerForegroundLayer.STATS, playerForegroundLayer(state.foregroundContext()))
         // No root fallback: the captions key opens the Subtitles list, and the short
         // list leaves the hidden controls hidden.
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
-        assertEquals(PlaybackOptionsPage.SUBTITLES, state.optionsPage)
-        assertTrue(state.optionsQuickList)
-        assertFalse(state.chrome.controlsVisible)
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
+        assertEquals(PlaybackOptionsPage.SUBTITLES, state.core.optionsPage)
+        assertTrue(state.core.optionsQuickList)
+        assertFalse(state.core.chrome.controlsVisible)
         // Stats stay enabled; they return once the list closes.
-        assertTrue(state.statsVisible)
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
+        assertTrue(state.core.statsVisible)
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
 
-        state.closeQuickList()
+        state.core.closeQuickList()
         state.openInfo()
         state.showRecordingConfirmation()
-        assertFalse(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MENU))
-        assertTrue(state.infoOpen)
-        assertNull(state.optionsPage)
-        assertNull(state.revealingKeyCode)
+        assertFalse(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MENU))
+        assertTrue(state.core.infoOpen)
+        assertNull(state.core.optionsPage)
+        assertNull(state.core.revealingKeyCode)
         assertEquals(PlayerForegroundLayer.CONFIRMATION, playerForegroundLayer(state.foregroundContext()))
 
-        assertFalse(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_DPAD_CENTER))
+        assertFalse(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_DPAD_CENTER))
         state.dispose()
     }
 
@@ -254,50 +248,50 @@ class LivePlayerLayerStateTest {
         val state = LivePlayerLayerState(this, 5_000L)
         fun keyContext() = PlayerKeyContext(
             surface = PlayerSurface.LIVE,
-            controlsVisible = state.chrome.controlsVisible,
+            controlsVisible = state.core.chrome.controlsVisible,
             seekbarFocused = false,
             timeshiftAvailable = true,
-            optionsOpen = state.optionsPage != null,
+            optionsOpen = state.core.optionsPage != null,
         )
         state.showControls()
         state.onActionFocused("player-settings")
 
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
-        assertTrue(state.chrome.controlsVisible)
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
-        val presses = state.quickList.keyPresses
-        state.onKeyDown()
-        assertEquals(presses + 1, state.quickList.keyPresses)
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
+        assertTrue(state.core.chrome.controlsVisible)
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
+        val presses = state.core.quickList.keyPresses
+        state.core.onKeyDown()
+        assertEquals(presses + 1, state.core.quickList.keyPresses)
 
         // The same key again moves focus down instead of reopening.
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
-        assertEquals(1, state.quickList.moveDownRequests)
-        assertEquals(PlaybackOptionsPage.AUDIO, state.optionsPage)
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK))
+        assertEquals(1, state.core.quickList.moveDownRequests)
+        assertEquals(PlaybackOptionsPage.AUDIO, state.core.optionsPage)
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_MEDIA_AUDIO_TRACK)
 
         // The other key switches lists, Menu opens the full root.
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
-        assertEquals(PlaybackOptionsPage.SUBTITLES, state.optionsPage)
-        assertTrue(state.optionsQuickList)
-        assertEquals(1, state.quickList.moveDownRequests)
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
+        assertEquals(PlaybackOptionsPage.SUBTITLES, state.core.optionsPage)
+        assertTrue(state.core.optionsQuickList)
+        assertEquals(1, state.core.quickList.moveDownRequests)
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
 
-        state.closeQuickList()
-        assertNull(state.optionsPage)
-        assertFalse(state.optionsQuickList)
-        assertTrue(state.chrome.controlsVisible)
-        assertEquals("player-settings", state.restoreChannelAction)
+        state.core.closeQuickList()
+        assertNull(state.core.optionsPage)
+        assertFalse(state.core.optionsQuickList)
+        assertTrue(state.core.chrome.controlsVisible)
+        assertEquals("player-settings", state.core.restoreControl)
         // Keys no longer count once the list is closed.
-        val closedPresses = state.quickList.keyPresses
-        state.onKeyDown()
-        assertEquals(closedPresses, state.quickList.keyPresses)
+        val closedPresses = state.core.quickList.keyPresses
+        state.core.onKeyDown()
+        assertEquals(closedPresses, state.core.quickList.keyPresses)
 
-        state.onChannelActionRestored()
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
-        state.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
-        assertTrue(state.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MENU))
-        assertEquals(PlaybackOptionsPage.ROOT, state.optionsPage)
-        assertFalse(state.optionsQuickList)
+        state.core.onFocusRestored()
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_CAPTIONS))
+        state.core.endOpeningKeyCycle(KeyEvent.KEYCODE_CAPTIONS)
+        assertTrue(state.core.openOptionsForKey(keyContext(), KeyEvent.KEYCODE_MENU))
+        assertEquals(PlaybackOptionsPage.ROOT, state.core.optionsPage)
+        assertFalse(state.core.optionsQuickList)
         state.dispose()
     }
 }

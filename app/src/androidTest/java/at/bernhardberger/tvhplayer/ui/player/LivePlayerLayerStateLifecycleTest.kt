@@ -21,7 +21,7 @@ class LivePlayerLayerStateLifecycleTest {
         composeRule.setContent {
             if (mounted) {
                 state = rememberLivePlayerLayerState(autoHideTimeoutMillis = 5_000L)
-                SideEffect { state.chrome.updateAutoHideEligibility(eligible = true) }
+                SideEffect { state.core.chrome.updateAutoHideEligibility(eligible = true) }
             }
         }
         composeRule.runOnIdle { state.showControls() }
@@ -31,6 +31,6 @@ class LivePlayerLayerStateLifecycleTest {
         composeRule.mainClock.advanceTimeByFrame()
         composeRule.mainClock.advanceTimeBy(5_000L)
 
-        composeRule.runOnIdle { assertTrue(state.chrome.controlsVisible) }
+        composeRule.runOnIdle { assertTrue(state.core.chrome.controlsVisible) }
     }
 }

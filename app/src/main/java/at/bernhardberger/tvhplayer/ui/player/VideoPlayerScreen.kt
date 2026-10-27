@@ -67,7 +67,6 @@ import at.bernhardberger.tvhplayer.core.browsingFocusChannelId
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.PlaybackStatusPresentation
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
@@ -79,7 +78,6 @@ import at.bernhardberger.tvhplayer.core.liveRetryRequestFailure
 import at.bernhardberger.tvhplayer.core.livePlayerAlert
 import at.bernhardberger.tvhplayer.core.playbackStatusPresentation
 import at.bernhardberger.tvhplayer.core.playbackChannelKeyAction
-import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerChromeLayer
@@ -410,8 +408,6 @@ fun VideoPlayerScreen(
     var channelNumberCommitted by remember { mutableStateOf(false) }
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
-    var restoreOptionsFocus by remember { mutableStateOf(false) }
-    var restoreInfoFocus by remember { mutableStateOf(false) }
     var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
     val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
     // The control last focused in the controls, which closing Info returns to.
@@ -571,7 +567,7 @@ fun VideoPlayerScreen(
         val notice = livePauseNotice ?: return@LaunchedEffect
         // A pause pressed while timeshift was starting was dropped: no grant for this channel.
         showPauseUnavailable(pauseUnavailableChannelText)
-        layerState.chrome.peekBanner()
+        layerState.core.chrome.peekBanner()
         playbackRuntime.consumeLivePauseNotice(notice)
     }
 
@@ -588,7 +584,7 @@ fun VideoPlayerScreen(
     }
 
     // Only Stats for nerds needs full diagnostics.
-    val diagnosticsWanted = layerState.statsVisible
+    val diagnosticsWanted = layerState.core.statsVisible
     DisposableEffect(diagnosticsWanted) {
         videoPlayerViewModel.setDiagnosticsEnabled(diagnosticsWanted)
         onDispose {
@@ -624,7 +620,7 @@ fun VideoPlayerScreen(
                     // restart registers it again.
                     liveIntent?.let(playbackRuntime::abandonLiveSelection)
                     // A Banner never outlives the stop, nor does its timer.
-                    layerState.chrome.hideBanner()
+                    layerState.core.chrome.hideBanner()
                 }
                 else -> Unit
             }
@@ -797,8 +793,8 @@ fun VideoPlayerScreen(
 
     fun openInfo(fromKey: Boolean = false) {
         infoRailChannelId = null
-        infoReturnAction = if (fromKey && !layerState.chrome.controlsVisible) null else "player-info"
-        restoreInfoFocus = false
+        infoReturnAction = if (fromKey && !layerState.core.chrome.controlsVisible) null else "player-info"
+        layerState.core.restoreInfoFocus = false
         layerState.openInfo(fromKey)
     }
 
@@ -818,17 +814,15 @@ fun VideoPlayerScreen(
         val returnToRail = infoRailChannelId != null
         layerState.closeInfo(returnToRail = returnToRail)
         infoRailChannelId = null
-        infoReturnAction = if (returnToRail || !layerState.chrome.controlsVisible) null else "player-info"
-        restoreInfoFocus = !returnToRail && layerState.chrome.controlsVisible
+        infoReturnAction = if (returnToRail || !layerState.core.chrome.controlsVisible) null else "player-info"
     }
 
     /**
      * An options key opened the options: commit a pending seek and drop a number entry.
      */
-    fun optionsOpenedFromKey(infoWasOpen: Boolean) {
+    fun optionsOpenedFromKey() {
         if (timelineState.seekPending) timelineState.commitPendingSeek()
         channelNumberInput = ""
-        restoreOptionsFocus = false
     }
 
     // Confirmed watch history, newest first, restricted to the current channel scope.
@@ -1127,7 +1121,7 @@ fun VideoPlayerScreen(
             numberEntryVisible = channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
             terminalErrorVisible = false,
-            seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
+            seekPreviewPhase = timelineState.seekPreviewPhase(layerState.core.chrome.controlsVisible),
         )
     val foregroundContext = currentPlayerForegroundContext()
     val confirmationVisible = foregroundContext.confirmationVisible
@@ -1139,21 +1133,21 @@ fun VideoPlayerScreen(
     // The digits shown in the top identity's place; empty while another layer covers the entry.
     val numberEntry = channelNumberInput.takeIf { foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY }.orEmpty()
     val numberEntryUp = foregroundLayer == PlayerForegroundLayer.NUMBER_ENTRY
-    LaunchedEffect(numberEntryUp, layerState.chrome.controlsVisible) {
-        if (!layerState.chrome.controlsVisible) numberEntryReturnAction = null
+    LaunchedEffect(numberEntryUp, layerState.core.chrome.controlsVisible) {
+        if (!layerState.core.chrome.controlsVisible) numberEntryReturnAction = null
         else if (numberEntryUp) numberEntryReturnAction = lastChromeControl
     }
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
-            controlsVisible = layerState.chrome.controlsVisible,
+            controlsVisible = layerState.core.chrome.controlsVisible,
             playbackProgressing = timelineState.playbackProgressing &&
                 !effectiveTimeshiftState.paused,
             playbackStable = connState is ConnectionState.Connected &&
                 playbackState is AppPlaybackState.Playing &&
                 statusPresentation == PlaybackStatusPresentation.NONE,
             seekPending = timelineState.seekPending,
-            modalVisible = layerState.optionsPage != null ||
-                layerState.infoOpen ||
+            modalVisible = layerState.core.optionsPage != null ||
+                layerState.core.infoOpen ||
                 showDrawer ||
                 channelNumberInput.isNotEmpty(),
             recoveryVisible = recoveryVisible,
@@ -1162,7 +1156,7 @@ fun VideoPlayerScreen(
         )
     )
     SideEffect {
-        layerState.chrome.updateAutoHideEligibility(autoHideEligible)
+        layerState.core.chrome.updateAutoHideEligibility(autoHideEligible)
     }
     val chromeState = playerStateCell(paused = livePaused)
     val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
@@ -1221,8 +1215,8 @@ fun VideoPlayerScreen(
     }
     val compactTuning = tuningVisible && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     SideEffect {
-        layerState.chrome.onBannerFramePresented(bannerFramePresented)
-        layerState.chrome.holdBanner(livePaused)
+        layerState.core.chrome.onBannerFramePresented(bannerFramePresented)
+        layerState.core.chrome.holdBanner(livePaused)
     }
     val airingEventId = nowEvent?.id?.value
     var watchedProgramme by remember { mutableStateOf<Pair<ChannelId, Long?>?>(null) }
@@ -1315,38 +1309,24 @@ fun VideoPlayerScreen(
     if (contentAllowed) PlayerRootFocusEffect(foregroundLayer, rootFocus)
 
     val handlePlaybackBack: () -> Unit = handle@{
-        when (
-            playerBackAction(
-                seekPreviewPhase = timelineState.seekPreviewPhase(layerState.chrome.controlsVisible),
-                surface = PlayerSurface.LIVE,
-                foregroundLayer = playerForegroundLayer(currentPlayerForegroundContext()),
-                // The Banner as drawn: a failed tune replaces it with the centre message.
-                bannerVisible = layerState.chrome.bannerVisible && !channelUnavailable,
-            )
-        ) {
+        val action = playerBackAction(
+            surface = PlayerSurface.LIVE,
+            context = currentPlayerForegroundContext(),
+            // The Banner as drawn: a failed tune replaces it with the centre message.
+            bannerVisible = layerState.core.chrome.bannerVisible && !channelUnavailable,
+        )
+        if (!layerState.core.applyBackAction(action)) when (action) {
             PlayerBackAction.DISMISS_CONFIRMATION -> dismissRecordingDialog()
             PlayerBackAction.CLOSE_INFO ->
                 closeInfo()
             PlayerBackAction.CLOSE_SCHEDULE -> layerState.closeSchedule()
-            PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
-                layerState.quickList.restoreStart()
-                layerState.closeQuickList()
-            }
-            PlayerBackAction.RETURN_TO_OPTIONS_ROOT ->
-                layerState.showOptionsPage(PlaybackOptionsPage.ROOT)
-            PlayerBackAction.CLOSE_OPTIONS -> {
-                layerState.closeOptions()
-                restoreOptionsFocus = true
-            }
             PlayerBackAction.CLEAR_NUMBER_ENTRY -> channelNumberInput = ""
             PlayerBackAction.CLOSE_CHANNEL_DRAWER -> layerState.dismissChannelDrawer()
             PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
-            PlayerBackAction.HIDE_BANNER -> layerState.chrome.hideBanner()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
-            PlayerBackAction.HIDE_CONTROLS -> layerState.chrome.hideControls()
-            PlayerBackAction.HIDE_STATS -> layerState.updateStatsVisibility(false)
+            else -> Unit
         }
     }
     if (contentAllowed) PlayerBackHandler(handlePlaybackBack)
@@ -1383,11 +1363,8 @@ fun VideoPlayerScreen(
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
                 val keyCode = event.nativeKeyEvent.keyCode
                 layerState.handleScheduleKey(event, foregroundLayer, ::prepareSchedule)?.let { return@onPreviewKeyEvent it }
-                if (layerState.infoOpen) {
-                    if (playbackSuppressesRevealingKey(layerState.revealingKeyCode, keyCode)) {
-                        if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_UP) layerState.endOpeningKeyCycle(keyCode)
-                        return@onPreviewKeyEvent true
-                    }
+                if (layerState.core.infoOpen) {
+                    if (layerState.core.consumesRevealingKey(event)) return@onPreviewKeyEvent true
                     // Details owns navigation; no playback or options key
                     // (including Left-as-Back in the other panels) reaches the player underneath.
                     return@onPreviewKeyEvent when (event.key) {
@@ -1399,7 +1376,7 @@ fun VideoPlayerScreen(
                 if (handlePlayerStopKeyWithoutTarget(
                         event = event,
                         hasActiveTarget = playbackRuntime.activeTarget.value != null,
-                        beginKeyCycle = layerState::beginOpeningKeyCycle,
+                        beginKeyCycle = layerState.core::beginOpeningKeyCycle,
                         stopAndClose = stopAndClose,
                     )
                 ) {
@@ -1407,17 +1384,18 @@ fun VideoPlayerScreen(
                 }
                 val keyContext = PlayerKeyContext(
                     surface = PlayerSurface.LIVE,
-                    controlsVisible = layerState.chrome.controlsVisible,
+                    controlsVisible = layerState.core.chrome.controlsVisible,
                     seekbarFocused = false,
                     timeshiftAvailable = effectiveTimeshiftState.available,
-                    optionsOpen = layerState.optionsPage != null,
-                    statsOpen = layerState.statsVisible,
-                    infoOpen = layerState.infoOpen,
+                    optionsOpen = layerState.core.optionsPage != null,
+                    statsOpen = layerState.core.statsVisible,
+                    infoOpen = layerState.core.infoOpen,
                     drawerOpen = showDrawer,
                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                     livePause = livePauseAvailability,
                 )
-                layerState.handleOverlayKey(
+                if (event.nativeKeyEvent.action == AndroidKeyEvent.ACTION_DOWN) layerState.core.onKeyDown()
+                layerState.core.handleOverlayKey(
                     event = event,
                     keyContext = keyContext,
                     foregroundLayer = foregroundLayer,
@@ -1437,13 +1415,13 @@ fun VideoPlayerScreen(
                 if (mediaAction != MediaPlaybackAction.NONE) {
                     when (liveMediaKeyAction(effectiveTimeshiftState.available, livePauseAvailability)) {
                         LiveMediaKeyAction.DISPATCH -> {
-                            layerState.beginOpeningKeyCycle(keyCode)
+                            layerState.core.beginOpeningKeyCycle(keyCode)
                             dispatchPlaybackAction(mediaAction)
                             layerState.showControls()
                             return@onPreviewKeyEvent true
                         }
                         LiveMediaKeyAction.REVEAL_WITH_REASON -> {
-                            layerState.beginOpeningKeyCycle(keyCode)
+                            layerState.core.beginOpeningKeyCycle(keyCode)
                             showPauseUnavailable()
                             layerState.showControls()
                             return@onPreviewKeyEvent true
@@ -1481,7 +1459,7 @@ fun VideoPlayerScreen(
                         Key.Enter,
                         Key.NumPadEnter,
                         Key.DirectionCenter -> {
-                            layerState.beginOpeningKeyCycle(keyCode)
+                            layerState.core.beginOpeningKeyCycle(keyCode)
                             // Not playable yet: the entry stays pending for the digit timer.
                             channelNumberEntryReadiness == ChannelNumberEntryReadiness.NOT_READY ||
                                 tuneEnteredChannel()
@@ -1496,12 +1474,12 @@ fun VideoPlayerScreen(
 
                 val keyAction = playerKeyAction(keyContext, keyCode = keyCode)
                 if (playerKeyActionStartsOpeningCycle(keyAction)) {
-                    layerState.beginOpeningKeyCycle(keyCode)
+                    layerState.core.beginOpeningKeyCycle(keyCode)
                 }
                 when (keyAction) {
                     PlayerKeyAction.DISMISS_OVERLAY_ONLY -> {
                         when {
-                            layerState.infoOpen -> {
+                            layerState.core.infoOpen -> {
                                 closeInfo()
                                 return@onPreviewKeyEvent true
                             }
@@ -1511,19 +1489,19 @@ fun VideoPlayerScreen(
                     PlayerKeyAction.REVEAL_CONTROLS -> {
                         if (timelineState.seekPending) timelineState.commitPendingSeek()
                         // Either direction peeks controls without activating the newly focused action.
-                        restoreInfoFocus = false
+                        layerState.core.restoreInfoFocus = false
                         layerState.showControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.REVEAL_AND_TOGGLE_PAUSE -> {
                         dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
                         // Pausing shows the Banner, not the controls, so Left/Right keep stepping.
-                        layerState.chrome.peekBanner()
+                        layerState.core.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.PEEK_BANNER -> {
                         if (livePauseUnavailable(livePauseAvailability)) showPauseUnavailable()
-                        layerState.chrome.peekBanner()
+                        layerState.core.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.OPEN_CHANNELS -> {
@@ -1539,16 +1517,16 @@ fun VideoPlayerScreen(
                     PlayerKeyAction.SEEK_BACK -> {
                         queueTimeshiftSeek(-seekStepMs(event.nativeKeyEvent.repeatCount))
                         // A quick step on the hidden player shows its preview in the Banner.
-                        layerState.chrome.peekBanner()
+                        layerState.core.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.SEEK_FORWARD -> {
                         queueTimeshiftSeek(seekStepMs(event.nativeKeyEvent.repeatCount))
-                        layerState.chrome.peekBanner()
+                        layerState.core.chrome.peekBanner()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.HIDE_CONTROLS -> {
-                        layerState.chrome.hideControls()
+                        layerState.core.chrome.hideControls()
                         return@onPreviewKeyEvent true
                     }
                     PlayerKeyAction.CLOSE_PLAYER -> {
@@ -1571,7 +1549,7 @@ fun VideoPlayerScreen(
         // Trial: Down from the action row opens the channel rows below on the playing channel, so
         // closing returns to the action it came from.
         val openRailFromActions: () -> Unit = {
-            layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
+            layerState.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
             if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) openChannelDrawer()
         }
         PlayerPage(
@@ -1588,7 +1566,7 @@ fun VideoPlayerScreen(
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
         val controlsShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls
-        val chromePanelOpen = layerState.optionsPage != null || layerState.infoOpen || layerState.scheduleOpen
+        val chromePanelOpen = layerState.core.optionsPage != null || layerState.core.infoOpen || layerState.scheduleOpen
         // Composed beside the controls rather than in their layer: the closed rail's cards are not
         // built again inside every reveal's first frame.
         val quickZap = rememberQuickZapRail(
@@ -1599,7 +1577,7 @@ fun VideoPlayerScreen(
                 controls = controlsShown,
                 // A pending or dispatched step holds the Banner up after its own timer ran out.
                 banner = !channelUnavailable && (bannerSeekPreview != null ||
-                    (layerState.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
+                    (layerState.core.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
                 stepPreview = bannerSeekPreview != null,
             ),
             content = chromeContent,
@@ -1630,20 +1608,20 @@ fun VideoPlayerScreen(
             ),
             actions = PlayerChromeActions(
                 // Under number entry the controls stay up, but the root takes the keys.
-                active = layerState.chrome.controlsVisible && layerState.optionsPage == null && !layerState.infoOpen &&
+                active = layerState.core.chrome.controlsVisible && layerState.core.optionsPage == null && !layerState.core.infoOpen &&
                     !numberEntryUp,
                 paused = !livePlayWhenReady(livePauseState, playWhenReady),
                 livePause = livePauseAvailability,
                 restoreFocus = when {
-                    infoReturnAction != null && !layerState.infoOpen -> infoReturnAction
-                    restoreInfoFocus -> "player-info"
-                    restoreOptionsFocus -> "player-settings"
+                    infoReturnAction != null && !layerState.core.infoOpen -> infoReturnAction
+                    layerState.core.restoreInfoFocus -> "player-info"
+                    layerState.core.restoreOptionsFocus -> "player-settings"
                     numberEntryReturnAction != null -> numberEntryReturnAction
-                    else -> layerState.restoreChannelAction
+                    else -> layerState.core.restoreControl
                 },
                 tracks = trackButtons,
             ),
-            entry = layerState.chrome.controlsEntry,
+            entry = layerState.core.chrome.controlsEntry,
             panelOpen = chromePanelOpen,
             numberEntryShown = numberEntry.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -1664,24 +1642,19 @@ fun VideoPlayerScreen(
                 layerState.openSchedule()
             },
             scheduleAvailable = rememberScheduleAvailable(observation, currentChannelId, nowSec),
-            onOptions = {
-                restoreOptionsFocus = false
-                layerState.openOptions()
-            },
-            onTrackList = layerState::showQuickList,
-            onInteraction = layerState.chrome::onUserInteraction,
+            onOptions = layerState.core::openOptions,
+            onTrackList = layerState.core::showQuickList,
+            onInteraction = layerState.core.chrome::onUserInteraction,
             onActionFocused = { lastChromeAction = it; layerState.onActionFocused(it) },
             onControlFocused = { lastChromeControl = it },
             onFocusRestored = {
                 infoReturnAction = null
                 numberEntryReturnAction = null
-                restoreInfoFocus = false
-                restoreOptionsFocus = false
-                layerState.onChannelActionRestored()
+                layerState.core.onFocusRestored()
             },
             onDownFromActions = openRailFromActions,
             downHint = stringResource(R.string.nav_channels),
-            onChannelCardFocusChanged = layerState.chrome::onChannelCardFocusChanged,
+            onChannelCardFocusChanged = layerState.core.chrome::onChannelCardFocusChanged,
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { actionsAlpha, controls ->
                 // Below the controls, the rail's cards hint at what Down opens.
@@ -1705,14 +1678,14 @@ fun VideoPlayerScreen(
                     onFocusChannel = { selectedId = it },
                     onPickChannel = { tuneChannel(it) },
                     onClose = { keyCode ->
-                        if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
+                        if (keyCode != null) layerState.core.beginOpeningKeyCycle(keyCode)
                         layerState.dismissChannelDrawer()
                     },
                     onOpenDetails = { channel, _, keyCode ->
-                        keyCode?.let(layerState::beginOpeningKeyCycle)
+                        keyCode?.let(layerState.core::beginOpeningKeyCycle)
                         infoRailChannelId = channel.id
                         infoReturnAction = null
-                        restoreInfoFocus = false
+                        layerState.core.restoreInfoFocus = false
                         layerState.openInfo()
                     },
                     active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
@@ -1738,7 +1711,7 @@ fun VideoPlayerScreen(
         // With the chrome hidden and no Banner, only the paused chip remains.
         PlayerHiddenStatusChip(
             state = hiddenChipState(
-                chromeState, hidden = foregroundLayer == PlayerForegroundLayer.NONE && !layerState.chrome.bannerVisible,
+                chromeState, hidden = foregroundLayer == PlayerForegroundLayer.NONE && !layerState.core.chrome.bannerVisible,
                 available = !channelUnavailable,
             ),
             end = liveBarEnd(liveBehindMs(effectiveTimeshiftState, compactTuning, liveStart), end = null),
@@ -1754,7 +1727,7 @@ fun VideoPlayerScreen(
             onPlayRecording = onPlayRecording, onShowGuide = onShowGuide,
             connectionUiState = connectionUiState, session = session,
         )
-        if (layerState.infoOpen && foregroundLayer == PlayerForegroundLayer.INFO) {
+        if (layerState.core.infoOpen && foregroundLayer == PlayerForegroundLayer.INFO) {
             LivePlayerProgrammeDetails(
                 event = detailsBaseEvent, channel = detailsChannel, observation = observation,
                 currentObservation = { session.observation.value }, nowSec = nowSec,
@@ -1762,7 +1735,7 @@ fun VideoPlayerScreen(
                 settingsStore = uiSettingsStore,
                 onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
-                onBackKeyDown = { layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
+                onBackKeyDown = { layerState.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
                 onPlayRecording = onPlayRecording,
             )
         }
@@ -1782,7 +1755,7 @@ fun VideoPlayerScreen(
         }
 
         PlayerPanelVisibility(
-            value = layerState.optionsPage?.let { it to layerState.optionsQuickList },
+            value = layerState.core.optionsPage?.let { it to layerState.core.optionsQuickList },
             // A quick list applies its focused row when it leaves; that must not wait.
             closesAtOnce = { (_, quick) -> quick },
         ) { (page, _) ->
@@ -1796,10 +1769,10 @@ fun VideoPlayerScreen(
                     playbackState is AppPlaybackState.Starting ||
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
-                statsVisible = layerState.statsVisible,
-                onPageChange = layerState::showOptionsPage,
-                quickList = layerState.quickList.takeIf { layerState.optionsQuickList },
-                onQuickListClose = layerState::closeQuickList,
+                statsVisible = layerState.core.statsVisible,
+                onPageChange = layerState.core::showOptionsPage,
+                quickList = layerState.core.quickList.takeIf { layerState.core.optionsQuickList },
+                onQuickListClose = layerState.core::closeQuickList,
                 quickListTargetEpoch = videoPresentation.epoch,
                 quickListAvailable = !channelFailed && playingLiveChannelId == currentChannelId,
                 isQuickListTargetCurrent = { epoch ->
@@ -1808,7 +1781,7 @@ fun VideoPlayerScreen(
                 },
                 onQuickAudioSelection = { epoch, override -> playbackRuntime.selectQuickListAudio(epoch, override) },
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = layerState::updateStatsVisibility,
+                onStatsVisibleChange = layerState.core::updateStatsVisibility,
             )
         }
 

@@ -52,7 +52,6 @@ import at.bernhardberger.tvheadend.sdk.media3.RecordingPlaybackStart
 import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.MediaPlaybackAction
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlaybackRetryCommand
 import at.bernhardberger.tvhplayer.core.PlayerBackAction
 import at.bernhardberger.tvhplayer.core.PlayerAutoHideContext
@@ -63,19 +62,14 @@ import at.bernhardberger.tvhplayer.core.PlayerKeyAction
 import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.playerKeyAction
 import at.bernhardberger.tvhplayer.core.playerKeyActionStartsOpeningCycle
-import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
 import at.bernhardberger.tvhplayer.core.seekStepMs
 import at.bernhardberger.tvhplayer.core.mediaPlaybackAction
 import at.bernhardberger.tvhplayer.core.playerBackAction
 import at.bernhardberger.tvhplayer.core.playerControlsAutoHideEligible
 import at.bernhardberger.tvhplayer.core.playerForegroundLayer
-import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
 import at.bernhardberger.tvhplayer.core.recordingRetryCommand
 import at.bernhardberger.tvhplayer.core.recordingPlayerAlert
 import at.bernhardberger.tvhplayer.core.deviceFaultDetail
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsKeyOutcome
-import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
-import at.bernhardberger.tvhplayer.core.playbackOptionsKeyRequest
 import at.bernhardberger.tvhplayer.playback.AppPlaybackFailureReason
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
@@ -200,27 +194,10 @@ fun RecordingPlayerScreen(
     val isPlaying = timelineState.isPlaying
     val rootFocus = remember { FocusRequester() }
     val infoFocus = remember { FocusRequester() }
-    var optionsPage by remember { mutableStateOf<PlaybackOptionsPage?>(null) }
-    var optionsQuickList by remember { mutableStateOf(false) }
-    val quickList = remember { PlaybackQuickListSignals() }
-    var restoreOptionsFocus by remember { mutableStateOf(false) }
-    var lastFocusedControl by remember { mutableStateOf("player-pause") }
-    var quickListReturnControl by remember { mutableStateOf<String?>(null) }
-    var restoreQuickListControl by remember { mutableStateOf<String?>(null) }
-    var restoreInfoActionFocus by remember { mutableStateOf(false) }
-    var statsVisible by remember { mutableStateOf(false) }
-    var infoOpen by remember { mutableStateOf(false) }
+    // The recording player has no layers of its own; a quick list before any focus returns to pause.
+    val layers = rememberPlayerLayerState(RECORDING_CONTROLS_AUTO_HIDE_MS, initialFocusedControl = "player-pause")
+    val chrome = layers.chrome
     val aspectRatio = targetAspect.mode
-    var revealingKeyCode by remember { mutableStateOf<Int?>(null) }
-    // The Banner and the controls; the info panel and the options cover them.
-    val chrome = remember(scope) {
-        PlayerChromeState(
-            scope = scope,
-            autoHideTimeoutMillis = RECORDING_CONTROLS_AUTO_HIDE_MS,
-            isCovered = { infoOpen || optionsPage != null },
-        )
-    }
-    DisposableEffect(chrome) { onDispose(chrome::dispose) }
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, chrome) {
         val observer = LifecycleEventObserver { _, event ->
@@ -231,6 +208,7 @@ fun RecordingPlayerScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
+    val statsVisible = layers.statsVisible
     DisposableEffect(statsVisible) {
         session.setDiagnosticsEnabled(statsVisible)
         onDispose {
@@ -264,42 +242,6 @@ fun RecordingPlayerScreen(
         timelineState.queueSeek(deltaMs)
     }
 
-    // The short list leaves the controls as they are underneath.
-    fun openQuickList(page: PlaybackOptionsPage) {
-        if (!optionsQuickList) quickListReturnControl = lastFocusedControl.takeIf { chrome.controlsVisible }
-        optionsQuickList = true
-        optionsPage = page
-        chrome.yieldToLayer()
-    }
-
-    fun openOptionsFromKey(keyCode: Int): Boolean {
-        val outcome = playbackOptionsKeyOutcome(
-            keyCode = keyCode,
-            quickListPage = optionsPage.takeIf { optionsQuickList },
-        ) ?: return false
-        if (timelineState.seekPending) timelineState.commitPendingSeek()
-        infoOpen = false
-        restoreOptionsFocus = false
-        when (outcome) {
-            PlaybackOptionsKeyOutcome.OpenMenu -> {
-                optionsQuickList = false
-                optionsPage = PlaybackOptionsPage.ROOT
-                chrome.yieldToLayer(controls = true)
-            }
-            PlaybackOptionsKeyOutcome.MoveDown -> quickList.moveDown()
-            is PlaybackOptionsKeyOutcome.OpenQuickList -> openQuickList(outcome.page)
-        }
-        return true
-    }
-
-    fun closeQuickList() {
-        restoreQuickListControl = quickListReturnControl.takeIf { chrome.controlsVisible }
-        quickListReturnControl = null
-        optionsPage = null
-        optionsQuickList = false
-        chrome.onUserInteraction()
-    }
-
     fun applyKeyAction(
         action: PlayerKeyAction,
         keyCode: Int,
@@ -311,7 +253,7 @@ fun RecordingPlayerScreen(
             if (timelineState.seekPending) {
                 timelineState.commitPendingSeek()
             }
-            restoreInfoActionFocus = false
+            layers.restoreInfoFocus = false
             chrome.showControls()
             true
         }
@@ -335,11 +277,11 @@ fun RecordingPlayerScreen(
             true
         }
         PlayerKeyAction.OPEN_INFO -> {
-            chrome.yieldToLayer(controls = false)
-            infoOpen = true
+            layers.openInfo()
             true
         }
-        PlayerKeyAction.OPEN_OPTIONS -> openOptionsFromKey(keyCode)
+        // The options keys reach the layers before any other key action.
+        PlayerKeyAction.OPEN_OPTIONS -> false
         PlayerKeyAction.SEEK_BACK -> {
             seekBy(-seekStepMs(repeatCount))
             // A quick step on the hidden player shows its preview in the Banner.
@@ -353,15 +295,14 @@ fun RecordingPlayerScreen(
         }
     }
 
-    fun recordingKeyAction(keyCode: Int): PlayerKeyAction = playerKeyAction(
-        PlayerKeyContext(
-            surface = PlayerSurface.RECORDING,
-            controlsVisible = chrome.controlsVisible,
-            seekbarFocused = false,
-            timeshiftAvailable = false,
-        ),
-        keyCode,
+    fun recordingKeyContext() = PlayerKeyContext(
+        surface = PlayerSurface.RECORDING,
+        controlsVisible = chrome.controlsVisible,
+        seekbarFocused = false,
+        timeshiftAvailable = false,
     )
+
+    fun recordingKeyAction(keyCode: Int): PlayerKeyAction = playerKeyAction(recordingKeyContext(), keyCode)
 
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
@@ -370,7 +311,7 @@ fun RecordingPlayerScreen(
             playbackStable = playbackAvailable &&
                 playbackState is AppPlaybackState.Playing,
             seekPending = timelineState.seekPending,
-            modalVisible = optionsPage != null || infoOpen || markerNavigation.open,
+            modalVisible = layers.optionsPage != null || layers.infoOpen || markerNavigation.open,
             recoveryVisible = playbackState is AppPlaybackState.Recovering,
             actionableErrorVisible = initialConnectionFailure ||
                 (recordingResolved &&
@@ -385,9 +326,9 @@ fun RecordingPlayerScreen(
     fun currentPlayerForegroundContext() =
         PlayerForegroundContext(
             confirmationVisible = false,
-            infoVisible = infoOpen && entry != null && playbackAvailable,
-            optionsPage = optionsPage,
-            optionsQuickList = optionsQuickList && optionsPage != null,
+            infoVisible = layers.infoOpen && entry != null && playbackAvailable,
+            optionsPage = layers.optionsPage,
+            optionsQuickList = layers.optionsQuickList && layers.optionsPage != null,
             numberEntryVisible = false,
             channelDrawerVisible = false,
             recoveryVisible = playbackState is AppPlaybackState.Recovering,
@@ -460,51 +401,31 @@ fun RecordingPlayerScreen(
         }
     }
 
+    // Info always closes into the controls, focused on its button.
     fun closeInfo() {
-        infoOpen = false
-        restoreInfoActionFocus = true
-        chrome.showControls()
+        layers.closeInfo(controls = true)
     }
 
-    // Back hides a Banner only when one is drawn: not while the recording still loads.
-    fun currentBackAction(): PlayerBackAction {
-        val layer = playerForegroundLayer(currentPlayerForegroundContext())
-        return playerBackAction(
-            seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
-            surface = PlayerSurface.RECORDING,
-            foregroundLayer = layer,
-            bannerVisible = playbackAvailable && chromeMode(layer).isBanner,
-        )
-    }
-
-    val handlePlaybackBack: () -> Unit = {
+    val handlePlaybackBack: () -> Unit = handle@{
         if (markerNavigation.open) {
             markerNavigation.dismiss()
             chrome.onUserInteraction()
-        } else when (currentBackAction()) {
-            PlayerBackAction.DISMISS_CONFIRMATION -> Unit
+            return@handle
+        }
+        val action = playerBackAction(
+            surface = PlayerSurface.RECORDING,
+            context = currentPlayerForegroundContext(),
+            // Back hides a Banner only when one is drawn: not while the recording still loads.
+            bannerVisible = playbackAvailable && chrome.bannerVisible,
+        )
+        // The recording player has no confirmation, schedule, number entry or channel drawer.
+        if (!layers.applyBackAction(action)) when (action) {
             PlayerBackAction.CLOSE_INFO -> closeInfo()
-            PlayerBackAction.CLOSE_SCHEDULE -> Unit // Only the live player has a schedule.
-            PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
-                quickList.restoreStart()
-                closeQuickList()
-            }
-            PlayerBackAction.RETURN_TO_OPTIONS_ROOT -> optionsPage = PlaybackOptionsPage.ROOT
-            PlayerBackAction.CLOSE_OPTIONS -> {
-                optionsPage = null
-                optionsQuickList = false
-                restoreOptionsFocus = true
-                chrome.onUserInteraction()
-            }
-            PlayerBackAction.CLEAR_NUMBER_ENTRY,
-            PlayerBackAction.CLOSE_CHANNEL_DRAWER -> Unit
             PlayerBackAction.CLOSE_PLAYER -> playerClose.close()
-            PlayerBackAction.HIDE_BANNER -> chrome.hideBanner()
             PlayerBackAction.CANCEL_PENDING_SEEK -> timelineState.cancelPendingSeek()
             PlayerBackAction.DISMISS_SEEK_FEEDBACK ->
                 timelineState.dismissDispatchedFeedback()
-            PlayerBackAction.HIDE_CONTROLS -> chrome.hideControls()
-            PlayerBackAction.HIDE_STATS -> statsVisible = false
+            else -> Unit
         }
     }
 
@@ -517,18 +438,13 @@ fun RecordingPlayerScreen(
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 val keyCode = event.nativeKeyEvent.keyCode
-                if (event.type == KeyEventType.KeyDown && optionsQuickList && optionsPage != null) {
-                    quickList.onKeyDown()
-                }
+                if (event.type == KeyEventType.KeyDown) layers.onKeyDown()
                 if (markerNavigation.handle(event, markers, ::seekMarker)) {
                     chrome.onUserInteraction()
                     return@onPreviewKeyEvent true
                 }
-                if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
-                    if (event.type == KeyEventType.KeyUp) revealingKeyCode = null
-                    return@onPreviewKeyEvent true
-                }
-                if (infoOpen) {
+                if (layers.consumesRevealingKey(event)) return@onPreviewKeyEvent true
+                if (layers.infoOpen) {
                     return@onPreviewKeyEvent when (event.key) {
                         Key.DirectionUp, Key.DirectionDown, Key.DirectionLeft, Key.DirectionRight,
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Back -> false
@@ -538,47 +454,23 @@ fun RecordingPlayerScreen(
                 if (handlePlayerStopKeyWithoutTarget(
                         event = event,
                         hasActiveTarget = session.activeTarget.value != null,
-                        beginKeyCycle = { revealingKeyCode = it },
+                        beginKeyCycle = layers::beginOpeningKeyCycle,
                         stopAndClose = ::stopAndClose,
                     )
                 ) {
                     return@onPreviewKeyEvent true
                 }
-                if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
-                if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
-                    // See VideoPlayerScreen: a focused Compose target swallows the Back cycle on
-                    // the TV before the BackHandler can fire, so Back is decided here.
-                    if (event.nativeKeyEvent.repeatCount == 0) {
-                        revealingKeyCode = keyCode
-                        handlePlaybackBack()
-                    }
-                    return@onPreviewKeyEvent true
-                }
-                if (
-                    foregroundLayer == PlayerForegroundLayer.RECOVERY ||
-                    foregroundLayer == PlayerForegroundLayer.TERMINAL_ERROR
-                ) {
-                    return@onPreviewKeyEvent playerParentConsumesRecoveryKey(keyCode)
-                }
-
-                if (playbackOptionsKeyRequest(keyCode) != null) {
-                    // Menu, audio-track and captions keys reach the options from Info or
-                    // another options page as well as from plain playback.
-                    val optionsKeyAction = recordingKeyAction(keyCode)
-                    if (playerKeyActionStartsOpeningCycle(optionsKeyAction)) {
-                        revealingKeyCode = keyCode
-                    }
-                    return@onPreviewKeyEvent applyKeyAction(optionsKeyAction, keyCode)
-                }
-
-                if (infoOpen || optionsPage != null) {
-                    if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && foregroundLayer != PlayerForegroundLayer.CONFIRMATION) {
-                        revealingKeyCode = keyCode
-                        handlePlaybackBack()
-                        return@onPreviewKeyEvent true
-                    }
-                    return@onPreviewKeyEvent false
-                }
+                // A focused Compose target swallows the Back cycle on the TV before the
+                // BackHandler can fire, so Back is decided here. Menu, audio-track and captions
+                // keys reach the options from any layer; a recording's quick list is always there.
+                layers.handleOverlayKey(
+                    event = event,
+                    keyContext = recordingKeyContext(),
+                    foregroundLayer = foregroundLayer,
+                    quickListAvailable = true,
+                    onBack = handlePlaybackBack,
+                    onOptionsOpened = { if (timelineState.seekPending) timelineState.commitPendingSeek() },
+                )?.let { return@onPreviewKeyEvent it }
 
                 val mediaAction = mediaPlaybackAction(
                     keyCode = keyCode,
@@ -588,7 +480,7 @@ fun RecordingPlayerScreen(
                     repeatCount = event.nativeKeyEvent.repeatCount,
                 )
                 if (mediaAction != MediaPlaybackAction.NONE) {
-                    revealingKeyCode = keyCode
+                    layers.beginOpeningKeyCycle(keyCode)
                     when (mediaAction) {
                         MediaPlaybackAction.PLAY -> session.play()
                         MediaPlaybackAction.PAUSE -> pausePlayback()
@@ -614,7 +506,7 @@ fun RecordingPlayerScreen(
 
                 val keyAction = recordingKeyAction(keyCode)
                 if (playerKeyActionStartsOpeningCycle(keyAction)) {
-                    revealingKeyCode = keyCode
+                    layers.beginOpeningKeyCycle(keyCode)
                 }
                 applyKeyAction(
                     action = keyAction,
@@ -660,44 +552,33 @@ fun RecordingPlayerScreen(
                     motionKey = recordingId,
                 ),
                 actions = PlayerChromeActions(
-                    active = chrome.controlsVisible && optionsPage == null,
+                    active = chrome.controlsVisible && layers.optionsPage == null,
                     paused = !playWhenReady,
                     restoreFocus = when {
-                        restoreQuickListControl != null -> restoreQuickListControl
-                        restoreInfoActionFocus -> "player-info"
-                        restoreOptionsFocus -> "player-settings"
+                        layers.restoreControl != null -> layers.restoreControl
+                        layers.restoreInfoFocus -> "player-info"
+                        layers.restoreOptionsFocus -> "player-settings"
                         else -> null
                     },
                     tracks = trackButtons,
                 ),
                 entry = chrome.controlsEntry,
-                panelOpen = optionsPage != null || infoOpen,
+                panelOpen = layers.optionsPage != null || layers.infoOpen,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 onTogglePause = ::togglePlayPause,
                 onSeek = ::seekBy,
                 onStop = ::stopAndClose,
-                onInfo = {
-                    chrome.yieldToLayer(controls = false)
-                    infoOpen = true
-                },
-                onOptions = {
-                    restoreOptionsFocus = false
-                    optionsQuickList = false
-                    optionsPage = PlaybackOptionsPage.ROOT
-                    chrome.yieldToLayer(controls = true)
-                },
+                onInfo = layers::openInfo,
+                onOptions = layers::openOptions,
                 onTrackList = { page ->
-                    restoreOptionsFocus = false
-                    openQuickList(page)
+                    // Unlike the live player, a track button forgets a pending return to the gear.
+                    layers.restoreOptionsFocus = false
+                    layers.showQuickList(page)
                 },
                 onInteraction = chrome::onUserInteraction,
                 onCommitSeek = timelineState::commitPendingSeek,
-                onActionFocused = { lastFocusedControl = it },
-                onFocusRestored = {
-                    restoreQuickListControl = null
-                    restoreInfoActionFocus = false
-                    restoreOptionsFocus = false
-                },
+                onActionFocused = layers::onActionFocused,
+                onFocusRestored = layers::onFocusRestored,
                 markerNavigation = markerNavigation,
                 onSeekMarker = ::seekMarker,
             ) }
@@ -710,7 +591,7 @@ fun RecordingPlayerScreen(
                         closeInfo()
                         scope.launch { session.playRecording(selection, start) }
                     }, onClose = ::closeInfo,
-                    onBackKeyDown = { revealingKeyCode = AndroidKeyEvent.KEYCODE_BACK })
+                    onBackKeyDown = { layers.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) })
             }
 
             PlaybackStatsVisibility(
@@ -759,7 +640,7 @@ fun RecordingPlayerScreen(
             deviceFaultDetail = playbackState.deviceFaultDetail(),
         )
         PlayerPanelVisibility(
-            value = optionsPage?.let { it to optionsQuickList },
+            value = layers.optionsPage?.let { it to layers.optionsQuickList },
             closesAtOnce = { (_, quick) -> quick },
         ) { (page, _) ->
             val audioAutomatic by session.audioAutomatic.collectAsStateWithLifecycle()
@@ -773,19 +654,16 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Recovering,
                 aspectRatio = aspectRatio,
                 statsVisible = statsVisible,
-                onPageChange = {
-                    optionsQuickList = false
-                    optionsPage = it
-                },
-                quickList = quickList.takeIf { optionsQuickList },
-                onQuickListClose = ::closeQuickList,
+                onPageChange = layers::showOptionsPage,
+                quickList = layers.quickList.takeIf { layers.optionsQuickList },
+                onQuickListClose = layers::closeQuickList,
                 quickListTargetEpoch = videoPresentation.epoch,
                 quickListAvailable = playbackAvailable && activeTarget == AppPlaybackTarget.Recording(recordingId),
                 isQuickListTargetCurrent = session::isQuickListTargetCurrent,
                 onQuickAudioSelection = { epoch, override -> session.selectQuickListAudio(epoch, override) },
                 recording = true,
                 onAspectRatioChange = targetAspect.select,
-                onStatsVisibleChange = { statsVisible = it },
+                onStatsVisibleChange = layers::updateStatsVisibility,
             )
         }
     }

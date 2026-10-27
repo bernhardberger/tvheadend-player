@@ -323,8 +323,8 @@ class PlayerMotionTest {
                 Box(Modifier.fillMaxSize()) {
                     liveControls(
                         optionsOpen = false, channelId = channel,
-                        mode = if (layers.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
-                        entry = layers.chrome.controlsEntry,
+                        mode = if (layers.core.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
+                        entry = layers.core.chrome.controlsEntry,
                     )
                 }
             }
@@ -334,7 +334,7 @@ class PlayerMotionTest {
         val settled = chromeTops()
         compose.mainClock.autoAdvance = false
         fun hide() {
-            change { layers.chrome.hideControls() }
+            change { layers.core.chrome.hideControls() }
             compose.mainClock.advanceTimeBy(1_000)
             compose.onNodeWithTag("player-footer").assertDoesNotExist()
         }
@@ -379,8 +379,8 @@ class PlayerMotionTest {
                     // One chrome: the Banner and the controls are two of its modes.
                     liveControls(
                         optionsOpen = false, channelId = ChannelId(1), title = "Programme",
-                        mode = playerChromeMode(layers.chrome.controlsVisible, layers.chrome.bannerVisible, stepPreview = false),
-                        entry = layers.chrome.controlsEntry,
+                        mode = playerChromeMode(layers.core.chrome.controlsVisible, layers.core.chrome.bannerVisible, stepPreview = false),
+                        entry = layers.core.chrome.controlsEntry,
                     )
                 }
             }

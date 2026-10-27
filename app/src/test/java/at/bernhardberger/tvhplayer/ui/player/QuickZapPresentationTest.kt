@@ -959,13 +959,13 @@ class QuickZapPresentationTest {
                         .onPreviewKeyEvent { event ->
                             val code = event.nativeKeyEvent.keyCode
                             when {
-                                layers.revealingKeyCode == code -> {
-                                    if (event.type == KeyEventType.KeyUp) layers.endOpeningKeyCycle(code)
+                                layers.core.revealingKeyCode == code -> {
+                                    if (event.type == KeyEventType.KeyUp) layers.core.endOpeningKeyCycle(code)
                                     true
                                 }
                                 event.key == Key.Back && layers.channelDrawerOpen -> {
                                     if (event.type == KeyEventType.KeyDown) {
-                                        layers.beginOpeningKeyCycle(code)
+                                        layers.core.beginOpeningKeyCycle(code)
                                         layers.dismissChannelDrawer()
                                     }
                                     true
@@ -979,14 +979,14 @@ class QuickZapPresentationTest {
                             content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, playing?.value,
                                 playing?.let { lineUp[((it.value - 1) % lineUp.size).toInt()].name }.orEmpty(), null, null, false, 900, "")),
                             timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 900, programme = playing?.let(::event)),
-                            actions = PlayerChromeActions(active = layers.chrome.controlsVisible, restoreFocus = layers.restoreChannelAction),
+                            actions = PlayerChromeActions(active = layers.core.chrome.controlsVisible, restoreFocus = layers.core.restoreControl),
                             onDownFromActions = {
-                                layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
+                                layers.core.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
                                 layers.openChannelDrawer()
                             },
                             onStop = {}, onInteraction = {}, onOptions = {}, onInfo = {},
                             onTogglePause = {}, onSeek = {},
-                            onFocusRestored = layers::onChannelActionRestored,
+                            onFocusRestored = layers.core::onFocusRestored,
                             onActionFocused = layers::onActionFocused,
                             decorationCoversControls = layers.channelDrawerOpen,
                             controlsDecoration = { actionsAlpha, controls -> QuickZapPresentation(
@@ -1010,7 +1010,7 @@ class QuickZapPresentationTest {
                                         }
                                     },
                                     onCloseDrawer = {
-                                        if (it != null) layers.beginOpeningKeyCycle(it)
+                                        if (it != null) layers.core.beginOpeningKeyCycle(it)
                                         layers.dismissChannelDrawer()
                                     },
                                 ) }

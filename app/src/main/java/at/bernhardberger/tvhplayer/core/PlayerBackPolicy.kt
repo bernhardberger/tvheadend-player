@@ -136,3 +136,15 @@ fun playerBackAction(
     }
     PlayerForegroundLayer.STATS -> PlayerBackAction.HIDE_STATS
 }
+
+/** What Back does on the layer in front of [context]; [bannerVisible] is the Banner as drawn. */
+fun playerBackAction(
+    surface: PlayerSurface,
+    context: PlayerForegroundContext,
+    bannerVisible: Boolean,
+): PlayerBackAction = playerBackAction(
+    surface = surface,
+    foregroundLayer = playerForegroundLayer(context),
+    seekPreviewPhase = context.seekPreviewPhase,
+    bannerVisible = bannerVisible,
+)

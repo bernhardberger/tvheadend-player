@@ -64,7 +64,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * The options keys driven through [LivePlayerLayerState.openOptionsForKey] and the real
+ * The options keys driven through [PlayerLayerState.openOptionsForKey] and the real
  * [PlaybackOptionsSheet], with the player root's key counting, key-cycle suppression and
  * Back routing as in VideoPlayerScreen, over a player whose tracks follow its track
  * selection parameters. Time is virtual: the main clock only moves when a test says so.
@@ -95,15 +95,15 @@ class PlaybackOptionsRemoteKeyTest {
         show()
 
         keyDown(Key.MediaAudioTrack)
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
-        assertTrue(layerState.optionsQuickList)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+        assertTrue(layerState.core.optionsQuickList)
         compose.onNodeWithTag(AUTOMATIC_ROW).assertIsFocused()
         compose.onNodeWithTag("playback-options-title").assertTextEquals("Audio")
         compose.onNodeWithTag("playback-options-header-back").assertDoesNotExist()
         compose.onNodeWithTag("playback-options-audio").assertDoesNotExist()
 
         keyUp(Key.MediaAudioTrack)
-        assertNull(layerState.revealingKeyCode)
+        assertNull(layerState.core.revealingKeyCode)
         advance(1_000)
         compose.onNodeWithTag(AUTOMATIC_ROW).assertIsFocused()
         assertEquals(0, player.selectionChanges)
@@ -111,7 +111,7 @@ class PlaybackOptionsRemoteKeyTest {
         // No way up to a root: Up on the first row stays in the list.
         press(Key.DirectionUp)
         compose.onNodeWithTag(AUTOMATIC_ROW).assertIsFocused()
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
     }
 
     @Test
@@ -122,11 +122,11 @@ class PlaybackOptionsRemoteKeyTest {
         compose.onNodeWithTag(AUTOMATIC_SUPPORT, useUnmergedTree = true).assertTextEquals("Playing: $MAIN_SUMMARY")
 
         press(Key.Menu)
-        assertEquals(PlaybackOptionsPage.ROOT, layerState.optionsPage)
-        assertFalse(layerState.optionsQuickList)
+        assertEquals(PlaybackOptionsPage.ROOT, layerState.core.optionsPage)
+        assertFalse(layerState.core.optionsQuickList)
         compose.onNodeWithTag("playback-options-audio").assertIsFocused()
         press(Key.DirectionRight)
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
         compose.onNodeWithTag(AUTOMATIC_SUPPORT, useUnmergedTree = true).assertTextEquals("Playing: $MAIN_SUMMARY")
         compose.onNodeWithTag("playback-options-header-back").assertExists()
     }
@@ -153,7 +153,7 @@ class PlaybackOptionsRemoteKeyTest {
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         assertEquals(listOf("third"), player.audioOverrides())
         assertEquals(2, player.selectionChanges)
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
     }
 
     @Test
@@ -170,8 +170,8 @@ class PlaybackOptionsRemoteKeyTest {
         compose.onNodeWithTag(THIRD_ROW).assertIsFocused()
         press(Key.MediaAudioTrack)
         compose.onNodeWithTag(AUTOMATIC_ROW).assertIsFocused()
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
-        assertTrue(layerState.optionsQuickList)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+        assertTrue(layerState.core.optionsQuickList)
         // Every stop was passed quickly; focus is back on what plays.
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         assertEquals(0, player.selectionChanges)
@@ -186,8 +186,8 @@ class PlaybackOptionsRemoteKeyTest {
         assertEquals(0, player.selectionChanges)
 
         press(Key.DirectionCenter)
-        assertNull(layerState.optionsPage)
-        assertFalse(layerState.optionsQuickList)
+        assertNull(layerState.core.optionsPage)
+        assertFalse(layerState.core.optionsQuickList)
         assertEquals(listOf("second"), player.audioOverrides())
         assertEquals(1, player.selectionChanges)
         advance(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS)
@@ -203,7 +203,7 @@ class PlaybackOptionsRemoteKeyTest {
         assertEquals(listOf("main"), player.audioOverrides())
 
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(1, automaticAudioRequests)
         assertEquals(emptyList<String>(), player.audioOverrides())
         assertTrue(player.audioAutomatic)
@@ -223,7 +223,7 @@ class PlaybackOptionsRemoteKeyTest {
         assertEquals(1, automaticAudioRequests)
 
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(1, automaticAudioRequests)
         assertEquals(start, player.parameters)
         assertEquals(listOf("second"), player.audioOverrides())
@@ -236,7 +236,7 @@ class PlaybackOptionsRemoteKeyTest {
         press(Key.DirectionDown)
         press(Key.Back)
         advance(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(0, player.selectionChanges)
         assertEquals(0, automaticAudioRequests)
     }
@@ -252,13 +252,13 @@ class PlaybackOptionsRemoteKeyTest {
 
         press(Key.Guide)
         assertFalse(layerState.scheduleOpen)
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
-        assertTrue(layerState.optionsQuickList)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+        assertTrue(layerState.core.optionsQuickList)
         compose.onNodeWithTag(SECOND_ROW).assertIsFocused()
         assertEquals(listOf("second"), player.audioOverrides())
 
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(start, player.parameters)
         assertEquals(listOf("main"), player.audioOverrides())
     }
@@ -271,11 +271,11 @@ class PlaybackOptionsRemoteKeyTest {
         press(Key.DirectionDown)
         advance(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS - 1_000)
         // Nine seconds after opening, four after the last key: still open.
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
         assertEquals(listOf("main"), player.audioOverrides())
 
         advance(1_100)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(listOf("main"), player.audioOverrides())
         assertEquals(0, automaticAudioRequests)
     }
@@ -288,7 +288,7 @@ class PlaybackOptionsRemoteKeyTest {
         press(Key.DirectionDown)
         // The row has not rested yet; switching lists closes this one and applies it.
         press(Key.Captions)
-        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
         assertEquals(listOf("main"), player.audioOverrides())
         assertEquals(1, player.selectionChanges)
     }
@@ -298,7 +298,7 @@ class PlaybackOptionsRemoteKeyTest {
         show()
         val start = player.parameters
         keyDown(Key.Captions)
-        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
         compose.onNodeWithTag(OFF_ROW).assertIsFocused()
         compose.onNodeWithTag("playback-options-title").assertTextEquals("Subtitles")
         compose.onNodeWithTag("playback-options-header-back").assertDoesNotExist()
@@ -314,7 +314,7 @@ class PlaybackOptionsRemoteKeyTest {
         assertEquals(listOf("dvb"), player.textOverrides())
 
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         // Off without a disabled text type, exactly as before; not a forced Off.
         assertEquals(start, player.parameters)
     }
@@ -349,7 +349,7 @@ class PlaybackOptionsRemoteKeyTest {
         show(withSubtitles = false)
 
         press(Key.Captions)
-        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
         compose.onNodeWithTag(OFF_ROW).assertIsFocused()
         compose.onNodeWithTag(OFF_SUPPORT, useUnmergedTree = true).assertTextEquals("No subtitles on this channel")
         // The row says why once; the header names only the state.
@@ -368,13 +368,13 @@ class PlaybackOptionsRemoteKeyTest {
         press(Key.DirectionDown)
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         press(Key.Captions)
-        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.SUBTITLES, layerState.core.optionsPage)
         press(Key.DirectionDown)
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
         assertEquals(listOf("dvb"), player.textOverrides())
 
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(emptyList<String>(), player.textOverrides())
         assertEquals(listOf("main"), player.audioOverrides())
         assertEquals(0, automaticAudioRequests)
@@ -385,8 +385,8 @@ class PlaybackOptionsRemoteKeyTest {
         show()
         press(Key.MediaAudioTrack)
         press(Key.Menu)
-        assertEquals(PlaybackOptionsPage.ROOT, layerState.optionsPage)
-        assertFalse(layerState.optionsQuickList)
+        assertEquals(PlaybackOptionsPage.ROOT, layerState.core.optionsPage)
+        assertFalse(layerState.core.optionsQuickList)
         compose.onNodeWithTag("playback-options-audio").assertIsFocused()
 
         press(Key.DirectionRight)
@@ -394,11 +394,11 @@ class PlaybackOptionsRemoteKeyTest {
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         advance(PLAYBACK_QUICK_LIST_AUTO_CLOSE_MS + 1_000)
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
         assertEquals(0, player.selectionChanges)
 
         press(Key.Back)
-        assertEquals(PlaybackOptionsPage.ROOT, layerState.optionsPage)
+        assertEquals(PlaybackOptionsPage.ROOT, layerState.core.optionsPage)
         assertEquals(0, player.selectionChanges)
     }
 
@@ -430,10 +430,10 @@ class PlaybackOptionsRemoteKeyTest {
             targetEpoch++
             player.parameters = with(player) { parameters.withOverride("second") }
             // Back can race recomposition, while the predecessor's restore is still bound.
-            layerState.quickList.restoreStart()
+            layerState.core.quickList.restoreStart()
         }
         frames()
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(listOf("second"), player.audioOverrides())
         assertEquals(0, automaticAudioRequests)
     }
@@ -450,7 +450,7 @@ class PlaybackOptionsRemoteKeyTest {
         }
         frames()
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 100)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(listOf("second"), player.audioOverrides())
         assertEquals(0, player.selectionChanges)
     }
@@ -463,14 +463,14 @@ class PlaybackOptionsRemoteKeyTest {
         // Track groups and channel are deliberately unchanged: epoch alone must retire the list.
         compose.runOnIdle { targetEpoch++ }
         frames()
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(0, player.selectionChanges)
         press(Key.MediaAudioTrack)
         press(Key.DirectionDown)
         compose.runOnIdle { targetAvailable = false }
         frames()
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 100)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(0, player.selectionChanges)
     }
 
@@ -486,7 +486,7 @@ class PlaybackOptionsRemoteKeyTest {
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 100)
         assertEquals(0, player.selectionChanges)
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
     }
 
     @Test
@@ -495,23 +495,23 @@ class PlaybackOptionsRemoteKeyTest {
         compose.runOnIdle { recovery = true }
         frames()
         press(Key.MediaAudioTrack)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(0, optionsOpened)
         compose.runOnIdle { recovery = false; targetAvailable = false }
         frames()
         press(Key.MediaAudioTrack)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertEquals(0, optionsOpened)
         compose.runOnIdle { targetAvailable = true; layerState.openInfo() }
         frames()
         press(Key.MediaAudioTrack)
-        assertEquals(PlaybackOptionsPage.AUDIO, layerState.optionsPage)
-        assertFalse(layerState.infoOpen)
+        assertEquals(PlaybackOptionsPage.AUDIO, layerState.core.optionsPage)
+        assertFalse(layerState.core.infoOpen)
         assertEquals(1, optionsOpened)
         press(Key.DirectionDown)
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 100)
         press(Key.DirectionLeft)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertTrue(player.audioOverrides().isEmpty())
     }
 
@@ -524,7 +524,7 @@ class PlaybackOptionsRemoteKeyTest {
         advance(PLAYBACK_QUICK_LIST_SETTLE_MS + 50)
 
         press(Key.Back)
-        assertNull(layerState.optionsPage)
+        assertNull(layerState.core.optionsPage)
         assertTrue(quickAudioQueue.isEmpty())
         assertEquals(0, automaticAudioRequests)
         assertEquals(0, player.selectionChanges)
@@ -576,28 +576,29 @@ class PlaybackOptionsRemoteKeyTest {
                             val foregroundLayer = if (recovery) PlayerForegroundLayer.RECOVERY
                                 else playerForegroundLayer(state.foregroundContext())
                             state.handleScheduleKey(event, foregroundLayer)?.let { return@onPreviewKeyEvent it }
-                            state.handleOverlayKey(
+                            if (event.type == KeyEventType.KeyDown) state.core.onKeyDown()
+                            state.core.handleOverlayKey(
                                 event = event,
                                 foregroundLayer = foregroundLayer,
                                 quickListAvailable = targetAvailable,
                                 keyContext = PlayerKeyContext(
                                     surface = PlayerSurface.LIVE,
-                                    controlsVisible = state.chrome.controlsVisible,
+                                    controlsVisible = state.core.chrome.controlsVisible,
                                     seekbarFocused = false,
                                     timeshiftAvailable = true,
-                                    optionsOpen = state.optionsPage != null,
-                                    infoOpen = state.infoOpen,
+                                    optionsOpen = state.core.optionsPage != null,
+                                    infoOpen = state.core.infoOpen,
                                     confirmationOpen = foregroundLayer == PlayerForegroundLayer.CONFIRMATION,
                                 ),
                                 onBack = {
                                     when (playerBackAction(PlayerSurface.LIVE, foregroundLayer)) {
                                         PlayerBackAction.RESTORE_AND_CLOSE_QUICK_LIST -> {
-                                            state.quickList.restoreStart()
-                                            state.closeQuickList()
+                                            state.core.quickList.restoreStart()
+                                            state.core.closeQuickList()
                                         }
                                         PlayerBackAction.RETURN_TO_OPTIONS_ROOT ->
-                                            state.showOptionsPage(PlaybackOptionsPage.ROOT)
-                                        PlayerBackAction.CLOSE_OPTIONS -> state.closeOptions()
+                                            state.core.showOptionsPage(PlaybackOptionsPage.ROOT)
+                                        PlayerBackAction.CLOSE_OPTIONS -> state.core.closeOptions()
                                         else -> Unit
                                     }
                                 },
@@ -607,14 +608,14 @@ class PlaybackOptionsRemoteKeyTest {
                         .focusRequester(rootFocus)
                         .focusable(),
                 ) {
-                    state.optionsPage?.let { page ->
+                    state.core.optionsPage?.let { page ->
                         PlaybackOptionsSheet(
                             page = page,
                             player = fake.player,
                             tracksResolving = false,
                             aspectRatio = AspectRatioMode.FIT,
                             statsVisible = false,
-                            onPageChange = state::showOptionsPage,
+                            onPageChange = state.core::showOptionsPage,
                             onAspectRatioChange = {},
                             onStatsVisibleChange = {},
                             audioAutomatic = fake.audioAutomatic,
@@ -622,8 +623,8 @@ class PlaybackOptionsRemoteKeyTest {
                                 automaticAudioRequests++
                                 fake.clearAudioOverrides()
                             },
-                            quickList = state.quickList.takeIf { state.optionsQuickList },
-                            onQuickListClose = state::closeQuickList,
+                            quickList = state.core.quickList.takeIf { state.core.optionsQuickList },
+                            onQuickListClose = state.core::closeQuickList,
                             quickListTargetEpoch = targetEpoch,
                             quickListAvailable = targetAvailable,
                             isQuickListTargetCurrent = { it == targetEpoch && targetAvailable },

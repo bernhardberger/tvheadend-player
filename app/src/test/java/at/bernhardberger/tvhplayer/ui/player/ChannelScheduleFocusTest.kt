@@ -182,7 +182,7 @@ class ChannelScheduleFocusTest {
                 if (layers.scheduleOpen) PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
                     ChannelSchedule(null, week, NOW, NOW, false, false, { null }, {},
                         onClose = { layers.closeSchedule(); onClose() }, onRetry = {}, initialEvent = week[45],
-                        onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
+                        onBackKeyDown = { layers.core.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
                 }
             }
         } }

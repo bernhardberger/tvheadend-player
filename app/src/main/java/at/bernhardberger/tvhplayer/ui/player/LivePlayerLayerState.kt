@@ -15,17 +15,8 @@ import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.type
 import at.bernhardberger.tvhplayer.core.PlayerForegroundLayer
-import at.bernhardberger.tvhplayer.core.playbackOptionsKeyRequest
-import at.bernhardberger.tvhplayer.core.playbackSuppressesRevealingKey
-import at.bernhardberger.tvhplayer.core.playerParentConsumesRecoveryKey
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsKeyOutcome
-import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerForegroundContext
-import at.bernhardberger.tvhplayer.core.PlayerKeyAction
-import at.bernhardberger.tvhplayer.core.PlayerKeyContext
 import at.bernhardberger.tvhplayer.core.PlayerSeekPreviewPhase
-import at.bernhardberger.tvhplayer.core.playbackOptionsKeyOutcome
-import at.bernhardberger.tvhplayer.core.playerKeyAction
 import kotlinx.coroutines.CoroutineScope
 
 private const val LIVE_PLAYER_AUTO_HIDE_MS = 5_000L
@@ -35,6 +26,10 @@ private val RailReturnActions = setOf(
     "player-pause", "player-stop", "player-audio", "player-subtitles", "player-info", "player-schedule", "player-settings",
 )
 
+/**
+ * The live player's layers: the shared [core] plus the channel drawer, the schedule and
+ * the recording confirmation only live TV has.
+ */
 @Stable
 internal class LivePlayerLayerState(
     scope: CoroutineScope,
@@ -44,22 +39,27 @@ internal class LivePlayerLayerState(
     var channelDrawerOpen by mutableStateOf(false)
         private set
 
-    var optionsPage by mutableStateOf<PlaybackOptionsPage?>(null)
-        private set
-
-    /** [optionsPage] is the Audio or Subtitles short list opened by its remote key. */
-    var optionsQuickList by mutableStateOf(false)
-        private set
-
-    val quickList = PlaybackQuickListSignals()
-
-    var infoOpen by mutableStateOf(false)
-        private set
-
     var scheduleOpen by mutableStateOf(false)
         private set
     var scheduleDetails by mutableStateOf<at.bernhardberger.tvheadend.sdk.core.EpgEvent?>(null)
         private set
+
+    var recordingConfirmationVisible by mutableStateOf(false)
+        private set
+
+    /** Info, the options and the chrome; the drawer and the schedule cover the chrome too. */
+    val core = PlayerLayerState(
+        scope = scope,
+        autoHideTimeoutMillis = autoHideTimeoutMillis,
+        bannerTimeoutMillis = bannerTimeoutMillis,
+        // Over the full menu, focus returns to the gear the menu belongs to.
+        quickListOverMenuReturn = "player-settings",
+        screenLayerOpen = { channelDrawerOpen || scheduleOpen },
+        closeScreenLayers = {
+            channelDrawerOpen = false
+            recordingConfirmationVisible = false
+        },
+    )
 
     fun showScheduleDetails(event: at.bernhardberger.tvheadend.sdk.core.EpgEvent?) {
         scheduleDetails = event
@@ -72,18 +72,15 @@ internal class LivePlayerLayerState(
     private var railReturnControls = true
 
     fun openSchedule(fromKey: Boolean = false) {
-        scheduleReturnControls = !fromKey || chrome.controlsVisible
+        scheduleReturnControls = !fromKey || core.chrome.controlsVisible
         scheduleReturnLayer = if (fromKey) at.bernhardberger.tvhplayer.core.playerForegroundLayer(foregroundContext())
             else PlayerForegroundLayer.CONTROLS
-        scheduleReturnAction = if (fromKey && chrome.controlsVisible) lastFocusedAction ?: "player-pause"
+        scheduleReturnAction = if (fromKey && core.chrome.controlsVisible) lastFocusedAction ?: "player-pause"
             else "player-schedule"
-        infoOpen = false
         recordingConfirmationVisible = false
         scheduleDetails = null
         channelDrawerOpen = false
-        optionsPage = null
-        optionsQuickList = false
-        chrome.yieldToLayer(controls = false)
+        core.yieldToScreenLayer()
         scheduleOpen = true
     }
 
@@ -91,14 +88,14 @@ internal class LivePlayerLayerState(
         scheduleOpen = false
         scheduleDetails = null
         if (showControls == null) when (scheduleReturnLayer) {
-            PlayerForegroundLayer.INFO -> { infoOpen = true; return }
+            PlayerForegroundLayer.INFO -> { core.reopenInfo(); return }
             PlayerForegroundLayer.CHANNEL_DRAWER -> { channelDrawerOpen = true; return }
             else -> Unit
         }
         if (showControls ?: scheduleReturnControls) {
-            restoreChannelAction = scheduleReturnAction
+            core.restoreControl = scheduleReturnAction
             this.showControls()
-        } else { restoreChannelAction = null; chrome.hideControls() }
+        } else { core.restoreControl = null; core.chrome.hideControls() }
     }
 
     /** Own GUIDE's whole cycle; navigation in the sheet must not become a player seek/reveal. */
@@ -108,23 +105,20 @@ internal class LivePlayerLayerState(
         prepare: () -> Unit = {},
     ): Boolean? {
         val code = event.nativeKeyEvent.keyCode
-        if (scheduleOpen && playbackSuppressesRevealingKey(revealingKeyCode, code)) {
-            if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(code)
-            return true
-        }
+        if (scheduleOpen && core.consumesRevealingKey(event)) return true
         if (code == AndroidKeyEvent.KEYCODE_GUIDE) {
             // Options own a preview/undo session; do not dispose it to cover it with Schedule.
-            if (optionsPage != null) return true
+            if (core.optionsPage != null) return true
             if (foregroundLayer in setOf(PlayerForegroundLayer.RECOVERY, PlayerForegroundLayer.TERMINAL_ERROR,
                     PlayerForegroundLayer.CONFIRMATION)) return true
             if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                beginOpeningKeyCycle(code)
+                core.beginOpeningKeyCycle(code)
                 if (scheduleOpen) closeSchedule() else {
                     prepare()
                     openSchedule(fromKey = true)
                 }
             }
-            if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(code)
+            if (event.type == KeyEventType.KeyUp) core.endOpeningKeyCycle(code)
             return true
         }
         if (!scheduleOpen) return null
@@ -148,254 +142,85 @@ internal class LivePlayerLayerState(
     var infoFromRail by mutableStateOf(false)
         private set
     /** The rail stays expanded while its page steps down to the schedule and back. */
-    val channelRailPresented: Boolean get() = channelDrawerOpen || (infoOpen && infoFromRail)
-
-    var recordingConfirmationVisible by mutableStateOf(false)
-        private set
-
-    var statsVisible by mutableStateOf(false)
-        private set
-
-    var revealingKeyCode by mutableStateOf<Int?>(null)
-        private set
-
-    /** The Banner and the controls; the drawer, info panel and options menu cover them. */
-    val chrome = PlayerChromeState(
-        scope = scope,
-        autoHideTimeoutMillis = autoHideTimeoutMillis,
-        bannerTimeoutMillis = bannerTimeoutMillis,
-        isCovered = { channelDrawerOpen || infoOpen || scheduleOpen || optionsPage != null },
-    )
+    val channelRailPresented: Boolean get() = channelDrawerOpen || (core.infoOpen && infoFromRail)
 
     private var lastFocusedAction: String? = null
-    /** The focused control a quick list returns to; both lists and the drawer restore Stop too. */
-    private var lastFocusedControl: String? = null
     private var channelDrawerReturnAction: String? = null
-    private var quickListReturnAction: String? = null
-    var restoreChannelAction by mutableStateOf<String?>(null)
-        private set
 
     fun onActionFocused(action: String) = profileTrace("P44:focus:control") {
         lastFocusedAction = action.takeIf { it in RailReturnActions } ?: lastFocusedAction
-        lastFocusedControl = action.takeUnless { it == "player-seekbar" }
-    }
-
-    fun onChannelActionRestored() {
-        restoreChannelAction = null
+        core.onActionFocused(action)
     }
 
     fun dismissChannelDrawer() {
         channelDrawerOpen = false
         if (railReturnControls) {
-            restoreChannelAction = channelDrawerReturnAction ?: "player-pause"
+            core.restoreControl = channelDrawerReturnAction ?: "player-pause"
             showControls()
-        } else chrome.hideControls()
+        } else core.chrome.hideControls()
     }
 
     fun onChannelTuneRequested() {
         if (scheduleOpen) closeSchedule(showControls = false)
-        if (chrome.hidden) {
-            chrome.peekBanner()
+        if (core.chrome.hidden) {
+            core.chrome.peekBanner()
             return
         }
         // Quick-zap owns focus until explicitly dismissed, including a failed tune.
-        if (!channelDrawerOpen) chrome.showControls(PlayerControlsEntry.FADE)
+        if (!channelDrawerOpen) core.chrome.showControls(PlayerControlsEntry.FADE)
     }
 
     /** A failed tune: with hidden chrome the centre message replaces the Banner. */
     fun onChannelUnavailable() {
-        if (chrome.hidden) chrome.hideBanner() else onChannelTuneRequested()
+        if (core.chrome.hidden) core.chrome.hideBanner() else onChannelTuneRequested()
     }
 
     /** A programme boundary on the watched channel at the live edge; the caller checks the policy. */
     fun onProgrammeChanged() {
-        chrome.peekBanner()
+        core.chrome.peekBanner()
     }
 
     /** Reveals the controls in place of the channel drawer. */
     fun showControls() {
         channelDrawerOpen = false
-        chrome.showControls()
+        core.chrome.showControls()
     }
 
     fun openInfo(fromKey: Boolean = false) {
-        infoReturnControls = !fromKey || chrome.controlsVisible
+        infoReturnControls = !fromKey || core.chrome.controlsVisible
         infoFromRail = channelDrawerOpen
-        chrome.yieldToLayer(controls = false)
-        channelDrawerOpen = false
-        optionsPage = null
-        optionsQuickList = false
-        recordingConfirmationVisible = false
-        infoOpen = true
+        core.openInfo()
     }
 
     fun closeInfo(returnToRail: Boolean = false) {
         recordingConfirmationVisible = false
-        infoOpen = false
         if (returnToRail) {
+            core.closeInfo(controls = null)
             // Resume the same rail visit, including its original controls focus target.
             channelDrawerOpen = true
-            chrome.yieldToLayer(controls = false)
-        } else if (infoReturnControls) showControls() else chrome.hideControls()
+            core.chrome.yieldToLayer(controls = false)
+        } else core.closeInfo(controls = infoReturnControls)
     }
 
     fun showRecordingConfirmation() {
-        if (infoOpen) recordingConfirmationVisible = true
+        if (core.infoOpen) recordingConfirmationVisible = true
     }
 
     fun dismissRecordingConfirmation() {
         recordingConfirmationVisible = false
     }
 
-    fun openOptions() {
-        showOptionsPage(PlaybackOptionsPage.ROOT)
-    }
-
-    fun showOptionsPage(page: PlaybackOptionsPage) {
-        chrome.yieldToLayer(controls = true)
-        channelDrawerOpen = false
-        infoOpen = false
-        recordingConfirmationVisible = false
-        optionsQuickList = false
-        optionsPage = page
-    }
-
-    /**
-     * The Audio or Subtitles short list over whatever the controls show now: the
-     * controls are neither revealed nor hidden, and closing the list returns focus to
-     * the control that had it.
-     */
-    fun showQuickList(page: PlaybackOptionsPage) {
-        if (!optionsQuickList) {
-            // Over the full menu, focus returns to the gear the menu belongs to.
-            quickListReturnAction = (if (optionsPage != null) "player-settings" else lastFocusedControl)
-                .takeIf { chrome.controlsVisible }
-        }
-        chrome.yieldToLayer()
-        channelDrawerOpen = false
-        infoOpen = false
-        recordingConfirmationVisible = false
-        optionsQuickList = true
-        optionsPage = page
-    }
-
-    /** Closes the quick list, keeping what is playing. */
-    fun closeQuickList() {
-        optionsPage = null
-        optionsQuickList = false
-        restoreChannelAction = quickListReturnAction.takeIf { chrome.controlsVisible }
-        quickListReturnAction = null
-    }
-
-    /**
-     * A Menu, audio-track or captions key: Menu opens the full options root, the
-     * audio-track and captions keys their short list (the key of the open list moves
-     * its focus down) over any other layer. The key cycle is held so the key-up cannot
-     * activate the newly focused row. Returns false, leaving every layer untouched,
-     * for any other key or while a modal confirmation owns the keys.
-     */
-    fun openOptionsForKey(
-        keyContext: PlayerKeyContext,
-        keyCode: Int,
-    ): Boolean {
-        if (playerKeyAction(keyContext, keyCode) != PlayerKeyAction.OPEN_OPTIONS) return false
-        val outcome = playbackOptionsKeyOutcome(
-            keyCode = keyCode,
-            quickListPage = optionsPage.takeIf { optionsQuickList },
-        ) ?: return false
-        beginOpeningKeyCycle(keyCode)
-        when (outcome) {
-            PlaybackOptionsKeyOutcome.OpenMenu -> showOptionsPage(PlaybackOptionsPage.ROOT)
-            PlaybackOptionsKeyOutcome.MoveDown -> quickList.moveDown()
-            is PlaybackOptionsKeyOutcome.OpenQuickList -> showQuickList(outcome.page)
-        }
-        return true
-    }
-
-    /** Shared live-screen overlay routing; null lets the remaining playback keys proceed. */
-    fun handleOverlayKey(
-        event: KeyEvent,
-        keyContext: PlayerKeyContext,
-        foregroundLayer: PlayerForegroundLayer,
-        quickListAvailable: Boolean,
-        onBack: () -> Unit,
-        onOptionsOpened: (Boolean) -> Unit,
-    ): Boolean? {
-        val keyCode = event.nativeKeyEvent.keyCode
-        if (event.type == KeyEventType.KeyDown) onKeyDown()
-        if (playbackSuppressesRevealingKey(revealingKeyCode, keyCode)) {
-            if (event.type == KeyEventType.KeyUp) endOpeningKeyCycle(keyCode)
-            return true
-        }
-        if (event.type != KeyEventType.KeyDown) return false
-        if (keyCode == AndroidKeyEvent.KEYCODE_BACK) {
-            if (event.nativeKeyEvent.repeatCount == 0) {
-                beginOpeningKeyCycle(keyCode)
-                onBack()
-            }
-            return true
-        }
-        if (foregroundLayer == PlayerForegroundLayer.RECOVERY) {
-            return playerParentConsumesRecoveryKey(keyCode)
-        }
-        val requestedPage = playbackOptionsKeyRequest(keyCode)
-        if (requestedPage != null) {
-            if (requestedPage != PlaybackOptionsPage.ROOT && !quickListAvailable && !keyContext.confirmationOpen) {
-                beginOpeningKeyCycle(keyCode)
-                return true
-            }
-            val infoWasOpen = infoOpen
-            val opened = openOptionsForKey(keyContext, keyCode)
-            if (opened) onOptionsOpened(infoWasOpen)
-            return opened
-        }
-        if (infoOpen || optionsPage != null) {
-            if (keyCode == AndroidKeyEvent.KEYCODE_DPAD_LEFT && foregroundLayer != PlayerForegroundLayer.CONFIRMATION) {
-                beginOpeningKeyCycle(keyCode)
-                onBack()
-                return true
-            }
-            return false
-        }
-        return null
-    }
-
-    /** Every key down while a quick list is open restarts its auto-close. */
-    fun onKeyDown() {
-        if (optionsQuickList && optionsPage != null) quickList.onKeyDown()
-    }
-
-    fun closeOptions() {
-        optionsPage = null
-        optionsQuickList = false
-    }
-
     fun openChannelDrawer(fromKey: Boolean = false) {
-        railReturnControls = !fromKey || chrome.controlsVisible
-        channelDrawerReturnAction = lastFocusedAction.takeIf { chrome.controlsVisible }
-        restoreChannelAction = null
-        chrome.yieldToLayer(controls = false)
-        infoOpen = false
+        railReturnControls = !fromKey || core.chrome.controlsVisible
+        channelDrawerReturnAction = lastFocusedAction.takeIf { core.chrome.controlsVisible }
+        core.restoreControl = null
         recordingConfirmationVisible = false
-        optionsPage = null
-        optionsQuickList = false
+        core.yieldToScreenLayer()
         channelDrawerOpen = true
     }
 
     fun closeChannelDrawer() {
         channelDrawerOpen = false
-    }
-
-    fun updateStatsVisibility(visible: Boolean) {
-        statsVisible = visible
-    }
-
-    fun beginOpeningKeyCycle(keyCode: Int) {
-        revealingKeyCode = keyCode
-    }
-
-    fun endOpeningKeyCycle(keyCode: Int) {
-        if (revealingKeyCode == keyCode) revealingKeyCode = null
     }
 
     fun foregroundContext(
@@ -404,23 +229,22 @@ internal class LivePlayerLayerState(
         terminalErrorVisible: Boolean = false,
         seekPreviewPhase: PlayerSeekPreviewPhase = PlayerSeekPreviewPhase.NONE,
     ) = PlayerForegroundContext(
-        confirmationVisible = infoOpen && recordingConfirmationVisible,
-        infoVisible = infoOpen && !recordingConfirmationVisible,
-        optionsPage = optionsPage,
-        optionsQuickList = optionsQuickList && optionsPage != null,
+        confirmationVisible = core.infoOpen && recordingConfirmationVisible,
+        infoVisible = core.infoOpen && !recordingConfirmationVisible,
+        optionsPage = core.optionsPage,
+        optionsQuickList = core.optionsQuickList && core.optionsPage != null,
         numberEntryVisible = numberEntryVisible,
-        channelDrawerVisible = channelDrawerOpen && !chrome.controlsVisible && !infoOpen,
+        channelDrawerVisible = channelDrawerOpen && !core.chrome.controlsVisible && !core.infoOpen,
         recoveryVisible = recoveryVisible,
         terminalErrorVisible = terminalErrorVisible,
         seekPreviewPhase = seekPreviewPhase,
-        controlsVisible = chrome.controlsVisible,
-        statsEnabled = statsVisible,
+        controlsVisible = core.chrome.controlsVisible,
+        statsEnabled = core.statsVisible,
         scheduleVisible = scheduleOpen,
     )
 
     fun dispose() {
-        chrome.dispose()
-        revealingKeyCode = null
+        core.dispose()
     }
 }
 

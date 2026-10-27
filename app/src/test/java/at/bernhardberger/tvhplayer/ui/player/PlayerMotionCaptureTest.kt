@@ -223,13 +223,13 @@ class PlayerMotionCaptureTest {
             layers = rememberLivePlayerLayerState()
             live(
                 session, behind = false, zapped = zapped,
-                mode = if (layers.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
-                entry = layers.chrome.controlsEntry,
+                mode = if (layers.core.chrome.controlsVisible) PlayerChromeMode.CONTROLS else PlayerChromeMode.HIDDEN,
+                entry = layers.core.chrome.controlsEntry,
             )
         }
         compose.mainClock.autoAdvance = false
         compose.runOnIdle {
-            layers.chrome.hideControls()
+            layers.core.chrome.hideControls()
             Snapshot.sendApplyNotifications()
         }
         compose.mainClock.advanceTimeBy(1_000)

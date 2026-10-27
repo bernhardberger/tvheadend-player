@@ -303,6 +303,18 @@ class PlayerBackPolicyTest {
         }
     }
 
+    @Test
+    fun backFromAContextUsesItsLayerAndSeekPreview() {
+        val pending = baseContext().copy(controlsVisible = true, seekPreviewPhase = PlayerSeekPreviewPhase.PENDING)
+        for (surface in PlayerSurface.entries) {
+            assertEquals(PlayerBackAction.CANCEL_PENDING_SEEK, playerBackAction(surface, pending, bannerVisible = false))
+            assertEquals(PlayerBackAction.CLOSE_INFO,
+                playerBackAction(surface, pending.copy(infoVisible = true), bannerVisible = true))
+            assertEquals(PlayerBackAction.HIDE_BANNER, playerBackAction(surface, baseContext(), bannerVisible = true))
+            assertEquals(PlayerBackAction.CLOSE_PLAYER, playerBackAction(surface, baseContext(), bannerVisible = false))
+        }
+    }
+
     private fun baseContext() = PlayerForegroundContext(
         confirmationVisible = false,
         infoVisible = false,

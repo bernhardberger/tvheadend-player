@@ -497,6 +497,63 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("Continue does not seek", position, positionMs)
     }
 
+    @Test fun menuOpensTheOptionsAndBackStepsFromAPageToTheRootThenToTheGear() {
+        screen()
+        playing()
+        key(Key.Menu)
+        assertTrue("Menu opens the options root", exists("playback-options-display"))
+        compose.onNodeWithTag("playback-options-display").performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        key(Key.DirectionCenter)
+        assertFalse("the page replaces the root", exists("playback-options-stats"))
+        key(Key.Back)
+        assertTrue("Back returns to the root", exists("playback-options-stats"))
+        key(Key.Back)
+        assertFalse(exists("playback-options-display"))
+        assertEquals("closing the options returns focus to their gear", listOf("player-settings"), focused())
+    }
+
+    @Test fun leftClosesTheOptionsRootLikeBack() {
+        screen()
+        playing()
+        key(Key.Menu)
+        assertTrue(exists("playback-options-display"))
+        key(Key.DirectionLeft)
+        assertFalse(exists("playback-options-display"))
+        assertEquals(listOf("player-settings"), focused())
+    }
+
+    @Test fun theAudioKeyOpensItsListOverWhatTheControlsShowAndBackReturnsThere() {
+        screen()
+        playing()
+        publishTracks(Tracks(listOf(audioTrack("a1", "de", true), audioTrack("a2", "en", false))))
+        key(Key.Back)
+        assertFalse("the player is hidden", exists("player-banner") || exists("player-actions"))
+        key(Key.MediaAudioTrack)
+        assertTrue("the Audio quick list opens over the hidden player", exists("playback-options-track-list"))
+        assertFalse("the controls stay hidden", exists("player-actions"))
+        key(Key.Back)
+        assertFalse(exists("playback-options-track-list"))
+        assertFalse("closing the list leaves the player hidden", exists("player-actions"))
+        key(Key.DirectionDown)
+        assertEquals(listOf("player-pause"), focused())
+        key(Key.MediaAudioTrack)
+        assertTrue(exists("playback-options-track-list"))
+        key(Key.Back)
+        assertEquals("the list returns focus to the control that had it", listOf("player-pause"), focused())
+    }
+
+    @Test fun theInfoKeyOpensDetailsAndBackReturnsToTheInfoButton() {
+        screen()
+        playing()
+        key(Key.Back)
+        key(Key.Info)
+        assertTrue(exists("programme-details-page"))
+        key(Key.Back)
+        assertFalse(exists("programme-details-page"))
+        assertEquals("closing details shows the controls on Info", listOf("player-info"), focused())
+    }
+
     @Test fun aGrowingRecordingShowsItsLengthAndBehindLiveAndTheBadgeSaysItStillRecords() {
         compose.setContent {
             TVHeadendPlayerTheme { RecordingChromeFixture(mode = PlayerChromeMode.BANNER, growing = true) }
