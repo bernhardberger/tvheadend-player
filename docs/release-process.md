@@ -172,6 +172,15 @@ generated APKs. The native bytes must match the Play APK, with both ARM ABIs and
 16 KB ELF LOAD alignment on 64-bit libraries. The AAB itself is a compressed
 upload container, not an APK to zip-align. Missing bundletool fails closed.
 
+The signing host needs a full JDK, not only a Java runtime: it signs the AAB with
+`jarsigner` (Debian: `openjdk-21-jdk-headless`). It has no Gradle, so populate its
+signing user's `~/.gradle/caches/modules-2/files-2.1` with the bundletool jars the
+build host already resolved, keeping the same relative paths: the jars that
+`bundletool_command()` in `tools/release_metadata.py` lists. Each jar's parent
+directory name is its SHA-1, so check that before copying. The GitHub
+`bundletool-all` JAR is a different build from the one on Google Maven, so prefer
+the cached Maven jars.
+
 ## Isolated signing on the signing host
 
 Run the signing tool from a trusted, reviewed checkout on the signing host, not
