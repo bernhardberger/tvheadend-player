@@ -34,6 +34,7 @@ import org.junit.Test
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import java.io.File
@@ -47,14 +48,16 @@ class SettingsAboutTest {
 
     private var sessionState by mutableStateOf<SessionState>(SessionState.Disconnected)
 
-    private fun show(fontScale: Float = 1f, machineTranslated: Boolean = false) {
+    private fun show(fontScale: Float = 1f, machineTranslated: Boolean? = false) {
         compose.setContent {
             CompositionLocalProvider(LocalDensity provides Density(1f, fontScale)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(Color.Black)) {
                         SettingsScreenNavigation(rememberDepthNavigationState(SETTINGS_ROOT, ABOUT_LEVEL),
-                            listOf(settingsRootLevel(false)) + settingsAboutLevels(sessionState, machineTranslated = machineTranslated))
+                            listOf(settingsRootLevel(false)) + (
+                                if (machineTranslated == null) settingsAboutLevels(sessionState)
+                                else settingsAboutLevels(sessionState, machineTranslated = machineTranslated)))
                     }
                 }
             }
@@ -118,6 +121,26 @@ class SettingsAboutTest {
         compose.onNodeWithText("Nobody has checked this translation yet", substring = true).assertIsDisplayed()
     }
 
+    // The notice follows the language's own resource flag (null passes none): machine-drafted Japanese
+    // shows it under Translation, reviewed German does not.
+    @Test @Config(qualifiers = "ja-w960dp-h540dp-land-mdpi")
+    fun machineDraftedJapaneseShowsTheNoticeFromItsResources() {
+        show(machineTranslated = null)
+        press(Key.DirectionCenter)
+        val title = RuntimeEnvironment.getApplication().resources.getString(at.bernhardberger.tvhplayer.R.string.about_machine_translated)
+        org.junit.Assert.assertNotEquals("Machine-translated", title)
+        repeat(4) { press(Key.DirectionDown) }
+        compose.onNodeWithText(title, substring = true).assertIsFocused()
+    }
+
+    @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
+    fun reviewedGermanShowsNoMachineNotice() {
+        show(machineTranslated = null)
+        press(Key.DirectionCenter)
+        val title = RuntimeEnvironment.getApplication().resources.getString(at.bernhardberger.tvhplayer.R.string.about_machine_translated)
+        compose.onNodeWithText(title, substring = true).assertDoesNotExist()
+    }
+
     @Test @Category(VisualCapture::class)
     fun aboutEnglishCapture() = capture("en-font1.0", 1f)
 
@@ -125,7 +148,18 @@ class SettingsAboutTest {
     @Config(qualifiers = "de-w960dp-h540dp-land-mdpi")
     fun aboutGermanCapture() = capture("de-font1.3", 1.3f)
 
+    @Test @Category(VisualCapture::class)
+    @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
+    fun aboutEnXaCapture() = capture("en-XA-font1.0", 1f)
+
+    @Test @Category(VisualCapture::class)
+    @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
+    fun aboutArXbCapture() = capture("ar-XB-font1.0", 1f)
+
+    private var captureScale = 1f
+
     private fun capture(name: String, scale: Float) {
+        captureScale = scale
         show(scale)
         save("$name-root")
         press(Key.DirectionCenter)
@@ -153,6 +187,8 @@ class SettingsAboutTest {
             val target = File("../build/review/about/$name.png")
             target.parentFile.mkdirs()
             target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            PseudoLocaleEvidence.mirror("about", name, bitmap, captureView, captureScale, "mdpi 1.0",
+                "native D-pad focus", "Settings About, licence and notices; production SettingsScreenNavigation")
             bitmap.recycle()
         }
     }

@@ -17,7 +17,7 @@ Informal **du**/din; imperative action labels.
 ## Term decisions
 
 - `nav_channels` Kanaler; `nav_epg` Tv-guide; `nav_recordings` Optagelser; `context_watch` Se.
-- `timeshift_setting` Tidsforskydning; `details_retention` Opbevaringstid; mux = multiplex.
+- `timeshift_setting` Sæt live-tv på pause og spol tilbage; `details_retention` Opbevaringstid; mux = multiplex.
 - Cancel annuller, Stop stop (recorded part kept), Delete slet.
 - `player_tuning` Skifter kanal, not scanning.
 - Missed = *Ikke optaget*, distinct from failed and canceled.
@@ -25,7 +25,7 @@ Informal **du**/din; imperative action labels.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); buffering corrected to *Bufferer*. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

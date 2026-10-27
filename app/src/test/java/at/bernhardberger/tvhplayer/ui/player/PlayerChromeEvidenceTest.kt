@@ -54,6 +54,7 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.ui.PseudoLocaleEvidence
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -464,6 +465,13 @@ class PlayerChromeEvidenceTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLargeText() = captures("de", 1.3f)
 
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA_XHDPI)
+    fun pseudoEnXa() = captures(PseudoLocaleEvidence.EN_XA, 1f)
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB_XHDPI)
+    fun pseudoArXb() = captures(PseudoLocaleEvidence.AR_XB, 1f)
+
     private enum class Scene { STATUS, BRIGHT_SCRIM, INFO, INFO_NO_LOGO, RECORDED, HERO_ART, HERO_FALLBACK, HERO_NEUTRAL, PREVIEW_ART, PREVIEW_TEXT }
 
     private fun captures(locale: String, fontScale: Float) {
@@ -521,6 +529,8 @@ class PlayerChromeEvidenceTest {
             val directory = File("../artifacts/player-chrome").apply { mkdirs() }
             val name = "${next.name.lowercase(Locale.ROOT)}-$locale-font$fontScale.png"
             File(directory, name).outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            PseudoLocaleEvidence.mirror("player-chrome", name.removeSuffix(".png"), bitmap, view, fontScale, "xhdpi Density(2.0)", "none",
+                "Player chrome scene ${next.name}; production player composables; fixture programme text is German fake data")
             bitmap.recycle()
         }
     }

@@ -16,7 +16,7 @@ Informal singular where natural; imperative action buttons.
 ## Term decisions
 
 - `nav_channels` Canale; `nav_epg` Ghid TV; `nav_recordings` Înregistrări; `context_watch` Vizionează.
-- `timeshift_setting` Redare decalată; `details_retention` Păstrare; mux = multiplex.
+- `timeshift_setting` Pauză și derulare înapoi pentru TV în direct; `details_retention` Păstrare; mux = multiplex.
 - Cancel anulează, Stop oprește (recorded part kept), Delete șterge.
 - `keep_recording` means continue the active recording, not keep a file.
 - `player_tuning` Se schimbă canalul, not scanning.
@@ -24,7 +24,7 @@ Informal singular where natural; imperative action buttons.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

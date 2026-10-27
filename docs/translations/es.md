@@ -17,14 +17,14 @@ Informal **tú** in directions; infinitives on action labels. Vocabulary leans t
 
 - `nav_channels` Canales; `nav_epg` Guía; `nav_recordings` Grabaciones; `context_watch` Ver.
 - `recording_state_missed` No realizada, distinct from Fallida and Cancelada; `details_retention` Conservación.
-- Timeshift = *reproducción en diferido*; `timeshift_live` Directo; `player_tuning` Cambiando canal.
+- Timeshift as a concept = *reproducción en diferido*; `timeshift_setting` Pausar y rebobinar la TV en directo; `timeshift_live` Directo; `player_tuning` Cambiando canal.
 - Cancel cancelar, Stop detener, Delete eliminar.
 - Appliance = *Modo televisor*.
 - New broadcast Estreno, repeat Reposición; mux = múltiplex.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium). The keycap-localization suggestion was rejected because literal remote key names are preserved; style alternatives remain unchanged. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

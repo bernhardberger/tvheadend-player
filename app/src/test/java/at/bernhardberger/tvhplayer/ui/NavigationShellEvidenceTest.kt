@@ -1222,6 +1222,37 @@ class NavigationShellEvidenceTest {
         }
     }
 
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA) fun pseudoEnXaDrawer() = capturePseudoDrawer(PseudoLocaleEvidence.EN_XA)
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB) fun pseudoArXbDrawer() = capturePseudoDrawer(PseudoLocaleEvidence.AR_XB)
+
+    /** The drawer with a playing channel, closed and open, on generated pseudo-locale resources. */
+    private fun capturePseudoDrawer(tag: String) {
+        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
+        settingsShell(1f)
+        PseudoLocaleEvidence.assertGenerated(tag, view)
+        compose.runOnIdle { warmPlayback = true }
+        playLive()
+        fun save(name: String, focus: String) {
+            compose.waitForIdle()
+            val bitmap = drawShell()
+            compose.waitForIdle()
+            assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
+            PseudoLocaleEvidence.mirror("drawer", "$tag-font1.0-$name", bitmap, view, 1f, "mdpi 1.0", focus,
+                "Settings on the SideRail with live playback; drawerWidth=${drawerWidth()}; production SideRail")
+            bitmap.recycle()
+        }
+        save("closed-playing", "none (drawer closed)")
+        openDrawer()
+        save("open-destination-focus", "nav-settings")
+        focusControl("fullscreen")
+        save("open-fullscreen-focus", "global-drawer-now-playing-fullscreen")
+        focusControl("stop")
+        save("open-stop-focus", "global-drawer-now-playing-stop")
+    }
+
     private fun captureNowPlaying(name: String, fontScale: String = "1.0") {
         compose.waitForIdle()
         val bitmap = drawShell()

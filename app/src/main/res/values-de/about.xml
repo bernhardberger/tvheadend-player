@@ -13,4 +13,6 @@
     <string name="about_translation">Übersetzung</string>
     <string name="about_machine_translated">Maschinell übersetzt</string>
     <string name="about_machine_translated_details">Diese Übersetzung hat noch niemand geprüft. Bitte melde Fehler als GitHub-Issue für Tvheadend Player.</string>
+    <!-- Reviewed German: stated explicitly so the regional de-CH override never answers for German itself. -->
+    <bool name="language_machine_translated">false</bool>
 </resources>

@@ -17,14 +17,14 @@ Concise and neutral, no reader pronouns; polite 请 in recovery guidance.
 ## Term decisions
 
 - `nav_channels` 频道; `nav_epg` 节目指南; `nav_recordings` 录制; `context_watch` 观看.
-- `timeshift_setting` 时移; live = 直播; behind live = 落后直播.
+- `timeshift_setting` 暂停和回退电视直播; live = 直播; behind live = 落后直播.
 - Cancel 取消录制 (future), Stop 停止录制 (recorded part kept), Delete 删除录制内容.
 - `player_tuning` 正在调谐; tuner = 调谐器; mux = 复用流, distinct from 频道.
 - `details_retention` 保留期限; server = 服务器; profile = 配置.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); mainland audio-description terminology and Behind live meaning corrected. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

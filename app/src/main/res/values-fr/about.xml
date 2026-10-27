@@ -1,0 +1,17 @@
+<resources>
+    <string name="settings_about">À propos</string>
+    <string name="about_version">Version</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">Serveur</string>
+    <string name="about_not_connected">Non connecté</string>
+    <string name="about_connected">Connecté</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">Basé sur TVHStream de Preclikos</string>
+    <string name="about_notices">Mentions et bibliothèques tierces</string>
+    <string name="about_translation">Traduction</string>
+    <string name="about_machine_translated">Traduction automatique</string>
+    <string name="about_machine_translated_details">Personne n’a encore vérifié cette traduction. Signale les erreurs dans les tickets GitHub de Tvheadend Player.</string>
+    <bool name="language_machine_translated">true</bool>
+</resources>

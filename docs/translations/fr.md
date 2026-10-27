@@ -20,14 +20,14 @@ Informal **tu** in directions; infinitives on action labels.
 - `nav_channels` Chaînes (TV); audio channels stay *canaux* (`track_channels_count`).
 - `details_broadcast_new` Inédit, repeat Rediffusion.
 - `details_retention` Conservation; `recording_state_missed` Manqué, distinct from Échec and Annulé.
-- Timeshift = *lecture différée*; `timeshift_live` Direct; `player_tuning` Changement de chaîne; mux = multiplex.
+- Timeshift as a concept = *lecture différée*; `timeshift_setting` Mettre en pause et rembobiner la TV en direct; `timeshift_live` Direct; `player_tuning` Changement de chaîne; mux = multiplex.
 - Cancel annuler, Stop arrêter, Delete supprimer; each confirmation keeps its consequence.
 - Appliance = *Mode téléviseur*, not a literal household-appliance word.
 - `recording_length_recorded` "Durée enregistrée : %1$s" avoids agreement with a formatted duration.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); video-buffer agreement corrected. The keycap-localization suggestion was rejected because literal remote key names are preserved. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

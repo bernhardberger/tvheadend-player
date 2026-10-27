@@ -1,0 +1,17 @@
+<resources>
+    <string name="settings_about">关于</string>
+    <string name="about_version">版本</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">服务器</string>
+    <string name="about_not_connected">未连接</string>
+    <string name="about_connected">已连接</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">基于Preclikos开发的TVHStream</string>
+    <string name="about_notices">声明与第三方库</string>
+    <string name="about_translation">翻译</string>
+    <string name="about_machine_translated">机器翻译</string>
+    <string name="about_machine_translated_details">此翻译尚未经任何人检查。请在Tvheadend Player的GitHub上提交问题，报告翻译错误。</string>
+    <bool name="language_machine_translated">true</bool>
+</resources>

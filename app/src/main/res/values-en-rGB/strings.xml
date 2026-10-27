@@ -1,0 +1,32 @@
+<resources>
+    <string name="details_program">Programme details</string>
+    <string name="details_about">About this programme</string>
+    <string name="no_epg">No programme information</string>
+    <string name="channels_view_program_art">Programme art</string>
+    <string name="guide_view_headline">Show programme info</string>
+    <string name="guide_view_genre_colors">Genre colours</string>
+    <string name="player_programme_progress_description">Programme progress, %1$s of %2$s</string>
+    <string name="epg_search_query">Programme title or description</string>
+    <string name="epg_search_hint">Select the search field and press OK to enter a programme title or description.</string>
+    <string name="epg_search_empty">No programmes match this search.</string>
+    <string name="epg_search_untitled">Untitled programme</string>
+    <string name="epg_search_result_description">%1$s, %2$s. Open programme details.</string>
+    <string name="epg_empty_day">No programmes in this time window</string>
+    <string name="epg_details_action_hint">Programme actions are shown in this panel. Playback never starts directly from the guide.</string>
+    <string name="epg_no_actions">There are no available actions for this programme.</string>
+    <string name="epg_already_aired">This programme has already aired. Details remain available for reference.</string>
+    <string name="recording_state_cancelled">Cancelled</string>
+    <string name="recording_notice_aborted">Recording cancelled</string>
+    <string name="recording_notice_canceled">Recording cancelled</string>
+    <plurals name="recording_notice_canceled_count">
+        <item quantity="one">%d recording cancelled</item>
+        <item quantity="other">%d recordings cancelled</item>
+    </plurals>
+    <string name="recording_already_scheduled">This programme is recording or scheduled.</string>
+    <string name="recordings_cancelled">Cancelled</string>
+    <string name="recordings_failed_cancelled">Failed and cancelled</string>
+    <string name="tunneling_setting">Tunnelled playback</string>
+    <string name="player_identity_info_hint">OK shows the programme info.</string>
+    <string name="channel_schedule_gap">No programme information until %1$s</string>
+    <string name="channel_schedule_end">No programme information after %1$s</string>
+</resources>

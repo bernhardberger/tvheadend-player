@@ -16,7 +16,7 @@ Informal singular in instructions; conventional action nouns on buttons. No form
 ## Term decisions
 
 - `nav_channels` Csatornák; `nav_epg` Műsorújság; `nav_recordings` Felvételek; `context_watch` Megnézés.
-- `timeshift_setting` Időeltolás; `details_retention` Megőrzési idő; mux = multiplex; buffer = puffer.
+- `timeshift_setting` Élő TV-adás szüneteltetése és visszatekerése; `details_retention` Megőrzési idő; mux = multiplex; buffer = puffer.
 - Cancel lemondás, Stop leállítás (recorded part kept), Delete törlés.
 - `player_tuning` Csatornaváltás, not scanning.
 - Appliance = *TV-készülék mód*.
@@ -24,7 +24,7 @@ Informal singular in instructions; conventional action nouns on buttons. No form
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

@@ -17,14 +17,14 @@ Informal singular; imperative action labels. Croatian forms throughout (posluži
 
 - `nav_channels` Kanali; `nav_epg` TV vodič; `nav_recordings` Snimke; `context_watch` Gledaj.
 - Programme = *emisija*; recording file = *snimka*, process = *snimanje*; `details_retention` Čuvanje.
-- `timeshift_setting` Vremenski pomak; mux = multipleks; buffer = međuspremnik.
+- `timeshift_setting` Pauziraj i premotavaj TV uživo; mux = multipleks; buffer = međuspremnik.
 - Cancel otkaži, Stop zaustavi (existing part kept), Delete izbriši.
 - `player_tuning` Prebacivanje, not scanning.
 - Appliance = *Način TV prijamnika*.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); occupied-tuner terminology made consistent. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

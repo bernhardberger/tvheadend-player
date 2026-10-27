@@ -17,14 +17,14 @@ Informal singular where direct address is natural; mostly imperative labels with
 
 - `nav_channels` Kanavat; `nav_epg` Ohjelmaopas; `nav_recordings` Tallenteet; `context_watch` Katso.
 - Completed recording = *tallenne*; recording process or schedule = *tallennus*.
-- `timeshift_setting` Ajansiirto; `details_retention` Säilytysaika; mux = kanavanippu; channel tag = kanavatunniste.
+- `timeshift_setting` Suoran TV-lähetyksen tauotus ja takaisinkelaus; `details_retention` Säilytysaika; mux = kanavanippu; channel tag = kanavatunniste.
 - Cancel peru, Stop pysäytä (recorded part kept), Delete poista.
 - Spoken duration ratios use explicit elapsed/total phrases instead of slashes.
 - Placeholder names are not inflected, to avoid suffixes on arbitrary names.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

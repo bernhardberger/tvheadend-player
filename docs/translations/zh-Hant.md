@@ -18,13 +18,13 @@ Neutral, Taiwan-oriented software terminology, no reader pronouns; polite 請 in
 
 - `nav_epg` 節目表 (not the converted 節目指南); `nav_recordings` 錄影; `context_watch` 觀看.
 - Server 伺服器; audio 音訊; cache 快取; profile 設定檔 (`profile` 串流設定檔); folder 資料夾; frame rate 影格率.
-- Timeshift 時移; live 直播; `player_tuning` 正在調諧; tuner 調諧器; mux 多工串流.
+- Timeshift as a concept 時移; `timeshift_setting` 暫停及倒轉電視直播; live 直播; `player_tuning` 正在調諧; tuner 調諧器; mux 多工串流.
 - Cancel 取消錄影, Stop 停止錄影 (recorded part kept), Delete 刪除錄影.
 - `details_retention` 保留期限.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); Behind live meaning and service-entry terminology corrected. No human reviewer; remains labeled machine-drafted. A representative Settings capture checks Traditional Chinese rendering, not whole-language visual acceptance.
 
 ## Open questions
 

@@ -18,14 +18,16 @@ All six: `zero`, `one`, `two`, `few`, `many`, `other`, each keeping the numeral.
 ## Term decisions
 
 - `nav_channels` القنوات; `nav_epg` دليل البرامج; `nav_recordings` التسجيلات; `record` تسجيل.
-- `timeshift_setting` الإزاحة الزمنية; live = مباشر; `player_tuning` جارٍ تبديل القناة, not scanning.
+- `timeshift_setting` إيقاف البث المباشر مؤقتًا وإرجاعه; live = مباشر; `player_tuning` جارٍ تبديل القناة, not scanning.
 - Cancel إلغاء التسجيل المجدول, Stop إيقاف التسجيل (content kept), Delete حذف التسجيل.
 - Mux = مُجمّع البث (`error_203_reason`), distinct from channel.
 - Role headings are collective labels.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); accepted findings applied. No human reviewer; remains labeled machine-drafted.
+
+Review corrections: past-tense recorded dates, singular TV/GUIDE button, channel/category number, explicit audio-channel counts and compact seconds. RTL layout acceptance remains open; see the round report.
 
 ## Open questions
 

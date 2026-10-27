@@ -8,9 +8,10 @@ delegated plan approval. Do not switch to informal “sen”.
 
 ## Review status
 
-The existing Sol medium draft is machine-drafted and awaits Sonnet medium review.
-Its provisional polite register is now approved; this does not approve individual
-translations. Reconcile against the final source changes before linguistic review.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining
+unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5
+(medium); no definite linguistic defects reported. The approved polite register
+is retained. No human reviewer; remains labeled machine-drafted.
 
 ## Typography
 
@@ -27,7 +28,7 @@ translations. Reconcile against the final source changes before linguistic revie
 
 - `nav_channels` Kanallar; `nav_epg` Rehber (compact; long form *program rehberi*); `nav_recordings` Kayıtlar; `context_watch` İzle.
 - *Kayıt* names both a file and an operation; the verbs keep the distinction.
-- `timeshift_setting` Zaman kaydırma; `details_retention` Saklama süresi; channel tag = kanal etiketi.
+- `timeshift_setting` Canlı TV yayınına ara ver ve geri sar; `details_retention` Saklama süresi; channel tag = kanal etiketi.
 - Tuner = *ayarlayıcı*; mux = *çoklayıcı*.
 - Cancel iptal et, Stop durdur (recorded part kept), Delete sil.
 - `player_tuning` Kanal değiştiriliyor, not scanning.

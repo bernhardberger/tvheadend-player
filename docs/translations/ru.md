@@ -17,7 +17,7 @@ Polite plural **вы** (lowercase when explicit); infinitive action labels.
 ## Term decisions
 
 - `nav_channels` Каналы; `nav_epg` Телепрограмма; `nav_recordings` Записи; `context_watch` Смотреть.
-- `timeshift_setting` Отложенный просмотр; `details_retention` Срок хранения; mux = мультиплекс; tuner = тюнер.
+- `timeshift_setting` Пауза и перемотка прямого эфира; `details_retention` Срок хранения; mux = мультиплекс; tuner = тюнер.
 - Cancel отменить запись, Stop остановить запись (recorded part kept), Delete удалить запись.
 - `keep_recording` is продолжить запись; `player_tuning` Переключение, not scanning.
 - `profile_direct_streaming` "Прямая трансляция потока" is kept distinct from *прямой эфир*.
@@ -25,7 +25,7 @@ Polite plural **вы** (lowercase when explicit); infinitive action labels.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); `keep_channel_setting` now explicitly means keeping the channel tuned during pause, rather than saving a channel. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 
