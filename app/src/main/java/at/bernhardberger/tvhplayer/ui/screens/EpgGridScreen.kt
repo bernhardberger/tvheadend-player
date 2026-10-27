@@ -838,6 +838,10 @@ fun EpgGridScreen(
             return it.copy(target = current, sec = it.sec.coerceIn(readableTimeRange), keepWindow = true)
         }
         val nowSec = nowSecProvider()
+        // A gap fallback must not turn an ongoing now sequence into a future span.
+        if (previous != null && nowSec in readableTimeRange) {
+            return previous.copy(target = current, sec = nowSec, keepWindow = true)
+        }
         val span = focusRows.getOrNull(current.channelIndex)?.events?.firstOrNull { it.id == current.eventId }
             ?.let { timelineFocusAnchorRange(it, readableTimeRange, nowSec) }
             ?: (readableTimeRange.first..readableTimeRange.first)

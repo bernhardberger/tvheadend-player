@@ -11,6 +11,27 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test fun nowPointSequenceCrossesAGapAndReturnsToItsOrigin() {
+        val rows = listOf(row(1, event(11, 0, 30), event(12, 30, 120)),
+            row(2, event(21, 30, 120)), row(3, event(31, 0, 30), event(32, 30, 120)))
+        val readable = 0L until 180 * 60L
+        val now = 15 * 60L
+        val origin = focus(0, 11)
+        val gap = moveTimelineEpgFocus(rows, origin, EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSec = now).target
+        assertEquals(focus(1, 21), gap)
+        val below = moveTimelineEpgFocus(rows, gap, EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSec = now).target
+        assertEquals(focus(2, 31), below)
+        assertEquals(below, timelinePageFocusTarget(rows, gap, 2, 1,
+            readableRangeSec = readable, anchorSec = now))
+        val backThroughGap = moveTimelineEpgFocus(rows, below, EpgFocusDirection.UP,
+            readableRangeSec = readable, anchorSec = now).target
+        assertEquals(gap, backThroughGap)
+        assertEquals(origin, moveTimelineEpgFocus(rows, backThroughGap, EpgFocusDirection.UP,
+            readableRangeSec = readable, anchorSec = now).target)
+    }
+
     @Test fun onAirAnchorAdvancesBetweenMovesAndPageResolution() {
         val rows = listOf(row(1, event(11, 0, 120)), row(2, event(21, 0, 120)),
             row(3, event(31, 0, 30), event(32, 30, 120)))
