@@ -8,6 +8,13 @@ import at.bernhardberger.tvhplayer.core.ConnectionUiState
 import at.bernhardberger.tvhplayer.core.awaitsGuide
 import at.bernhardberger.tvhplayer.core.isDegraded
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
+import at.bernhardberger.tvhplayer.core.GUIDE_VISIBLE_WINDOW_SEC
+import at.bernhardberger.tvhplayer.core.currentEpgSnapshot
+import at.bernhardberger.tvhplayer.core.epgFrontierSettled
+import at.bernhardberger.tvhplayer.core.guideWindowBounds
+import at.bernhardberger.tvhplayer.core.shouldWaitForGuideCoverage
+import java.time.ZoneId
+import kotlin.time.Instant
 
 /** Display-only history boundary; never turn a wall-clock estimate into a seek grant. */
 internal fun scheduleHistoryStart(state: AppTimeshiftState): Long? {
@@ -30,3 +37,22 @@ internal fun scheduleOffline(connection: ConnectionUiState, epg: EpgRepositorySt
 
 internal fun scheduleLoading(connection: ConnectionUiState, epg: EpgRepositoryState): Boolean =
     !scheduleOffline(connection, epg) && connection.awaitsGuide(epg)
+
+/** The schedule asks for the Guide's seven-day reach; the server answers with what it holds. */
+internal fun scheduleCoverageThroughSec(openedAtSec: Long, zone: ZoneId): Long =
+    guideWindowBounds(openedAtSec, zone).latestStartSec + GUIDE_VISIBLE_WINDOW_SEC
+
+/** Later days are still arriving while the request runs and the channel's live coverage stops short of it. */
+internal fun scheduleCoveragePending(
+    connection: ConnectionUiState, epg: EpgRepositoryState, channelId: ChannelId,
+    throughSec: Long, requestPending: Boolean,
+): Boolean {
+    val snapshot = epg.currentEpgSnapshot()
+    return shouldWaitForGuideCoverage(
+        connectionReady = connection == ConnectionUiState.Ready,
+        hasCurrentSnapshot = snapshot != null,
+        acquisitionPending = requestPending,
+        coverageSettled = epgFrontierSettled(snapshot?.coverages?.firstOrNull { it.channelId == channelId },
+            Instant.fromEpochSeconds(throughSec)),
+    )
+}

@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens.recordings
 
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
+import at.bernhardberger.tvhplayer.ui.components.errorMarkColor
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.watchingIndicator
 import at.bernhardberger.tvhplayer.ui.components.recordingViewerPosition
@@ -1051,11 +1052,6 @@ private fun recordingStateMark(state: DvrEntryState?): RecordingOverlineMark? = 
     DvrEntryState.INVALID -> RecordingOverlineMark.CANCELLED
     else -> null
 }
-
-/** The error colour of a mark: pink on the dark surface, dark red on a focused, light row. */
-@Composable
-private fun errorMarkColor(focused: Boolean): Color =
-    if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error
 
 /** The Recordings 1xx alert, shown only while there are no recordings to list. */
 internal fun recordingsAppError(

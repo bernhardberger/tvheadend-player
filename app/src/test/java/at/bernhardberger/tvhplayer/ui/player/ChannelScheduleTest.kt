@@ -7,6 +7,7 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.components.scheduleInitialEvent
 import kotlinx.coroutines.test.runTest
+import java.time.ZoneId
 import kotlin.time.Instant
 import org.junit.Assert.*
 import org.junit.Test
@@ -82,6 +83,21 @@ class ChannelScheduleTest {
         assertTrue(scheduleOffline(ConnectionUiState.Reconnecting, EpgRepositoryState.Empty))
         assertFalse(scheduleLoading(ConnectionUiState.Reconnecting, EpgRepositoryState.Empty))
         assertTrue(scheduleOffline(ConnectionUiState.CredentialUnavailable, EpgRepositoryState.Empty))
+    }
+
+    @Test fun laterDaysLoadOnlyWhileTheChannelRequestRunsShortOfTheGuidesReach() {
+        val opened = 1789246200L
+        val through = scheduleCoverageThroughSec(opened, ZoneId.of("UTC"))
+        assertTrue(through > opened + 6 * 86_400 && through <= opened + 7 * 86_400)
+        fun epg(channel: Long, knownTo: Long) = EpgRepositoryState.Current(EpgSnapshot.create(events = emptyList(),
+            coverages = listOf(EpgCoverage.create(ChannelId(channel), Instant.fromEpochSeconds(opened), Instant.fromEpochSeconds(knownTo)))))
+        val ready = ConnectionUiState.Ready
+        assertTrue(scheduleCoveragePending(ready, epg(1, opened + 3600), ChannelId(1), through, requestPending = true))
+        assertTrue(scheduleCoveragePending(ready, epg(2, through), ChannelId(1), through, requestPending = true))
+        assertFalse(scheduleCoveragePending(ready, epg(1, through), ChannelId(1), through, requestPending = true))
+        // A settled request shows what the server holds; offline keeps its own Retry instead.
+        assertFalse(scheduleCoveragePending(ready, epg(1, opened + 3600), ChannelId(1), through, requestPending = false))
+        assertFalse(scheduleCoveragePending(ConnectionUiState.Reconnecting, epg(1, opened + 3600), ChannelId(1), through, requestPending = true))
     }
 
     @Test fun guidePreparesOnceAndNeverOpensOverRecoveryOrConfirmation() = runTest {

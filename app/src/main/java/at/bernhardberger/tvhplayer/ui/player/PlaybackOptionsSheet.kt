@@ -532,7 +532,7 @@ internal val PlaybackPanelPadding = 20.dp
 internal val PlaybackPanelHeaderTop = 26.dp
 
 /** Start inset of a row's text inside the TV ListItem; the header title lines up with it. */
-private val PlaybackRowTextInset = 16.dp
+internal val PlaybackRowTextInset = 16.dp
 
 /** Padding around non-scrolling rows: the panel padding at the sides and bottom. */
 private val PanelRowsPadding = PaddingValues(

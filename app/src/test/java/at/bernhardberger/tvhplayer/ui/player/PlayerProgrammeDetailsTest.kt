@@ -8,6 +8,8 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.unit.height
+import androidx.compose.ui.unit.width
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
@@ -34,6 +36,35 @@ class PlayerProgrammeDetailsTest {
     private val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 101)
     private val watched = EpgEvent.create(EventId(1), channel.id,
         Instant.fromEpochSeconds(1_000), Instant.fromEpochSeconds(3_000), title = "Watched program")
+
+    @Test fun framedPictureStandsBesideTheInformationWhileTitleAndAboutKeepBrowseWidths() {
+        var framed by mutableStateOf(true)
+        val other = EpgEvent.create(EventId(2), channel.id, Instant.fromEpochSeconds(1_000), Instant.fromEpochSeconds(3_000),
+            title = "A programme title long enough to reach the framed picture beside the information block",
+            description = "A description long enough for the About card to want more than its browse width on this page.")
+        compose.setContent { TVHeadendPlayerTheme { PlayerDetailsSurface(framedArt = framed) {
+            at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(other, null, channel, 2_000,
+                listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
+        } } }
+        settle()
+        fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).getUnclippedBoundsInRoot()
+        val art = bounds("details-framed-art")
+        val title = bounds("details-title")
+        val about = bounds("details-about")
+        // A four-column card on the end keyline, beside the information and just above About.
+        assertEquals(268f, art.width.value, 0.5f)
+        assertEquals(151f, art.height.value, 0.5f)
+        assertEquals(960f - 58f, art.right.value, 0.5f)
+        assertTrue("title ${title.right} runs under the picture ${art.left}", title.right <= art.left)
+        assertTrue("picture ${art.bottom} overlaps About ${about.top}", art.bottom <= about.top)
+        assertTrue("picture ${art.bottom} floats above About ${about.top}", about.top.value - art.bottom.value <= 32f)
+        assertTrue("About ${about.width} is wider than the browse page's", about.width.value <= 584.5f)
+        compose.runOnIdle { framed = false }
+        settle()
+        compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertDoesNotExist()
+        assertTrue(bounds("details-about").width.value <= 584.5f)
+        assertEquals(960f - 58f, bounds("details-title").right.value, 0.5f)
+    }
 
     @Test fun liveDetailsOpensWatchedProgrammeAndBackRestoresInfo() {
         show(recording = false)

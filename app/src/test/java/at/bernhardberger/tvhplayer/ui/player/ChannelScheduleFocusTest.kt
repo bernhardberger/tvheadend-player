@@ -6,11 +6,31 @@ import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.test.core.app.ApplicationProvider
+import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
+import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.NoticeContext
+import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
+import at.bernhardberger.tvhplayer.settings.UiSettingsStore
+import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withContext
+import java.time.ZoneId
+import java.util.concurrent.atomic.AtomicInteger
 import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.*
 import kotlin.time.Instant
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
+import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,11 +81,229 @@ class ChannelScheduleFocusTest {
         compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
             ChannelSchedule(null, data, NOW, NOW, loading, false, { null }, {}, {}, {})
         } } }
-        compose.onNodeWithText("Loading schedule").assertIsFocused()
+        compose.onNodeWithContentDescription("Loading schedule").assertIsFocused()
         compose.runOnIdle { loading = false }
         compose.onNodeWithText("Close").assertIsFocused()
         compose.runOnIdle { data = events }
         compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+    }
+
+    @Test fun viewerRowUsesThePlayersBehindLiveDistanceAndNoPlayingMark() {
+        var behind by mutableStateOf(0L)
+        compose.setContent { TVHeadendPlayerTheme { CompositionLocalProvider(LocalWatchingChannel provides ChannelId(1),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+            PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                ChannelSchedule(null, events, NOW, NOW - 3600, false, false, { null }, {}, {}, {}, viewerBehindMs = behind)
+            }
+        } } }
+        // At the live edge the row says nothing, whatever the wall clock suggests; no "0 minutes".
+        compose.onAllNodesWithText("behind live", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(0)
+        compose.runOnIdle { behind = 3_600_000L }
+        compose.onNodeWithText("1:00:00 behind live", substring = true, useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test fun rowsWithLaterDaysArrivingEndOnALoadingLine() {
+        var loading by mutableStateOf(true)
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, events, NOW, NOW, loading, false, { null }, {}, {}, {})
+        } } }
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+        compose.onNodeWithTag("channel-schedule-list").performScrollToNode(hasTestTag("channel-schedule-footer"))
+        compose.onNodeWithTag("channel-schedule-footer").assertTextEquals("Loading later days")
+        compose.runOnIdle { loading = false }
+        compose.onNodeWithTag("channel-schedule-footer").assertTextContains("No program information after", substring = true)
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+    }
+
+    @Test fun programmesEndForTheViewerNotTheWallClock() {
+        val wall = NOW - 3_000L
+        // Wall clock "20:00"; the viewer two hours behind at "18:00".
+        fun at(h: Int, m: Int) = wall + (h - 20) * 3_600L + m * 60L
+        val day = listOf(event(1, at(17, 0), at(17, 50)), event(2, at(17, 50), at(18, 30)),
+            event(3, at(19, 0), at(19, 30)), event(4, at(19, 30), at(20, 30)))
+        compose.setContent { TVHeadendPlayerTheme { CompositionLocalProvider(LocalWatchingChannel provides ChannelId(1),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+            PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                ChannelSchedule(null, day, wall, at(18, 0), false, false, { null }, {}, {}, {},
+                    viewerBehindMs = 7_200_000L)
+            }
+        } } }
+        fun row(id: Int) = compose.onNodeWithTag("schedule-row-$id", useUnmergedTree = true)
+        val strip = SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)
+        row(1).assert(hasAnyDescendant(hasText("Ended")))
+        row(2).assert(hasAnyDescendant(hasText("2:00:00 behind live")))
+        // Between the viewer and live: still ahead of them, so its duration and no strip.
+        row(3).assert(hasAnyDescendant(hasText("30m")))
+        row(3).assert(hasAnyDescendant(hasText("Ended", substring = true)).not())
+        row(3).assert(hasAnyDescendant(strip).not())
+        // On air at the wall clock: its time left and the cyan strip.
+        row(4).assert(hasAnyDescendant(hasText("left", substring = true)))
+        row(4).assert(hasAnyDescendant(strip))
+    }
+
+    @Test fun statusLinesLeadWithTheirTimeFactsAndEndWithTheCategory() {
+        val news = events.map { EpgEvent.create(it.id, it.channelId, it.start, it.stop, title = it.title,
+            contentGenre = ContentGenre.fromContentType(0x20L)) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, news, NOW, NOW, false, false,
+                { if (it.id == EventId(1)) DvrEntryState.COMPLETED_ERROR else null }, {}, {}, {})
+        } } }
+        // An ellipsis may only ever cut the category, never the time left or the failure.
+        compose.onNodeWithText("Ended • Recording failed • News", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("30m left • News", substring = true, useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithText("60m • News", useUnmergedTree = true).assertCountEquals(2)
+        compose.onAllNodesWithText("News •", substring = true, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test fun theSelectedDaysTabStaysWholeInViewWhenTheListMovesToALaterDay() {
+        // More days than the panel shows tabs for, even at this test's narrow fallback font.
+        val days = List(20) { event(it + 1, NOW + it * 86_400L, NOW + it * 86_400L + 3600) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, days, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = days.last())
+        } } }
+        compose.onNodeWithTag("schedule-row-20").assertIsFocused()
+        val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
+        val tab = compose.onNode(SemanticsMatcher("a day tab") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("schedule-tab-") == true } and isSelected()).getUnclippedBoundsInRoot()
+        assertTrue("selected tab $tab outside $list", tab.left >= list.left && tab.right <= list.right)
+    }
+
+    @Test fun theRowAboveTheFocusedOneStaysClearOfTheTopFade() {
+        val evening = List(6) { event(it + 1, NOW + it * 3600L, NOW + (it + 1) * 3600L) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, evening, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = evening[4])
+        } } }
+        compose.onNodeWithTag("schedule-row-5").assertIsFocused()
+        val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("schedule-row-4").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+        compose.onNodeWithTag("schedule-row-5").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("schedule-row-4").assertIsFocused()
+        compose.onNodeWithTag("schedule-row-3").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+    }
+
+    @Test fun theTopReserveIsARealRowsHeightAtEveryFontScale() {
+        var fontScale by mutableStateOf(1f)
+        var computed = 0.dp
+        compose.setContent { TVHeadendPlayerTheme {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, fontScale)) {
+                computed = rememberScheduleRowHeight()
+                PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                    // Focus away from the running row, so its own height is measured unscaled and with its strip.
+                    ChannelSchedule(null, events, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = events[2])
+                }
+            }
+        } }
+        for (scale in listOf(1f, 1.3f)) {
+            compose.runOnIdle { fontScale = scale }
+            compose.waitForIdle()
+            val measured = compose.onNodeWithTag("schedule-row-2").fetchSemanticsNode().size.height
+            val expected = with(compose.density) { computed.toPx() }
+            // tv-material keeps the list item's padding internal; a library change must show up here.
+            assertEquals("row height at font scale $scale", expected, measured.toFloat(), 1f)
+        }
+    }
+
+    @Test fun theCoverageRequestReachesTheGuidesWeekAndEndsWithItsSessionThePanelOrTheTimeout() {
+        val fake = FakeTvheadendSession(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED,
+                dvrWrite = CapabilityAccess.DENIED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create(events)),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create(entries = emptyList())),
+        ))
+        val requests = java.util.Collections.synchronizedList(mutableListOf<Triple<CurrentSessionObservation, ChannelId, Instant>>())
+        val ended = AtomicInteger()
+        val firstUnwound = CompletableDeferred<Unit>()
+        val session = object : TvheadendSession by fake {
+            override val epgRepository = object : EpgRepository by fake.epgRepository {
+                override suspend fun acquireCoverage(currentSession: CurrentSessionObservation, channelId: ChannelId,
+                    through: Instant): EpgCoverageAcquisitionResult {
+                    requests += Triple(currentSession, channelId, through)
+                    val first = requests.size == 1
+                    // A server that never answers: only cancellation or the panel's timeout ends the request.
+                    try { awaitCancellation() } finally {
+                        // The first request unwinds slowly, finishing only after its replacement started.
+                        if (first) withContext(NonCancellable) { firstUnwound.await() }
+                        ended.incrementAndGet()
+                    }
+                }
+            }
+        }
+        val mutations = DvrMutationActions(
+            scheduleEntry = { _, _ -> error("Unexpected DVR mutation") },
+            stopEntry = { _, _ -> error("Unexpected DVR mutation") },
+            cancelEntry = { _, _ -> error("Unexpected DVR mutation") },
+            deleteEntry = { _, _ -> error("Unexpected DVR mutation") },
+            updateWatchStateCommand = { _, _, _ -> error("Unexpected DVR mutation") })
+        val notices = NoticeCenter({ 0L }) { NoticeContext(0, null) }
+        val settings = UiSettingsStore(ApplicationProvider.getApplicationContext<Application>())
+        var open by mutableStateOf(true)
+        compose.mainClock.autoAdvance = false
+        compose.setContent { TVHeadendPlayerTheme {
+            val observation by fake.observation.collectAsState()
+            val scope = rememberCoroutineScope()
+            val layers = remember { LivePlayerLayerState(scope, autoHideTimeoutMillis = 5_000) }
+            if (open) PlayerChannelSchedule(layers, channel.id, channel, observation, { fake.observation.value }, NOW,
+                AppTimeshiftState(), mutations, notices, scope, settings, onRetry = {},
+                onPlay = { _, _ -> error("Unexpected playback command") }, onPlayRecording = null,
+                onShowGuide = { _, _ -> error("Unexpected Guide") }, session = session)
+        } }
+        fun settle() { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        // The request runs off the main thread; frames keep the paused clock's effects moving meanwhile.
+        fun settleUntil(condition: () -> Boolean) {
+            repeat(100) { if (condition()) return; settle(); Thread.sleep(10) }
+            assertTrue(condition())
+        }
+        fun footer(): SemanticsNodeInteraction {
+            compose.onNodeWithTag("channel-schedule-list").performScrollToNode(hasTestTag("channel-schedule-footer"))
+            return compose.onNodeWithTag("channel-schedule-footer")
+        }
+        settle()
+        settleUntil { requests.size == 1 }
+        val (first, channelId, through) = requests[0]
+        assertSame(fake.observation.value.currentSession, first)
+        assertEquals(channel.id, channelId)
+        assertEquals(Instant.fromEpochSeconds(scheduleCoverageThroughSec(NOW, ZoneId.systemDefault())), through)
+        assertTrue("reaches the Guide's week", through.epochSeconds - NOW >= 6 * 86_400L)
+        footer().assertTextEquals("Loading later days")
+
+        // A new session generation cancels the old request and asks again under the new proof.
+        compose.runOnIdle { fake.replaceGeneration(fake.observation.value) }
+        settle()
+        settleUntil { requests.size == 2 }
+        assertNotSame(first, requests[1].first)
+        assertSame(fake.observation.value.currentSession, requests[1].first)
+        // The replaced request's late end leaves the running one's loading line alone.
+        firstUnwound.complete(Unit)
+        settleUntil { ended.get() == 1 }
+        settle()
+        footer().assertTextEquals("Loading later days")
+
+        // Closing the panel cancels its request; opening it again asks once more.
+        compose.runOnIdle { open = false }
+        settle()
+        settleUntil { ended.get() == 2 }
+        compose.runOnIdle { open = true }
+        settle()
+        settleUntil { requests.size == 3 }
+        footer().assertTextEquals("Loading later days")
+
+        // The timeout settles the request: the list ends on its end-of-schedule line.
+        compose.mainClock.advanceTimeBy(29_000)
+        compose.waitForIdle()
+        footer().assertTextEquals("Loading later days")
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        settleUntil { ended.get() == 3 }
+        settle()
+        footer().assertTextContains("No program information after", substring = true)
+        assertEquals(3, requests.size)
+    }
+
+    private fun SemanticsNodeInteraction.assertTopPositionInRootIsAtLeast(top: androidx.compose.ui.unit.Dp) {
+        val actual = getUnclippedBoundsInRoot().top
+        assertTrue("row top $actual above $top", actual >= top)
     }
 
     private fun show(viewer: Long, onOpen: (EpgEvent) -> Unit = {}) {
@@ -121,6 +359,7 @@ class ChannelScheduleFocusTest {
 
     companion object {
         const val NOW = 1789246200L
+        val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101)
         val events = listOf(
             event(1, NOW - 5400, NOW - 1800), event(2, NOW - 1800, NOW + 1800),
             event(3, NOW + 1800, NOW + 5400), event(4, NOW + 86400, NOW + 90000),
