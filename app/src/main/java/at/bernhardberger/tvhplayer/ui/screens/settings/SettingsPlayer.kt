@@ -215,7 +215,8 @@ internal fun settingsPlayerLevel(
             onClick = { onAutoStartPlaybackChanged(!ui.autoStartPlayback) }),
         settingsRow(WARM_PLAYBACK_LEVEL, stringResource(R.string.warm_playback_setting),
             warmPlaybackLabel(ui.warmPlaybackMode), child = WARM_PLAYBACK_LEVEL),
-        settingsRow("timeshift", stringResource(R.string.timeshift_setting), checked = ui.timeshiftEnabled,
+        settingsRow("timeshift", stringResource(R.string.timeshift_setting),
+            supporting = stringResource(R.string.timeshift_setting_description), checked = ui.timeshiftEnabled,
             onClick = { onTimeshiftEnabledChanged(!ui.timeshiftEnabled) }),
         // Only a paused timeshift channel is kept tuned, so without timeshift the row has no effect.
         settingsRow(KEEP_CHANNEL_LEVEL, stringResource(R.string.keep_channel_setting),

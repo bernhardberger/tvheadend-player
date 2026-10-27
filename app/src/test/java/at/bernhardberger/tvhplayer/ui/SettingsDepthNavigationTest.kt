@@ -355,7 +355,7 @@ class SettingsDepthNavigationTest {
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
-        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Pause and rewind live TV” is on."))
+        compose.onNode(isFocused() and hasText(keep) and hasText("Available when “Timeshift” is on."))
             .assertIsNotEnabled()
         press(Key.DirectionCenter)
         press(Key.DirectionRight)

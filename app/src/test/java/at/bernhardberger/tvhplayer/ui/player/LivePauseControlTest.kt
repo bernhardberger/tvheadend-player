@@ -60,7 +60,7 @@ class LivePauseControlTest {
     private lateinit var view: View
     private var livePause by mutableStateOf(LivePauseAvailability.STARTING)
     private var paused by mutableStateOf(false)
-    private var feedback by mutableStateOf<String?>(null)
+    private var unavailablePresses = 0
     private var toggles = 0
 
     @Before fun leanback() {
@@ -89,14 +89,16 @@ class LivePauseControlTest {
         compose.onNodeWithTag("player-pause").assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.StateDescription))
     }
 
-    @Test fun dimmedPressShowsTheReasonWithoutPausing() {
+    @Test fun dimmedPressReportsUnavailabilityWithoutPausingOrWritingTimelineFeedback() {
         show(LivePauseAvailability.UNAVAILABLE)
         center()
-        compose.onNodeWithText(text(R.string.pause_unavailable_channel)).assertExists()
+        assertEquals(1, unavailablePresses)
+        compose.onNodeWithText(text(R.string.pause_unavailable_channel)).assertDoesNotExist()
         compose.onNodeWithTag("player-pause").assertIsFocused()
-        compose.runOnIdle { feedback = null; livePause = LivePauseAvailability.OFF }
+        compose.runOnIdle { livePause = LivePauseAvailability.OFF }
         center()
-        compose.onNodeWithText(text(R.string.pause_timeshift_off)).assertExists()
+        assertEquals(2, unavailablePresses)
+        compose.onNodeWithText(text(R.string.pause_timeshift_off)).assertDoesNotExist()
         assertEquals(0, toggles)
     }
 
@@ -105,7 +107,7 @@ class LivePauseControlTest {
         compose.onNodeWithTag("player-pause").assertContentDescriptionEquals(text(R.string.pause))
         center()
         assertEquals(1, toggles)
-        assertEquals(null, feedback)
+        assertEquals(0, unavailablePresses)
         compose.runOnIdle { paused = true }
         compose.onNodeWithTag("player-pause").assertContentDescriptionEquals(text(R.string.play))
     }
@@ -136,11 +138,11 @@ class LivePauseControlTest {
         center()
         compose.onNodeWithTag("player-pause").assertIsFocused()
         capture("$locale-font$fontScale-unavailable-channel", fontScale)
-        compose.runOnIdle { feedback = null; livePause = LivePauseAvailability.OFF }
+        compose.runOnIdle { livePause = LivePauseAvailability.OFF }
         center()
         compose.onNodeWithTag("player-pause").assertIsFocused()
         capture("$locale-font$fontScale-timeshift-off", fontScale)
-        compose.runOnIdle { feedback = null; livePause = LivePauseAvailability.STARTING }
+        compose.runOnIdle { livePause = LivePauseAvailability.STARTING }
         center()
         compose.runOnIdle { paused = true }
         compose.onNodeWithTag("player-pause").assertIsFocused().assertContentDescriptionEquals(text(R.string.play))
@@ -170,11 +172,11 @@ class LivePauseControlTest {
                             PlayerChrome(
                                 mode = PlayerChromeMode.CONTROLS,
                                 content = PlayerChromeContent("", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, 7, "Documentary", null, null, false, 1_800, "")),
-                                timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800, feedback = feedback),
+                                timeline = PlayerChromeTimeline.Live(AppTimeshiftState(), nowSec = 1_800),
                                 actions = PlayerChromeActions(active = true, paused = paused, livePause = livePause),
                                 onTogglePause = { toggles++ },
                                 onSeek = {}, onStop = {}, onInfo = {}, onOptions = {}, onInteraction = {},
-                                onPauseUnavailable = { feedback = it },
+                                onPauseUnavailable = { unavailablePresses++ },
                             )
                         }
                     }
@@ -203,7 +205,7 @@ class LivePauseControlTest {
             File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
             File(directory, "$name.txt").writeText(
                 "canvas=1920x1080\ndensity=2.0\nlocale=${name.substringBefore('-')}\nfontScale=$fontScale\n" +
-                    "leanback=true\nfocus=player-pause\nlivePause=$livePause\npaused=$paused\nfeedback=${feedback.orEmpty()}\n" +
+                    "leanback=true\nfocus=player-pause\nlivePause=$livePause\npaused=$paused\n" +
                     "production PlayerChrome; fake state, no playback\n",
             )
             bitmap.recycle()

@@ -77,7 +77,7 @@ internal fun PlayerChrome(
     entry: PlayerControlsEntry = PlayerControlsEntry.TRAVEL,
     panelOpen: Boolean = false,
     onCommitSeek: () -> Unit = {},
-    onPauseUnavailable: (reason: String) -> Unit = {},
+    onPauseUnavailable: () -> Unit = {},
     onActionFocused: (String) -> Unit = {},
     /** Opens the Audio or Subtitles quick list from its button, shown per [PlayerChromeActions.tracks]. */
     onTrackList: (PlaybackOptionsPage) -> Unit = {},

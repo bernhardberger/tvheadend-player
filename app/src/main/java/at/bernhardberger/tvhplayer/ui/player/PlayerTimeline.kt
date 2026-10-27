@@ -593,7 +593,7 @@ private fun TimelineStatusSlot(
                         feedback,
                         style = MaterialTheme.typography.labelLarge,
                         color = if (feedbackIsError) {
-                            MaterialTheme.colorScheme.onErrorContainer
+                            MaterialTheme.colorScheme.error
                         } else {
                             MaterialTheme.colorScheme.onSurface
                         },
@@ -603,18 +603,7 @@ private fun TimelineStatusSlot(
                             .weight(1f)
                             .padding(end = maxOf(24.dp, endReserve))
                             .wrapContentWidth(Alignment.Start)
-                            .then(
-                                if (feedbackIsError) {
-                                    Modifier
-                                        .background(
-                                            MaterialTheme.colorScheme.errorContainer,
-                                            MaterialTheme.shapes.small,
-                                        )
-                                        .padding(horizontal = 8.dp)
-                                } else {
-                                    Modifier.playerStatusScrim()
-                                },
-                            )
+                            .playerStatusScrim()
                             .testTag(feedbackTestTag),
                     )
                 } else {

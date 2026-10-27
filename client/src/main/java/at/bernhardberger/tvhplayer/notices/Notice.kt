@@ -11,6 +11,7 @@ import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 
 enum class NoticeSeverity { INFO, FAILURE }
 enum class ConnectionNoticeKind { LOST, RESTORED, LOGIN_REJECTED }
+enum class PauseUnavailableReason { SETTINGS_OFF, CHANNEL_UNAVAILABLE }
 
 /** User feedback policy, with no resources or presentation dependencies. */
 sealed interface Notice {
@@ -74,6 +75,11 @@ sealed interface Notice {
     data class CacheClear(val success: Boolean) : Notice {
         override val key = "cache-clear"
         override val severity = if (success) NoticeSeverity.INFO else NoticeSeverity.FAILURE
+    }
+
+    data class PauseUnavailable(val reason: PauseUnavailableReason) : Notice {
+        override val key = "pause-unavailable"
+        override val severity = NoticeSeverity.INFO
     }
 
     data class BackgroundPlayback(val reason: BackgroundPlaybackNotice) : Notice {

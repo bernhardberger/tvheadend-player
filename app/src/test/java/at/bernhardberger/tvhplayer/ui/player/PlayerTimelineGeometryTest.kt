@@ -3,6 +3,12 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.view.View
+import androidx.compose.foundation.background
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
@@ -70,6 +76,41 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class PlayerTimelineGeometryTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun errorSeekFeedbackUsesErrorTextOverTheStatusScrimWithoutAnErrorContainer() {
+        lateinit var view: View
+        var error = Color.Unspecified
+        var errorContainer = Color.Unspecified
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                error = MaterialTheme.colorScheme.error
+                errorContainer = MaterialTheme.colorScheme.errorContainer
+                Box(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
+                    PlayerTimelineBlock(progress = 0.5f, tone = PlayerTimelineTone.ACTIVE,
+                        feedback = "Seek unavailable", feedbackIsError = true)
+                }
+            }
+        }
+        compose.waitForIdle()
+        val node = compose.onNodeWithTag("player-window-title", useUnmergedTree = true).fetchSemanticsNode()
+        val results = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        node.config[androidx.compose.ui.semantics.SemanticsActions.GetTextLayoutResult].action!!(results)
+        assertEquals(error, results.single().layoutInput.style.color)
+        compose.runOnIdle {
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+            val bounds = node.boundsInRoot
+            val pixels = (bounds.top.toInt() until bounds.bottom.toInt()).flatMap { y ->
+                (bounds.left.toInt() until bounds.right.toInt()).map { x -> bitmap.getPixel(x, y) }
+            }
+            assertFalse("no solid error container behind feedback", errorContainer.toArgb() in pixels)
+            assertTrue("the shared status scrim still darkens the white backdrop", pixels.any {
+                android.graphics.Color.red(it) < 200 && android.graphics.Color.green(it) < 200 && android.graphics.Color.blue(it) < 200
+            })
+            bitmap.recycle()
+        }
+    }
 
     private val now = 1_800L
     private val airing = event(42L, now - 1_800, now + 1_800)

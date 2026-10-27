@@ -88,7 +88,7 @@ internal fun PlayerChromeControls(
     onTrackList: (PlaybackOptionsPage) -> Unit,
     onInteraction: () -> Unit,
     onCommitSeek: () -> Unit,
-    onPauseUnavailable: (reason: String) -> Unit,
+    onPauseUnavailable: () -> Unit,
     onActionFocused: (String) -> Unit,
     onControlFocused: (String) -> Unit,
     onFocusRestored: () -> Unit,
@@ -421,7 +421,7 @@ internal fun PlayerChromeControls(
                 lastFocusedControl = it; lastAction = it; onActionFocused(it); onControlFocused(it)
             },
             onTogglePause = when {
-                pauseUnavailableReason != null -> { { onPauseUnavailable(pauseUnavailableReason) } }
+                pauseUnavailableReason != null -> onPauseUnavailable
                 // The selected channel has no installed target yet; a toggle would reach the previous one.
                 !pausable && livePause == LivePauseAvailability.NONE -> { {} }
                 else -> { { onTogglePause() } }

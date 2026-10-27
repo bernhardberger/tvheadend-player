@@ -12,6 +12,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSubscriptionError
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.notifications.AppNoticeIcon
 import at.bernhardberger.tvhplayer.ui.notifications.NoticeFormatter
 import org.junit.Assert.assertEquals
@@ -25,6 +26,20 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class, qualifiers = "en")
 class NoticeFormatterTest {
     private val formatter get() = NoticeFormatter(ApplicationProvider.getApplicationContext<Application>())
+
+    @Test fun unavailablePauseNamesTheSettingOrChannel() {
+        assertEquals("Timeshift is off in Settings.",
+            formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)
+        assertEquals("Pause isn't available on this channel.",
+            formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE)).headline)
+    }
+
+    @Test @Config(qualifiers = "de") fun unavailablePauseUsesTheGermanSettingsLabel() {
+        assertEquals("Timeshift ist in den Einstellungen ausgeschaltet.",
+            formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF)).headline)
+        assertEquals("Pausieren ist auf diesem Sender nicht möglich.",
+            formatter.format(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE)).headline)
+    }
 
     @Test fun lostNoticeOnlyMentionsSavedChannelsWhenPresent() {
         assertEquals("Connection lost", formatter.format(Notice.Connection(

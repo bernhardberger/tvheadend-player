@@ -123,6 +123,8 @@ import at.bernhardberger.tvhplayer.stores.ChannelSelectionStore
 import at.bernhardberger.tvhplayer.stores.LastPlayedChannelStore
 import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 import at.bernhardberger.tvhplayer.notices.NoticeCenter
+import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.ui.screens.postDvrFailure
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
@@ -511,8 +513,6 @@ fun VideoPlayerScreen(
     val timeshiftExpiredText = stringResource(R.string.timeshift_target_expired)
     val timeshiftReplacedText = stringResource(R.string.timeshift_target_replaced)
     val timeshiftUncertainText = stringResource(R.string.timeshift_seek_uncertain)
-    val pauseUnavailableChannelText = stringResource(R.string.pause_unavailable_channel)
-    val pauseTimeshiftOffText = stringResource(R.string.pause_timeshift_off)
     LaunchedEffect(timelineState, effectiveTimeshiftState.timeline) {
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
@@ -554,19 +554,17 @@ fun VideoPlayerScreen(
         }
     }
 
-    fun showPauseUnavailable(reason: String) {
-        timelineState.applyFeedback(timelineState.beginFeedbackOperation(), reason)
+    fun showPauseUnavailable(reason: PauseUnavailableReason =
+        if (livePauseAvailability == LivePauseAvailability.OFF) PauseUnavailableReason.SETTINGS_OFF
+        else PauseUnavailableReason.CHANNEL_UNAVAILABLE,
+    ) {
+        notices.post(Notice.PauseUnavailable(reason), notices.context())
     }
-
-    fun showPauseUnavailable() = showPauseUnavailable(
-        if (livePauseAvailability == LivePauseAvailability.OFF) pauseTimeshiftOffText
-        else pauseUnavailableChannelText,
-    )
 
     LaunchedEffect(livePauseNotice) {
         val notice = livePauseNotice ?: return@LaunchedEffect
         // A pause pressed while timeshift was starting was dropped: no grant for this channel.
-        showPauseUnavailable(pauseUnavailableChannelText)
+        showPauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE)
         layerState.core.chrome.peekBanner()
         playbackRuntime.consumeLivePauseNotice(notice)
     }
@@ -1628,7 +1626,7 @@ fun VideoPlayerScreen(
             onTogglePause = {
                 dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
             },
-            onPauseUnavailable = ::showPauseUnavailable,
+            onPauseUnavailable = { showPauseUnavailable() },
             onSeek = { deltaMs ->
                 queueTimeshiftSeek(deltaMs)
             },

@@ -12,6 +12,18 @@ class NoticeCenterTest {
     private fun post(id: Int) = center.post(Notice.Dvr(DvrChangeKind.RECORDING_STARTED,
         DvrEntry.create(DvrEntryId(id.toLong())), DvrChangeOrigin.External), context)
 
+    @Test fun repeatedUnavailablePausesReplaceOnePendingNoticeAndExpire() {
+        repeat(10) { center.post(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF), context) }
+        center.post(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE), context)
+        val pending = center.state.value.pending.single()
+        assertEquals(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE), pending.notice)
+        assertEquals(NoticeSeverity.INFO, pending.notice.severity)
+        assertTrue(center.show(pending.id, 4_000))
+        time = 4_000
+        center.prune()
+        assertNull(center.state.value.candidate)
+    }
+
     @Test fun fifoReplacementKeepsItsSlotAndOnlyEightPending() {
         post(1)
         val first = center.state.value.pending.single()

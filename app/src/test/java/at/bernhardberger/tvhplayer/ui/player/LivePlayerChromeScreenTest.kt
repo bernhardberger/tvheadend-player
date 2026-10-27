@@ -81,6 +81,7 @@ import at.bernhardberger.tvhplayer.notices.NoticeCenter
 import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.notices.NoticeSeverity
 import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationKind
 import at.bernhardberger.tvheadend.sdk.core.DvrMutationResult
@@ -873,6 +874,45 @@ class LivePlayerChromeScreenTest {
         }
     }
 
+    @Test fun pauseWithTimeshiftOffPostsOneNoticeWithoutTimelineFeedback() {
+        val data = InMemoryData()
+        runBlocking { PlayerSettingsStore(data).setTimeshiftEnabled(false) }
+        screen(settingsData = data)
+        compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.OFF }
+        key(Key.DirectionDown)
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        repeat(3) { key(Key.DirectionCenter) }
+        key(Key.MediaPause)
+        assertEquals(Notice.PauseUnavailable(PauseUnavailableReason.SETTINGS_OFF),
+            notices.state.value.pending.single().notice)
+        assertFalse(exists("player-window-title"))
+        assertFalse(exists("player-seek-feedback"))
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+    }
+
+    @Test fun pauseOnAnUnpausableChannelPostsTheChannelNoticeWithoutTimelineFeedback() {
+        val connection = ScriptedSubscriptionConnection().apply {
+            scriptSubscribe(SubscriptionOperationResult.Ok(SubscriptionConfirmation(null, null, null, 0L)))
+        }
+        val manager = createSubscriptionManager(connection, Dispatchers.Default).apply { startAdmission() }
+        try {
+            screen(opener = manager)
+            startLiveSubscription(connection, height = 1080L, signal = 53739L)
+            playerReady()
+            compose.waitUntil(5_000) { idleMainLooper(); runtime.livePause.value.availability == LivePauseAvailability.UNAVAILABLE }
+            key(Key.DirectionDown)
+            compose.onNodeWithTag("player-pause").assertIsFocused()
+            key(Key.DirectionCenter)
+            key(Key.MediaPause)
+            assertEquals(Notice.PauseUnavailable(PauseUnavailableReason.CHANNEL_UNAVAILABLE),
+                notices.state.value.pending.single().notice)
+            assertFalse(exists("player-window-title"))
+            assertFalse(exists("player-seek-feedback"))
+        } finally {
+            runBlocking { manager.closeAndJoin() }
+        }
+    }
+
     @Test fun playerInfoContainsProgrammeActionsAndBackReturnsDirectlyToControls() {
         screen()
         key(Key.DirectionDown)
@@ -1026,13 +1066,13 @@ class LivePlayerChromeScreenTest {
                 assertFalse("Banner '$badges' shows no badge ('$absent')", badges.contains(absent))
             }
 
-            // Without live Pause, Center explains over the Banner; Down opens the controls.
+            // Without live Pause, Center posts a notice; Down opens the controls.
             key(Key.DirectionCenter)
             assertFalse(exists("player-actions"))
             assertTrue(exists("player-banner"))
-            assertTrue("the reason shows in the Banner", runtime.livePause.value.availability.let {
+            assertTrue("the reason is posted as a notice", runtime.livePause.value.availability.let {
                 it != LivePauseAvailability.UNAVAILABLE && it != LivePauseAvailability.OFF
-            } || compose.onAllNodesWithText("Pause isn't available", substring = true).fetchSemanticsNodes().isNotEmpty())
+            } || notices.state.value.pending.any { it.notice is Notice.PauseUnavailable })
             key(Key.DirectionDown)
             assertTrue(exists("player-actions"))
             val controls = identityDescription() + " | " + badgeDescription("player-footer")

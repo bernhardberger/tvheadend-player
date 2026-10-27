@@ -91,8 +91,11 @@ class StartupBufferSettingsUiTest {
         }
         key(Key.DirectionCenter)
         // Long titles wrap to a second line instead of being cut off.
-        val timeshift = if (german) "Live-TV pausieren und zurückspulen" else "Pause and rewind live TV"
+        val timeshift = "Timeshift"
+        val timeshiftDescription = if (german) "Live-TV pausieren und zurückspulen" else "Pause and rewind live TV"
+        compose.onNode(hasText(timeshift) and hasText(timeshiftDescription) and hasClickAction()).assertIsDisplayed()
         assertFalse("Timeshift title is cut off", overflows(timeshift))
+        assertFalse("Timeshift supporting line is cut off", overflows(timeshiftDescription))
         // The row sits right after "Stream profile", so Down reaches it from the first player row.
         var downs = 0
         while (focusedRows(title).isEmpty()) {

@@ -12,6 +12,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.notices.ConnectionNoticeKind
 import at.bernhardberger.tvhplayer.notices.DvrMutationFeedback
 import at.bernhardberger.tvhplayer.notices.Notice
+import at.bernhardberger.tvhplayer.notices.PauseUnavailableReason
 import at.bernhardberger.tvhplayer.playback.BackgroundPlaybackNotice
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import java.time.ZoneId
@@ -64,6 +65,10 @@ internal class NoticeFormatter(private val context: Context) {
         })
         is Notice.CacheClear -> FormattedNotice(context.getString(
             if (notice.success) R.string.cache_notice_cleared else R.string.cache_notice_failed))
+        is Notice.PauseUnavailable -> FormattedNotice(context.getString(when (notice.reason) {
+            PauseUnavailableReason.SETTINGS_OFF -> R.string.pause_timeshift_off
+            PauseUnavailableReason.CHANNEL_UNAVAILABLE -> R.string.pause_unavailable_channel
+        }))
         is Notice.BackgroundPlayback -> FormattedNotice(context.getString(when (notice.reason) {
             BackgroundPlaybackNotice.LIMIT_EXPIRED -> R.string.background_live_stopped
             BackgroundPlaybackNotice.TUNER_LOST -> R.string.background_tuner_lost
