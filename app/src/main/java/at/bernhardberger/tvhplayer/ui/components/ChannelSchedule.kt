@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -8,10 +9,13 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -83,7 +87,8 @@ internal fun ChannelSchedule(
     val days = remember(events, zone, today) { events.map(::date).distinct() }
     val initialIndex = events.indexOfFirst { it.id == initialEvent?.id }.coerceAtLeast(0)
     val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialIndex)
-    val bringIntoView = rememberListEdgeBringIntoView(listState, 0.dp)
+    // The band starts a row lower, so the row above the focused one stays clear of the top fade.
+    val bringIntoView = rememberListEdgeBringIntoView(listState, 0.dp, topOverflow = rememberScheduleRowHeight())
     val scope = rememberCoroutineScope()
     val rowFocus = remember(events.map { it.id }) { events.associate { it.id to FocusRequester() } }
     val selectedTabFocus = remember { FocusRequester() }
@@ -161,6 +166,12 @@ internal fun ChannelSchedule(
                 }
             }
         } else {
+            // The selected day's tab stays whole in view wherever the list or the tabs moved it.
+            val tabInView = remember(days) { days.associateWith { BringIntoViewRequester() } }
+            LaunchedEffect(tabInView, selectedDay) {
+                withFrameNanos { }
+                selectedDay?.let(tabInView::get)?.bringIntoView()
+            }
             AppTabRow(days.indexOf(selectedDay).coerceAtLeast(0), AppTabStyle.Section,
                 modifier = Modifier.padding(horizontal = PlaybackPanelPadding),
                 selectedTabFocus = selectedTabFocus,
@@ -183,7 +194,7 @@ internal fun ChannelSchedule(
                                 selectedDay = day
                                 target?.let { event -> scope.launch { scrollToRow(events.indexOf(event)) } }
                         }, first = index == 0, last = index == days.lastIndex,
-                        modifier = Modifier.testTag("schedule-tab-$day"),
+                        modifier = Modifier.bringIntoViewRequester(tabInView.getValue(day)).testTag("schedule-tab-$day"),
                         label = when (day) {
                             today -> stringResource(R.string.channel_schedule_today)
                             today.plusDays(1) -> stringResource(R.string.channel_schedule_tomorrow)
@@ -209,7 +220,7 @@ internal fun ChannelSchedule(
                             if (headingDay != day) ScheduleDayHeading(formatDayHeader(day, locale))
                             ChannelScheduleRow(event, nowSec, viewerSec, viewerBehindMs, recording(event), timeWidth,
                                 onClick = { onOpen(event) },
-                                onContextMenu = onContextMenu?.let { open -> { open(event) } }, channel = channel,
+                                onContextMenu = onContextMenu?.let { open -> { open(event) } },
                                 modifier = Modifier.focusRequester(rowFocus.getValue(event.id))
                                     .focusProperties {
                                         left = FocusRequester.Cancel; right = FocusRequester.Cancel
@@ -250,6 +261,22 @@ private fun rememberScheduleTimeWidth(): Dp {
         with(density) { samples.maxOf { measurer.measure(it, style).size.width }.toDp() }
     }
 }
+
+/** A programme row's height with its progress strip, at the current font scale. */
+@Composable
+private fun rememberScheduleRowHeight(): Dp {
+    val typography = MaterialTheme.typography
+    val density = LocalDensity.current
+    return remember(typography, density) {
+        with(density) {
+            ScheduleRowVerticalPadding * 2 + typography.titleMedium.lineHeight.toDp() +
+                typography.bodyMedium.lineHeight.toDp() + ScheduleProgressGap + ChannelRowProgressHeight
+        }
+    }
+}
+
+/** The TV list item's own vertical content padding, which the library keeps internal. */
+private val ScheduleRowVerticalPadding = 12.dp
 
 /** A day's start in the continuous list: its date as a quiet heading over a divider. */
 @Composable
@@ -314,7 +341,6 @@ private fun ChannelScheduleRow(
     event: EpgEvent, nowSec: Long, viewerSec: Long?, viewerBehindMs: Long?, recording: DvrEntryState?, timeWidth: Dp,
     onClick: () -> Unit, modifier: Modifier = Modifier,
     onContextMenu: (() -> Unit)? = null,
-    channel: Channel? = null,
 ) {
     val contextMenu = rememberBrowseContextMenuTrigger(onContextMenu)
     var focused by remember { mutableStateOf(false) }
@@ -326,16 +352,17 @@ private fun ChannelScheduleRow(
     val resources = LocalResources.current
     // The player bar's own distance and wording; the live edge says nothing.
     val behind = viewerBehindMs?.takeIf { watched && it > 0L }
+    // Time facts lead and the category ends the line, so an ellipsis only ever cuts the category.
     val facts = listOfNotNull(
-        programmeCategory(event)?.let { programmeCategoryLabel(it) },
         when {
-            failed -> stringResource(if (recording == DvrEntryState.MISSED) R.string.recording_notice_missed else R.string.details_status_failed)
             behind != null -> stringResource(R.string.timeshift_behind_live, formatPlaybackDuration(behind))
             event.isRunning(nowSec) -> stringResource(R.string.recordings_until, formatHm(stop)) + ScheduleSeparator +
                 playerMinutesLeft(((stop - nowSec + 59) / 60).toInt())
             ended -> stringResource(R.string.channel_schedule_ended)
             else -> formatDurationMinutes((stop - start + 59) / 60, resources)
         },
+        if (failed) stringResource(if (recording == DvrEntryState.MISSED) R.string.recording_notice_missed else R.string.details_status_failed) else null,
+        programmeCategory(event)?.let { programmeCategoryLabel(it) },
     )
     val at = if (watched) viewerSec else nowSec
     val progress = event.progress(at).takeIf { event.isRunning(at) }
@@ -376,8 +403,11 @@ private fun ChannelScheduleRow(
             }
         },
         leadingContent = {
-            ProgrammeArtwork(event.image, channel?.icon.takeIf { event.image == null }, null,
-                Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height))
+            val slot = Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height)
+            // The header names the channel: a programme without art keeps a plain tile, no logo,
+            // a step off the row's own fill in either focus state.
+            if (event.image != null) ProgrammeArtwork(event.image, null, null, slot)
+            else Box(slot.clip(MaterialTheme.shapes.small).background(LocalContentColor.current.copy(alpha = TvTrackAlpha)))
         },
         modifier = modifier.then(contextMenu.modifier).fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }.testTag("schedule-row-${event.id.value}"),

@@ -10,7 +10,10 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.*
 import kotlin.time.Instant
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -90,10 +93,55 @@ class ChannelScheduleFocusTest {
             ChannelSchedule(null, events, NOW, NOW, loading, false, { null }, {}, {}, {})
         } } }
         compose.onNodeWithTag("schedule-row-2").assertIsFocused()
-        compose.onNodeWithTag("channel-schedule-footer").performScrollTo().assertTextEquals("Loading later days")
+        compose.onNodeWithTag("channel-schedule-list").performScrollToNode(hasTestTag("channel-schedule-footer"))
+        compose.onNodeWithTag("channel-schedule-footer").assertTextEquals("Loading later days")
         compose.runOnIdle { loading = false }
-        compose.onNodeWithTag("channel-schedule-footer").performScrollTo().assertTextContains("No program information after", substring = true)
+        compose.onNodeWithTag("channel-schedule-footer").assertTextContains("No program information after", substring = true)
         compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+    }
+
+    @Test fun statusLinesLeadWithTheirTimeFactsAndEndWithTheCategory() {
+        val news = events.map { EpgEvent.create(it.id, it.channelId, it.start, it.stop, title = it.title,
+            contentGenre = ContentGenre.fromContentType(0x20L)) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, news, NOW, NOW, false, false,
+                { if (it.id == EventId(1)) DvrEntryState.COMPLETED_ERROR else null }, {}, {}, {})
+        } } }
+        // An ellipsis may only ever cut the category, never the time left or the failure.
+        compose.onNodeWithText("Ended • Recording failed • News", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText("30m left • News", substring = true, useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithText("60m • News", useUnmergedTree = true).assertCountEquals(2)
+        compose.onAllNodesWithText("News •", substring = true, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test fun theSelectedDaysTabStaysWholeInViewWhenTheListMovesToALaterDay() {
+        // More days than the panel shows tabs for, even at this test's narrow fallback font.
+        val days = List(20) { event(it + 1, NOW + it * 86_400L, NOW + it * 86_400L + 3600) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, days, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = days.last())
+        } } }
+        compose.onNodeWithTag("schedule-row-20").assertIsFocused()
+        val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
+        val tab = compose.onNode(SemanticsMatcher("a day tab") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("schedule-tab-") == true } and isSelected()).getUnclippedBoundsInRoot()
+        assertTrue("selected tab $tab outside $list", tab.left >= list.left && tab.right <= list.right)
+    }
+
+    @Test fun theRowAboveTheFocusedOneStaysClearOfTheTopFade() {
+        val evening = List(6) { event(it + 1, NOW + it * 3600L, NOW + (it + 1) * 3600L) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, evening, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = evening[4])
+        } } }
+        compose.onNodeWithTag("schedule-row-5").assertIsFocused()
+        val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
+        compose.onNodeWithTag("schedule-row-4").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+        compose.onNodeWithTag("schedule-row-5").performKeyInput { pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("schedule-row-4").assertIsFocused()
+        compose.onNodeWithTag("schedule-row-3").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+    }
+
+    private fun SemanticsNodeInteraction.assertTopPositionInRootIsAtLeast(top: androidx.compose.ui.unit.Dp) {
+        val actual = getUnclippedBoundsInRoot().top
+        assertTrue("row top $actual above $top", actual >= top)
     }
 
     private fun show(viewer: Long, onOpen: (EpgEvent) -> Unit = {}) {

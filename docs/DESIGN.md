@@ -1137,20 +1137,24 @@ playback: its caller supplies events, viewer position, recording marks and actio
 The sheet header carries the picon, the `channelTitleText` title in the options
 sheet's `titleLarge` and the clock in `titleMedium` at the tertiary alpha, on the
 rows' text keyline. Rows are standard `ListItem`s with library focus defaults: an
-80×45dp `ProgrammeArtwork` (channel logo when the programme has no picture), a
+80×45dp `ProgrammeArtwork` (a plain tile in the artwork's own tone when the
+programme has no picture: the header already names the channel), a
 16sp `titleMedium` headline with the start time in its own measured column and
-the one-line title, and a 14sp `bodyMedium` supporting line under the title
-(category • state: time left, behind live in the player bar's wording and
-live-edge tolerance, Ended, duration, or a failed recording) with the channel
-rows' 2dp progress strip. Recording marks are the rows' shared dots; failed
+the one-line title, and a 14sp `bodyMedium` supporting line under the title with
+the time facts first and the category last, so an ellipsis cuts only the
+category: until • time left, behind live in the player bar's wording and
+live-edge tolerance (the viewer's row only), Ended, or the duration, then a
+failed recording, then the category. The channel rows' 2dp progress strip follows. Recording marks are the rows' shared dots; failed
 recordings use the error mark. There is no playing mark: orange viewer progress
 and initial focus name the viewer's programme, cyan progress the one on air.
 Ended rows step their headline back to the secondary alpha. Day tabs follow
-focus above one continuous list; later days start under a sentence-case
+focus above one continuous list, and the selected day's tab is brought whole
+into view wherever the list or the tabs moved it; later days start under a sentence-case
 `titleSmall` date over a divider, and gaps (time column plus "No program
 information until …") are passive rows in the secondary tone, as is the end line.
 The list runs to the sheet's bottom edge with the shared list edge fades and
-bring-into-view reserve. While nothing has loaded, skeleton tabs and rows hold
+bring-into-view reserve; its band starts one row lower (the shared top
+overflow), so a row above the focused one is always clear of the top fade. While nothing has loaded, skeleton tabs and rows hold
 focus and announce loading; offline uses the shared programme status line with
 Retry.
 OK opens the shared details page; Menu/hold OK opens the shared context menu.
