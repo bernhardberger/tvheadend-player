@@ -13,7 +13,16 @@ D-pad.
 > release. It is not an official Tvheadend application and is not affiliated
 > with or endorsed by the Tvheadend project.
 
-<!-- screenshots: lead image and gallery added once the owner picks them -->
+![Channels as large picture cards, with Ridge Light playing on Ridge Earth](artwork/screenshots/channels.png)
+
+| | |
+|---|---|
+| ![The program guide, with Ridge Light focused and its picture in the headline](artwork/screenshots/guide.png) | ![The player controls over the live picture, with the channel list peeking out below](artwork/screenshots/player.png) |
+| Program guide | Player controls |
+| ![The details page for Ridge Light, with its picture across the screen](artwork/screenshots/details.png) | ![Recordings, with a Documentaries folder open and a partly watched recording](artwork/screenshots/recordings.png) |
+| Program details | Recordings |
+
+The screenshots show fictional channels and programs.
 
 ## What you need
 

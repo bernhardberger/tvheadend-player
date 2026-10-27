@@ -105,7 +105,8 @@
   sound, or nothing.
 - **Keep paused TV tuned**: if you leave the app while live TV is paused, the
   channel stays tuned for 10, 20 or 30 minutes so you can continue, or not at all
-  (Off). It needs **Pause and rewind live TV**.
+  (Off). It is available when **Timeshift**, which pauses and rewinds live TV,
+  is on.
 - **Match content frame rate**, with Always, Only if seamless and Off. The player
   asks the TV for the frame rate the server declares for the stream, so a 50 Hz
   channel can switch a TV that offers 50 Hz. Playback statistics show the output

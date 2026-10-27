@@ -33,6 +33,11 @@ Pixel-exact reproduction also depends on the same JDK, Robolectric native graphi
 and fonts. Copy only owner-selected images into a tracked artwork directory and
 review the diff; never force-add the generated directory.
 
+The README uses Channels as the lead image, then Guide, player controls, details
+and Recordings; the Settings capture is not used. The tracked copies in
+[`artwork/screenshots/`](../artwork/screenshots/) are the same pixels saved
+without the fully opaque alpha channel.
+
 ## Scene contract
 
 Every scene uses English, UTC, font scale 1.0, a 960×540dp landscape canvas at
@@ -40,7 +45,8 @@ xhdpi (1920×1080 pixels) and the fictional
 [fixture-art pack](../app/src/test/resources/fixture-art/README.md). The live
 scenes share channel **1 · Ridge Earth**, **Ridge Light** on
 **2026-10-04 20:00–21:00 UTC** and a **20:15** clock, and agree on what the other
-channels have on air. Recordings shows the previous evening's airing with a saved
+channels have on air. Ridge Light carries the XMLTV genre Documentary and no DVB
+content type, so every screen names its genre the same way. Recordings shows the previous evening's airing with a saved
 position of 00:20:23.
 
 | Capture | Time and position | Focus |
