@@ -668,10 +668,12 @@ private fun DetailsAirings(
                     if (listState.layoutInfo.visibleItemsInfo.any { it.key == lastCard?.value })
                         lastCard?.let(requesters::get)?.requestFocus()
                 }
-            }.focusGroup().rowContentEmphasis(emphasis).testTag("details-airings")
-                .onSizeChanged { rowHeight.intValue = it.height; onTextHeight(textHeight()) },
+            }.focusGroup().testTag("details-airings")
+                .onSizeChanged { rowHeight.intValue = it.height; onTextHeight(textHeight()) }
+                // The focused card's glow reaches past the room, inside the dimming layer.
+                .cardGlowRoom(top = CardGlowReach - AiringCardRoom).rowContentEmphasis(emphasis),
                 state = listState,
-                contentPadding = PaddingValues(horizontal = DetailsKeyline, vertical = AiringCardRoom),
+                contentPadding = PaddingValues(horizontal = DetailsKeyline, vertical = CardGlowReach),
                 horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 itemsIndexed(airings, key = { _, it -> it.id.value }) { index, item ->
                     AiringCard(item, airingEpisode(item, pageTitle, pageEpisode, LocalContext.current.resources), item.channelId?.let(channelOf), nowSec,

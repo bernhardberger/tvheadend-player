@@ -99,6 +99,8 @@ import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.formatTimeInterval
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import at.bernhardberger.tvhplayer.ui.common.progress
+import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
+import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
 import at.bernhardberger.tvhplayer.ui.components.ChannelLogoGlow
 import at.bernhardberger.tvhplayer.ui.components.ChannelNowIndicators
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -367,8 +369,8 @@ private fun ChannelsCardRow(
             contentPadding = PaddingValues(
                 start = keyline + CompactZapRowOffscreen,
                 end = cards.keyline + CompactZapRowOffscreen,
-                top = ImmersiveFocusRoom,
-                bottom = ImmersiveFocusRoom,
+                top = CardGlowReach,
+                bottom = CardGlowReach,
             ),
             modifier = modifier
                 .browseUnderlap(underlap)
@@ -378,6 +380,8 @@ private fun ChannelsCardRow(
                     val rootWidth = coordinates.findRootCoordinates().size.width
                     screenEdge = (if (ltr) -left else left + coordinates.size.width - rootWidth).coerceAtLeast(0f)
                 }
+                // The focused card's glow reaches past the focus room, outside the fade's layer.
+                .cardGlowRoom(top = CardGlowReach - ImmersiveFocusRoom)
                 // The card before the keyline runs on under the navigation drawer and fades out at the screen edge.
                 .navigationEdgeFadeMask(keyline - CompactZapCardGap, leadingInsetPx = { screenEdge })
                 // Under the opening drawer the cards darken like the backdrop, inside the fade's layer.

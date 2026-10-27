@@ -314,8 +314,8 @@ to its image card. Unfocused and pressed scales stay native. Native list rows
 unscaled player identity are not cards. Buttons keep their native focus growth;
 this includes the WideButton-style `GuidedStepAction` surface at 1.1×.
 
-Embedded-progress cards use the shared `embeddedProgressCardBorder` treatment
-(revised 2026-10-27): use a 2.5dp focused outline with the native shape,
+Embedded-progress cards use the shared focus ring (revised 2026-10-27): use a
+2.5dp focused outline with the native shape,
 use `onSurface` for its colour to match native focused buttons, and move its path
 4.25dp **outside** the card, leaving a 3dp gap inside the centred stroke. The
 outline radius includes that offset: TV Material 1.1.0's native 8dp card radius
@@ -325,12 +325,33 @@ The bottom progress strip
 remains in its designed flush, full-width slot; the outline must
 not paint over it. Layout reserves the additional outer extent.
 
+The focused ring breathes like Google TV Home's (accepted 2026-10-27): its
+alpha eases in and out between solid and 0.45, a full cycle every 3 seconds. It
+starts solid when focus arrives; a pressed card keeps its solid ring at its
+resting size, as before. With
+animations turned off in the system settings the ring stays solid. A TV
+Material border cannot change between frames without recomposing, so
+`cardFocusRing` in `EmbeddedProgressCardBorder.kt` is the one place that draws
+the ring and the card's focus scale, both read only while drawing; the cards
+pass `embeddedProgressCardBorder()` and `EmbeddedProgressCardScale` to turn the
+native ones off. The scale applies to the drawing, so focus and semantics
+bounds stay at rest as under the native scale. Only the focused card runs the
+pulse.
+
 Picture cards add a restrained native focus glow (accepted 2026-10-27), shared
 by Quick Zap, Channels cards and programme airings. Its colour comes from the
 picture shown, or the channel's picon accent on a logo card; without a usable
 colour it stays neutral. Use a broad, soft 24dp native glow at 0.45 alpha, with
 the shared outline and scale above; native pressed treatment stays unchanged.
 Rows, Guide cells and buttons keep their native defaults.
+
+The glow is never cut by a straight line (2026-10-27). A row or grid of such
+cards keeps `CardGlowReach` (40dp) of room around its cards with
+`Modifier.cardGlowRoom`, which lets the list draw past its bounds without
+changing its size or place, and grows the list's content padding by the same
+amount. The room goes outside any offscreen layer, such as an edge-fade mask or
+a dimming row, that would otherwise clip it. A deliberate edge fade may fade the
+glow with the content; the screen edge may end it.
 
 Component commit model is set by the component:
 

@@ -117,6 +117,7 @@ internal fun CompactZapCard(
     val haloPx = with(LocalDensity.current) { halo.roundToPx() }
     val haloTransformation = remember(haloPx) { if (haloPx > 0) LogoHaloTransformation(haloPx, CompactZapLogoHaloAlpha) else null }
     val interaction = remember { MutableInteractionSource() }
+    val ring = rememberCardFocusRing(interaction)
     CompactCard(
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
@@ -127,7 +128,7 @@ internal fun CompactZapCard(
         // A scrim keeps text legible over artwork; the logo card's text sits on a flat surface.
         // The player rail keeps the kit's.
         scrimBrush = if (showArtwork && !channelLed) CardDefaults.ScrimBrush else SolidColor(Color.Transparent),
-        modifier = modifier.then(contextMenu.modifier),
+        modifier = modifier.then(contextMenu.modifier).cardFocusRing(ring, MaterialTheme.colorScheme.onSurface),
         image = {
             Box(Modifier.fillMaxWidth().height(imageHeight).background(TvSurfaceColors.containerLowest)) {
                 if (artworkModel != null && !artworkFailed) AsyncImage(

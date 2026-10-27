@@ -14,7 +14,8 @@ import androidx.compose.ui.focus.focusTarget
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.*
-import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -30,9 +31,11 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.RowChangeMotion
 import at.bernhardberger.tvhplayer.ui.components.RowDimAlpha
 import at.bernhardberger.tvhplayer.ui.components.RowHeaderQuietAlpha
+import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
 import at.bernhardberger.tvhplayer.ui.components.rowEmphasis
 
 /** How much of the next row shows below the focused one: its quiet title and the top of its cards. */
@@ -130,8 +133,12 @@ internal fun PlayerChannelBrowser(
     Box(Modifier.fillMaxWidth()
         // Runs off the screen's bottom edge; the page may leave less room than it asks for.
         .height(if (rows.size > 1) rowHeight + PlayerChannelRowPeek else rowHeight)
-        // The previous row slides out under the preview rather than across it.
-        .clipToBounds()
+        // The previous row slides out under the preview rather than across it. A single row's
+        // focused card keeps its glow below; a next row's peek ends at the browser's bottom.
+        .drawWithContent {
+            val glowBelow = if (rows.size > 1) 0f else (CardGlowReach - ChannelCardRoom).toPx()
+            clipRect(bottom = size.height + glowBelow) { this@drawWithContent.drawContent() }
+        }
         .testTag("player-channel-browser")
         .relocatedKeys(state)
         .onPreviewKeyEvent { event ->
@@ -189,7 +196,11 @@ internal fun PlayerChannelBrowser(
                         style = typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface)
                     Spacer(Modifier.height(PlayerChannelRowTitleGap))
-                    Box(Modifier.height(cardHeight).graphicsLayer { alpha = lerp(RowDimAlpha, 1f, emphasis()) }) {
+                    // The dimming layer reaches as far as the focused card's glow.
+                    Box(Modifier.height(cardHeight)
+                        .cardGlowRoom(top = CardGlowReach - ChannelCardRoom)
+                        .graphicsLayer { alpha = lerp(RowDimAlpha, 1f, emphasis()) }
+                        .padding(vertical = CardGlowReach - ChannelCardRoom)) {
                         CompositionLocalProvider(LocalChannelPeekAnchor provides (row == current)) {
                         ChannelDrawer(
                             channels = if (row == PlayerChannelRow.ON_NOW) channels else recentChannels,
