@@ -1164,8 +1164,8 @@ overflow), so a row above the focused one is always clear of the top fade. While
 focus and announce loading; offline uses the shared programme status line with
 Retry.
 OK opens the shared details page; Menu/hold OK opens the shared context menu.
-Back from details restores the source row. From a browsed list row other than the
-opening row, Back focuses the selected day's tab without moving the list. From the
+Back from details restores the source row and keeps the row the sheet opened on. From a
+browsed list row other than the opening row, Back focuses the selected day's tab without moving the list. From the
 opening row, the opening state or the tabs, Back closes the sheet and restores its
 origin (including the Schedule action for button entry). A held Back acts once. Focusing another day
 tab still jumps the list to that day. Remote

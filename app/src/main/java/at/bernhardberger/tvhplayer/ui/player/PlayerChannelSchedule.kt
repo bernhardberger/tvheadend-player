@@ -70,6 +70,8 @@ internal fun PlayerChannelSchedule(
     }
     val moreLoading = scheduleCoveragePending(connection, observation.epgState, channelId, throughSec, pendingRequest != null)
     var focused by remember(channelId) { mutableStateOf(scheduleInitialEvent(events, viewerSec, nowSec)) }
+    // Survives the details page replacing the list, so Back after details still reaches the tabs.
+    var openingEvent by remember(channelId) { mutableStateOf<EventId?>(null) }
     var contextMenu by remember { mutableStateOf(false) }
     val details = layers.scheduleDetails
     if (details != null) LivePlayerProgrammeDetails(details, channel, observation, currentObservation, nowSec,
@@ -94,7 +96,8 @@ internal fun PlayerChannelSchedule(
                 onClose = { layers.closeSchedule() }, onRetry = onRetry,
                 initialEvent = focused ?: scheduleInitialEvent(events, viewerSec, nowSec), onFocused = { focused = it },
                 viewerBehindMs = liveBehindMs(timeshift),
-                onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
+                onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) },
+                openingEvent = openingEvent, onOpeningEvent = { openingEvent = it })
         }
     }
 }
