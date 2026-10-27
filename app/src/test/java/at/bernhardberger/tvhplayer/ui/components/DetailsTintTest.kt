@@ -94,9 +94,15 @@ class DetailsTintTest {
         releaseSample.complete(Unit)
         showPage()
         compose.waitUntil(10_000) { DetailsArtColors.stored(AppArtworkSource(session, art)) != null }
-        compose.mainClock.advanceTimeBy(1000)
+        // The page starts fully dimmed until the backdrop's dim is measured off the UI thread, which
+        // under load can take longer than any fixed clock advance.
+        val corner = Color(0xFF190C0C).copy(alpha = .92f).compositeOver(Color.Red)
+        compose.waitUntil(10_000) {
+            compose.mainClock.advanceTimeBy(100)
+            (pixel(20, 1060) shr 16 and 0xff) >= (corner.toArgb() shr 16 and 0xff) - 3
+        }
         // The bottom-left corner, beyond the scrim's reach from the top right, away from the text.
-        assertNear(20, 1060, Color(0xFF190C0C).copy(alpha = .92f).compositeOver(Color.Red))
+        assertNear(20, 1060, corner)
     }
 
     @Test fun warmPlaybackKeepsTheThemeBehindTheTransparentPage() {
