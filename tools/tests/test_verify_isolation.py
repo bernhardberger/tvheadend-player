@@ -36,10 +36,11 @@ class VerifyIsolationTest(unittest.TestCase):
                                   text=True, capture_output=True, timeout=10)
 
     def test_installed_launcher_gets_options_and_failure_never_falls_back(self):
-        result = self.run_verify(installed=True, arguments=("--staged-sdk", "--visual-captures"))
+        result = self.run_verify(installed=True, arguments=("--staged-sdk", "--visual-captures", "--release"))
         self.assertEqual(result.returncode, 37)
         self.assertIn("LAUNCH=--staged-sdk", result.stdout)
         self.assertIn("LAUNCH=--visual-captures", result.stdout)
+        self.assertIn("LAUNCH=--release", result.stdout)
         self.assertNotIn("ARG=", result.stdout)
 
     def test_worker_does_not_recurse_or_reuse_external_daemons(self):

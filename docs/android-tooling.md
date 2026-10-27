@@ -35,6 +35,10 @@ timeout --kill-after=5s 30m ./tools/verify
 `--offline` requires already cached dependencies; a cache miss is a failed build,
 not permission to change dependencies. `tools/verify` includes the published SDK
 and native provenance gates. It compiles Android tests but does not run them.
+It builds and lints the Play build only; `tools/verify --release` adds the
+Appliance lint, debug APK and manifest contract. `tools/prepare-release` and CI
+pass `--release`. Run it yourself after changing Appliance-only code, manifests
+or resources.
 Use the `gradle-run` skill for bounded logs, cancellation and live-test isolation.
 
 On copilot, an installed `/usr/local/bin/tvhplayer-verify` launcher makes
