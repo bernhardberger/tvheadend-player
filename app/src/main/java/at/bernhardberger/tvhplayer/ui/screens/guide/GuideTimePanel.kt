@@ -185,12 +185,14 @@ internal fun GuideTimePanel(
                         else -> false
                     }
                 }) {
-                // Level with Now and on the rows' text column, so the day reads as the heading of its times.
+                // Level with Now and on the rows' text column. The schedule's small day label, set
+                // on the band's bottom edge, reads as the heading of the times below, not as one of them.
                 Box(Modifier.fillMaxWidth().padding(start = PlaybackPanelPadding + 16.dp, end = PlaybackPanelPadding, top = 20.dp)
-                    .heightIn(min = 48.dp), contentAlignment = Alignment.CenterStart) {
+                    .heightIn(min = 48.dp), contentAlignment = Alignment.BottomStart) {
                     Text(
                         guideDayLabel(timesDay, today, zoneId, locale),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.semantics { heading() },
