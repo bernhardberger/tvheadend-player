@@ -93,7 +93,11 @@ internal fun railStatusLabel(status: RailPlaybackStatus, behindLiveMinutes: Long
         RailPlaybackStatus.RECORDED -> resources.getString(R.string.details_recorded)
     }
 
-/** Line two: the state, then the channel when the title above it is a programme or recording. */
+/**
+ * Line two after the playback mark: the state, then the channel when the title above it is a
+ * programme or recording. The mark already says live and paused, so those name only the channel,
+ * or the state when there is no channel to show.
+ */
 internal fun railStatusLine(
     status: RailPlaybackStatus,
     behindLiveMinutes: Long?,
@@ -101,5 +105,9 @@ internal fun railStatusLine(
     resources: Resources,
 ): String {
     val label = railStatusLabel(status, behindLiveMinutes, resources)
-    return if (channel != null) resources.getString(R.string.rail_now_playing_line, label, channel) else label
+    return when {
+        channel == null -> label
+        status == RailPlaybackStatus.LIVE || status == RailPlaybackStatus.PAUSED -> channel
+        else -> resources.getString(R.string.rail_now_playing_line, label, channel)
+    }
 }

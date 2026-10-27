@@ -515,6 +515,8 @@ internal fun SideRail(
                                 else if (focusedControl == control) focusedControl = null
                             },
                             animated = animateNowPlaying ?: systemAnimationsEnabled,
+                            fullWidth = fullWidth,
+                            visibleWidthPx = visibleWidthPx,
                         )
                     }
 
@@ -707,8 +709,6 @@ private val NowPlayingPlateGap = 12.dp
 
 /** The labels start [NowPlayingPlateGap] after the plate, which reaches past the destinations' icons. */
 private val NowPlayingTextStart = ItemIconCenter + NowPlayingPlateWidth / 2 + NowPlayingPlateGap
-// Compensates the pill and button's inner padding so the first icon aligns with the title.
-private val ControlIconPaddingCompensation = 10.dp
 
 /**
  * The top section while something plays behind browse: the playing channel's plate on the mark's
@@ -734,6 +734,8 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
     onStop: () -> Unit,
     onControlFocused: (String, Boolean) -> Unit,
     animated: Boolean,
+    fullWidth: Dp,
+    visibleWidthPx: IntState,
 ) = HoldWatching(nowPlaying.reconnecting) {
     // A reconnect keeps the strip and title where the viewer was until playback resumes or ends.
     val reconnecting = nowPlaying.reconnecting
@@ -783,29 +785,18 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
                     .testTag("global-drawer-now-playing-plate"),
                 contentAlpha = if (status == RailPlaybackStatus.TUNING) inactiveContentAlpha() else 1f,
             ) {
-                Box(Modifier.matchParentSize().background(androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.5f)),
-                    contentAlignment = Alignment.Center) {
-                    val mark = when (status) {
-                        RailPlaybackStatus.PAUSED -> ChannelPlaybackIndicator.PAUSED
-                        RailPlaybackStatus.TUNING, RailPlaybackStatus.RECONNECTING -> ChannelPlaybackIndicator.TUNING
-                        else -> ChannelPlaybackIndicator.PLAYING
-                    }
-                    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                        ChannelPlaybackMarker(mark, size = 16.dp, announceState = false, animated = animated,
-                            modifier = Modifier.testTag("global-drawer-now-playing-glyph-${mark.name.lowercase()}"))
-                    }
-                }
                 NowPlayingRailStrip(nowPlaying, programme, status, nowSec)
             }
+            // The kit's enter slides in from the left; clipped, the labels emerge from the plate's edge.
             androidx.compose.animation.AnimatedVisibility(expanded,
                 enter = NavigationDrawerItemDefaults.ContentAnimationEnter,
                 exit = NavigationDrawerItemDefaults.ContentAnimationExit,
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = NowPlayingTextStart)) {
-                Column {
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = NowPlayingTextStart).clipToBounds()) {
+                Column(Modifier.testTag("global-drawer-now-playing-text")) {
                     Text(title ?: channel, style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    NowPlayingStatusLine(status, viewer, nowSecProvider, lineChannel)
+                    NowPlayingStatusLine(status, viewer, nowSecProvider, lineChannel, animated)
                 }
             }
         }
@@ -820,12 +811,17 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
                 onTogglePause = onTogglePause,
                 onStop = onStop,
                 onControlFocused = onControlFocused,
+                fullWidth = fullWidth,
+                visibleWidthPx = visibleWidthPx,
             )
         }
     }
 }
 
-/** The kit has no grouped icon row: the shared pill is passive; each button keeps kit focus. */
+/**
+ * The kit has no grouped icon row: the shared pill is passive; each button keeps kit focus. The pill
+ * spans a destination's extent and grows with the sheet as their pills do; the buttons share it evenly.
+ */
 @Composable
 private fun DrawerNowPlayingControls(
     paused: Boolean,
@@ -837,16 +833,19 @@ private fun DrawerNowPlayingControls(
     onTogglePause: () -> Unit,
     onStop: () -> Unit,
     onControlFocused: (String, Boolean) -> Unit,
+    fullWidth: Dp,
+    visibleWidthPx: IntState,
 ) {
     val pauseFocus = remember { FocusRequester() }
     val stopFocus = remember { FocusRequester() }
     val controls = listOf("fullscreen", "pause", "stop").filter { it != "pause" || pauseAvailable }
     val requesters = listOfNotNull(fullScreenFocus, pauseFocus.takeIf { pauseAvailable }, stopFocus)
-    Row(Modifier.padding(start = NowPlayingTextStart - ControlIconPaddingCompensation, top = 4.dp)
+    Row(Modifier.padding(top = 4.dp)
+        .withinDrawerSheet(fullWidth, visibleWidthPx)
+        .width(NavigationDrawerItemDefaults.ExpandedDrawerItemWidth)
         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha), CircleShape)
-        // 4dp ends keep the kit's 1.1x disc inside the rounded capsule.
-        .padding(horizontal = 4.dp, vertical = 2.dp).testTag("global-drawer-now-playing-controls"),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        .padding(vertical = 2.dp).testTag("global-drawer-now-playing-controls"),
+        horizontalArrangement = Arrangement.SpaceEvenly) {
         controls.forEachIndexed { index, control ->
             key(control) {
                 val label = when (control) {
@@ -905,25 +904,38 @@ private fun BoxScope.NowPlayingRailStrip(
     )
 }
 
-/** Line two: the state, and the channel when the title is a programme or recording. */
+/** Line two: the playback mark, then the state it leaves unsaid and the channel when the title is a programme or recording. */
 @Composable
 private fun NowPlayingStatusLine(
     status: RailPlaybackStatus,
     viewer: State<LiveViewerPosition?>,
     nowSecProvider: () -> Long,
     channel: String?,
+    animated: Boolean,
 ) {
     val minutes = if (status == RailPlaybackStatus.BEHIND_LIVE) {
         railBehindLiveMinutes(viewer.value?.epochSec, nowSecProvider())
     } else null
-    Text(
-        railStatusLine(status, minutes, channel, LocalResources.current),
-        Modifier.clearAndSetSemantics {},
-        style = MaterialTheme.typography.bodySmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+    val mark = when (status) {
+        RailPlaybackStatus.PAUSED -> ChannelPlaybackIndicator.PAUSED
+        RailPlaybackStatus.TUNING, RailPlaybackStatus.RECONNECTING -> ChannelPlaybackIndicator.TUNING
+        else -> ChannelPlaybackIndicator.PLAYING
+    }
+    Row(Modifier.testTag("global-drawer-now-playing-line"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            ChannelPlaybackMarker(mark, size = 16.dp, announceState = false, animated = animated,
+                modifier = Modifier.testTag("global-drawer-now-playing-glyph-${mark.name.lowercase()}"))
+        }
+        Text(
+            railStatusLine(status, minutes, channel, LocalResources.current),
+            Modifier.clearAndSetSemantics {},
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /** [value], or while [held] the value it had when the hold began. */
