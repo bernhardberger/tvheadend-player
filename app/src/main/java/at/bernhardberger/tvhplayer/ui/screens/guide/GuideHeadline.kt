@@ -240,7 +240,7 @@ internal fun guideHeadlineDropPx(viewportPx: Int, gridTopPx: Int, stridePx: Int,
  * the first row. Its scrim clears it above the ruler, so it
  * fills the space above the grid without covering the grid.
  */
-private val GuideHeadlinePictureReach = 104.dp
+internal val GuideHeadlinePictureReach = 104.dp
 
 /**
  * The Guide's headline: who and what the settled [programme] is ([rememberSettledGuideHeadline]),
