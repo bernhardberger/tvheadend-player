@@ -338,7 +338,7 @@ fun RecordingPlayerScreen(
                         playbackState is AppPlaybackState.Failed)),
             seekPreviewPhase = timelineState.seekPreviewPhase(chrome.controlsVisible),
             controlsVisible = chrome.controlsVisible && playbackAvailable,
-            statsEnabled = statsVisible,
+            statsEnabled = layers.statsVisible,
         )
     val foregroundContext = currentPlayerForegroundContext()
     val seekPreviewPhase = foregroundContext.seekPreviewPhase

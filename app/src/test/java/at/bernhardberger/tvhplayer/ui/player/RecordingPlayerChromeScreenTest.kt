@@ -35,6 +35,9 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import android.net.Uri
+import android.view.KeyEvent as AndroidKeyEvent
+import android.view.View
+import androidx.compose.ui.platform.LocalView
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
@@ -114,6 +117,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
 class RecordingPlayerChromeScreenTest {
     @get:Rule val compose = createComposeRule()
+    private lateinit var rootView: View
     private val context = ApplicationProvider.getApplicationContext<Application>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private lateinit var player: ExoPlayer
@@ -513,6 +517,32 @@ class RecordingPlayerChromeScreenTest {
         assertEquals("closing the options returns focus to their gear", listOf("player-settings"), focused())
     }
 
+    @Test fun twoBacksBeforeACompositionHideTheStatsThenClose() {
+        var closed = false
+        screen(onClose = { closed = true })
+        playing()
+        key(Key.Menu)
+        compose.onNodeWithTag("playback-options-stats").performSemanticsAction(SemanticsActions.RequestFocus)
+        settle()
+        key(Key.DirectionCenter)
+        key(Key.DirectionCenter)
+        key(Key.Back)
+        key(Key.Back)
+        key(Key.Back)
+        assertFalse("only the stats remain", exists("player-settings") || exists("player-banner"))
+        assertTrue("the stats are shown", texts("Stats for nerds"))
+        assertFalse(closed)
+        // Both Backs arrive before the screen recomposes.
+        compose.runOnUiThread {
+            repeat(2) {
+                rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_DOWN, AndroidKeyEvent.KEYCODE_BACK))
+                rootView.dispatchKeyEvent(AndroidKeyEvent(AndroidKeyEvent.ACTION_UP, AndroidKeyEvent.KEYCODE_BACK))
+            }
+        }
+        settle()
+        assertTrue("the first Back hides the stats, the second closes", closed)
+    }
+
     @Test fun leftClosesTheOptionsRootLikeBack() {
         screen()
         playing()
@@ -717,6 +747,7 @@ class RecordingPlayerChromeScreenTest {
             single { NoticeCenter({ 0L }) { NoticeContext(0, session.observation.value.currentSession?.generationIdentity) } }
         }
         compose.setContent {
+            rootView = LocalView.current
             KoinApplication(application = { modules(noticeModule) }) {
             val target by runtime.activeTarget.collectAsState()
             val selection by runtime.recordingSelection.collectAsState()
