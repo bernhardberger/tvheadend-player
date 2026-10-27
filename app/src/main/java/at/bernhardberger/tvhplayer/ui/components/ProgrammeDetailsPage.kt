@@ -44,6 +44,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
@@ -82,16 +84,21 @@ import at.bernhardberger.tvhplayer.images.BackdropTransformation
 import at.bernhardberger.tvhplayer.images.CinematicScrimTransformation
 import at.bernhardberger.tvhplayer.images.GuideScrimTransformation
 import coil3.SingletonImageLoader
+import coil3.Image
+import coil3.toBitmap
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import coil3.request.transformations
+import coil3.request.allowHardware
 import at.bernhardberger.tvhplayer.ui.common.formatFirstAired
 import at.bernhardberger.tvhplayer.ui.common.formatFileSize
 import at.bernhardberger.tvhplayer.ui.common.formatMetadataNumber
 import java.util.Locale
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class DetailsSection { ACTIONS, ABOUT, AIRINGS, FACTS }
@@ -306,7 +313,18 @@ internal fun ProgrammeDetailsPage(
             // Without one the logo scrolls away with the page, like the photo on Google TV's actor
             // page, and the glow gives way to an even tint of its colour; the reader replaces the
             // page, so the logo fades with it.
-            if (art != null) DetailsBackdrop(art, background, backdrop, reading = { readingProgress.value })
+            val textAreas = remember(art, title) { mutableStateMapOf<String, DetailsBackdropTextArea>() }
+            val textArea: (String, androidx.compose.ui.geometry.Rect, Boolean) -> Unit = { name, bounds, primary ->
+                // Keep the first-screen positions while rows scroll or the reader replaces them.
+                if (pageScroll.value == 0 && !reading && viewport > 0) {
+                    val width = viewport * 16f / 9f
+                    textAreas[name] = DetailsBackdropTextArea(bounds.left / width, bounds.top / viewport,
+                        bounds.right / width, bounds.bottom / viewport, primary)
+                }
+            }
+            if (art != null) DetailsBackdrop(art, background, backdrop, reading = { readingProgress.value },
+                textAreas = textAreas.values.toList(), scrolledTextTop = headingKeyline.toFloat() / viewport.coerceAtLeast(1),
+                readingTextTop = with(density) { DetailsSafeEdge.toPx() } / viewport.coerceAtLeast(1))
             else if (glowChannel != null) {
                 ChannelLogoGlow(picon, glowChannel, Modifier.testTag("details-logo-glow"), scrolled = backdrop)
                 DetailsHeroLogo(picon,
@@ -374,7 +392,7 @@ internal fun ProgrammeDetailsPage(
                                 glowChannel != null -> DetailsHeroLogoSize.first
                                 framedChannel != null -> PlayerChromeTokens.heroWidth
                                 else -> null
-                            }) {
+                            }, textArea = textArea) {
                             recordingFailure?.let { text ->
                                 Spacer(Modifier.height(20.dp))
                                 Text(text, Modifier.testTag("details-synopsis"), style = MaterialTheme.typography.bodyLarge,
@@ -391,13 +409,15 @@ internal fun ProgrammeDetailsPage(
                                 wide = framedChannel != null,
                                 Modifier.focusRequester(aboutFocus).onFocusChanged {
                                     if (it.isFocused) section = DetailsSection.ABOUT
-                                }.focusProperties { canFocus = backEnabled })
+                                }.focusProperties { canFocus = backEnabled },
+                                onTextArea = { textArea("synopsis", it, false) })
                         }
                          // With the action row's 8dp inset, 28dp before the buttons.
                          Spacer(Modifier.height(20.dp))
                         // Entering the row returns to the action last focused there.
                         CompositionLocalProvider(LocalBringIntoViewSpec provides rowSpec) {
-                            Box(Modifier.focusProperties { onEnter = { actionFocus().requestFocus() } }.focusGroup()) {
+                            Box(Modifier.focusProperties { onEnter = { actionFocus().requestFocus() } }.focusGroup()
+                                .onGloballyPositioned { textArea("actions", it.boundsInRoot(), true) }) {
                                 DetailsActions(actions, event, recording, nowSec, requesters, { if (backEnabled) onAction(it) }) {
                                     lastAction = it; section = DetailsSection.ACTIONS; onActionFocused(it)
                                 }
@@ -476,13 +496,14 @@ internal val AiringCardWidth = 220.dp
 private val AiringCardRoom = 12.dp
 
 @Composable
-private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, wide: Boolean = false, modifier: Modifier) {
+private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, wide: Boolean = false, modifier: Modifier,
+    onTextArea: (androidx.compose.ui.geometry.Rect) -> Unit) {
     Box((if (wide) Modifier.fillMaxWidth() else Modifier.widthIn(max = 584.dp)).testTag("details-about")) {
         val interaction = remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
         DetailsReadingPanel(onRead, modifier.fillMaxWidth().testTag("details-about-description"), interaction) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                Box(Modifier.weight(1f)) { DetailsSynopsis(synopsis.orEmpty()) }
+                Box(Modifier.weight(1f)) { DetailsSynopsis(synopsis.orEmpty(), onTextArea) }
                 // Like a focused button, the arrow's circle turns white and the arrow dark.
                 Icon(painterResource(R.drawable.ic_arrow_forward), null,
                     Modifier.size(32.dp).background(
@@ -495,7 +516,7 @@ private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, wide: Boolean = 
 }
 
 @Composable
-private fun DetailsSynopsis(text: String) {
+private fun DetailsSynopsis(text: String, onTextArea: (androidx.compose.ui.geometry.Rect) -> Unit) {
     val measurer = rememberTextMeasurer()
     val style = MaterialTheme.typography.bodyMedium
     val more = stringResource(R.string.details_more)
@@ -521,7 +542,7 @@ private fun DetailsSynopsis(text: String) {
                 candidate(low)
             }
         }
-        Text(displayed, Modifier.testTag("details-synopsis"), style = style, maxLines = 2)
+        Text(displayed, Modifier.testTag("details-synopsis").onGloballyPositioned { onTextArea(it.boundsInRoot()) }, style = style, maxLines = 2)
     }
 }
 
@@ -750,34 +771,79 @@ private const val DetailsHeroWidthFraction = 758f / 960f
  * all text, dims it further, so bright art stays behind its lines.
  */
 @Composable
-private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -> Float, reading: () -> Float) {
+private fun DetailsBackdrop(art: ArtworkId, background: State<Color>, blur: () -> Float, reading: () -> Float,
+    textAreas: List<DetailsBackdropTextArea>, scrolledTextTop: Float, readingTextTop: Float) {
     val session = LocalArtworkContext.current.currentSession ?: return
     val context = LocalPlatformContext.current
     val source = remember(session, art) { AppArtworkSource(session, art) }
+    val sharp = remember(source, context) {
+        ImageRequest.Builder(context).data(source).allowHardware(false).build()
+    }
     val blurred = remember(source, context) {
         ImageRequest.Builder(context).data(source)
+            .allowHardware(false)
             .size(DetailsBackdropDecodeSize.first, DetailsBackdropDecodeSize.second)
             .transformations(BackdropTransformation(DetailsBackdropWidth, DetailsBackdropBlurRadius))
             .build()
     }
     var blurredLoaded by remember(blurred) { mutableStateOf(false) }
+    var sharpImage by remember(source) { mutableStateOf<Image?>(null) }
+    var blurredImage by remember(source) { mutableStateOf<Image?>(null) }
+    val sharpSamples = key(source, true) { rememberDetailsSamples(sharpImage) }
+    val blurredSamples = key(source, false) { rememberDetailsSamples(blurredImage) }
+    val sharpDim = key(source, true) { rememberDetailsDim(sharpSamples.value, sharp = true,
+        textTop = 0f.takeIf { textAreas.isNotEmpty() }, areas = textAreas) }
+    val scrolledDim = key(source, false) { rememberDetailsDim(blurredSamples.value, sharp = false, textTop = scrolledTextTop) }
+    val readingDim = key(source, "reading") { rememberDetailsDim(blurredSamples.value, sharp = false, textTop = readingTextTop,
+        floor = DetailsReadingDimAlpha) }
     // Scrolled, Google TV trades the scrim for an even dim: the rows then run across the whole width.
     Box(Modifier.fillMaxSize()
         .drawWithContent {
             drawContent()
-            drawRect(background.value, alpha = blur() * DetailsScrolledDimAlpha +
-                reading() * (DetailsReadingDimAlpha - DetailsScrolledDimAlpha))
+            // Until a measurement arrives its layer is safely dimmed; it relaxes with the same
+            // motion as the page. A late decode never exposes a bright, unmeasured picture.
+            val scrolled = scrolledDim.value
+            drawRect(background.value, alpha = (1f - blur()) * sharpDim.value + blur() * scrolled +
+                reading() * (maxOf(readingDim.value, scrolled) - scrolled))
         }
         .unditheredGradient(over = true, alpha = { 1f - blur() }) { size -> detailsScrim(background.value, size) }) {
         // The blur fades in over the sharp picture, which goes once the loaded blur covers it.
-        AsyncImage(source, null, contentScale = ContentScale.Crop,
+        AsyncImage(sharp, null, contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
                 .graphicsLayer { this.alpha = if (blur() >= 1f && blurredLoaded) 0f else 1f }
-                .testTag("details-hero"))
+                .testTag("details-hero"), onSuccess = { sharpImage = it.result.image })
         AsyncImage(blurred, null, contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = blur() }.testTag("details-hero-blurred"),
-            onSuccess = { blurredLoaded = true })
+            onSuccess = { blurredLoaded = true; blurredImage = it.result.image })
     }
+}
+
+/** Read each decode once off the UI thread. Sharp samples retain highlights; the other request
+ * already contains the small baked blur. The picture is cropped to the page's 16:9 viewport.
+ */
+@Composable
+private fun rememberDetailsSamples(image: Image?): State<IntArray?> = produceState(null, image) {
+        if (image != null) value = withContext(Dispatchers.Default) {
+            val bitmap = image.toBitmap()
+            val width = minOf(bitmap.width, bitmap.height * 16 / 9).coerceAtLeast(1)
+            val height = minOf(bitmap.height, bitmap.width * 9 / 16).coerceAtLeast(1)
+            val pixels = IntArray(width * height)
+            bitmap.getPixels(pixels, 0, width, (bitmap.width - width) / 2, (bitmap.height - height) / 2, width, height)
+            detailsBackdropSamples(pixels, width, height)
+        }
+}
+
+@Composable
+private fun rememberDetailsDim(samples: IntArray?, sharp: Boolean, textTop: Float?,
+    floor: Float = if (sharp) 0f else DetailsScrolledDimAlpha, areas: List<DetailsBackdropTextArea> = emptyList()): State<Float> {
+    var measured by remember(samples, sharp, textTop) { mutableFloatStateOf(1f) }
+    LaunchedEffect(samples, sharp, textTop, floor, areas) {
+        val pixels = samples
+        if (pixels != null && textTop != null) measured = withContext(Dispatchers.Default) {
+            measuredDetailsDim(pixels, sharp, floor, textTop, areas)
+        }
+    }
+    return animateFloatAsState(measured, RowChangeMotion, label = "detailsBackdropDim")
 }
 
 /**
@@ -799,11 +865,9 @@ private fun detailsScrim(color: Color, size: androidx.compose.ui.geometry.Size):
 /** The scrim's reach from the top-right corner, as shares of the width and the height. */
 private const val DetailsScrimReachX = 1f
 private const val DetailsScrimReachY = 1.2f
-private val DetailsScrimStops = floatArrayOf(0f, .3f, .55f, .8f, 1f)
-private val DetailsScrimAlphas = floatArrayOf(.05f, .2f, .6f, .85f, .92f)
 /** Google TV's scrolled details page measured about 0.6 of the sharp art's brightness. */
 private const val DetailsScrolledDimAlpha = .4f
-/** The reader's dim, at which the brightest blurred art still keeps its text at about 4.5:1. */
+/** The reader keeps at least its original dim, or the measured readable dim when that is stronger. */
 private const val DetailsReadingDimAlpha = .6f
 
 /**
@@ -997,13 +1061,14 @@ private fun DetailsInformation(
     event: EpgEvent?, recording: DvrEntry?, recordingAdmission: RecordingPlaybackAdmission?,
     channel: Channel?, nowSec: Long,
     corner: Dp?,
+    textArea: (String, androidx.compose.ui.geometry.Rect, Boolean) -> Unit,
     synopsis: @Composable () -> Unit,
 ) {
     // Only the title spans the page; the remaining information keeps its narrow text column.
     // Beside the corner logo the title stops short of it and takes a second line instead.
     Column(Modifier.fillMaxWidth().testTag("details-information")) {
         ProgrammeEyebrow(channel?.icon, channelTitleText(channel?.number, channel?.name.orEmpty()),
-            Modifier.widthIn(max = 470.dp)) {
+            Modifier.widthIn(max = 470.dp).onGloballyPositioned { textArea("eyebrow", it.boundsInRoot(), false) }) {
             val removal = recording?.takeIf { event == null }?.let { recordingRemovalTime(it, nowSec) }
             if (removal != null) {
                 DetailsStatusBadge(null, stringResource(R.string.details_available_until,
@@ -1011,19 +1076,28 @@ private fun DetailsInformation(
             } else detailsStatus(event, recording, nowSec)?.let { DetailsStatusBadge(it) }
         }
         Spacer(Modifier.height(8.dp))
+        var titleInk by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
         Text(event?.title ?: recording?.title.orEmpty(),
             Modifier.fillMaxWidth()
                 .then(if (corner != null) Modifier.padding(end = corner + DetailsTitleLogoGap) else Modifier)
-                .testTag("details-title").semantics { heading() },
+                .testTag("details-title").semantics { heading() }.onGloballyPositioned {
+                    val bounds = it.boundsInRoot()
+                    titleInk?.let { ink -> textArea("title", ink.translate(bounds.topLeft), true) }
+                },
             style = MaterialTheme.typography.displaySmall, maxLines = if (corner != null) 2 else 1,
-            overflow = TextOverflow.Ellipsis)
+            overflow = TextOverflow.Ellipsis, onTextLayout = { layout ->
+                titleInk = androidx.compose.ui.geometry.Rect(
+                    (0 until layout.lineCount).minOf { layout.getLineLeft(it) }, 0f,
+                    (0 until layout.lineCount).maxOf { layout.getLineRight(it) }, layout.size.height.toFloat())
+            })
         val subtitle = (event?.subtitle ?: recording?.subtitle)?.takeIf(String::isNotBlank)
         subtitle?.let {
             Spacer(Modifier.height(4.dp))
-            Text(it, Modifier.widthIn(max = 470.dp).testTag("details-subtitle"), style = MaterialTheme.typography.titleLarge, color = TvTextColors.primary,
+            Text(it, Modifier.widthIn(max = 470.dp).testTag("details-subtitle")
+                .onGloballyPositioned { textArea("subtitle", it.boundsInRoot(), true) }, style = MaterialTheme.typography.titleLarge, color = TvTextColors.primary,
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        Column(Modifier.widthIn(max = 470.dp)) { synopsis() }
+        Column(Modifier.widthIn(max = 470.dp).onGloballyPositioned { textArea("failure", it.boundsInRoot(), false) }) { synopsis() }
         val facts = event?.let { programmeDetailsFacts(it, nowSec) } ?: recording?.let { recordingDetailsFacts(it, recordingAdmission, nowSec) }.orEmpty()
         val resources = LocalContext.current.resources
         val metadata = programmeHeaderMetadata(programmeAboutFacts(event, recording, resources,
@@ -1040,7 +1114,8 @@ private fun DetailsInformation(
             // The facts stay with the title whether or not a subtitle sits between them; a wider
             // gap under the title alone reads as a missing line.
             Spacer(Modifier.height(8.dp))
-            Row(Modifier.widthIn(max = 470.dp).testTag("details-metadata-row"), verticalAlignment = Alignment.CenterVertically,
+            Row(Modifier.widthIn(max = 470.dp).testTag("details-metadata-row")
+                .onGloballyPositioned { textArea("metadata", it.boundsInRoot(), false) }, verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Screen readers hear the episode as "Season 5, Episode 10", as on the airing cards.
             val episode = event?.episode ?: recording?.episode
@@ -1054,7 +1129,9 @@ private fun DetailsInformation(
             if (ratingText != null) ProgrammeAgeRatingBox(ratingText, "details-rating")
             }
         }
-        DetailsProgress(event, recording, recordingAdmission, nowSec)
+        Column(Modifier.onGloballyPositioned { textArea("progress", it.boundsInRoot(), false) }) {
+            DetailsProgress(event, recording, recordingAdmission, nowSec)
+        }
         // The same warning as the recording's row and pane.
         if (recording != null && remember(recording) { recordingStoppedEarly(recording) != null }) {
             Spacer(Modifier.height(8.dp))

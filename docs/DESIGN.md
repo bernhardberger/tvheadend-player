@@ -1176,6 +1176,16 @@ timeshift window is listed; this display estimate is not a seek grant.
   actions, including during playback. Recorded date metadata uses the current
   locale in both player bars; the top bar's channel logo has no synthetic chip
   background or frame.
+- Details artwork keeps the sharp radial scrim initially and the even dim over
+  blurred art after scrolling. Measure the decoded picture and raise only the
+  dim needed to keep readable text at **4.5:1** or better, including metadata
+  and active airing captions; do not change the type, layout or text colours.
+  Sharp-state measurements follow the laid-out text regions. Scrolled art keeps
+  at least its 40% dim and the reader at least 60%; dark art that already passes
+  retains those floors. Measurements retain small highlights rather than
+  averaging the picture, run off the UI thread, and relax a protective veil
+  through the existing page motion after a decode. Intentionally quiet rows
+  retain their existing emphasis; they become readable when focused.
 - Option lists inside the player stay in the modal side panel above.
 
 ## 11. Icons
