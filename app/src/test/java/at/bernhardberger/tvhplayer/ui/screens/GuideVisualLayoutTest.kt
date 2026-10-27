@@ -171,6 +171,62 @@ class GuideVisualLayoutTest {
     private var guideActive by mutableStateOf(true)
     private var browseReturn by mutableStateOf(false)
 
+    /** The README scene: the fixture pack's line-up on 2026-10-04 with Ridge Light on air at 20:15, xhdpi. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun presentation() {
+        val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
+        val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
+        val art = listOf("ridge-light", "harbor-kickoff", "northline-tonight", "field-desk", "paper-kite-tales", "little-orbit",
+            "ion-wake", "lantern-road", "kettle-hour", "glass-harbor", "harbor-lights-live", "river-court")
+        // Channel, start and stop in minutes from 20:00, title, DVB content type, synopsis.
+        val schedule = listOf(
+            Triple(1, -60 to 0, Triple("Tide Watch", 0x91L, "Coastal wildlife along a tidal estuary, wading birds and seals.")),
+            Triple(1, 0 to 60, Triple("Ridge Light", 0x91L, "Seasonal mountain light, forests and weather moving over a ridge.")),
+            Triple(1, 60 to 120, Triple("Tide Watch", 0x91L, "Coastal wildlife along a tidal estuary, wading birds and seals.")),
+            Triple(2, -30 to 105, Triple("Harbor Kickoff", 0x43L, "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.")),
+            Triple(2, 105 to 210, Triple("River Court", 0x44L, "Indoor basketball, River Court against North Quay.")),
+            Triple(3, -45 to 0, Triple("Skyglass Weather", 0x20L, "Weather presentation.")),
+            Triple(3, 0 to 45, Triple("Northline Tonight", 0x21L, "Evening studio news from a regional desk with two anchors.")),
+            Triple(3, 45 to 90, Triple("Field Desk", 0x23L, "Field reporting from a flooded riverside road.")),
+            Triple(3, 90 to 105, Triple("Skyglass Weather", 0x20L, "Weather presentation.")),
+            Triple(3, 105 to 180, Triple("Northline Tonight", 0x21L, "Evening studio news from a regional desk with two anchors.")),
+            Triple(4, -50 to 5, Triple("Little Orbit", 0x55L, "A gentle science table about orbits using marbles and a bowl.")),
+            Triple(4, 5 to 50, Triple("Paper Kite Tales", 0x55L, "2D animation about a paper kite over painted hills.")),
+            Triple(4, 50 to 120, Triple("Little Orbit", 0x55L, "A gentle science table about orbits using marbles and a bowl.")),
+            Triple(5, -40 to 25, Triple("Ion Wake", 0x12L, "Sci-fi anime: a courier rides a magnetic rail through Ion Harbor.")),
+            Triple(5, 25 to 95, Triple("Lantern Road", 0x13L, "Fantasy anime: a cartographer maps a valley from a lantern sky-bridge.")),
+            Triple(5, 95 to 160, Triple("Ion Wake", 0x12L, "Sci-fi anime: a courier rides a magnetic rail through Ion Harbor.")),
+            Triple(6, -60 to 30, Triple("The Kettle Hour", 0xA5L, "A warm kitchen programme about broths, bread and weeknight pans.")),
+            Triple(6, 30 to 150, Triple("Glass Harbor", 0x10L, "A quiet drama about night-shift workers in a harbour glass workshop.")),
+            Triple(7, -60 to 120, Triple("Harbor Lights Live", 0x63L, "A small-hall concert with a quartet.")),
+        )
+        val pictures = mapOf("Ridge Light" to "ridge-light", "Harbor Kickoff" to "harbor-kickoff", "Northline Tonight" to "northline-tonight",
+            "Field Desk" to "field-desk", "Paper Kite Tales" to "paper-kite-tales", "Little Orbit" to "little-orbit",
+            "Ion Wake" to "ion-wake", "Lantern Road" to "lantern-road", "The Kettle Hour" to "kettle-hour",
+            "Glass Harbor" to "glass-harbor", "Harbor Lights Live" to "harbor-lights-live", "River Court" to "river-court")
+        val events = schedule.mapIndexed { index, (channel, minutes, programme) ->
+            val (title, contentType, synopsis) = programme
+            EpgEvent.create(EventId(1000L + index), ChannelId(channel.toLong()),
+                Instant.fromEpochSeconds(hour + minutes.first * 60L), Instant.fromEpochSeconds(hour + minutes.second * 60L),
+                title = title, summary = synopsis,
+                subtitle = "Winter on the ridge".takeIf { title == "Ridge Light" },
+                image = pictures[title]?.let { ArtworkId(101 + art.indexOf(it)) },
+                contentGenre = ContentGenre.fromContentType(contentType))
+        }
+        loader.shutdown()
+        loader = at.bernhardberger.tvhplayer.testutil.FixtureArt.imageLoader(context(), buildMap {
+            picons.forEachIndexed { index, name -> put(ArtworkId(index + 1), at.bernhardberger.tvhplayer.testutil.FixtureArt.picon(name)) }
+            art.forEachIndexed { index, name -> put(ArtworkId(101 + index), at.bernhardberger.tvhplayer.testutil.FixtureArt.art(name)) }
+        })
+        images.install(loader)
+        show(headline = true, history = false, channelNames = names, events = events, tagName = "Favorites")
+        key(Key.DirectionDown)
+        focused("Ridge Light")
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture("guide", 1f, LayoutDirection.Ltr, outputs = "build/outputs/presentation").recycle()
+    }
+
     @Test fun retainedEntryWaitsForRowsWhenNewCoverageArrivesBeforePreparation() {
         val coverageRelease = CompletableDeferred<Unit>()
         val preparationRelease = java.util.concurrent.CountDownLatch(1)
@@ -2917,8 +2973,12 @@ class GuideVisualLayoutTest {
         initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
         playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
         lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null,
+        channelNames: List<String>? = null,
         preparationBlocker: @Composable () -> Unit = {}) {
-        val channels = (1L..12L).map { id ->
+        val channels = channelNames?.mapIndexed { index, name ->
+            Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(index + 1),
+                tagIds = listOf(ChannelTagId(1)))
+        } ?: (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
                 number = id, icon = if (id == 3L) null else ArtworkId(id.toInt()),
@@ -3017,7 +3077,7 @@ class GuideVisualLayoutTest {
         compose.setContent {
             preparationBlocker()
             KoinIsolatedContext(koinApplication { modules(noticeModule) }) {
-            CompositionLocalProvider(LocalDensity provides Density(1f, scale), LocalLayoutDirection provides direction) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale), LocalLayoutDirection provides direction) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     lineColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -3152,19 +3212,21 @@ class GuideVisualLayoutTest {
     private fun guidePaneTitle() =
         compose.onNode(SemanticsMatcher.expectValue(SemanticsProperties.PaneTitle, context().getString(R.string.epg_title)))
 
-    private fun capture(name: String, scale: Float, direction: LayoutDirection): Bitmap {
+    private fun capture(name: String, scale: Float, direction: LayoutDirection,
+        outputs: String = "build/outputs/browse-cohesion/guide"): Bitmap {
         assertNoPlayback()
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
             bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
         }
-        assertEquals(960, bitmap.width)
-        assertEquals(540, bitmap.height)
-        val directory = File("build/outputs/browse-cohesion/guide").apply { mkdirs() }
+        val density = context().resources.displayMetrics.density
+        assertEquals((960 * density).toInt(), bitmap.width)
+        assertEquals((540 * density).toInt(), bitmap.height)
+        val directory = File(outputs).apply { mkdirs() }
         File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
         File(directory, "$name.txt").writeText(
-            "canvas=960x540dp; density=1; locale=${Locale.getDefault()}; direction=$direction; fontScale=$scale; timezone=UTC\n" +
+            "canvas=960x540dp; density=$density; locale=${Locale.getDefault()}; direction=$direction; fontScale=$scale; timezone=UTC\n" +
                 "syntheticClockStart=2026-10-04T20:15:00Z; captureClockMillis=${SystemClock.uptimeMillis()}\n" +
                 "focus=${compose.onNode(isFocused()).fetchSemanticsNode().config.let { it.getOrElseNullable(SemanticsProperties.Text) { null } ?: it.getOrElseNullable(SemanticsProperties.ContentDescription) { null } }}; " +
                 "bounds=${compose.onNode(isFocused()).fetchSemanticsNode().boundsInRoot}; position=${position.position.value}\n" +

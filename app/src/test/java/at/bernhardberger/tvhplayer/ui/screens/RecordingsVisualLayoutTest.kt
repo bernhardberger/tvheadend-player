@@ -138,6 +138,52 @@ class RecordingsVisualLayoutTest {
         assertNoCommands()
     }
 
+    /** The README scene: the previous evening's Ridge Light, partly watched, under a 2026-10-04 20:15 clock, xhdpi. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentation() {
+        assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+        val evening = 1_791_057_600L
+        fun recording(id: Long, title: String, channel: String, folder: String?, start: Long, minutes: Long,
+            art: String?, synopsis: String, position: Long? = null, plays: Long? = null) = DvrEntry.create(
+            DvrEntryId(id), title = title, state = DvrEntryState.COMPLETED, folder = listOfNotNull(folder),
+            start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + minutes * 60),
+            files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
+                stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L)),
+            channelName = channel, image = art?.let { ArtworkId(100 + id.toInt()) }, description = synopsis,
+            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays)
+        val library = listOf(
+            recording(1, "Ridge Light", "Ridge Earth", "Documentaries", evening, 60, "ridge-light",
+                "Seasonal mountain light, forests and weather moving over a ridge.", position = 1223),
+            recording(2, "Tide Watch", "Ridge Earth", "Documentaries", evening - 86400 + 3600, 60, "still-tide-watch",
+                "Coastal wildlife along a tidal estuary, wading birds and seals.", plays = 1),
+            recording(3, "Coastal Miles", "Amber Stage", "Documentaries", evening - 2 * 86400, 45, "still-coastal-miles",
+                "A walking travel strand along a temperate coast."),
+            recording(4, "Harbor Kickoff", "Harbor Sport", "Sport", evening - 86400 - 1800, 135, "harbor-kickoff",
+                "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", plays = 1),
+            recording(5, "River Court", "Harbor Sport", "Sport", evening - 3 * 86400, 105, "river-court",
+                "Indoor basketball, River Court against North Quay."),
+            recording(6, "Glass Harbor", "Amber Stage", null, evening + 1800, 120, "glass-harbor",
+                "A quiet drama about night-shift workers in a harbour glass workshop."),
+            recording(7, "Harbor Lights Live", "Harbor Lights", null, evening - 86400, 90, "harbor-lights-live",
+                "A small-hall concert with a quartet."),
+            recording(8, "Paper Kite Tales", "Kite Kids", null, evening - 2 * 86400 - 7200, 30, "paper-kite-tales",
+                "2D animation about a paper kite over painted hills.", plays = 1),
+        )
+        val art = listOf("ridge-light", "still-tide-watch", "still-coastal-miles", "harbor-kickoff", "river-court",
+            "glass-harbor", "harbor-lights-live", "paper-kite-tales")
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(),
+            art.mapIndexed { index, name -> ArtworkId(101 + index) to FixtureArt.art(name) }.toMap()))
+        show(entries = library)
+        compose.mainClock.advanceTimeBy(1_500)
+        focused("recordings-folder-Documentaries")
+        key(Key.DirectionRight)
+        focused("recording-list-entry-1")
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture("recordings", 1f, outputs = "build/outputs/presentation")
+    }
+
     @Test fun recordingSpaceLineIsQuietInformationInTheHeader() {
         val context = ApplicationProvider.getApplicationContext<Application>()
         show(diskSpace = DvrDiskSpaceState.Current(DvrDiskSpace(412_000_000_000L, 1_588_000_000_000L, 2_000_000_000_000L)))
@@ -1260,7 +1306,7 @@ class RecordingsVisualLayoutTest {
         }
         compose.setContent {
             val liveObservation by session.observation.collectAsState()
-            CompositionLocalProvider(LocalDensity provides Density(1f, scale)) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale)) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     backDispatcher = requireNotNull(LocalOnBackPressedDispatcherOwner.current).onBackPressedDispatcher
@@ -1531,21 +1577,23 @@ class RecordingsVisualLayoutTest {
         }
     }
 
-    private fun capture(name: String, scale: Float, focusEvidence: String? = null) {
+    private fun capture(name: String, scale: Float, focusEvidence: String? = null,
+        outputs: String = "build/outputs/browse-cohesion/archive-depth") {
         if (System.getProperty("tvhplayer.writeMotionCaptures") == "false") return
         assertNoCommands()
         val rows = visibleListRows()
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
-            assertEquals(960, bitmap.width)
-            assertEquals(540, bitmap.height)
-            val directory = File("build/outputs/browse-cohesion/archive-depth").apply { mkdirs() }
+            val density = view.resources.displayMetrics.density
+            assertEquals((960 * density).toInt(), bitmap.width)
+            assertEquals((540 * density).toInt(), bitmap.height)
+            val directory = File(outputs).apply { mkdirs() }
             File(directory, "$name.png").outputStream().use {
                 assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
             }
             File(directory, "$name.txt").writeText(
-                "Production RecordingsScreenContent + SideRail; 960x540 mdpi; ${view.resources.configuration.locales[0].toLanguageTag()}; UTC; fontScale=$scale\n" +
+                "Production RecordingsScreenContent + SideRail; 960x540dp at density $density; ${view.resources.configuration.locales[0].toLanguageTag()}; UTC; fontScale=$scale\n" +
                     "Robolectric SDK34 native View.draw; native D-pad focus; fixed recording dates; absent artwork\n" +
                     "Opaque theme background, no video; SDK/playback/navigation calls=0\n" +
                     "Static composition only, not physical-TV focus feel, overscan, motion or SurfaceView proof.\n" +

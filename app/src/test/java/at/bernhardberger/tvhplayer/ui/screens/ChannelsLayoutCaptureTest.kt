@@ -34,6 +34,21 @@ class ChannelsLayoutCaptureTest {
     @get:Rule val compose = createComposeRule()
     private val fixture = ChannelsLayoutFixture(compose, images)
 
+    /** The README scene: Immersive with the app's default view, Ridge Light on air under a 20:15 clock, xhdpi. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentation() {
+        val zone = java.util.TimeZone.getDefault()
+        try {
+            java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
+            assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+            fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true)
+            capture("channels", card(1), outputs = "build/outputs/presentation")
+        } finally {
+            java.util.TimeZone.setDefault(zone)
+        }
+    }
+
     private fun card(id: Int) = hasTestTag("channel-card-$id")
     private fun row(id: Int) = hasTestTag("channel-row-$id")
     private val tagsButton = hasTestTag("channels-tags-button")
@@ -184,7 +199,8 @@ class ChannelsLayoutCaptureTest {
         capture("de-1.3-3-view-options", hasTestTag("channels-view-layout-grid"), locale = "de", fontScale = 1.3f)
     }
 
-    private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f) {
+    private fun capture(name: String, focus: SemanticsMatcher, locale: String = "en", fontScale: Float = 1f,
+        outputs: String = "build/outputs/u4-channel-views") {
         fixture.awaitFocus(focus)
         // The background follows focus after a pause and a fade; a logo's glow is baked off the
         // main thread first, and the logo comes with it.
@@ -200,13 +216,13 @@ class ChannelsLayoutCaptureTest {
         val settled = draw()
         assertTrue("$name captured mid-animation", bitmap.sameAs(settled))
         settled.recycle()
-        val directory = File("build/outputs/u4-channel-views").apply { mkdirs() }
+        val directory = File(outputs).apply { mkdirs() }
         File(directory, "$name.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
         File(directory, "$name.txt").writeText(
             """
-            canvas=960x540 dp; density=1.0 (mdpi); locale=$locale; fontScale=$fontScale
+            canvas=960x540 dp; density=${fixture.context.resources.displayMetrics.density}; locale=$locale; fontScale=$fontScale
             shell=TVHeadendPlayerTheme + SideRail; background=theme background, no video
             view=${fixture.channelsView}
             focus=${focus.description} reached by D-pad

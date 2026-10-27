@@ -185,6 +185,80 @@ class PlayerChromeCaptureTest {
     fun pseudoEnXa() = captures(PseudoLocaleEvidence.EN_XA, 1f)
     @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB_XHDPI)
     fun pseudoArXb() = captures(PseudoLocaleEvidence.AR_XB, 1f)
+
+    /** The README scene: Ridge Light at 20:15 of 20:00-21:00 on 2026-10-04, ten minutes buffered, at live. */
+    @Test fun presentation() {
+        val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
+        val now = hour + 15 * 60
+        val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage")
+        val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage")
+        // Title, art and minutes from 20:00, as in the Guide's README scene.
+        val onAir = listOf(Triple("Ridge Light", "ridge-light", 0 to 60), Triple("Harbor Kickoff", "harbor-kickoff", -30 to 105),
+            Triple("Northline Tonight", "northline-tonight", 0 to 45), Triple("Paper Kite Tales", "paper-kite-tales", 5 to 50),
+            Triple("Ion Wake", "ion-wake", -40 to 25), Triple("The Kettle Hour", "kettle-hour", -60 to 30))
+        val lineUp = names.mapIndexed { index, name ->
+            Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(201 + index))
+        }
+        val events = onAir.mapIndexed { index, (title, _, minutes) ->
+            EpgEvent.create(EventId(500L + index), ChannelId(index + 1L), Instant.fromEpochSeconds(hour + minutes.first * 60L),
+                Instant.fromEpochSeconds(hour + minutes.second * 60L), title = title, image = ArtworkId(301 + index),
+                subtitle = "Winter on the ridge".takeIf { index == 0 }, genre = "Documentary".takeIf { index == 0 },
+                summary = "Seasonal mountain light, forests and weather moving over a ridge.".takeIf { index == 0 })
+        }
+        val next = EpgEvent.create(EventId(510), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
+            Instant.fromEpochSeconds(hour + 7200), title = "Tide Watch")
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        images.install(FixtureArt.imageLoader(app, buildMap {
+            picons.forEachIndexed { index, name -> put(ArtworkId(201 + index), FixtureArt.picon(name)) }
+            onAir.forEachIndexed { index, (_, art, _) -> put(ArtworkId(301 + index), FixtureArt.art(art)) }
+        }))
+        val still = FixtureArt.art("still-ridge-light")
+        val programme = events[0]
+        lateinit var view: View
+        var shown by mutableStateOf(false)
+        compose.mainClock.autoAdvance = false
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(2f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    Box(Modifier.fillMaxSize()) {
+                        Image(still.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        // Composed after the first frame, as the capture scenes are; the resting rail scrolls inside layout otherwise.
+                        if (shown) Controls(
+                            timeshift = AppTimeshiftState(available = true, bufferStartMs = -600_000, positionMs = 0,
+                                liveEdgeMs = 0, timingKnown = true),
+                            behind = false, paused = false,
+                            content = PlayerChromeContent(
+                                clock = formatClock(now),
+                                info = liveInfoBarData(app.resources, 1, "Ridge Earth", programme, next, nextScheduled = false,
+                                    nowSec = now, unavailableTitle = "No program information"),
+                                state = playerStateCell(false),
+                                recordingNow = false,
+                                picon = ArtworkId(201),
+                                artwork = programme.image,
+                            ),
+                            window = ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
+                            programme = programme, peek = true,
+                            tracks = PlayerTrackButtons(audio = "English", subtitles = "Off"),
+                            nowSec = now, peekChannels = lineUp, peekEvent = { id -> events.firstOrNull { it.channelId == id } },
+                        )
+                    }
+                }
+            }
+        }
+        compose.runOnIdle { shown = true }
+        compose.waitForIdle()
+        repeat(15) {
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+        }
+        compose.onNodeWithTag("player-pause").assertIsFocused()
+        val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle { view.draw(Canvas(bitmap)) }
+        val directory = File("build/outputs/presentation").apply { mkdirs() }
+        File(directory, "player.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+    }
     @Test fun seekSteps() = captures("en", 1f, stepsOnly = true)
     @Test fun seekStepsLargeText() = captures("en", 1.3f, longStepsOnly = true)
     @Test fun detailsButtonsEnglish() = captures("en", 1f, detailsOnly = true)
@@ -971,6 +1045,10 @@ class PlayerChromeCaptureTest {
         /** The closed rail's rows peek under the controls, as the player composes them. */
         peek: Boolean = false,
         tracks: PlayerTrackButtons = PlayerTrackButtons(),
+        nowSec: Long = NOW,
+        /** The peeking rail's channels and their programmes on air, when not the default line-up. */
+        peekChannels: List<Channel> = channels,
+        peekEvent: ((ChannelId) -> EpgEvent?)? = null,
     ) {
         Box(Modifier.fillMaxSize()) {
         var railFocus by remember { mutableStateOf<ChannelId?>(null) }
@@ -981,7 +1059,7 @@ class PlayerChromeCaptureTest {
             content = content,
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
-                nowSec = NOW,
+                nowSec = nowSec,
                 programme = programme,
                 committedTimeshift = committed,
                 committedWindow = window,
@@ -1011,8 +1089,8 @@ class PlayerChromeCaptureTest {
                     peek = actionsAlpha.takeIf { peek },
                     channelContent = {
                         if (peek && tray == null && browser == null) ProvideArtworkSession(session) {
-                            PlayerChannelBrowser(peekRows, channels, channels.drop(1), channels[0].id, emptySet(), railEvent,
-                                NOW, false, {}, {}, { _, _, _ -> }, {})
+                            PlayerChannelBrowser(peekRows, peekChannels, peekChannels.drop(1), peekChannels[0].id, emptySet(),
+                                peekEvent ?: railEvent, nowSec, false, {}, {}, { _, _, _ -> }, {})
                         }
                         else if (browser != null) ProvideArtworkSession(session) { PlayerChannelBrowser(browser, channels, if (emptyRecent) emptyList() else channels.drop(1),
                             channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },

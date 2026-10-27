@@ -104,8 +104,9 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         guidePending: Boolean = false,
         firstTitle: String? = null,
         guide: Boolean = false,
+        presentation: Boolean = false,
     ) {
-        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle)
+        val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation)
         // All channels is opt-in under Settings: hiding it shows the tags only.
         val visibility = if (allChannels) ChannelScopeVisibility() else ChannelScopeVisibility(
             configured = true, allChannelsVisible = false,
@@ -115,7 +116,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         channelsView = view
         imageLoader?.let(images::install)
         compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, scale), LocalWarmPlayback provides warmPlayback) {
+            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale), LocalWarmPlayback provides warmPlayback) {
                 TVHeadendPlayerTheme {
                     this@ChannelsLayoutFixture.view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -214,11 +215,12 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
 
     private fun observation(
         tags: Boolean, manyTags: Boolean, emptyGroup: Boolean, recordingNow: Int?, scheduledNext: Int?,
-        guidePending: Boolean, firstTitle: String?,
+        guidePending: Boolean, firstTitle: String?, presentation: Boolean,
     ): SessionObservation {
         val channels = LINE_UP.mapIndexed { index, (name, _) ->
             Channel.create(
-                id = ChannelId(index + 1L), name = name, number = index + 1L,
+                // The README scene keeps every name short; the long German one is a layout case.
+                id = ChannelId(index + 1L), name = if (presentation && index == 1) "Harbor Sport" else name, number = index + 1L,
                 icon = ArtworkId(index + 1),
                 tagIds = if (manyTags) listOfNotNull(ChannelTagId(1).takeIf { index < 6 }, ChannelTagId(2L + index % (TAG_NAMES.size - 1)))
                     else listOf(ChannelTagId(if (index < 6) 1 else 2)),
@@ -238,12 +240,15 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         }
         val now = System.currentTimeMillis() / 1000
         val events = channels.mapIndexedNotNull { index, channel ->
-            val title = firstTitle.takeIf { index == 0 } ?: LINE_UP[index].second ?: return@mapIndexedNotNull null
+            val title = firstTitle.takeIf { index == 0 } ?: (if (presentation && index == 1) "Harbor Kickoff" else null)
+                ?: LINE_UP[index].second ?: return@mapIndexedNotNull null
+            // The README scene puts Ridge Light at 20:00-21:00 under a 20:15 clock.
+            val switch = if (presentation && index == 0) now + 45 * 60 else now + (25 + index * 5) * 60
             listOf(
                 EpgEvent.create(
                     id = EventId(channel.id.value * 100), channelId = channel.id,
-                    start = Instant.fromEpochSeconds(now - (10 + index * 7) * 60),
-                    stop = Instant.fromEpochSeconds(now + (25 + index * 5) * 60),
+                    start = Instant.fromEpochSeconds(now - (if (presentation && index == 0) 15 else 10 + index * 7) * 60),
+                    stop = Instant.fromEpochSeconds(switch),
                     title = title,
                     // Only the first programme has a subtitle, as EIT supplies one beside the title.
                     subtitle = "Winter on the ridge".takeIf { index == 0 },
@@ -259,8 +264,8 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                 ),
                 EpgEvent.create(
                     id = EventId(channel.id.value * 100 + 1), channelId = channel.id,
-                    start = Instant.fromEpochSeconds(now + (25 + index * 5) * 60),
-                    stop = Instant.fromEpochSeconds(now + (85 + index * 5) * 60),
+                    start = Instant.fromEpochSeconds(switch),
+                    stop = Instant.fromEpochSeconds(switch + 60 * 60),
                     title = NEXT_TITLES[index],
                 ),
             )

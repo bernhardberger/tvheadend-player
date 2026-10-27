@@ -301,20 +301,7 @@ class SettingsVisualEvidenceTest {
     }
 
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishPlaybackPages() {
-        val sdk = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(
-            at.bernhardberger.tvheadend.sdk.core.SessionState.Ready(at.bernhardberger.tvheadend.sdk.core.ServerCapabilities.create(
-                streaming = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
-                dvrWrite = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED)),
-            at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.ChannelCatalog.create()),
-            at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create()),
-            at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.DvrSnapshot.create()))
-        val profiles = listOf("htsp", "pass", "matroska", "webtv-h264-aac-mpegts").mapIndexed { index, name ->
-            at.bernhardberger.tvheadend.sdk.core.StreamProfile(
-                at.bernhardberger.tvheadend.sdk.core.StreamProfileId((index + 1).toString().padStart(32, '0')), name, "")
-        }
-        val ui = at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState(connected = true, audioLanguages = listOf("en"),
-            profiles = at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult.Available.create(profiles, requireNotNull(sdk.currentSession)),
-            selectedProfileId = profiles.first().id)
+        val ui = connectedPlaybackUi()
         lateinit var navigation: DepthNavigationState
         compose.setContent {
             TVHeadendPlayerTheme {
@@ -350,6 +337,58 @@ class SettingsVisualEvidenceTest {
         press(Key.DirectionCenter)
         compose.onNodeWithText("Audio language").assertIsFocused()
         capture("en-font1.0-audio-subtitles")
+    }
+
+    /** README scene: Playback settings over the warm Ridge Light picture, 1920×1080. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi") fun presentation() {
+        val ui = connectedPlaybackUi()
+        val still = at.bernhardberger.tvhplayer.testutil.FixtureArt.art("still-ridge-light").asImageBitmap()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                view = LocalView.current
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                    WarmPlaybackScrim()
+                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(applianceBuild = false, connectionStatus = "Connected"),
+                            settingsPlayerLevel(ui, {})),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        press(Key.DirectionCenter)
+        compose.mainClock.advanceTimeBy(1000)
+        compose.waitForIdle()
+        lateinit var bitmap: Bitmap
+        compose.runOnIdle {
+            bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            view.draw(Canvas(bitmap))
+        }
+        assertEquals(1920, bitmap.width)
+        assertEquals(1080, bitmap.height)
+        val directory = File("build/outputs/presentation").apply { mkdirs() }
+        File(directory, "settings.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+    }
+
+    /** A connected session offering four stream profiles, the first one chosen. */
+    private fun connectedPlaybackUi(): at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState {
+        val sdk = at.bernhardberger.tvheadend.sdk.core.SessionObservation.create(
+            at.bernhardberger.tvheadend.sdk.core.SessionState.Ready(at.bernhardberger.tvheadend.sdk.core.ServerCapabilities.create(
+                streaming = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED,
+                dvrWrite = at.bernhardberger.tvheadend.sdk.core.CapabilityAccess.ALLOWED)),
+            at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.ChannelCatalog.create()),
+            at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.EpgSnapshot.create()),
+            at.bernhardberger.tvheadend.sdk.core.DvrRepositoryState.Current(at.bernhardberger.tvheadend.sdk.core.DvrSnapshot.create()))
+        val profiles = listOf("htsp", "pass", "matroska", "webtv-h264-aac-mpegts").mapIndexed { index, name ->
+            at.bernhardberger.tvheadend.sdk.core.StreamProfile(
+                at.bernhardberger.tvheadend.sdk.core.StreamProfileId((index + 1).toString().padStart(32, '0')), name, "")
+        }
+        return at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState(connected = true, audioLanguages = listOf("en"),
+            profiles = at.bernhardberger.tvheadend.sdk.core.StreamProfilesResult.Available.create(profiles, requireNotNull(sdk.currentSession)),
+            selectedProfileId = profiles.first().id)
     }
 
     private fun press(key: Key) {
