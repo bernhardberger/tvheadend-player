@@ -35,6 +35,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.*
@@ -249,7 +250,7 @@ internal fun ProgrammeDetailsPage(
     val background = rememberDetailsTint(art, picon.takeIf { art != null })
     val glowChannel = channel?.id?.takeIf { art == null && picon != null }
     // The player's rail opens another channel's programme over the playing video, so its picture
-    // does not show behind the page: it stands framed in the second column instead.
+    // does not show behind the page: it stands framed beside the information instead.
     val framedChannel = channel?.takeIf { warmPlayback && LocalPlayerDetailsFramedArt.current }
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
         Box(Modifier.browseDetailsViewport().then(modifier).fillMaxSize()
@@ -315,18 +316,6 @@ internal fun ProgrammeDetailsPage(
                             translationY = -pageScroll.value.toFloat()
                             this.alpha = 1f - readingProgress.value
                         }.testTag("details-hero-logo"))
-            } else if (framedChannel != null) {
-                // The rail preview's hero, the picture or the channel's colour with its logo,
-                // scrolling away with the page like the logo above.
-                ProgrammeHero(event?.image ?: recording?.image, framedChannel.id,
-                    framedChannel.number?.toString().orEmpty(), framedChannel.icon,
-                    Modifier.align(Alignment.TopEnd).padding(top = DetailsSafeEdge, end = DetailsKeyline)
-                        .graphicsLayer {
-                            translationY = -pageScroll.value.toFloat()
-                            this.alpha = 1f - readingProgress.value
-                            shape = PlayerChromeTokens.heroShape
-                            clip = true
-                        }.testTag("details-framed-art"))
             }
             readingTransition.AnimatedContent(transitionSpec = {
                 (fadeIn(tween(PlayerMotion.MediumMs * 2, easing = PlayerMotion.Standard)) togetherWith
@@ -365,14 +354,22 @@ internal fun ProgrammeDetailsPage(
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }
                             .scrollSection(pageSpec, DetailsSection.ACTIONS)) {
-                        // Beside the framed art the information stands at least its height, so the
-                        // description below, which reaches the art's edge, always clears it.
-                        Box(if (framedChannel != null) Modifier.heightIn(min = PlayerChromeTokens.heroHeight) else Modifier,
+                        // The framed picture is a four-column card on the end keyline, its foot on the
+                        // information's last line; the block stands at least its height.
+                        Box(if (framedChannel != null) Modifier.heightIn(min = DetailsFramedArtSize.second) else Modifier,
                             contentAlignment = Alignment.BottomStart) {
+                        framedChannel?.let { framed ->
+                            // The rail preview's hero, the picture or the channel's colour with its logo.
+                            ProgrammeHero(event?.image ?: recording?.image, framed.id,
+                                framed.number?.toString().orEmpty(), framed.icon,
+                                Modifier.align(Alignment.BottomEnd)
+                                    .size(DetailsFramedArtSize.first, DetailsFramedArtSize.second)
+                                    .clip(PlayerChromeTokens.heroShape).testTag("details-framed-art"))
+                        }
                         DetailsInformation(event, recording, recordingAdmission, channel, nowSec,
                             corner = when {
                                 glowChannel != null -> DetailsHeroLogoSize.first
-                                framedChannel != null -> PlayerChromeTokens.heroWidth
+                                framedChannel != null -> DetailsFramedArtSize.first
                                 else -> null
                             }) {
                             recordingFailure?.let { text ->
@@ -387,8 +384,6 @@ internal fun ProgrammeDetailsPage(
                              // Group gap; also clears the 1.05 focus growth (~3dp) and its 2dp outline.
                              Spacer(Modifier.height(24.dp))
                             DetailsAbout(synopsis, { reading = true },
-                                // Under the framed art the card ends on the art's edge, the page's end keyline.
-                                wide = framedChannel != null,
                                 Modifier.focusRequester(aboutFocus).onFocusChanged {
                                     if (it.isFocused) section = DetailsSection.ABOUT
                                 }.focusProperties { canFocus = backEnabled })
@@ -476,8 +471,8 @@ internal val AiringCardWidth = 220.dp
 private val AiringCardRoom = 12.dp
 
 @Composable
-private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, wide: Boolean = false, modifier: Modifier) {
-    Box((if (wide) Modifier.fillMaxWidth() else Modifier.widthIn(max = 584.dp)).testTag("details-about")) {
+private fun DetailsAbout(synopsis: String?, onRead: () -> Unit, modifier: Modifier) {
+    Box(Modifier.widthIn(max = 584.dp).testTag("details-about")) {
         val interaction = remember { MutableInteractionSource() }
         val focused by interaction.collectIsFocusedAsState()
         DetailsReadingPanel(onRead, modifier.fillMaxWidth().testTag("details-about-description"), interaction) {
@@ -737,6 +732,8 @@ private val DetailsBackdropDecodeSize = 320 to 180
 private const val DetailsBackdropWidth = 160
 private const val DetailsBackdropBlurRadius = 3
 private val DetailsHeroLogoSize = 240.dp to 135.dp
+/** The grid's four-column card (268dp of twelve 52dp columns and 20dp gutters), at 16:9. */
+private val DetailsFramedArtSize = 268.dp to 151.dp
 private val DetailsTitleLogoGap = 32.dp
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f

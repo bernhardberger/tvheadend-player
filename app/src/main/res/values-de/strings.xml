@@ -725,6 +725,7 @@
     <string name="channel_schedule_today">Heute</string>
     <string name="channel_schedule_tomorrow">Morgen</string>
     <string name="channel_schedule_ended">Beendet</string>
-    <string name="channel_schedule_gap">%1$s  Keine Programminformationen bis %2$s</string>
+    <string name="channel_schedule_gap">Keine Programminformationen bis %1$s</string>
     <string name="channel_schedule_end">Keine Programminformationen nach %1$s</string>
+    <string name="channel_schedule_loading_more">Weitere Tage werden geladen</string>
 </resources>

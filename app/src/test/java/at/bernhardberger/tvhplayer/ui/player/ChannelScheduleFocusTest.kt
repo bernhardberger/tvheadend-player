@@ -61,10 +61,38 @@ class ChannelScheduleFocusTest {
         compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
             ChannelSchedule(null, data, NOW, NOW, loading, false, { null }, {}, {}, {})
         } } }
-        compose.onNodeWithText("Loading schedule").assertIsFocused()
+        compose.onNodeWithContentDescription("Loading schedule").assertIsFocused()
         compose.runOnIdle { loading = false }
         compose.onNodeWithText("Close").assertIsFocused()
         compose.runOnIdle { data = events }
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+    }
+
+    @Test fun viewerRowUsesThePlayersBehindLiveDistanceAndNoPlayingMark() {
+        var behind by mutableStateOf(0L)
+        compose.setContent { TVHeadendPlayerTheme { CompositionLocalProvider(LocalWatchingChannel provides ChannelId(1),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+            PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                ChannelSchedule(null, events, NOW, NOW - 3600, false, false, { null }, {}, {}, {}, viewerBehindMs = behind)
+            }
+        } } }
+        // At the live edge the row says nothing, whatever the wall clock suggests; no "0 minutes".
+        compose.onAllNodesWithText("behind live", substring = true, useUnmergedTree = true).assertCountEquals(0)
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(0)
+        compose.runOnIdle { behind = 3_600_000L }
+        compose.onNodeWithText("1:00:00 behind live", substring = true, useUnmergedTree = true).assertExists()
+        compose.onAllNodesWithTag("channel-playing-indicator", useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test fun rowsWithLaterDaysArrivingEndOnALoadingLine() {
+        var loading by mutableStateOf(true)
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, events, NOW, NOW, loading, false, { null }, {}, {}, {})
+        } } }
+        compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+        compose.onNodeWithTag("channel-schedule-footer").performScrollTo().assertTextEquals("Loading later days")
+        compose.runOnIdle { loading = false }
+        compose.onNodeWithTag("channel-schedule-footer").performScrollTo().assertTextContains("No program information after", substring = true)
         compose.onNodeWithTag("schedule-row-2").assertIsFocused()
     }
 

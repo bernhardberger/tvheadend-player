@@ -13,7 +13,13 @@ import at.bernhardberger.tvhplayer.playback.RecordingPlaybackSelection
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.components.*
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.time.ZoneId
+import kotlin.time.Instant
 
 /** Player-only sheet and details navigation; the column itself has no player dependency. */
 @Composable
@@ -27,6 +33,7 @@ internal fun PlayerChannelSchedule(
     onPlayRecording: ((RecordingPlaybackSelection) -> Unit)?,
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     connectionUiState: ConnectionUiState? = null,
+    session: TvheadendSession,
 ) {
     val historyStart = scheduleHistoryStart(timeshift)
     val snapshot = observation.epgSnapshotForDisplay
@@ -38,11 +45,32 @@ internal fun PlayerChannelSchedule(
     }
     val connection = connectionUiState ?: observation.sessionState.toConnectionUiState()
     val viewerSec = liveViewerEpochSec(channelId, nowSec).takeIf { channelWatchingIndicator(channelId).isPlayingItem }
+    // The startup guide holds only hours ahead; ask for the Guide's reach for this channel.
+    val throughSec = remember(channelId) { scheduleCoverageThroughSec(nowSec, ZoneId.systemDefault()) }
+    var requestPending by remember(channelId) { mutableStateOf(false) }
+    val currentSession = observation.currentSession
+    LaunchedEffect(channelId, currentSession, throughSec) {
+        val capability = currentSession ?: return@LaunchedEffect
+        requestPending = true
+        try {
+            withTimeoutOrNull(SCHEDULE_COVERAGE_TIMEOUT_MS) {
+                withContext(Dispatchers.Default) {
+                    session.epgRepository.acquireCoverage(capability, channelId, Instant.fromEpochSeconds(throughSec))
+                }
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Repository failures settle the request; connection state owns user feedback.
+        } finally {
+            requestPending = false
+        }
+    }
+    val moreLoading = scheduleCoveragePending(connection, observation.epgState, channelId, throughSec, requestPending)
     var focused by remember(channelId) { mutableStateOf(scheduleInitialEvent(events, viewerSec, nowSec)) }
     var contextMenu by remember { mutableStateOf(false) }
     val details = layers.scheduleDetails
-    if (details != null) {
-        LivePlayerProgrammeDetails(details, channel, observation, currentObservation, nowSec,
+    if (details != null) LivePlayerProgrammeDetails(details, channel, observation, currentObservation, nowSec,
             mutations, notices, scope, settings,
             onPlay = { id, name -> layers.closeSchedule(false); onPlay(id, name) },
             onPlayRecording = onPlayRecording?.let { play -> { selection -> layers.closeSchedule(false); play(selection) } },
@@ -53,17 +81,17 @@ internal fun PlayerChannelSchedule(
             onShowDetails = { contextMenu = false },
             onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) },
             framedArt = details.id != scheduleInitialEvent(events, viewerSec, nowSec)?.id)
-    } else ProvideArtworkSession(observation.currentSession, observation) {
-        PlaybackOptionsOverlayFrame(
-            panelTag = "channel-schedule-panel", panelWidth = 480.dp, showScrim = false) {
+    else ProvideArtworkSession(observation.currentSession, observation) {
+        PlaybackOptionsOverlayFrame(panelTag = "channel-schedule-panel", panelWidth = 480.dp, showScrim = false) {
             ChannelSchedule(channel, events, nowSec, viewerSec,
-                 loading = scheduleLoading(connection, observation.epgState),
+                 loading = scheduleLoading(connection, observation.epgState) || moreLoading,
                  offline = scheduleOffline(connection, observation.epgState),
                 recording = { observation.dvrEntryForEvent(it)?.state },
                 onOpen = { contextMenu = false; layers.showScheduleDetails(it) },
                 onContextMenu = { contextMenu = true; layers.showScheduleDetails(it) },
                 onClose = { layers.closeSchedule() }, onRetry = onRetry,
-                initialEvent = focused ?: scheduleInitialEvent(events, viewerSec, nowSec), onFocused = { focused = it })
+                initialEvent = focused ?: scheduleInitialEvent(events, viewerSec, nowSec), onFocused = { focused = it },
+                viewerBehindMs = liveBehindMs(timeshift))
         }
     }
 }
@@ -77,3 +105,6 @@ internal fun rememberScheduleAvailable(observation: SessionObservation, channelI
     }
     return end != null && end > nowSec
 }
+
+/** Seven days for one channel is a larger query than a Guide page; after this the end footer shows. */
+private const val SCHEDULE_COVERAGE_TIMEOUT_MS = 30_000L

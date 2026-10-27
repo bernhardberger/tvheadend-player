@@ -1065,10 +1065,13 @@ only the colour and indication rules above apply here. Remote keys follow §6 an
   label swaps with the browse fade through (90 ms out, then 210 ms in).
 - Short OK tunes; holding OK opens the programme details as a full-screen
   two-column dialog that fades in and out, without tabs or the up hint, and only
-  Back closes it. Its second column frames the programme's artwork at the hero's
-  360×202dp, or the channel's colour with its picon, scrolling away with the
-  page; the playing channel's own details draw no art, the video being their
-  backdrop. This is the rail's exemption from the context menu: the dialog already
+  Back closes it. It is the browse details page in every position, size and type
+  over the video and its scrim. Beside the information it frames the programme's
+  artwork as the grid's four-column card (268×151dp) on the end keyline, its foot
+  on the information's last line, or the channel's colour with its picon; the
+  title stops short of it as beside the browse logo, and the About card keeps its
+  browse width. The playing channel's own details draw no art, the video being
+  their backdrop. This is the rail's exemption from the context menu: the dialog already
   leads with the menu's order (Watch, Record, Show in Guide), so a held OK still
   lands on Watch.
 - While the controls show, the closed rail peeks: the footer stands 14dp higher
@@ -1131,17 +1134,35 @@ quick list is open: GUIDE is consumed without interrupting its preview/undo
 session. Appliance entry routing is unchanged. The
 recordings player has no Schedule action. The reusable column owns no tuning or
 playback: its caller supplies events, viewer position, recording marks and actions.
-Rows keep an 80×45dp artwork slot (lighter sheet surface with a centred channel
-logo when absent), the shared playing
-and recording marks, orange viewer progress and cyan on-air progress. Day tabs
-follow focus above one continuous list; gaps and day headings are not focusable.
+The sheet header carries the picon, the `channelTitleText` title in the options
+sheet's `titleLarge` and the clock in `titleMedium` at the tertiary alpha, on the
+rows' text keyline. Rows are standard `ListItem`s with library focus defaults: an
+80×45dp `ProgrammeArtwork` (channel logo when the programme has no picture), a
+16sp `titleMedium` headline with the start time in its own measured column and
+the one-line title, and a 14sp `bodyMedium` supporting line under the title
+(category • state: time left, behind live in the player bar's wording and
+live-edge tolerance, Ended, duration, or a failed recording) with the channel
+rows' 2dp progress strip. Recording marks are the rows' shared dots; failed
+recordings use the error mark. There is no playing mark: orange viewer progress
+and initial focus name the viewer's programme, cyan progress the one on air.
+Ended rows step their headline back to the secondary alpha. Day tabs follow
+focus above one continuous list; later days start under a sentence-case
+`titleSmall` date over a divider, and gaps (time column plus "No program
+information until …") are passive rows in the secondary tone, as is the end line.
+The list runs to the sheet's bottom edge with the shared list edge fades and
+bring-into-view reserve. While nothing has loaded, skeleton tabs and rows hold
+focus and announce loading; offline uses the shared programme status line with
+Retry.
 OK opens the shared details page; Menu/hold OK opens the shared context menu.
 Back restores the source row, then the Schedule action for button entry. Remote
 INFO, channel-rail shortcuts and GUIDE return to the layer from which they opened:
 bare picture stays bare; visible controls return with a fresh auto-hide timeout.
 A fresh visit starts at
 the viewer's programme. The panel pauses controls auto-hide; channel keys and
-number entry dismiss it. Loading holds focus until rows arrive; empty data offers
+number entry dismiss it. Opening it asks for the channel's guide as far as the
+Guide reaches (seven days); while that request runs and coverage stops short, the
+list ends on a loading line instead of its end line, and the days the server holds
+appear as tabs. Loading holds focus until rows arrive; empty data offers
 Close; stale data remains visible with Retry. Only history overlapping the known
 timeshift window is listed; this display estimate is not a seek grant.
 

@@ -1743,7 +1743,7 @@ fun VideoPlayerScreen(
             dvrMutationActions, notices, scope, uiSettingsStore, onReconnect,
             onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
             onPlayRecording = onPlayRecording, onShowGuide = onShowGuide,
-            connectionUiState = connectionUiState,
+            connectionUiState = connectionUiState, session = session,
         )
         if (layerState.infoOpen && foregroundLayer == PlayerForegroundLayer.INFO) {
             LivePlayerProgrammeDetails(

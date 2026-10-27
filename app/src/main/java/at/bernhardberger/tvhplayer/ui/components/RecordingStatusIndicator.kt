@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Icon
 import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvRecordingColor
@@ -53,6 +54,11 @@ fun RecordingStatusIndicator(
 
 /** The red of a recording mark drawn outside this indicator: deeper on a focused, light row. */
 fun recordingMarkColor(focused: Boolean): Color = if (focused) TvRecordingFocusedColor else TvRecordingColor
+
+/** The error colour of a mark: pink on the dark surface, dark red on a focused, light row. */
+@Composable
+internal fun errorMarkColor(focused: Boolean): Color =
+    if (focused) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.error
 
 /** Scheduled mark for places that only know "scheduled", not a DVR entry state. */
 @Composable
