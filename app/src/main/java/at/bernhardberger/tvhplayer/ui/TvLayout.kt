@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 
 // ---- Product spacing ----
@@ -16,6 +17,8 @@ val TvSpacing80 = 80.dp
 
 /** Shared focus growth for all cards, including cards built from clickable TV Material surfaces. */
 internal const val TvCardFocusedScale = 1.05f
+/** Native WideButton-style focus growth for guided-step actions. */
+internal const val TvGuidedActionFocusedScale = 1.1f
 
 /** Minimum title/action slot height shared by peer top-level browse destinations. */
 val TvBrowseHeaderHeight = 40.dp
@@ -100,6 +103,9 @@ val SettingsDepthRowMinHeight = 56.dp
 
 /** Non-interactive programme progress on browse cards, rows, and detail panes. */
 val TvProgressStripHeight = 4.dp
+internal val TvCardProgressStripHeight = 3.dp
+internal val TvCompactProgressStripHeight = 2.dp
+internal val TvLogoPlateColor = Color.Black.copy(alpha = 0.6f)
 
 // ---- Player overlay geometry ----
 /** Gradient run-out, not content spacing. Do not unify with the paddings. */

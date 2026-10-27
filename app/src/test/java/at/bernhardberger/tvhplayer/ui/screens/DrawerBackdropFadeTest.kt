@@ -114,8 +114,11 @@ class DrawerBackdropFadeTest {
     private fun capture(): Bitmap {
         lateinit var bitmap: Bitmap
         compose.runOnIdle {
-            bitmap = Bitmap.createBitmap(fixture.view.width, fixture.view.height, Bitmap.Config.ARGB_8888)
-            fixture.view.draw(Canvas(bitmap))
+            bitmap = Bitmap.createBitmap(760, 410, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(bitmap)
+            canvas.translate(-200f, -60f)
+            // Preserve window coordinates while drawing only the bounding region of all probes.
+            fixture.view.draw(canvas)
         }
         return bitmap
     }
@@ -125,8 +128,8 @@ class DrawerBackdropFadeTest {
         var sum = 0f
         var n = 0
         for (ys in region.ys) for (y in ys step 4) for (x in region.xs step 4) {
-            val p = Color(a.getPixel(x, y))
-            val q = Color(b.getPixel(x, y))
+            val p = Color(a.getPixel(x - 200, y - 60))
+            val q = Color(b.getPixel(x - 200, y - 60))
             sum += abs(p.red - q.red) + abs(p.green - q.green) + abs(p.blue - q.blue)
             n++
         }

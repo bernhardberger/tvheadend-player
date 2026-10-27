@@ -5,30 +5,14 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
-import androidx.compose.foundation.border
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.key.*
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -39,12 +23,10 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService
 import at.bernhardberger.tvhplayer.ui.SettingsSection
-import at.bernhardberger.tvhplayer.ui.TvSpacing8
-import at.bernhardberger.tvhplayer.ui.TvSpacing16
+import at.bernhardberger.tvhplayer.ui.components.ScrollReadingBox
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthLevel
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthRow
 import at.bernhardberger.tvhplayer.ui.components.depth.DepthItem
-import kotlinx.coroutines.launch
 
 @Composable
 internal fun settingsApplianceLevel(): DepthLevel {
@@ -86,53 +68,14 @@ internal fun settingsApplianceLevel(
 /** Always on the Appliance page, outside its action row. Uses the existing Info reading pattern. */
 @Composable
 private fun ApplianceDisclosure(modifier: Modifier) {
-    val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    var focused by remember { mutableStateOf(false) }
-    var scrollKey by remember { mutableStateOf<Key?>(null) }
-    val step = with(LocalDensity.current) { 120.dp.roundToPx() }
-    Text(
-        stringResource(R.string.appliance_accessibility_disclosure),
-        style = MaterialTheme.typography.bodyMedium,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.fillMaxWidth().heightIn(max = 168.dp)
-            .border(1.dp, if (focused) MaterialTheme.colorScheme.onSurface else Color.Transparent)
-            .onFocusChanged { focused = it.isFocused }
-            .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyUp && event.key == scrollKey) {
-                    scrollKey = null
-                    true
-                } else if (event.type == KeyEventType.KeyDown &&
-                    (event.key == Key.DirectionUp || event.key == Key.DirectionDown)) {
-                    val delta = if (event.key == Key.DirectionDown) step else -step
-                    if ((delta < 0 && !scroll.canScrollBackward) || (delta > 0 && !scroll.canScrollForward)) {
-                        event.key == scrollKey
-                    } else {
-                        scrollKey = event.key
-                        scope.launch { scroll.scrollTo((scroll.value + delta).coerceIn(0, scroll.maxValue)) }
-                        true
-                    }
-                } else false
-            }
-            .focusable()
-            .padding(horizontal = TvSpacing16, vertical = TvSpacing8)
-            .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-            .clipToBounds()
-            .drawWithContent {
-                drawContent()
-                val fade = 24.dp.toPx().coerceAtMost(size.height)
-                if (scroll.canScrollForward) drawRect(
-                    Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
-                    blendMode = BlendMode.DstIn,
-                )
-                if (scroll.canScrollBackward) drawRect(
-                    Brush.verticalGradient(listOf(Color.Transparent, Color.Black), endY = fade),
-                    blendMode = BlendMode.DstIn,
-                )
-            }
-            .verticalScroll(scroll)
-            .testTag("appliance-disclosure"),
-    )
+    ScrollReadingBox(
+        title = stringResource(R.string.appliance_section_accessibility),
+        modifier = modifier.fillMaxWidth().heightIn(max = 168.dp),
+        readingModifier = Modifier.testTag("appliance-disclosure"),
+    ) {
+        Text(stringResource(R.string.appliance_accessibility_disclosure),
+            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 private fun isApplianceEntryServiceEnabled(context: Context): Boolean {
     val manager = context.getSystemService(AccessibilityManager::class.java)

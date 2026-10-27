@@ -1,5 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
+import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.SizeTransform
@@ -545,7 +548,7 @@ internal fun ChannelsRowCard(
             if (showsArt && !channelName && playbackIndicator != ChannelPlaybackIndicator.NONE) Box(
                 Modifier.align(Alignment.BottomEnd).padding(ImmersiveCardEmbedInset)
                     .height(32.dp * (width / AiringCardWidth))
-                    .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
+                    .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
                     .padding(horizontal = 6.dp).testTag("$tag-art-playing"),
                 contentAlignment = Alignment.Center,
             ) {
@@ -563,7 +566,7 @@ internal fun ChannelsRowCard(
             if (progress != null) ProgressStrip(progress,
                 Modifier.align(Alignment.BottomStart).fillMaxWidth().testTag("$tag-progress"),
                 color = progressColor(watchingIndicator(running, nowSec).isPlayingItem),
-                height = 3.dp)
+                height = TvCardProgressStripHeight)
         },
         title = {
             if (!channelName) return@StandardProgrammeCard

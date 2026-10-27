@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+
 import androidx.compose.ui.graphics.graphicsLayer
 
 import androidx.compose.foundation.layout.width
@@ -2307,18 +2309,6 @@ internal fun guideEmptyMessageRes(
     connectionUiState == ConnectionUiState.Reconnecting -> R.string.epg_reconnecting
     connectionUiState == ConnectionUiState.Ready && channelCatalogCurrent && isEmptyTag -> R.string.empty_channel_tag
     else -> R.string.epg_loading
-}
-
-@Composable
-private fun rememberCurrentEpochSeconds(): () -> Long {
-    val nowSec = remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
-    LaunchedEffect(nowSec) {
-        while (true) {
-            delay(5_000)
-            nowSec.longValue = System.currentTimeMillis() / 1000L
-        }
-    }
-    return remember(nowSec) { { nowSec.longValue } }
 }
 
 internal fun Long.formatDateTime(locale: java.util.Locale = java.util.Locale.getDefault()): String =

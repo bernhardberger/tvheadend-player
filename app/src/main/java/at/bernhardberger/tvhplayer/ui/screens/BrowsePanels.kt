@@ -53,14 +53,13 @@ import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 import at.bernhardberger.tvhplayer.ui.components.browseDetailsViewport
 import at.bernhardberger.tvhplayer.ui.player.OptionsHeader
 import at.bernhardberger.tvhplayer.ui.player.PlaybackListBottomFade
-import at.bernhardberger.tvhplayer.ui.player.PlaybackListFade
+import at.bernhardberger.tvhplayer.ui.components.listEdgeFadeMask
 import at.bernhardberger.tvhplayer.ui.player.PlaybackListTopFade
 import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionRow
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelHeaderTop
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelPadding
 import at.bernhardberger.tvhplayer.ui.player.PlaybackPanelWidth
 import at.bernhardberger.tvhplayer.ui.player.containedFocus
-import at.bernhardberger.tvhplayer.ui.player.playbackListFade
 import kotlinx.coroutines.flow.first
 import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 
@@ -202,7 +201,7 @@ internal fun BrowsePanelList(
             modifier = Modifier
                 .fillMaxWidth()
                 // The panel's end cuts the next row at full contrast, so only the top fades.
-                .playbackListFade(PlaybackListFade(top = listState.canScrollBackward, bottom = false))
+                .listEdgeFadeMask(24.dp, 0.dp, { listState.canScrollBackward }, { false })
                 .focusGroup(),
         ) {
             items(entries, key = { entry ->

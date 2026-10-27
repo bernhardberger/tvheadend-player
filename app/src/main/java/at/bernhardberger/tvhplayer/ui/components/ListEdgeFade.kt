@@ -17,6 +17,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.SemanticsPropertyKey
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.offset
@@ -141,13 +143,19 @@ internal fun Modifier.listEdgeFades(listState: LazyListState, topFade: Boolean =
         layout(placeable.width + 2 * overhang, placeable.height) { placeable.placeRelative(overhang, 0) }
     }
 
-/** Local transparent edge masks; the scroll-dependent edges are read only during drawing. */
+internal val ListTopFadeVisible = SemanticsPropertyKey<Boolean>("ListTopFadeVisible")
+internal val ListBottomFadeVisible = SemanticsPropertyKey<Boolean>("ListBottomFadeVisible")
+
+/** Local transparent edge masks; scroll edges are read during drawing and semantics, not composition. */
 internal fun Modifier.listEdgeFadeMask(
     topHeight: Dp,
     bottomHeight: Dp,
     showTopFade: () -> Boolean,
     showBottomFade: () -> Boolean,
-): Modifier = graphicsLayer {
+): Modifier = semantics {
+    this[ListTopFadeVisible] = topHeight > 0.dp && showTopFade()
+    this[ListBottomFadeVisible] = bottomHeight > 0.dp && showBottomFade()
+}.graphicsLayer {
     compositingStrategy = CompositingStrategy.Offscreen
 }.drawWithContent {
     drawContent()

@@ -39,6 +39,8 @@ import androidx.media3.common.Tracks
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.settings.AspectRatioMode
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.components.ListTopFadeVisible
+import at.bernhardberger.tvhplayer.ui.components.ListBottomFadeVisible
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -121,7 +123,7 @@ class PlaybackOptionsTrackListTest {
         val rowsInView = if (fontScale > 1f) 4 else 5
         (listOf("automatic") + TRACK_IDS).take(rowsInView).forEach(::assertRowFullyInList)
         assertFade(focusedId = "automatic")
-        assertTrue("The ORF list continues below the panel, so its band shows", listFade().bottom)
+        assertTrue("The ORF list continues below the panel, so its band shows", bottomFade())
         val name = "audio-menu-$locale-font$fontScale" + if (minimalScroll) "-minimal-scroll" else ""
         capture(view, "$name-top")
 
@@ -138,7 +140,7 @@ class PlaybackOptionsTrackListTest {
             assertNoLineCut(id)
         }
         // The last row is focused: the list has reached its end and shows it unfaded.
-        assertFalse("The last row is faded", listFade().bottom)
+        assertFalse("The last row is faded", bottomFade())
         compose.onAllNodes(hasText("Hz", substring = true), useUnmergedTree = true).assertCountEquals(0)
         capture(view, "$name-bottom")
 
@@ -149,11 +151,14 @@ class PlaybackOptionsTrackListTest {
             assertRowFullyInList(id)
             assertFade(focusedId = id)
         }
-        assertFalse("The first row is faded", listFade().top)
+        assertFalse("The first row is faded", topFade())
     }
 
-    private fun listFade(): PlaybackListFade =
-        compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[PlaybackListFadeKey]
+    private fun topFade(): Boolean =
+        compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListTopFadeVisible]
+
+    private fun bottomFade(): Boolean =
+        compose.onNodeWithTag("playback-options-track-list").fetchSemanticsNode().config[ListBottomFadeVisible]
 
     /**
      * The bottom band shows exactly while the list can scroll forward, the top fade
@@ -162,16 +167,15 @@ class PlaybackOptionsTrackListTest {
     private fun assertFade(focusedId: String) {
         val list = compose.onNodeWithTag("playback-options-track-list")
         val range = list.fetchSemanticsNode().config[SemanticsProperties.VerticalScrollAxisRange]
-        val fade = listFade()
-        assertEquals("Bottom band at $focusedId", range.value() < range.maxValue(), fade.bottom)
-        assertEquals("Top fade at $focusedId", range.value() > 0f, fade.top)
+        assertEquals("Bottom band at $focusedId", range.value() < range.maxValue(), bottomFade())
+        assertEquals("Top fade at $focusedId", range.value() > 0f, topFade())
         val bounds = list.getUnclippedBoundsInRoot()
         val row = compose.onNodeWithTag(rowTag(focusedId)).getUnclippedBoundsInRoot()
-        if (fade.bottom) {
+        if (bottomFade()) {
             val bandTop = bounds.bottom - PlaybackListBottomFade
             assertTrue("Focused row $focusedId $row reaches into the band below $bandTop", row.bottom <= bandTop)
         }
-        if (fade.top) {
+        if (topFade()) {
             val fadeBottom = bounds.top + PlaybackListTopFade
             assertTrue("Focused row $focusedId $row reaches into the fade above $fadeBottom", row.top >= fadeBottom)
         }

@@ -205,7 +205,11 @@ class GuideRenderingCostContractTest {
         )
         val details = File(repositoryRoot,
             "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ProgrammeDetailsHost.kt").readText()
-        val clock = screenSource.substringAfter("private fun rememberCurrentEpochSeconds()")
+        val clock = File(repositoryRoot,
+            "app/src/main/java/at/bernhardberger/tvhplayer/ui/common/TimeConverter.kt").readText()
+            .section("internal fun rememberCurrentEpochSeconds()", "/** Details refresh")
+        val channels = File(repositoryRoot,
+            "app/src/main/java/at/bernhardberger/tvhplayer/ui/screens/ChannelsScreen.kt").readText()
 
         assertEquals(1, (guide + movedGuideSource).count("val nowSecProvider = rememberCurrentEpochSeconds()"))
         assertFalse((guide + movedGuideSource).contains("var nowSec by remember"))
@@ -218,6 +222,9 @@ class GuideRenderingCostContractTest {
         assertFalse(detailsArguments.contains("nowSecProvider()"))
         assertEquals(1, clock.count("mutableLongStateOf("))
         assertTrue(clock.contains("return remember(nowSec) { { nowSec.longValue } }"))
+        assertEquals(1, channels.count("val nowSec = rememberCurrentEpochSeconds()"))
+        assertFalse(channels.contains("var nowSec by remember"))
+        assertFalse(channels.contains("nowSec()"))
     }
 
     private fun String.section(start: String, end: String): String {
