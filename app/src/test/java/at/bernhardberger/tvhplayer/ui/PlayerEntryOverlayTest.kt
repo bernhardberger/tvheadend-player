@@ -252,7 +252,11 @@ class PlayerEntryOverlayTest {
         val bindings = session.calls.count { it == FakeSessionCall.BIND_LIVE_PLAYBACK }
         leavePlayer()
         assertTrue(slotDescription()!!.startsWith("Now playing: Ridge Light, 1 Name 1, "))
-        compose.onNodeWithTag("global-drawer-now-playing-item").performSemanticsAction(SemanticsActions.OnClick)
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
+        key(Key.DirectionCenter)
         compose.waitUntil(10_000) { playerVisible }
         settle()
         compose.onNodeWithTag("player-page-first", useUnmergedTree = true).assertExists()
@@ -283,12 +287,12 @@ class PlayerEntryOverlayTest {
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         key(Key.DirectionUp)
-        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
 
         unconsumedCenterUps = 0
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         settle()
-        assertTrue("the drawer item activates on release, not on press", !playerVisible)
+        assertTrue("Full screen activates on release, not on press", !playerVisible)
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.waitUntil(10_000) { playerVisible }
         settle()
@@ -327,13 +331,13 @@ class PlayerEntryOverlayTest {
         key(Key.DirectionUp)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         key(Key.DirectionUp)
-        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
         assertEquals(ChannelsKey, shellStack().last())
 
         unconsumedCenterUps = 0
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
         settle()
-        assertTrue("the drawer item activates on release, not on press", !playerVisible)
+        assertTrue("Full screen activates on release, not on press", !playerVisible)
         compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
         compose.waitUntil(10_000) { playerVisible }
         settle()
@@ -369,7 +373,15 @@ class PlayerEntryOverlayTest {
         // These recordings name no channel, so the title stands alone before the state.
         val description = slotDescription()!!
         assertTrue(description, description.startsWith("Now playing: Recording 7, ") && ", ," !in description)
-        compose.onNodeWithTag("global-drawer-now-playing-item").performSemanticsAction(SemanticsActions.OnClick)
+        key(Key.DirectionLeft)
+        compose.onNodeWithTag("nav-recordings").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-epg").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
+        key(Key.DirectionCenter)
         compose.waitUntil(10_000) { playerVisible }
         settle()
         compose.onNodeWithTag("player-banner", useUnmergedTree = true).assertExists()
@@ -430,15 +442,28 @@ class PlayerEntryOverlayTest {
                 settle()
             }
         }
+        if (from == "rail") {
+            key(Key.DirectionLeft)
+            compose.onNodeWithTag("nav-channels").assertIsFocused()
+            key(Key.DirectionUp)
+            compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
+            // Capture the pressed button that leaves on release, not its unpressed size.
+            compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
+            settle()
+            assertTrue("Full screen activates on release, not on press", !playerVisible)
+        }
         val before = frame("sound-only-$from-before")
         compose.mainClock.autoAdvance = false
-        val action = when (from) {
-            "browse" -> hasTestTag("channel-row-1")
-            "details" -> hasTestTag("details-watch")
-            "rail" -> hasTestTag("global-drawer-now-playing-item")
-            else -> hasText("Watch") and hasClickAction() and hasAnyAncestor(hasTestTag("browse-context-menu"))
+        if (from == "rail") {
+            compose.onRoot().performKeyInput { keyUp(Key.DirectionCenter) }
+        } else {
+            val action = when (from) {
+                "browse" -> hasTestTag("channel-row-1")
+                "details" -> hasTestTag("details-watch")
+                else -> hasText("Watch") and hasClickAction() and hasAnyAncestor(hasTestTag("browse-context-menu"))
+            }
+            compose.onNode(action).performSemanticsAction(SemanticsActions.OnClick)
         }
-        compose.onNode(action).performSemanticsAction(SemanticsActions.OnClick)
         val frameCount = (PlayerMotion.DestinationMs + 100) / 16
         val frames = (1..frameCount).map {
             compose.mainClock.advanceTimeByFrame()
