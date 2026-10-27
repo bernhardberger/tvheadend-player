@@ -359,7 +359,7 @@ Component commit model is set by the component:
 |---|---|
 | Page-scope tabs | focus — content below slides with tab direction |
 | Standard navigation drawer | focus — destination changes as focus moves |
-| Drawer playing slot | OK — focusing it never navigates or previews |
+| Drawer now-playing controls | OK — focusing a control never navigates or previews |
 | Lists, grids, choice rows | OK |
 
 Pressed feedback needs the component to receive the key: parents do not consume
@@ -419,23 +419,31 @@ Anatomy per Material for TV / design kit:
   non-interactive, never first focus, outside Back. The wordmark announces the
   app name once and reveals/hides with the same transitions as item labels.
 - **Playing slot:** while live TV or a recording plays behind browse, the
-  playing channel replaces the brand inside the same 56dp section; nothing else
-  moves and nothing is reserved when nothing plays. Collapsed it shows the
-  now-playing plate on the icon axis with the viewer-position strip; a 20dp disc
-  on the plate's top-right corner marks paused (pause bars) or tuning and
-  reconnecting (spinner). The plate keeps full emphasis in the collapsed rail;
+  playing channel replaces the brand in a 56dp header (64dp at font 1.3).
+  Collapsed it shows the now-playing plate on the icon axis with the viewer-position
+  strip. Centred on a 50% black wash are sound bars while playing, a pause glyph
+  while paused, or a spinner while tuning/reconnecting. Reduced motion keeps the
+  glyph static. The plate keeps full emphasis in the collapsed rail;
   only tuning dims the picon and drops the strip; reconnecting freezes it. Expanded adds the title (programme at the viewer
   position, the recording title, or the channel name without guide data) and
-  `State • Channel`. It is a library drawer item and the first stop above the
-  destinations: Up from the first destination reaches it, Down returns, drawer
-  entry still focuses the current destination. Focusing it does nothing; OK
-  returns to the full-screen player for that target without retuning. For
-  accessibility it is one button node, never selected and outside the
-  destinations' selectable group, that announces only discrete state changes.
+  `State • Channel`. The header is readable but never focusable or clickable.
+  Below it, `DrawerNowPlayingControls` groups Full screen, Pause/Play and Stop in
+  one passive 32dp ghost-fill pill (`surfaceVariant` at `TvGhostFillAlpha`), with
+  28dp TV Material icon buttons, 16dp icons, 2dp gaps and padded ends that contain
+  the kit's focused disc. The first icon aligns with the title. The row reserves
+  36dp even when closed; only the open drawer composes the controls. Pause is
+  omitted for live targets without timeshift, but always offered for recordings; a paused live channel shows Play only while timeshift is available, otherwise only Full screen and Stop remain.
+  Full screen returns without retuning; Pause/Play uses the player's transport;
+  Stop ends playback. Each button has one spoken label and is never selected.
+  Drawer entry focuses the current destination. Up from Channels explicitly
+  reaches Full screen; Down from any control returns to Channels. Left/Right
+  traverse the row, Right from Stop exits to the page, Left from Full screen and
+  Up stay put. Back retains the drawer's normal behavior.
   A reconnect holds the title and strip where they were until playback
   resumes. When
-  playback stops, ends or fails the brand returns; if the slot had focus, focus
-  moves to the current destination. The *Stop* browse setting never shows it.
+  playback stops, ends or fails the brand returns; if a control had focus, focus
+  moves to Channels, also when the focused Pause control disappears. The *Stop*
+  browse setting never shows it. Nothing is reserved when nothing plays.
 - Destinations (Channels, Guide, Recordings) are centred between the top section
   and the bottom section; Settings is the bottom section. Nothing in the rail
   moves when it expands: rows keep their positions and icons and the brand mark

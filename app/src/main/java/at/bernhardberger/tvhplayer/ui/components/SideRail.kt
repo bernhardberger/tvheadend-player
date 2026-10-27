@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -20,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeight
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -57,7 +57,6 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.graphicsLayer
@@ -67,17 +66,14 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.LiveRegionMode
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.clearAndSetSemantics
-import androidx.compose.ui.semantics.focused
 import androidx.compose.ui.semantics.liveRegion
-import androidx.compose.ui.semantics.onClick
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.testTag
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,6 +82,8 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.DrawerState
 import androidx.tv.material3.DrawerValue
 import androidx.tv.material3.Icon
+import androidx.tv.material3.IconButton
+import androidx.tv.material3.IconButtonDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.NavigationDrawer
 import androidx.tv.material3.NavigationDrawerItem
@@ -95,14 +93,13 @@ import androidx.tv.material3.NavigationDrawerItemDefaults
 import androidx.tv.material3.NavigationDrawerScope
 import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
-import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlate
-import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateHeight
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateWidth
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.BrowseShellBackAction
@@ -112,6 +109,7 @@ import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TvScreenPadding
+import at.bernhardberger.tvhplayer.ui.TvGhostFillAlpha
 import kotlin.math.roundToInt
 
 // Material for TV drawer padding: 12dp on both edges of the item column.
@@ -260,13 +258,23 @@ internal fun SideRail(
     rootBackPriority: Boolean = false,
     connectionDegraded: Boolean = false,
     onBackHandlerChanged: ((() -> Unit) -> Unit) = {},
-    /** What plays behind browse; it takes the mark's place and returns to the player. */
+    /** What plays behind browse; the controls below it act on that target. */
     nowPlaying: RailNowPlaying? = null,
     programmeAt: (ChannelId, Long) -> EpgEvent? = { _, _ -> null },
     onOpenNowPlaying: () -> Unit = {},
+    livePauseAvailable: Boolean = false,
+    nowPlayingPaused: Boolean = false,
+    onToggleNowPlayingPause: () -> Unit = {},
+    onStopNowPlaying: () -> Unit = {},
+    animateNowPlaying: Boolean? = null,
     nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
+    var systemAnimationsEnabled by remember { mutableStateOf(android.animation.ValueAnimator.areAnimatorsEnabled()) }
+    LifecycleResumeEffect(Unit) {
+        systemAnimationsEnabled = android.animation.ValueAnimator.areAnimatorsEnabled()
+        onPauseOrDispose { }
+    }
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
@@ -382,15 +390,24 @@ internal fun SideRail(
         }
     }
     SideEffect { onBackHandlerChanged(handleBrowseBack) }
-    var nowPlayingFocused by remember { mutableStateOf(false) }
+    val fullScreenFocus = remember { FocusRequester() }
+    val pauseAvailable = nowPlaying?.target is AppPlaybackTarget.Recording || livePauseAvailable
+    var focusedControl by remember { mutableStateOf<String?>(null) }
     // Read while composing the slot's removal, before it detaches and drops its focus.
-    val nowPlayingFocusLost = remember(nowPlaying == null) {
-        nowPlaying == null && Snapshot.withoutReadObservation { nowPlayingFocused }
+    val nowPlayingFocusLost = remember(nowPlaying == null, pauseAvailable) {
+        Snapshot.withoutReadObservation {
+            focusedControl != null && (nowPlaying == null ||
+                !pauseAvailable && focusedControl == "pause")
+        }
     }
     LaunchedEffect(nowPlayingFocusLost) {
         if (nowPlayingFocusLost) {
-            nowPlayingFocused = false
-            (itemFocus[drawerRoute] ?: itemFocus[items.firstOrNull()?.route])?.requestFocus()
+            focusedControl = null
+            val fallback = AppDestination.CHANNELS.takeIf(itemFocus::containsKey) ?: items.firstOrNull()?.route
+            if (fallback != null) {
+                requestRoute(fallback)
+                itemFocus[fallback]?.requestFocus()
+            }
         }
     }
 
@@ -472,9 +489,7 @@ internal fun SideRail(
                         // Kit drawer: 12dp on every edge; header and footer are 56dp
                         // sections and the destination block is centred between them.
                         .padding(DrawerStartPadding)
-                        .then(
-                            activeItemFocus?.let { Modifier.focusRestorer(it) } ?: Modifier
-                        )
+                        // Entry is owned by the destination effect above, not a remembered control.
                         .focusGroup()
                         .selectableGroup(),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -484,15 +499,24 @@ internal fun SideRail(
                     } else {
                         DrawerNowPlaying(
                             nowPlaying = nowPlaying,
-                            colors = drawerColors,
+                            expanded = drawerValue == DrawerValue.Open,
+                            controlsEnabled = !detailsOpen && !modalOpen,
+                            pauseAvailable = pauseAvailable,
+                            paused = nowPlayingPaused,
+                            fullScreenFocus = fullScreenFocus,
+                            channelsFocus = itemFocus[AppDestination.CHANNELS] ?: activeItemFocus,
                             programmeAt = programmeAt,
                             nowSecProvider = nowSecProvider,
                             onOpen = onOpenNowPlaying,
-                            modifier = Modifier
-                                .withinDrawerSheet(fullWidth, visibleWidthPx)
-                                .focusProperties { canFocus = !detailsOpen && !modalOpen }
-                                // Focus only shows where the player is; it never navigates or previews.
-                                .onFocusChanged { nowPlayingFocused = it.isFocused },
+                            onTogglePause = onToggleNowPlayingPause,
+                            onStop = onStopNowPlaying,
+                            onControlFocused = { control, focused ->
+                                if (focused) focusedControl = control
+                                else if (focusedControl == control) focusedControl = null
+                            },
+                            animated = animateNowPlaying ?: systemAnimationsEnabled,
+                            fullWidth = fullWidth,
+                            visibleWidthPx = visibleWidthPx,
                         )
                     }
 
@@ -507,7 +531,12 @@ internal fun SideRail(
                                 colors = drawerColors,
                                 modifier = Modifier
                                     .withinDrawerSheet(fullWidth, visibleWidthPx)
-                                    .focusProperties { canFocus = !detailsOpen && !modalOpen }
+                                    .focusProperties {
+                                        canFocus = !detailsOpen && !modalOpen
+                                        if (item.route == AppDestination.CHANNELS && nowPlaying != null && drawerValue == DrawerValue.Open) {
+                                            up = fullScreenFocus
+                                        }
+                                    }
                                     .focusRequester(itemFocus.getValue(item.route))
                                     .semantics { contentDescription = item.label }
                                     .testTag(item.route.testTag)
@@ -623,7 +652,7 @@ internal fun SideRail(
  * widths on `animateDpAsState`'s default spring, as the library item does, so the
  * mark reveals with the sheet instead of widening it ahead of the items. The mark
  * itself never moves; while the drawer is inactive it is dimmed like the items.
- * While something plays behind browse, [DrawerNowPlaying] takes its place in the same box.
+ * While something plays behind browse, [DrawerNowPlaying] replaces it with the header and controls.
  */
 @Composable
 private fun DrawerBrandHeader(drawerValue: DrawerValue) {
@@ -676,19 +705,15 @@ private fun DrawerBrandHeader(drawerValue: DrawerValue) {
     }
 }
 
-private val NowPlayingDiscSize = 20.dp
-private val NowPlayingDiscMarkSize = 12.dp
 private val NowPlayingPlateGap = 12.dp
 
 /** The labels start [NowPlayingPlateGap] after the plate, which reaches past the destinations' icons. */
-private val NowPlayingTextIndent =
-    ItemIconCenter + NowPlayingPlateWidth / 2 + NowPlayingPlateGap - ExpandedItemLabelStart
+private val NowPlayingTextStart = ItemIconCenter + NowPlayingPlateWidth / 2 + NowPlayingPlateGap
 
 /**
  * The top section while something plays behind browse: the playing channel's plate on the mark's
- * axis, and with the drawer open what plays and where the viewer is. It is the first stop above the
- * destinations and returns to the player; focusing it changes nothing else. The plate keeps full
- * opacity in the closed rail, as the picture it stands for does.
+ * axis, and with the drawer open what plays and where the viewer is. Only the controls take focus.
+ * Their height stays reserved when closed, so the destinations do not move.
  *
  * Positions are read where they are drawn: the strip and the behind-live line follow the viewer each
  * second, while the item itself recomposes only when the programme or the state changes.
@@ -696,11 +721,21 @@ private val NowPlayingTextIndent =
 @Composable
 private fun NavigationDrawerScope.DrawerNowPlaying(
     nowPlaying: RailNowPlaying,
-    colors: NavigationDrawerItemColors,
+    expanded: Boolean,
+    controlsEnabled: Boolean,
+    pauseAvailable: Boolean,
+    paused: Boolean,
+    fullScreenFocus: FocusRequester,
+    channelsFocus: FocusRequester?,
     programmeAt: (ChannelId, Long) -> EpgEvent?,
     nowSecProvider: () -> Long,
     onOpen: () -> Unit,
-    modifier: Modifier,
+    onTogglePause: () -> Unit,
+    onStop: () -> Unit,
+    onControlFocused: (String, Boolean) -> Unit,
+    animated: Boolean,
+    fullWidth: Dp,
+    visibleWidthPx: IntState,
 ) = HoldWatching(nowPlaying.reconnecting) {
     // A reconnect keeps the strip and title where the viewer was until playback resumes or ends.
     val reconnecting = nowPlaying.reconnecting
@@ -722,7 +757,6 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
     }
     val programme = heldWhile(reconnecting, lookedUp)
     val behindLive by remember(viewer) { derivedStateOf { viewer.value?.behindLive == true } }
-    var focused by remember { mutableStateOf(false) }
     val status = railPlaybackStatus(nowPlaying, indicator, behindLive)
     val channel = channelTitleText(nowPlaying.channelNumber, nowPlaying.channelName)
     val title = nowPlaying.recordingTitle ?: programme?.title
@@ -734,78 +768,113 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
     } else {
         stringResource(R.string.rail_now_playing_description_channel, title ?: channel, statusLabel)
     }
-    Box(Modifier.height(BrandHeaderHeight).testTag("global-drawer-now-playing")) {
-        // The library item announces itself as a selectable destination of the drawer's group; the
-        // slot is an action instead, so it states its own button node and stays out of that count.
-        Box(
-            Modifier.clearAndSetSemantics {
+    val headerHeight = if (LocalDensity.current.fontScale >= 1.3f) 64.dp else BrandHeaderHeight
+    Column(Modifier.testTag("global-drawer-now-playing")) {
+        Box(Modifier.height(headerHeight).width(if (expanded) NavigationDrawerItemDefaults.ExpandedDrawerItemWidth
+            else NavigationDrawerItemDefaults.CollapsedDrawerItemWidth)
+            .clearAndSetSemantics {
                 contentDescription = description
-                role = Role.Button
-                this.focused = focused
-                onClick { onOpen(); true }
                 liveRegion = LiveRegionMode.Polite
                 testTag = "global-drawer-now-playing-item"
-            },
-        ) {
-            NavigationDrawerItem(
-                selected = false,
-                onClick = onOpen,
-                leadingContent = {
-                    PinnedRailIcon {
-                        // The plate is wider than an icon and keeps the icons' centre.
-                        Box(Modifier.size(NavigationDrawerItemDefaults.IconSize), contentAlignment = Alignment.Center) {
-                            NowPlayingPlate(
-                                picon = nowPlaying.picon,
-                                channelNumber = nowPlaying.channelNumber?.toString(),
-                                modifier = Modifier
-                                    .requiredSize(NowPlayingPlateWidth, NowPlayingPlateHeight)
-                                    // Its per-second strip stays out of the announced item.
-                                    .clearAndSetSemantics { testTag = "global-drawer-now-playing-plate" },
-                                // A tune has no picture yet; the mark waits at the inactive items' ratio.
-                                contentAlpha = if (status == RailPlaybackStatus.TUNING) inactiveContentAlpha() else 1f,
-                            ) { NowPlayingRailStrip(nowPlaying, programme, status, nowSec) }
-                        }
-                    }
-                },
-                supportingContent = {
-                    NowPlayingStatusLine(status, viewer, nowSecProvider, lineChannel)
-                },
-                colors = colors,
-                modifier = modifier
-                    .height(BrandHeaderHeight)
-                    .onFocusChanged { focused = it.isFocused },
+            }) {
+            NowPlayingPlate(
+                picon = nowPlaying.picon,
+                channelNumber = nowPlaying.channelNumber?.toString(),
+                modifier = Modifier.align(Alignment.CenterStart)
+                    .offset(x = ItemIconCenter - NowPlayingPlateWidth / 2)
+                    .testTag("global-drawer-now-playing-plate"),
+                contentAlpha = if (status == RailPlaybackStatus.TUNING) inactiveContentAlpha() else 1f,
             ) {
-                Text(
-                    title ?: channel,
-                    Modifier.padding(start = NowPlayingTextIndent),
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                NowPlayingRailStrip(nowPlaying, programme, status, nowSec)
+            }
+            // The kit's enter slides in from the left; clipped, the labels emerge from the plate's edge.
+            androidx.compose.animation.AnimatedVisibility(expanded,
+                enter = NavigationDrawerItemDefaults.ContentAnimationEnter,
+                exit = NavigationDrawerItemDefaults.ContentAnimationExit,
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = NowPlayingTextStart).clipToBounds()) {
+                Column(Modifier.testTag("global-drawer-now-playing-text")) {
+                    Text(title ?: channel, style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    NowPlayingStatusLine(status, viewer, nowSecProvider, lineChannel, animated)
+                }
             }
         }
-        val discMark = when (status) {
-            RailPlaybackStatus.PAUSED -> ChannelPlaybackIndicator.PAUSED
-            RailPlaybackStatus.TUNING, RailPlaybackStatus.RECONNECTING -> ChannelPlaybackIndicator.TUNING
-            else -> null
+        Box(Modifier.height(36.dp)) {
+            if (expanded) DrawerNowPlayingControls(
+                paused = paused,
+                pauseAvailable = pauseAvailable,
+                enabled = controlsEnabled,
+                fullScreenFocus = fullScreenFocus,
+                channelsFocus = channelsFocus,
+                onOpen = onOpen,
+                onTogglePause = onTogglePause,
+                onStop = onStop,
+                onControlFocused = onControlFocused,
+                fullWidth = fullWidth,
+                visibleWidthPx = visibleWidthPx,
+            )
         }
-        if (discMark != null) {
-            // Centred on the plate's top trailing corner, above the item so the closed pill cannot clip it;
-            // a focused item raises its own z-index, so the disc stays above that too.
-            Box(
-                Modifier
-                    .zIndex(1f)
-                    .offset(
-                        x = ItemIconCenter + NowPlayingPlateWidth / 2 - NowPlayingDiscSize / 2,
-                        y = (BrandHeaderHeight - NowPlayingPlateHeight - NowPlayingDiscSize) / 2,
-                    )
-                    .size(NowPlayingDiscSize)
-                    .background(TvSurfaceColors.containerHighest, CircleShape)
-                    .clearAndSetSemantics { testTag = "global-drawer-now-playing-disc" },
-                contentAlignment = Alignment.Center,
-            ) {
-                CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
-                    ChannelPlaybackMarker(discMark, size = NowPlayingDiscMarkSize, announceState = false)
+    }
+}
+
+/**
+ * The kit has no grouped icon row: the shared pill is passive; each button keeps kit focus. The pill
+ * spans a destination's extent and grows with the sheet as their pills do; the buttons share it evenly.
+ */
+@Composable
+private fun DrawerNowPlayingControls(
+    paused: Boolean,
+    pauseAvailable: Boolean,
+    enabled: Boolean,
+    fullScreenFocus: FocusRequester,
+    channelsFocus: FocusRequester?,
+    onOpen: () -> Unit,
+    onTogglePause: () -> Unit,
+    onStop: () -> Unit,
+    onControlFocused: (String, Boolean) -> Unit,
+    fullWidth: Dp,
+    visibleWidthPx: IntState,
+) {
+    val pauseFocus = remember { FocusRequester() }
+    val stopFocus = remember { FocusRequester() }
+    val controls = listOf("fullscreen", "pause", "stop").filter { it != "pause" || pauseAvailable }
+    val requesters = listOfNotNull(fullScreenFocus, pauseFocus.takeIf { pauseAvailable }, stopFocus)
+    Row(Modifier.padding(top = 4.dp)
+        .withinDrawerSheet(fullWidth, visibleWidthPx)
+        .width(NavigationDrawerItemDefaults.ExpandedDrawerItemWidth)
+        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha), CircleShape)
+        .padding(vertical = 2.dp).testTag("global-drawer-now-playing-controls"),
+        horizontalArrangement = Arrangement.SpaceEvenly) {
+        controls.forEachIndexed { index, control ->
+            key(control) {
+                val label = when (control) {
+                    "fullscreen" -> stringResource(R.string.player_full_screen)
+                    "pause" -> stringResource(if (paused) R.string.play else R.string.pause)
+                    else -> stringResource(R.string.stop)
+                }
+                val icon = when (control) {
+                    "fullscreen" -> R.drawable.ic_fullscreen
+                    "pause" -> if (paused) R.drawable.ic_play_arrow else R.drawable.ic_pause
+                    else -> R.drawable.ic_stop
+                }
+                IconButton(
+                    onClick = when (control) { "fullscreen" -> onOpen; "pause" -> onTogglePause; else -> onStop },
+                    modifier = Modifier.size(IconButtonDefaults.SmallButtonSize)
+                        .focusRequester(requesters[index])
+                        .focusProperties {
+                            canFocus = enabled
+                            up = FocusRequester.Cancel
+                            down = channelsFocus ?: FocusRequester.Default
+                            left = requesters.getOrNull(index - 1) ?: FocusRequester.Cancel
+                            right = requesters.getOrNull(index + 1) ?: FocusRequester.Default
+                        }
+                        .onFocusChanged { onControlFocused(control, it.isFocused) }
+                        .testTag("global-drawer-now-playing-$control")
+                        .semantics { contentDescription = label },
+                    colors = IconButtonDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                ) {
+                    Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(IconButtonDefaults.SmallIconSize))
                 }
             }
         }
@@ -835,23 +904,38 @@ private fun BoxScope.NowPlayingRailStrip(
     )
 }
 
-/** Line two: the state, and the channel when the title is a programme or recording. */
+/** Line two: the playback mark, then the state it leaves unsaid and the channel when the title is a programme or recording. */
 @Composable
 private fun NowPlayingStatusLine(
     status: RailPlaybackStatus,
     viewer: State<LiveViewerPosition?>,
     nowSecProvider: () -> Long,
     channel: String?,
+    animated: Boolean,
 ) {
     val minutes = if (status == RailPlaybackStatus.BEHIND_LIVE) {
         railBehindLiveMinutes(viewer.value?.epochSec, nowSecProvider())
     } else null
-    Text(
-        railStatusLine(status, minutes, channel, LocalResources.current),
-        Modifier.padding(start = NowPlayingTextIndent).clearAndSetSemantics {},
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
+    val mark = when (status) {
+        RailPlaybackStatus.PAUSED -> ChannelPlaybackIndicator.PAUSED
+        RailPlaybackStatus.TUNING, RailPlaybackStatus.RECONNECTING -> ChannelPlaybackIndicator.TUNING
+        else -> ChannelPlaybackIndicator.PLAYING
+    }
+    Row(Modifier.testTag("global-drawer-now-playing-line"),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
+            ChannelPlaybackMarker(mark, size = 16.dp, announceState = false, animated = animated,
+                modifier = Modifier.testTag("global-drawer-now-playing-glyph-${mark.name.lowercase()}"))
+        }
+        Text(
+            railStatusLine(status, minutes, channel, LocalResources.current),
+            Modifier.clearAndSetSemantics {},
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 /** [value], or while [held] the value it had when the hold began. */

@@ -34,6 +34,35 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.LivePauseState
+import at.bernhardberger.tvhplayer.ui.player.livePlayWhenReady
+
+/** Null means this drawer item no longer owns the transport. */
+internal fun drawerControlPaused(
+    target: AppPlaybackTarget?,
+    activeTarget: AppPlaybackTarget?,
+    livePause: LivePauseState,
+    playerPlayWhenReady: Boolean,
+): Boolean? {
+    if (target == null || target != activeTarget) return null
+    return when (target) {
+        is AppPlaybackTarget.Live -> !livePlayWhenReady(livePause, playerPlayWhenReady)
+        is AppPlaybackTarget.Recording -> !playerPlayWhenReady
+    }
+}
+
+internal fun drawerTogglePlayWhenReady(
+    target: AppPlaybackTarget?,
+    activeTarget: AppPlaybackTarget?,
+    livePause: LivePauseState,
+    playerPlayWhenReady: Boolean,
+): Boolean? = drawerControlPaused(target, activeTarget, livePause, playerPlayWhenReady)
+
+internal fun shouldStopDrawerPlayback(
+    target: AppPlaybackTarget?,
+    activeTarget: AppPlaybackTarget?,
+    stopInFlight: Boolean,
+): Boolean = !stopInFlight && target != null && target == activeTarget
 
 /** Presentation only: a stall retains pause intent; only the owned tune spins. */
 enum class ChannelPlaybackIndicator { NONE, PLAYING, PAUSED, TUNING }
@@ -90,6 +119,7 @@ internal fun ChannelPlaybackMarker(
     modifier: Modifier = Modifier,
     size: Dp = 20.dp,
     announceState: Boolean = true,
+    animated: Boolean = true,
 ) {
     if (indicator == ChannelPlaybackIndicator.NONE) return
     val description = stringResource(when (indicator) {
@@ -101,20 +131,26 @@ internal fun ChannelPlaybackMarker(
     if (indicator == ChannelPlaybackIndicator.TUNING) {
         // TV Material 1.1.0 has no progress primitive; use the installed Material one.
         Box(slot) {
-            CircularProgressIndicator(
-                modifier = Modifier.fillMaxSize().clearAndSetSemantics {
-                    if (announceState) contentDescription = description
-                },
+            val progressModifier = Modifier.fillMaxSize().clearAndSetSemantics {
+                if (announceState) contentDescription = description
+            }
+            if (animated) CircularProgressIndicator(
+                modifier = progressModifier,
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            ) else CircularProgressIndicator(
+                progress = { 0.75f },
+                modifier = progressModifier,
                 color = LocalContentColor.current,
                 strokeWidth = 2.dp,
             )
         }
     } else if (indicator == ChannelPlaybackIndicator.PLAYING) {
-        val phase = rememberInfiniteTransition(label = "watching").animateFloat(
+        val phase = if (animated) rememberInfiniteTransition(label = "watching").animateFloat(
             initialValue = 0f, targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(1_400, easing = LinearEasing), RepeatMode.Restart),
             label = "soundBars",
-        )
+        ) else null
         val color = LocalContentColor.current
         Canvas(slot.clearAndSetSemantics {
             if (announceState) contentDescription = description
@@ -122,7 +158,7 @@ internal fun ChannelPlaybackMarker(
             // Read animation state only while drawing, never while composing a row.
             val width = this.size.width / 7f
             repeat(3) { index ->
-                val height = this.size.height * watchingBarHeight(index, phase.value)
+                val height = this.size.height * watchingBarHeight(index, phase?.value ?: 0f)
                 drawRoundRect(color, Offset(width * (1 + index * 2), (this.size.height - height) / 2),
                     Size(width, height), CornerRadius(width / 2))
             }

@@ -1,6 +1,17 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import org.robolectric.util.ReflectionHelpers
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -39,6 +50,7 @@ import androidx.compose.ui.test.assertIsFocused
 import androidx.compose.ui.test.isNotFocusable
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performKeyInput
@@ -71,6 +83,10 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
+import at.bernhardberger.tvhplayer.playback.LivePauseState
+import at.bernhardberger.tvhplayer.ui.components.drawerControlPaused
+import at.bernhardberger.tvhplayer.ui.components.drawerTogglePlayWhenReady
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
@@ -213,7 +229,7 @@ class NavigationShellEvidenceTest {
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun playingChannelTakesTheMarksPlaceAndNothingElseMoves() {
+    fun playingControlsReserveTheirHeightWhileTheDrawerIsClosed() {
         settingsShell(1f)
         fun rows() = listOf("nav-channels", "nav-epg", "nav-recordings", "nav-settings").map(::bounds)
         val brand = bounds("global-drawer-brand")
@@ -221,17 +237,21 @@ class NavigationShellEvidenceTest {
 
         playLive()
         compose.onNodeWithTag("global-drawer-brand").assertDoesNotExist()
-        assertEquals(brand, bounds("global-drawer-now-playing"))
-        assertEquals(closed, rows())
+        assertEquals(brand.height + 36f, bounds("global-drawer-now-playing").height, .5f)
+        val playingRows = rows()
+        compose.onNodeWithTag("global-drawer-now-playing-controls").assertDoesNotExist()
         // The plate keeps the mark's axis, the icons' centre at x40.
         assertEquals(40f, bounds("global-drawer-now-playing-plate", unmerged = true).center.x, .5f)
-        assertEquals(bounds("global-drawer-now-playing").center.y, bounds("global-drawer-now-playing-plate", unmerged = true).center.y, .5f)
+        assertEquals(brand.center.y, bounds("global-drawer-now-playing-plate", unmerged = true).center.y, .5f)
 
-        compose.runOnIdle { nowPlaying = null }
         openDrawer()
+        assertEquals(playingRows.map { it.top }, rows().map { it.top })
+        compose.onNodeWithTag("global-drawer-now-playing-controls").assertExists()
+        compose.runOnIdle { nowPlaying = null }
+        compose.waitForIdle()
         val open = rows()
         playLive()
-        assertEquals(open, rows())
+        assertEquals(playingRows.map { it.top }, rows().map { it.top })
         assertEquals(280f, drawerWidth(), .5f)
         compose.runOnIdle { nowPlaying = null }
         compose.waitForIdle()
@@ -242,7 +262,7 @@ class NavigationShellEvidenceTest {
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun playingSlotIsTheFirstStopAboveTheDestinationsAndReturnsToThePlayer() {
+    fun fullScreenIsTheFirstStopAboveTheDestinationsAndReturnsToThePlayer() {
         settingsShell(1f)
         playLive()
         openDrawer()
@@ -254,7 +274,7 @@ class NavigationShellEvidenceTest {
         val visited = navigations.toList()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.waitForIdle()
-        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
         // Focus shows where the player is; it neither navigates nor starts anything.
         assertEquals(visited, navigations)
         assertEquals(0, opened)
@@ -266,10 +286,7 @@ class NavigationShellEvidenceTest {
         compose.onRoot().performKeyInput { pressKey(Key.DirectionUp) }
         compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
         compose.waitForIdle()
-        // The focused item raises itself; the pause disc still draws above its pill.
-        val disc = bounds("global-drawer-now-playing-disc")
-        val discInk = Color(drawShell().getPixel(disc.center.x.toInt(), disc.top.toInt() + 2))
-        assertTrue("disc ink $discInk", channelDistance(discInk, TvSurfaceColors.containerHighest) < 0.05f)
+        compose.onNodeWithTag("global-drawer-now-playing-glyph-paused", useUnmergedTree = true).assertExists()
         compose.onRoot().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.waitForIdle()
         assertEquals(1, opened)
@@ -284,7 +301,7 @@ class NavigationShellEvidenceTest {
         openDrawer()
         compose.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionUp) } }
         compose.waitForIdle()
-        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
 
         compose.runOnIdle { nowPlaying = null }
         compose.waitForIdle()
@@ -292,6 +309,233 @@ class NavigationShellEvidenceTest {
         // Up from Settings passed Channels, so Channels is the destination the drawer stands on.
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         assertEquals(280f, drawerWidth(), .5f)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun controlRowTraversesInvokesActionsAndStopRestoresChannels() {
+        settingsShell(1f)
+        playLive()
+        openDrawer()
+        focusControl("fullscreen")
+        key(Key.DirectionLeft)
+        key(Key.DirectionUp)
+        control("fullscreen").assertIsFocused()
+        key(Key.DirectionRight)
+        control("pause").assertIsFocused()
+        key(Key.DirectionCenter)
+        compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
+        assertEquals(1, toggled)
+        key(Key.DirectionCenter)
+        compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
+        assertEquals(2, toggled)
+        key(Key.DirectionRight)
+        control("stop").assertIsFocused()
+        key(Key.DirectionLeft)
+        control("pause").assertIsFocused()
+        listOf("fullscreen", "pause", "stop").forEach {
+            focusControl(it)
+            key(Key.DirectionUp)
+            control(it).assertIsFocused()
+            key(Key.DirectionDown)
+            compose.onNodeWithTag("nav-channels").assertIsFocused()
+        }
+        focusControl("stop")
+        key(Key.DirectionCenter)
+        assertEquals(1, stopped)
+        compose.onNodeWithTag("global-drawer-now-playing").assertDoesNotExist()
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun pauseRemovalRestoresChannelsButRecordingsAlwaysOfferPause() {
+        settingsShell(1f)
+        playLive()
+        openDrawer()
+        focusControl("pause")
+        compose.runOnIdle { pauseAvailable = false }
+        compose.waitForIdle()
+        control("pause").assertDoesNotExist()
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionUp)
+        control("fullscreen").assertIsFocused()
+        key(Key.DirectionRight)
+        control("stop").assertIsFocused()
+        playRecording()
+        control("pause").assertExists()
+        focusControl("pause")
+        key(Key.DirectionCenter)
+        assertEquals(1, toggled)
+        compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
+        focusControl("fullscreen")
+        key(Key.DirectionCenter)
+        assertEquals(1, opened)
+        focusControl("stop")
+        key(Key.DirectionCenter)
+        assertEquals(1, stopped)
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun rightFromStopExitsAndDrawerReentryUsesDestinationNotControls() {
+        settingsShell(1f)
+        playLive()
+        openDrawer()
+        focusControl("stop")
+        key(Key.DirectionRight)
+        assertEquals(80f, drawerWidth(), .5f)
+        compose.onNodeWithTag("global-drawer-now-playing-controls").assertDoesNotExist()
+        openDrawer()
+        compose.onNodeWithTag("nav-settings").assertIsFocused()
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun controlsKeepTheDrawersBackHandler() {
+        settingsShell(1f)
+        playLive()
+        openDrawer()
+        focusControl("pause")
+        key(Key.Back)
+        compose.waitForIdle()
+        compose.onNodeWithTag("nav-channels").assertIsFocused()
+        assertEquals(0, toggled)
+        assertEquals(0, stopped)
+        assertEquals(0, opened)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun pendingPauseWhileStartingShowsPlayAndTheNextPressResumes() {
+        settingsShell(1f)
+        playLive()
+        compose.runOnIdle {
+            watchingIndicator = ChannelPlaybackIndicator.TUNING
+            transportPause = LivePauseState(LivePauseAvailability.STARTING, selectionPending = true)
+        }
+        openDrawer()
+        focusControl("pause")
+        compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
+        key(Key.DirectionCenter)
+        compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
+        compose.onNodeWithTag("global-drawer-now-playing-glyph-tuning", useUnmergedTree = true).assertExists()
+        assertTrue(transportPause.pending)
+        key(Key.DirectionCenter)
+        assertEquals(false, transportPause.pending)
+        compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
+        assertEquals(2, toggled)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun reducedMotionSettingIsReadAgainOnResumeWithoutRecreatingTheShell() {
+        fun durationScale(value: Float) = ReflectionHelpers.callStaticMethod<Unit>(
+            android.animation.ValueAnimator::class.java, "setDurationScale",
+            ReflectionHelpers.ClassParameter.from(Float::class.javaPrimitiveType, value))
+        durationScale(1f)
+        animateNowPlaying = null
+        try {
+            settingsShell(1f)
+            openDrawer()
+            compose.mainClock.autoAdvance = false
+            playLive()
+            compose.mainClock.advanceTimeBy(2_000)
+            compose.waitForIdle()
+            val moving = drawShell()
+            compose.mainClock.advanceTimeBy(320)
+            compose.waitForIdle()
+            assertTrue("playing marker animates before the setting changes", !moving.sameAs(drawShell()))
+            compose.runOnIdle {
+                shellLifecycle.currentState = Lifecycle.State.CREATED
+                durationScale(0f)
+                shellLifecycle.currentState = Lifecycle.State.RESUMED
+            }
+            compose.mainClock.advanceTimeBy(32)
+            compose.waitForIdle()
+            val still = drawShell()
+            compose.mainClock.advanceTimeBy(320)
+            compose.waitForIdle()
+            assertTrue("resumed shell uses a static marker", still.sameAs(drawShell()))
+        } finally {
+            durationScale(1f)
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    private fun control(name: String) = compose.onNodeWithTag("global-drawer-now-playing-$name")
+    private fun focusControl(name: String) {
+        control(name).performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+        compose.waitForIdle()
+    }
+    private fun key(key: Key) {
+        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.waitForIdle()
+    }
+
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun approvedDrawerControlStates() {
+        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
+        settingsShell(1f)
+        compose.runOnIdle { warmPlayback = true }
+        playLive()
+        captureNowPlaying("G-5-closed-playing")
+        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
+        captureNowPlaying("closed-paused")
+        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PLAYING }
+        openDrawer()
+        focusControl("fullscreen")
+        captureNowPlaying("G-1-fullscreen-focused")
+        focusControl("stop")
+        captureNowPlaying("G-2-stop-focused")
+        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
+        focusControl("pause")
+        captureNowPlaying("G-3-play-focused")
+        openDrawer()
+        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PLAYING; pauseAvailable = false }
+        captureNowPlaying("G-4-no-timeshift")
+        // The bright Northline mark and recording title share the fixture's news scene.
+        key(Key.DirectionRight)
+        playRecording()
+        assertEquals(80f, drawerWidth(), .5f)
+        captureNowPlaying("R9-closed-recording-bright-logo")
+    }
+
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun approvedDrawerControlEnlarged() {
+        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
+        settingsShell(1.3f)
+        compose.runOnIdle { warmPlayback = true }
+        playLive()
+        openDrawer()
+        focusControl("fullscreen")
+        assertEquals(100f, bounds("global-drawer-now-playing").height, .5f)
+        captureNowPlaying("G-6-fullscreen-focused", fontScale = "1.3")
+    }
+
+    /** The open header at full HD with Full screen focused, live and paused. */
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi")
+    fun openHeaderFullHd() {
+        images.install(FixtureArt.imageLoader(RuntimeEnvironment.getApplication(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(3) to FixtureArt.picon("northline-news"))))
+        settingsShell(1f, density = 2f)
+        compose.runOnIdle { warmPlayback = true }
+        playLive()
+        openDrawer()
+        focusControl("fullscreen")
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
+        assertEquals(1920, view.width)
+        assertEquals(1080, view.height)
+        captureNowPlaying("1080p-open-live-fullscreen-focused")
+        compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
+        captureNowPlaying("1080p-open-paused-fullscreen-focused")
     }
 
     @Test
@@ -312,36 +556,36 @@ class NavigationShellEvidenceTest {
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun slotFollowsThePlaybackState() {
         settingsShell(1f)
+        openDrawer()
         fun description() = compose.onNodeWithTag("global-drawer-now-playing-item")
             .fetchSemanticsNode().config.getOrNull(SemanticsProperties.ContentDescription)?.single()
-        fun marks(disc: Boolean, strip: Boolean) {
+        fun marks(mark: String, strip: Boolean) {
             compose.waitForIdle()
-            compose.onNodeWithTag("global-drawer-now-playing-disc").let { if (disc) it.assertExists() else it.assertDoesNotExist() }
+            compose.onNodeWithTag("global-drawer-now-playing-glyph-$mark", useUnmergedTree = true).assertExists()
             // The strip's semantics stay out of the announced item, so its ink is the evidence.
             val plate = bounds("global-drawer-now-playing-plate", unmerged = true)
             val ink = Color(drawShell().getPixel(plate.left.toInt() + 6, plate.bottom.toInt() - 1))
             assertEquals("strip ink $ink", strip, channelDistance(ink, viewerColor) < 0.05f)
         }
-        val select = "Select to return to the player."
 
         playLive()
-        marks(disc = false, strip = true)
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Live. $select", description())
+        marks(mark = "playing", strip = true)
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Live.", description())
 
         compose.runOnIdle { livePosition.value = LiveViewerPosition(liveTarget.channelId, fixtureNow - 720, behindLive = true) }
-        marks(disc = false, strip = true)
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Behind live. $select", description())
+        marks(mark = "playing", strip = true)
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Behind live.", description())
 
         compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
-        marks(disc = true, strip = true)
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Paused. $select", description())
+        marks(mark = "paused", strip = true)
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Paused.", description())
 
         compose.runOnIdle {
             watchingIndicator = ChannelPlaybackIndicator.TUNING
             livePosition.value = null
         }
-        marks(disc = true, strip = false)
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Tuning. $select", description())
+        marks(mark = "tuning", strip = false)
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Tuning.", description())
 
         compose.runOnIdle {
             watchingIndicator = ChannelPlaybackIndicator.PLAYING
@@ -358,17 +602,17 @@ class NavigationShellEvidenceTest {
             watchingIndicator = ChannelPlaybackIndicator.NONE
             livePosition.value = null
         }
-        marks(disc = true, strip = true)
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting. $select", description())
+        marks(mark = "tuning", strip = true)
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting.", description())
 
         playLive()
         compose.runOnIdle { guideData = false }
-        marks(disc = false, strip = false)
-        assertEquals("Now playing: 1 Ridge Earth HD, Live. $select", description())
+        marks(mark = "playing", strip = false)
+        assertEquals("Now playing: 1 Ridge Earth HD, Live.", description())
 
         playRecording()
-        marks(disc = false, strip = true)
-        assertEquals("Now playing: Northline Tonight, 3 Northline News, Recorded. $select", description())
+        marks(mark = "playing", strip = true)
+        assertEquals("Now playing: Northline Tonight, 3 Northline News, Recorded.", description())
         assertEquals(LiveRegionMode.Polite, compose.onNodeWithTag("global-drawer-now-playing-item")
             .fetchSemanticsNode().config.getOrNull(SemanticsProperties.LiveRegion))
     }
@@ -390,7 +634,6 @@ class NavigationShellEvidenceTest {
             compose.mainClock.advanceTimeBy(61_000)
             compose.waitForIdle()
         }
-        val select = "Select to return to the player."
         playLive()
         compose.runOnIdle { livePosition.value = null }
         compose.waitForIdle()
@@ -402,12 +645,12 @@ class NavigationShellEvidenceTest {
         compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.NONE }
         compose.waitForIdle()
         val strip = stripRow()
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting. $select", description())
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting.", description())
 
         // The clock passes the programme's end while the reconnect lasts.
         clock = fixtureStart.epochSeconds + 7200 + 540
         passMinute()
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting. $select", description())
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Reconnecting.", description())
         assertEquals(strip, stripRow())
 
         compose.runOnIdle {
@@ -415,7 +658,7 @@ class NavigationShellEvidenceTest {
             watchingIndicator = ChannelPlaybackIndicator.PLAYING
         }
         compose.waitForIdle()
-        assertEquals("Now playing: Ridge Night, 1 Ridge Earth HD, Live. $select", description())
+        assertEquals("Now playing: Ridge Night, 1 Ridge Earth HD, Live.", description())
         assertTrue("the strip moves on with the programme", strip != stripRow())
     }
 
@@ -424,26 +667,80 @@ class NavigationShellEvidenceTest {
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun heldMarkOfAnotherTargetLeavesTheSlotUnmarked() {
         settingsShell(1f)
+        openDrawer()
         playLive()
         compose.runOnIdle {
             heldTarget = AppPlaybackTarget.Recording(fixtureRecording.id)
             watchingIndicator = ChannelPlaybackIndicator.PAUSED
         }
         compose.waitForIdle()
-        compose.onNodeWithTag("global-drawer-now-playing-disc").assertDoesNotExist()
-        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Live. Select to return to the player.",
+        compose.onNodeWithTag("global-drawer-now-playing-glyph-paused", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals("Now playing: Ridge Light, 1 Ridge Earth HD, Live.",
             compose.onNodeWithTag("global-drawer-now-playing-item").fetchSemanticsNode()
                 .config.getOrNull(SemanticsProperties.ContentDescription)?.single())
 
         compose.runOnIdle { heldTarget = null }
         compose.waitForIdle()
-        compose.onNodeWithTag("global-drawer-now-playing-disc").assertExists()
+        compose.onNodeWithTag("global-drawer-now-playing-glyph-paused", useUnmergedTree = true).assertExists()
     }
 
-    /** The slot is an action, not a destination: a button, never selected, outside the destinations' count. */
+    /** The mark leads line two, beside the plate rather than over the picon. */
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun slotIsAButtonOutsideTheDestinations() {
+    fun playbackMarkLeadsLineTwo() {
+        settingsShell(1f)
+        playLive()
+        compose.onNodeWithTag("global-drawer-now-playing-glyph-playing", useUnmergedTree = true).assertDoesNotExist()
+        openDrawer()
+        val plate = bounds("global-drawer-now-playing-plate", unmerged = true)
+        val text = bounds("global-drawer-now-playing-text", unmerged = true)
+        val line = bounds("global-drawer-now-playing-line", unmerged = true)
+        val glyph = bounds("global-drawer-now-playing-glyph-playing", unmerged = true)
+        assertTrue("mark $glyph outside line two $line", line.contains(glyph.topLeft) && line.contains(glyph.center))
+        assertEquals(text.left, glyph.left, .5f)
+        assertTrue("line two $line not below the title in $text", line.top > text.top + 8)
+        assertEquals(plate.right + 12f, glyph.left, .5f)
+    }
+
+    /** Opening, the labels come out of the plate's edge; nothing of them crosses the picon. */
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun headerTextNeverCrossesThePlateWhileTheDrawerOpens() {
+        settingsShell(1f)
+        playLive()
+        val plate = bounds("global-drawer-now-playing-plate", unmerged = true)
+        fun plateRegion(bitmap: Bitmap) = (plate.left.toInt() + 2 until plate.right.toInt() - 2).flatMap { x ->
+            (plate.top.toInt() + 2 until plate.bottom.toInt() - 2).map { y -> bitmap.getPixel(x, y) }
+        }
+        val closedPlate = plateRegion(drawShell())
+        compose.mainClock.autoAdvance = false
+        try {
+            compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
+            val widths = mutableListOf<Float>()
+            repeat(90) {
+                compose.mainClock.advanceTimeByFrame()
+                compose.waitForIdle()
+                val text = compose.onAllNodesWithTag("global-drawer-now-playing-text", useUnmergedTree = true)
+                    .fetchSemanticsNodes().singleOrNull()?.boundsInRoot ?: return@repeat
+                if (text.width > 0f) {
+                    assertTrue("labels at ${text.left} left of the plate's edge", text.left >= plate.right + 12f - .5f)
+                    widths += text.width
+                }
+                assertEquals("frame $it drew over the plate", closedPlate, plateRegion(drawShell()))
+            }
+            compose.mainClock.autoAdvance = true
+            compose.waitForIdle()
+            val settled = bounds("global-drawer-now-playing-text", unmerged = true).width
+            assertTrue("no frame caught the labels mid-entry: $widths", widths.any { it < settled - 4f })
+        } finally {
+            compose.mainClock.autoAdvance = true
+        }
+    }
+
+    /** Header is readable, not interactive; each control is one named button, never selected. */
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun headerIsPassiveAndControlsAreButtonsOutsideTheDestinations() {
         settingsShell(1f)
         openDrawer()
         fun selectable() = compose.onAllNodes(SemanticsMatcher.keyIsDefined(SemanticsProperties.Selected))
@@ -451,8 +748,15 @@ class NavigationShellEvidenceTest {
         val destinations = selectable()
         playLive()
         compose.onNodeWithTag("global-drawer-now-playing-item")
-            .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+            .assert(isNotFocusable())
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
             .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+        listOf("fullscreen" to "Full screen", "pause" to "Pause", "stop" to "Stop").forEach { (control, label) ->
+            compose.onNodeWithTag("global-drawer-now-playing-$control")
+                .assert(SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button))
+                .assert(SemanticsMatcher.keyNotDefined(SemanticsProperties.Selected))
+            compose.onAllNodesWithContentDescription(label).assertCountEquals(1)
+        }
         assertEquals(destinations, selectable())
     }
 
@@ -496,7 +800,7 @@ class NavigationShellEvidenceTest {
         playLive()
         compose.onRoot().performKeyInput { repeat(4) { pressKey(Key.DirectionUp) } }
         compose.waitForIdle()
-        compose.onNodeWithTag("global-drawer-now-playing-item").assertIsFocused()
+        compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
         captureNowPlaying("open-live-focused")
         compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PAUSED }
         captureNowPlaying("open-paused-focused")
@@ -504,20 +808,21 @@ class NavigationShellEvidenceTest {
 
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
-    fun lineTwoNamesTheStateBeforeTheChannel() {
+    fun lineTwoLeavesLiveAndPausedToTheMark() {
         val resources = RuntimeEnvironment.getApplication().resources
         val channel = "1 Ridge Earth HD"
         fun line(status: RailPlaybackStatus, minutes: Long? = null, on: String? = channel) =
             railStatusLine(status, minutes, on, resources)
-        assertEquals("Live • 1 Ridge Earth HD", line(RailPlaybackStatus.LIVE))
+        assertEquals("1 Ridge Earth HD", line(RailPlaybackStatus.LIVE))
         assertEquals("12m behind live • 1 Ridge Earth HD", line(RailPlaybackStatus.BEHIND_LIVE, 12))
         assertEquals("Behind live • 1 Ridge Earth HD", line(RailPlaybackStatus.BEHIND_LIVE))
-        assertEquals("Paused • 1 Ridge Earth HD", line(RailPlaybackStatus.PAUSED))
+        assertEquals("1 Ridge Earth HD", line(RailPlaybackStatus.PAUSED))
         assertEquals("Tuning • 1 Ridge Earth HD", line(RailPlaybackStatus.TUNING))
         assertEquals("Reconnecting • 1 Ridge Earth HD", line(RailPlaybackStatus.RECONNECTING))
         assertEquals("Recorded • 1 Ridge Earth HD", line(RailPlaybackStatus.RECORDED))
         // Without guide data the channel is the title and line two is only the state.
         assertEquals("Live", line(RailPlaybackStatus.LIVE, on = null))
+        assertEquals("Paused", line(RailPlaybackStatus.PAUSED, on = null))
     }
 
     /**
@@ -834,7 +1139,17 @@ class NavigationShellEvidenceTest {
     private val recordingPosition = mutableStateOf<RecordingViewerPosition?>(null)
     private val navigations = mutableListOf<AppDestination>()
     private var opened = 0
+    private var pauseAvailable by mutableStateOf(true)
+    private var toggled = 0
+    private var transportPause by mutableStateOf(LivePauseState(LivePauseAvailability.READY))
+    private var stopped = 0
+    private var browseBack: () -> Unit = {}
     private var viewerColor = Color.Unspecified
+    private var animateNowPlaying: Boolean? = false
+    private val shellOwner = object : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry(this)
+    }
+    private val shellLifecycle get() = shellOwner.lifecycle
 
     /** Live on Ridge Earth at the live edge, as the runtime reports it while browse keeps it warm. */
     private fun playLive() {
@@ -860,12 +1175,15 @@ class NavigationShellEvidenceTest {
     }
 
     /** Settings root on the global shell, over an offline video-like still. */
-    private fun settingsShell(fontScale: Float) {
+    private fun settingsShell(fontScale: Float, density: Float = 1f) {
         val still = FixtureArt.art("still-ridge-light").asImageBitmap()
+        val recordingStill = FixtureArt.art("still-northline-studio").asImageBitmap()
         lateinit var navigation: DepthNavigationState
+        compose.runOnUiThread { shellLifecycle.currentState = Lifecycle.State.RESUMED }
         compose.setContent {
             CompositionLocalProvider(
-                LocalDensity provides Density(1f, fontScale),
+                LocalLifecycleOwner provides shellOwner,
+                LocalDensity provides Density(density, fontScale),
                 LocalWatchingTarget provides (heldTarget ?: nowPlaying?.target),
                 LocalWatchingChannel provides ((heldTarget ?: nowPlaying?.target) as? AppPlaybackTarget.Live)?.channelId,
                 LocalWatchingIndicator provides watchingIndicator,
@@ -873,12 +1191,22 @@ class NavigationShellEvidenceTest {
                 LocalRecordingPosition provides recordingPosition,
             ) {
                 TVHeadendPlayerTheme {
+                    BackHandler { browseBack() }
+                    val backDispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
                     view = LocalView.current
                     viewerColor = MaterialTheme.colorScheme.tertiary
                     navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    // Robolectric's Compose key injection stops at the view; supply the activity's
+                    // unhandled-Back fallback after child key handlers have had the event.
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).onKeyEvent {
+                        if (it.key == Key.Back && it.type == KeyEventType.KeyUp) {
+                            backDispatcher.onBackPressed()
+                            true
+                        } else false
+                    }) {
                         if (warmPlayback) {
-                            Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            Image(if (nowPlaying?.target is AppPlaybackTarget.Recording) recordingStill else still,
+                                null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             WarmPlaybackScrim()
                         }
                         ProvideArtworkSession(fixtureObservation.currentSession) {
@@ -886,12 +1214,28 @@ class NavigationShellEvidenceTest {
                             currentRoute = AppDestination.SETTINGS,
                             showEpgMenu = true,
                             onRootBack = {},
+                            onBackHandlerChanged = { browseBack = it },
                             onNavigate = { navigations += it },
                             nowPlaying = nowPlaying,
+                            livePauseAvailable = pauseAvailable,
+                            nowPlayingPaused = drawerControlPaused(nowPlaying?.target, nowPlaying?.target,
+                                transportPause, watchingIndicator != ChannelPlaybackIndicator.PAUSED) == true,
+                            animateNowPlaying = animateNowPlaying,
                             programmeAt = { _, at ->
                                 listOf(fixtureProgramme, fixtureFollowing).firstOrNull { guideData && it.isRunning(at) }
                             },
                             onOpenNowPlaying = { opened++ },
+                            onToggleNowPlayingPause = {
+                                toggled++
+                                val playing = drawerTogglePlayWhenReady(nowPlaying?.target, nowPlaying?.target,
+                                    transportPause, watchingIndicator != ChannelPlaybackIndicator.PAUSED)!!
+                                if (transportPause.selectionPending) {
+                                    transportPause = transportPause.copy(pending = !playing)
+                                } else {
+                                    watchingIndicator = if (playing) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.PAUSED
+                                }
+                            },
+                            onStopNowPlaying = { stopped++; nowPlaying = null },
                             nowSecProvider = { clock },
                         ) { padding, drawerActive ->
                             SettingsScreenNavigation(
@@ -956,13 +1300,13 @@ class NavigationShellEvidenceTest {
         }
     }
 
-    private fun captureNowPlaying(name: String) {
+    private fun captureNowPlaying(name: String, fontScale: String = "1.0") {
         compose.waitForIdle()
         val bitmap = drawShell()
         compose.waitForIdle()
         assertTrue("$name was captured mid-animation", bitmap.sameAs(drawShell()))
-        val directory = File("../build/review/rail-now-playing").apply { mkdirs() }
-        File(directory, "en-font1.0-$name.png").outputStream().use {
+        val directory = File("../build/review/drawer-controls").apply { mkdirs() }
+        File(directory, "en-font$fontScale-$name.png").outputStream().use {
             assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it))
         }
     }

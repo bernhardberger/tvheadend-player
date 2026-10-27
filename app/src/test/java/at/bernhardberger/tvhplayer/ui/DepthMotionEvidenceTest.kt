@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.assertIsFocused
+import androidx.compose.ui.test.assertIsNotFocused
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
@@ -824,7 +825,10 @@ class DepthMotionEvidenceTest {
 
     private fun iconInk(label: String, rtl: Boolean = false): IntRange {
         val bitmap = draw()
-        val row = bounds("nav-channels")
+        // Channels takes focus while opening, so its pill is ink too. Guide uses the
+        // same PinnedRailIcon but stays unfocused/unselected throughout this fixture.
+        compose.onNodeWithTag("nav-epg").assertIsNotFocused()
+        val row = bounds("nav-epg")
         val rows = row.top.toInt()..row.bottom.toInt()
         val background = bitmap.getPixel(if (rtl) bitmap.width - 3 else 2, 300)
         val xs = if (rtl) (bitmap.width - 65) until (bitmap.width - 12) else 12..64
