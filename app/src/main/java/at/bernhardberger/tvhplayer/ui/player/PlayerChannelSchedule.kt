@@ -47,11 +47,13 @@ internal fun PlayerChannelSchedule(
     val viewerSec = liveViewerEpochSec(channelId, nowSec).takeIf { channelWatchingIndicator(channelId).isPlayingItem }
     // The startup guide holds only hours ahead; ask for the Guide's reach for this channel.
     val throughSec = remember(channelId) { scheduleCoverageThroughSec(nowSec, ZoneId.systemDefault()) }
-    var requestPending by remember(channelId) { mutableStateOf(false) }
+    // The request still running, if any; a replaced request's late cleanup leaves its successor's alone.
+    var pendingRequest by remember(channelId) { mutableStateOf<Any?>(null) }
     val currentSession = observation.currentSession
     LaunchedEffect(channelId, currentSession, throughSec) {
         val capability = currentSession ?: return@LaunchedEffect
-        requestPending = true
+        val request = Any()
+        pendingRequest = request
         try {
             withTimeoutOrNull(SCHEDULE_COVERAGE_TIMEOUT_MS) {
                 withContext(Dispatchers.Default) {
@@ -63,10 +65,10 @@ internal fun PlayerChannelSchedule(
         } catch (_: Exception) {
             // Repository failures settle the request; connection state owns user feedback.
         } finally {
-            requestPending = false
+            if (pendingRequest === request) pendingRequest = null
         }
     }
-    val moreLoading = scheduleCoveragePending(connection, observation.epgState, channelId, throughSec, requestPending)
+    val moreLoading = scheduleCoveragePending(connection, observation.epgState, channelId, throughSec, pendingRequest != null)
     var focused by remember(channelId) { mutableStateOf(scheduleInitialEvent(events, viewerSec, nowSec)) }
     var contextMenu by remember { mutableStateOf(false) }
     val details = layers.scheduleDetails

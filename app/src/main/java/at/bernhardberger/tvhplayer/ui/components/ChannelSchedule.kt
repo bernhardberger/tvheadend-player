@@ -356,7 +356,8 @@ private fun ChannelScheduleRow(
     var focused by remember { mutableStateOf(false) }
     val start = event.start.epochSeconds
     val stop = event.stop.epochSeconds
-    val ended = stop <= nowSec
+    // Ended for the viewer: what lies between a behind-live viewer and live is still ahead of them.
+    val ended = stop <= (viewerSec ?: nowSec)
     val watched = viewerSec != null && event.isRunning(viewerSec)
     val failed = recording in ScheduleFailedStates
     val resources = LocalResources.current

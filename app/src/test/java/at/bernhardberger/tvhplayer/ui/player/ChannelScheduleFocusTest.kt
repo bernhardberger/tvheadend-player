@@ -15,7 +15,10 @@ import at.bernhardberger.tvhplayer.notices.NoticeContext
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
 import at.bernhardberger.tvhplayer.settings.UiSettingsStore
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.withContext
 import java.time.ZoneId
 import java.util.concurrent.atomic.AtomicInteger
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -114,6 +117,32 @@ class ChannelScheduleFocusTest {
         compose.onNodeWithTag("schedule-row-2").assertIsFocused()
     }
 
+    @Test fun programmesEndForTheViewerNotTheWallClock() {
+        val wall = NOW - 3_000L
+        // Wall clock "20:00"; the viewer two hours behind at "18:00".
+        fun at(h: Int, m: Int) = wall + (h - 20) * 3_600L + m * 60L
+        val day = listOf(event(1, at(17, 0), at(17, 50)), event(2, at(17, 50), at(18, 30)),
+            event(3, at(19, 0), at(19, 30)), event(4, at(19, 30), at(20, 30)))
+        compose.setContent { TVHeadendPlayerTheme { CompositionLocalProvider(LocalWatchingChannel provides ChannelId(1),
+                LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+            PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                ChannelSchedule(null, day, wall, at(18, 0), false, false, { null }, {}, {}, {},
+                    viewerBehindMs = 7_200_000L)
+            }
+        } } }
+        fun row(id: Int) = compose.onNodeWithTag("schedule-row-$id", useUnmergedTree = true)
+        val strip = SemanticsMatcher.keyIsDefined(SemanticsProperties.ProgressBarRangeInfo)
+        row(1).assert(hasAnyDescendant(hasText("Ended")))
+        row(2).assert(hasAnyDescendant(hasText("2:00:00 behind live")))
+        // Between the viewer and live: still ahead of them, so its duration and no strip.
+        row(3).assert(hasAnyDescendant(hasText("30m")))
+        row(3).assert(hasAnyDescendant(hasText("Ended", substring = true)).not())
+        row(3).assert(hasAnyDescendant(strip).not())
+        // On air at the wall clock: its time left and the cyan strip.
+        row(4).assert(hasAnyDescendant(hasText("left", substring = true)))
+        row(4).assert(hasAnyDescendant(strip))
+    }
+
     @Test fun statusLinesLeadWithTheirTimeFactsAndEndWithTheCategory() {
         val news = events.map { EpgEvent.create(it.id, it.channelId, it.start, it.stop, title = it.title,
             contentGenre = ContentGenre.fromContentType(0x20L)) }
@@ -185,13 +214,19 @@ class ChannelScheduleFocusTest {
         ))
         val requests = java.util.Collections.synchronizedList(mutableListOf<Triple<CurrentSessionObservation, ChannelId, Instant>>())
         val ended = AtomicInteger()
+        val firstUnwound = CompletableDeferred<Unit>()
         val session = object : TvheadendSession by fake {
             override val epgRepository = object : EpgRepository by fake.epgRepository {
                 override suspend fun acquireCoverage(currentSession: CurrentSessionObservation, channelId: ChannelId,
                     through: Instant): EpgCoverageAcquisitionResult {
                     requests += Triple(currentSession, channelId, through)
+                    val first = requests.size == 1
                     // A server that never answers: only cancellation or the panel's timeout ends the request.
-                    try { awaitCancellation() } finally { ended.incrementAndGet() }
+                    try { awaitCancellation() } finally {
+                        // The first request unwinds slowly, finishing only after its replacement started.
+                        if (first) withContext(NonCancellable) { firstUnwound.await() }
+                        ended.incrementAndGet()
+                    }
                 }
             }
         }
@@ -236,9 +271,14 @@ class ChannelScheduleFocusTest {
         // A new session generation cancels the old request and asks again under the new proof.
         compose.runOnIdle { fake.replaceGeneration(fake.observation.value) }
         settle()
-        settleUntil { requests.size == 2 && ended.get() == 1 }
+        settleUntil { requests.size == 2 }
         assertNotSame(first, requests[1].first)
         assertSame(fake.observation.value.currentSession, requests[1].first)
+        // The replaced request's late end leaves the running one's loading line alone.
+        firstUnwound.complete(Unit)
+        settleUntil { ended.get() == 1 }
+        settle()
+        footer().assertTextEquals("Loading later days")
 
         // Closing the panel cancels its request; opening it again asks once more.
         compose.runOnIdle { open = false }

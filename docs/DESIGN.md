@@ -1147,7 +1147,10 @@ live-edge tolerance (the viewer's row only), Ended, or the duration, then a
 failed recording, then the category. The channel rows' 2dp progress strip follows. Recording marks are the rows' shared dots; failed
 recordings use the error mark. There is no playing mark: orange viewer progress
 and initial focus name the viewer's programme, cyan progress the one on air.
-Ended rows step their headline back to the secondary alpha. Day tabs follow
+A programme counts as ended once it ended before the viewer's position (the
+wall clock when the channel is not being watched): it says Ended and steps its
+headline back to the secondary alpha. Programmes between a behind-live viewer and
+live keep their duration, undimmed and without a strip. Day tabs follow
 focus above one continuous list, and the selected day's tab is brought whole
 into view wherever the list or the tabs moved it; later days start under a sentence-case
 `titleSmall` date over a divider, and gaps (time column plus "No program
