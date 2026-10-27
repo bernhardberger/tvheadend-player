@@ -16,14 +16,14 @@ Informal **du**/din where natural; short imperative labels.
 ## Term decisions
 
 - `nav_channels` Kanaler; `nav_epg` TV-guide; `nav_recordings` Opptak; `context_watch` Se.
-- `timeshift_setting` Tidsforskyvning; `details_retention` Lagringstid; mux = multipleks; channel tag = kanaletikett.
+- `timeshift_setting` Pause og spol tilbake direktesendt TV; `details_retention` Lagringstid; mux = multipleks; channel tag = kanaletikett.
 - Cancel avlys, Stop stopp (captured part kept), Delete slett.
 - Appliance = *TV-modus* / *TV-starttjeneste*.
 - `settings_channel_tags_last_enabled` uses the setting-state word *på*.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

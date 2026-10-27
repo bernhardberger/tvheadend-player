@@ -109,6 +109,55 @@ class SettingsVisualEvidenceTest {
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-mdpi") fun englishEnlarged() = captureStates("en", 1.3f)
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-mdpi") fun germanEnlarged() = captureStates("de", 1.3f)
 
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA) fun pseudoEnXa() = capturePseudoSettings(PseudoLocaleEvidence.EN_XA)
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB) fun pseudoArXb() = capturePseudoSettings(PseudoLocaleEvidence.AR_XB)
+
+    // Representative CJK capture on the integrated zh-Hant resources.
+    @Category(VisualCapture::class)
+    @Test @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_ZH_HANT) fun cjkZhHant() = capturePseudoSettings(PseudoLocaleEvidence.ZH_HANT)
+
+    /**
+     * Settings root, General and the language page on generated pseudo-locale resources. Row
+     * positions are not asserted: long or mirrored text may legitimately re-wrap the rows.
+     */
+    private fun capturePseudoSettings(tag: String) {
+        val resources = RuntimeEnvironment.getApplication().resources
+        lateinit var navigation: DepthNavigationState
+        compose.setContent {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+                TVHeadendPlayerTheme {
+                    view = LocalView.current
+                    navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
+                    Box(Modifier.fillMaxSize().background(Color.Black)) {
+                        DebugVideoBackdrop(true, Modifier.fillMaxSize())
+                        WarmPlaybackScrim()
+                        SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                            onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                            SettingsScreenNavigation(navigation, listOf(
+                                settingsRootLevel(applianceBuild = false,
+                                    connectionStatus = resources.getString(at.bernhardberger.tvhplayer.R.string.error_101_title))) +
+                                settingsGeneralLevels(UiSettings(), AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE, {}, {}, {}),
+                                initialFocusEnabled = !drawerActive, contentPadding = padding)
+                        }
+                    }
+                }
+            }
+        }
+        if (tag == PseudoLocaleEvidence.EN_XA || tag == PseudoLocaleEvidence.AR_XB) PseudoLocaleEvidence.assertGenerated(tag, view)
+        else PseudoLocaleEvidence.assertLocalized(tag, view)
+        val prefix = "$tag-font1.0"
+        compose.runOnIdle {
+            navigation.update(DepthStack(listOf(DepthFrame(SETTINGS_ROOT, SettingsSection.GENERAL.name))))
+        }
+        capture("$prefix-root")
+        press(Key.DirectionCenter)
+        capture("$prefix-general")
+        press(Key.DirectionRight)
+        capture("$prefix-language")
+    }
+
     private fun captureStates(locale: String, fontScale: Float) {
         var cacheState by mutableStateOf(CacheClearState.IDLE)
         var cacheCalls = 0
@@ -352,6 +401,9 @@ class SettingsVisualEvidenceTest {
             assertTrue("Focus must not overlap next row", native.bottom <= rows[index + 1].top)
             "middleFocus=$focused; nativeFocusVertical=$native; rows=$rows\n"
         } else ""
+        PseudoLocaleEvidence.mirror("settings", name, bitmap, view, name.substringAfter("-font").substringBefore("-").toFloat(),
+            "mdpi 1.0", name.substringAfter("-font").substringAfter("-"),
+            "Settings on SideRail; production SettingsScreenNavigation; native focus; activeColumn=$activeColumn; rows=$rows")
         File(directory, "$name.txt").writeText(
             "canvas=960x540 logical; pixels=${bitmap.width}x${bitmap.height}; density=1.0; " +
                 "locale=${name.substringBefore("-font")}; fontScale=${name.substringAfter("-font").substringBefore("-")}; " +

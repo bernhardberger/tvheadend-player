@@ -1,0 +1,17 @@
+<resources>
+    <string name="settings_about">Hakkında</string>
+    <string name="about_version">Sürüm</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">Sunucu</string>
+    <string name="about_not_connected">Bağlı değil</string>
+    <string name="about_connected">Bağlı</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">Preclikos tarafından geliştirilen TVHStream temel alınmıştır</string>
+    <string name="about_notices">Bildirimler ve üçüncü taraf kitaplıklar</string>
+    <string name="about_translation">Çeviri</string>
+    <string name="about_machine_translated">Makine çevirisi</string>
+    <string name="about_machine_translated_details">Bu çeviriyi henüz kimse kontrol etmedi. Lütfen hataları GitHub üzerinde Tvheadend Player projesine sorun olarak bildirin.</string>
+    <bool name="language_machine_translated">true</bool>
+</resources>

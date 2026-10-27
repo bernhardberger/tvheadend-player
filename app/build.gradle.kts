@@ -62,7 +62,11 @@ tasks.withType<Test>().configureEach {
 // list keeps only these translations of the app and its libraries, writes the locale config that
 // Android 13+ offers in its per-app language settings, and fills the in-app picker. A bare
 // language follows the system's region; a tag with a region is an entry of its own.
-val appLanguages = listOf("de", "en")
+val appLanguages = listOf(
+    "cs", "da", "de-DE", "de-AT", "de-CH", "en-GB", "en-US", "es", "fr", "hr",
+    "it", "hu", "nl", "nb", "pl", "pt-BR", "pt-PT", "ro", "fi", "sv", "tr",
+    "el", "ru", "uk", "zh-Hans", "zh-Hant", "ja", "ko",
+)
 // Debug builds add Android's pseudo-locales: en-XA for long text, ar-XB for right-to-left.
 val pseudoLocales = listOf("en-XA", "ar-XB")
 fun javaStringArray(values: List<String>) = values.joinToString(prefix = "{", postfix = "}") { "\"$it\"" }

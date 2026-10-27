@@ -18,14 +18,14 @@ Polite plural **ви** (lowercase when explicit); infinitive action labels.
 
 - `nav_channels` Канали; `nav_epg` Телепрограма; `nav_recordings` Записи; `context_watch` Дивитися.
 - App = *застосунок*; folder = *тека*.
-- `timeshift_setting` Відкладений перегляд; `details_retention` Термін зберігання; mux = мультиплекс; tuner = тюнер.
+- `timeshift_setting` Пауза й перемотування прямого ефіру; `details_retention` Термін зберігання; mux = мультиплекс; tuner = тюнер.
 - Cancel скасувати запис, Stop зупинити запис (recorded part kept), Delete видалити запис.
 - `player_tuning` Перемикання, not scanning.
 - `profile_direct_streaming` "Пряма трансляція потоку" is kept distinct from *прямий ефір*.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium), including the recovered unchanged About draft; `keep_channel_setting` now explicitly means keeping the channel tuned during pause, rather than saving a channel. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

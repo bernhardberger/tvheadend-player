@@ -1,0 +1,17 @@
+<resources>
+    <string name="settings_about">앱 정보</string>
+    <string name="about_version">버전</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">서버</string>
+    <string name="about_not_connected">연결되지 않음</string>
+    <string name="about_connected">연결됨</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">Preclikos의 TVHStream을 기반으로 제작</string>
+    <string name="about_notices">고지 사항 및 타사 라이브러리</string>
+    <string name="about_translation">번역</string>
+    <string name="about_machine_translated">기계 번역</string>
+    <string name="about_machine_translated_details">아직 아무도 이 번역을 검토하지 않았습니다. 오류는 Tvheadend Player의 GitHub 이슈로 알려 주세요.</string>
+    <bool name="language_machine_translated">true</bool>
+</resources>

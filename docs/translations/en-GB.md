@@ -20,7 +20,7 @@ No change from en-US; spelling only.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. The override file holds only the differing strings.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining applicable round-1 overrides from `daebdd86`. Sonnet 5.5 (medium) reviewed the six differing strings and regional fallback. No human reviewer; the override locale is labeled machine-drafted.
 
 ## Open questions
 

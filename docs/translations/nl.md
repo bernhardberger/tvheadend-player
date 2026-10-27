@@ -17,14 +17,14 @@ Informal **je**; infinitive action labels.
 
 - `nav_channels` Zenders; `nav_epg` Tv-gids; `nav_recordings` Opnamen; `context_watch` Kijken.
 - Cancel annuleren (future), Stop stoppen (active, file kept), Delete verwijderen.
-- Mux = multiplex, never *zender*. Timeshift stays the technical feature name; behind live = *achter live*.
+- Mux = multiplex, never *zender*. Timeshift stays the technical feature name; `timeshift_setting` is Live-tv pauzeren en terugspoelen; behind live = *achter live*.
 - `player_tuning` Zender afstemmen: switching to a channel, not scanning.
 - Appliance = *Tv-modus*; entry service = *tv-startservice*.
 - `appliance_back_for_menu` keeps the literal Back label.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); genre negation corrected from absence *Geen* to predicate *Niet*. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

@@ -32,6 +32,7 @@ import org.junit.Assert.*
 import org.junit.Rule
 import org.junit.Test
 import org.junit.experimental.categories.Category
+import at.bernhardberger.tvhplayer.ui.PseudoLocaleEvidence
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -417,6 +418,34 @@ class OnboardingLayoutEvidenceTest {
         capture("success-focused")
     }
 
+    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
+    fun pseudoEnXaServer() = pseudoServer()
+    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
+    fun pseudoArXbServer() = pseudoServer()
+    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_EN_XA)
+    fun pseudoEnXaAccount() = pseudoAccount()
+    @Test @Category(VisualCapture::class) @Config(qualifiers = PseudoLocaleEvidence.QUALIFIERS_AR_XB)
+    fun pseudoArXbAccount() = pseudoAccount()
+
+    private fun pseudoServer() {
+        show()
+        press(Key.DirectionDown)
+        press(Key.DirectionUp)
+        compose.onNodeWithTag("setup-find-server").assertIsFocused()
+        capture("server-searching")
+        discovery.value = discovering(SERVER, SECOND_SERVER)
+        compose.waitForIdle()
+        capture("server-results")
+        compose.runOnUiThread { state.continueFromAddress() }
+        compose.waitForIdle()
+        capture("server-validation")
+    }
+
+    private fun pseudoAccount() {
+        show(SetupStep.SIGN_IN, ConnectionFormState(host = "192.0.2.10"))
+        capture("account")
+    }
+
     private fun assertSuccess() {
         compose.onNodeWithTag("setup-start-watching").assertIsFocused().assertIsDisplayed()
         assertLabelled("setup-start-watching")
@@ -466,6 +495,8 @@ class OnboardingLayoutEvidenceTest {
             view.draw(Canvas(bitmap))
             val directory = File("build/outputs/onboarding-captures").apply { mkdirs() }
             File(directory, "$name.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+            PseudoLocaleEvidence.mirror("onboarding", name, bitmap, view, captureScale, "mdpi 1.0", focus ?: "none",
+                "step=${state.step}; mode=${state.mode}; production ConnectionSetupFlow; fictional offline discovery data")
             File(directory, "$name.txt").writeText("canvas=960x540dp; locale=${view.resources.configuration.locales[0].language}; fontScale=$captureScale; focus=$focus; step=${state.step}; mode=${state.mode}; production composables, fictional offline data")
             bitmap.recycle()
         }

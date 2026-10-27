@@ -17,14 +17,14 @@ Informal singular instructions; neutral noun labels on buttons where idiomatic.
 ## Term decisions
 
 - `nav_channels` Κανάλια; `nav_epg` Οδηγός; `nav_recordings` Εγγραφές; `context_watch` Προβολή.
-- `timeshift_setting` Χρονική μετατόπιση; `details_retention` Διατήρηση; tuner = δέκτης; mux = πολυπλεξία.
+- `timeshift_setting` Παύση και επανατύλιξη ζωντανής TV; `details_retention` Διατήρηση; tuner = δέκτης; mux = πολυπλεξία.
 - Cancel ακύρωση, Stop διακοπή (recorded part kept), Delete διαγραφή.
 - `player_tuning` Αλλαγή καναλιού, not scanning; `keep_recording` is συνέχιση εγγραφής.
 - Appliance = *λειτουργία συσκευής TV*, an explanatory choice.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

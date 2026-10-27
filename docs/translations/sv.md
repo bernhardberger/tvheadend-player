@@ -16,7 +16,7 @@ Informal **du**/din; neutral or imperative action labels.
 ## Term decisions
 
 - `nav_channels` Kanaler; `nav_epg` Tv-guide; `nav_recordings` Inspelningar; `context_watch` Titta.
-- `timeshift_setting` Tidsförskjutning; `details_retention` Lagringstid; mux = multiplex.
+- `timeshift_setting` Pausa och spola tillbaka direktsänd tv; `details_retention` Lagringstid; mux = multiplex.
 - Cancel avboka, Stop stoppa, Delete radera; generic canceled server states use *avbruten*.
 - `player_tuning` Byter kanal, not scanning.
 - Appliance = *Tv-läge*; service labels use *tv-starttjänst*.
@@ -24,7 +24,7 @@ Informal **du**/din; neutral or imperative action labels.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

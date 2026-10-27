@@ -43,8 +43,9 @@ and for the overnight string changes before reconciling the existing drafts.
 
 ## First set of languages (ships with 0.3.0)
 
-The agreed list is frozen for this release (codes identify intended locales;
-Android resource qualifiers are chosen and verified during implementation):
+The release list below excludes Arabic and Hebrew, deferred by the owner to a
+later release. Their reviewed resources stay in the repository but are filtered
+out of the 0.3.0 APK. Debug `ar-XB` remains available for RTL checks.
 
 | Group | Languages |
 |---|---|
@@ -54,7 +55,7 @@ Android resource qualifiers are chosen and verified during implementation):
 | Nordic | Swedish (sv), Danish (da), Norwegian Bokmål (nb), Finnish (fi) |
 | Central and Southeastern Europe | Czech (cs), Polish (pl), Hungarian (hu), Croatian (hr), Romanian (ro), Greek (el) |
 | Cyrillic | Russian (ru) and Ukrainian (uk), always together |
-| Other agreed languages | Turkish (tr), Simplified Chinese (zh-Hans), Traditional Chinese (zh-Hant), Japanese (ja), Korean (ko), Arabic (ar), Hebrew (he) |
+| Other agreed languages | Turkish (tr), Simplified Chinese (zh-Hans), Traditional Chinese (zh-Hant), Japanese (ja), Korean (ko) |
 
 Afrikaans and further additions wait for demand or a contributor. Traditional
 Chinese gets its own terminology review, not just character conversion.
@@ -84,8 +85,8 @@ uses Swiss Standard German spelling, not a dialect translation.
 - Lint does not require a regional override to be complete; missing strings fall
   back to the language file.
 
-Arabic and Hebrew are the right-to-left test. Arabic also has six plural forms,
-Croatian, Czech, Polish, Russian and Ukrainian three or four.
+Deferred Arabic and Hebrew remain the right-to-left translation test. Arabic also
+has six plural forms, Croatian, Czech, Polish, Russian and Ukrainian three or four.
 
 ## Register per language (proposal)
 
@@ -134,8 +135,8 @@ Each language page records the final choice.
    and which Hebrew folder (`he` or `iw`) Android 9 and later resolve.
 3. **Test locales.** Turn on the pseudo-locales en-XA (long text) and ar-XB
    (right-to-left) for debug builds. Each release candidate gets one long-text
-   and one right-to-left screenshot set; before 0.3.0, one right-to-left check
-   on the TV as well.
+   and one right-to-left screenshot set. Complete a right-to-left check on the TV
+   before accepting Arabic and Hebrew for a later release.
 4. **String notes and the last British spelling** ("Tunnelled") in the English
    strings.
 5. **Glossary, language pages and how-to page.**
@@ -147,7 +148,7 @@ Each language page records the final choice.
    escaping and Unicode checks, then Sonnet review and adjudication. Run Android
    lint and compilation; capture representative long-text, CJK and RTL surfaces.
    Character limits guide review but do not prove rendered fit. Complete the
-   physical-TV RTL check before release.
+   physical-TV RTL check before shipping the deferred Arabic and Hebrew locales.
 8. **Credits and labels** in Settings → About (already in the 0.3.0 scope).
 
 ### After 0.3.0
@@ -163,7 +164,8 @@ Each language page records the final choice.
 ## Needs the owner
 
 - The plan is approved for implementation; public announcements still need approval.
-- The full language slate, including de-CH, and the model choice are agreed.
+- The 0.3.0 language slate, including de-CH but excluding deferred Arabic and
+  Hebrew, and the model choice are agreed.
 - Asking the Czech and Croatian contacts to look over their languages.
 - Any public beta-tester announcement (Tvheadend forum, LibreELEC forum,
   TVHClient and TVHStream trackers, #hts). Each one is public and waits for an

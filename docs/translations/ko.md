@@ -16,14 +16,14 @@ Neutral noun and action labels with conventional polite explanations (approved 2
 ## Term decisions
 
 - `nav_channels` 채널; `nav_epg` 편성표; `nav_recordings` 녹화; `context_watch` 시청.
-- Archive = 보관함; `timeshift_setting` 타임시프트; live = 실시간.
+- Archive = 보관함; `timeshift_setting` 실시간 TV 일시정지 및 되감기; live = 실시간.
 - Cancel 녹화 예약 취소, Stop 녹화 중지 (recorded part kept), Delete 삭제.
 - `player_tuning` 채널 전환 중, not scanning; mux = 멀티플렉스.
 - Failed folder actions read 전체 `%2$d`개 중 `%1$d`개.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); Pause terminology made consistent and display refresh rate corrected to *주사율*. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

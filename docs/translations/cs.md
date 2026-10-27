@@ -17,14 +17,14 @@ Informal singular in explanations; infinitive action labels. Plan: informal unle
 
 - `nav_channels` Kanály; `nav_epg` Program; `nav_recordings` Nahrávky; `context_watch` Sledovat.
 - Recording file = *nahrávka*, process = *nahrávání*; `details_retention` Doba uchování.
-- `timeshift_setting` Časový posun; mux = multiplex; `player_tuning` Přepínání, not scanning.
+- `timeshift_setting` Pozastavit a přetáčet živé vysílání; mux = multiplex; `player_tuning` Přepínání, not scanning.
 - Cancel zrušit, Stop zastavit, Delete smazat.
 - `recording_state_missed` Nenahráno; the notice says *Nahrávání neproběhlo*.
 - Bulk-failure sentences use the total `%2$d` for the inflected denominator.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); empty-search grammar and gender-neutral resume wording corrected. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

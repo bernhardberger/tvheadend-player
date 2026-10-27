@@ -18,14 +18,14 @@ Informal **tu** in directions; imperative action labels.
 
 - `nav_channels` Canali; `nav_epg` Guida; `nav_recordings` Registrazioni; `context_watch` Guarda.
 - `recording_state_missed` Mancata, distinct from Non riuscita and Annullata; `details_retention` Conservazione.
-- Timeshift = *riproduzione differita*; `timeshift_live` Diretta; `player_tuning` Cambio canale.
+- Timeshift as a concept = *riproduzione differita*; `timeshift_setting` Pausa e riavvolgimento della TV in diretta; `timeshift_live` Diretta; `player_tuning` Cambio canale.
 - Cancel annulla, Stop interrompi, Delete elimina.
 - Appliance = *Modalità TV*. Passthrough and tunneling keep familiar loanwords.
 - Recording states agree with feminine *registrazione*; programme playback lines use masculine *registrato*.
 
 ## Review status
 
-Machine-drafted by GPT-6.1 Sol (medium) in round 1 from source commit daebdd86; Sonnet 5.5 review pending; no human reviewer yet. Ships labeled machine-drafted.
+Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retaining unchanged round-1 text from `daebdd86`. Full resources reviewed by Sonnet 5.5 (medium); no definite linguistic defects reported. No human reviewer; remains labeled machine-drafted.
 
 ## Open questions
 

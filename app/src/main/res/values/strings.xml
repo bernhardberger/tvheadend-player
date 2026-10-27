@@ -1,4 +1,4 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
     <string name="player_full_screen">Full screen</string>
     <string name="stop">Stop</string>
     <string name="warm_playback_setting">While browsing</string>

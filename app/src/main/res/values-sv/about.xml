@@ -1,0 +1,17 @@
+<resources>
+    <string name="settings_about">Om</string>
+    <string name="about_version">Version</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">Server</string>
+    <string name="about_not_connected">Inte ansluten</string>
+    <string name="about_connected">Ansluten</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">Baserad på TVHStream av Preclikos</string>
+    <string name="about_notices">Meddelanden och tredjepartsbibliotek</string>
+    <string name="about_translation">Översättning</string>
+    <string name="about_machine_translated">Maskinöversatt</string>
+    <string name="about_machine_translated_details">Ingen har granskat den här översättningen ännu. Rapportera fel som GitHub-ärenden för Tvheadend Player.</string>
+    <bool name="language_machine_translated">true</bool>
+</resources>

@@ -1,0 +1,17 @@
+<resources>
+    <string name="settings_about">このアプリについて</string>
+    <string name="about_version">バージョン</string>
+    <string name="about_version_value">%1$s (%2$d) · %3$s</string>
+    <string name="about_build_play">Play</string>
+    <string name="about_build_appliance">Appliance</string>
+    <string name="about_server">サーバー</string>
+    <string name="about_not_connected">未接続</string>
+    <string name="about_connected">接続済み</string>
+    <string name="about_license">GNU General Public License v3</string>
+    <string name="about_attribution">PreclikosによるTVHStreamを基にしています</string>
+    <string name="about_notices">ライセンス表記とサードパーティ製ライブラリ</string>
+    <string name="about_translation">翻訳</string>
+    <string name="about_machine_translated">機械翻訳</string>
+    <string name="about_machine_translated_details">この翻訳はまだ誰も確認していません。誤りはTvheadend PlayerのGitHubのIssueで報告してください。</string>
+    <bool name="language_machine_translated">true</bool>
+</resources>

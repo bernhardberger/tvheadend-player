@@ -20,7 +20,7 @@ Inherits German (`one`, `other`).
 
 ## Review status
 
-No overrides needed so far; uses de. Regional assessment is machine-drafted; Sonnet 5.5 review pending; no human reviewer yet.
+Assessed against frozen source `6d80a8ff` for 0.3.0. No overrides needed; `de-AT` inherits reviewed `de` and its false machine-translated flag. The regional assessment originated with GPT-6.1 Sol (medium) and was checked by Sonnet 5.5 (medium). No Austrian human reviewer yet; this is not regional native-speaker acceptance.
 
 ## Open questions
 
