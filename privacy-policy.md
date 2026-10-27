@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-10-18
+Last updated: 2026-10-27
 
 This policy describes Tvheadend Player, an independent open-source Android TV
 client for Tvheadend servers. It is not an official Tvheadend application.
@@ -36,6 +36,10 @@ device-transfer extraction are disabled for the app.
 The app connects only to the Tvheadend server configured by the user. It sends
 the username and HTSP challenge-response authentication data needed to connect,
 and receives channel, guide, icon, and media data from that server.
+
+During setup, the app searches your local network for Tvheadend servers with
+multicast DNS (the `_htsp._tcp` service type); this search stays on the local
+network and sends nothing elsewhere.
 
 Direct HTSP uses a raw TCP connection. It does not encrypt or authenticate the
 network transport and should be used only on a trusted local network or through

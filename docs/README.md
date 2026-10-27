@@ -29,6 +29,7 @@ the whole `docs/` tree. Repository presence, a recent date, or words such as
 | `device-targets.md` | Device roles and mutation boundary; physical-device, install, ADB, signing, or deployment work only. |
 | `android-tooling.md` | Build/install/capture conventions and lane selection: Notebook032 interactive preview, LXC119 automated capture, physical TV acceptance; Android CLI and R8 limits. |
 | `notebook-tv-preview.md` | Operational Notebook032 Android TV preview runbook: reuse/start, fullscreen keyboard control, verified APK updates, captures and ownership. Read for interactive UI iteration. |
+| `presentation-captures.md` | README screenshots: reproducible fictional scenes, packaging and editorial use; screenshot refresh only. |
 | `profiling.md` | Baseline profile generation, offline/configured-server profiling, optional R8 arm, guarded sustained traces, timestamped video and physical-TV limits. |
 | `product-identity-plan.md` | Implemented product identity specification; identity, packaging, or public-copy work. |
 | `release-process.md` | Release, signing, publication, and rollback policy. |
