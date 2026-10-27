@@ -548,7 +548,7 @@ tasks.register("verifyExternalSdkConsumption") {
             val dataStoreVersions = runtimeGraph.filter { it.startsWith("datastore=") }
                 .map { it.removePrefix("datastore=") }
                 .toSet()
-            check(dataStoreVersions == setOf("1.2.1")) {
+            check(dataStoreVersions == setOf("1.3.0")) {
                 "$variant runtime DataStore versions are $dataStoreVersions"
             }
             val coroutinesVersions = runtimeGraph.filter { it.startsWith("coroutines=") }
