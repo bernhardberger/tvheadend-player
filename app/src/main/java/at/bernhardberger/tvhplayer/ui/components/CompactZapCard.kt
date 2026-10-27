@@ -121,6 +121,7 @@ internal fun CompactZapCard(
         onClick = onClick,
         onLongClick = contextMenu.onLongClick,
         border = embeddedProgressCardBorder(),
+        scale = EmbeddedProgressCardScale,
         interactionSource = interaction,
         glow = artworkCardGlow(artwork.takeIf { showArtwork }, channel.icon, interaction),
         // A scrim keeps text legible over artwork; the logo card's text sits on a flat surface.

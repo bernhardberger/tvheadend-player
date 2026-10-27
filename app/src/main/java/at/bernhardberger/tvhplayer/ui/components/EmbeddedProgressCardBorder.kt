@@ -11,8 +11,10 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 
 private val FocusOutlineWidth = 2.5.dp
-private val FocusOutlineInset = 3.dp
+private val FocusOutlineInset = 4.25.dp
 internal val EmbeddedProgressCardBorderOutset = FocusOutlineInset + FocusOutlineWidth / 2
+internal const val EmbeddedProgressCardFocusedScale = 1.05f
+internal val EmbeddedProgressCardScale = CardDefaults.scale(focusedScale = EmbeddedProgressCardFocusedScale)
 
 /**
  * Native card outline, displaced outward so embedded edge content remains visible. [held] keeps
@@ -26,8 +28,8 @@ internal fun embeddedProgressCardBorder(held: Boolean = false, cardRadius: Dp = 
         // TV Material expands the outline by this distance; the stroke is centered on it.
         inset = FocusOutlineInset,
         // TV Material 1.1.0 Card.kt defaults to 8dp; custom cards supply their radius.
-        // SurfaceBorder expands bounds, not radii: add the 3dp outward inset
-        // to keep concentric corners and a 1.75dp gap inside the centered stroke.
+        // SurfaceBorder expands bounds, not radii: add the outward inset
+        // to keep concentric corners and a 3dp gap inside the centered stroke.
         shape = RoundedCornerShape(cardRadius + FocusOutlineInset),
     )
     return CardDefaults.border(border = if (held) focused else Border.None, focusedBorder = focused)
