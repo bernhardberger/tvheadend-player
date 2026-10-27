@@ -17,7 +17,7 @@ Concise and neutral, no reader pronouns; polite 请 in recovery guidance.
 ## Term decisions
 
 - `nav_channels` 频道; `nav_epg` 节目指南; `nav_recordings` 录制; `context_watch` 观看.
-- `timeshift_setting` 暂停和回退电视直播; live = 直播; behind live = 落后直播.
+- `timeshift_setting` 时移; `timeshift_setting_description` 暂停和回退电视直播; live = 直播; behind live = 落后直播.
 - Cancel 取消录制 (future), Stop 停止录制 (recorded part kept), Delete 删除录制内容.
 - `player_tuning` 正在调谐; tuner = 调谐器; mux = 复用流, distinct from 频道.
 - `details_retention` 保留期限; server = 服务器; profile = 配置.

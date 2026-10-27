@@ -18,7 +18,7 @@ Polite plural **ви** (lowercase when explicit); infinitive action labels.
 
 - `nav_channels` Канали; `nav_epg` Телепрограма; `nav_recordings` Записи; `context_watch` Дивитися.
 - App = *застосунок*; folder = *тека*.
-- `timeshift_setting` Пауза й перемотування прямого ефіру; `details_retention` Термін зберігання; mux = мультиплекс; tuner = тюнер.
+- `timeshift_setting` Відкладений перегляд; `timeshift_setting_description` Пауза й перемотування прямого ефіру; `details_retention` Термін зберігання; mux = мультиплекс; tuner = тюнер.
 - Cancel скасувати запис, Stop зупинити запис (recorded part kept), Delete видалити запис.
 - `player_tuning` Перемикання, not scanning.
 - `profile_direct_streaming` "Пряма трансляція потоку" is kept distinct from *прямий ефір*.

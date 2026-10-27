@@ -16,7 +16,7 @@ Informal singular in instructions; conventional action nouns on buttons. No form
 ## Term decisions
 
 - `nav_channels` Csatornák; `nav_epg` Műsorújság; `nav_recordings` Felvételek; `context_watch` Megnézés.
-- `timeshift_setting` Élő TV-adás szüneteltetése és visszatekerése; `details_retention` Megőrzési idő; mux = multiplex; buffer = puffer.
+- `timeshift_setting` Időeltolás; `timeshift_setting_description` Élő TV-adás szüneteltetése és visszatekerése; `details_retention` Megőrzési idő; mux = multiplex; buffer = puffer.
 - Cancel lemondás, Stop leállítás (recorded part kept), Delete törlés.
 - `player_tuning` Csatornaváltás, not scanning.
 - Appliance = *TV-készülék mód*.

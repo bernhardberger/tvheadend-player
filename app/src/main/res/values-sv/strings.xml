@@ -512,8 +512,8 @@
     <string name="player_paused">Pausad</string>
     <string name="player_buffer_summary">%1$s tillgängligt</string>
     <string name="player_current_broadcast">Aktuell sändning</string>
-    <string name="timeshift_setting">Pausa och spola tillbaka direktsänd tv</string>
-    <string name="timeshift_setting_description">Tillåt att Tvheadend Player begär en tidsförskjutningsbuffert för direktsänd tv från din server.</string>
+    <string name="timeshift_setting">Tidsförskjutning</string>
+    <string name="timeshift_setting_description">Pausa och spola tillbaka direktsänd tv</string>
     <string name="refresh_rate_matching_setting">Matcha innehållets bildfrekvens</string>
     <string name="frame_rate_switching_always">Alltid</string>
     <string name="frame_rate_switching_seamless_only">Bara utan avbrott</string>

@@ -536,8 +536,8 @@
     <string name="player_paused">Pozastaveno</string>
     <string name="player_buffer_summary">Dostupné: %1$s</string>
     <string name="player_current_broadcast">Aktuální vysílání</string>
-    <string name="timeshift_setting">Pozastavit a přetáčet živé vysílání</string>
-    <string name="timeshift_setting_description">Povolit Tvheadend Player požadovat od tvého serveru vyrovnávací paměť pro časový posun živé TV.</string>
+    <string name="timeshift_setting">Časový posun</string>
+    <string name="timeshift_setting_description">Pozastavit a přetáčet živé vysílání</string>
     <string name="refresh_rate_matching_setting">Přizpůsobit snímkové frekvenci obsahu</string>
     <string name="frame_rate_switching_always">Vždy</string>
     <string name="frame_rate_switching_seamless_only">Jen plynule</string>

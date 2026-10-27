@@ -524,8 +524,8 @@
     <string name="player_paused">En pausa</string>
     <string name="player_buffer_summary">%1$s disponibles</string>
     <string name="player_current_broadcast">Emisión actual</string>
-    <string name="timeshift_setting">Pausar y rebobinar la TV en directo</string>
-    <string name="timeshift_setting_description">Permitir que Tvheadend Player solicite a tu servidor un búfer para ver la TV en diferido.</string>
+    <string name="timeshift_setting">Reproducción en diferido</string>
+    <string name="timeshift_setting_description">Pausar y rebobinar la TV en directo</string>
     <string name="refresh_rate_matching_setting">Ajustar a los fotogramas del contenido</string>
     <string name="frame_rate_switching_always">Siempre</string>
     <string name="frame_rate_switching_seamless_only">Solo sin cortes</string>
@@ -552,7 +552,7 @@
     <string name="keep_channel_setting">Mantener sintonizada la TV en pausa</string>
     <string name="keep_channel_off">Desactivado</string>
     <string name="keep_channel_description">Si sales de la aplicación con la TV en directo en pausa, el canal seguirá sintonizado durante este tiempo para que puedas continuar. Mientras tanto, un sintonizador seguirá ocupado.</string>
-    <string name="keep_channel_needs_timeshift">Disponible cuando «%1$s» está activado.</string>
+    <string name="keep_channel_needs_timeshift">Disponible cuando «%1$s» está activada.</string>
     <string name="startup_buffer_setting">Búfer de inicio</string>
     <string name="startup_buffer_automatic">Automático • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>

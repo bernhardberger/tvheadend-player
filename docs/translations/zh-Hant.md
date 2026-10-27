@@ -18,7 +18,7 @@ Neutral, Taiwan-oriented software terminology, no reader pronouns; polite 請 in
 
 - `nav_epg` 節目表 (not the converted 節目指南); `nav_recordings` 錄影; `context_watch` 觀看.
 - Server 伺服器; audio 音訊; cache 快取; profile 設定檔 (`profile` 串流設定檔); folder 資料夾; frame rate 影格率.
-- Timeshift as a concept 時移; `timeshift_setting` 暫停及倒轉電視直播; live 直播; `player_tuning` 正在調諧; tuner 調諧器; mux 多工串流.
+- Timeshift as a concept 時移; `timeshift_setting` 時移; `timeshift_setting_description` 暫停及倒轉電視直播; live 直播; `player_tuning` 正在調諧; tuner 調諧器; mux 多工串流.
 - Cancel 取消錄影, Stop 停止錄影 (recorded part kept), Delete 刪除錄影.
 - `details_retention` 保留期限.
 

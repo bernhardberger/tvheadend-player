@@ -20,7 +20,7 @@ Informal **tu** in directions; infinitives on action labels.
 - `nav_channels` Chaînes (TV); audio channels stay *canaux* (`track_channels_count`).
 - `details_broadcast_new` Inédit, repeat Rediffusion.
 - `details_retention` Conservation; `recording_state_missed` Manqué, distinct from Échec and Annulé.
-- Timeshift as a concept = *lecture différée*; `timeshift_setting` Mettre en pause et rembobiner la TV en direct; `timeshift_live` Direct; `player_tuning` Changement de chaîne; mux = multiplex.
+- Timeshift as a concept = *lecture différée*; `timeshift_setting` Lecture différée; `timeshift_setting_description` Mettre en pause et rembobiner la TV en direct; `timeshift_live` Direct; `player_tuning` Changement de chaîne; mux = multiplex.
 - Cancel annuler, Stop arrêter, Delete supprimer; each confirmation keeps its consequence.
 - Appliance = *Mode téléviseur*, not a literal household-appliance word.
 - `recording_length_recorded` "Durée enregistrée : %1$s" avoids agreement with a formatted duration.

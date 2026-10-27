@@ -488,8 +488,8 @@
     <string name="player_paused">Em pausa</string>
     <string name="player_buffer_summary">%1$s disponíveis</string>
     <string name="player_current_broadcast">Emissão atual</string>
-    <string name="timeshift_setting">Pausar e recuar na TV em direto</string>
-    <string name="timeshift_setting_description">Permitir que o Tvheadend Player peça ao servidor um buffer de timeshift para TV em direto.</string>
+    <string name="timeshift_setting">Timeshift</string>
+    <string name="timeshift_setting_description">Pausar e recuar na TV em direto</string>
     <string name="refresh_rate_matching_setting">Ajustar à taxa de fotogramas do conteúdo</string>
     <string name="frame_rate_switching_always">Sempre</string>
     <string name="frame_rate_switching_seamless_only">Só sem interrupções</string>

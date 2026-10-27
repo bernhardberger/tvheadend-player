@@ -15,7 +15,7 @@ Informal singular guidance (Seleciona, Prime, Verifica, Tenta, teu). Status text
 
 ## Term decisions
 
-- `timeshift_setting` Pausar e recuar na TV em direto, following the frozen source's explicit pause/rewind wording.
+- `timeshift_setting` Timeshift; `timeshift_setting_description` Pausar e recuar na TV em direto.
 
 - European UI words: Ver, Eliminar, Guardar, Definições, Ligação, Palavra-passe, Utilizador, Grelha, Ecrã, Comando, Ficheiro.
 - `details_broadcast_repeat` Repetição, `details_broadcast_new` Estreia.

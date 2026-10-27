@@ -500,8 +500,8 @@
     <string name="player_paused">일시정지됨</string>
     <string name="player_buffer_summary">%1$s 사용 가능</string>
     <string name="player_current_broadcast">현재 방송</string>
-    <string name="timeshift_setting">실시간 TV 일시정지 및 되감기</string>
-    <string name="timeshift_setting_description">Tvheadend Player가 서버에 실시간 TV 타임시프트 버퍼를 요청하도록 허용합니다.</string>
+    <string name="timeshift_setting">타임시프트</string>
+    <string name="timeshift_setting_description">실시간 TV 일시정지 및 되감기</string>
     <string name="refresh_rate_matching_setting">콘텐츠 프레임 속도에 맞추기</string>
     <string name="frame_rate_switching_always">항상</string>
     <string name="frame_rate_switching_seamless_only">끊김 없이 가능한 경우만</string>

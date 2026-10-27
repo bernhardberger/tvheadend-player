@@ -17,7 +17,7 @@ Informal singular; imperative action labels. Croatian forms throughout (posluži
 
 - `nav_channels` Kanali; `nav_epg` TV vodič; `nav_recordings` Snimke; `context_watch` Gledaj.
 - Programme = *emisija*; recording file = *snimka*, process = *snimanje*; `details_retention` Čuvanje.
-- `timeshift_setting` Pauziraj i premotavaj TV uživo; mux = multipleks; buffer = međuspremnik.
+- `timeshift_setting` Vremenski pomak; `timeshift_setting_description` Pauziraj i premotavaj TV uživo; mux = multipleks; buffer = međuspremnik.
 - Cancel otkaži, Stop zaustavi (existing part kept), Delete izbriši.
 - `player_tuning` Prebacivanje, not scanning.
 - Appliance = *Način TV prijamnika*.

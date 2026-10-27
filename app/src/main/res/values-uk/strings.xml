@@ -536,8 +536,8 @@
     <string name="player_paused">Призупинено</string>
     <string name="player_buffer_summary">Доступно %1$s</string>
     <string name="player_current_broadcast">Поточна передача</string>
-    <string name="timeshift_setting">Пауза й перемотування прямого ефіру</string>
-    <string name="timeshift_setting_description">Дозволити Tvheadend Player запитувати у вашого сервера буфер відкладеного перегляду прямого ефіру.</string>
+    <string name="timeshift_setting">Відкладений перегляд</string>
+    <string name="timeshift_setting_description">Пауза й перемотування прямого ефіру</string>
     <string name="refresh_rate_matching_setting">Узгодження частоти кадрів</string>
     <string name="frame_rate_switching_always">Завжди</string>
     <string name="frame_rate_switching_seamless_only">Лише без переривань</string>

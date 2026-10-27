@@ -16,7 +16,7 @@ Informal singular where natural; imperative action buttons.
 ## Term decisions
 
 - `nav_channels` Canale; `nav_epg` Ghid TV; `nav_recordings` Înregistrări; `context_watch` Vizionează.
-- `timeshift_setting` Pauză și derulare înapoi pentru TV în direct; `details_retention` Păstrare; mux = multiplex.
+- `timeshift_setting` Redare decalată; `timeshift_setting_description` Pauză și derulare înapoi pentru TV în direct; `details_retention` Păstrare; mux = multiplex.
 - Cancel anulează, Stop oprește (recorded part kept), Delete șterge.
 - `keep_recording` means continue the active recording, not keep a file.
 - `player_tuning` Se schimbă canalul, not scanning.

@@ -17,7 +17,7 @@ Polite plural **вы** (lowercase when explicit); infinitive action labels.
 ## Term decisions
 
 - `nav_channels` Каналы; `nav_epg` Телепрограмма; `nav_recordings` Записи; `context_watch` Смотреть.
-- `timeshift_setting` Пауза и перемотка прямого эфира; `details_retention` Срок хранения; mux = мультиплекс; tuner = тюнер.
+- `timeshift_setting` Отложенный просмотр; `timeshift_setting_description` Пауза и перемотка прямого эфира; `details_retention` Срок хранения; mux = мультиплекс; tuner = тюнер.
 - Cancel отменить запись, Stop остановить запись (recorded part kept), Delete удалить запись.
 - `keep_recording` is продолжить запись; `player_tuning` Переключение, not scanning.
 - `profile_direct_streaming` "Прямая трансляция потока" is kept distinct from *прямой эфир*.

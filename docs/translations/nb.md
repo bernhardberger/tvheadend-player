@@ -16,7 +16,7 @@ Informal **du**/din where natural; short imperative labels.
 ## Term decisions
 
 - `nav_channels` Kanaler; `nav_epg` TV-guide; `nav_recordings` Opptak; `context_watch` Se.
-- `timeshift_setting` Pause og spol tilbake direktesendt TV; `details_retention` Lagringstid; mux = multipleks; channel tag = kanaletikett.
+- `timeshift_setting` Tidsforskyvning; `timeshift_setting_description` Pause og spol tilbake direktesendt TV; `details_retention` Lagringstid; mux = multipleks; channel tag = kanaletikett.
 - Cancel avlys, Stop stopp (captured part kept), Delete slett.
 - Appliance = *TV-modus* / *TV-starttjeneste*.
 - `settings_channel_tags_last_enabled` uses the setting-state word *på*.

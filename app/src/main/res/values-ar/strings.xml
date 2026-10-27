@@ -560,8 +560,8 @@
     <string name="player_paused">متوقف مؤقتًا</string>
     <string name="player_buffer_summary">المتاح %1$s</string>
     <string name="player_current_broadcast">البث الحالي</string>
-    <string name="timeshift_setting">إيقاف البث المباشر مؤقتًا وإرجاعه</string>
-    <string name="timeshift_setting_description">السماح لـ Tvheadend Player بطلب مخزن مؤقت للإزاحة الزمنية للتلفزيون المباشر من الخادم.</string>
+    <string name="timeshift_setting">الإزاحة الزمنية</string>
+    <string name="timeshift_setting_description">إيقاف البث المباشر مؤقتًا وإرجاعه</string>
     <string name="refresh_rate_matching_setting">مطابقة معدل إطارات المحتوى</string>
     <string name="frame_rate_switching_always">دائمًا</string>
     <string name="frame_rate_switching_seamless_only">دون انقطاع فقط</string>

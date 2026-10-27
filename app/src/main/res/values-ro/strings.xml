@@ -524,8 +524,8 @@
     <string name="player_paused">În pauză</string>
     <string name="player_buffer_summary">%1$s disponibile</string>
     <string name="player_current_broadcast">Difuzarea curentă</string>
-    <string name="timeshift_setting">Pauză și derulare înapoi pentru TV în direct</string>
-    <string name="timeshift_setting_description">Permite Tvheadend Player să solicite serverului tău un buffer pentru redarea decalată a televiziunii în direct.</string>
+    <string name="timeshift_setting">Redare decalată</string>
+    <string name="timeshift_setting_description">Pauză și derulare înapoi pentru TV în direct</string>
     <string name="refresh_rate_matching_setting">Potrivește frecvența cadrelor</string>
     <string name="frame_rate_switching_always">Întotdeauna</string>
     <string name="frame_rate_switching_seamless_only">Doar fără întreruperi</string>
@@ -552,7 +552,7 @@
     <string name="keep_channel_setting">Păstrează canalul sintonizat în pauză</string>
     <string name="keep_channel_off">Dezactivat</string>
     <string name="keep_channel_description">Dacă ieși din aplicație când TV în direct este în pauză, canalul rămâne sintonizat pentru această durată, ca să poți continua. Între timp, un tuner rămâne ocupat.</string>
-    <string name="keep_channel_needs_timeshift">Disponibil când „%1$s” este activat.</string>
+    <string name="keep_channel_needs_timeshift">Disponibil când „%1$s” este activată.</string>
     <string name="startup_buffer_setting">Buffer de pornire</string>
     <string name="startup_buffer_automatic">Automat • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>

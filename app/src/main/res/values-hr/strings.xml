@@ -524,8 +524,8 @@
     <string name="player_paused">Pauzirano</string>
     <string name="player_buffer_summary">Dostupno: %1$s</string>
     <string name="player_current_broadcast">Trenutačno emitiranje</string>
-    <string name="timeshift_setting">Pauziraj i premotavaj TV uživo</string>
-    <string name="timeshift_setting_description">Dopusti da Tvheadend Player zatraži od tvog poslužitelja međuspremnik za vremenski pomak TV-a uživo.</string>
+    <string name="timeshift_setting">Vremenski pomak</string>
+    <string name="timeshift_setting_description">Pauziraj i premotavaj TV uživo</string>
     <string name="refresh_rate_matching_setting">Uskladi s frekvencijom sličica sadržaja</string>
     <string name="frame_rate_switching_always">Uvijek</string>
     <string name="frame_rate_switching_seamless_only">Samo bez prekida</string>

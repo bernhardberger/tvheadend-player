@@ -18,7 +18,7 @@ Informal **tu** in directions; imperative action labels.
 
 - `nav_channels` Canali; `nav_epg` Guida; `nav_recordings` Registrazioni; `context_watch` Guarda.
 - `recording_state_missed` Mancata, distinct from Non riuscita and Annullata; `details_retention` Conservazione.
-- Timeshift as a concept = *riproduzione differita*; `timeshift_setting` Pausa e riavvolgimento della TV in diretta; `timeshift_live` Diretta; `player_tuning` Cambio canale.
+- Timeshift as a concept = *riproduzione differita*; `timeshift_setting` Riproduzione differita; `timeshift_setting_description` Pausa e riavvolgimento della TV in diretta; `timeshift_live` Diretta; `player_tuning` Cambio canale.
 - Cancel annulla, Stop interrompi, Delete elimina.
 - Appliance = *Modalità TV*. Passthrough and tunneling keep familiar loanwords.
 - Recording states agree with feminine *registrazione*; programme playback lines use masculine *registrato*.

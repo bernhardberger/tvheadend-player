@@ -17,7 +17,7 @@ Informal **tú** in directions; infinitives on action labels. Vocabulary leans t
 
 - `nav_channels` Canales; `nav_epg` Guía; `nav_recordings` Grabaciones; `context_watch` Ver.
 - `recording_state_missed` No realizada, distinct from Fallida and Cancelada; `details_retention` Conservación.
-- Timeshift as a concept = *reproducción en diferido*; `timeshift_setting` Pausar y rebobinar la TV en directo; `timeshift_live` Directo; `player_tuning` Cambiando canal.
+- Timeshift as a concept = *reproducción en diferido*; `timeshift_setting` Reproducción en diferido; `timeshift_setting_description` Pausar y rebobinar la TV en directo; `timeshift_live` Directo; `player_tuning` Cambiando canal.
 - Cancel cancelar, Stop detener, Delete eliminar.
 - Appliance = *Modo televisor*.
 - New broadcast Estreno, repeat Reposición; mux = múltiplex.

@@ -16,7 +16,7 @@ Informal **du**/din; neutral or imperative action labels.
 ## Term decisions
 
 - `nav_channels` Kanaler; `nav_epg` Tv-guide; `nav_recordings` Inspelningar; `context_watch` Titta.
-- `timeshift_setting` Pausa och spola tillbaka direktsänd tv; `details_retention` Lagringstid; mux = multiplex.
+- `timeshift_setting` Tidsförskjutning; `timeshift_setting_description` Pausa och spola tillbaka direktsänd tv; `details_retention` Lagringstid; mux = multiplex.
 - Cancel avboka, Stop stoppa, Delete radera; generic canceled server states use *avbruten*.
 - `player_tuning` Byter kanal, not scanning.
 - Appliance = *Tv-läge*; service labels use *tv-starttjänst*.

@@ -28,7 +28,7 @@ is retained. No human reviewer; remains labeled machine-drafted.
 
 - `nav_channels` Kanallar; `nav_epg` Rehber (compact; long form *program rehberi*); `nav_recordings` Kayıtlar; `context_watch` İzle.
 - *Kayıt* names both a file and an operation; the verbs keep the distinction.
-- `timeshift_setting` Canlı TV yayınına ara ver ve geri sar; `details_retention` Saklama süresi; channel tag = kanal etiketi.
+- `timeshift_setting` Zaman kaydırma; `timeshift_setting_description` Canlı TV yayınına ara ver ve geri sar; `details_retention` Saklama süresi; channel tag = kanal etiketi.
 - Tuner = *ayarlayıcı*; mux = *çoklayıcı*.
 - Cancel iptal et, Stop durdur (recorded part kept), Delete sil.
 - `player_tuning` Kanal değiştiriliyor, not scanning.

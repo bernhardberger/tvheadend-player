@@ -512,8 +512,8 @@
     <string name="player_paused">Szüneteltetve</string>
     <string name="player_buffer_summary">%1$s érhető el</string>
     <string name="player_current_broadcast">Jelenlegi adás</string>
-    <string name="timeshift_setting">Élő TV-adás szüneteltetése és visszatekerése</string>
-    <string name="timeshift_setting_description">Engedélyezd, hogy a Tvheadend Player időeltolási puffert kérjen a szerveredtől az élő TV-hez.</string>
+    <string name="timeshift_setting">Időeltolás</string>
+    <string name="timeshift_setting_description">Élő TV-adás szüneteltetése és visszatekerése</string>
     <string name="refresh_rate_matching_setting">Igazítás a tartalom képkockasebességéhez</string>
     <string name="frame_rate_switching_always">Mindig</string>
     <string name="frame_rate_switching_seamless_only">Csak zökkenőmentesen</string>

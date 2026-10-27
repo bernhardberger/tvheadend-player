@@ -17,7 +17,7 @@ Informal singular imperatives; lowercase twoje/twój in explanations.
 
 - `nav_channels` Kanały; `nav_epg` Program TV; `nav_recordings` Nagrania; `context_watch` Oglądaj.
 - Recording file = *nagranie*, process = *nagrywanie*; `details_retention` Przechowywanie.
-- `timeshift_setting` Wstrzymuj i przewijaj telewizję na żywo; mux = multipleks; `player_tuning` Przełączanie, not scanning.
+- `timeshift_setting` Przesunięcie w czasie; `timeshift_setting_description` Wstrzymuj i przewijaj telewizję na żywo; mux = multipleks; `player_tuning` Przełączanie, not scanning.
 - Cancel anuluj, Stop zatrzymaj (recorded part kept), Delete usuń.
 - `recording_state_missed` Pominięte; the notice says *Nagrywanie nie odbyło się*.
 - Bulk-failure denominator follows the total `%2$d`; "z … nagrania/nagrań" uses the genitive.

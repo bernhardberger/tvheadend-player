@@ -21,7 +21,7 @@ Gender-neutral: nominal actions and impersonal guidance (יש, אפשר); no mas
 ## Term decisions
 
 - `nav_channels` ערוצים; `nav_epg` מדריך; `nav_recordings` הקלטות; `context_watch` צפייה.
-- Live = שידור חי; `timeshift_setting` השהיה והרצה לאחור של שידור חי; `player_tuning` מעבר ערוץ, not scanning.
+- Live = שידור חי; `timeshift_setting` השהיית שידור חי; `timeshift_setting_description` השהיה והרצה לאחור של שידור חי; `player_tuning` מעבר ערוץ, not scanning.
 - Cancel ביטול ההקלטה המתוזמנת, Stop עצירת ההקלטה (content kept), Delete מחיקת הקלטה.
 - Mux = מקבץ שידור, distinct from channel.
 
@@ -32,4 +32,4 @@ Reconciled to frozen source `6d80a8ff` for 0.3.0 by GPT-6.1 Sol (medium), retain
 ## Open questions
 
 - Verify the plural categories on supported Android versions before integration.
-- Mux vocabulary still needs native review. The current timeshift setting explicitly includes rewind, matching the frozen English source.
+- Mux vocabulary still needs native review. The timeshift setting description explicitly includes rewind.

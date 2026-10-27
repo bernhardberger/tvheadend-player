@@ -524,8 +524,8 @@
     <string name="player_paused">מושהה</string>
     <string name="player_buffer_summary">%1$s זמינים</string>
     <string name="player_current_broadcast">השידור הנוכחי</string>
-    <string name="timeshift_setting">השהיה והרצה לאחור של שידור חי</string>
-    <string name="timeshift_setting_description">מתן אפשרות ל-Tvheadend Player לבקש מהשרת מאגר להשהיית טלוויזיה בשידור חי.</string>
+    <string name="timeshift_setting">השהיית שידור חי</string>
+    <string name="timeshift_setting_description">השהיה והרצה לאחור של שידור חי</string>
     <string name="refresh_rate_matching_setting">התאמה לקצב התמונות של התוכן</string>
     <string name="frame_rate_switching_always">תמיד</string>
     <string name="frame_rate_switching_seamless_only">רק ללא הפרעה</string>
@@ -552,7 +552,7 @@
     <string name="keep_channel_setting">שמירת הכוונון בשידור מושהה</string>
     <string name="keep_channel_off">כבוי</string>
     <string name="keep_channel_description">ביציאה מהאפליקציה בזמן ששידור חי מושהה, הערוץ יישאר מכוון למשך הזמן הזה כדי לאפשר המשך צפייה. המקלט יישאר תפוס בינתיים.</string>
-    <string name="keep_channel_needs_timeshift">זמין כאשר ״%1$s״ מופעל.</string>
+    <string name="keep_channel_needs_timeshift">זמין כאשר ״%1$s״ מופעלת.</string>
     <string name="startup_buffer_setting">מאגר התחלתי</string>
     <string name="startup_buffer_automatic">אוטומטי • %1$s</string>
     <string name="startup_buffer_seconds">%1$s שנ׳</string>

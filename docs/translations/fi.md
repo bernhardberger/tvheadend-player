@@ -17,7 +17,7 @@ Informal singular where direct address is natural; mostly imperative labels with
 
 - `nav_channels` Kanavat; `nav_epg` Ohjelmaopas; `nav_recordings` Tallenteet; `context_watch` Katso.
 - Completed recording = *tallenne*; recording process or schedule = *tallennus*.
-- `timeshift_setting` Suoran TV-lähetyksen tauotus ja takaisinkelaus; `details_retention` Säilytysaika; mux = kanavanippu; channel tag = kanavatunniste.
+- `timeshift_setting` Ajansiirto; `timeshift_setting_description` Suoran TV-lähetyksen tauotus ja takaisinkelaus; `details_retention` Säilytysaika; mux = kanavanippu; channel tag = kanavatunniste.
 - Cancel peru, Stop pysäytä (recorded part kept), Delete poista.
 - Spoken duration ratios use explicit elapsed/total phrases instead of slashes.
 - Placeholder names are not inflected, to avoid suffixes on arbitrary names.

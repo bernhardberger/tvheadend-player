@@ -17,7 +17,7 @@ Informal singular instructions; neutral noun labels on buttons where idiomatic.
 ## Term decisions
 
 - `nav_channels` Κανάλια; `nav_epg` Οδηγός; `nav_recordings` Εγγραφές; `context_watch` Προβολή.
-- `timeshift_setting` Παύση και επανατύλιξη ζωντανής TV; `details_retention` Διατήρηση; tuner = δέκτης; mux = πολυπλεξία.
+- `timeshift_setting` Χρονική μετατόπιση; `timeshift_setting_description` Παύση και επανατύλιξη ζωντανής TV; `details_retention` Διατήρηση; tuner = δέκτης; mux = πολυπλεξία.
 - Cancel ακύρωση, Stop διακοπή (recorded part kept), Delete διαγραφή.
 - `player_tuning` Αλλαγή καναλιού, not scanning; `keep_recording` is συνέχιση εγγραφής.
 - Appliance = *λειτουργία συσκευής TV*, an explanatory choice.

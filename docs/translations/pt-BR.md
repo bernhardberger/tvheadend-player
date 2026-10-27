@@ -18,7 +18,7 @@ Neutral action labels; natural Brazilian imperatives in guidance, no formal addr
 - Brazilian UI words: Assistir, Excluir, Salvar, Configurações, Conexão, Senha, Usuário, Grade.
 - `details_broadcast_repeat` Reprise, `details_broadcast_new` Inédito (broadcast status, not playback repeat).
 - `player_tuning` Sintonizando: switching to the chosen channel, not scanning.
-- Live = Ao vivo; delayed status = Com atraso; *Timeshift* is the technical concept, while `timeshift_setting` is Pausar e retroceder a TV ao vivo.
+- Live = Ao vivo; delayed status = Com atraso; `timeshift_setting` Timeshift; `timeshift_setting_description` Pausar e retroceder a TV ao vivo.
 - Cancel Cancelar gravação, Stop Parar gravação, Delete Excluir gravação.
 - Channel tags = etiquetas, groups = grupos; mux = multiplex, not a channel.
 

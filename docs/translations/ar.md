@@ -22,7 +22,7 @@ All six: `zero`, `one`, `two`, `few`, `many`, `other`, each keeping the numeral.
 ## Term decisions
 
 - `nav_channels` القنوات; `nav_epg` دليل البرامج; `nav_recordings` التسجيلات; `record` تسجيل.
-- `timeshift_setting` إيقاف البث المباشر مؤقتًا وإرجاعه; live = مباشر; `player_tuning` جارٍ تبديل القناة, not scanning.
+- `timeshift_setting` الإزاحة الزمنية; `timeshift_setting_description` إيقاف البث المباشر مؤقتًا وإرجاعه; live = مباشر; `player_tuning` جارٍ تبديل القناة, not scanning.
 - Cancel إلغاء التسجيل المجدول, Stop إيقاف التسجيل (content kept), Delete حذف التسجيل.
 - Mux = مُجمّع البث (`error_203_reason`), distinct from channel.
 - Role headings are collective labels.

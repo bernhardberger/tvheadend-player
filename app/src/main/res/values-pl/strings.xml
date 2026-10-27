@@ -536,8 +536,8 @@
     <string name="player_paused">Wstrzymano</string>
     <string name="player_buffer_summary">Dostępne: %1$s</string>
     <string name="player_current_broadcast">Bieżąca emisja</string>
-    <string name="timeshift_setting">Wstrzymuj i przewijaj telewizję na żywo</string>
-    <string name="timeshift_setting_description">Pozwól Tvheadend Player żądać od twojego serwera bufora przesunięcia w czasie telewizji na żywo.</string>
+    <string name="timeshift_setting">Przesunięcie w czasie</string>
+    <string name="timeshift_setting_description">Wstrzymuj i przewijaj telewizję na żywo</string>
     <string name="refresh_rate_matching_setting">Dopasuj do liczby klatek materiału</string>
     <string name="frame_rate_switching_always">Zawsze</string>
     <string name="frame_rate_switching_seamless_only">Tylko bez zakłóceń</string>

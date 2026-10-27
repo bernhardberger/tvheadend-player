@@ -482,8 +482,8 @@
     <string name="player_paused">已暂停</string>
     <string name="player_buffer_summary">可用%1$s</string>
     <string name="player_current_broadcast">当前播出</string>
-    <string name="timeshift_setting">暂停和回退电视直播</string>
-    <string name="timeshift_setting_description">允许Tvheadend Player向服务器请求电视直播时移缓冲区。</string>
+    <string name="timeshift_setting">时移</string>
+    <string name="timeshift_setting_description">暂停和回退电视直播</string>
     <string name="refresh_rate_matching_setting">匹配内容帧率</string>
     <string name="frame_rate_switching_always">始终</string>
     <string name="frame_rate_switching_seamless_only">仅限无缝切换</string>

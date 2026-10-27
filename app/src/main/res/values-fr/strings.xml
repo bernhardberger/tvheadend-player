@@ -524,8 +524,8 @@
     <string name="player_paused">En pause</string>
     <string name="player_buffer_summary">%1$s disponibles</string>
     <string name="player_current_broadcast">Diffusion en cours</string>
-    <string name="timeshift_setting">Mettre en pause et rembobiner la TV en direct</string>
-    <string name="timeshift_setting_description">Autoriser Tvheadend Player à demander un tampon de lecture différée TV à ton serveur.</string>
+    <string name="timeshift_setting">Lecture différée</string>
+    <string name="timeshift_setting_description">Mettre en pause et rembobiner la TV en direct</string>
     <string name="refresh_rate_matching_setting">Adapter à la fréquence du contenu</string>
     <string name="frame_rate_switching_always">Toujours</string>
     <string name="frame_rate_switching_seamless_only">Uniquement sans coupure</string>
@@ -552,7 +552,7 @@
     <string name="keep_channel_setting">Garder la chaîne réglée pendant la pause</string>
     <string name="keep_channel_off">Désactivé</string>
     <string name="keep_channel_description">Si tu quittes l’application pendant une pause de la TV en direct, la chaîne reste réglée pendant cette durée pour te permettre de reprendre. Un tuner reste occupé entre-temps.</string>
-    <string name="keep_channel_needs_timeshift">Disponible quand « %1$s » est activé.</string>
+    <string name="keep_channel_needs_timeshift">Disponible quand « %1$s » est activée.</string>
     <string name="startup_buffer_setting">Tampon de démarrage</string>
     <string name="startup_buffer_automatic">Automatique • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>

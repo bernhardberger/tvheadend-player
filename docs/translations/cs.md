@@ -17,7 +17,7 @@ Informal singular in explanations; infinitive action labels. Plan: informal unle
 
 - `nav_channels` Kanály; `nav_epg` Program; `nav_recordings` Nahrávky; `context_watch` Sledovat.
 - Recording file = *nahrávka*, process = *nahrávání*; `details_retention` Doba uchování.
-- `timeshift_setting` Pozastavit a přetáčet živé vysílání; mux = multiplex; `player_tuning` Přepínání, not scanning.
+- `timeshift_setting` Časový posun; `timeshift_setting_description` Pozastavit a přetáčet živé vysílání; mux = multiplex; `player_tuning` Přepínání, not scanning.
 - Cancel zrušit, Stop zastavit, Delete smazat.
 - `recording_state_missed` Nenahráno; the notice says *Nahrávání neproběhlo*.
 - Bulk-failure sentences use the total `%2$d` for the inflected denominator.

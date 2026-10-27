@@ -512,8 +512,8 @@
     <string name="player_paused">På pause</string>
     <string name="player_buffer_summary">%1$s tilgængelig</string>
     <string name="player_current_broadcast">Aktuel udsendelse</string>
-    <string name="timeshift_setting">Sæt live-tv på pause og spol tilbage</string>
-    <string name="timeshift_setting_description">Tillad, at Tvheadend Player anmoder din server om en tidsforskydningsbuffer til live-tv.</string>
+    <string name="timeshift_setting">Tidsforskydning</string>
+    <string name="timeshift_setting_description">Sæt live-tv på pause og spol tilbage</string>
     <string name="refresh_rate_matching_setting">Match indholdets billedfrekvens</string>
     <string name="frame_rate_switching_always">Altid</string>
     <string name="frame_rate_switching_seamless_only">Kun uden afbrydelse</string>

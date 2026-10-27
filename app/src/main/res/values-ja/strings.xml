@@ -500,8 +500,8 @@
     <string name="player_paused">一時停止中</string>
     <string name="player_buffer_summary">%1$s利用可能</string>
     <string name="player_current_broadcast">現在の放送</string>
-    <string name="timeshift_setting">ライブ放送の一時停止と巻き戻し</string>
-    <string name="timeshift_setting_description">Tvheadend Playerがサーバーにライブテレビのタイムシフト用バッファを要求することを許可します。</string>
+    <string name="timeshift_setting">タイムシフト</string>
+    <string name="timeshift_setting_description">ライブ放送の一時停止と巻き戻し</string>
     <string name="refresh_rate_matching_setting">コンテンツのフレームレートに合わせる</string>
     <string name="frame_rate_switching_always">常に</string>
     <string name="frame_rate_switching_seamless_only">シームレスな場合のみ</string>

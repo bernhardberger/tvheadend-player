@@ -512,8 +512,8 @@
     <string name="player_paused">Duraklatıldı</string>
     <string name="player_buffer_summary">%1$s kullanılabilir</string>
     <string name="player_current_broadcast">Geçerli yayın</string>
-    <string name="timeshift_setting">Canlı TV yayınına ara ver ve geri sar</string>
-    <string name="timeshift_setting_description">Tvheadend Player uygulamasının canlı TV için sunucunuzdan zaman kaydırma arabelleği istemesine izin verin.</string>
+    <string name="timeshift_setting">Zaman kaydırma</string>
+    <string name="timeshift_setting_description">Canlı TV yayınına ara ver ve geri sar</string>
     <string name="refresh_rate_matching_setting">İçeriğin kare hızıyla eşleştir</string>
     <string name="frame_rate_switching_always">Her zaman</string>
     <string name="frame_rate_switching_seamless_only">Yalnızca kesintisiz</string>

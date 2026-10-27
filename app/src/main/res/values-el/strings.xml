@@ -512,8 +512,8 @@
     <string name="player_paused">Σε παύση</string>
     <string name="player_buffer_summary">Διαθέσιμα %1$s</string>
     <string name="player_current_broadcast">Τρέχουσα μετάδοση</string>
-    <string name="timeshift_setting">Παύση και επανατύλιξη ζωντανής TV</string>
-    <string name="timeshift_setting_description">Επίτρεψε στο Tvheadend Player να ζητά από τον διακομιστή σου προσωρινή μνήμη χρονικής μετατόπισης για ζωντανή TV.</string>
+    <string name="timeshift_setting">Χρονική μετατόπιση</string>
+    <string name="timeshift_setting_description">Παύση και επανατύλιξη ζωντανής TV</string>
     <string name="refresh_rate_matching_setting">Αντιστοίχιση ρυθμού καρέ</string>
     <string name="frame_rate_switching_always">Πάντα</string>
     <string name="frame_rate_switching_seamless_only">Μόνο χωρίς διακοπή</string>
@@ -540,7 +540,7 @@
     <string name="keep_channel_setting">Διατήρηση συντονισμού σε παύση</string>
     <string name="keep_channel_off">Ανενεργή</string>
     <string name="keep_channel_description">Αν φύγεις από την εφαρμογή ενώ η ζωντανή TV είναι σε παύση, το κανάλι μένει συντονισμένο για αυτό το διάστημα ώστε να συνεχίσεις. Στο μεταξύ δεσμεύει έναν δέκτη.</string>
-    <string name="keep_channel_needs_timeshift">Διαθέσιμο όταν είναι ενεργό το «%1$s».</string>
+    <string name="keep_channel_needs_timeshift">Διαθέσιμο όταν είναι ενεργή η «%1$s».</string>
     <string name="startup_buffer_setting">Μνήμη εκκίνησης</string>
     <string name="startup_buffer_automatic">Αυτόματα • %1$s</string>
     <string name="startup_buffer_seconds">%1$s s</string>
