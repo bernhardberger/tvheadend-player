@@ -1116,6 +1116,58 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
+    @Test fun leftThenRightThenDownFromOnAirUsesNowRatherThanProgrammeStart() {
+        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+                Instant.fromEpochSeconds(hour + end * 60), title = name)
+        // Fixed now is 20:15: the next row changes one minute after the focused programme starts.
+        show(history = false, events = listOf(
+            programme(109, 1, -60, -10, "Previous programme"),
+            programme(110, 1, -10, 44, "Current conversation"),
+            programme(210, 2, -118, -9, "Ended movie"),
+            programme(211, 2, -9, 100, "Current comedy"),
+        ))
+        key(Key.DirectionDown)
+        focused("Current conversation")
+        key(Key.DirectionLeft)
+        focused("Previous programme")
+        key(Key.DirectionRight)
+        focused("Current conversation")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Current comedy")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertNoPlayback()
+    }
+
+    @Test fun futureVisibleSpanStaysStickyThroughALongProgramme() {
+        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+                Instant.fromEpochSeconds(hour + end * 60), title = name)
+        show(events = listOf(
+            programme(110, 1, 0, 60, "Current programme"),
+            programme(111, 1, 60, 120, "Future span"),
+            programme(210, 2, 0, 300, "Long programme"),
+            programme(410, 4, 0, 90, "Earlier half"),
+            programme(411, 4, 90, 120, "Later half"),
+        ))
+        key(Key.DirectionDown)
+        focused("Current programme")
+        key(Key.DirectionRight)
+        focused("Future span")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Long programme")
+        key(Key.DirectionDown)
+        focused("Later half")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        key(Key.DirectionUp)
+        focused("Long programme")
+        key(Key.DirectionUp)
+        focused("Future span")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+    }
+
     @Test fun leftAndRightBackToTheAnchoredProgrammeStartANewAnchor() {
         // Channel 1 runs one programme from 20:00 to 22:00; channel 2 is hourly.
         show(longProgramme = true, longProgrammeHours = 2, longProgrammeSuccessor = true)
@@ -1125,14 +1177,14 @@ class GuideVisualLayoutTest {
         focused(title(2, 0))
         key(Key.DirectionRight)
         focused(title(2, 1))
-        // Up keeps 21:00 as the anchor inside the long programme.
+        // Up keeps the 21:00–22:00 span inside the long programme.
         key(Key.DirectionUp)
         focused(title(1, 0))
         key(Key.DirectionRight)
         focused(title(1, 2))
         key(Key.DirectionLeft)
         focused(title(1, 0))
-        // Left made a new focus, so Down starts from the programme's visible start, not the old 21:00.
+        // Left made a new focus, so Down uses now, not the old future span.
         key(Key.DirectionDown)
         focused(title(2, 0))
         assertNoPlayback()

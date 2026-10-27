@@ -265,8 +265,8 @@ fun reconcileTimelineEpgFocus(
 
 /**
  * Left and Right step programme by programme. Up and Down pick the adjacent row's programme
- * at [anchorSec], by default the focused programme's start. Callers keep the anchor across
- * vertical moves so that repeated Up and Down never drift in time.
+ * at [anchorSec] or overlapping [anchorSpanSec]. Without an anchor, use the focused programme's
+ * readable span. Callers keep the anchor across vertical moves so they never drift in time.
  */
 fun moveTimelineEpgFocus(
     rows: List<EpgFocusColumn>,
@@ -276,6 +276,7 @@ fun moveTimelineEpgFocus(
     anchorSec: Long? = null,
     readableRangeSec: LongRange? = null,
     minReadableOverlapSec: Long = 1,
+    anchorSpanSec: LongRange? = null,
 ): TimelineEpgFocusMove {
     val row = rows.getOrNull(current.channelIndex)
         ?: return TimelineEpgFocusMove(current)
@@ -293,17 +294,19 @@ fun moveTimelineEpgFocus(
         return TimelineEpgFocusMove(current.copy(eventId = event.id))
     }
 
+    val span = anchorSpanSec ?: readableRangeSec?.takeIf { anchorSec == null }
+        ?.let { timelineFocusAnchorRange(currentEvent, it) }
     val step = if (direction == EpgFocusDirection.UP) -1 else 1
     val channelIndex = generateSequence(current.channelIndex + step) { it + step }
         .takeWhile { it in rows.indices }
         .firstOrNull { timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds,
-            readableRangeSec, minReadableOverlapSec) != null }
+            readableRangeSec, minReadableOverlapSec, span) != null }
     if (channelIndex == null && direction == EpgFocusDirection.UP) {
         return TimelineEpgFocusMove(current, focusHeader = true)
     }
     channelIndex ?: return TimelineEpgFocusMove(current)
     val best = timelineEventAt(rows[channelIndex].events, anchorSec ?: currentEvent.start.epochSeconds,
-        readableRangeSec, minReadableOverlapSec)
+        readableRangeSec, minReadableOverlapSec, span)
         ?: return TimelineEpgFocusMove(current)
 
     return TimelineEpgFocusMove(
@@ -367,23 +370,26 @@ fun timelinePageFocusTarget(
     anchorSec: Long? = null,
     readableRangeSec: LongRange? = null,
     minReadableOverlapSec: Long = 1,
+    anchorSpanSec: LongRange? = null,
 ): EpgFocusTarget? {
     val currentEvent = rows.getOrNull(current.channelIndex)
         ?.events
         ?.firstOrNull { it.id == current.eventId }
         ?: return null
+    val span = anchorSpanSec ?: readableRangeSec?.takeIf { anchorSec == null }
+        ?.let { timelineFocusAnchorRange(currentEvent, it) }
     val step = if (direction < 0) -1 else 1
     val startIndex = preferredChannelIndex.coerceIn(rows.indices)
     val targetIndex = generateSequence(startIndex) { it + step }
         .takeWhile { it in rows.indices }
         .firstOrNull {
             timelineEventAt(rows[it].events, anchorSec ?: currentEvent.start.epochSeconds,
-                readableRangeSec, minReadableOverlapSec) != null &&
+                readableRangeSec, minReadableOverlapSec, span) != null &&
                 (searchChannelIds == null || rows[it].channelId in searchChannelIds)
         }
         ?: return null
     val targetEvent = timelineEventAt(rows[targetIndex].events, anchorSec ?: currentEvent.start.epochSeconds,
-        readableRangeSec, minReadableOverlapSec)
+        readableRangeSec, minReadableOverlapSec, span)
         ?: return null
     return EpgFocusTarget(targetIndex, targetEvent.id)
 }
@@ -399,18 +405,41 @@ fun timelineEventIsReadable(event: EpgEventEntry, readableRangeSec: LongRange, m
     return overlap > 0 && ((start >= readableRangeSec.first && end <= readableEnd) || overlap >= minReadableOverlapSec)
 }
 
-/** The qualifying programme on air at [anchorSec]; across a gap the nearest one, the later on a tie. */
+/** A readable on-air programme anchors at now; otherwise use its visible half-open span. */
+fun timelineFocusAnchorRange(event: EpgEventEntry, readableRangeSec: LongRange, nowSec: Long? = null): LongRange {
+    if (readableRangeSec.isEmpty()) return readableRangeSec
+    if (nowSec != null && nowSec in readableRangeSec && nowSec in event.start.epochSeconds until event.stop.epochSeconds) {
+        return nowSec..nowSec
+    }
+    val start = maxOf(event.start.epochSeconds, readableRangeSec.first)
+    val end = minOf(event.stop.epochSeconds, readableRangeSec.last + 1)
+    return if (start < end) start until end else event.start.epochSeconds.coerceIn(readableRangeSec).let { it..it }
+}
+
+/** Largest span overlap, then midpoint containment, then earlier start. Gaps use the nearest programme. */
 fun timelineEventAt(
     events: List<EpgEventEntry>,
     anchorSec: Long,
     readableRangeSec: LongRange? = null,
     minReadableOverlapSec: Long = 1,
+    anchorSpanSec: LongRange? = null,
 ): EpgEventEntry? {
     if (readableRangeSec?.isEmpty() == true) return null
-    val anchor = readableRangeSec?.let { anchorSec.coerceIn(it) } ?: anchorSec
-    return events.asSequence().filter {
+    val span = anchorSpanSec?.takeUnless { it.isEmpty() }
+    val anchor = span?.let { it.first + (it.last - it.first + 1) / 2 }
+        ?: readableRangeSec?.let { anchorSec.coerceIn(it) } ?: anchorSec
+    val candidates = events.filter {
         readableRangeSec == null || timelineEventIsReadable(it, readableRangeSec, minReadableOverlapSec)
-    }.minWithOrNull(
+    }
+    if (span != null) {
+        candidates.filter { it.start.epochSeconds <= span.last && it.stop.epochSeconds > span.first }
+            .minWithOrNull(compareBy<EpgEventEntry>(
+                { -(minOf(it.stop.epochSeconds, span.last + 1) - maxOf(it.start.epochSeconds, span.first)) },
+                { anchor !in it.start.epochSeconds until it.stop.epochSeconds },
+                { it.start.epochSeconds },
+            ))?.let { return it }
+    }
+    return candidates.minWithOrNull(
         compareBy<EpgEventEntry>(
             { maxOf(it.start.epochSeconds - anchor, anchor - it.stop.epochSeconds + 1, 0L) },
             { -it.start.epochSeconds },

@@ -11,6 +11,75 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test fun readableOnAirAnchorUsesNowAfterTheAdjacentRowsProgrammeChanges() {
+        // 00:49: Das Gespräch began at 00:24, but the adjacent row changed at 00:25.
+        val current = event(11, 24, 78)
+        val readable = 0L until 180 * 60L
+        val anchor = timelineFocusAnchorRange(current, readable, nowSec = 49 * 60L)
+        assertEquals(49 * 60L..49 * 60L, anchor)
+        val rows = listOf(row(1, current), row(2, event(21, -84, 25), event(22, 25, 134)))
+        assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSpanSec = anchor).target)
+        assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
+            readableRangeSec = readable, anchorSpanSec = anchor))
+        assertEquals(24 * 60L until 40 * 60L,
+            timelineFocusAnchorRange(current, 0L until 40 * 60L, nowSec = 49 * 60L))
+    }
+
+    @Test fun stickyVisibleSpanSurvivesALongProgrammeAndChannelPaging() {
+        val rows = listOf(row(1, event(11, 60, 120)), row(2, event(21, 0, 300)),
+            row(3, event(31, 0, 90), event(32, 90, 120)))
+        val readable = 40 * 60L until 170 * 60L
+        val span = timelineFocusAnchorRange(rows[0].events.single(), readable, nowSec = 50 * 60L)
+        val first = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSpanSec = span)
+        assertEquals(focus(1, 21), first.target)
+        assertEquals(focus(2, 32), moveTimelineEpgFocus(rows, first.target, EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSpanSec = span).target)
+        assertEquals(focus(2, 32), timelinePageFocusTarget(rows, first.target, 2, 1,
+            searchChannelIds = setOf(ChannelId(3)), readableRangeSec = readable, anchorSpanSec = span))
+        assertEquals(focus(0, 11), moveTimelineEpgFocus(rows, first.target, EpgFocusDirection.UP,
+            readableRangeSec = readable, anchorSpanSec = span).target)
+    }
+
+    @Test fun visibleOverlapTiesPreferMidpointThenEarlierStart() {
+        val readable = 40 * 60L until 170 * 60L
+        val source = row(1, event(11, 60, 120))
+        val midpointTie = listOf(source, row(2, event(21, 30, 90), event(22, 90, 150)))
+        assertEquals(focus(1, 22), moveTimelineEpgFocus(midpointTie, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable).target)
+        val earlierTie = listOf(source, row(2, event(22, 100, 120), event(21, 60, 80)))
+        assertEquals(focus(1, 21), moveTimelineEpgFocus(earlierTie, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable).target)
+    }
+
+    @Test fun spanAcrossAGapUsesTheNearestQualifyingProgrammeToItsMidpoint() {
+        val rows = listOf(row(1, event(11, 60, 100)), row(2, event(21, 55, 59), event(22, 101, 150)))
+        val readable = 40 * 60L until 170 * 60L
+        assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable).target)
+        assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
+            readableRangeSec = readable))
+    }
+
+    @Test fun spanUsesOnlyTheReadablePartOfTheFocusedProgramme() {
+        val current = event(11, 0, 180)
+        val readable = 40 * 60L until 100 * 60L
+        assertEquals(readable, timelineFocusAnchorRange(current, readable, nowSec = -1))
+        val rows = listOf(row(1, current), row(2, event(21, 0, 41), event(22, 41, 110)))
+        assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable, minReadableOverlapSec = 720).target)
+    }
+
+    @Test fun unanchoredFutureProgrammeUsesLargestVisibleOverlapForRowsAndPages() {
+        val rows = listOf(row(1, event(11, 60, 120)), row(2, event(21, 30, 61), event(22, 61, 150)))
+        val readable = 40 * 60L until 170 * 60L
+        assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable).target)
+        assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
+            readableRangeSec = readable))
+    }
+
     @Test fun verticalAndPageMovesSkipEdgeSliversButKeepFullyVisibleShortProgrammes() {
         val readable = 40 * 60L until 170 * 60L
         val minimum = 12 * 60L
