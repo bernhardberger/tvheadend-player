@@ -116,6 +116,31 @@ class ChannelScheduleFocusTest {
         compose.onNodeWithTag("channel-schedule-list").assertDoesNotExist()
     }
 
+    @Test fun backAfterADetailsRoundTripFromABrowsedRowStillReachesTheTabs() {
+        val midnight = java.time.Instant.ofEpochSecond(NOW).atZone(ZoneId.systemDefault()).toLocalDate()
+            .atStartOfDay(ZoneId.systemDefault()).toEpochSecond()
+        val week = List(7 * 8) { event(it + 1, midnight + it * 10_800L, midnight + (it + 1) * 10_800L) }
+        var detail by mutableStateOf<EpgEvent?>(null)
+        var closed = 0
+        compose.setContent { TVHeadendPlayerTheme {
+            // As the live player does: the details page replaces the list, the caller keeps its rows.
+            var focused by remember { mutableStateOf(week[45]) }
+            var opening by remember { mutableStateOf<EventId?>(null) }
+            if (detail == null) PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                ChannelSchedule(null, week, NOW, NOW, false, false, { null },
+                    onOpen = { detail = it }, onClose = { closed++ }, onRetry = {},
+                    initialEvent = focused, onFocused = { focused = it },
+                    openingEvent = opening, onOpeningEvent = { opening = it })
+            }
+        } }
+        compose.onNodeWithTag("schedule-row-46").assertIsFocused().performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("schedule-row-47").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
+        compose.runOnIdle { assertEquals(week[46], detail); detail = null }
+        compose.onNodeWithTag("schedule-row-47").assertIsFocused().performKeyInput { pressKey(Key.Back) }
+        compose.onNode(isSelected()).assertIsFocused()
+        assertEquals(0, closed)
+    }
+
     @Test fun backOnTabsClosesImmediately() {
         var closed = 0
         show(viewer = NOW, onClose = { closed++ })

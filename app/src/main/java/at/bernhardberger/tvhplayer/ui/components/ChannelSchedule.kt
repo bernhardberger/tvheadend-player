@@ -84,6 +84,9 @@ internal fun ChannelSchedule(
     onContextMenu: ((EpgEvent) -> Unit)? = null,
     viewerBehindMs: Long? = null,
     onBackKeyDown: () -> Unit = {},
+    /** The row the panel opened on, kept by the caller so a details round trip does not reset it. */
+    openingEvent: EventId? = null,
+    onOpeningEvent: (EventId) -> Unit = {},
 ) {
     val zone = ZoneId.systemDefault()
     val locale = LocalConfiguration.current.locales[0]
@@ -101,7 +104,7 @@ internal fun ChannelSchedule(
     var selectedDay by remember { mutableStateOf(initialEvent?.let(::date)) }
     var entered by remember { mutableStateOf(false) }
     var focusedEvent by remember { mutableStateOf<EpgEvent?>(null) }
-    var openingEventId by remember { mutableStateOf<EventId?>(null) }
+    var openingEventId by remember { mutableStateOf(openingEvent) }
     var rowOwnsFocus by remember { mutableStateOf(false) }
     fun back() {
         if (rowOwnsFocus && openingEventId != null && focusedEvent?.id != openingEventId && events.isNotEmpty()) {
@@ -132,7 +135,10 @@ internal fun ChannelSchedule(
                 val target = removed?.let { old -> events.firstOrNull { it.start >= old.stop }
                     ?: scheduleInitialEvent(events, viewerSec, nowSec) } ?: events[initialIndex]
                 // Loading and automatic expiry are not browsing away from the opening row.
-                if (!entered || (removed != null && removed.id == openingEventId)) openingEventId = target.id
+                if (!entered && openingEventId == null || removed != null && removed.id == openingEventId) {
+                    openingEventId = target.id
+                    onOpeningEvent(target.id)
+                }
                 scrollToRow(events.indexOf(target))
                 withFrameNanos { }
                 entered = rowFocus[target.id]?.requestFocus() == true
