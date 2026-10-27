@@ -538,7 +538,7 @@ class AudioInterruptionRuntimeTest {
     @Test fun queuedAutomaticFromPredecessorCannotClearSuccessorManualChoice() = exercise {
         live(timeshift = false)
         val manual = installManualAudio()
-        settle()
+        await { settings.audioChoices.read("test-profile", ChannelId(1)) != null }
         settings.audioChoices.write("test-profile", ChannelId(2), requireNotNull(settings.audioChoices.read("test-profile", ChannelId(1))))
         val oldEpoch = runtime.videoPresentation.value.epoch
         val release = CompletableDeferred<Unit>()
@@ -2738,11 +2738,11 @@ class AudioInterruptionRuntimeTest {
             ), null))
         }
 
-        suspend fun await(predicate: () -> Boolean) {
+        suspend fun await(predicate: suspend () -> Boolean) {
             withTimeout(5_000) {
                 while (!predicate()) {
                     shadowOf(Looper.getMainLooper()).idle()
-                    delay(10)
+                    delay(2)
                 }
             }
         }

@@ -199,9 +199,7 @@ class BrowseContextMenuScreenTest {
             repeat(24) { frame ->
                 compose.mainClock.advanceTimeByFrame()
                 if (returning) compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
-                val bitmap = resumeBitmap()
-                val light = android.graphics.Color.red(bitmap.getPixel(x, y))
-                bitmap.recycle()
+                val light = probeLight(x, y)
                 // Full-screen art under the scrim reaches about .45 of the heading here; the heading
                 // itself showing through would stay near it.
                 assertTrue("Hosting details covers browse on frame $frame: $light/$brightest", light < brightest * .6f)
@@ -441,6 +439,9 @@ class BrowseContextMenuScreenTest {
         assertEquals(RecordingPlaybackStart.RESUME, start)
     }
 
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun recordingResumeDialogCapture() = recordingOkShowsResumeAndBackRestoresRow()
+
     @Test fun recordingOkShowsResumeAndBackRestoresRow() {
         val now = Instant.parse("2026-09-15T19:00:00Z").epochSeconds
         val resumeEnd = "Ends at ${at.bernhardberger.tvhplayer.ui.common.formatClock(now + 28 * 60)}"
@@ -652,9 +653,7 @@ class BrowseContextMenuScreenTest {
         fun assertFrames(exiting: Boolean = false) {
             repeat(24) { frame ->
                 compose.mainClock.advanceTimeBy(16)
-                val bitmap = resumeBitmap()
-                val light = android.graphics.Color.red(bitmap.getPixel(x, y))
-                bitmap.recycle()
+                val light = probeLight(x, y)
                 if (exiting && !details) compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
                 else if (details) assertTrue("Details remain drawn on frame $frame: $light/$brightest",
                     light >= brightest * .38f)
@@ -831,9 +830,7 @@ class BrowseContextMenuScreenTest {
         fun assertCoveredFrames(direction: String) {
             repeat(24) { frame ->
                 compose.mainClock.advanceTimeByFrame()
-                val bitmap = resumeBitmap()
-                val light = android.graphics.Color.red(bitmap.getPixel(x, y))
-                bitmap.recycle()
+                val light = probeLight(x, y)
                 assertTrue("$direction covers browse heading on frame $frame: $light/$brightest",
                     light <= brightest * .4f)
                 row.assertIsNotFocused()
@@ -848,9 +845,7 @@ class BrowseContextMenuScreenTest {
             val lights = mutableListOf<Int>()
             repeat(24) {
                 compose.mainClock.advanceTimeByFrame()
-                val bitmap = resumeBitmap()
-                lights += android.graphics.Color.red(bitmap.getPixel(x, y))
-                bitmap.recycle()
+                lights += probeLight(x, y)
                 compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
             }
             // The details page's blurred art is not black, so opaque means well below the browse probe.
@@ -887,9 +882,7 @@ class BrowseContextMenuScreenTest {
             compose.runOnIdle { back.onBackPressed() }
             repeat(24) {
                 compose.mainClock.advanceTimeByFrame()
-                val bitmap = resumeBitmap()
-                lights += android.graphics.Color.red(bitmap.getPixel(x, y))
-                bitmap.recycle()
+                lights += probeLight(x, y)
                 compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
             }
             // The details page's blurred art is not black, so opaque means well below the browse probe.
@@ -1234,6 +1227,19 @@ class BrowseContextMenuScreenTest {
         }
     }
 
+    /** Draw the same window coordinate, clipping raster work to the pixel asserted by frame loops. */
+    private fun probeLight(x: Int, y: Int): Int {
+        val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        compose.runOnIdle {
+            val canvas = Canvas(bitmap)
+            canvas.translate(-x.toFloat(), -y.toFloat())
+            view.draw(canvas)
+        }
+        val light = android.graphics.Color.red(bitmap.getPixel(0, 0))
+        bitmap.recycle()
+        return light
+    }
+
     @Test fun fullscreenMenuHidesRailUntilDirectRecordClosesIt() {
         show(recordings = false, realRail = true)
         compose.onNodeWithTag("channel-row-1").requestFocus().performKeyInput { pressKey(Key.Menu) }
@@ -1294,7 +1300,7 @@ class BrowseContextMenuScreenTest {
             if (action == "Back") hardwareBack() else hardwareKey(android.view.KeyEvent.KEYCODE_DPAD_CENTER)
             repeat(36) {
                 compose.mainClock.advanceTimeByFrame()
-                resumeBitmap().recycle()
+                probeLight(0, 0)
                 val focused = compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes()
                 frames += focused.map { "${it.id}:${it.config.getOrElse(SemanticsProperties.TestTag) { "" }}:${it.config.getOrElse(SemanticsProperties.Text) { emptyList() }}" }
                 assertTrue("Unexpected focus at frame $it: $frames", focused.all { it.id == row || (!returned && it.id in before) })

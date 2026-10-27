@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvScrimModalAlpha
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContent
@@ -120,12 +122,12 @@ internal fun CentredDialog(
         val scrim = transition.animateFloat(
             transitionSpec = { tween(PlayerMotion.PanelMs, easing = PlayerMotion.Standard) },
             label = "modal-rail-scrim",
-        ) { if (it == EnterExitState.Visible) 0.6f else 0f }
+        ) { if (it == EnterExitState.Visible) TvScrimModalAlpha else 0f }
         DisposableEffect(layering, scrim) {
             layering?.modalScrims?.set(key, scrim)
             onDispose { layering?.modalScrims?.remove(key) }
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f))
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = TvScrimModalAlpha))
             .testTag("centred-dialog-scrim")
             .semantics { dialog(); paneTitle = title }
             .onPreviewKeyEvent { event ->

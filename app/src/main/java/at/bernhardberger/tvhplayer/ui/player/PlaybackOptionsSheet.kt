@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.components.listEdgeFadeMask
+
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -15,16 +17,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.unit.Dp
 import at.bernhardberger.tvhplayer.ui.components.InsetBringIntoViewSpec
 import androidx.compose.foundation.focusGroup
@@ -793,10 +788,6 @@ private fun ColumnScope.TrackOptionsPage(
     )
     // The bottom band hints that the list continues and shows only while it can
     // scroll forward; a short top fade shows only while it can scroll back.
-    val fade = PlaybackListFade(
-        top = listState.canScrollBackward,
-        bottom = listState.canScrollForward,
-    )
     // Focus scrolling always keeps the focused row out of both fade bands. The insets
     // stay fixed: tying them to the fades would feed each scroll back into the next.
     // At either end of the list the scroll stops there, and that fade is off.
@@ -827,7 +818,8 @@ private fun ColumnScope.TrackOptionsPage(
                 .fillMaxWidth()
                 // Use the rest of the panel height rather than a fixed list height.
                 .weight(1f, fill = false)
-                .playbackListFade(fade)
+                .listEdgeFadeMask(PlaybackListTopFade, PlaybackListBottomFade,
+                    { listState.canScrollBackward }, { listState.canScrollForward })
                 .focusGroup()
                 .testTag("playback-options-track-list"),
         ) {
@@ -909,44 +901,6 @@ internal val PlaybackListBottomFade = 128.dp
 
 /** Short fade under the header while the list can scroll back. */
 internal val PlaybackListTopFade = 24.dp
-
-/** Which edges of a panel list are faded. */
-internal data class PlaybackListFade(val top: Boolean, val bottom: Boolean)
-
-/** Test-visible record of the fade drawn on a panel list. */
-internal val PlaybackListFadeKey = SemanticsPropertyKey<PlaybackListFade>("PlaybackListFade")
-
-internal fun Modifier.playbackListFade(fade: PlaybackListFade): Modifier = this
-    .semantics { this[PlaybackListFadeKey] = fade }
-    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-    .drawWithContent {
-        drawContent()
-        if (fade.bottom) {
-            val band = PlaybackListBottomFade.toPx().coerceAtMost(size.height)
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Black, Color.Transparent),
-                    startY = size.height - band,
-                    endY = size.height,
-                ),
-                topLeft = Offset(0f, size.height - band),
-                size = Size(size.width, band),
-                blendMode = BlendMode.DstIn,
-            )
-        }
-        if (fade.top) {
-            val band = PlaybackListTopFade.toPx().coerceAtMost(size.height)
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(Color.Transparent, Color.Black),
-                    startY = 0f,
-                    endY = band,
-                ),
-                size = Size(size.width, band),
-                blendMode = BlendMode.DstIn,
-            )
-        }
-    }
 
 private const val QUICK_LIST_OFF_ROW = "subtitles-off"
 

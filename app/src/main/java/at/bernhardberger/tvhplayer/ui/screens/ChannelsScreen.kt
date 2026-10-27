@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.screens
 
+import at.bernhardberger.tvhplayer.ui.common.rememberCurrentEpochSeconds
+
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 
@@ -320,7 +322,7 @@ internal fun ChannelsScreenContent(
     var pendingFocusTagId by remember { mutableStateOf<ChannelTagId?>(null) }
     var isRestoring by remember { mutableStateOf(false) }
 
-    var nowSec by remember { mutableLongStateOf(System.currentTimeMillis() / 1000L) }
+    val nowSec = rememberCurrentEpochSeconds()
 
     val listState = rememberLazyListState()
     // Native focus scrolling and the explicit preview anchor share one viewport policy:
@@ -557,13 +559,6 @@ internal fun ChannelsScreenContent(
         return true
     }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            nowSec = System.currentTimeMillis() / 1000L
-            delay(5000L)
-        }
-    }
-
     LaunchedEffect(
         channelScope.activeTagId, orderedChannelIds, channelScopeState.settingsLoaded,
         initialFocusEnabled, tagResetGeneration, viewport, alertsGoneWithFocus,
@@ -668,7 +663,7 @@ internal fun ChannelsScreenContent(
                     channels = channelScope.allChannels,
                     channelId = { focusedChannelId?.takeIf(orderedChannelIds::contains) ?: scopeEntryChannelId() },
                     observation = observation,
-                    nowSec = { nowSec },
+                    nowSec = nowSec,
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
                     endInset = detailPanePadding.calculateEndPadding(layoutDirection),
                     modifier = Modifier.fillMaxSize(),
@@ -731,7 +726,7 @@ internal fun ChannelsScreenContent(
                     ChannelsTabBody(
                         channelScopeState, observation, connectionUiState, connectionFailure, orderedChannelIds,
                         channelNumbers, playingChannelId, recordingChannelIds, tagNotice,
-                        { focusedChannelId }, ::scopeEntryChannelId, { nowSec }, initialFocusEnabled,
+                        { focusedChannelId }, ::scopeEntryChannelId, nowSec, initialFocusEnabled,
                         playbackChannelId, playbackIndicator,
                     )
                 },

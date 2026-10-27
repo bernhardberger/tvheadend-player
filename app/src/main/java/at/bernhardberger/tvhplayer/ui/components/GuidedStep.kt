@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvGuidedActionFocusedScale
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -276,7 +278,7 @@ fun GuidedStepAction(
             disabledContainerColor = containerColor,
             disabledContentColor = colors.onSurface.copy(alpha = TvTextDisabledAlpha),
         ),
-        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.1f),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = TvGuidedActionFocusedScale),
     ) {
         Row(
             modifier = Modifier

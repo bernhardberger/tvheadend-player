@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
+import at.bernhardberger.tvhplayer.ui.TvCompactProgressStripHeight
+
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
@@ -218,10 +220,10 @@ internal fun CompactZapCard(
                 ProgressStrip(
                     progress = progress,
                     color = progressColor(watchingIndicator(currentEvent, nowSec).isPlayingItem),
-                    height = 2.dp,
+                    height = TvCompactProgressStripHeight,
                     modifier = Modifier.fillMaxWidth().testTag("$tag-progress"),
                 )
-            } else Box(Modifier.fillMaxWidth().height(2.dp))
+            } else Box(Modifier.fillMaxWidth().height(TvCompactProgressStripHeight))
         },
     )
 }

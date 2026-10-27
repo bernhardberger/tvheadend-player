@@ -15,6 +15,8 @@ import at.bernhardberger.tvheadend.sdk.core.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
+import at.bernhardberger.tvhplayer.ui.TvCardProgressStripHeight
+import at.bernhardberger.tvhplayer.ui.TvLogoPlateColor
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.isRunning
 import coil3.compose.AsyncImage
@@ -37,7 +39,7 @@ internal fun ProgrammeArtwork(
         } else PiconBox(channelIcon, Modifier.align(Alignment.Center).size(100.dp, 45.dp))
         // Same embedded strip as the player's schedule tiles; card borders keep clear of it.
         if (progress != null) ProgressStrip(progress,
-            progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = 3.dp, color = progressColor)
+            progressModifier.align(Alignment.BottomStart).fillMaxWidth(), height = TvCardProgressStripHeight, color = progressColor)
     }
 }
 
@@ -48,7 +50,7 @@ internal fun ProgrammeArtwork(
 @Composable
 internal fun ArtworkLogoPlate(channelIcon: ArtworkId?, modifier: Modifier = Modifier, scale: Float = 1f) {
     PiconBox(channelIcon, modifier.size(56.dp * scale, 32.dp * scale)
-        .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
+        .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
         .padding(horizontal = 4.dp * scale, vertical = 3.dp * scale))
 }
 

@@ -9,7 +9,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.key.*
@@ -22,6 +21,7 @@ import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.tv.material3.*
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
@@ -123,10 +123,6 @@ internal fun ProgrammeDetailsFullDescription(
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val readingFocus = remember { FocusRequester() }
-    val scroll = rememberScrollState()
-    val scope = rememberCoroutineScope()
-    var focused by remember { mutableStateOf(false) }
-    val scrollStep = with(LocalDensity.current) { 60.dp.roundToPx() }
     val paneTitle = title ?: stringResource(R.string.details_read_more)
     LaunchedEffect(Unit) { withFrameNanos { }; readingFocus.requestFocus() }
     Column(modifier.fillMaxSize()) {
@@ -136,45 +132,69 @@ internal fun ProgrammeDetailsFullDescription(
     }
     Row(Modifier.fillMaxSize().padding(bottom = if (heading == null) 40.dp else 0.dp), horizontalArrangement = Arrangement.spacedBy(TvGridGutter)) {
         reading()
-        Surface(modifier = Modifier.weight(1f).fillMaxHeight().testTag("details-full-description"),
-            shape = DetailsReadingShape,
-            colors = SurfaceDefaults.colors(
-                containerColor = detailsReadingFill(focused),
-                contentColor = MaterialTheme.colorScheme.onSurface),
-            border = detailsReadingBorder(focused)) {
-            Box(Modifier.fillMaxSize().testTag("player-info-reading")
-                .semantics { this.paneTitle = paneTitle }
-                .focusRequester(readingFocus).onFocusChanged { focused = it.isFocused }
-                .focusProperties {
+        ScrollReadingBox(
+            title = paneTitle,
+            modifier = Modifier.weight(1f).fillMaxHeight().testTag("details-full-description")
+                .focusRequester(readingFocus),
+            readingModifier = Modifier.testTag("player-info-reading"),
+            trapFocus = true,
+            contentWidth = if (heading == null) 560.dp else 760.dp,
+            content = content,
+        )
+    }
+    }
+}
+
+/** Shared reading surface. Inline readers release focus at an edge; modal readers keep it until Back. */
+@Composable
+internal fun ScrollReadingBox(
+    title: String,
+    modifier: Modifier = Modifier,
+    readingModifier: Modifier = Modifier,
+    trapFocus: Boolean = false,
+    contentWidth: Dp = Dp.Unspecified,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
+    var focused by remember { mutableStateOf(false) }
+    var scrollKey by remember { mutableStateOf<Key?>(null) }
+    val scrollStep = with(LocalDensity.current) { 60.dp.roundToPx() }
+    Surface(modifier = modifier, shape = DetailsReadingShape,
+        colors = SurfaceDefaults.colors(containerColor = detailsReadingFill(focused),
+            contentColor = MaterialTheme.colorScheme.onSurface),
+        border = detailsReadingBorder(focused)) {
+        Box(readingModifier.fillMaxSize().semantics(mergeDescendants = true) { if (trapFocus) paneTitle = title }
+            .onFocusChanged { focused = it.isFocused }
+            .focusProperties {
+                if (trapFocus) {
                     up = FocusRequester.Cancel; down = FocusRequester.Cancel
                     left = FocusRequester.Cancel; right = FocusRequester.Cancel
                 }
-                .onPreviewKeyEvent { event ->
-                    val delta = when (event.key) {
-                        Key.DirectionDown -> scrollStep
-                        Key.DirectionUp -> -scrollStep
-                        Key.DirectionLeft, Key.DirectionRight -> return@onPreviewKeyEvent true
-                        else -> return@onPreviewKeyEvent false
-                    }
-                    if (event.type == KeyEventType.KeyDown) scope.launch {
-                        scroll.scrollTo((scroll.value + delta).coerceIn(0, scroll.maxValue))
-                    }
-                    true
-                }.focusable().padding(DetailsReadingInset)) {
-                Column(Modifier.widthIn(max = if (heading == null) 560.dp else 760.dp).fillMaxSize()
-                    .graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
-                    .drawWithContent {
-                        drawContent()
-                        val fade = 32.dp.toPx().coerceAtMost(size.height)
-                        if (scroll.canScrollBackward) drawRect(
-                            Brush.verticalGradient(listOf(Color.Transparent, Color.Black), endY = fade), blendMode = BlendMode.DstIn)
-                        if (scroll.canScrollForward) drawRect(
-                            Brush.verticalGradient(listOf(Color.Black, Color.Transparent), startY = size.height - fade, endY = size.height),
-                            blendMode = BlendMode.DstIn)
-                    }.verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(24.dp), content = content)
             }
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyUp && event.key == scrollKey) {
+                    scrollKey = null
+                    return@onPreviewKeyEvent true
+                }
+                val delta = when (event.key) {
+                    Key.DirectionDown -> scrollStep
+                    Key.DirectionUp -> -scrollStep
+                    Key.DirectionLeft, Key.DirectionRight -> return@onPreviewKeyEvent trapFocus
+                    else -> return@onPreviewKeyEvent false
+                }
+                if (!trapFocus && ((delta < 0 && !scroll.canScrollBackward) ||
+                        (delta > 0 && !scroll.canScrollForward))) return@onPreviewKeyEvent event.key == scrollKey
+                if (event.type == KeyEventType.KeyDown) {
+                    scrollKey = event.key
+                    scope.launch { scroll.scrollTo((scroll.value + delta).coerceIn(0, scroll.maxValue)) }
+                }
+                true
+            }.focusable().padding(DetailsReadingInset)) {
+            Column(Modifier.widthIn(max = contentWidth).fillMaxSize()
+                .listEdgeFadeMask(32.dp, 32.dp, { scroll.canScrollBackward }, { scroll.canScrollForward })
+                .verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(24.dp), content = content)
         }
-    }
     }
 }
 

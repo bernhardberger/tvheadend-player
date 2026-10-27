@@ -1,5 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvCompactProgressStripHeight
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -64,7 +66,7 @@ internal fun NowPlayingStrip(
             val progress = programmeProgress(current, nowSec)
             if (progress != null) ProgressStrip(
                 progress = progress,
-                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = 2.dp,
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(), height = TvCompactProgressStripHeight,
                 color = progressColor(watchingIndicator(current, nowSec).isPlayingItem),
             )
         }
