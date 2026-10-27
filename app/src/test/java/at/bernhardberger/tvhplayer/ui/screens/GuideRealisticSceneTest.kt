@@ -94,7 +94,7 @@ import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 /** The complete receiver-style fixture in the production guide: D-pad journeys and viewport checks. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
-    instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens"])
+    instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideRealisticSceneTest {
     @get:Rule val images = ImageLoaderRule()
