@@ -120,6 +120,7 @@ import at.bernhardberger.tvhplayer.core.shouldWaitForGuideCoverage
 import at.bernhardberger.tvhplayer.core.timelineFrontierFocus
 import at.bernhardberger.tvhplayer.core.timelinePageFocusTarget
 import at.bernhardberger.tvhplayer.core.timelineEventIsReadable
+import at.bernhardberger.tvhplayer.core.timelineFocusAnchorRange
 import at.bernhardberger.tvhplayer.core.timelineProgrammeAcrossGap
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
@@ -210,11 +211,16 @@ private data class ChannelFocusRequest(
     val direction: Int,
     val coverageRequest: GuideCoverageRequestToken,
     val throughSec: Long,
-    val anchorSec: Long,
+    val anchor: GuideFocusAnchor,
 )
 
-/** The time Up and Down keep while [target] stays focused; any other focus change drops it. */
-private data class GuideFocusAnchor(val target: EpgFocusTarget, val sec: Long, val keepWindow: Boolean)
+/** A null span follows now; a visible span stays fixed until another focus change drops it. */
+private data class GuideFocusAnchor(
+    val target: EpgFocusTarget,
+    val sec: Long,
+    val keepWindow: Boolean,
+    val spanSec: LongRange? = null,
+)
 
 private data class WindowFocusRequest(
     val preferredChannelId: ChannelId,
@@ -823,16 +829,25 @@ fun EpgGridScreen(
             coverageSettled = ::pageCoverageSettled,
         )
 
-    /** Up and Down keep this time inside the readable track, never in an edge reserve. */
-    fun anchorSecFor(current: EpgFocusTarget): Long =
-        (focusAnchor?.takeIf { it.target == current }?.sec
-            ?: focusRows.getOrNull(current.channelIndex)?.events?.firstOrNull { it.id == current.eventId }
-                ?.let { maxOf(it.start.epochSeconds, readableTimeRange.first) }
-            ?: readableTimeRange.first).coerceIn(readableTimeRange)
+    /** New vertical sequences follow now on air, otherwise the focused programme's visible span. */
+    fun anchorFor(
+        current: EpgFocusTarget,
+        previous: GuideFocusAnchor? = focusAnchor?.takeIf { it.target == current },
+    ): GuideFocusAnchor {
+        previous?.takeIf { it.spanSec != null }?.let {
+            return it.copy(target = current, sec = it.sec.coerceIn(readableTimeRange), keepWindow = true)
+        }
+        val nowSec = nowSecProvider()
+        val span = focusRows.getOrNull(current.channelIndex)?.events?.firstOrNull { it.id == current.eventId }
+            ?.let { timelineFocusAnchorRange(it, readableTimeRange, nowSec) }
+            ?: (readableTimeRange.first..readableTimeRange.first)
+        return GuideFocusAnchor(current, span.first, keepWindow = true,
+            spanSec = span.takeUnless { it == nowSec..nowSec })
+    }
 
-    fun selectAnchored(target: EpgFocusTarget, anchorSec: Long, keepWindow: Boolean = true) {
+    fun selectAnchored(target: EpgFocusTarget, anchor: GuideFocusAnchor) {
         selectedTarget = target
-        focusAnchor = GuideFocusAnchor(target, anchorSec.coerceIn(readableTimeRange), keepWindow)
+        focusAnchor = anchor.copy(target = target)
     }
 
     /** Left, Right and time jumps start a new anchor, even when they land on the anchored programme again. */
@@ -841,13 +856,14 @@ fun EpgGridScreen(
         focusAnchor = null
     }
 
-    /** Entry and Now land on the programme on air anchored at now, so Up and Down keep now; others start a new anchor. */
+    /** Entry and Now mark a now-point; the next vertical move rechecks now and its readability. */
     fun selectAtNow(target: EpgFocusTarget?) {
         val nowSec = nowSecProvider()
         val event = target?.let { focusRows.getOrNull(it.channelIndex)?.events?.firstOrNull { e -> e.id == it.eventId } }
         if (target != null && event != null && nowSec in windowStartSec until windowEndSec &&
             nowSec in event.start.epochSeconds until event.stop.epochSeconds
-        ) selectAnchored(target, nowSec, keepWindow = false) else selectUnanchored(target)
+        ) selectAnchored(target, GuideFocusAnchor(target, nowSec.coerceIn(readableTimeRange), keepWindow = false))
+        else selectUnanchored(target)
     }
 
     fun requestChannelFocus(
@@ -866,7 +882,7 @@ fun EpgGridScreen(
             direction = direction,
             coverageRequest = coverageRequest,
             throughSec = windowEndSec,
-            anchorSec = anchorSecFor(current),
+            anchor = anchorFor(current),
         )
     }
 
@@ -1333,14 +1349,17 @@ fun EpgGridScreen(
         }
         val snapshot = epgState.currentEpgSnapshot()
             .takeIf { connectionUiState == ConnectionUiState.Ready }
+        val origin = EpgFocusTarget(originChannelIndex, request.originEventId)
+        val anchor = anchorFor(origin, request.anchor)
         val target = snapshot?.let {
             timelinePageFocusTarget(
                 rows = focusRows,
-                current = EpgFocusTarget(originChannelIndex, request.originEventId),
+                current = origin,
                 preferredChannelIndex = preferredChannelIndex,
                 direction = request.direction,
                 searchChannelIds = request.coverageRequest.generations.keys,
-                anchorSec = request.anchorSec,
+                anchorSec = anchor.sec,
+                anchorSpanSec = anchor.spanSec,
                 readableRangeSec = readableTimeRange,
                 minReadableOverlapSec = minReadableOverlapSec,
             )
@@ -1356,7 +1375,7 @@ fun EpgGridScreen(
         if (!coverageSettled && projectionBehind) return@LaunchedEffect
         if (coverageSettled && target != null) {
             pendingInitialChannelIndex = target.channelIndex
-            selectAnchored(target, request.anchorSec)
+            selectAnchored(target, anchor)
         } else if (
             shouldWaitForGuideCoverage(
                 connectionReady = connectionUiState == ConnectionUiState.Ready,
@@ -1458,19 +1477,20 @@ fun EpgGridScreen(
             return
         }
         val targetPageIds = channelPageIds(targetIndex).toSet()
-        val anchorSec = anchorSecFor(current)
+        val anchor = anchorFor(current)
         val target = timelinePageFocusTarget(
             rows = focusRows,
             current = current,
             preferredChannelIndex = targetIndex,
             direction = direction,
             searchChannelIds = targetPageIds,
-            anchorSec = anchorSec,
+            anchorSec = anchor.sec,
+            anchorSpanSec = anchor.spanSec,
             readableRangeSec = readableTimeRange,
             minReadableOverlapSec = minReadableOverlapSec,
         )
         if (target == null) return
-        selectAnchored(target, anchorSec)
+        selectAnchored(target, anchor)
     }
 
     // focusSec stands in for the programme's start when it is not loaded yet, so the focus lands on
@@ -1588,13 +1608,14 @@ fun EpgGridScreen(
         } else {
             visibleIndices.min()..visibleIndices.max()
         }
-        val anchorSec = anchorSecFor(current)
+        val anchor = anchorFor(current)
         val move = moveTimelineEpgFocus(
             rows = focusRows,
             current = current,
             direction = direction,
             visibleChannelRange = visibleRange,
-            anchorSec = anchorSec,
+            anchorSec = anchor.sec,
+            anchorSpanSec = anchor.spanSec,
             readableRangeSec = readableTimeRange,
             minReadableOverlapSec = minReadableOverlapSec,
         )
@@ -1690,7 +1711,7 @@ fun EpgGridScreen(
                 }
                 val next = move.target
                 if (direction == EpgFocusDirection.UP || direction == EpgFocusDirection.DOWN) {
-                    selectAnchored(next, anchorSec)
+                    selectAnchored(next, anchor)
                 } else {
                     selectUnanchored(next)
                 }
