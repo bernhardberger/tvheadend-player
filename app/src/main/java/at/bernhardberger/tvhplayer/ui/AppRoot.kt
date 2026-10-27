@@ -565,6 +565,7 @@ fun AppRoot(
         playerSettingsStore.playerSettings.map { it.warmPlaybackMode }.distinctUntilChanged()
     }.collectAsStateWithLifecycle<WarmPlaybackMode?>(initialValue = null)
     val playbackState by playbackRuntime.state.collectAsStateWithLifecycle()
+    val livePause by playbackRuntime.livePause.collectAsStateWithLifecycle()
     val activeTarget by playbackRuntime.activeTarget.collectAsStateWithLifecycle()
     val videoPresentation by playbackRuntime.videoPresentation.collectAsStateWithLifecycle()
     val activeChannelId = (activeTarget as? AppPlaybackTarget.Live)?.channelId
@@ -1284,6 +1285,27 @@ fun AppRoot(
                             }
                         },
                         nowPlaying = nowPlaying,
+                        livePauseAvailable = livePause.availability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.READY ||
+                            livePause.availability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.STARTING,
+                        onToggleNowPlayingPause = {
+                            val target = nowPlaying?.target
+                            if (target != null && playbackRuntime.activeTarget.value == target) {
+                                val playing = if (target is AppPlaybackTarget.Live) {
+                                    at.bernhardberger.tvhplayer.ui.player.livePlayWhenReady(
+                                        playbackRuntime.livePause.value, playbackRuntime.player.playWhenReady)
+                                } else playbackRuntime.player.playWhenReady
+                                // Same local/server transport as player keys, with the runtime's intent fence.
+                                playbackRuntime.setSessionPlayWhenReady(!playing) { playbackRuntime.activeTarget.value == target }
+                            }
+                        },
+                        onStopNowPlaying = {
+                            val target = nowPlaying?.target
+                            if (target != null && playbackRuntime.activeTarget.value == target) {
+                                browseStop = playbackSelectionScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                                    withContext(NonCancellable) { playbackRuntime.stop() }
+                                }
+                            }
+                        },
                         // Read from the collected observation so a guide that arrives later reaches the slot.
                         programmeAt = { channelId, atSec ->
                             playbackObservation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(atSec))

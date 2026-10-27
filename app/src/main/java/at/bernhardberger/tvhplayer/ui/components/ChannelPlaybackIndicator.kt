@@ -90,6 +90,7 @@ internal fun ChannelPlaybackMarker(
     modifier: Modifier = Modifier,
     size: Dp = 20.dp,
     announceState: Boolean = true,
+    animated: Boolean = true,
 ) {
     if (indicator == ChannelPlaybackIndicator.NONE) return
     val description = stringResource(when (indicator) {
@@ -101,20 +102,26 @@ internal fun ChannelPlaybackMarker(
     if (indicator == ChannelPlaybackIndicator.TUNING) {
         // TV Material 1.1.0 has no progress primitive; use the installed Material one.
         Box(slot) {
-            CircularProgressIndicator(
-                modifier = Modifier.fillMaxSize().clearAndSetSemantics {
-                    if (announceState) contentDescription = description
-                },
+            val progressModifier = Modifier.fillMaxSize().clearAndSetSemantics {
+                if (announceState) contentDescription = description
+            }
+            if (animated) CircularProgressIndicator(
+                modifier = progressModifier,
+                color = LocalContentColor.current,
+                strokeWidth = 2.dp,
+            ) else CircularProgressIndicator(
+                progress = { 0.75f },
+                modifier = progressModifier,
                 color = LocalContentColor.current,
                 strokeWidth = 2.dp,
             )
         }
     } else if (indicator == ChannelPlaybackIndicator.PLAYING) {
-        val phase = rememberInfiniteTransition(label = "watching").animateFloat(
+        val phase = if (animated) rememberInfiniteTransition(label = "watching").animateFloat(
             initialValue = 0f, targetValue = 1f,
             animationSpec = infiniteRepeatable(tween(1_400, easing = LinearEasing), RepeatMode.Restart),
             label = "soundBars",
-        )
+        ) else null
         val color = LocalContentColor.current
         Canvas(slot.clearAndSetSemantics {
             if (announceState) contentDescription = description
@@ -122,7 +129,7 @@ internal fun ChannelPlaybackMarker(
             // Read animation state only while drawing, never while composing a row.
             val width = this.size.width / 7f
             repeat(3) { index ->
-                val height = this.size.height * watchingBarHeight(index, phase.value)
+                val height = this.size.height * watchingBarHeight(index, phase?.value ?: 0f)
                 drawRoundRect(color, Offset(width * (1 + index * 2), (this.size.height - height) / 2),
                     Size(width, height), CornerRadius(width / 2))
             }
