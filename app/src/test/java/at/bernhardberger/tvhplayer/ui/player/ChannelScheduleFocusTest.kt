@@ -399,8 +399,8 @@ class ChannelScheduleFocusTest {
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         settleUntil { ended.get() == 3 }
-        settle()
-        footer().assertTextContains("No program information after", substring = true)
+        // The request's end reaches the list on a later frame; under load that can take a few.
+        settleUntil { runCatching { footer().assertTextContains("No program information after", substring = true) }.isSuccess }
         assertEquals(3, requests.size)
     }
 
