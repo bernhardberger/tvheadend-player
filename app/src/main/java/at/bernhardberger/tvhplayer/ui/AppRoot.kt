@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui
 
 import at.bernhardberger.tvhplayer.ui.components.ProvideWatchingProgress
+import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 
 import at.bernhardberger.tvhplayer.profiling.profileRouteDraw
 
@@ -847,9 +848,30 @@ fun AppRoot(
             )
         }
     }
+    // Returns to the recording that still plays behind browse, without restarting it.
+    val returnToWarmRecording: (DvrEntryId, () -> Unit) -> Boolean = { id, beforeRequest ->
+        val currentTarget = playbackRuntime.activeTarget.value
+        val currentSelection = playbackRuntime.recordingSelection.value
+        val stillWarm = browseStop?.isCompleted != false && warmRecordingId(currentTarget, currentSelection,
+            tvheadendSession.observation.value.currentSession) == id
+        if (stillWarm) {
+            beforeRequest()
+            playbackRuntime.notePlaybackIntent()
+            playerEntry.request(playbackSelectionScope) {
+                val target = playbackOrchestrator.requestRecordingPlayer(
+                    activeChannelId = null, activeRecordingId = id, requestedRecordingId = id,
+                    restartPlayback = false,
+                    startPlayback = {
+                        playbackRuntime.playRecording(requireNotNull(currentSelection), RecordingPlaybackStart.RESUME)
+                    },
+                ) ?: return@request
+                backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.RESUME))
+            }
+        }
+        stillWarm
+    }
     val content: @Composable (PaddingValues, Boolean, Boolean, List<AppNavKey>) -> Unit = {
             contentPadding, drawerActive, contentAllowed, shellBackStack ->
-            ProvideWatchingProgress(playbackRuntime) {
             Box(Modifier.fillMaxSize().profileRouteDraw(currentDestination?.destination?.name ?: "NONE", drawerActive)) {
                 // The full-screen shell only ever shows players: its edges are player transitions.
                 val playerTransition = shellBackStack.lastOrNull().let { it is LivePlayerKey || it is RecordingPlayerKey }
@@ -962,27 +984,7 @@ fun AppRoot(
                                 navigateTopLevel(GuideKey)
                             },
                             playingRecordingId = warmRecordingId,
-                            onReturnToRecording = { id, beforeRequest ->
-                                val currentTarget = playbackRuntime.activeTarget.value
-                                val currentSelection = playbackRuntime.recordingSelection.value
-                                val stillWarm = browseStop?.isCompleted != false && warmRecordingId(currentTarget, currentSelection,
-                                    tvheadendSession.observation.value.currentSession) == id
-                                if (stillWarm) {
-                                    beforeRequest()
-                                    playbackRuntime.notePlaybackIntent()
-                                    playerEntry.request(playbackSelectionScope) {
-                                        val target = playbackOrchestrator.requestRecordingPlayer(
-                                            activeChannelId = null, activeRecordingId = id, requestedRecordingId = id,
-                                            restartPlayback = false,
-                                            startPlayback = {
-                                                playbackRuntime.playRecording(requireNotNull(currentSelection), RecordingPlaybackStart.RESUME)
-                                            },
-                                        ) ?: return@request
-                                        backStack.pushTransient(recordingPlayerKey(target.recordingId, RecordingPlaybackStart.RESUME))
-                                    }
-                                }
-                                stillWarm
-                            },
+                            onReturnToRecording = returnToWarmRecording,
                             onWatchChannel = requestLivePlayer,
                             contentAllowed = contentAllowed,
                             contentPadding = contentPadding,
@@ -1136,7 +1138,6 @@ fun AppRoot(
                 )
 
             }
-            }
     }
 
     val startupAction = remember(applianceLaunchState, selectRoot, appVm) {
@@ -1243,8 +1244,12 @@ fun AppRoot(
                 motionEnabled = !applianceLaunchActive && ValueAnimator.areAnimatorsEnabled(),
                 rail = {
                     val railBackStack = rememberShellBackStack(backStack, playerShell = false)
+                    // Hidden from the moment browse stops playback, not only once the stop completes.
+                    val nowPlaying = railNowPlaying(activeTarget, playbackState, playbackObservation, warmRecordingId,
+                        stopWhileBrowsing = shouldStopPlaybackWhileBrowsing(isPlayerRoute = false, mode = warmPlaybackMode))
                     PlayerEntryOverlays(playerEntry,
                         playerShown = { !shouldShowMainNavigationRail(backStack.lastOrNull(), navigationStartDestination) }) {
+                    ProvideWatchingProgress(playbackRuntime) {
                     SideRail(
                         // A fading rail keeps marking the page it fades with.
                         currentRoute = (railBackStack.lastOrNull() ?: currentDestination)?.destination,
@@ -1278,14 +1283,30 @@ fun AppRoot(
                                 )
                             }
                         },
+                        nowPlaying = nowPlaying,
+                        // Read from the collected observation so a guide that arrives later reaches the slot.
+                        programmeAt = { channelId, atSec ->
+                            playbackObservation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(atSec))
+                        },
+                        // The same warm return as Continue watching: the player opens on what plays.
+                        onOpenNowPlaying = {
+                            when (val target = nowPlaying?.target) {
+                                is AppPlaybackTarget.Live -> requestLivePlayer(target.channelId, nowPlaying.channelName)
+                                is AppPlaybackTarget.Recording -> returnToWarmRecording(target.recordingId) {}
+                                null -> Unit
+                            }
+                        },
                         content = { contentPadding, drawerActive ->
                             content(contentPadding, drawerActive, contentAllowed, railBackStack)
                         },
                     )
                     }
+                    }
                 },
                 fullScreen = {
-                    content(TvFullScreenPadding, false, contentAllowed, rememberShellBackStack(backStack, playerShell = true))
+                    ProvideWatchingProgress(playbackRuntime) {
+                        content(TvFullScreenPadding, false, contentAllowed, rememberShellBackStack(backStack, playerShell = true))
+                    }
                 },
             )
         },

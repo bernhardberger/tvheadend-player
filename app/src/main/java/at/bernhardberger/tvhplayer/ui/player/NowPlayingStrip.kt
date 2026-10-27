@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.player
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -16,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -58,12 +60,7 @@ internal fun NowPlayingStrip(
     val current = displayed?.takeIf { it.isRunning(nowSec) || (at != null && it.isRunning(at)) }
     Row(modifier.testTag("player-now-playing").semantics(mergeDescendants = true) {},
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        // The plate carries the progress strip; without it the strip would float under the logo.
-        Box(Modifier.size(48.dp, 27.dp).clip(PlayerChromeTokens.chipShape).background(TvSurfaceColors.containerLowest),
-            contentAlignment = Alignment.Center) {
-            if (picon != null) PiconBox(picon, Modifier.padding(3.dp))
-            else Text(channelNumber.orEmpty(), style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+        NowPlayingPlate(picon, channelNumber) {
             val progress = programmeProgress(current, nowSec)
             if (progress != null) ProgressStrip(
                 progress = progress,
@@ -85,5 +82,30 @@ internal fun NowPlayingStrip(
             Text(current?.title.orEmpty(), style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+internal val NowPlayingPlateWidth = 48.dp
+internal val NowPlayingPlateHeight = 27.dp
+
+/**
+ * The playing channel's logo plate, or its number without a logo. The plate carries [strip], the
+ * progress strip; without it the strip would float under the logo. [contentAlpha] dims only the mark.
+ */
+@Composable
+internal fun NowPlayingPlate(
+    picon: ArtworkId?,
+    channelNumber: String?,
+    modifier: Modifier = Modifier,
+    contentAlpha: Float = 1f,
+    strip: @Composable BoxScope.() -> Unit = {},
+) {
+    Box(modifier.size(NowPlayingPlateWidth, NowPlayingPlateHeight).clip(PlayerChromeTokens.chipShape)
+        .background(TvSurfaceColors.containerLowest), contentAlignment = Alignment.Center) {
+        val mark = if (contentAlpha < 1f) Modifier.graphicsLayer { alpha = contentAlpha } else Modifier
+        if (picon != null) PiconBox(picon, mark.padding(3.dp))
+        else Text(channelNumber.orEmpty(), mark, style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
+        strip()
     }
 }

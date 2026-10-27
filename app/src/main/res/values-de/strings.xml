@@ -564,6 +564,8 @@
     <string name="player_state_paused">Pausiert</string>
     <string name="player_buffering">Puffern</string>
     <string name="player_tuning">Sender wird eingestellt</string>
+    <string name="rail_now_playing_description">Läuft gerade: %1$s, %2$s, %3$s. Auswählen, um zum Player zurückzukehren.</string>
+    <string name="rail_now_playing_description_channel">Läuft gerade: %1$s, %2$s. Auswählen, um zum Player zurückzukehren.</string>
     <string name="player_recording">Aufnahme läuft</string>
     <string name="player_recorded_on">Aufgenommen am %1$s</string>
     <string name="player_recorded_ends">Aufgenommen am %1$s • Endet %2$s</string>

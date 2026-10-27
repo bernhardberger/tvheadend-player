@@ -713,6 +713,9 @@
     <string name="player_state_paused">Paused</string>
     <string name="player_buffering">Buffering</string>
     <string name="player_tuning">Tuning</string>
+    <string name="rail_now_playing_line" translatable="false">%1$s • %2$s</string>
+    <string name="rail_now_playing_description">Now playing: %1$s, %2$s, %3$s. Select to return to the player.</string>
+    <string name="rail_now_playing_description_channel">Now playing: %1$s, %2$s. Select to return to the player.</string>
     <string name="player_recording">Recording now</string>
     <string name="player_recorded_on">Recorded %1$s</string>
     <string name="player_recorded_ends">Recorded %1$s • Ends %2$s</string>
