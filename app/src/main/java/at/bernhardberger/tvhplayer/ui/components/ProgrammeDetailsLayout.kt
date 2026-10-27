@@ -164,7 +164,7 @@ internal fun ScrollReadingBox(
         colors = SurfaceDefaults.colors(containerColor = detailsReadingFill(focused),
             contentColor = MaterialTheme.colorScheme.onSurface),
         border = detailsReadingBorder(focused)) {
-        Box(readingModifier.fillMaxSize().semantics(mergeDescendants = true) { paneTitle = title }
+        Box(readingModifier.fillMaxSize().semantics(mergeDescendants = true) { if (trapFocus) paneTitle = title }
             .onFocusChanged { focused = it.isFocused }
             .focusProperties {
                 if (trapFocus) {

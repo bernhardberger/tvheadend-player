@@ -526,7 +526,7 @@ class AudioInterruptionRuntimeTest {
         assertFalse(preview.isCompleted)
         release.complete(Unit)
         blocker.join(); preview.join(); back.join()
-        await { player.trackSelectionParameters.overrides.values.singleOrNull()?.mediaTrackGroup === manual.mediaTrackGroup }
+        settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
         assertNotNull(settings.audioChoices.read("test-profile", ChannelId(1)))
         // Retain the session choice, not just the immediate player parameters.
@@ -557,7 +557,7 @@ class AudioInterruptionRuntimeTest {
         blocker.join(); replacement.await(); stalePreview.join()
         // Consume the replacement's stream registration so live() below targets its successor.
         connection.awaitCollectionRegistered()
-        await { player.trackSelectionParameters.overrides.values.singleOrNull()?.mediaTrackGroup === manual.mediaTrackGroup }
+        settle()
         assertSame(manual.mediaTrackGroup, player.trackSelectionParameters.overrides.values.single().mediaTrackGroup)
         assertNotNull(settings.audioChoices.read("test-profile", ChannelId(2)))
         assertFalse(runtime.isQuickListTargetCurrent(oldEpoch))
