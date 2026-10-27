@@ -9,12 +9,12 @@ import androidx.tv.material3.Border
 import androidx.tv.material3.CardBorder
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 
 private val FocusOutlineWidth = 2.5.dp
 private val FocusOutlineInset = 4.25.dp
 internal val EmbeddedProgressCardBorderOutset = FocusOutlineInset + FocusOutlineWidth / 2
-internal const val EmbeddedProgressCardFocusedScale = 1.05f
-internal val EmbeddedProgressCardScale = CardDefaults.scale(focusedScale = EmbeddedProgressCardFocusedScale)
+internal val EmbeddedProgressCardScale = CardDefaults.scale(focusedScale = TvCardFocusedScale)
 
 /**
  * Native card outline, displaced outward so embedded edge content remains visible. [held] keeps

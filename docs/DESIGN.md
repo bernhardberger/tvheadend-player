@@ -305,14 +305,22 @@ Any different treatment is a **global** decision recorded here and applied once
 (theme or shared defaults helper), never per screen. Until then, a per-call-site
 override is a defect.
 
+All focusable cards use the single `TvCardFocusedScale` token in `ui/TvLayout.kt`
+(1.05×), including the compact channel cards, standard programme cards, recent
+channel tiles and details reading panels. `StandardCardContainer` delegates focus
+to its image card. Unfocused and pressed scales stay native. Native list rows
+(Channels and Recordings), unscaled Guide cells and schedule rows, and the
+unscaled player identity are not cards. Buttons keep their native focus growth;
+this includes the WideButton-style `GuidedStepAction` surface at 1.1×.
+
 Embedded-progress cards use the shared `embeddedProgressCardBorder` treatment
 (revised 2026-10-27): use a 2.5dp focused outline with the native shape,
 use `onSurface` for its colour to match native focused buttons, and move its path
 4.25dp **outside** the card, leaving a 3dp gap inside the centred stroke. The
 outline radius includes that offset: TV Material 1.1.0's native 8dp card radius
-becomes 12.25dp on the expanded path, keeping the corners concentric. Shared
-focused scale is 1.05×, a subtler lift toward the Google TV Home reference; the
-unfocused and pressed scales remain the native 1×. The bottom progress strip
+becomes 12.25dp on the expanded path, keeping the corners concentric. The shared
+card focus scale gives a subtler lift toward the Google TV Home reference.
+The bottom progress strip
 remains in its designed flush, full-width slot; the outline must
 not paint over it. Layout reserves the additional outer extent.
 

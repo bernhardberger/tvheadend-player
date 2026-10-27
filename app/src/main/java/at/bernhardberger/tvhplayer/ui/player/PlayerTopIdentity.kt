@@ -75,6 +75,7 @@ import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
@@ -426,7 +427,7 @@ private fun RecentChip(
             border = ClickableSurfaceDefaults.border(
                 focusedBorder = Border(BorderStroke(3.dp, onSurface), inset = 2.dp, shape = RoundedCornerShape(10.dp)),
             ),
-            scale = ClickableSurfaceDefaults.scale(focusedScale = PlayerChromeTokens.cardFocusedScale),
+            scale = ClickableSurfaceDefaults.scale(focusedScale = TvCardFocusedScale),
             modifier = modifier.size(RecentTileWidth, RecentTileHeight).semantics { contentDescription = label },
         ) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

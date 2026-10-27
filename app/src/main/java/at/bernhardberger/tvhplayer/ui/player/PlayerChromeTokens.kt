@@ -28,8 +28,6 @@ internal object PlayerChromeTokens {
     /** Trial: the channel card and the rail's cards, three grid columns wide. */
     val channelCardWidth = 196.dp
     val channelCardHeight = 110.dp
-    /** Trial: the channel cards' focus growth; 1.05 stays clear of the margin and the arrow lanes. */
-    const val cardFocusedScale = 1.05f
     /** Trial: a row title's height above a card row. */
     val rowTitleGap = 8.dp
 

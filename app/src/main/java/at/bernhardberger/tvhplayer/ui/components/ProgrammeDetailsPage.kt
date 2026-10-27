@@ -73,6 +73,7 @@ import at.bernhardberger.tvheadend.sdk.playback.SubscriptionStreamType
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.core.*
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.TvTextColors
 import at.bernhardberger.tvhplayer.ui.common.*
@@ -531,7 +532,7 @@ private fun DetailsReadingPanel(onRead: () -> Unit, modifier: Modifier, interact
             val onSurface = MaterialTheme.colorScheme.onSurface
             Surface(onClick = onRead, modifier = modifier, interactionSource = interactionSource,
                 shape = ClickableSurfaceDefaults.shape(DetailsReadingShape),
-                 scale = ClickableSurfaceDefaults.scale(focusedScale = 1.05f),
+                 scale = ClickableSurfaceDefaults.scale(focusedScale = TvCardFocusedScale),
                 // The description in its quieter grey until focus makes it the thing to read.
                 colors = ClickableSurfaceDefaults.colors(
                     containerColor = detailsReadingFill(false), contentColor = TvTextColors.secondary,
@@ -547,8 +548,8 @@ private val DetailsHeadingContentGap = 16.dp
 
 @Composable
 private fun DetailsSectionHeading(title: String, emphasis: () -> Float, modifier: Modifier = Modifier,
-    focusOverflow: androidx.compose.ui.unit.Dp = AiringCardWidth / (16f / 9f) * ((EmbeddedProgressCardFocusedScale - 1f) / 2f) +
-        EmbeddedProgressCardBorderOutset * EmbeddedProgressCardFocusedScale,
+    focusOverflow: androidx.compose.ui.unit.Dp = AiringCardWidth / (16f / 9f) * ((TvCardFocusedScale - 1f) / 2f) +
+        EmbeddedProgressCardBorderOutset * TvCardFocusedScale,
     // The row already reserves AiringCardRoom; only its painted overflow reduces the visible gap.
     // One dp compensates optically for the heading's glyph descent.
     bottomSpace: androidx.compose.ui.unit.Dp = DetailsHeadingContentGap - AiringCardRoom + focusOverflow - 1.dp) {
