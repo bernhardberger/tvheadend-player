@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
@@ -15,7 +14,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -315,7 +313,6 @@ private fun ScheduleNote(time: String?, text: String, timeWidth: Dp, modifier: M
                     }
                 }
             },
-            leadingContent = { Spacer(Modifier.width(ScheduleArtworkSize.width)) },
             modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false })
     }
 }
@@ -332,8 +329,20 @@ private fun ScheduleSkeletonRow(timeWidth: Dp) {
             }
         },
         supportingContent = { SkeletonLine(Modifier.padding(start = timeWidth + TvSpacing16), widthFraction = 0.5f) },
-        leadingContent = { Spacer(Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height)) },
+        trailingContent = { ScheduleArtworkSlot(null) },
         modifier = Modifier.fillMaxWidth().focusProperties { canFocus = false })
+}
+
+/**
+ * A row's picture at its trailing end, so times and titles start at one x in every row. Most
+ * programmes have none: the header already names the channel, so they show nothing, and the slot
+ * keeps only the picture's height so rows with and without one stand equally tall.
+ */
+@Composable
+private fun ScheduleArtworkSlot(image: ArtworkId?) {
+    Box(Modifier.height(ScheduleArtworkSize.height), contentAlignment = Alignment.Center) {
+        if (image != null) ProgrammeArtwork(image, null, null, Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height))
+    }
 }
 
 /** The headline's two columns: the start time, then [content] on the titles' line. */
@@ -413,13 +422,7 @@ private fun ChannelScheduleRow(
                 }
             }
         },
-        leadingContent = {
-            val slot = Modifier.size(ScheduleArtworkSize.width, ScheduleArtworkSize.height)
-            // The header names the channel: a programme without art keeps a plain tile, no logo,
-            // a step off the row's own fill in either focus state.
-            if (event.image != null) ProgrammeArtwork(event.image, null, null, slot)
-            else Box(slot.clip(MaterialTheme.shapes.small).background(LocalContentColor.current.copy(alpha = TvTrackAlpha)))
-        },
+        trailingContent = { ScheduleArtworkSlot(event.image) },
         modifier = modifier.then(contextMenu.modifier).fillMaxWidth()
             .onFocusChanged { focused = it.isFocused }.testTag("schedule-row-${event.id.value}"),
     )

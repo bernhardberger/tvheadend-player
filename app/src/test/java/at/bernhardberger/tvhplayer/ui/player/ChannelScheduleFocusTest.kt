@@ -182,6 +182,20 @@ class ChannelScheduleFocusTest {
         compose.onNodeWithTag("schedule-row-3").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
     }
 
+    @Test fun rowsWithAndWithoutAPictureShareTheirHeightAndTextStart() {
+        // Most programmes have no picture: it sits at the trailing end, so nothing else moves.
+        val mixed = events.map { if (it.id != EventId(3)) it else EpgEvent.create(it.id, it.channelId, it.start, it.stop,
+            title = it.title, image = ArtworkId(1)) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, mixed, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = mixed[0])
+        } } }
+        val pictured = compose.onNodeWithTag("schedule-row-3").fetchSemanticsNode().size.height
+        val plain = compose.onNodeWithTag("schedule-row-4").fetchSemanticsNode().size.height
+        assertEquals(pictured, plain)
+        val titles = listOf("Programme 3", "Programme 4").map { compose.onNodeWithText(it, useUnmergedTree = true).getUnclippedBoundsInRoot().left }
+        assertEquals(titles[0], titles[1])
+    }
+
     @Test fun theTopReserveIsARealRowsHeightAtEveryFontScale() {
         var fontScale by mutableStateOf(1f)
         var computed = 0.dp

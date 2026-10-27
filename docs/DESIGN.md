@@ -1136,11 +1136,14 @@ recordings player has no Schedule action. The reusable column owns no tuning or
 playback: its caller supplies events, viewer position, recording marks and actions.
 The sheet header carries the picon, the `channelTitleText` title in the options
 sheet's `titleLarge` and the clock in `titleMedium` at the tertiary alpha, on the
-rows' text keyline. Rows are standard `ListItem`s with library focus defaults: an
-80×45dp `ProgrammeArtwork` (a plain tile in the artwork's own tone when the
-programme has no picture: the header already names the channel), a
+rows' text keyline. Rows are standard `ListItem`s with library focus defaults. A
+programme's 80×45dp `ProgrammeArtwork` sits at the row's trailing end; most
+programmes have none and show nothing there (the header already names the
+channel), so times and titles start at one x in every row without an empty slot,
+and the trailing slot keeps the picture's height so rows stand equally tall. A
 16sp `titleMedium` headline with the start time in its own measured column and
-the one-line title, and a 14sp `bodyMedium` supporting line under the title with
+the one-line title, and a 14sp `bodyMedium` supporting line under the title, in
+the list item's muted supporting tone (behind live included), with
 the time facts first and the category last, so an ellipsis cuts only the
 category: until • time left, behind live in the player bar's wording and
 live-edge tolerance (the viewer's row only), Ended, or the duration, then a
