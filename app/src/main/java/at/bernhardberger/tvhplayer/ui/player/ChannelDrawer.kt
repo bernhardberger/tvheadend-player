@@ -60,11 +60,13 @@ import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.core.visibleChannelNumber
 import at.bernhardberger.tvhplayer.profiling.profileTrace
 import at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin
+import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCard
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardWidth
 import at.bernhardberger.tvhplayer.ui.components.CompactZapRowOffscreen
 import at.bernhardberger.tvhplayer.ui.components.StartKeylineBringIntoViewSpec
+import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
 import at.bernhardberger.tvhplayer.ui.components.overflowingRowViewport
 import kotlinx.coroutines.flow.first
 import kotlin.math.roundToInt
@@ -228,10 +230,11 @@ fun ChannelDrawer(
         CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
         LazyRow(
             modifier = Modifier.overflowingRowViewport(offscreenPx)
-                .then(if (peek != null && peekAnchor) Modifier.onGloballyPositioned { peek.cards(it, cardRoomPx) } else Modifier),
+                .then(if (peek != null && peekAnchor) Modifier.onGloballyPositioned { peek.cards(it, cardRoomPx) } else Modifier)
+                // The focused card's glow reaches past the row's room for its scale and ring.
+                .cardGlowRoom(top = CardGlowReach - ChannelCardRoom),
             state = listState,
-            // Room above and below the cards for the focus scale and border.
-            contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = ChannelCardRoom),
+            contentPadding = PaddingValues(horizontal = edgeInset + offscreen, vertical = CardGlowReach),
             horizontalArrangement = Arrangement.spacedBy(CompactZapCardGap),
         ) {
             items(channels, key = { it.id.value }) { channel ->

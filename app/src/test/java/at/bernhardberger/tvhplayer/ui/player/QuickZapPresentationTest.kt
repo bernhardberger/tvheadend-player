@@ -1,5 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.player
 
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
 import android.app.Application
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
@@ -297,10 +298,8 @@ class QuickZapPresentationTest {
             // The pinned rail keeps card 1 off-screen, left of the keyline; card 3 rests unfocused.
             val native = card(3).fetchSemanticsNode().boundsInRoot
             val focused = card(2).fetchSemanticsNode().boundsInRoot
-            // The full-width strip (card 2 has a current programme) carries the focus transform; the card's semantics do not.
-            val scale = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
-                .fetchSemanticsNode().boundsInRoot.width / focused.width
-            assertEquals(expectedScale, scale, .01f)
+            // The card scales in drawing only; its semantics and its strip's keep the resting bounds.
+            val scale = expectedScale
             // Supersample the real production composition, not a copied RoundedCornerShape.
             val sampleScale = 4
             val bitmap = Bitmap.createBitmap(view.width * sampleScale, view.height * sampleScale, Bitmap.Config.ARGB_8888)
@@ -352,7 +351,8 @@ class QuickZapPresentationTest {
             assertTrue("$state corner gap varies: $gaps", gaps.max() - gaps.min() < .5f)
             val progress = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
                 .fetchSemanticsNode().boundsInRoot
-            val strip = pixel(progress.left + progress.width * .1f, progress.bottom - .75f * scale)
+            val strip = pixel(left + (progress.left - focused.left + progress.width * .1f) * scale,
+                top + (progress.bottom - focused.top - .75f) * scale)
             assertViewerProgressColor("orange lower progress strip remains visible", strip)
             bitmap.recycle()
             capture("$prefix-native-corner-$state", 2, fontScale)
@@ -498,8 +498,8 @@ class QuickZapPresentationTest {
         assertEquals(focusColor, pixel(button.center.x, button.top + 8f))
         key(Key.DirectionDown)
         val bounds = card(2).fetchSemanticsNode().boundsInRoot
-        val scale = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
-            .fetchSemanticsNode().boundsInRoot.width / bounds.width
+        // The card scales in drawing only; its semantics keep the resting bounds.
+        val scale = TvCardFocusedScale
         val outlineTop = bounds.center.y - (bounds.height / 2f + 4.25f) * scale
         assertEquals(focusColor, pixel(bounds.center.x, outlineTop))
         assertEquals(0xFFE1E2E5.toInt(), focusColor)
@@ -517,19 +517,18 @@ class QuickZapPresentationTest {
         val focusedBounds = card(2).fetchSemanticsNode().boundsInRoot
         val progressBounds = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot
-        // Card semantics describe its unscaled layout; descendants include the native focus transform.
-        val scale = progressBounds.width / focusedBounds.width
-        val paintedBottom = focusedBounds.center.y + focusedBounds.height * scale / 2f
-        val paintedLeft = focusedBounds.center.x - focusedBounds.width * scale / 2f
-        assertEquals("progress stays embedded at the bottom", paintedBottom, progressBounds.bottom, .5f)
-        assertEquals("progress stays full width", paintedLeft, progressBounds.left, .5f)
+        // Card and strip semantics describe the resting layout; the focus scale applies to the drawing.
+        val scale = TvCardFocusedScale
+        assertEquals("progress stays embedded at the bottom", focusedBounds.bottom, progressBounds.bottom, .5f)
+        assertEquals("progress stays full width", focusedBounds.left, progressBounds.left, .5f)
         assertTrue("progress remains a visible strip", progressBounds.height >= 2f)
+        val center = focusedBounds.center
         compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             val pixel = bitmap.getPixel(
-                (progressBounds.left + progressBounds.width * .1f).toInt(),
-                (progressBounds.bottom - 1f).toInt(),
+                (center.x + (progressBounds.left + progressBounds.width * .1f - center.x) * scale).toInt(),
+                (center.y + (progressBounds.bottom - center.y) * scale - 1f).toInt(),
             )
             assertViewerProgressColor("orange progress is painted above the bottom edge, not covered by the gray ring", pixel)
             bitmap.recycle()

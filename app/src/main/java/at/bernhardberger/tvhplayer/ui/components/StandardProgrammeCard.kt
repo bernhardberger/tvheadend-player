@@ -14,6 +14,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardContainerColors
 import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import androidx.tv.material3.StandardCardContainer
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -40,8 +41,10 @@ internal fun StandardProgrammeCard(
     StandardCardContainer(
         modifier = Modifier.width(width),
         imageCard = { interaction ->
+            val ring = rememberCardFocusRing(interaction)
             Card(onClick = onClick, onLongClick = onLongClick, interactionSource = interaction,
-                modifier = modifier.fillMaxWidth().aspectRatio(16f / 9f),
+                modifier = modifier.cardFocusRing(ring, MaterialTheme.colorScheme.onSurface)
+                    .fillMaxWidth().aspectRatio(16f / 9f),
                 colors = CardDefaults.colors(containerColor = TvSurfaceColors.containerLowest),
                 glow = artworkCardGlow(art, picon, interaction),
                 scale = EmbeddedProgressCardScale,

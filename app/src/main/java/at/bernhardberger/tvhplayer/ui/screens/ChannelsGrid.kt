@@ -5,6 +5,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.BringIntoViewSpec
 import androidx.compose.foundation.gestures.LocalBringIntoViewSpec
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.PaddingValues
@@ -19,6 +20,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -29,6 +31,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -40,8 +43,10 @@ import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.ChannelNavigation
 import at.bernhardberger.tvhplayer.ui.TvGridVerticalMargin
+import at.bernhardberger.tvhplayer.ui.components.CardGlowReach
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.CompactZapCardGap
+import at.bernhardberger.tvhplayer.ui.components.cardGlowRoom
 import at.bernhardberger.tvhplayer.ui.components.tabFocus
 
 /** Four columns of the immersive row's cards. */
@@ -50,7 +55,10 @@ internal const val ChannelsGridColumns = 4
 /** Tighter than the columns, so more rows fit below the header. */
 private val ChannelsGridRowGap = 16.dp
 
-/** Room on every side for a focused card's native scale and its outer outline. */
+/**
+ * Room on every side for a focused card's scale and its outer outline. The grid draws its glow
+ * further out, to [CardGlowReach], past its own bounds.
+ */
 internal val ChannelsGridEdgeInset = 16.dp
 
 /**
@@ -85,7 +93,7 @@ internal fun ChannelsGrid(
     val density = LocalDensity.current
     val bringIntoView = remember(density) {
         with(density) {
-            ChannelsGridBringIntoViewSpec(topInsetPx = ChannelsGridEdgeInset.toPx())
+            ChannelsGridBringIntoViewSpec(topInsetPx = CardGlowReach.toPx())
         }
     }
     var focusedIndex by remember { mutableIntStateOf(-1) }
@@ -100,9 +108,9 @@ internal fun ChannelsGrid(
             horizontalArrangement = Arrangement.spacedBy(CompactZapCardGap),
             verticalArrangement = Arrangement.spacedBy(ChannelsGridRowGap),
             contentPadding = PaddingValues(
-                start = ChannelsGridEdgeInset,
-                end = ChannelsGridEdgeInset,
-                top = ChannelsGridEdgeInset,
+                start = CardGlowReach,
+                end = CardGlowReach,
+                top = CardGlowReach,
                 bottom = TvGridVerticalMargin,
             ),
             modifier = Modifier
@@ -126,7 +134,13 @@ internal fun ChannelsGrid(
                         event.key == Key.DirectionDown -> index / columns == lastRow
                         else -> ChannelNavigation.pageDirectionForKeyCode(event.nativeKeyEvent.keyCode)?.let(onPage) ?: false
                     }
-                },
+                }
+                // The focused card's glow reaches past the inset, into the headline gap above.
+                .cardGlowRoom(
+                    horizontal = CardGlowReach - ChannelsGridEdgeInset,
+                    top = CardGlowReach - ChannelsGridEdgeInset,
+                    bottom = 0.dp,
+                ),
         ) {
             itemsIndexed(channels, key = { _, channel -> channelLazyItemKey(channel.id) }) { index, channel ->
                 val channelId = channel.id
@@ -136,38 +150,40 @@ internal fun ChannelsGrid(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(now))
                 }
-                ChannelsRowCard(
-                    channel = channel,
-                    event = event,
-                    nowSec = now,
-                    playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
-                        ?: ChannelPlaybackIndicator.NONE,
-                    recording = channelId in frame.recordingIds,
-                    onClick = { onPlay(channel) },
-                    onLongClick = { onOpenContextMenu(channelId) },
-                    programmeLoading = frame.guideLoading,
-                    programmePicture = programmePicture,
-                    channelName = channelNames,
-                    width = cardWidth,
-                    tagPrefix = "channels-grid",
-                    modifier = Modifier
-                        .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
-                        .tabFocus()
-                        .focusProperties {
-                            if (index % columns == 0) {
-                                if (ltr) left = navigationFocus ?: FocusRequester.Default
-                                else right = navigationFocus ?: FocusRequester.Default
+                Box(Modifier.clipAboveInset(state, index) { focusedIndex == index }) {
+                    ChannelsRowCard(
+                        channel = channel,
+                        event = event,
+                        nowSec = now,
+                        playbackIndicator = frame.playbackIndicator.takeIf { channelId == frame.playbackChannelId }
+                            ?: ChannelPlaybackIndicator.NONE,
+                        recording = channelId in frame.recordingIds,
+                        onClick = { onPlay(channel) },
+                        onLongClick = { onOpenContextMenu(channelId) },
+                        programmeLoading = frame.guideLoading,
+                        programmePicture = programmePicture,
+                        channelName = channelNames,
+                        width = cardWidth,
+                        tagPrefix = "channels-grid",
+                        modifier = Modifier
+                            .then(if (isCurrent) Modifier.focusRequester(focusRequesters.getValue(channelId)) else Modifier)
+                            .tabFocus()
+                            .focusProperties {
+                                if (index % columns == 0) {
+                                    if (ltr) left = navigationFocus ?: FocusRequester.Default
+                                    else right = navigationFocus ?: FocusRequester.Default
+                                }
+                                if (index < columns && headerFocus != null) up = headerFocus
                             }
-                            if (index < columns && headerFocus != null) up = headerFocus
-                        }
-                        .onFocusChanged {
-                            if (it.isFocused) {
-                                focusedIndex = index
-                                onFocusChannel(channelId)
+                            .onFocusChanged {
+                                if (it.isFocused) {
+                                    focusedIndex = index
+                                    onFocusChannel(channelId)
+                                }
                             }
-                        }
-                        .testTag("channel-card-${channelId.value}"),
-                )
+                            .testTag("channel-card-${channelId.value}"),
+                    )
+                }
             }
         }
     }
@@ -184,6 +200,19 @@ internal fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable,
         ),
     )
     layout(placeable.width, placeable.height - extra) { placeable.place(0, -extra) }
+}
+
+/**
+ * Ends a card scrolled up past the focused row at the inset's line, as the grid's own bounds did,
+ * so only the focused card's glow reaches into the room above. Its place is read during drawing.
+ */
+private fun Modifier.clipAboveInset(state: LazyGridState, index: Int, focused: () -> Boolean) = drawWithContent {
+    // Offsets count from the content padding's end, where the focused row stays.
+    val top = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset?.y
+    if (top == null || top >= 0 || focused()) drawContent()
+    else clipRect(-size.width, -ChannelsGridEdgeInset.toPx() - top, 2 * size.width, 2 * size.height) {
+        this@drawWithContent.drawContent()
+    }
 }
 
 /**
