@@ -11,6 +11,35 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class TimelineEpgFocusPolicyTest {
+    @Test fun onAirAnchorAdvancesBetweenMovesAndPageResolution() {
+        val rows = listOf(row(1, event(11, 0, 120)), row(2, event(21, 0, 120)),
+            row(3, event(31, 0, 30), event(32, 30, 120)))
+        val readable = 0L until 180 * 60L
+        val firstAnchor = timelineFocusAnchorRange(rows[0].events.single(), readable, nowSec = 15 * 60L)
+        val first = moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSpanSec = firstAnchor).target
+        assertEquals(focus(1, 21), first)
+        val nextAnchor = timelineFocusAnchorRange(rows[1].events.single(), readable, nowSec = 45 * 60L)
+        assertEquals(45 * 60L..45 * 60L, nextAnchor)
+        assertEquals(focus(2, 32), moveTimelineEpgFocus(rows, first, EpgFocusDirection.DOWN,
+            readableRangeSec = readable, anchorSpanSec = nextAnchor).target)
+        assertEquals(focus(2, 32), timelinePageFocusTarget(rows, first, 2, 1,
+            readableRangeSec = readable, anchorSpanSec = nextAnchor))
+        assertEquals(0L until 120 * 60L,
+            timelineFocusAnchorRange(rows[1].events.single(), readable, nowSec = 125 * 60L))
+    }
+
+    @Test fun onAirProgrammeWithNowInLeftReserveUsesVisibleSpanRatherThanClampedNow() {
+        val rows = listOf(row(1, event(11, 0, 120)), row(2, event(21, 0, 40), event(22, 40, 150)))
+        val readable = 20 * 60L until 180 * 60L
+        val span = timelineFocusAnchorRange(rows[0].events.single(), readable, nowSec = 15 * 60L)
+        assertEquals(20 * 60L until 120 * 60L, span)
+        assertEquals(focus(1, 22), moveTimelineEpgFocus(rows, focus(0, 11), EpgFocusDirection.DOWN,
+            readableRangeSec = readable, minReadableOverlapSec = 720, anchorSpanSec = span).target)
+        assertEquals(focus(1, 22), timelinePageFocusTarget(rows, focus(0, 11), 1, 1,
+            readableRangeSec = readable, minReadableOverlapSec = 720, anchorSpanSec = span))
+    }
+
     @Test fun readableOnAirAnchorUsesNowAfterTheAdjacentRowsProgrammeChanges() {
         // 00:49: Das Gespräch began at 00:24, but the adjacent row changed at 00:25.
         val current = event(11, 24, 78)
