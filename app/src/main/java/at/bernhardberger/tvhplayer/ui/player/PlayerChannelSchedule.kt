@@ -83,8 +83,7 @@ internal fun PlayerChannelSchedule(
             onContinueWatching = { layers.closeSchedule(false) },
             showContextMenu = contextMenu,
             onShowDetails = { contextMenu = false },
-            onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) },
-            framedArt = details.id != scheduleInitialEvent(events, viewerSec, nowSec)?.id)
+            onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
     else ProvideArtworkSession(observation.currentSession, observation) {
         PlaybackOptionsOverlayFrame(panelTag = "channel-schedule-panel", panelWidth = 480.dp, showScrim = false) {
             ChannelSchedule(channel, events, nowSec, viewerSec,

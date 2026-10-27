@@ -100,7 +100,7 @@ class ChannelScheduleCaptureTest {
                     val actions = listOfNotNull(BrowseContextAction.CONTINUE_WATCHING.takeIf { playing },
                         BrowseContextAction.RECORD, BrowseContextAction.SHOW_GUIDE)
                     ProvideArtworkSession(session) {
-                        PlayerDetailsSurface(framedArt = !playing) {
+                        PlayerDetailsSurface {
                             ProgrammeDetailsPage(event, null, channel, now, actions, {}, {})
                         }
                     }

@@ -18,20 +18,10 @@ import at.bernhardberger.tvhplayer.ui.screens.DvrMutationAction
 import at.bernhardberger.tvhplayer.ui.screens.DvrMutationActions
 import kotlinx.coroutines.CoroutineScope
 
-/**
- * Whether a details page over the player shows its programme's picture framed in its second
- * column: true for a programme other than the one the video is showing.
- */
-internal val LocalPlayerDetailsFramedArt = compositionLocalOf { false }
-
-/**
- * The browse details surface over the existing player, without a playback request. [framedArt]
- * frames the programme's picture beside the page, for a channel opened from the rail.
- */
+/** The browse details surface over the existing player, without a playback request. */
 @Composable
 internal fun PlayerDetailsSurface(
     onBackKeyDown: () -> Unit = {},
-    framedArt: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val dispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
@@ -45,8 +35,7 @@ internal fun PlayerDetailsSurface(
         }
     }) {
         WarmPlaybackScrim()
-        CompositionLocalProvider(LocalWarmPlayback provides true, LocalPlayerDetailsFramedArt provides framedArt,
-            content = content)
+        CompositionLocalProvider(LocalWarmPlayback provides true, content = content)
     }
 }
 
@@ -66,7 +55,6 @@ internal fun LivePlayerProgrammeDetails(
     onShowGuide: (ChannelId, EpgEvent?) -> Unit,
     onClose: () -> Unit,
     onBackKeyDown: () -> Unit = {},
-    framedArt: Boolean = false,
     onContinueWatching: (() -> Unit)? = null,
     showContextMenu: Boolean = false,
     onShowDetails: () -> Unit = {},
@@ -76,7 +64,7 @@ internal fun LivePlayerProgrammeDetails(
     val openingObservation = remember { observation }
     val latestNow = rememberUpdatedState(nowSec)
     val inFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
-    PlayerDetailsSurface(onBackKeyDown, framedArt) {
+    PlayerDetailsSurface(onBackKeyDown) {
         if (openingEvent != null) {
             ProgrammeDetailsHost(
                 openingEvent = openingEvent,

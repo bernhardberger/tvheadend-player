@@ -754,7 +754,7 @@ class PlayerChromeCaptureTest {
                     playing = !rail)
                 // A page per scene: the previous scene's section and focus must not carry over.
                 key(scene) { ProvideArtworkSession(session) {
-                    PlayerDetailsSurface(framedArt = rail) {
+                    PlayerDetailsSurface {
                         ProgrammeDetailsPage(
                             shown.takeUnless { scene == Scene.PROGRAMME_INFO_NO_EPG }, recording, channel, NOW,
                             if (scene == Scene.PROGRAMME_INFO_NO_EPG) listOf(BrowseContextAction.CONTINUE_WATCHING) else actions,

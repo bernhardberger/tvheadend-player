@@ -37,12 +37,14 @@ class PlayerProgrammeDetailsTest {
     private val watched = EpgEvent.create(EventId(1), channel.id,
         Instant.fromEpochSeconds(1_000), Instant.fromEpochSeconds(3_000), title = "Watched program")
 
-    @Test fun framedPictureStandsBesideTheInformationWhileTitleAndAboutKeepBrowseWidths() {
-        var framed by mutableStateOf(true)
+    @Test @org.robolectric.annotation.GraphicsMode(org.robolectric.annotation.GraphicsMode.Mode.NATIVE)
+    fun warmBrowseFramesPictureBesideInformationAndColdBrowseKeepsFullTitleWidth() {
+        var warm by mutableStateOf(true)
         val other = EpgEvent.create(EventId(2), channel.id, Instant.fromEpochSeconds(1_000), Instant.fromEpochSeconds(3_000),
             title = "A programme title long enough to reach the framed picture beside the information block",
             description = "A description long enough for the About card to want more than its browse width on this page.")
-        compose.setContent { TVHeadendPlayerTheme { PlayerDetailsSurface(framedArt = framed) {
+        compose.setContent { TVHeadendPlayerTheme { CompositionLocalProvider(
+            at.bernhardberger.tvhplayer.ui.LocalWarmPlayback provides warm) {
             at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(other, null, channel, 2_000,
                 listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
         } } }
@@ -51,19 +53,41 @@ class PlayerProgrammeDetailsTest {
         val art = bounds("details-framed-art")
         val title = bounds("details-title")
         val about = bounds("details-about")
-        // A four-column card on the end keyline, beside the information and just above About.
-        assertEquals(268f, art.width.value, 0.5f)
-        assertEquals(151f, art.height.value, 0.5f)
+        // The shared three-column tile ends on the information's last line, clear of About.
+        assertEquals(196f, art.width.value, 0.5f)
+        assertEquals(110f, art.height.value, 0.5f)
         assertEquals(960f - 58f, art.right.value, 0.5f)
-        assertTrue("title ${title.right} runs under the picture ${art.left}", title.right <= art.left)
+        assertEquals(bounds("details-information").bottom.value, art.bottom.value, 0.5f)
+        assertEquals(bounds("details-timeline").bottom.value, art.bottom.value, 0.5f)
+        assertTrue("title ${title.right} runs under the picture ${art.left}", title.right.value <= art.left.value - 32f)
+        val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
+        compose.onNodeWithTag("details-title").performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+        assertEquals(2, layouts.single().lineCount)
+        assertTrue(layouts.single().isLineEllipsized(1))
         assertTrue("picture ${art.bottom} overlaps About ${about.top}", art.bottom <= about.top)
         assertTrue("picture ${art.bottom} floats above About ${about.top}", about.top.value - art.bottom.value <= 32f)
         assertTrue("About ${about.width} is wider than the browse page's", about.width.value <= 584.5f)
-        compose.runOnIdle { framed = false }
+        // No programme art: the shared, non-focusable hero fallback occupies the same tile.
+        compose.onNodeWithTag("programme-fallback-mark", useUnmergedTree = true).assertExists()
+        compose.onNodeWithTag("details-framed-art", useUnmergedTree = true)
+            .assert(SemanticsMatcher.keyNotDefined(SemanticsActions.OnClick))
+        compose.onNodeWithTag("details-continue_watching").assertIsFocused()
+        compose.runOnIdle { warm = false }
         settle()
         compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertDoesNotExist()
         assertTrue(bounds("details-about").width.value <= 584.5f)
         assertEquals(960f - 58f, bounds("details-title").right.value, 0.5f)
+    }
+
+    @Test fun warmDetailsWithoutChannelOmitTileAndTitleReserve() {
+        compose.setContent { TVHeadendPlayerTheme { PlayerDetailsSurface {
+            at.bernhardberger.tvhplayer.ui.components.ProgrammeDetailsPage(watched, null, null, 2_000,
+                listOf(at.bernhardberger.tvhplayer.core.BrowseContextAction.CONTINUE_WATCHING), {}, {})
+        } } }
+        settle()
+        compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(902f, compose.onNodeWithTag("details-title").getUnclippedBoundsInRoot().right.value, 0.5f)
+        compose.onNodeWithTag("details-continue_watching").assertIsFocused()
     }
 
     @Test fun liveDetailsOpensWatchedProgrammeAndBackRestoresInfo() {
@@ -73,6 +97,7 @@ class PlayerProgrammeDetailsTest {
         compose.onNodeWithTag("details-title").assert(SemanticsMatcher.keyIsDefined(SemanticsProperties.Heading))
         compose.onNodeWithTag("details-watch").assertDoesNotExist()
         compose.onNodeWithTag("details-show_guide").assertExists()
+        compose.onNodeWithTag("details-framed-art", useUnmergedTree = true).assertExists()
         back()
     }
 

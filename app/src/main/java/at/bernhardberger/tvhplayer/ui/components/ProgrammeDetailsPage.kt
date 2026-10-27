@@ -257,9 +257,8 @@ internal fun ProgrammeDetailsPage(
     // colour glows over the page instead, opaque in itself.
     val background = rememberDetailsTint(art, picon.takeIf { art != null })
     val glowChannel = channel?.id?.takeIf { art == null && picon != null }
-    // The player's rail opens another channel's programme over the playing video, so its picture
-    // does not show behind the page: it stands framed beside the information instead.
-    val framedChannel = channel?.takeIf { warmPlayback && LocalPlayerDetailsFramedArt.current }
+    // Over warm video, every entry point frames the programme beside its information instead.
+    val framedChannel = channel?.takeIf { warmPlayback }
     CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
         Box(Modifier.browseDetailsViewport().then(modifier).fillMaxSize()
              .graphicsLayer { this.alpha = alpha.value }
@@ -310,7 +309,7 @@ internal fun ProgrammeDetailsPage(
                 val full = minOf(heroHeight - headingKeyline, pageScroll.maxValue).coerceAtLeast(1)
                 maxOf((pageScroll.value.toFloat() / full).coerceIn(0f, 1f), readingProgress.value)
             }
-            // With warm playback the live video is the background, so the page draws no art.
+            // With warm playback the video is the background, so the page draws no backdrop art.
             // Scrolled away (or reading), the picture blurs in place, like Google TV; no zoom.
             // Without one the logo scrolls away with the page, like the photo on Google TV's actor
             // page, and the glow gives way to an even tint of its colour; the reader replaces the
@@ -373,22 +372,22 @@ internal fun ProgrammeDetailsPage(
                         else stringResource(R.string.details_important_information),
                         Modifier.onSizeChanged { heroHeight = it.height }.rowContentEmphasis { heroEmphasis.value }
                             .scrollSection(pageSpec, DetailsSection.ACTIONS)) {
-                        // The framed picture is a four-column card on the end keyline, its foot on the
+                        // The framed picture is three columns on the end keyline, its foot on the
                         // information's last line; the block stands at least its height.
-                        Box(if (framedChannel != null) Modifier.heightIn(min = DetailsFramedArtSize.second) else Modifier,
+                        Box(if (framedChannel != null) Modifier.heightIn(min = PlayerChromeTokens.channelCardHeight) else Modifier,
                             contentAlignment = Alignment.BottomStart) {
                         framedChannel?.let { framed ->
                             // The rail preview's hero, the picture or the channel's colour with its logo.
                             ProgrammeHero(event?.image ?: recording?.image, framed.id,
                                 framed.number?.toString().orEmpty(), framed.icon,
                                 Modifier.align(Alignment.BottomEnd)
-                                    .size(DetailsFramedArtSize.first, DetailsFramedArtSize.second)
+                                    .size(PlayerChromeTokens.channelCardWidth, PlayerChromeTokens.channelCardHeight)
                                     .clip(PlayerChromeTokens.heroShape).testTag("details-framed-art"))
                         }
                         DetailsInformation(event, recording, recordingAdmission, channel, nowSec,
                             corner = when {
                                 glowChannel != null -> DetailsHeroLogoSize.first
-                                framedChannel != null -> DetailsFramedArtSize.first
+                                framedChannel != null -> PlayerChromeTokens.channelCardWidth
                                 else -> null
                             }, textArea = textArea) {
                             recordingFailure?.let { text ->
@@ -759,8 +758,6 @@ private val DetailsBackdropDecodeSize = 320 to 180
 private const val DetailsBackdropWidth = 160
 private const val DetailsBackdropBlurRadius = 3
 private val DetailsHeroLogoSize = 240.dp to 135.dp
-/** The grid's four-column card (268dp of twelve 52dp columns and 20dp gutters), at 16:9. */
-private val DetailsFramedArtSize = 268.dp to 151.dp
 private val DetailsTitleLogoGap = 32.dp
 // Material for TV kit "Immersive row" background image: 758 of 960dp, top-right (Figma 8689:24742).
 private const val DetailsHeroWidthFraction = 758f / 960f

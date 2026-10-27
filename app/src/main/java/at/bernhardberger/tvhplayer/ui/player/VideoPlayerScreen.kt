@@ -1764,8 +1764,6 @@ fun VideoPlayerScreen(
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
                 onBackKeyDown = { layerState.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
                 onPlayRecording = onPlayRecording,
-                // Held OK on a rail card: that channel's programme, not the one playing.
-                framedArt = infoRailChannelId != null,
             )
         }
 
