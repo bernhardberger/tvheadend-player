@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.*
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.*
@@ -57,6 +59,7 @@ class ChannelScheduleCaptureTest {
     @After fun restore() { TimeZone.setDefault(zone) }
 
     @Test fun englishStates() = capture("en", listOf("live", "behind-live", "future", "tomorrow-gap", "end", "failed", "loading", "loading-more", "empty", "offline", "no-art"))
+    @Test fun englishBackToTabs() = capture("en", listOf("back-to-tabs"))
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanLongTitle() = capture("de", listOf("long-title"))
 
@@ -190,6 +193,7 @@ class ChannelScheduleCaptureTest {
                                 },
                                 onOpen = {}, onClose = {}, onRetry = {},
                                 initialEvent = when (scene) {
+                                    "back-to-tabs" -> events.first { it.start.epochSeconds >= at(18, 15, 0) }
                                     "future" -> events.first { it.start.epochSeconds >= at(18, 0, 0) }
                                     "tomorrow-gap" -> events.first { it.start.epochSeconds == at(16, 6, 0) }
                                     "end" -> events.last()
@@ -207,6 +211,13 @@ class ChannelScheduleCaptureTest {
             compose.waitForIdle()
             compose.mainClock.advanceTimeBy(1000)
             compose.waitForIdle()
+            if (name == "back-to-tabs") {
+                compose.onRoot().performKeyInput { pressKey(Key.DirectionDown) }
+                compose.onRoot().performKeyInput { pressKey(Key.Back) }
+                compose.onNode(isSelected()).assertIsFocused()
+                compose.mainClock.advanceTimeBy(1000)
+                compose.waitForIdle()
+            }
             compose.runOnIdle {
                 val root = requireNotNull(view).rootView
                 val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)

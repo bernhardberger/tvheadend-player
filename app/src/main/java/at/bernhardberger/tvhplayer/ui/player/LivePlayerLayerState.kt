@@ -133,15 +133,8 @@ internal class LivePlayerLayerState(
             if (event.type == KeyEventType.KeyDown) closeSchedule(showControls = false)
             return null
         }
-        // Details owns Back (including its nested pages and recording confirmations).
-        if (code == AndroidKeyEvent.KEYCODE_BACK && scheduleDetails == null) {
-            if (event.type == KeyEventType.KeyDown && event.nativeKeyEvent.repeatCount == 0) {
-                beginOpeningKeyCycle(code)
-                closeSchedule()
-            }
-            return true
-        }
-        // Like Info, the sheet owns navigation and suppresses playback/options shortcuts.
+        // The sheet owns Back through its rows, tabs and details, plus ordinary navigation.
+        // Like Info, it suppresses playback/options shortcuts.
         return when (code) {
             AndroidKeyEvent.KEYCODE_DPAD_UP, AndroidKeyEvent.KEYCODE_DPAD_DOWN,
             AndroidKeyEvent.KEYCODE_DPAD_LEFT, AndroidKeyEvent.KEYCODE_DPAD_RIGHT,

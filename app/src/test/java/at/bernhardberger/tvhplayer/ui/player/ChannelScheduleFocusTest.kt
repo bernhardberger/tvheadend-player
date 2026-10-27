@@ -1,8 +1,11 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import android.app.Application
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
@@ -73,6 +76,92 @@ class ChannelScheduleFocusTest {
         compose.onNodeWithTag("schedule-row-2").performKeyInput { pressKey(Key.DirectionCenter) }
         compose.runOnIdle { detail = null }
         compose.onNodeWithTag("schedule-row-2").assertIsFocused()
+    }
+
+    @Test fun backOnOpeningRowClosesImmediately() {
+        var closed = 0
+        showBackSchedule { closed++ }
+        compose.onNodeWithTag("schedule-row-46").assertIsFocused().performKeyInput { pressKey(Key.Back) }
+        assertEquals(1, closed)
+        compose.onNodeWithTag("channel-schedule-list").assertDoesNotExist()
+    }
+
+    @Test fun backAfterReturningToOpeningRowClosesImmediately() {
+        var closed = 0
+        showBackSchedule { closed++ }
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionDown); pressKey(Key.DirectionUp) }
+        compose.onNodeWithTag("schedule-row-46").assertIsFocused().performKeyInput { pressKey(Key.Back) }
+        assertEquals(1, closed)
+        compose.onNodeWithTag("channel-schedule-list").assertDoesNotExist()
+    }
+
+    @Test fun backFromABrowsedLaterDayRowReturnsToItsTabWithoutScrollingThenCloses() {
+        var closed = 0
+        val week = showBackSchedule { closed++ }
+        compose.onNodeWithTag("schedule-row-46").performKeyInput { pressKey(Key.DirectionDown) }
+        val row = compose.onNodeWithTag("schedule-row-47")
+        row.assertIsFocused()
+        val before = row.getUnclippedBoundsInRoot()
+        val scroll = compose.onNodeWithTag("channel-schedule-list").fetchSemanticsNode()
+            .config[SemanticsProperties.VerticalScrollAxisRange]
+        val beforeScroll = scroll.value()
+        row.performKeyInput { pressKey(Key.Back) }
+        val day = java.time.Instant.ofEpochSecond(week[45].start.epochSeconds).atZone(ZoneId.systemDefault()).toLocalDate()
+        compose.onNodeWithTag("schedule-tab-$day").assertIsSelected().assertIsFocused()
+        assertEquals(before, row.getUnclippedBoundsInRoot())
+        assertEquals(beforeScroll, scroll.value())
+        assertEquals(0, closed)
+        compose.onNode(isSelected()).performKeyInput { pressKey(Key.Back) }
+        assertEquals(1, closed)
+        compose.onNodeWithTag("channel-schedule-list").assertDoesNotExist()
+    }
+
+    @Test fun backOnTabsClosesImmediately() {
+        var closed = 0
+        show(viewer = NOW, onClose = { closed++ })
+        compose.onRoot().performKeyInput { pressKey(Key.DirectionUp); pressKey(Key.DirectionUp) }
+        compose.onNodeWithText("Today").assertIsFocused()
+        compose.onNodeWithText("Today").performKeyInput { pressKey(Key.Back) }
+        assertEquals(1, closed)
+    }
+
+    @Test fun heldBackReturnsToTabsOnlyOnceAndTodayStillJumpsTheList() {
+        var closed = 0
+        val week = showBackSchedule { closed++ }
+        compose.onNodeWithTag("schedule-row-46").performKeyInput { pressKey(Key.DirectionDown) }
+        compose.onNodeWithTag("schedule-row-47").performKeyInput {
+            keyDown(Key.Back)
+            advanceEventTime(1_200)
+        }
+        compose.onNode(isSelected()).assertIsFocused()
+        assertEquals(0, closed)
+        compose.onRoot().performKeyInput { keyUp(Key.Back) }
+        compose.onNode(isSelected()).assertIsFocused()
+        assertEquals(0, closed)
+        compose.onRoot().performKeyInput { repeat(5) { pressKey(Key.DirectionLeft) } }
+        compose.onNodeWithText("Today").assertIsFocused()
+        compose.onNodeWithText("Today").performKeyInput { pressKey(Key.DirectionDown) }
+        val todayRow = scheduleInitialEvent(week, NOW, NOW)!!
+        compose.onNodeWithTag("schedule-row-${todayRow.id.value}").assertIsFocused()
+    }
+
+    /** Keep the live player's parent key routing in the path; it must let the panel own Back. */
+    private fun showBackSchedule(onClose: () -> Unit): List<EpgEvent> {
+        val midnight = java.time.Instant.ofEpochSecond(NOW).atZone(ZoneId.systemDefault()).toLocalDate()
+            .atStartOfDay(ZoneId.systemDefault()).toEpochSecond()
+        val week = List(7 * 8) { event(it + 1, midnight + it * 10_800L, midnight + (it + 1) * 10_800L) }
+        compose.setContent { TVHeadendPlayerTheme {
+            val scope = rememberCoroutineScope()
+            val layers = remember { LivePlayerLayerState(scope, 5_000).apply { openSchedule() } }
+            Box(Modifier.onPreviewKeyEvent { layers.handleScheduleKey(it) ?: false }) {
+                if (layers.scheduleOpen) PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+                    ChannelSchedule(null, week, NOW, NOW, false, false, { null }, {},
+                        onClose = { layers.closeSchedule(); onClose() }, onRetry = {}, initialEvent = week[45],
+                        onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
+                }
+            }
+        } }
+        return week
     }
 
     @Test fun loadingDataArrivalAndEmptyCloseHaveFocus() {
@@ -180,6 +269,20 @@ class ChannelScheduleFocusTest {
         compose.onNodeWithTag("schedule-row-5").performKeyInput { pressKey(Key.DirectionUp) }
         compose.onNodeWithTag("schedule-row-4").assertIsFocused()
         compose.onNodeWithTag("schedule-row-3").assertTopPositionInRootIsAtLeast(list.top + ListTopFadeHeight)
+    }
+
+    @Test fun rowsWithAndWithoutAPictureShareTheirHeightAndTextStart() {
+        // Most programmes have no picture: it sits at the trailing end, so nothing else moves.
+        val mixed = events.map { if (it.id != EventId(3)) it else EpgEvent.create(it.id, it.channelId, it.start, it.stop,
+            title = it.title, image = ArtworkId(1)) }
+        compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
+            ChannelSchedule(null, mixed, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = mixed[0])
+        } } }
+        val pictured = compose.onNodeWithTag("schedule-row-3").fetchSemanticsNode().size.height
+        val plain = compose.onNodeWithTag("schedule-row-4").fetchSemanticsNode().size.height
+        assertEquals(pictured, plain)
+        val titles = listOf("Programme 3", "Programme 4").map { compose.onNodeWithText(it, useUnmergedTree = true).getUnclippedBoundsInRoot().left }
+        assertEquals(titles[0], titles[1])
     }
 
     @Test fun theTopReserveIsARealRowsHeightAtEveryFontScale() {
@@ -296,8 +399,8 @@ class ChannelScheduleFocusTest {
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         settleUntil { ended.get() == 3 }
-        settle()
-        footer().assertTextContains("No program information after", substring = true)
+        // The request's end reaches the list on a later frame; under load that can take a few.
+        settleUntil { runCatching { footer().assertTextContains("No program information after", substring = true) }.isSuccess }
         assertEquals(3, requests.size)
     }
 
@@ -306,9 +409,9 @@ class ChannelScheduleFocusTest {
         assertTrue("row top $actual above $top", actual >= top)
     }
 
-    private fun show(viewer: Long, onOpen: (EpgEvent) -> Unit = {}) {
+    private fun show(viewer: Long, onOpen: (EpgEvent) -> Unit = {}, onClose: () -> Unit = {}) {
         compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
-            ChannelSchedule(null, events, NOW, viewer, false, false, { null }, onOpen, {}, {})
+            ChannelSchedule(null, events, NOW, viewer, false, false, { null }, onOpen, onClose, {})
         } } }
     }
 

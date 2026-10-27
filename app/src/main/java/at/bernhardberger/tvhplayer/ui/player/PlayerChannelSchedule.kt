@@ -93,7 +93,8 @@ internal fun PlayerChannelSchedule(
                 onContextMenu = { contextMenu = true; layers.showScheduleDetails(it) },
                 onClose = { layers.closeSchedule() }, onRetry = onRetry,
                 initialEvent = focused ?: scheduleInitialEvent(events, viewerSec, nowSec), onFocused = { focused = it },
-                viewerBehindMs = liveBehindMs(timeshift))
+                viewerBehindMs = liveBehindMs(timeshift),
+                onBackKeyDown = { layers.beginOpeningKeyCycle(android.view.KeyEvent.KEYCODE_BACK) })
         }
     }
 }
