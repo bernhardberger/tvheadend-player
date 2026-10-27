@@ -1587,9 +1587,16 @@ fun VideoPlayerScreen(
         // The same availability as the options sheet's quick lists the buttons open.
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
+        val controlsShown = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls
+        val chromePanelOpen = layerState.optionsPage != null || layerState.infoOpen || layerState.scheduleOpen
+        // Composed beside the controls rather than in their layer: the closed rail's cards are not
+        // built again inside every reveal's first frame.
+        val quickZap = rememberQuickZapRail(
+            // Keep the departing rail expanded throughout its vertical step.
+            expanded = layerState.channelRailPresented, detached = true)
         PlayerChrome(
             mode = playerChromeMode(
-                controls = chromeLayer == PlayerForegroundLayer.CONTROLS || channelRailOpen || keepControls,
+                controls = controlsShown,
                 // A pending or dispatched step holds the Banner up after its own timer ran out.
                 banner = !channelUnavailable && (bannerSeekPreview != null ||
                     (layerState.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
@@ -1637,7 +1644,7 @@ fun VideoPlayerScreen(
                 tracks = trackButtons,
             ),
             entry = layerState.chrome.controlsEntry,
-            panelOpen = layerState.optionsPage != null || layerState.infoOpen || layerState.scheduleOpen,
+            panelOpen = chromePanelOpen,
             numberEntryShown = numberEntry.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter),
             onTogglePause = {
@@ -1677,52 +1684,54 @@ fun VideoPlayerScreen(
             onChannelCardFocusChanged = layerState.chrome::onChannelCardFocusChanged,
             decorationCoversControls = channelRailOpen,
             controlsDecoration = { actionsAlpha, controls ->
-                QuickZapPresentation(
-                    // Keep the departing rail expanded throughout its vertical step.
-                    expanded = layerState.channelRailPresented,
-                    // The rows' saved logos are those of the observation their scope was resolved from.
-                    channelContent = { ProvideArtworkSession(currentSession, channelScope.observation) {
-                        PlayerChannelBrowser(
-                            state = channelBrowser,
-                            channels = channels,
-                            recentChannels = recentChannels,
-                            playingChannelId = currentChannelId,
-                            recordingChannelIds = recordingChannelIds,
-                            nowSec = nowSec,
-                            nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            onFocusChannel = { selectedId = it },
-                            onPickChannel = { tuneChannel(it) },
-                            onClose = { keyCode ->
-                                if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
-                                layerState.dismissChannelDrawer()
-                            },
-                            onOpenDetails = { channel, _, keyCode ->
-                                keyCode?.let(layerState::beginOpeningKeyCycle)
-                                infoRailChannelId = channel.id
-                                infoReturnAction = null
-                                restoreInfoFocus = false
-                                layerState.openInfo()
-                            },
-                            active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-                            channelsTitle = channelsTitle,
-                        )
-                    } },
-                    trayBleeds = recentChannels.isNotEmpty(),
-                    header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle) },
-                    preview = {
-                        val previewChannel = channels.firstOrNull { it.id == selectedId }
-                        QuickZapTrayPreview(previewChannel,
-                            previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            previewChannel?.let { observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
-                            nowSec,
-                            Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
-                            scrolling = channelBrowser.scrolling)
-                    },
-                    controls = controls,
-                    // Below the controls, the rail's cards hint at what Down opens.
-                    peek = actionsAlpha.takeIf { channels.isNotEmpty() },
-                )
+                // Below the controls, the rail's cards hint at what Down opens.
+                QuickZapControls(quickZap, peek = actionsAlpha.takeIf { channels.isNotEmpty() }, controls = controls)
             },
+        )
+        QuickZapRail(
+            quickZap,
+            // The rows' saved logos are those of the observation their scope was resolved from.
+            channelContent = { ProvideArtworkSession(currentSession, channelScope.observation) {
+                // Read in the rail, so the controls' show and hide do not recompose the whole player.
+                val railNowSec = quickZap.clock(nowSec)
+                PlayerChannelBrowser(
+                    state = channelBrowser,
+                    channels = channels,
+                    recentChannels = recentChannels,
+                    playingChannelId = currentChannelId,
+                    recordingChannelIds = recordingChannelIds,
+                    nowSec = railNowSec,
+                    nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(railNowSec)) },
+                    onFocusChannel = { selectedId = it },
+                    onPickChannel = { tuneChannel(it) },
+                    onClose = { keyCode ->
+                        if (keyCode != null) layerState.beginOpeningKeyCycle(keyCode)
+                        layerState.dismissChannelDrawer()
+                    },
+                    onOpenDetails = { channel, _, keyCode ->
+                        keyCode?.let(layerState::beginOpeningKeyCycle)
+                        infoRailChannelId = channel.id
+                        infoReturnAction = null
+                        restoreInfoFocus = false
+                        layerState.openInfo()
+                    },
+                    active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
+                    channelsTitle = channelsTitle,
+                )
+            } },
+            trayBleeds = recentChannels.isNotEmpty(),
+            header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle) },
+            preview = {
+                val previewChannel = channels.firstOrNull { it.id == selectedId }
+                QuickZapTrayPreview(previewChannel,
+                    previewChannel?.let { observation.eventAt(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
+                    previewChannel?.let { observation.nextEvent(it.id, kotlin.time.Instant.fromEpochSeconds(nowSec)) },
+                    nowSec,
+                    Modifier.padding(horizontal = at.bernhardberger.tvhplayer.ui.TvGridHorizontalMargin),
+                    scrolling = channelBrowser.scrolling)
+            },
+            peeks = channels.isNotEmpty(),
+            visible = controlsShown && !chromePanelOpen,
         )
         // Full recovery and the unavailable message replace even an exiting ring.
         if (!busyBlocked) PlayerBusyIndicator(busyStatus, Modifier.align(Alignment.Center), cover = videoPresentation)
