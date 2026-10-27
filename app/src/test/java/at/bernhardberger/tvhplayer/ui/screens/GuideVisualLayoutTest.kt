@@ -211,7 +211,9 @@ class GuideVisualLayoutTest {
                 title = title, summary = synopsis,
                 subtitle = "Winter on the ridge".takeIf { title == "Ridge Light" },
                 image = pictures[title]?.let { ArtworkId(101 + art.indexOf(it)) },
-                contentGenre = ContentGenre.fromContentType(contentType))
+                // Ridge Light carries the same XMLTV genre as on the Channels card and details page, so the headline says Documentary.
+                genre = "Documentary".takeIf { title == "Ridge Light" },
+                contentGenre = ContentGenre.fromContentType(contentType).takeUnless { title == "Ridge Light" })
         }
         loader.shutdown()
         loader = at.bernhardberger.tvhplayer.testutil.FixtureArt.imageLoader(context(), buildMap {
