@@ -1116,6 +1116,32 @@ class GuideVisualLayoutTest {
         bitmap.recycle()
     }
 
+    @Test fun nowPointSequenceCrossesAGapAndReturnsToItsOrigin() {
+        fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
+            EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
+                Instant.fromEpochSeconds(hour + end * 60), title = name)
+        show(history = false, events = listOf(
+            programme(110, 1, 0, 30, "Origin on air"),
+            programme(111, 1, 30, 120, "Later origin programme"),
+            programme(210, 2, 30, 120, "Nearest future programme across gap"),
+            programme(410, 4, 0, 30, "On air below gap"),
+            programme(411, 4, 30, 120, "Later programme below gap"),
+        ))
+        key(Key.DirectionDown)
+        focused("Origin on air")
+        val window = checkNotNull(position.position.value).windowStartSec
+        key(Key.DirectionDown)
+        focused("Nearest future programme across gap")
+        key(Key.DirectionDown)
+        focused("On air below gap")
+        key(Key.DirectionUp)
+        focused("Nearest future programme across gap")
+        key(Key.DirectionUp)
+        focused("Origin on air")
+        assertEquals(window, checkNotNull(position.position.value).windowStartSec)
+        assertNoPlayback()
+    }
+
     @Test fun onAirAnchorAdvancesWithTheClockBetweenDownPresses() {
         fun programme(id: Long, channel: Long, start: Long, end: Long, name: String) =
             EpgEvent.create(EventId(id), ChannelId(channel), Instant.fromEpochSeconds(hour + start * 60),
