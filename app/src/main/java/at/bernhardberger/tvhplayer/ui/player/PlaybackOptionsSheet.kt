@@ -819,7 +819,7 @@ private fun ColumnScope.TrackOptionsPage(
                 // Use the rest of the panel height rather than a fixed list height.
                 .weight(1f, fill = false)
                 .listEdgeFadeMask(PlaybackListTopFade, PlaybackListBottomFade,
-                    { listState.canScrollBackward }, { listState.canScrollForward })
+                    { listState.canScrollBackward }, { listState.canScrollForward }, exposeFades = true)
                 .focusGroup()
                 .testTag("playback-options-track-list"),
         ) {

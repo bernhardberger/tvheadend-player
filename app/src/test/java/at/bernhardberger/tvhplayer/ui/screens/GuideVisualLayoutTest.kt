@@ -138,7 +138,7 @@ import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
 /** Offline native production composition; never a replacement Guide or a playback test. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
-    instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens"])
+    instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class GuideVisualLayoutTest {
     @get:Rule val images = ImageLoaderRule()

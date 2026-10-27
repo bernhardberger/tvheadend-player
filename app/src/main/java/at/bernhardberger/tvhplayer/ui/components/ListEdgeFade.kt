@@ -134,9 +134,8 @@ internal fun Modifier.listEdgeFades(listState: LazyListState, topFade: Boolean =
         val placeable = measurable.measure(constraints.offset(horizontal = 2 * overhang))
         layout(placeable.width - 2 * overhang, placeable.height) { placeable.placeRelative(-overhang, 0) }
     }
-    .listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { topFade && listState.canScrollBackward }) {
-        listState.canScrollForward
-    }
+    .listEdgeFadeMask(ListTopFadeHeight, ListBottomFadeHeight, { topFade && listState.canScrollBackward },
+        { listState.canScrollForward })
     .layout { measurable, constraints ->
         val overhang = ListFocusOverhang.roundToPx()
         val placeable = measurable.measure(constraints.offset(horizontal = -2 * overhang))
@@ -146,16 +145,21 @@ internal fun Modifier.listEdgeFades(listState: LazyListState, topFade: Boolean =
 internal val ListTopFadeVisible = SemanticsPropertyKey<Boolean>("ListTopFadeVisible")
 internal val ListBottomFadeVisible = SemanticsPropertyKey<Boolean>("ListBottomFadeVisible")
 
-/** Local transparent edge masks; scroll edges are read during drawing and semantics, not composition. */
+/**
+ * Local transparent edge masks; scroll edges are read during drawing, not composition. With
+ * [exposeFades] the visible edges are also reported in semantics; leave it off inside a layout
+ * that widens the node, such as [listEdgeFades], where those semantics would take its bounds.
+ */
 internal fun Modifier.listEdgeFadeMask(
     topHeight: Dp,
     bottomHeight: Dp,
     showTopFade: () -> Boolean,
     showBottomFade: () -> Boolean,
-): Modifier = semantics {
+    exposeFades: Boolean = false,
+): Modifier = then(if (exposeFades) Modifier.semantics {
     this[ListTopFadeVisible] = topHeight > 0.dp && showTopFade()
     this[ListBottomFadeVisible] = bottomHeight > 0.dp && showBottomFade()
-}.graphicsLayer {
+} else Modifier).graphicsLayer {
     compositingStrategy = CompositingStrategy.Offscreen
 }.drawWithContent {
     drawContent()
