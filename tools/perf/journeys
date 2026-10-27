@@ -1,0 +1,200 @@
+#!/usr/bin/env python3
+"""Record G10 frame histogram deltas without resetting HWUI counters."""
+
+import argparse
+import datetime
+import json
+import math
+import re
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+PACKAGE = "at.bernhardberger.tvhplayer"
+ROOT = Path(__file__).resolve().parents[2]
+
+# Start each journey in its documented state; setup isn't silently included in a
+# different journey's frame counts. All movement uses the same keys as a remote.
+JOURNEYS = {
+    "cold-start": [],
+    "warm-start": [("HOME", 2.0)],
+    "drawer-first": [("BACK", 1.0)] + [("DPAD_DOWN", 1.0)] * 3
+    + [("DPAD_UP", 1.0)] * 3 + [("DPAD_RIGHT", 1.0)],
+    "drawer-warm": [("BACK", 1.0)] + [("DPAD_DOWN", 1.0)] * 3
+    + [("DPAD_UP", 1.0)] * 3 + [("DPAD_RIGHT", 1.0)],
+    "channels-immersive": [("DPAD_RIGHT", 0.4)] * 12 + [("DPAD_LEFT", 0.4)] * 12,
+    "channels-grid": [("DPAD_DOWN", 0.4)] * 12 + [("DPAD_UP", 0.4)] * 12,
+    "channels-list": [("DPAD_DOWN", 0.4)] * 12 + [("DPAD_UP", 0.4)] * 12,
+    "guide-first": [("BACK", 1.0), ("DPAD_DOWN", 2.0), ("DPAD_RIGHT", 2.0)],
+    "guide-navigation": [("DPAD_DOWN", 0.4)] * 5 + [("DPAD_UP", 0.4)] * 5
+    + [("DPAD_RIGHT", 0.4)] * 5 + [("DPAD_LEFT", 0.4)] * 5
+    + [("CHANNEL_DOWN", 1.0), ("CHANNEL_UP", 1.0)],
+    "side-rail": [("DPAD_UP", 2.0), ("DPAD_DOWN", 2.0), ("BACK", 1.0), ("BACK", 2.0)],
+    "recordings-tabs": [("DPAD_RIGHT", 0.4)] * 2 + [("DPAD_LEFT", 0.4)] * 2,
+    "recordings-scroll": [("DPAD_DOWN", 0.4)] * 12 + [("DPAD_UP", 0.4)] * 12,
+    "settings-general": [("DPAD_CENTER", 1.0), ("BACK", 1.0)],
+    "settings-connection": [("DPAD_CENTER", 1.0), ("BACK", 1.0)],
+    "settings-about": [("DPAD_CENTER", 1.0), ("BACK", 1.0)],
+    "player-tune": [("DPAD_CENTER", 10.0)],
+    "controls": [("DPAD_UP", 2.5), ("BACK", 2.0)] * 5,
+    "rail": [("DPAD_UP", 2.0), ("DPAD_DOWN", 2.0)]
+    + [("DPAD_RIGHT", 0.4)] * 12 + [("DPAD_LEFT", 0.4)] * 12
+    + [("BACK", 1.0), ("BACK", 2.0)],
+    "player-zap": [("CHANNEL_UP", 2.5), ("CHANNEL_DOWN", 2.5)] * 5,
+}
+
+PRECONDITIONS = {
+    "cold-start": "Configured profile, autoplay off; force-stop then launch (new-process histogram).",
+    "warm-start": "Channels already open, same process; HOME then launch.",
+    "drawer-first": "Channels group tab focused, freshly launched; no other destination visited.",
+    "drawer-warm": "Channels group tab focused, after a complete drawer-first tour in the same process.",
+    "channels-immersive": "Immersive layout selected via View options; first channel card focused.",
+    "channels-grid": "Grid layout selected via View options; first channel card focused.",
+    "channels-list": "List layout selected via View options; first channel row focused.",
+    "guide-first": "Channels group tab focused; Guide not yet visited this process.",
+    "guide-navigation": "Loaded Guide programme focused, enough rows/programmes for scrolling.",
+    "side-rail": "Settled playback; passive banner and controls hidden.",
+    "recordings-tabs": "Recordings Archive tab focused; recordings permission enabled.",
+    "recordings-scroll": "First Schedule list entry focused; populated schedule, no dialog.",
+    "settings-general": "Settings root, General row focused.",
+    "settings-connection": "Settings root, Connection row focused (do not open credential fields).",
+    "settings-about": "Settings root, About row focused.",
+    "player-tune": "Playable channel card/row focused; at least two playable channels for zap.",
+    "controls": "Settled playback; passive banner and controls hidden.",
+    "rail": "Settled playback; passive banner and controls hidden; enough channels for scrolling.",
+    "player-zap": "Settled playback, controls hidden; two playable adjacent channels.",
+}
+
+
+def histogram(text, label):
+    match = re.search(r"^" + re.escape(label) + r":\s*(.*)$", text, re.MULTILINE)
+    if not match:
+        raise ValueError(f"Missing {label} in gfxinfo output")
+    bins = {int(ms): int(count) for ms, count in re.findall(r"(\d+)ms=(\d+)", match.group(1))}
+    if not bins:
+        raise ValueError(f"Empty {label} in gfxinfo output")
+    return bins
+
+
+def delta(before, after, label):
+    first, last = histogram(before, label) if before is not None else {}, histogram(after, label)
+    counts = {ms: last.get(ms, 0) - first.get(ms, 0) for ms in first.keys() | last.keys()}
+    if any(count < 0 for count in counts.values()):
+        raise ValueError(f"{label} counters decreased; app or renderer may have restarted")
+    total = sum(counts.values())
+    percentiles = {}
+    for percentile in (50, 90, 95, 99):
+        target = (total * percentile + 99) // 100
+        cumulative = 0
+        value = None
+        for ms, count in sorted(counts.items()):
+            cumulative += count
+            if total and cumulative >= target:
+                value = ms
+                break
+        percentiles[f"p{percentile}_ms"] = value
+    return {"frame_count": total, **percentiles, "histogram_ms": counts}
+
+
+def main():
+    listings = []
+    for name, sequence in JOURNEYS.items():
+        keys = ", ".join(f"{key} ({delay:g}s)" for key, delay in sequence) or "force-stop, launch, wait 12s"
+        if name == "warm-start":
+            keys += ", launch, wait 12s"
+        listings.append(f"{name}: {keys}\n  Start: {PRECONDITIONS[name]}")
+    parser = argparse.ArgumentParser(description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter, epilog="\n\n".join(listings))
+    parser.add_argument("--serial", required=True, help="Explicit device serial")
+    parser.add_argument("journey", choices=JOURNEYS, nargs="?", help="One journey, prepared manually")
+    parser.add_argument("--trace", choices=JOURNEYS, metavar="JOURNEY", help="Record this journey with Perfetto")
+    parser.add_argument("--trace-config", type=Path,
+        default=ROOT / "build/perf/evidence/pf.cfg", help="Perfetto text config (sent on stdin)")
+    parser.add_argument("--device-label", default="device", help="Nonidentifying result label, not a serial/address")
+    args = parser.parse_args()
+    if not args.journey and not args.trace:
+        parser.error("provide a journey or --trace JOURNEY")
+    if args.journey and args.trace and args.journey != args.trace:
+        parser.error("journey and --trace must name the same journey")
+    args.journey = args.journey or args.trace
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,31}", args.device_label):
+        parser.error("--device-label must be a short nonidentifying label")
+    config = None
+    if args.trace:
+        config = args.trace_config.read_text()
+        duration = re.search(r"\bduration_ms\s*:\s*(\d+)", config)
+        # Leave time for snapshot commands as well as the prescribed waits.
+        required = sum(delay for _, delay in JOURNEYS[args.journey]) + 15
+        if not duration:
+            parser.error("trace config must have a bounded duration_ms")
+        trace_duration_ms = max(int(duration[1]), math.ceil(required * 1000))
+        config = re.sub(r"\bduration_ms\s*:\s*\d+", f"duration_ms: {trace_duration_ms}", config)
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    # Do not place the serial in files: it may identify a network endpoint.
+    output = ROOT / "build" / "perf" / "runs" / f"{stamp}-{args.device_label}"
+    output.mkdir(parents=True, exist_ok=False)
+
+    def adb(*args):
+        return subprocess.run(["adb", "-s", args_serial, *args], check=True,
+                              capture_output=True, text=True, timeout=60).stdout
+
+    args_serial = args.serial
+    trace = None
+    remote_trace = f"/data/local/tmp/player-perf-{stamp}.perfetto-trace"
+    if args.journey == "cold-start":
+        adb("shell", "am", "force-stop", PACKAGE)
+    try:
+        if config is not None:
+            trace = subprocess.Popen(["adb", "-s", args_serial, "shell", "perfetto", "--txt",
+                                      "-c", "-", "-o", remote_trace], stdin=subprocess.PIPE,
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True)
+            trace.stdin.write(config)
+            trace.stdin.close()
+            time.sleep(1)
+        before = None if args.journey == "cold-start" else adb("shell", "dumpsys", "gfxinfo", PACKAGE)
+        for key, delay in JOURNEYS[args.journey]:
+            adb("shell", "input", "keyevent", key)
+            time.sleep(delay)
+        if args.journey in ("cold-start", "warm-start"):
+            adb("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.ui.MainActivity")
+            time.sleep(12)
+        after = adb("shell", "dumpsys", "gfxinfo", PACKAGE)
+        if trace is not None:
+            status = trace.wait(timeout=trace_duration_ms / 1000 + 30)
+            if status:
+                raise RuntimeError("Perfetto failed; no valid trace recorded")
+            adb("pull", remote_trace, str(output / f"{args.journey}.perfetto-trace"))
+    finally:
+        if trace is not None:
+            if trace.poll() is None:
+                trace.terminate()
+                trace.wait(timeout=10)
+            adb("shell", "rm", "-f", remote_trace)
+    result = {"journey": args.journey, "cpu": delta(before, after, "HISTOGRAM"),
+              "gpu": delta(before, after, "GPU HISTOGRAM"), "lane": "gfxinfo",
+              "precondition": PRECONDITIONS[args.journey], "keys": JOURNEYS[args.journey],
+              "baseline": "new-process-zero" if before is None else "snapshot-delta",
+              "screen_validation": "operator required; key injection does not validate focus"}
+    (output / f"{args.journey}.json").write_text(json.dumps(result, indent=2) + "\n")
+    rows = ["| Metric | Frames | p50 | p90 | p95 | p99 |", "|---|---:|---:|---:|---:|---:|"]
+    for name in ("cpu", "gpu"):
+        values = result[name]
+        rows.append("| " + name.upper() + " | " + " | ".join(str(values[key]) for key in
+                    ("frame_count", "p50_ms", "p90_ms", "p95_ms", "p99_ms")) + " |")
+    (output / "summary.md").write_text(f"# {args.journey}\n\nStart: {PRECONDITIONS[args.journey]}\n\n"
+        "Numbers are recorded, not gated. Operator must confirm the screen/focus journey.\n"
+        "Percentiles are histogram bucket upper bounds in ms; zero frames yields null.\n\n"
+        + "\n".join(rows) + "\n")
+    print(output)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except subprocess.CalledProcessError:
+        print("Device command failed; no result was recorded.", file=sys.stderr)
+        sys.exit(1)
+    except (ValueError, OSError, RuntimeError, subprocess.TimeoutExpired):
+        print("Measurement failed (histogram, trace, or local I/O); no result was recorded.", file=sys.stderr)
+        sys.exit(1)

@@ -85,5 +85,6 @@ gradle.extensions.extraProperties.set(
 rootProject.name = "TVHeadendPlayer"
 include(":app")
 include(":baselineprofile")
+include(":macrobenchmark")
 include(":client")
 include(":decoder-ffmpeg")

@@ -125,6 +125,7 @@ android {
         }
         create("profile") {
             initWith(getByName("release"))
+            proguardFiles("benchmark-rules.pro")
             // Controlled code-optimization comparison; identical resources and instrumentation.
             isMinifyEnabled = providers.gradleProperty("tvhplayer.profileMinify")
                 .map { it.toBooleanStrict() }.orElse(false).get()
@@ -475,8 +476,8 @@ tasks.register("verifyExternalSdkConsumption") {
             "App/client dependencies contain local fallbacks: $forbiddenLocalDependencies"
         }
         check(includedBuildNames.isEmpty()) { "The app must not use included builds: $includedBuildNames" }
-        // :baselineprofile is a test-only generator; no shipping variant depends on it.
-        check(projectPaths == setOf(":", ":app", clientProjectPath, decoderProjectPath, ":baselineprofile")) {
+        // :baselineprofile and :macrobenchmark are test-only modules; no shipping build depends on them.
+        check(projectPaths == setOf(":", ":app", clientProjectPath, decoderProjectPath, ":baselineprofile", ":macrobenchmark")) {
             "Unexpected Gradle projects: $projectPaths"
         }
 

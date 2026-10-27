@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Split an AndroidX benchmarkData.json into per-journey measurement records."""
+
+import argparse
+import datetime
+import json
+import re
+from pathlib import Path
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("result", type=Path, help="AndroidX *benchmarkData.json from the test output")
+    parser.add_argument("--device-label", required=True, help="Nonidentifying label, never a serial/address")
+    args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_-]{0,31}", args.device_label):
+        parser.error("device label must be a short nonidentifying label")
+    data = json.loads(args.result.read_text())
+    benchmarks = data.get("benchmarks", [])
+    if not benchmarks:
+        parser.error("input has no benchmark results")
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+    output = Path(__file__).resolve().parents[2] / "build/perf/runs" / f"{stamp}-{args.device_label}"
+    output.mkdir(parents=True, exist_ok=False)
+    lines = ["# Macrobenchmark measurements", "", "Numbers recorded, not gated.", "",
+             "| Journey | Metric (AndroidX units) | Median | P50 | P90 | P95 | P99 |",
+             "|---|---|---:|---:|---:|---:|---:|"]
+    for index, benchmark in enumerate(benchmarks):
+        name = benchmark["name"]
+        if not re.fullmatch(r"[A-Za-z0-9_.\[\]-]+", name):
+            parser.error("unexpected benchmark name")
+        # Preserve AndroidX metric samples, but not device context/serials or arbitrary extras.
+        result = {key: benchmark[key] for key in
+                  ("name", "className", "totalRunTimeNs", "repeatIterations", "warmupIterations",
+                   "metrics", "sampledMetrics") if key in benchmark}
+        result["lane"] = "macrobenchmark"
+        (output / f"{index:02d}-{name}.json").write_text(json.dumps(result, indent=2) + "\n")
+        for group in ("metrics", "sampledMetrics"):
+            for metric, values in result.get(group, {}).items():
+                cells = [values.get(key, "—") for key in
+                         ("median", "P50", "P90", "P95", "P99")]
+                lines.append(f"| {name} | {metric} | " + " | ".join(map(str, cells)) + " |")
+    (output / "summary.md").write_text("\n".join(lines) + "\n")
+    print(output)
+
+
+if __name__ == "__main__":
+    main()

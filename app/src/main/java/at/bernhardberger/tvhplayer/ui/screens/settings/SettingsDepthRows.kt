@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.screens.settings
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
@@ -40,7 +41,7 @@ internal fun settingsLevel(
         Row(Modifier.fillMaxWidth().heightIn(min = TvBrowseHeaderHeight),
             verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.graphicsLayer {
+                modifier = Modifier.testTag("settings-level-$id").graphicsLayer {
                     scaleX = lerp(SettingsHeadingPreviewScale, 1f, emphasis())
                     scaleY = scaleX
                     transformOrigin = TransformOrigin(0f, 1f)
@@ -121,7 +122,7 @@ internal fun settingsRow(
                 focusedSelectedContainerColor = MaterialTheme.colorScheme.inverseSurface,
                 focusedSelectedContentColor = MaterialTheme.colorScheme.inverseOnSurface,
             ),
-            modifier = modifier.fillMaxWidth().padding(bottom = TvSpacing4)
+            modifier = modifier.testTag("settings-row-$id").fillMaxWidth().padding(bottom = TvSpacing4)
                 .heightIn(min = if (supporting == null) 48.dp else SettingsDepthRowMinHeight).semantics {
                 if (!enabled) disabled()
                 if (checked != null) { role = Role.Switch; toggleableState = ToggleableState(checked) }
