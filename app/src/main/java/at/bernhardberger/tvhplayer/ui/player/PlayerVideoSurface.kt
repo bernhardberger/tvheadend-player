@@ -16,6 +16,7 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -28,9 +29,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.common.C
+import androidx.media3.common.Format
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DecoderReuseEvaluation
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import at.bernhardberger.tvhplayer.core.shouldKeepPlaybackScreenOn
@@ -76,21 +81,93 @@ fun PlayerVideoSurface(
             lifecycle.removeObserver(lifecycleObserver)
         }
     }
-    var videoSize by remember(player) { mutableStateOf(player.videoSize) }
-    DisposableEffect(player) {
+    var geometryVersion by remember(player) { mutableIntStateOf(0) }
+    val inputPictureSize = remember(player, geometryVersion, videoVisible) {
+        val format = (player as? ExoPlayer)?.videoFormat
+        // Media3 1.11.1 derives tunnelled output geometry from the input format (no codec crop).
+        // Match MediaCodecVideoRenderer.onOutputFormatChanged's applied rotation and pixel ratio.
+        if (format != null && format.width > 0 && format.height > 0) {
+            val rotated = format.rotationDegrees == 90 || format.rotationDegrees == 270
+            VideoSize(
+                if (rotated) format.height else format.width,
+                if (rotated) format.width else format.height,
+                if (rotated) 1f / format.pixelWidthHeightRatio else format.pixelWidthHeightRatio,
+            )
+        } else {
+            VideoSize.UNKNOWN
+        }
+    }
+    var hasCurrentSize by remember(player, videoVisible) {
+        // A normal tunnelled size callback precedes the first frame and thus the reveal. Read
+        // again in this composition, rather than requiring a callback after listener replacement.
+        val decoded = player.videoSize
+        mutableStateOf(
+            videoVisible && inputPictureSize.width > 0 && inputPictureSize.height > 0 &&
+                decoded.width == inputPictureSize.width && decoded.height == inputPictureSize.height &&
+                decoded.pixelWidthHeightRatio == inputPictureSize.pixelWidthHeightRatio,
+        )
+    }
+    DisposableEffect(player, videoVisible) {
         val sizeListener = object : Player.Listener {
             override fun onVideoSizeChanged(size: VideoSize) {
-                videoSize = size
+                if (videoVisible && size.width > 0 && size.height > 0) hasCurrentSize = true
+                geometryVersion++
+            }
+        }
+        val exoPlayer = player as? ExoPlayer
+        val formatListener = object : AnalyticsListener {
+            override fun onVideoInputFormatChanged(
+                eventTime: AnalyticsListener.EventTime,
+                format: Format,
+                decoderReuseEvaluation: DecoderReuseEvaluation?,
+            ) {
+                // A fallback reveal with no geometry must also recover when only the input
+                // format arrives: tunnelled size callbacks can remain absent or be unchanged.
+                // Once decoded geometry arrives, input formats can be ahead of the shown frame.
+                if (!hasCurrentSize) geometryVersion++
             }
         }
         player.addListener(sizeListener)
-        videoSize = player.videoSize
-        onDispose { player.removeListener(sizeListener) }
+        exoPlayer?.addAnalyticsListener(formatListener)
+        geometryVersion++
+        onDispose {
+            player.removeListener(sizeListener)
+            exoPlayer?.removeAnalyticsListener(formatListener)
+        }
     }
-    // Null fills the screen and lets the view fit the picture; a ratio lays the surface out at it.
-    val frameAspect = surfaceFrameAspect(
-        aspectRatio, videoSize.width, videoSize.height, videoSize.pixelWidthHeightRatio,
-    )
+    // The target's mode changes before its picture arrives. Size callbacks (including UNKNOWN
+    // during replacement) are not target-scoped, so neither may reshape the retained picture.
+    // Use the existing presentation reveal as the commit point, without changing its cover rules.
+    // Re-read the player there too: a same-size target need not send another size callback.
+    val pictureSize = remember(player, geometryVersion, videoVisible, hasCurrentSize) {
+        val exoPlayer = player as? ExoPlayer
+        // Media3 1.11.1 publishes tunnelled sizes only from processed-frame callbacks, which
+        // may lag the cover's fallback reveal. Use input geometry until the decoded size matches
+        // at reveal or a valid size callback arrives afterward. Then decoded sizes keep in-stream
+        // aspect changes aligned with the shown frame rather than the buffered input format.
+        if (hasCurrentSize || exoPlayer?.isTunnelingEnabled != true) {
+            player.videoSize
+        } else {
+            // With no current tunnelled format, even a non-zero reported size may be stale.
+            inputPictureSize
+        }
+    }
+    var presentedFrameAspect by remember(player) { mutableStateOf<Float?>(null) }
+    // Fit non-nominal pictures at their own display aspect here too. PlayerView's inner FIT
+    // layout reads the same potentially stale VideoSize independently; FILL ignores that ratio.
+    val pictureAspect = if (pictureSize.width > 0 && pictureSize.height > 0) {
+        (pictureSize.width * pictureSize.pixelWidthHeightRatio / pictureSize.height)
+            .takeIf { it > 0f && it.isFinite() }
+    } else {
+        null
+    }
+    val frameAspect = if (videoVisible) {
+        surfaceFrameAspect(aspectRatio, pictureSize.width, pictureSize.height, pictureSize.pixelWidthHeightRatio)
+            ?: pictureAspect ?: presentedFrameAspect
+    } else {
+        presentedFrameAspect
+    }
+    SideEffect { if (videoVisible) presentedFrameAspect = frameAspect }
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(
             factory = { context ->
@@ -112,11 +189,7 @@ fun PlayerVideoSurface(
                 view.keepScreenOn = keepScreenOn
                 surfaceFrameRate.request(frameRate)
                 view.alpha = if (videoVisible) 1f else 0f
-                view.resizeMode = if (frameAspect == null) {
-                    AspectRatioFrameLayout.RESIZE_MODE_FIT
-                } else {
-                    AspectRatioFrameLayout.RESIZE_MODE_FILL
-                }
+                view.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FILL
             },
             modifier = (if (frameAspect == null) Modifier.fillMaxSize() else Modifier.aspectRatio(frameAspect))
                 .testTag("video-surface"),
