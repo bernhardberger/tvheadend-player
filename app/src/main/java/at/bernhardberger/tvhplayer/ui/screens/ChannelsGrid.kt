@@ -20,7 +20,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
@@ -150,7 +157,7 @@ internal fun ChannelsGrid(
                 val event = remember(channelId, frame.observation, now) {
                     frame.observation.eventAt(channelId, kotlin.time.Instant.fromEpochSeconds(now))
                 }
-                Box(Modifier.clipAboveInset(state, index) { focusedIndex == index }) {
+                Box(Modifier.clipAboveInset(state, index)) {
                     ChannelsRowCard(
                         channel = channel,
                         event = event,
@@ -203,15 +210,40 @@ internal fun Modifier.overflowTop(overflow: Dp): Modifier = layout { measurable,
 }
 
 /**
- * Ends a card scrolled up past the focused row at the inset's line, as the grid's own bounds did,
- * so only the focused card's glow reaches into the room above. Its place is read during drawing.
+ * Only a card whose resting top is inside the viewport can spill glow above the inset. During
+ * scrolling, fade the departing content and glow together; at rest retain the original inset clip.
+ * Read placement during drawing, not focus: focus changes before the scroll starts.
  */
-private fun Modifier.clipAboveInset(state: LazyGridState, index: Int, focused: () -> Boolean) = drawWithContent {
-    // Offsets count from the content padding's end, where the focused row stays.
-    val top = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset?.y
-    if (top == null || top >= 0 || focused()) drawContent()
-    else clipRect(-size.width, -ChannelsGridEdgeInset.toPx() - top, 2 * size.width, 2 * size.height) {
-        this@drawWithContent.drawContent()
+private fun Modifier.clipAboveInset(state: LazyGridState, index: Int) = drawWithCache {
+    val paint = Paint()
+    val inset = ChannelsGridEdgeInset.toPx()
+    val reach = CardGlowReach.toPx()
+    onDrawWithContent {
+        // Offsets count from the content padding's end, where the focused row stays.
+        val top = state.layoutInfo.visibleItemsInfo.firstOrNull { it.index == index }?.offset?.y
+        if (top == null || top >= 0) drawContent()
+        else {
+            val edge = -inset - top
+            clipRect(-size.width, edge, 2 * size.width, 2 * size.height) {
+                if (state.isScrollInProgress) {
+                    // Isolate only this departing item, without cropping its side/bottom glow.
+                    val bounds = Rect(-reach, edge, size.width + reach, size.height + reach)
+                    drawContext.canvas.saveLayer(bounds, paint)
+                    this@onDrawWithContent.drawContent()
+                    drawRect(
+                        Brush.verticalGradient(
+                            0f to Color.Transparent, 0.25f to Color.Black.copy(alpha = 0.1f),
+                            0.75f to Color.Black.copy(alpha = 0.9f), 1f to Color.Black,
+                            startY = edge, endY = edge + inset,
+                        ),
+                        topLeft = Offset(bounds.left, edge),
+                        size = Size(bounds.width, inset),
+                        blendMode = BlendMode.DstIn,
+                    )
+                    drawContext.canvas.restore()
+                } else this@onDrawWithContent.drawContent()
+            }
+        }
     }
 }
 

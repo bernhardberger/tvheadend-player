@@ -6,13 +6,17 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.test.SemanticsMatcher
@@ -43,7 +47,9 @@ import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
+import at.bernhardberger.tvhplayer.ui.TvCardFocusedScale
 import at.bernhardberger.tvhplayer.ui.player.PlayerChannelBrowser
 import at.bernhardberger.tvhplayer.ui.player.PlayerChannelBrowserState
 import at.bernhardberger.tvhplayer.ui.player.QuickZapPresentation
@@ -56,6 +62,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.experimental.categories.Category
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
@@ -95,6 +102,58 @@ class CardGlowRoomTest {
         repeat(2) { fixture.key(Key.DirectionDown) }
         // The row above still shows its last pixel rows just below the grid's inset line, as before.
         channels("grid-3-scrolled", card(1 + 2 * ChannelsGridColumns), Side.TOP, rowAbove = ChannelsGridEdgeInset.value)
+    }
+
+    @Test fun gridClipsContentAndFadesTheEdgeMidScrollInBothDirections() = gridScrollFrames()
+
+    @Test @Category(VisualCapture::class)
+    fun captureGridScrollFrames() = gridScrollFrames()
+
+    @Test @Category(VisualCapture::class)
+    fun captureScrolledGridAtRest() = gridKeepsItsGlowAboveAfterScrolling()
+
+    @Test @Category(VisualCapture::class)
+    fun captureRingPulseFrames() = ringPulsesBetweenSolidAndSeeThrough()
+
+    private fun gridScrollFrames() {
+        compose.mainClock.autoAdvance = false
+        fixture.show(ChannelsView(ChannelsLayout.GRID, setOf(ChannelsLayout.GRID)), fixture.fixtureArt(), warmPlayback = true)
+        repeat(40) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        fixture.awaitFocus(card(1))
+        val first = bounds(card(1))
+        val inset = (first.top - ChannelsGridEdgeInset.value).toInt()
+        val xRange = (first.left + first.width / 4).toInt() until (first.right - first.width / 4).toInt()
+        fun top() = compose.onNode(card(1)).fetchSemanticsNode().layoutInfo.coordinates.positionInRoot().y
+        fun sample(direction: String) {
+            val start = top()
+            compose.mainClock.advanceTimeBy(32)
+            compose.waitForIdle()
+            val middle = top()
+            assertTrue("$direction actually scrolls", abs(start - middle) > 1f)
+            val frame = draw()
+            save("grid-scroll-$direction", frame)
+            for (y in inset - 24 until inset) {
+                for (x in xRange) {
+                    // Only a smooth glow may reach this gap, not the picture/lettering or a cut edge.
+                    val step = abs(luminance(frame.getPixel(x, y)) - luminance(frame.getPixel(x, y - 1)))
+                    assertTrue("$direction: content or a cut in headline gap at $x,$y: $step", step < MaxStep)
+                }
+            }
+            val above = xRange.map { luminance(frame.getPixel(it, inset - 1)) }.average()
+            val edge = xRange.map { luminance(frame.getPixel(it, inset)) }.average()
+            assertTrue("$direction: hard cut at viewport edge: $above -> $edge", abs(edge - above) < MaxStep)
+            frame.recycle()
+            compose.mainClock.advanceTimeBy(32)
+            compose.waitForIdle()
+            assertTrue("$direction sample was mid-scroll, not at rest", abs(top() - middle) > 1f)
+            repeat(20) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        }
+        fixture.key(Key.DirectionDown)
+        fixture.awaitFocus(card(5))
+        sample("down")
+        fixture.key(Key.DirectionUp)
+        fixture.awaitFocus(card(1))
+        sample("up")
     }
 
     @Test fun immersiveRowKeepsItsGlowAbove() {
@@ -154,6 +213,65 @@ class CardGlowRoomTest {
         assertTrue("one breath reaches a solid ring: $solid", solid > 0.8f)
         assertTrue("and a see-through one: $faint of $solid",
             faint / solid in CardFocusRingPulseLow - 0.1f..CardFocusRingPulseLow + 0.1f)
+
+        fixture.key(Key.DirectionRight)
+        fixture.awaitFocus(card(2))
+        repeat(40) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        val oldBounds = bounds(card(1))
+        val newBounds = bounds(card(2))
+        val oldFrame = draw()
+        assertTrue("the old card has no ring", ringAlpha(oldFrame, oldBounds) < 0.05f)
+        val newAlphas = (1..2 * CardFocusRingPulseMs / 100).map {
+            compose.mainClock.advanceTimeBy(100)
+            compose.waitForIdle()
+            val frame = draw()
+            // The neighbour's real glow overlaps the right edge; sample this card's top ring and interior.
+            for (y in oldBounds.top.toInt() - 12 until oldBounds.bottom.toInt()) {
+                for (x in (oldBounds.left + oldBounds.width / 4).toInt() until (oldBounds.right - oldBounds.width / 4).toInt()) {
+                    assertEquals("the old card and ring pixels stay still at $x,$y", oldFrame.getPixel(x, y), frame.getPixel(x, y))
+                }
+            }
+            ringAlpha(frame, newBounds).also { frame.recycle() }
+        }
+        oldFrame.recycle()
+        assertTrue("only the new card's ring breathes: $newAlphas", newAlphas.max() - newAlphas.min() > 0.3f)
+    }
+
+    @Test fun ringRestoresCurrentInteractionsWhenMotionChanges() {
+        compose.mainClock.autoAdvance = false
+        val motion = mutableStateOf(true)
+        val source = mutableStateOf(MutableInteractionSource())
+        lateinit var ring: CardFocusRing
+        compose.setContent { ring = rememberCardFocusRing(source.value, motion.value) }
+        compose.waitForIdle()
+        compose.runOnIdle { assertTrue(source.value.tryEmit(FocusInteraction.Focus())) }
+        compose.mainClock.advanceTimeBy(CardFocusRingPulseMs.toLong())
+        compose.runOnIdle {
+            assertTrue("focused mid-breath", ring.alpha.value < 0.6f)
+            motion.value = false
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            assertEquals(1f, ring.alpha.value, 0f)
+            assertTrue(ring.shown)
+            assertEquals(TvCardFocusedScale, ring.scale.value, 0f)
+        }
+        compose.mainClock.advanceTimeBy(2 * CardFocusRingPulseMs.toLong())
+        compose.runOnIdle {
+            assertEquals(1f, ring.alpha.value, 0f)
+            motion.value = true
+        }
+        repeat(CardFocusRingPulseMs / 100) { compose.mainClock.advanceTimeBy(100); compose.waitForIdle() }
+        compose.runOnIdle {
+            assertTrue("the held focus resumes breathing", ring.alpha.value < 0.6f)
+            source.value = MutableInteractionSource()
+        }
+        compose.mainClock.advanceTimeByFrame()
+        compose.runOnIdle {
+            assertEquals(1f, ring.alpha.value, 0f)
+            assertEquals(1f, ring.scale.value, 0f)
+            assertTrue("a new source inherits neither focus nor ring", !ring.shown)
+        }
     }
 
     @Test fun ringStaysSolidWhenAnimationsAreOff() {

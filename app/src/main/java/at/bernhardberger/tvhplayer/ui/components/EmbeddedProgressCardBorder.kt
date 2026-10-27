@@ -94,11 +94,19 @@ internal fun rememberCardFocusRing(
     motionEnabled: Boolean = ValueAnimator.areAnimatorsEnabled(),
 ): CardFocusRing {
     val ring = remember { CardFocusRing() }
+    // Motion changes restart animation, not the interactions already held by this source.
+    val focuses = remember(interactionSource) { mutableListOf<FocusInteraction.Focus>() }
+    val presses = remember(interactionSource) { mutableListOf<PressInteraction.Press>() }
     LaunchedEffect(ring, interactionSource, motionEnabled) {
-        val focuses = mutableListOf<FocusInteraction.Focus>()
-        val presses = mutableListOf<PressInteraction.Press>()
+        ring.alpha.snapTo(1f)
+        ring.shown = focuses.isNotEmpty() || presses.isNotEmpty()
+        val restingFocus = focuses.isNotEmpty() && presses.isEmpty()
+        ring.scale.snapTo(if (restingFocus) TvCardFocusedScale else 1f)
         var scaling: Job? = null
-        var pulse: Job? = null
+        var pulse: Job? = if (restingFocus && motionEnabled) launch {
+            ring.alpha.animateTo(CardFocusRingPulseLow,
+                infiniteRepeatable(tween(CardFocusRingPulseMs, easing = PulseEasing), RepeatMode.Reverse))
+        } else null
         interactionSource.interactions.collect { interaction ->
             when (interaction) {
                 is FocusInteraction.Focus -> focuses += interaction
