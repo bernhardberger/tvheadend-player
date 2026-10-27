@@ -10,6 +10,41 @@ import org.junit.Test
 
 @OptIn(ExperimentalTvheadendApi::class, TvheadendTestingApi::class)
 class ProgrammeDetailsPolicyTest {
+    @Test fun brightDetailsDimUsesCompositedLuminanceAndRetainsTheSmallestPassingAlpha() {
+        fun luminance(alpha: Float): Pair<Double, Double> {
+            val background = 1.0 * (1 - alpha) + 26.0 / 255 * alpha
+            val foreground = 192.0 / 255 * .70 + background * .30
+            return detailsRelativeLuminance(foreground, foreground, foreground) to
+                detailsRelativeLuminance(background, background, background)
+        }
+        val dim = detailsBackdropDimAlpha(.4f, ::luminance)
+        val (foreground, background) = luminance(dim)
+        assertTrue(dim > .4f)
+        assertTrue((foreground + .05) / (background + .05) >= 4.5)
+        val (tooLightText, tooLightArt) = luminance(dim - .001f)
+        assertTrue((tooLightText + .05) / (tooLightArt + .05) < 4.55)
+    }
+
+    @Test fun darkDetailsKeepTheirSharpScrolledAndReadingFloors() {
+        val dark = IntArray(160 * 90) { 0x202020 }
+        assertEquals(0f, measuredDetailsDim(dark, sharp = true, floor = 0f), 0f)
+        assertEquals(.4f, measuredDetailsDim(dark, sharp = false, floor = .4f), 0f)
+        assertEquals(.6f, measuredDetailsDim(dark, sharp = false, floor = .6f), 0f)
+    }
+
+    @Test fun isolatedHighlightsAreNotAveragedOutOfDetailsMeasurements() {
+        val pixels = IntArray(320 * 180) { 0xff101010.toInt() }
+        pixels[90 * 320 + 160] = 0xffffffff.toInt()
+        val samples = detailsBackdropSamples(pixels, 320, 180)
+        assertEquals(0xffffff, samples[45 * 160 + 80])
+        assertTrue(measuredDetailsDim(samples, sharp = false, floor = .4f) > .4f)
+    }
+
+    @Test fun smallArtCoversEveryDetailsSample() {
+        val samples = detailsBackdropSamples(IntArray(16 * 9) { 0xffffffff.toInt() }, 16, 9)
+        assertTrue(samples.all { it == 0xffffff })
+    }
+
     private val event = EpgEvent.create(EventId(1), ChannelId(1), Instant.fromEpochSeconds(100), Instant.fromEpochSeconds(200))
     private fun recording(state: DvrEntryState, position: Long = 0, files: List<DvrRecordingFile>? = null) = DvrEntry.create(
         DvrEntryId(1), state = state, start = event.start, stop = event.stop, playPosition = position.seconds, files = files)
