@@ -7,15 +7,19 @@ cd "$ROOT_DIR"
 # --staged-sdk builds against the SDK checkout staged in ../tvheadend-sdk/build/local-maven so an
 # SDK fix can be tested before it is published. Such a run cannot prove public SDK consumption, so
 # it drops only SDK provenance and reports a weaker conclusion. It never gates a release.
+# --release adds the Appliance build: its lint, debug APK and manifest contract. Routine
+# verification covers Play only, since Appliance compiles and lints the same sources again.
 staged_sdk=false
 capture_tests=exclude
+release_checks=false
 for argument in "$@"; do
     case "$argument" in
         --staged-sdk) staged_sdk=true ;;
         --visual-captures) capture_tests=all ;;
+        --release) release_checks=true ;;
         *)
             printf 'error: unknown option: %s\n' "$argument" >&2
-            printf 'usage: tools/verify [--staged-sdk] [--visual-captures]\n' >&2
+            printf 'usage: tools/verify [--staged-sdk] [--visual-captures] [--release]\n' >&2
             exit 1
             ;;
     esac
@@ -33,6 +37,10 @@ if [[ "${TVHPLAYER_VERIFY_ISOLATED:-}" == 1 ]]; then
     gradle_arguments+=(--no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process)
 fi
 provenance_tasks=(:app:verifyExternalSdkConsumption)
+appliance_tasks=()
+if [[ "$release_checks" == true ]]; then
+    appliance_tasks=(:app:lintApplianceDebug :app:assembleApplianceDebug)
+fi
 if [[ "$staged_sdk" == true ]]; then
     gradle_arguments+=(-Ptvheadend.sdk.local=true)
     provenance_tasks=()
@@ -84,9 +92,8 @@ gradle_common=("${gradle_arguments[@]}" "-Ptvhplayer.captureTests=$capture_tests
     :client:testDebugUnitTest :decoder-ffmpeg:testDebugUnitTest :app:testPlayDebugUnitTest \
     "${gradle_common[@]}"
 ./gradlew \
-    :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:lintApplianceDebug \
-    :app:assemblePlayDebug :app:assembleApplianceDebug \
-    "${provenance_tasks[@]}" \
+    :client:lintDebug :decoder-ffmpeg:lintDebug :app:lintPlayDebug :app:assemblePlayDebug \
+    "${appliance_tasks[@]}" "${provenance_tasks[@]}" \
     "${gradle_common[@]}"
 
 printf '==> External native dependency and packaged APK integrity\n'
@@ -102,7 +109,7 @@ if [[ ! -f "$apk" ]]; then
     printf 'error: expected APK was not produced: %s\n' "$apk" >&2
     exit 1
 fi
-if [[ ! -f "$appliance_apk" ]]; then
+if [[ "$release_checks" == true && ! -f "$appliance_apk" ]]; then
     printf 'error: expected Appliance APK was not produced: %s\n' "$appliance_apk" >&2
     exit 1
 fi
@@ -131,25 +138,19 @@ if ! "$zipalign" -c -P 16 4 "$apk"; then
     printf 'error: APK native libraries are not 16 KB zip-aligned\n' >&2
     exit 1
 fi
-if ! "$zipalign" -c -P 16 4 "$appliance_apk"; then
+if [[ "$release_checks" == true ]] && ! "$zipalign" -c -P 16 4 "$appliance_apk"; then
     printf 'error: Appliance APK native libraries are not 16 KB zip-aligned\n' >&2
     exit 1
 fi
 
 badging="$($aapt dump badging "$apk")"
 play_manifest="$($aapt dump xmltree "$apk" AndroidManifest.xml)"
-manifest_tree="$($aapt dump xmltree "$appliance_apk" AndroidManifest.xml)"
-appliance_badging="$($aapt dump badging "$appliance_apk")"
-accessibility_tree="$($aapt dump xmltree "$appliance_apk" res/xml/appliance_entry_accessibility_service.xml)"
 
 if [[ "$play_manifest" != *'android.intent.category.LEANBACK_LAUNCHER'* ||
       "$play_manifest" == *'android.intent.category.HOME'* ||
       "$play_manifest" == *'android.accessibilityservice.AccessibilityService'* ||
-      "$play_manifest" == *'ApplianceEntryAccessibilityService'* ||
-      "$appliance_badging" != *"package: name='at.bernhardberger.tvhplayer.appliance'"* ||
-      "$appliance_badging" != *"application-label:'Tvheadend Player Appliance'"* ||
-      "$manifest_tree" != *'android.intent.category.LEANBACK_LAUNCHER'* ]]; then
-    printf 'error: Play/Appliance manifest contract failed\n' >&2
+      "$play_manifest" == *'ApplianceEntryAccessibilityService'* ]]; then
+    printf 'error: Play manifest contract failed\n' >&2
     exit 1
 fi
 
@@ -167,43 +168,55 @@ for expected in "${required_badging[@]}"; do
     fi
 done
 
-required_home_entries=(
-    'android.intent.category.HOME'
-    'android.intent.category.DEFAULT'
-)
-for expected in "${required_home_entries[@]}"; do
-    if [[ "$manifest_tree" != *"$expected"* ]]; then
-        printf 'error: APK manifest is missing HOME entry %s\n' "$expected" >&2
+if [[ "$release_checks" == true ]]; then
+    manifest_tree="$($aapt dump xmltree "$appliance_apk" AndroidManifest.xml)"
+    appliance_badging="$($aapt dump badging "$appliance_apk")"
+    accessibility_tree="$($aapt dump xmltree "$appliance_apk" res/xml/appliance_entry_accessibility_service.xml)"
+    if [[ "$appliance_badging" != *"package: name='at.bernhardberger.tvhplayer.appliance'"* ||
+          "$appliance_badging" != *"application-label:'Tvheadend Player Appliance'"* ||
+          "$manifest_tree" != *'android.intent.category.LEANBACK_LAUNCHER'* ]]; then
+        printf 'error: Appliance manifest contract failed\n' >&2
         exit 1
     fi
-done
 
-required_accessibility_entries=(
-    'at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService'
-    'android.permission.BIND_ACCESSIBILITY_SERVICE'
-    'android.accessibilityservice.AccessibilityService'
-)
-for expected in "${required_accessibility_entries[@]}"; do
-    if [[ "$manifest_tree" != *"$expected"* ]]; then
-        printf 'error: APK manifest is missing accessibility entry %s\n' "$expected" >&2
-        exit 1
-    fi
-done
+    required_home_entries=(
+        'android.intent.category.HOME'
+        'android.intent.category.DEFAULT'
+    )
+    for expected in "${required_home_entries[@]}"; do
+        if [[ "$manifest_tree" != *"$expected"* ]]; then
+            printf 'error: APK manifest is missing HOME entry %s\n' "$expected" >&2
+            exit 1
+        fi
+    done
 
-required_accessibility_metadata=(
-    'android:accessibilityFlags(0x01010384)=(type 0x11)0x21'
-    'android:canRetrieveWindowContent(0x01010385)=(type 0x12)0x0'
-    'android:canRequestFilterKeyEvents(0x010103d9)=(type 0x12)0xffffffff'
-)
-for expected in "${required_accessibility_metadata[@]}"; do
-    if [[ "$accessibility_tree" != *"$expected"* ]]; then
-        printf 'error: accessibility metadata is missing %s\n' "$expected" >&2
+    required_accessibility_entries=(
+        'at.bernhardberger.tvhplayer.accessibility.ApplianceEntryAccessibilityService'
+        'android.permission.BIND_ACCESSIBILITY_SERVICE'
+        'android.accessibilityservice.AccessibilityService'
+    )
+    for expected in "${required_accessibility_entries[@]}"; do
+        if [[ "$manifest_tree" != *"$expected"* ]]; then
+            printf 'error: APK manifest is missing accessibility entry %s\n' "$expected" >&2
+            exit 1
+        fi
+    done
+
+    required_accessibility_metadata=(
+        'android:accessibilityFlags(0x01010384)=(type 0x11)0x21'
+        'android:canRetrieveWindowContent(0x01010385)=(type 0x12)0x0'
+        'android:canRequestFilterKeyEvents(0x010103d9)=(type 0x12)0xffffffff'
+    )
+    for expected in "${required_accessibility_metadata[@]}"; do
+        if [[ "$accessibility_tree" != *"$expected"* ]]; then
+            printf 'error: accessibility metadata is missing %s\n' "$expected" >&2
+            exit 1
+        fi
+    done
+    if [[ "$accessibility_tree" == *'android:accessibilityEventTypes'* ]]; then
+        printf 'error: accessibility service must not subscribe to window or content events\n' >&2
         exit 1
     fi
-done
-if [[ "$accessibility_tree" == *'android:accessibilityEventTypes'* ]]; then
-    printf 'error: accessibility service must not subscribe to window or content events\n' >&2
-    exit 1
 fi
 
 printf '==> APK identity\n'
@@ -218,6 +231,8 @@ sha256sum "$apk"
 
 if [[ "$staged_sdk" == true ]]; then
     printf '==> Development checks passed against the staged SDK (NOT release-verified)\n'
+elif [[ "$release_checks" == true ]]; then
+    printf '==> Verification passed (Play and Appliance)\n'
 else
-    printf '==> Verification passed\n'
+    printf '==> Verification passed (Play; the release path adds Appliance with --release)\n'
 fi

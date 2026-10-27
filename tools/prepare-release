@@ -52,7 +52,7 @@ temporary_dir="$(mktemp -d)"
 trap 'rm -rf "$temporary_dir"' EXIT
 
 cd "$ROOT_DIR"
-./tools/verify
+./tools/verify --release
 # Release bytes are always built from scratch: a fresh JVM and no outputs restored from the build cache.
 ./gradlew clean :app:syncReleasedSdkEvidence :app:assemblePlayRelease :app:assembleApplianceRelease :app:bundlePlayRelease --no-daemon --no-build-cache
 
