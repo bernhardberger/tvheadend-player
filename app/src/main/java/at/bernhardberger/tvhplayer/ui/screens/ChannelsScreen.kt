@@ -128,6 +128,8 @@ import at.bernhardberger.tvhplayer.ui.TvBrowseHeaderHeight
 import at.bernhardberger.tvhplayer.ui.TvBrowseLeadingInset
 import at.bernhardberger.tvhplayer.ui.TvBrowseTrailingInset
 import at.bernhardberger.tvhplayer.ui.screens.guide.guideHeadlineHeight
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlineRulerGap
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideHeadlinePictureReach
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.ChannelScopeState
 import kotlinx.coroutines.Job
@@ -670,9 +672,11 @@ internal fun ChannelsScreenContent(
                     logoTop = contentPadding.calculateTopPadding() + TvBrowseHeaderHeight,
                     endInset = detailPanePadding.calculateEndPadding(layoutDirection),
                     modifier = Modifier.fillMaxSize(),
-                    // Over the grid the picture ends with the headline, clear of the cards.
+                    // Over the grid the picture reaches past the headline into the first row, as the
+                    // Guide's does, so it fades out behind the cards rather than above them.
                     pictureHeight = if (layout == ChannelsLayout.GRID) {
-                        contentPadding.calculateTopPadding() + TvBrowseHeaderHeight + ChannelsHeaderGap + guideHeadlineHeight()
+                        contentPadding.calculateTopPadding() + TvBrowseHeaderHeight + ChannelsHeaderGap + guideHeadlineHeight() +
+                            GuideHeadlineRulerGap + GuideHeadlinePictureReach
                     } else null,
                 )
             }
