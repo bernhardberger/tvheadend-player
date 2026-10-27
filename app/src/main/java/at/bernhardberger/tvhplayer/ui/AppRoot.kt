@@ -1285,22 +1285,28 @@ fun AppRoot(
                             }
                         },
                         nowPlaying = nowPlaying,
+                        nowPlayingPaused = at.bernhardberger.tvhplayer.ui.components.drawerControlPaused(
+                            nowPlaying?.target, activeTarget, livePause,
+                            at.bernhardberger.tvhplayer.ui.components.rememberPlaybackIntent(playbackRuntime.player).value,
+                        ) == true,
                         livePauseAvailable = livePause.availability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.READY ||
                             livePause.availability == at.bernhardberger.tvhplayer.playback.LivePauseAvailability.STARTING,
                         onToggleNowPlayingPause = {
                             val target = nowPlaying?.target
-                            if (target != null && playbackRuntime.activeTarget.value == target) {
-                                val playing = if (target is AppPlaybackTarget.Live) {
-                                    at.bernhardberger.tvhplayer.ui.player.livePlayWhenReady(
-                                        playbackRuntime.livePause.value, playbackRuntime.player.playWhenReady)
-                                } else playbackRuntime.player.playWhenReady
+                            val playWhenReady = at.bernhardberger.tvhplayer.ui.components.drawerTogglePlayWhenReady(
+                                target, playbackRuntime.activeTarget.value,
+                                playbackRuntime.livePause.value, playbackRuntime.player.playWhenReady,
+                            )
+                            if (playWhenReady != null) {
                                 // Same local/server transport as player keys, with the runtime's intent fence.
-                                playbackRuntime.setSessionPlayWhenReady(!playing) { playbackRuntime.activeTarget.value == target }
+                                playbackRuntime.setSessionPlayWhenReady(playWhenReady) { playbackRuntime.activeTarget.value == target }
                             }
                         },
                         onStopNowPlaying = {
                             val target = nowPlaying?.target
-                            if (target != null && playbackRuntime.activeTarget.value == target) {
+                            if (at.bernhardberger.tvhplayer.ui.components.shouldStopDrawerPlayback(
+                                    target, playbackRuntime.activeTarget.value, browseStop?.isCompleted == false,
+                                )) {
                                 browseStop = playbackSelectionScope.launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
                                     withContext(NonCancellable) { playbackRuntime.stop() }
                                 }

@@ -34,6 +34,35 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.LivePauseState
+import at.bernhardberger.tvhplayer.ui.player.livePlayWhenReady
+
+/** Null means this drawer item no longer owns the transport. */
+internal fun drawerControlPaused(
+    target: AppPlaybackTarget?,
+    activeTarget: AppPlaybackTarget?,
+    livePause: LivePauseState,
+    playerPlayWhenReady: Boolean,
+): Boolean? {
+    if (target == null || target != activeTarget) return null
+    return when (target) {
+        is AppPlaybackTarget.Live -> !livePlayWhenReady(livePause, playerPlayWhenReady)
+        is AppPlaybackTarget.Recording -> !playerPlayWhenReady
+    }
+}
+
+internal fun drawerTogglePlayWhenReady(
+    target: AppPlaybackTarget?,
+    activeTarget: AppPlaybackTarget?,
+    livePause: LivePauseState,
+    playerPlayWhenReady: Boolean,
+): Boolean? = drawerControlPaused(target, activeTarget, livePause, playerPlayWhenReady)
+
+internal fun shouldStopDrawerPlayback(
+    target: AppPlaybackTarget?,
+    activeTarget: AppPlaybackTarget?,
+    stopInFlight: Boolean,
+): Boolean = !stopInFlight && target != null && target == activeTarget
 
 /** Presentation only: a stall retains pause intent; only the owned tune spins. */
 enum class ChannelPlaybackIndicator { NONE, PLAYING, PAUSED, TUNING }

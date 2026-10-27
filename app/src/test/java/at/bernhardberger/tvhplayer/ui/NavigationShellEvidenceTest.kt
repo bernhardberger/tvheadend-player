@@ -1,6 +1,17 @@
 package at.bernhardberger.tvhplayer.ui
 
 import android.app.Application
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import org.robolectric.util.ReflectionHelpers
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -71,6 +82,10 @@ import at.bernhardberger.tvheadend.sdk.media3.PlaybackRecoveryReason
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
 import at.bernhardberger.tvhplayer.playback.AppPlaybackState
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.playback.LivePauseAvailability
+import at.bernhardberger.tvhplayer.playback.LivePauseState
+import at.bernhardberger.tvhplayer.ui.components.drawerControlPaused
+import at.bernhardberger.tvhplayer.ui.components.drawerTogglePlayWhenReady
 import at.bernhardberger.tvhplayer.settings.AppLanguage
 import at.bernhardberger.tvhplayer.settings.UiSettings
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
@@ -382,12 +397,69 @@ class NavigationShellEvidenceTest {
         playLive()
         openDrawer()
         focusControl("pause")
-        compose.runOnIdle { browseBack() }
+        key(Key.Back)
         compose.waitForIdle()
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         assertEquals(0, toggled)
         assertEquals(0, stopped)
         assertEquals(0, opened)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun pendingPauseWhileStartingShowsPlayAndTheNextPressResumes() {
+        settingsShell(1f)
+        playLive()
+        compose.runOnIdle {
+            watchingIndicator = ChannelPlaybackIndicator.TUNING
+            transportPause = LivePauseState(LivePauseAvailability.STARTING, selectionPending = true)
+        }
+        openDrawer()
+        focusControl("pause")
+        compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
+        key(Key.DirectionCenter)
+        compose.onAllNodesWithContentDescription("Play").assertCountEquals(1)
+        compose.onNodeWithTag("global-drawer-now-playing-glyph-tuning", useUnmergedTree = true).assertExists()
+        assertTrue(transportPause.pending)
+        key(Key.DirectionCenter)
+        assertEquals(false, transportPause.pending)
+        compose.onAllNodesWithContentDescription("Pause").assertCountEquals(1)
+        assertEquals(2, toggled)
+    }
+
+    @Test
+    @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
+    fun reducedMotionSettingIsReadAgainOnResumeWithoutRecreatingTheShell() {
+        fun durationScale(value: Float) = ReflectionHelpers.callStaticMethod<Unit>(
+            android.animation.ValueAnimator::class.java, "setDurationScale",
+            ReflectionHelpers.ClassParameter.from(Float::class.javaPrimitiveType, value))
+        durationScale(1f)
+        animateNowPlaying = null
+        try {
+            settingsShell(1f)
+            compose.mainClock.autoAdvance = false
+            playLive()
+            compose.mainClock.advanceTimeBy(2_000)
+            compose.waitForIdle()
+            val moving = drawShell()
+            compose.mainClock.advanceTimeBy(320)
+            compose.waitForIdle()
+            assertTrue("playing marker animates before the setting changes", !moving.sameAs(drawShell()))
+            compose.runOnIdle {
+                shellLifecycle.currentState = Lifecycle.State.CREATED
+                durationScale(0f)
+                shellLifecycle.currentState = Lifecycle.State.RESUMED
+            }
+            compose.mainClock.advanceTimeBy(32)
+            compose.waitForIdle()
+            val still = drawShell()
+            compose.mainClock.advanceTimeBy(320)
+            compose.waitForIdle()
+            assertTrue("resumed shell uses a static marker", still.sameAs(drawShell()))
+        } finally {
+            durationScale(1f)
+            compose.mainClock.autoAdvance = true
+        }
     }
 
     private fun control(name: String) = compose.onNodeWithTag("global-drawer-now-playing-$name")
@@ -423,6 +495,11 @@ class NavigationShellEvidenceTest {
         openDrawer()
         compose.runOnIdle { watchingIndicator = ChannelPlaybackIndicator.PLAYING; pauseAvailable = false }
         captureNowPlaying("G-4-no-timeshift")
+        // The bright Northline mark and recording title share the fixture's news scene.
+        key(Key.DirectionRight)
+        playRecording()
+        assertEquals(80f, drawerWidth(), .5f)
+        captureNowPlaying("R9-closed-recording-bright-logo")
     }
 
     @Category(VisualCapture::class)
@@ -986,9 +1063,15 @@ class NavigationShellEvidenceTest {
     private var opened = 0
     private var pauseAvailable by mutableStateOf(true)
     private var toggled = 0
+    private var transportPause by mutableStateOf(LivePauseState(LivePauseAvailability.READY))
     private var stopped = 0
     private var browseBack: () -> Unit = {}
     private var viewerColor = Color.Unspecified
+    private var animateNowPlaying: Boolean? = false
+    private val shellOwner = object : LifecycleOwner {
+        override val lifecycle = LifecycleRegistry(this)
+    }
+    private val shellLifecycle get() = shellOwner.lifecycle
 
     /** Live on Ridge Earth at the live edge, as the runtime reports it while browse keeps it warm. */
     private fun playLive() {
@@ -1016,9 +1099,12 @@ class NavigationShellEvidenceTest {
     /** Settings root on the global shell, over an offline video-like still. */
     private fun settingsShell(fontScale: Float) {
         val still = FixtureArt.art("still-ridge-light").asImageBitmap()
+        val recordingStill = FixtureArt.art("still-northline-studio").asImageBitmap()
         lateinit var navigation: DepthNavigationState
+        compose.runOnUiThread { shellLifecycle.currentState = Lifecycle.State.RESUMED }
         compose.setContent {
             CompositionLocalProvider(
+                LocalLifecycleOwner provides shellOwner,
                 LocalDensity provides Density(1f, fontScale),
                 LocalWatchingTarget provides (heldTarget ?: nowPlaying?.target),
                 LocalWatchingChannel provides ((heldTarget ?: nowPlaying?.target) as? AppPlaybackTarget.Live)?.channelId,
@@ -1027,12 +1113,22 @@ class NavigationShellEvidenceTest {
                 LocalRecordingPosition provides recordingPosition,
             ) {
                 TVHeadendPlayerTheme {
+                    BackHandler { browseBack() }
+                    val backDispatcher = LocalOnBackPressedDispatcherOwner.current!!.onBackPressedDispatcher
                     view = LocalView.current
                     viewerColor = MaterialTheme.colorScheme.tertiary
                     navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
-                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+                    // Robolectric's Compose key injection stops at the view; supply the activity's
+                    // unhandled-Back fallback after child key handlers have had the event.
+                    Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).onKeyEvent {
+                        if (it.key == Key.Back && it.type == KeyEventType.KeyUp) {
+                            backDispatcher.onBackPressed()
+                            true
+                        } else false
+                    }) {
                         if (warmPlayback) {
-                            Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                            Image(if (nowPlaying?.target is AppPlaybackTarget.Recording) recordingStill else still,
+                                null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             WarmPlaybackScrim()
                         }
                         ProvideArtworkSession(fixtureObservation.currentSession) {
@@ -1044,15 +1140,22 @@ class NavigationShellEvidenceTest {
                             onNavigate = { navigations += it },
                             nowPlaying = nowPlaying,
                             livePauseAvailable = pauseAvailable,
-                            animateNowPlaying = false,
+                            nowPlayingPaused = drawerControlPaused(nowPlaying?.target, nowPlaying?.target,
+                                transportPause, watchingIndicator != ChannelPlaybackIndicator.PAUSED) == true,
+                            animateNowPlaying = animateNowPlaying,
                             programmeAt = { _, at ->
                                 listOf(fixtureProgramme, fixtureFollowing).firstOrNull { guideData && it.isRunning(at) }
                             },
                             onOpenNowPlaying = { opened++ },
                             onToggleNowPlayingPause = {
                                 toggled++
-                                watchingIndicator = if (watchingIndicator == ChannelPlaybackIndicator.PAUSED)
-                                    ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.PAUSED
+                                val playing = drawerTogglePlayWhenReady(nowPlaying?.target, nowPlaying?.target,
+                                    transportPause, watchingIndicator != ChannelPlaybackIndicator.PAUSED)!!
+                                if (transportPause.selectionPending) {
+                                    transportPause = transportPause.copy(pending = !playing)
+                                } else {
+                                    watchingIndicator = if (playing) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.PAUSED
+                                }
                             },
                             onStopNowPlaying = { stopped++; nowPlaying = null },
                             nowSecProvider = { clock },

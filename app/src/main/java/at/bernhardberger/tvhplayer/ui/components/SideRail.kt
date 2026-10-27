@@ -93,6 +93,7 @@ import androidx.tv.material3.NavigationDrawerItemDefaults
 import androidx.tv.material3.NavigationDrawerScope
 import androidx.tv.material3.Text
 import androidx.tv.material3.rememberDrawerState
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.BuildConfig
@@ -262,12 +263,18 @@ internal fun SideRail(
     programmeAt: (ChannelId, Long) -> EpgEvent? = { _, _ -> null },
     onOpenNowPlaying: () -> Unit = {},
     livePauseAvailable: Boolean = false,
+    nowPlayingPaused: Boolean = false,
     onToggleNowPlayingPause: () -> Unit = {},
     onStopNowPlaying: () -> Unit = {},
-    animateNowPlaying: Boolean = android.animation.ValueAnimator.areAnimatorsEnabled(),
+    animateNowPlaying: Boolean? = null,
     nowSecProvider: () -> Long = { System.currentTimeMillis() / 1000L },
     content: @Composable (PaddingValues, drawerActive: Boolean) -> Unit,
 ) {
+    var systemAnimationsEnabled by remember { mutableStateOf(android.animation.ValueAnimator.areAnimatorsEnabled()) }
+    LifecycleResumeEffect(Unit) {
+        systemAnimationsEnabled = android.animation.ValueAnimator.areAnimatorsEnabled()
+        onPauseOrDispose { }
+    }
     val channelsLabel = stringResource(R.string.nav_channels)
     val epgLabel = stringResource(R.string.nav_epg)
     val recordingsLabel = stringResource(R.string.nav_recordings)
@@ -495,6 +502,7 @@ internal fun SideRail(
                             expanded = drawerValue == DrawerValue.Open,
                             controlsEnabled = !detailsOpen && !modalOpen,
                             pauseAvailable = pauseAvailable,
+                            paused = nowPlayingPaused,
                             fullScreenFocus = fullScreenFocus,
                             channelsFocus = itemFocus[AppDestination.CHANNELS] ?: activeItemFocus,
                             programmeAt = programmeAt,
@@ -506,7 +514,7 @@ internal fun SideRail(
                                 if (focused) focusedControl = control
                                 else if (focusedControl == control) focusedControl = null
                             },
-                            animated = animateNowPlaying,
+                            animated = animateNowPlaying ?: systemAnimationsEnabled,
                         )
                     }
 
@@ -699,6 +707,8 @@ private val NowPlayingPlateGap = 12.dp
 
 /** The labels start [NowPlayingPlateGap] after the plate, which reaches past the destinations' icons. */
 private val NowPlayingTextStart = ItemIconCenter + NowPlayingPlateWidth / 2 + NowPlayingPlateGap
+// Compensates the pill and button's inner padding so the first icon aligns with the title.
+private val ControlIconPaddingCompensation = 10.dp
 
 /**
  * The top section while something plays behind browse: the playing channel's plate on the mark's
@@ -714,6 +724,7 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
     expanded: Boolean,
     controlsEnabled: Boolean,
     pauseAvailable: Boolean,
+    paused: Boolean,
     fullScreenFocus: FocusRequester,
     channelsFocus: FocusRequester?,
     programmeAt: (ChannelId, Long) -> EpgEvent?,
@@ -800,7 +811,7 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
         }
         Box(Modifier.height(36.dp)) {
             if (expanded) DrawerNowPlayingControls(
-                paused = indicator == ChannelPlaybackIndicator.PAUSED,
+                paused = paused,
                 pauseAvailable = pauseAvailable,
                 enabled = controlsEnabled,
                 fullScreenFocus = fullScreenFocus,
@@ -831,7 +842,7 @@ private fun DrawerNowPlayingControls(
     val stopFocus = remember { FocusRequester() }
     val controls = listOf("fullscreen", "pause", "stop").filter { it != "pause" || pauseAvailable }
     val requesters = listOfNotNull(fullScreenFocus, pauseFocus.takeIf { pauseAvailable }, stopFocus)
-    Row(Modifier.padding(start = NowPlayingTextStart - 10.dp, top = 4.dp)
+    Row(Modifier.padding(start = NowPlayingTextStart - ControlIconPaddingCompensation, top = 4.dp)
         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha), CircleShape)
         // 4dp ends keep the kit's 1.1x disc inside the rounded capsule.
         .padding(horizontal = 4.dp, vertical = 2.dp).testTag("global-drawer-now-playing-controls"),

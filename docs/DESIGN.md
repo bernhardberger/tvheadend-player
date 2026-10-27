@@ -432,7 +432,7 @@ Anatomy per Material for TV / design kit:
   28dp TV Material icon buttons, 16dp icons, 2dp gaps and padded ends that contain
   the kit's focused disc. The first icon aligns with the title. The row reserves
   36dp even when closed; only the open drawer composes the controls. Pause is
-  omitted for live targets without timeshift, but always offered for recordings.
+  omitted for live targets without timeshift, but always offered for recordings; a paused live channel shows Play only while timeshift is available, otherwise only Full screen and Stop remain.
   Full screen returns without retuning; Pause/Play uses the player's transport;
   Stop ends playback. Each button has one spoken label and is never selected.
   Drawer entry focuses the current destination. Up from Channels explicitly
