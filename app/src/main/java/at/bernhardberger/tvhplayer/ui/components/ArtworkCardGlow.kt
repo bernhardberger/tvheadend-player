@@ -48,6 +48,6 @@ internal fun artworkCardGlow(
             rgb?.let { Color(0xFF000000.toInt() or it) } ?: neutral,
             tween(320), label = "cardGlowColor",
         )
-        CardDefaults.glow(focusedGlow = Glow(color.copy(alpha = 0.45f), 12.dp))
+        CardDefaults.glow(focusedGlow = Glow(color.copy(alpha = 0.45f), 24.dp))
     }
 }

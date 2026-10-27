@@ -94,7 +94,7 @@ class ArtworkCardGlowTest {
         compose.waitForIdle()
     }
 
-    private fun glow(color: Color) = CardDefaults.glow(focusedGlow = Glow(color.copy(alpha = .45f), 12.dp))
+    private fun glow(color: Color) = CardDefaults.glow(focusedGlow = Glow(color.copy(alpha = .45f), 24.dp))
 
     @Test fun noPictureOrLogoStaysNeutralWithoutDecoding() {
         show(logo = null)

@@ -547,8 +547,10 @@ private val DetailsHeadingContentGap = 16.dp
 
 @Composable
 private fun DetailsSectionHeading(title: String, emphasis: () -> Float, modifier: Modifier = Modifier,
-    focusOverflow: androidx.compose.ui.unit.Dp = AiringCardWidth / (16f / 9f) * .05f + 3.dp,
-    bottomSpace: androidx.compose.ui.unit.Dp = DetailsHeadingContentGap - 4.dp) {
+    focusOverflow: androidx.compose.ui.unit.Dp = AiringCardWidth / (16f / 9f) * .05f + EmbeddedProgressCardBorderOutset,
+    // Reserve the outline in the section height too, not only the quiet heading's displacement.
+    // The optical correction accounts for the heading's glyph descent and the row's own padding.
+    bottomSpace: androidx.compose.ui.unit.Dp = DetailsHeadingContentGap - 7.dp + EmbeddedProgressCardBorderOutset) {
     Text(title, modifier.layout { measurable, constraints ->
         val heading = measurable.measure(constraints)
         layout(heading.width, heading.height + bottomSpace.roundToPx()) { heading.place(0, 0) }

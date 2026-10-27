@@ -344,8 +344,8 @@ class QuickZapPresentationTest {
                     }
                     assertTrue("ring missing at $degrees degrees", ring.isNotEmpty())
                     val gap = ring.first() - radius
-                    assertEquals("$state native radius=$radius corner=$dx,$dy angle=$degrees inner gap", .5f, gap, .4f)
-                    assertEquals("$state centered 3dp stroke at $degrees degrees", 3f, ring.last() - ring.first(), .5f)
+                    assertEquals("$state native radius=$radius corner=$dx,$dy angle=$degrees inner gap", 1.75f, gap, .4f)
+                    assertEquals("$state centered 2.5dp stroke at $degrees degrees", 2.5f, ring.last() - ring.first(), .5f)
                     gap
                 }
             }
@@ -500,7 +500,7 @@ class QuickZapPresentationTest {
         val bounds = card(2).fetchSemanticsNode().boundsInRoot
         val scale = compose.onNodeWithTag("player-channel-2-progress", useUnmergedTree = true)
             .fetchSemanticsNode().boundsInRoot.width / bounds.width
-        val outlineTop = bounds.center.y - (bounds.height / 2f + 2f) * scale
+        val outlineTop = bounds.center.y - (bounds.height / 2f + 3f) * scale
         assertEquals(focusColor, pixel(bounds.center.x, outlineTop))
         assertEquals(0xFFE1E2E5.toInt(), focusColor)
     }
