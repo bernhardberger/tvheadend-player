@@ -284,7 +284,10 @@ class GuideVisualLayoutTest {
         show(headline = true)
         repeat(11) { key(Key.DirectionDown) }
         focused(title(12, 0))
-        repeat(4) { key(Key.DirectionRight) }
+        repeat(4) { offset ->
+            key(Key.DirectionRight)
+            focused(title(12, offset + 1))
+        }
         focused(title(12, 4))
         val left = checkNotNull(position.position.value)
         assertNotEquals(hour - 1800, left.windowStartSec)
@@ -577,7 +580,10 @@ class GuideVisualLayoutTest {
         key(Key.DirectionDown)
         focused(title(1, 0))
         // The fourth programme (23:00) moves the window past now, to a start off the half hour.
-        repeat(3) { key(Key.DirectionRight) }
+        repeat(3) { offset ->
+            key(Key.DirectionRight)
+            focused(title(1, offset + 1))
+        }
         focused(title(1, 3))
         val start = checkNotNull(position.position.value).windowStartSec
         assertTrue("The window starts at ${Instant.fromEpochSeconds(start)}", start % 1800 != 0L && start > now)
@@ -1065,7 +1071,12 @@ class GuideVisualLayoutTest {
         key(Key.DirectionDown)
         focused(title(1, 0))
         // The fourth programme scrolls the window past now; the third still fits beside it.
-        repeat(3) { key(Key.DirectionRight) }
+        // Window preparation runs off the Compose scheduler. waitForIdle alone can return
+        // while it is pending, when Guide deliberately consumes the next navigation key.
+        repeat(3) { offset ->
+            key(Key.DirectionRight)
+            focused(title(1, offset + 1))
+        }
         focused(title(1, 3))
         repeat(7) { key(Key.DirectionDown) }
         focused(title(9, 3)) // The metadata-only third channel is not an invented programme.
@@ -2610,7 +2621,10 @@ class GuideVisualLayoutTest {
         val nowWindow = checkNotNull(position.position.value).windowStartSec
         key(Key.DirectionDown)
         focused(title(2, 0))
-        repeat(4) { key(Key.DirectionRight) }
+        repeat(4) { offset ->
+            key(Key.DirectionRight)
+            focused(title(2, offset + 1))
+        }
         focused(title(2, 4))
         assertNotEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
         key(Key.Back)
@@ -2638,7 +2652,10 @@ class GuideVisualLayoutTest {
             key(Key.DirectionDown)
             focused(title(2, 1))
             val nowWindow = checkNotNull(position.position.value).windowStartSec
-            repeat(3) { key(Key.DirectionRight) }
+            repeat(3) { offset ->
+                key(Key.DirectionRight)
+                focused(title(2, offset + 2))
+            }
             focused(title(2, 4))
             assertNotEquals(nowWindow, checkNotNull(position.position.value).windowStartSec)
             val full = checkNotNull(session.observation.value.epgSnapshotForDisplay)
