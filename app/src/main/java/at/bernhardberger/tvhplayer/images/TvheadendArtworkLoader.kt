@@ -4,6 +4,7 @@ import android.content.Context
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.android.addTvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.player.PlayerMotion
 import coil3.ImageLoader
@@ -22,6 +23,17 @@ private class AppArtworkMapper(private val session: TvheadendSession) : Mapper<A
         data.currentSession?.let { TvheadendArtwork.create(session, it, data.id) } ?: data.saved
 }
 
+internal fun remoteLogoHttpClient(): OkHttpClient = OkHttpClient.Builder()
+    .retryOnConnectionFailure(false)
+    .callTimeout(10, TimeUnit.SECONDS)
+    .addNetworkInterceptor { chain ->
+        chain.proceed(chain.request().newBuilder().header(
+            "User-Agent",
+            "TvheadendPlayer/${BuildConfig.VERSION_NAME} (+https://github.com/bernhardberger/tvheadend-player)",
+        ).build())
+    }
+    .build()
+
 fun buildImageLoader(
     context: Context,
     session: TvheadendSession,
@@ -32,13 +44,8 @@ fun buildImageLoader(
             add(AppArtworkMapper(session))
             addTvheadendArtwork()
             add(remoteLogos)
-            // Dedicated client: no Tvheadend credentials, cookie jar or custom headers.
-            add(OkHttpNetworkFetcherFactory(callFactory = {
-                OkHttpClient.Builder()
-                    .retryOnConnectionFailure(false)
-                    .callTimeout(10, TimeUnit.SECONDS)
-                    .build()
-            }))
+            // Dedicated client: no Tvheadend credentials or cookies; only the app User-Agent.
+            add(OkHttpNetworkFetcherFactory(callFactory = ::remoteLogoHttpClient))
         }
         .diskCache(remoteLogos.diskCache)
         // Every logo and programme picture fades in over its placeholder when it is actually

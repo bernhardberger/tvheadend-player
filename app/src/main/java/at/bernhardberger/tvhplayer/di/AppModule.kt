@@ -42,6 +42,7 @@ import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
 import coil3.ImageLoader
 import kotlin.time.Duration.Companion.milliseconds
 import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -94,7 +95,9 @@ val appModule = module {
             profileStore = TvheadendServerProfileStore(androidContext()),
             playerSettings = playerSettings,
             ioDispatcher = get(qualifier = named("io")),
-            clearAppArtwork = { get<RemoteLogoCache>().clear() },
+            clearAppArtwork = {
+                clearAppArtworkBestEffort { get<RemoteLogoCache>().clear() }
+            },
         )
         val audioOutput = TvheadendAudioOutputProvider(androidContext())
         val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)
@@ -206,5 +209,16 @@ val appModule = module {
             profileOwner = get(),
             uiSettingsStore = get(),
         )
+    }
+}
+
+internal suspend fun clearAppArtworkBestEffort(clear: suspend () -> Unit) {
+    try {
+        clear()
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Throwable) {
+        // Cache failures must not undo a saved profile; never log URLs or paths.
+        android.util.Log.w("AppModule", "Could not clear app artwork cache")
     }
 }

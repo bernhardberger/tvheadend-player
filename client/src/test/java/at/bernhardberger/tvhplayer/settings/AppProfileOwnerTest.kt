@@ -194,7 +194,7 @@ class AppProfileOwnerTest {
         }
 
         assertTrue(result.isFailure)
-        assertEquals(1, artworkClears)
+        assertEquals(0, artworkClears) // A rejected write did not replace the profile.
         assertEquals(1L, owner.configurationGeneration.value) // Accepted replacement invalidates old notices even on failure.
     }
 
@@ -210,10 +210,54 @@ class AppProfileOwnerTest {
         backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
         runCurrent()
         assertEquals(0, artworkClears) // Startup preserves the offline cache.
-        runCatching { owner.saveServer("", 9982) }
+        owner.saveServer("offline.invalid", 9982)
         assertEquals(1, artworkClears)
         owner.clearProfile()
         assertEquals(2, artworkClears)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun artworkClearWaitsForPersistenceAndSessionReplacement() = runTest {
+        val stored = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
+        val fakeSession = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
+        val replacementEntered = CompletableDeferred<Unit>()
+        val releaseReplacement = CompletableDeferred<Unit>()
+        var artworkGeneration = 0
+        val requestGenerations = mutableListOf<Int>()
+        val session = object : TvheadendSession by fakeSession {
+            override suspend fun connect(profile: ServerProfile): SessionCommandResult {
+                assertTrue(stored.loadProfile() is ServerProfileReadResult.Available)
+                replacementEntered.complete(Unit)
+                releaseReplacement.await()
+                return fakeSession.connect(profile)
+            }
+        }
+        val owner = AppProfileOwner(
+            session = session, profileStore = stored,
+            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            readProfileForEditing = { error("Unexpected editing read") },
+            clearAppArtwork = {
+                assertTrue(at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall.CONNECT in fakeSession.calls)
+                artworkGeneration++
+            },
+        )
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val save = async { owner.saveServer("offline.invalid", 9982) }
+        replacementEntered.await()
+        // A request from UI during replacement still carries the old cache generation.
+        requestGenerations += artworkGeneration
+        assertEquals(0, artworkGeneration)
+        releaseReplacement.complete(Unit)
+        save.await()
+        requestGenerations += artworkGeneration
+        assertEquals(listOf(0, 1), requestGenerations)
+        assertTrue(owner.serverProfile.value is ServerProfileReadResult.Available)
+        owner.clearProfile()
+        assertEquals(ServerProfileReadResult.Missing, stored.loadProfile())
+        assertEquals(ServerProfileReadResult.Missing, owner.serverProfile.value)
+        assertEquals(2, artworkGeneration)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)

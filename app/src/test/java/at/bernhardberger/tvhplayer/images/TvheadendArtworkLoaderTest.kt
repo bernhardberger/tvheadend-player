@@ -24,6 +24,7 @@ import at.bernhardberger.tvheadend.sdk.playback.ExperimentalTvheadendApi
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionCall
 import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
+import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.ui.components.ArtworkContext
 import coil3.decode.DataSource
 import coil3.network.NetworkFetcher
@@ -40,6 +41,19 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
+import okhttp3.Authenticator
+import okhttp3.Call
+import okhttp3.Connection
+import okhttp3.CookieJar
+import okhttp3.Interceptor
+import okhttp3.Protocol
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
+import java.util.concurrent.TimeUnit
 import org.junit.Test
 import org.junit.After
 import org.junit.runner.RunWith
@@ -160,6 +174,41 @@ class TvheadendArtworkLoaderTest {
         assertEquals(icon.url.toUri(), mapped)
         assertTrue(loader.components.newFetcher(mapped, Options(app), loader)?.first is NetworkFetcher)
         assertTrue(FakeSessionCall.LOAD_ARTWORK !in session.calls)
+    }
+
+    @Test fun productionRemoteClientIsBoundedCredentialFreeAndIdentifiesTheApp() {
+        val client = remoteLogoHttpClient()
+        assertFalse(client.retryOnConnectionFailure)
+        assertEquals(10_000, client.callTimeoutMillis)
+        assertSame(CookieJar.NO_COOKIES, client.cookieJar)
+        assertSame(Authenticator.NONE, client.authenticator)
+        assertSame(Authenticator.NONE, client.proxyAuthenticator)
+        assertTrue(client.interceptors.isEmpty())
+        assertEquals(1, client.networkInterceptors.size) // Only the descriptive User-Agent.
+        val request = Request.Builder().url("https://192.0.2.1/logo.png").build()
+        val chain = object : Interceptor.Chain {
+            override fun request() = request
+            override fun proceed(request: Request): Response {
+                assertEquals(
+                    "TvheadendPlayer/${BuildConfig.VERSION_NAME} (+https://github.com/bernhardberger/tvheadend-player)",
+                    request.header("User-Agent"),
+                )
+                assertEquals(setOf("User-Agent"), request.headers.names())
+                assertNull(request.header("Authorization"))
+                assertNull(request.header("Cookie"))
+                return Response.Builder().request(request).protocol(Protocol.HTTP_1_1)
+                    .code(200).message("OK").body(ByteArray(0).toResponseBody()).build()
+            }
+            override fun connection(): Connection? = null
+            override fun call(): Call = error("No network in this test")
+            override fun connectTimeoutMillis() = client.connectTimeoutMillis
+            override fun readTimeoutMillis() = client.readTimeoutMillis
+            override fun writeTimeoutMillis() = client.writeTimeoutMillis
+            override fun withConnectTimeout(timeout: Int, unit: TimeUnit) = this
+            override fun withReadTimeout(timeout: Int, unit: TimeUnit) = this
+            override fun withWriteTimeout(timeout: Int, unit: TimeUnit) = this
+        }
+        client.networkInterceptors.single().intercept(chain).close()
     }
 
     private fun connecting(profile: ServerProfile): SessionObservation {

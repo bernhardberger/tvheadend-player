@@ -44,6 +44,8 @@ and receives channel, guide, icon, and media data from that server.
 When the server lists channel or tag logos as web addresses, the TV loads them
 directly from those addresses, without sending Tvheadend credentials or cookies.
 These connections use HTTP or HTTPS as specified by the address.
+The logo host sees the TV's network address and the app's name and version; over
+plain HTTP, the request and image are not encrypted.
 
 During setup, the app searches your local network for Tvheadend servers with
 multicast DNS (the `_htsp._tcp` service type); this search stays on the local

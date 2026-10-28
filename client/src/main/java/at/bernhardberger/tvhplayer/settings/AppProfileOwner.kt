@@ -213,7 +213,6 @@ class AppProfileOwner(
     }
 
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
-        clearAppArtwork()
         mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
@@ -221,6 +220,7 @@ class AppProfileOwner(
         val profile = profileStore.storeAnonymous(host, htspPort)
         check(profile is ServerProfileReadResult.Available)
         applyServerProfile(profile)
+        clearAppArtwork()
     }
 
     private suspend fun commitPasswordServer(
@@ -229,7 +229,6 @@ class AppProfileOwner(
         username: String,
         password: String,
     ) = serverMutex.withLock {
-        clearAppArtwork()
         mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
@@ -237,10 +236,10 @@ class AppProfileOwner(
         val profile = profileStore.storePassword(host, htspPort, username, password)
         check(profile is ServerProfileReadResult.Available)
         applyServerProfile(profile)
+        clearAppArtwork()
     }
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
-        clearAppArtwork()
         mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
@@ -248,6 +247,7 @@ class AppProfileOwner(
         val profile = profileStore.clearProfile()
         check(profile == ServerProfileReadResult.Missing)
         applyServerProfile(profile)
+        clearAppArtwork()
     }
 
     private suspend fun commitStreamProfileSelection(

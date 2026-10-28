@@ -12,17 +12,24 @@ import kotlinx.coroutines.withContext
 internal object DetailsArtColors {
     // Art without a usable colour is remembered too, so it is not decoded again on every focus.
     private val colors = LruCache<Any, Sample>(128)
+    private var generation = 0L
 
     private class Sample(val rgb: Int?)
 
     fun stored(source: Any): Int? = colors.get(source)?.rgb
 
-    fun clear() = colors.evictAll()
+    fun clear() = synchronized(colors) {
+        generation += 1
+        colors.evictAll()
+    }
 
-    // No shared lock: a slow decode must not hold up other artwork; a duplicate sample is harmless.
+    // Only admission/publication take the lock; a slow decode never holds up other artwork.
     suspend fun sample(context: Context, source: Any): Int? =
         withContext(Dispatchers.Default) {
-            colors.get(source)?.let { return@withContext it.rgb }
+            val started = synchronized(colors) {
+                colors.get(source)?.let { return@withContext it.rgb }
+                generation
+            }
             val result = loadArtworkSample(context, source) as? SuccessResult
                 ?: return@withContext null
             // Prefer the colour that stands out (default filters skip skin tones and near
@@ -31,7 +38,10 @@ internal object DetailsArtColors {
             val vivid = Palette.from(bitmap).generate().let { it.vibrantSwatch ?: it.darkVibrantSwatch }
             val swatch = vivid ?: Palette.from(bitmap).clearFilters().generate().dominantSwatch
             val rgb = swatch?.rgb?.and(0xFFFFFF)
-            colors.put(source, Sample(rgb))
-            rgb
+            synchronized(colors) {
+                if (generation != started) return@withContext null
+                colors.put(source, Sample(rgb))
+                rgb
+            }
         }
 }
