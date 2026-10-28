@@ -1306,6 +1306,9 @@ class AudioInterruptionRuntimeTest {
         val retune = scope.async { runtime.retuneAfterReconnect() }
         await { retune.isCompleted }
         await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        // The playback thread raises the ended stream's error only once Robolectric's clock moves;
+        // in production it arrives long before the retry's backoff ends, so before any zap.
+        await { shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(10)); player.playerError != null }
         // The viewer picks another channel while the retry waits.
         session.scriptLivePlaybackSuccess(manager)
         live(timeshift = false, channel = 2)
@@ -1314,6 +1317,61 @@ class AudioInterruptionRuntimeTest {
         assertEquals(AppPlaybackTarget.Live(ChannelId(2)), runtime.activeTarget.value)
         assertFalse(runtime.state.value is AppPlaybackState.Recovering || runtime.state.value is AppPlaybackState.Failed)
         assertEquals(2, connection.subscribeCount)
+    }
+
+    @Test fun theEndedStreamsErrorDuringAReconnectBackoffKeepsTheChannelRecovering() = exercise(virtualTime = true) {
+        live(timeshift = false)
+        restartServer()
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { retune.isCompleted }
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        // The ended stream's error arrives while the retry waits.
+        reportStreamError()
+        settle()
+        assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
+        assertEquals(AppPlaybackTarget.Live(ChannelId(1)), runtime.activeTarget.value)
+        advanceRecoveryTime(2_001)
+        for (delayMillis in listOf(5_000L, 10_000L, 20_000L)) {
+            await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == delayMillis }
+            advanceRecoveryTime(delayMillis + 1)
+        }
+        // Out of retries: the failure shows.
+        await { runtime.state.value is AppPlaybackState.Failed }
+        assertNull(runtime.activeTarget.value)
+    }
+
+    @Test fun theEndedStreamsErrorAfterAReconnectRetryFoundAnotherSessionShowsTheFailure() = exercise(virtualTime = true) {
+        live(timeshift = false)
+        restartServer()
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { retune.isCompleted }
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        // The session changes during the backoff: the retry no longer runs.
+        replaceSession()
+        advanceRecoveryTime(2_001)
+        settle()
+        reportStreamError()
+        await { runtime.state.value is AppPlaybackState.Failed }
+        assertEquals(1, connection.subscribeCount)
+    }
+
+    @Test fun theEndedStreamsErrorHeldBackDuringABackoffShowsWhenTheRetryDoesNotRun() = exercise(virtualTime = true) {
+        live(timeshift = false)
+        restartServer()
+        session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
+        val retune = scope.async { runtime.retuneAfterReconnect() }
+        await { retune.isCompleted }
+        await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == 2_000L }
+        reportStreamError()
+        settle()
+        assertEquals(2_000L, (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis)
+        // The session changes during the backoff: the retry no longer runs.
+        replaceSession()
+        advanceRecoveryTime(2_001)
+        await { runtime.state.value is AppPlaybackState.Failed }
+        assertEquals(1, connection.subscribeCount)
     }
 
     @Test fun aChannelPausedBehindBrowseStopsAtTheReconnectInsteadOfRetuning() = exercise {

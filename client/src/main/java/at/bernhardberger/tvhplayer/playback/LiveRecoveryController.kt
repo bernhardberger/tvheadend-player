@@ -200,6 +200,9 @@ internal class LiveRecoveryController(
         deferredRecovery = null
     }
 
+    /** An attempt for [targetEpoch] is waiting out its backoff or retuning, and not yet resolved. */
+    fun attemptPendingFor(targetEpoch: Long): Boolean = recoveryAttempts.owns(targetEpoch)
+
     fun resetBackoffLocked() {
         recoveryBudget.reset()
     }

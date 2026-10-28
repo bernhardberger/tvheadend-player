@@ -2712,7 +2712,14 @@ class AppPlaybackRuntime(
                 return
             }
             // An attempt that did not run (a Pause owes it again) keeps the target retrying.
-            if (result != null) reconnectRecoveryEpoch = null
+            if (result != null) {
+                reconnectRecoveryEpoch = null
+            } else if (player.playerError != null && !targetInstallationInProgress) {
+                // The ended stream's error, held back while the attempt was pending, shows until
+                // a retry runs again.
+                publishPlayerError()
+                return
+            }
         }
         if (coordinator.playerCleanupPending.value) return
         if (shouldRepublishPlayerStateAfterRecovery(
@@ -2736,20 +2743,28 @@ class AppPlaybackRuntime(
         // A failed target never completes a pause pressed before its grant. A paused kept-channel
         // retune still has to fail closed, so its pending pause resolves (and stops) serialized.
         val failClosedPauseEpoch = livePauseController.onPlayerErrorUnderAccessLock()
-        presentation.publishFailed(
-            AppPlaybackState.Failed(
-                reason = if (_activeTarget.value is AppPlaybackTarget.Recording) {
-                    AppPlaybackFailureReason.RECORDING_READ_FAILED
-                } else {
-                    AppPlaybackFailureReason.OTHER
-                },
-                playerErrorCode = player.playerError?.errorCodeName,
-                playerErrorNumber = player.playerError?.errorCode,
-                playerErrorClassification = classifyPlaybackError(player.playerError),
-                subscriptionIssue = lastSubscriptionIssue(),
-                deviceFault = isDevicePlaybackFault(player.playerError),
-            ),
-        )
+        // The ended stream's error, arriving while a reconnect retry backs off: the retries present
+        // the target as recovering until it plays again or their budget runs out. A pause that
+        // fails closed still needs the failure.
+        val epoch = activeTargetEpoch
+        val reconnectRetryPending = epoch != null && reconnectRecoveryEpoch == epoch &&
+            failClosedPauseEpoch == null && liveRecovery.attemptPendingFor(epoch)
+        if (!reconnectRetryPending) {
+            presentation.publishFailed(
+                AppPlaybackState.Failed(
+                    reason = if (_activeTarget.value is AppPlaybackTarget.Recording) {
+                        AppPlaybackFailureReason.RECORDING_READ_FAILED
+                    } else {
+                        AppPlaybackFailureReason.OTHER
+                    },
+                    playerErrorCode = player.playerError?.errorCodeName,
+                    playerErrorNumber = player.playerError?.errorCode,
+                    playerErrorClassification = classifyPlaybackError(player.playerError),
+                    subscriptionIssue = lastSubscriptionIssue(),
+                    deviceFault = isDevicePlaybackFault(player.playerError),
+                ),
+            )
+        }
         livePauseController.publishLivePause()
         presentation.publishDiagnosticsUnderAccessLock()
         if (failClosedPauseEpoch != null) livePauseController.launchPendingLivePauseResolution(failClosedPauseEpoch)
