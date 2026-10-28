@@ -523,11 +523,16 @@ slots imply a phone app.
   separate **Restrict Minor Access** checkbox; targeting children brings in the
   Families requirements
   (<https://support.google.com/googleplay/android-developer/answer/9867159>).
-- **Answer:** **18 and over**, leave **Restrict Minor Access** off, and answer
-  No to appeal to children.
-- **Evidence:** the app is for people who run their own Tvheadend server; the
-  listing and icon don't address children; the content comes unfiltered from
-  the user's server.
+- **Answer (owner, 2026-10-28):** **13–15, 16–17 and 18 and over**; no group
+  under 13, so the Families policy doesn't apply. Answer No to appeal to
+  children. Restrict Minor Access isn't offered with teen groups selected.
+- **Evidence:** a household TV app that teenagers use too; the listing and icon
+  don't address children. The app has no ads, purchases or data collection (the
+  login stays on the device and goes only to the user's server), so the teen
+  groups add no obligations. Content comes unfiltered from the user's server;
+  Tvheadend can limit an account to channel tags, and the content rating (4.5)
+  is what the store shows. Google notes 13–17 "may be considered to include
+  children in some locales" and may review the declaration more closely.
 
 ### 4.7 Data safety
 
@@ -828,7 +833,7 @@ one updates the other.
    Recommendation: 0.3.1 first.
 6. Demo video host (unlisted YouTube or other) and which channels to show (5.2).
 7. If Console demands phone screenshots: what to upload (3.4).
-8. Target audience 18 and over (4.6) and category Video Players & Editors
+8. Target audience 13–15, 16–17 and 18 and over (4.6) and category Video Players & Editors
    (1.4): confirm.
 9. Testers: email list or Google Group (1.7), and where the invite asks people
    to send their address (6.1).
