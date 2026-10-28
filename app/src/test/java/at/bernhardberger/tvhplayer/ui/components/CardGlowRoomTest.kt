@@ -43,8 +43,10 @@ import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
 import at.bernhardberger.tvheadend.sdk.testing.FakeSessionObservation
+import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.settings.ChannelsLayout
 import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.stores.ChannelAccentStore
 import at.bernhardberger.tvhplayer.testutil.FixtureArt
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
 import at.bernhardberger.tvhplayer.testutil.VisualCapture
@@ -341,9 +343,12 @@ class CardGlowRoomTest {
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
             ArtworkId(1) to FixtureArt.picon("ridge-earth"), ArtworkId(2) to FixtureArt.picon("harbor-sport"),
         )))
+        // The cards sample their colours off the main thread, where waiting for idle does not see them.
+        val accentStore = ChannelAccentStore()
+        val accents = ChannelAccents(accentStore) { _, id -> "rail-${id.value}" }
         val state = PlayerChannelBrowserState().apply { onNow.focusedId = channels.first().id }
         compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(1f, 1f)) {
+            CompositionLocalProvider(LocalDensity provides Density(1f, 1f), LocalChannelAccents provides accents) {
                 TVHeadendPlayerTheme {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -369,6 +374,7 @@ class CardGlowRoomTest {
         compose.onRoot().performKeyInput { pressKey(key) }
         val focus = hasTestTag("player-channel-card-$focused")
         compose.waitUntil(10_000) { compose.onAllNodes(focus and isFocused()).fetchSemanticsNodes().isNotEmpty() }
+        compose.waitUntil(10_000) { accentStore["rail-1"] != null && accentStore["rail-2"] != null }
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         check(name, bounds(focus), sides)
