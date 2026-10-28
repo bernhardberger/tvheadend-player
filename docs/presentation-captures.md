@@ -38,8 +38,7 @@ The README uses Channels as the lead image, then a gallery in pairs: Channels as
 a list and without program pictures, Guide and details, the player controls and
 its channel list, the channel schedule and the side menu over warm playback, then
 Recordings folders and a recording inside a folder. The Grid and Settings
-captures are not used: in the Grid, logo badges cover titles printed in the
-program art. The tracked copies in
+captures are not used. The tracked copies in
 [`artwork/screenshots/`](../artwork/screenshots/) are the same pixels saved
 without the fully opaque alpha channel.
 
