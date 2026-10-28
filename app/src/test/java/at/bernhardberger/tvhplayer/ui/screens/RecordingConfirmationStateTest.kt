@@ -152,6 +152,8 @@ class RecordingConfirmationStateTest {
         compose.onNodeWithTag("recording-confirmation-back").assertIsFocused()
         compose.onNodeWithTag("recording-confirmation-confirm").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
+        // The list without the recording is prepared off the main thread, which waitForIdle does not wait for.
+        compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithTag("recording-list-entry-2").assertIsFocused()
         compose.runOnIdle { assertEquals(1, calls) }
     }
@@ -200,7 +202,6 @@ class RecordingConfirmationStateTest {
         if (source == "browse") {
             // Browse cards open playback; deletion arrives as a repository publication.
             compose.runOnIdle { session.publish(snapshot(survivors)) }
-            compose.waitUntil(10_000) { state.archivePath == if (emptyRoot) emptyList<String>() else listOf("Series") }
         } else {
             row.performKeyInput { pressKey(Key.Menu) }
             if (source == "details") {
@@ -210,6 +211,8 @@ class RecordingConfirmationStateTest {
             compose.onNodeWithTag("recording-confirmation-back").assertIsFocused().performKeyInput { pressKey(Key.DirectionRight) }
             compose.onNodeWithTag("recording-confirmation-confirm").assertIsFocused().performKeyInput { pressKey(Key.DirectionCenter) }
         }
+        // The archive without the folder is prepared off the main thread, which waitForIdle does not wait for.
+        compose.waitUntil(10_000) { state.archivePath == if (emptyRoot) emptyList<String>() else listOf("Series") }
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         if (emptyRoot) {
@@ -248,6 +251,9 @@ class RecordingConfirmationStateTest {
                     state = state, dvrMutationActions = actions, notices = notices,
                 )
             }
+        }
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("recording-list-entry-1")).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("recording-list-entry-1").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
         compose.onNodeWithTag("details-cancel").requestFocus().performKeyInput { pressKey(Key.DirectionCenter) }
