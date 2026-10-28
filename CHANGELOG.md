@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.1
+
+### Settings
+
+- Settings → About → Privacy policy shows the privacy policy on screen, in the
+  same reader as the license.
+
+### Everywhere
+
+- In the side menu, the Full screen, Pause and Stop buttons for what is playing
+  sit in a row under the title, and the title fades in beside the channel logo
+  as the menu opens.
+
+### Recordings
+
+- Leaving a folder for the one inside it fades the parent list out, so its
+  arrows no longer rest beside the menu.
+
+### Fixes
+
+- After a server restart, live TV keeps retrying to reconnect with its usual
+  backoff instead of stopping after two attempts, and shows the reconnecting
+  ring instead of "Playback stopped" between attempts.
+- A channel kept tuned in the background is released when the server restarts
+  and drops its timeshift, and the Interrupted notice follows.
+
 ## 0.3.0
 
 ### Getting started
