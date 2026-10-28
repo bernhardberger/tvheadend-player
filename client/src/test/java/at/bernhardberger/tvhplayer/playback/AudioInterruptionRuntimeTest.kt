@@ -2428,6 +2428,9 @@ class AudioInterruptionRuntimeTest {
         await { zap.isCompleted }
         assertTrue(zap.await()?.isStarted == true)
         assertNotNull(holder)
+        // The playback thread opens channel 2's subscription after the install; a session replaced
+        // before that refuses the open itself instead of testing the escalation.
+        await { connection.subscribeCount == 2 }
         val previous = session.observation.value
         session.replaceGeneration(SessionObservation.create(
             sessionState = previous.sessionState, channelState = previous.channelState,
@@ -2436,7 +2439,6 @@ class AudioInterruptionRuntimeTest {
         settle()
         admissionHeld.complete(Unit)
         await { holder?.isCompleted == true }
-        await { connection.subscribeCount == 2 }
         delay(300)
         settle()
         // Reported under the replaced session: dropped, neither retuning nor charging channel 2.
