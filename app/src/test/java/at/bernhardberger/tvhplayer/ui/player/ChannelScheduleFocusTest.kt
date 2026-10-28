@@ -284,9 +284,12 @@ class ChannelScheduleFocusTest {
     }
 
     @Test fun theRowAboveTheFocusedOneStaysClearOfTheTopFade() {
-        val evening = List(6) { event(it + 1, NOW + it * 3600L, NOW + (it + 1) * 3600L) }
+        // One local afternoon in any zone: a day heading above the focused row would move the row above it.
+        val zone = ZoneId.systemDefault()
+        val noon = java.time.Instant.ofEpochSecond(NOW).atZone(zone).toLocalDate().atTime(12, 0).atZone(zone).toEpochSecond()
+        val afternoon = List(6) { event(it + 1, noon + it * 3600L, noon + (it + 1) * 3600L) }
         compose.setContent { TVHeadendPlayerTheme { PlaybackOptionsOverlayFrame(panelWidth = 480.dp) {
-            ChannelSchedule(null, evening, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = evening[4])
+            ChannelSchedule(null, afternoon, NOW, NOW, false, false, { null }, {}, {}, {}, initialEvent = afternoon[4])
         } } }
         compose.onNodeWithTag("schedule-row-5").assertIsFocused()
         val list = compose.onNodeWithTag("channel-schedule-list").getUnclippedBoundsInRoot()
@@ -383,8 +386,10 @@ class ChannelScheduleFocusTest {
             repeat(100) { if (condition()) return; settle(); Thread.sleep(10) }
             assertTrue(condition())
         }
+        // performScrollToNode animates its scroll, which the paused clock never finishes; jump to the last row instead.
         fun footer(): SemanticsNodeInteraction {
-            compose.onNodeWithTag("channel-schedule-list").performScrollToNode(hasTestTag("channel-schedule-footer"))
+            compose.onNodeWithTag("channel-schedule-list").performScrollToKey(events.last().id.value)
+            compose.waitForIdle()
             return compose.onNodeWithTag("channel-schedule-footer")
         }
         settle()
