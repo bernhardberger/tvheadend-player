@@ -1,4 +1,5 @@
 import java.time.Duration
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 buildscript {
     dependencies {
@@ -42,5 +43,7 @@ subprojects {
         }
         // A hung test must fail instead of holding the shared Gradle build lock indefinitely.
         timeout.set(Duration.ofMinutes(15))
+        // CI keeps no test reports: its log is the only record of why a test failed.
+        testLogging.exceptionFormat = TestExceptionFormat.FULL
     }
 }

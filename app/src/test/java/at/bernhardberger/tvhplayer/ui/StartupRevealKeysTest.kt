@@ -124,16 +124,23 @@ class StartupRevealKeysTest {
         val covered = pixel(view)
         assertTrue("the startup screen covers the player", covered != android.graphics.Color.RED)
 
+        val start = compose.mainClock.currentTime
         state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1)
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.PictureHoldMs - 20L)
         assertEquals("opaque through the hold", covered, pixel(view))
         compose.mainClock.advanceTimeBy(20L + StartupRevealMs / 2)
-        assertTrue("fading", pixel(view) != covered && pixel(view) != android.graphics.Color.RED)
+        // The pixel halfway tells when the fade started, so a late start shows in the messages.
+        val fading = pixel(view)
+        val handoff = "handoff at $start ms, halfway ${Integer.toHexString(fading)}"
+        assertTrue("fading: $handoff", fading != covered && fading != android.graphics.Color.RED)
         assertEquals(0, revealed)
         compose.mainClock.advanceTimeBy(StartupRevealMs / 2 + 40L)
         compose.waitForIdle()
-        assertEquals("the player shows after hold + long2", android.graphics.Color.RED, pixel(view))
+        assertEquals(
+            "the player shows after hold + long2 ($handoff, now ${compose.mainClock.currentTime} ms)",
+            Integer.toHexString(android.graphics.Color.RED), Integer.toHexString(pixel(view)),
+        )
         assertEquals(1, revealed)
     }
 
