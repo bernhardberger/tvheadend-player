@@ -13,6 +13,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -84,7 +85,7 @@ class StartupRevealKeysTest {
         }
         frames()
         // Autoplay's handoff: the startup screen starts dissolving into the first video frames.
-        state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1)
+        change { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
         frames()
         assertEquals(0, revealed)
         assertEquals(1, startupScreens())
@@ -125,7 +126,7 @@ class StartupRevealKeysTest {
         assertTrue("the startup screen covers the player", covered != android.graphics.Color.RED)
 
         val start = compose.mainClock.currentTime
-        state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1)
+        change { state = state.copy(presentation = MainStartupPresentation.Inactive, revealRequestId = 1) }
         compose.mainClock.advanceTimeByFrame()
         compose.mainClock.advanceTimeBy(PlayerMotion.PictureHoldMs - 20L)
         assertEquals("opaque through the hold", covered, pixel(view))
@@ -161,6 +162,12 @@ class StartupRevealKeysTest {
     private fun frames() = repeat(4) {
         compose.mainClock.advanceTimeByFrame()
         compose.waitForIdle()
+    }
+
+    /** Publish the handoff before advancing the paused clock, rather than racing snapshot delivery. */
+    private fun change(block: () -> Unit) = compose.runOnIdle {
+        block()
+        Snapshot.sendApplyNotifications()
     }
 
     private fun startupScreens() = compose.onAllNodes(hasTestTag("main-startup-root")).fetchSemanticsNodes().size
