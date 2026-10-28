@@ -110,6 +110,7 @@ import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerViewModel
 import at.bernhardberger.tvhplayer.viewmodels.SettingsStorageViewModel
 import at.bernhardberger.tvhplayer.viewmodels.VideoPlayerViewModel
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
@@ -773,10 +774,11 @@ class PlayerEntryOverlayTest {
         }
     }.createMediaSource(item)
 
+    // Background preparation takes real time, which the advanced clock does not see.
     private fun settle() {
         repeat(10) {
             compose.mainClock.advanceTimeBy(100)
-            compose.waitForIdle()
+            compose.awaitBrowsePreparation()
         }
     }
 

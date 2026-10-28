@@ -83,6 +83,9 @@ import at.bernhardberger.tvhplayer.ui.AppDestination
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberPreparedBrowseData
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparationLane
+import at.bernhardberger.tvhplayer.ui.components.browsePreparationLane
 import at.bernhardberger.tvhplayer.ui.common.formatClock
 import at.bernhardberger.tvhplayer.ui.common.formatHm
 import at.bernhardberger.tvhplayer.ui.common.programmeCategoryLabelRes
@@ -250,16 +253,8 @@ class GuideVisualLayoutTest {
                 historicalEvents = snapshot.historicalEvents, coverages = (1L..12L).map {
                     EpgCoverage.create(ChannelId(it), Instant.fromEpochSeconds(hour), Instant.fromEpochSeconds(hour + 7 * 86400))
                 })
-            // Read BrowsePreparationKt.preparationDispatcher to hold its serial lane without a production seam.
-            val dispatcher = try {
-                Class.forName("at.bernhardberger.tvhplayer.ui.components.BrowsePreparationKt")
-                    .getDeclaredField("preparationDispatcher").apply { isAccessible = true }
-                    .get(null) as kotlinx.coroutines.CoroutineDispatcher
-            } catch (failure: ReflectiveOperationException) {
-                throw AssertionError("Cannot hold BrowsePreparationKt.preparationDispatcher for the entry race", failure)
-            }
             val held = java.util.concurrent.CountDownLatch(1)
-            dispatcher.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
+            browsePreparationLane.dispatch(kotlin.coroutines.EmptyCoroutineContext) {
                 held.countDown()
                 check(preparationRelease.await(30, java.util.concurrent.TimeUnit.SECONDS))
             }
@@ -1555,9 +1550,9 @@ class GuideVisualLayoutTest {
             compose.runOnIdle { holdPreparation.value = true }
             compose.waitForIdle()
             assertTrue(held.await(5, java.util.concurrent.TimeUnit.SECONDS))
-            key(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
+            keyWhilePreparing(Key.DirectionRight) // 22:00–23:00 shifts the 19:30–22:30 window.
             val before = position.position.value
-            key(Key.DirectionDown)
+            keyWhilePreparing(Key.DirectionDown)
             assertEquals(before, position.position.value)
             release.countDown()
             focused(title(1, 2))
@@ -2368,12 +2363,16 @@ class GuideVisualLayoutTest {
                 compose.mainClock.advanceTimeBy(80)
             }
             // Programme 2 runs past the window, so focus reaches it a few frames after the window moves;
-            // wait for it frame by frame, well inside the settle that follows the last press.
+            // wait for it frame by frame, well inside the settle that follows the last press. The moved
+            // window's rows are prepared in the background on real time, which the held clock does not see.
             val lastPress = compose.mainClock.currentTime - 80
             val programme2 = hasText(title(1, 2)) and isFocused()
             while (compose.onAllNodes(programme2).fetchSemanticsNodes().isEmpty() &&
                 compose.mainClock.currentTime - lastPress < GuideHeadlineSettleMs - 40
-            ) compose.mainClock.advanceTimeByFrame()
+            ) {
+                awaitBrowsePreparationLane()
+                compose.mainClock.advanceTimeByFrame()
+            }
             // Focus rests on programme 2 while the headline still shows programme 0.
             compose.onNode(programme2).assertExists()
             compose.onNode(hasTestTag("guide-headline-title"), useUnmergedTree = true).assertTextEquals(title(1, 0))
@@ -2436,6 +2435,8 @@ class GuideVisualLayoutTest {
             val next = hasTestTag("guide-headline-title") and hasText(title(2, 0))
             var framesAfterSwitch = 0
             for (frame in 0 until 600) {
+                // The new group's rows are prepared in the background on real time, which the held clock does not see.
+                awaitBrowsePreparationLane()
                 compose.mainClock.advanceTimeByFrame()
                 assertTrue("logo missing at frame $frame",
                     compose.onAllNodesWithTag("channels-immersive-picon").fetchSemanticsNodes().isNotEmpty())
@@ -3360,7 +3361,15 @@ class GuideVisualLayoutTest {
         checkNotNull(text.config[SemanticsActions.GetTextLayoutResult].action).invoke(layouts)
         return text.boundsInRoot.top + layouts.single().firstBaseline
     }
-    private fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
+    // A key reaches the screen once it has prepared what it shows, as on a device where that takes milliseconds.
+    private fun key(key: Key) {
+        compose.awaitBrowsePreparation()
+        keyWhilePreparing(key)
+    }
+    private fun keyWhilePreparing(key: Key) {
+        compose.onRoot().performKeyInput { pressKey(key) }
+        compose.waitForIdle()
+    }
     private fun dateButtonText(day: String, startSec: Long) = context().getString(R.string.epg_date_button, day,
         at.bernhardberger.tvhplayer.ui.common.formatClock(
             java.time.Instant.ofEpochSecond(startSec).atZone(java.time.ZoneOffset.UTC), Locale.getDefault()))

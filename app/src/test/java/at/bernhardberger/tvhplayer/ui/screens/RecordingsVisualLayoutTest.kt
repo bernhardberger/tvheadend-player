@@ -61,6 +61,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.GraphicsMode
 import at.bernhardberger.tvhplayer.testutil.ImageLoaderRule
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 
 /** Offline production screen and shell, with real D-pad focus and no server/player. */
 @RunWith(RobolectricTestRunner::class)
@@ -1307,7 +1308,7 @@ class RecordingsVisualLayoutTest {
                     dvrDiskSpaceState = it.dvrDiskSpaceState)
             })
         }
-        compose.waitForIdle()
+        compose.awaitBrowsePreparation()
     }
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
@@ -1375,7 +1376,7 @@ class RecordingsVisualLayoutTest {
                 }
             }
         }
-        compose.waitForIdle()
+        compose.awaitBrowsePreparation()
     }
 
     private fun recording(id: Long, title: String, path: String?, state: DvrEntryState = DvrEntryState.COMPLETED,

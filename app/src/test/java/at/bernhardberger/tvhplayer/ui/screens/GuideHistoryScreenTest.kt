@@ -26,6 +26,7 @@ import at.bernhardberger.tvhplayer.settings.*
 import at.bernhardberger.tvhplayer.stores.*
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.viewmodels.ChannelsViewModel
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.*
@@ -221,7 +222,12 @@ class GuideHistoryScreenTest {
             compose.waitUntil(10_000) { compose.onAllNodes(hasText(title) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNodeWithText(title).assertIsFocused()
         }
-        fun key(key: Key) { compose.onRoot().performKeyInput { pressKey(key) }; compose.waitForIdle() }
+        // A key reaches the screen once it has prepared what it shows, as on a device where that takes milliseconds.
+        fun key(key: Key) {
+            compose.awaitBrowsePreparation()
+            compose.onRoot().performKeyInput { pressKey(key) }
+            compose.waitForIdle()
+        }
         fun dateFocused() {
             compose.waitUntil(10_000) {
                 compose.onAllNodes(hasTestTag("guide-date-button") and isFocused()).fetchSemanticsNodes().isNotEmpty()

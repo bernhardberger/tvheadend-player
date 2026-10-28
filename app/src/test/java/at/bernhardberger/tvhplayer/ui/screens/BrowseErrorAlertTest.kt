@@ -41,6 +41,7 @@ import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.components.rememberBrowseConnectionFailure
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
+import at.bernhardberger.tvhplayer.ui.components.awaitBrowsePreparation
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
@@ -289,7 +290,9 @@ class BrowseErrorAlertTest {
         compose.waitUntil(10_000) { compose.onAllNodes(hasTestTag(tag) and isFocused()).fetchSemanticsNodes().isNotEmpty() }
     }
 
+    // A key reaches the screen once it has prepared what it shows, as on a device where that takes milliseconds.
     private fun key(key: Key) {
+        compose.awaitBrowsePreparation()
         compose.onRoot().performKeyInput { pressKey(key) }
         compose.waitForIdle()
     }
