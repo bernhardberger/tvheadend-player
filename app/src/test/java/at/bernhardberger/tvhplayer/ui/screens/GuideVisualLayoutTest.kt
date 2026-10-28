@@ -302,6 +302,9 @@ class GuideVisualLayoutTest {
                 position.save(checkNotNull(position.position.value).copy(channelId = ChannelId(3)))
                 guideActive = true
             }
+            // Going offline prepares the window's index anew, off the Compose scheduler; until its
+            // rows show, Guide consumes the key.
+            compose.waitUntil(10_000) { compose.onAllNodes(hasText(title(4, 0))).fetchSemanticsNodes().isNotEmpty() }
             key(Key.DirectionDown)
             focused(title(4, 0))
             assertNoPlayback()
