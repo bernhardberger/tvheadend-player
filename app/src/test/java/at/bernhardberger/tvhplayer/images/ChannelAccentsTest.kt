@@ -120,11 +120,12 @@ class ChannelAccentsTest {
 
     @Test fun aFailedLoadIsNotTriedAgainByALaterPassOrACaller() {
         startPass()
-        await { loads.size == 4 && running.get() == 0 }
+        await { loads.size == 4 }
+        // The pass holds the picon until it noted the failure, so the caller waits for that and loads nothing.
+        assertNull(runBlocking { sampleNow(broken).awaitIdling() })
         session.publish(observation(catalog(listOf(red, white, broken, blue))))
         await { store[key(blue)] != null }
         assertEquals("only the new picon is loaded", listOf(red, stored, white, broken, blue).ids(), loaded())
-        assertNull(runBlocking { sampleNow(broken).awaitIdling() })
         assertEquals(1, loads.count { it == broken })
         // A clear starts over: the failed picon is tried once more with the rest.
         runBlocking { store.clear() }

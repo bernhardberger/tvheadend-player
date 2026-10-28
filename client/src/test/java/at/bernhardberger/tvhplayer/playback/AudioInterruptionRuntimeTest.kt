@@ -2022,8 +2022,8 @@ class AudioInterruptionRuntimeTest {
         settle()
         assertEquals(1, connection.subscribeCount)
         runtime.setSessionPlayWhenReady(true) { true }
-        await { connection.subscribeCount == 2 }
-        assertTrue(player.playWhenReady)
+        // The retune subscribes before it starts playing.
+        await { connection.subscribeCount == 2 && player.playWhenReady }
     }
 
     @Test fun playingWhileExhaustedButSuppressedWaitsForSuppression() = exercise {
@@ -2112,9 +2112,9 @@ class AudioInterruptionRuntimeTest {
         live(timeshift = false)
         suppress(true)
         runtime.onRecoveryRequired(PlaybackRecoveryReason.LIVE_BUFFER_EXHAUSTED_RETIREMENT_FAILED)
-        await { player.mediaItemCount == 0 }
+        // The unsubscribe follows the cleared player asynchronously.
+        await { player.mediaItemCount == 0 && connection.unsubscribeCount > 0 }
         assertEquals(1, connection.subscribeCount)
-        assertTrue(connection.unsubscribeCount > 0)
         suppress(false)
         await { connection.subscribeCount == 2 }
     }
