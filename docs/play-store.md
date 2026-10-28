@@ -114,10 +114,17 @@ fixed" (<https://support.google.com/googleplay/android-developer/answer/9859348>
 A closed track doesn't fix it yet, but changing the key after testers installed
 the app makes them uninstall and reinstall.
 
-Open point: the help page ties the quantum-ready hybrid signature (for Android
-17 and newer) to Google-generated keys. Whether supplying our own key gives that
-up, and whether it matters for a TV app on Android 9 to 14, is not answered on
-the fetched pages.
+**Decided (owner, 2026-10-28):** keep our own key. The help page ties the
+quantum-ready hybrid signature (for Android 17 and newer) to Google-generated
+keys; no TV we target runs Android 17, and a Google-generated key would stop
+GitHub APKs from updating Play installs. Revisit the Android 17 key upgrade when
+a phone version ships.
+
+Recovery was tested on 2026-10-28 before the upload: the owner restored the
+encrypted key copy from the off-site Backblaze backup (pinned snapshot, checksum
+matched), unlocked it with the vault entries alone, and the certificate SHA-256
+matched the value above. The drill copy was deleted afterwards. PEPK runs on the
+signing host against the live keystore, not against a restored copy.
 
 ### 1.3 App content
 
