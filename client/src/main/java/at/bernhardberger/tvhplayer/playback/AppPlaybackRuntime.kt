@@ -619,6 +619,7 @@ class AppPlaybackRuntime(
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         val recoveryIntent = playbackRequests.get()
         val reconnectAdmitted = { reconnectGeneration == null || profileStillCurrent(reconnectGeneration) }
+        val keptTarget = if (reconnectGeneration != null) ::reconnectingActiveTarget else ::healthyActiveTarget
         presentationEpoch.publishIfCurrent(expectedPresentationEpoch) {
             if (!recovering && _activeTarget.value == null || viewerRetry && healthyActiveTarget() == null) {
                 presentation.publishStarting()
@@ -641,6 +642,7 @@ class AppPlaybackRuntime(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 result = unavailableLiveTargetResult(channelId),
                 failureReason = AppPlaybackFailureReason.OTHER,
+                keptTarget = keptTarget,
             )
         }
         if (
@@ -651,6 +653,7 @@ class AppPlaybackRuntime(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 result = PlaybackTargetResult.NOT_READY,
                 failureReason = AppPlaybackFailureReason.OTHER,
+                keptTarget = keptTarget,
             )
         }
         val streamProfileId = profileOwner.selectedStreamProfileIdFor(profileSelection.currentSession)
@@ -665,6 +668,7 @@ class AppPlaybackRuntime(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 result = unavailableLiveTargetResult(channelId),
                 failureReason = AppPlaybackFailureReason.OTHER,
+                keptTarget = keptTarget,
             )
         }
         if (
@@ -676,6 +680,7 @@ class AppPlaybackRuntime(
                 expectedPresentationEpoch = expectedPresentationEpoch,
                 result = PlaybackTargetResult.NOT_READY,
                 failureReason = AppPlaybackFailureReason.OTHER,
+                keptTarget = keptTarget,
             )
         }
         val retainInterruptionMute = recovering && !viewerRetry && audioInterruptions.interruptionMuted
@@ -694,6 +699,7 @@ class AppPlaybackRuntime(
             canInstall = {
                 reconnectAdmitted() && (recoveryFence == null || canContinueRecoveryLocked(recoveryFence))
             },
+            keptTarget = keptTarget,
             installTarget = {
                 if (!targetCommands.isOpen()) {
                     PlaybackTargetResult.SHUT_DOWN
@@ -2377,6 +2383,8 @@ class AppPlaybackRuntime(
     private suspend fun installTargetForPresentation(
         expectedPresentationEpoch: Long,
         canInstall: () -> Boolean = { true },
+        // The active target a failed install leaves in place.
+        keptTarget: () -> AppPlaybackTarget? = ::healthyActiveTarget,
         installTarget: suspend () -> PlaybackTargetResult,
         onStarted: () -> Unit,
         onFailed: (PlaybackTargetResult) -> Unit,
@@ -2384,7 +2392,7 @@ class AppPlaybackRuntime(
         if (!targetCommands.isOpen()) return PlaybackTargetResult.SHUT_DOWN
         if (!canInstall()) return PlaybackTargetResult.NOT_READY
         val previousPlayWhenReady = player.playWhenReady
-        val previousTarget = healthyActiveTarget()
+        val previousTarget = keptTarget()
         val previousTargetEpoch = activeTargetEpoch
         val previousMediaItem = player.currentMediaItem
         presentation.coverVideoForTargetInstallLocked()
@@ -2399,7 +2407,7 @@ class AppPlaybackRuntime(
                     targetCommands.isOpen() &&
                         presentationEpoch.isCurrent(expectedPresentationEpoch)
                 },
-                activeTarget = ::healthyActiveTarget,
+                activeTarget = keptTarget,
                 onStarted = {
                     ownedMediaItem = player.currentMediaItem
                     audioInterruptions.restoreWithdrawnMuteOnCommitLocked()
@@ -2424,7 +2432,7 @@ class AppPlaybackRuntime(
             settleRetiredTargetLocked(expectedPresentationEpoch, !currentCoroutineContext().isActive, previousPlayWhenReady)
             val previousTargetStays = targetCommands.isOpen() &&
                 presentationEpoch.isCurrent(expectedPresentationEpoch) &&
-                previousTarget != null && healthyActiveTarget() == previousTarget &&
+                previousTarget != null && keptTarget() == previousTarget &&
                 activeTargetEpoch == previousTargetEpoch && player.currentMediaItem == previousMediaItem
             if (previousTargetStays) {
                 presentation.restoreVideoAfterFailedInstallLocked(resumesPlaying = foreground && previousPlayWhenReady)
@@ -2443,8 +2451,10 @@ class AppPlaybackRuntime(
         expectedPresentationEpoch: Long,
         result: PlaybackTargetResult,
         failureReason: AppPlaybackFailureReason,
+        keptTarget: () -> AppPlaybackTarget? = ::healthyActiveTarget,
     ): PlaybackTargetResult = installTargetForPresentation(
         expectedPresentationEpoch = expectedPresentationEpoch,
+        keptTarget = keptTarget,
         installTarget = { result },
         onStarted = {},
         onFailed = { targetResult ->
@@ -2526,6 +2536,18 @@ class AppPlaybackRuntime(
                 playerErrorPresent = player.playerError != null,
                 playbackState = player.playbackState,
             )
+        }
+    }
+
+    /**
+     * The target a reconnect retune keeps when it fails. The restart ended its stream, so the
+     * player's error (or idle player) is expected: the retries keep the target until their
+     * budget runs out, whenever that error arrives.
+     */
+    private fun reconnectingActiveTarget(): AppPlaybackTarget? = targetCommands.readIfOpen {
+        _activeTarget.value.takeIf {
+            !coordinator.playerCleanupPending.value &&
+            livePlaybackObservation.value != LivePlaybackObservation.Departed && departedEpoch != activeTargetEpoch
         }
     }
 

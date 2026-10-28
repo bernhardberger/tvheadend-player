@@ -1335,6 +1335,9 @@ class AudioInterruptionRuntimeTest {
         // The first retry follows at once; the later ones back off as any live recovery does.
         for (delayMillis in listOf(2_000L, 5_000L, 10_000L, 20_000L)) {
             await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == delayMillis }
+            // The retune unsubscribed the ended stream, whose player error arrives meanwhile: the
+            // retries keep their target all the same.
+            await { player.playerError != null }
             advanceRecoveryTime(delayMillis + 1)
         }
         // Out of retries: the ended stream is stopped, not left frozen on screen.
