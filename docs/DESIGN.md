@@ -427,10 +427,13 @@ Anatomy per Material for TV / design kit:
   only tuning dims the picon and drops the strip; reconnecting freezes it. Expanded adds the title (programme at the viewer
   position, the recording title, or the channel name without guide data) and
   `State • Channel`. The header is readable but never focusable or clickable.
-  Below it, `DrawerNowPlayingControls` groups Full screen, Pause/Play and Stop in
-  one passive 32dp ghost-fill pill (`surfaceVariant` at `TvGhostFillAlpha`), with
-  28dp TV Material icon buttons, 16dp icons, 2dp gaps and padded ends that contain
-  the kit's focused disc. The first icon aligns with the title. The row reserves
+  Below it, `DrawerNowPlayingControls` shows Full screen, Pause/Play and Stop as
+  small 28dp TV Material icon buttons with 16dp icons, each on a ghost disc
+  fainter than the header buttons' (`surfaceVariant` at 0.28), 12dp apart, the
+  first starting on the title's edge. Opening the drawer, the title and status
+  line fade in with a slide no longer than the 12dp gap, so they never cross the
+  plate. No shared background: alignment groups them with the header
+  (owner, 2026-10-28, direction B of the controls round). The row reserves
   36dp even when closed; only the open drawer composes the controls. Pause is
   omitted for live targets without timeshift, but always offered for recordings; a paused live channel shows Play only while timeshift is available, otherwise only Full screen and Stop remain.
   Full screen returns without retuning; Pause/Play uses the player's transport;

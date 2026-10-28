@@ -702,7 +702,7 @@ class NavigationShellEvidenceTest {
         assertEquals(plate.right + 12f, glyph.left, .5f)
     }
 
-    /** Opening, the labels come out of the plate's edge; nothing of them crosses the picon. */
+    /** Opening, the labels fade in with a slide no longer than the gap; nothing of them crosses the picon. */
     @Test
     @Config(qualifiers = "en-w960dp-h540dp-land-mdpi")
     fun headerTextNeverCrossesThePlateWhileTheDrawerOpens() {
@@ -716,22 +716,23 @@ class NavigationShellEvidenceTest {
         compose.mainClock.autoAdvance = false
         try {
             compose.onNodeWithTag("nav-settings").performSemanticsAction(SemanticsActions.RequestFocus) { it() }
-            val widths = mutableListOf<Float>()
+            val lefts = mutableListOf<Float>()
             repeat(90) {
                 compose.mainClock.advanceTimeByFrame()
                 compose.waitForIdle()
                 val text = compose.onAllNodesWithTag("global-drawer-now-playing-text", useUnmergedTree = true)
                     .fetchSemanticsNodes().singleOrNull()?.boundsInRoot ?: return@repeat
                 if (text.width > 0f) {
-                    assertTrue("labels at ${text.left} left of the plate's edge", text.left >= plate.right + 12f - .5f)
-                    widths += text.width
+                    assertTrue("labels at ${text.left} over the plate", text.left >= plate.right - .5f)
+                    lefts += text.left
                 }
                 assertEquals("frame $it drew over the plate", closedPlate, plateRegion(drawShell()))
             }
             compose.mainClock.autoAdvance = true
             compose.waitForIdle()
-            val settled = bounds("global-drawer-now-playing-text", unmerged = true).width
-            assertTrue("no frame caught the labels mid-entry: $widths", widths.any { it < settled - 4f })
+            val settled = bounds("global-drawer-now-playing-text", unmerged = true).left
+            assertEquals("labels settle a gap after the plate", plate.right + 12f, settled, .5f)
+            assertTrue("no frame caught the labels mid-slide: $lefts", lefts.any { it < settled - 2f })
         } finally {
             compose.mainClock.autoAdvance = true
         }

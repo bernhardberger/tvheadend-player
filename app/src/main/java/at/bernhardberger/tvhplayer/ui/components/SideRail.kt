@@ -1,6 +1,8 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -709,6 +711,9 @@ private val NowPlayingPlateGap = 12.dp
 
 /** The labels start [NowPlayingPlateGap] after the plate, which reaches past the destinations' icons. */
 private val NowPlayingTextStart = ItemIconCenter + NowPlayingPlateWidth / 2 + NowPlayingPlateGap
+private val DrawerControlGap = 12.dp
+/** Fainter than the header buttons' ghost fill: the controls stay subordinate to the title. */
+private const val DrawerControlFillAlpha = 0.28f
 
 /**
  * The top section while something plays behind browse: the playing channel's plate on the mark's
@@ -787,11 +792,12 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
             ) {
                 NowPlayingRailStrip(nowPlaying, programme, status, nowSec)
             }
-            // The kit's enter slides in from the left; clipped, the labels emerge from the plate's edge.
+            // The kit's fade with a slide no longer than the gap, so the labels never cross the plate.
+            val gapPx = with(LocalDensity.current) { NowPlayingPlateGap.roundToPx() }
             androidx.compose.animation.AnimatedVisibility(expanded,
-                enter = NavigationDrawerItemDefaults.ContentAnimationEnter,
+                enter = fadeIn() + slideInHorizontally { -gapPx },
                 exit = NavigationDrawerItemDefaults.ContentAnimationExit,
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = NowPlayingTextStart).clipToBounds()) {
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = NowPlayingTextStart)) {
                 Column(Modifier.testTag("global-drawer-now-playing-text")) {
                     Text(title ?: channel, style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -819,8 +825,8 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
 }
 
 /**
- * The kit has no grouped icon row: the shared pill is passive; each button keeps kit focus. The pill
- * spans a destination's extent and grows with the sheet as their pills do; the buttons share it evenly.
+ * Small kit icon buttons, each on a faint ghost disc, in a row that starts on the title's edge
+ * with a fixed gap: alignment groups them with the header, so the row needs no shared background.
  */
 @Composable
 private fun DrawerNowPlayingControls(
@@ -843,9 +849,8 @@ private fun DrawerNowPlayingControls(
     Row(Modifier.padding(top = 4.dp)
         .withinDrawerSheet(fullWidth, visibleWidthPx)
         .width(NavigationDrawerItemDefaults.ExpandedDrawerItemWidth)
-        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = TvGhostFillAlpha), CircleShape)
-        .padding(vertical = 2.dp).testTag("global-drawer-now-playing-controls"),
-        horizontalArrangement = Arrangement.SpaceEvenly) {
+        .padding(start = NowPlayingTextStart, top = 2.dp, bottom = 2.dp).testTag("global-drawer-now-playing-controls"),
+        horizontalArrangement = Arrangement.spacedBy(DrawerControlGap)) {
         controls.forEachIndexed { index, control ->
             key(control) {
                 val label = when (control) {
@@ -872,7 +877,8 @@ private fun DrawerNowPlayingControls(
                         .onFocusChanged { onControlFocused(control, it.isFocused) }
                         .testTag("global-drawer-now-playing-$control")
                         .semantics { contentDescription = label },
-                    colors = IconButtonDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.Transparent),
+                    colors = IconButtonDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = DrawerControlFillAlpha)),
                 ) {
                     Icon(painterResource(icon), contentDescription = null, modifier = Modifier.size(IconButtonDefaults.SmallIconSize))
                 }
