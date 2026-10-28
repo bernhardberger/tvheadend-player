@@ -698,8 +698,11 @@ class GuideVisualLayoutTest {
 
     @Test fun aConnectingGuideShowsItsSkeletonAndNoLoadingText() {
         show(connecting = true)
+        // The preparation anchor draws a skeleton too; the capture needs the screen's own, which
+        // takes focus once its background preparation lands.
         compose.waitUntil(5_000) {
-            compose.onAllNodesWithTag("guide-skeleton", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+            compose.onAllNodesWithTag("browse-preparing", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() &&
+                compose.onAllNodesWithTag("guide-skeleton", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
         }
         compose.onNodeWithTag("guide-skeleton", useUnmergedTree = true).assertIsDisplayed()
             .assertContentDescriptionEquals(context().getString(R.string.epg_loading))
