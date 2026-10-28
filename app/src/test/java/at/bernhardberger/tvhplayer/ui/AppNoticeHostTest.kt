@@ -150,7 +150,7 @@ class AppNoticeHostTest {
             override suspend fun clear() { release.await() }
         }
         val queue = NoticeCenter(SystemClock::elapsedRealtime, { NoticeContext(0, null) })
-        val model = SettingsStorageViewModel(cache, queue, at.bernhardberger.tvhplayer.stores.ChannelAccentStore())
+        val model = SettingsStorageViewModel(cache, queue, at.bernhardberger.tvhplayer.stores.ChannelAccentStore()) {}
         var playback by mutableStateOf(false)
         var clicks = 0
         compose.setContent {

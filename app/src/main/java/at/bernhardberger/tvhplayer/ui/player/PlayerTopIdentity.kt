@@ -71,7 +71,7 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
@@ -473,7 +473,7 @@ private val HintShadow = Shadow(Color.Black.copy(alpha = 0.6f), blurRadius = 8f)
 
 /** A recent channel, shown in the row below the top identity. */
 internal data class RecentChannelPeek(
-    val picon: ArtworkId?,
+    val picon: ChannelIcon?,
     val number: String,
     val name: String,
     val channelId: ChannelId? = null,

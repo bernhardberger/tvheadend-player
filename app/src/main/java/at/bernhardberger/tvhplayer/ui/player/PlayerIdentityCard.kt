@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
@@ -32,7 +32,7 @@ private val PiconLift = 12.dp
 /** A channel card's face, used by the channel rows' tiles: its picon, or its name without one, on a plain surface. */
 @Composable
 internal fun BoxScope.ChannelCardFace(
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     channelId: ChannelId?,
     name: String,
     logoTag: String = "player-identity-logo",

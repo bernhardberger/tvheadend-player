@@ -7,6 +7,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.detailsTintRgb
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
@@ -19,7 +20,7 @@ import at.bernhardberger.tvhplayer.images.DetailsArtColors
 @Composable
 internal fun rememberDetailsTint(
     art: ArtworkId?,
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     onSettled: (() -> Unit)? = null,
 ): State<Color> {
     val currentOnSettled by rememberUpdatedState(onSettled)

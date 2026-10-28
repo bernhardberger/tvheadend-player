@@ -175,10 +175,12 @@ class AppProfileOwnerTest {
         ) { currentSession ->
             available(StreamProfileId("11111111111111111111111111111111"), currentSession)
         }
+        var artworkClears = 0
         val owner = profileOwner(
             session,
             PlayerSettingsStore(InMemoryPreferencesDataStore()),
             StandardTestDispatcher(testScheduler),
+            clearAppArtwork = { artworkClears++ },
         )
         backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
         runCurrent()
@@ -192,7 +194,26 @@ class AppProfileOwnerTest {
         }
 
         assertTrue(result.isFailure)
+        assertEquals(1, artworkClears)
         assertEquals(1L, owner.configurationGeneration.value) // Accepted replacement invalidates old notices even on failure.
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun acceptedServerSaveAndProfileRemovalClearAppArtwork() = runTest {
+        var artworkClears = 0
+        val owner = profileOwner(
+            at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession(),
+            PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            StandardTestDispatcher(testScheduler),
+            clearAppArtwork = { artworkClears++ },
+        )
+        backgroundScope.launch(start = CoroutineStart.UNDISPATCHED) { owner.run() }
+        runCurrent()
+        assertEquals(0, artworkClears) // Startup preserves the offline cache.
+        runCatching { owner.saveServer("", 9982) }
+        assertEquals(1, artworkClears)
+        owner.clearProfile()
+        assertEquals(2, artworkClears)
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -380,6 +401,7 @@ class AppProfileOwnerTest {
         session: TvheadendSession,
         settings: PlayerSettingsStore,
         ioDispatcher: CoroutineDispatcher,
+        clearAppArtwork: suspend () -> Unit = {},
     ): AppProfileOwner {
         return AppProfileOwner(
             session = session,
@@ -387,6 +409,7 @@ class AppProfileOwnerTest {
             playerSettings = settings,
             ioDispatcher = ioDispatcher,
             readProfileForEditing = { error("Unexpected editing read") },
+            clearAppArtwork = clearAppArtwork,
         )
     }
 

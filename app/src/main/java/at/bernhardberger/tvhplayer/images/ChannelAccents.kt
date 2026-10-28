@@ -7,6 +7,7 @@ import at.bernhardberger.tvheadend.sdk.android.TvheadendArtworkLoadException
 import android.content.Context
 import androidx.palette.graphics.Palette
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionGenerationIdentity
@@ -44,7 +45,8 @@ class ChannelAccents(
     private val failed = ConcurrentHashMap.newKeySet<String>()
 
     /** The stored colour of [picon], from memory. Null before the store was read and for an unknown key. */
-    fun stored(picon: AppArtworkSource): Int? = key(picon)?.let { store[it] }
+    fun stored(picon: Any): Int? = if (picon is AppArtworkSource) key(picon)?.let { store[it] }
+        else DetailsArtColors.stored(picon)
 
     /**
      * The colour of [picon]: the stored one, else sampled now and stored. A picon without a usable
@@ -53,7 +55,9 @@ class ChannelAccents(
      * replaced meanwhile. Without a key the colour is sampled for this call only. Before a session
      * only the stored colour of a saved copy is known; it is sampled once the session is there.
      */
-    suspend fun sample(context: Context, picon: AppArtworkSource): Int? {
+    suspend fun sample(context: Context, picon: Any): Int? {
+        // Remote logos use the same small decode, but never enter the SDK's persistent accent store.
+        if (picon !is AppArtworkSource) return DetailsArtColors.sample(context, picon)
         val session = picon.currentSession ?: return key(picon)?.let {
             store.load()
             store[it]
@@ -86,7 +90,9 @@ class ChannelAccents(
             .distinctUntilChanged { old, new -> old.first === new.first && old.second === new.second }
             .map { (session, catalog) ->
                 if (session == null || catalog == null) null
-                else FillInTarget(session, catalog.channels.mapNotNullTo(LinkedHashSet()) { it.icon })
+                else FillInTarget(session, catalog.channels.mapNotNullTo(LinkedHashSet()) {
+                    (it.icon as? ChannelIcon.ImageCache)?.artworkId
+                })
             }
             .distinctUntilChanged()
             .combine(store.clears) { target, clears -> target to clears }

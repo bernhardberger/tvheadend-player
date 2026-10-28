@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -105,7 +106,7 @@ class PiconBoxInkTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(LIGHT_FILL).padding(40.dp)) {
                         ProvideArtworkSession(session) {
-                            PiconBox(ArtworkId(1), Modifier.size(200.dp, 120.dp).testTag("picon"), ground = ground)
+                            PiconBox(ChannelIcon.ImageCache(ArtworkId(1)), Modifier.size(200.dp, 120.dp).testTag("picon"), ground = ground)
                         }
                     }
                 }
@@ -145,7 +146,7 @@ class PiconBoxInkTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(LIGHT_FILL).padding(40.dp)) {
                         ProvideArtworkSession(session) {
-                            PiconBox(ArtworkId(1), Modifier.size(200.dp, 120.dp).testTag("picon"),
+                            PiconBox(ChannelIcon.ImageCache(ArtworkId(1)), Modifier.size(200.dp, 120.dp).testTag("picon"),
                                 ground = if (focused) LIGHT_FILL else DARK_FILL,
                                 prefetchGround = if (focused) DARK_FILL else LIGHT_FILL)
                         }
@@ -203,7 +204,7 @@ class PiconBoxInkTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(DARK_FILL).padding(40.dp)) {
                         ProvideArtworkSession(session) {
-                            ProgrammePanePicture(art = null, logo = ArtworkId(1), accent = accent, logoTag = "pane-logo",
+                            ProgrammePanePicture(art = null, logo = ChannelIcon.ImageCache(ArtworkId(1)), accent = accent, logoTag = "pane-logo",
                                 modifier = Modifier.size(268.dp, 151.dp))
                         }
                     }
@@ -229,7 +230,7 @@ class PiconBoxInkTest {
                     view = LocalView.current
                     Box(Modifier.fillMaxSize().background(fill).padding(40.dp)) {
                         ProvideArtworkSession(session) {
-                            PiconBox(ArtworkId(1), Modifier.size(width.dp, height.dp).testTag("picon"), ground = ground)
+                            PiconBox(ChannelIcon.ImageCache(ArtworkId(1)), Modifier.size(width.dp, height.dp).testTag("picon"), ground = ground)
                         }
                     }
                 }

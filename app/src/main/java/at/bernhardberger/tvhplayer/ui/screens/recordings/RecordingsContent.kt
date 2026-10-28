@@ -90,7 +90,7 @@ import androidx.tv.material3.Icon
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ListItem
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -377,7 +377,7 @@ internal fun RecordingNowFolderRow(
 @Composable
 internal fun RecordingMetadataPane(
     entry: DvrEntry?,
-    piconPath: ArtworkId?,
+    piconPath: ChannelIcon?,
     admission: RecordingPlaybackAdmission?,
     modifier: Modifier = Modifier,
     kind: RecordingRowKind = RecordingRowKind.ARCHIVE,
@@ -527,7 +527,7 @@ private fun recordingRuleLabel(entry: DvrEntry): Pair<String, Int>? = when {
 private fun RecordingListWithPane(
     entry: DvrEntry?,
     kind: RecordingRowKind,
-    piconForEntry: (DvrEntry) -> ArtworkId?,
+    piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     paneBottom: Dp,
     list: @Composable () -> Unit,
@@ -561,7 +561,7 @@ internal fun RecordingSchedule(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    piconForEntry: (DvrEntry) -> ArtworkId?,
+    piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
@@ -713,7 +713,7 @@ internal fun RecordingProblems(
     onFocused: (String) -> Unit,
     onOpen: (DvrEntry) -> Unit,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,
-    piconForEntry: (DvrEntry) -> ArtworkId?,
+    piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     initialScrollIndex: Int,
     onScrollChanged: (Int) -> Unit,
@@ -877,7 +877,7 @@ internal enum class RecordingRowKind {
 @Composable
 internal fun RecordingListRow(
     entry: DvrEntry,
-    piconPath: ArtworkId?,
+    piconPath: ChannelIcon?,
     resumePosition: Duration?,
     selected: Boolean,
     modifier: Modifier = Modifier,

@@ -915,7 +915,7 @@ internal fun DetailsHero(
  * same request [LoadDetailsHeroLogo] made ahead.
  */
 @Composable
-internal fun DetailsHeroLogo(picon: ArtworkId?, modifier: Modifier) {
+internal fun DetailsHeroLogo(picon: ChannelIcon?, modifier: Modifier) {
     PiconBox(picon, modifier.size(DetailsHeroLogoSize.first, DetailsHeroLogoSize.second), placeholders = false,
         ground = null)
 }
@@ -926,7 +926,7 @@ internal fun DetailsHeroLogo(picon: ArtworkId?, modifier: Modifier) {
  * or at once when there is none.
  */
 @Composable
-internal fun LoadDetailsHeroLogo(picon: ArtworkId?, onSettled: () -> Unit) {
+internal fun LoadDetailsHeroLogo(picon: ChannelIcon?, onSettled: () -> Unit) {
     val artwork = LocalArtworkContext.current
     val context = LocalPlatformContext.current
     val density = LocalDensity.current
@@ -1181,7 +1181,7 @@ private fun DetailsProgress(event: EpgEvent?, recording: DvrEntry?, recordingAdm
 
 @Composable
 internal fun ProgrammeEyebrow(
-    picon: ArtworkId?, text: String,
+    picon: ChannelIcon?, text: String,
     modifier: Modifier = Modifier, piconModifier: Modifier = Modifier,
     trailing: @Composable () -> Unit = {},
 ) {
@@ -1199,7 +1199,7 @@ internal fun ProgrammeEyebrow(
  * placeholder, the whole box stands.
  */
 @Composable
-private fun InlineLogo(picon: ArtworkId, modifier: Modifier) {
+private fun InlineLogo(picon: ChannelIcon, modifier: Modifier) {
     val density = LocalDensity.current
     var drawnWidth by remember(picon) { mutableStateOf<Dp?>(null) }
     Box(Modifier.size(drawnWidth ?: InlineLogoWidth, InlineLogoHeight)) {

@@ -82,6 +82,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.ProvideTextStyle
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
@@ -234,14 +235,15 @@ internal fun ChannelsImmersiveBackground(
             val art = id?.takeIf { programArt && session }?.let(picture)
             val channel = channels.firstOrNull { it.id == id }
             val icon = channel?.icon
-            ChannelBackdrop(id, art, icon, logo = channel != null && (session || icon?.let { artwork.logo(it).saved } != null))
+            ChannelBackdrop(id, art, icon, logo = channel != null && (session || icon is ChannelIcon.RemoteUrl ||
+                icon?.let { (artwork.logo(it) as? AppArtworkSource)?.saved } != null))
         },
         // The art in the corner leaves the rest clear, so the gradient is kept off its holes.
         modifier.browseScreenBackdrop().underBrowseShellScrim().testTag("channels-immersive-background"),
         onReveal = { revealed = it },
     ) { shown, onReady ->
         val channel = shown.channel
-        // Without a session or a saved logo neither colour nor picture can load; the plain background stays.
+        // Without a session, a saved logo or a remote URL, the plain background stays.
         if (channel == null || !shown.logo) {
             LaunchedEffect(Unit) { onReady() }
             return@FocusBackdrop
@@ -286,10 +288,10 @@ internal fun ChannelsImmersiveBackground(
 
 /**
  * What a backdrop shows: the channel's programme picture, which needs the session, or else its
- * [logo], there with the session or before it as a saved copy. It carries the channel's [icon], so
+ * [logo], there with the session or before it as a saved copy or remote URL. It carries the channel's [icon], so
  * a backdrop fading out still draws after its channel has left the list.
  */
-private data class ChannelBackdrop(val channel: ChannelId?, val art: ArtworkId?, val icon: ArtworkId?, val logo: Boolean)
+private data class ChannelBackdrop(val channel: ChannelId?, val art: ArtworkId?, val icon: ChannelIcon?, val logo: Boolean)
 
 /** What the immersive list's cards need from the screen. */
 internal class ChannelsImmersiveCards(

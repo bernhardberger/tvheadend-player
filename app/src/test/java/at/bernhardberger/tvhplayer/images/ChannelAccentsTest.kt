@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.os.Looper
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -105,6 +106,39 @@ class ChannelAccentsTest {
     }.build()
 
     @After fun stop() { scope.coroutineContext[Job]!!.cancel() }
+
+    @Test fun fillInSamplesImageCacheIconsButDoesNotFetchRemoteUrls() {
+        session.publish(observation(ChannelCatalog.create(listOf(
+            Channel.create(ChannelId(1), icon = ChannelIcon.ImageCache(red)),
+            Channel.create(ChannelId(2), icon = ChannelIcon.parse("https://192.0.2.1/logo.png")),
+        ))))
+        startPass()
+        await { store[key(red)] != null }
+        assertEquals(listOf(red).ids(), loaded())
+    }
+
+    @Test fun remoteAccentUsesTheUrlAndIsOnlyKeptInMemory() {
+        val url = "https://192.0.2.1/logo.png"
+        DetailsArtColors.clear()
+        var loads = 0
+        images.install(ImageLoader.Builder(app).components {
+            add(Interceptor { chain ->
+                assertEquals(url, chain.request.data)
+                loads++
+                SuccessResult(picon(red).asImage(), chain.request, DataSource.NETWORK)
+            })
+        }.build())
+        try {
+            val color = scope.async { accents.sample(app, url) }.awaitIdling()
+            assertTrue(color != null && color != NEUTRAL_ACCENT_RGB)
+            assertEquals(color, accents.stored(url))
+            assertEquals(color, scope.async { accents.sample(app, url) }.awaitIdling())
+            assertEquals(1, loads)
+            assertNull(store[url])
+        } finally {
+            DetailsArtColors.clear()
+        }
+    }
 
     @Test fun thePassSamplesOnlyMissingPiconsOneAtATimeAndStoresNeutralForAColourlessOne() {
         runBlocking { store.put(key(stored), 0x123456) }
@@ -272,7 +306,7 @@ class ChannelAccentsTest {
         fun key(id: ArtworkId) = "profile-${id.value}"
 
         fun catalog(picons: List<ArtworkId?>) = ChannelCatalog.create(picons.mapIndexed { index, icon ->
-            Channel.create(ChannelId(index + 1L), name = "Channel", number = index + 1L, icon = icon)
+            Channel.create(ChannelId(index + 1L), name = "Channel", number = index + 1L, icon = icon?.let { ChannelIcon.ImageCache(it) })
         })
 
         fun observation(

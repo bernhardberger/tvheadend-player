@@ -36,6 +36,7 @@ import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
@@ -320,7 +321,7 @@ internal fun PlayerPresentedLiveTimeline(
 @Composable
 private fun ProgrammeArtworkTile(
     artwork: ArtworkId?,
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     channelId: ChannelId?,
     channelNumber: String,
     modifier: Modifier,
@@ -342,7 +343,7 @@ private fun ProgrammeArtworkTile(
 /** The channel in the artwork's place: its picon, or its number, on [channelFallbackGround]. */
 @Composable
 private fun ChannelArtworkFallback(
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     channelId: ChannelId?,
     channelNumber: String,
 ) {

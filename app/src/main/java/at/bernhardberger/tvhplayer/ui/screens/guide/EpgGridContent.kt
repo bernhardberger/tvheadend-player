@@ -81,6 +81,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.SurfaceDefaults
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.Channel
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryState
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent as EpgEventEntry
@@ -509,7 +510,7 @@ internal fun TimelineChannelHeader(
                     maxLines = 1,
                 )
             }
-            if (channel.icon != null && currentSession != null && !logoFailed) {
+            if (channel.icon != null && (currentSession != null || channel.icon is ChannelIcon.RemoteUrl) && !logoFailed) {
                 PiconBox(
                     piconPath = channel.icon,
                     modifier = Modifier

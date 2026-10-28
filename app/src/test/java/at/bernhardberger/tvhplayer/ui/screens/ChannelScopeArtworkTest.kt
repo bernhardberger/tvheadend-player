@@ -2,9 +2,14 @@ package at.bernhardberger.tvhplayer.ui.screens
 
 import android.app.Application
 import android.graphics.Bitmap
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -31,6 +36,7 @@ import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
 import coil3.request.SuccessResult
+import coil3.request.ErrorResult
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -51,6 +57,42 @@ class ChannelScopeArtworkTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val requests = mutableListOf<AppArtworkSource>()
+
+    @Test fun immersiveBackdropCanLoadARemoteLogoBeforeReady() {
+        val icon = ChannelIcon.parse("https://192.0.2.1/backdrop.png") as ChannelIcon.RemoteUrl
+        val models = showBackdrop(icon)
+        compose.onNodeWithTag("channels-logo-glow").assertExists()
+        assertTrue(models.isNotEmpty())
+        assertTrue(models.all { it == icon.url })
+    }
+
+    @Test fun immersiveBackdropWaitsForAnImageCacheLogoWithoutASavedCopy() {
+        val models = showBackdrop(ChannelIcon.ImageCache(ArtworkId(1)))
+        compose.onNodeWithTag("channels-logo-glow").assertDoesNotExist()
+        assertTrue(models.isEmpty())
+    }
+
+    private fun showBackdrop(icon: ChannelIcon): List<Any> {
+        val models = java.util.Collections.synchronizedList(mutableListOf<Any>())
+        images.install(ImageLoader.Builder(ApplicationProvider.getApplicationContext<Application>())
+            .components {
+                add(Interceptor { chain ->
+                    models += chain.request.data
+                    ErrorResult(null, chain.request, IllegalStateException("Fixture missing image"))
+                })
+            }.coroutineContext(Dispatchers.Main.immediate).diskCache(null).build())
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                ChannelsImmersiveBackground(
+                    channels = listOf(Channel.create(ChannelId(1), icon = icon)),
+                    channelId = { ChannelId(1) }, observation = SessionObservation.create(),
+                    nowSec = { 0L }, logoTop = 0.dp, endInset = 0.dp, modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        compose.waitForIdle()
+        return models
+    }
 
     @Test fun rowsOfTheFirstProfilesScopeNeverShowTheSecondProfilesSavedLogos() {
         val session = FakeTvheadendSession()
@@ -116,7 +158,7 @@ class ChannelScopeArtworkTest {
     private fun observation() = SessionObservation.create(
         sessionState = SessionState.Synchronizing,
         channelState = ChannelRepositoryState.Stale(ChannelCatalog.create((1..3).map { n ->
-            Channel.create(ChannelId(n.toLong()), name = "Channel $n", number = n.toLong(), icon = ArtworkId(n))
+            Channel.create(ChannelId(n.toLong()), name = "Channel $n", number = n.toLong(), icon = ChannelIcon.ImageCache(ArtworkId(n)))
         })),
         epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),

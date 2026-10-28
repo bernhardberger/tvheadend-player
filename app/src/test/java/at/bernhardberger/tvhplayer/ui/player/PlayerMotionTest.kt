@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.ui.components.PlaybackOptionsOverlayFrame
 
 import android.app.Application
@@ -798,7 +799,7 @@ class PlayerMotionTest {
             view = LocalView.current
             // With a logo: without one the identity has no chip for the entry's chip to stand on.
             val content = PlayerChromeContent("", liveInfoBarData(LocalContext.current.resources, 1, "One", null, null, false, 0, "Programme"),
-                picon = ArtworkId.parse("imagecache/2"))
+                picon = ChannelIcon.parse("imagecache/2"))
             TVHeadendPlayerTheme {
                 // The entry's three-digit field, in tabular digits.
                 val measurer = rememberTextMeasurer()

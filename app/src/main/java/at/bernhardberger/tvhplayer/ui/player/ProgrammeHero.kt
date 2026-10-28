@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
@@ -34,7 +35,7 @@ fun ProgrammeHero(
     image: ArtworkId?,
     channelId: ChannelId,
     channelNumber: String,
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     modifier: Modifier = Modifier,
     recordingBadge: Boolean = false,
 ) {
@@ -82,7 +83,7 @@ fun ProgrammeHero(
  * the video never shows through the tile.
  */
 @Composable
-internal fun channelFallbackGround(picon: ArtworkId?, channelId: ChannelId?): Brush {
+internal fun channelFallbackGround(picon: ChannelIcon?, channelId: ChannelId?): Brush {
     val top = if (picon != null && channelId != null) {
         rememberChannelAccent(picon, channelId).copy(alpha = 0.48f).compositeOver(TvSurfaceColors.containerLowest)
     } else TvSurfaceColors.containerLow

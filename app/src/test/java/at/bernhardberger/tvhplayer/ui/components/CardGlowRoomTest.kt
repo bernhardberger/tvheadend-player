@@ -39,6 +39,7 @@ import at.bernhardberger.tvheadend.sdk.core.DvrSnapshot
 import at.bernhardberger.tvheadend.sdk.core.EpgRepositoryState
 import at.bernhardberger.tvheadend.sdk.core.EpgSnapshot
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ServerCapabilities
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionState
@@ -330,8 +331,8 @@ class CardGlowRoomTest {
 
     private fun rail(name: String, recent: Boolean, key: Key, focused: Int, vararg sides: Side) {
         val channels = listOf(
-            Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1)),
-            Channel.create(ChannelId(2), name = "Harbor Sport HD", number = 102, icon = ArtworkId(2)),
+            Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ChannelIcon.ImageCache(ArtworkId(1))),
+            Channel.create(ChannelId(2), name = "Harbor Sport HD", number = 102, icon = ChannelIcon.ImageCache(ArtworkId(2))),
             Channel.create(ChannelId(3), name = "Northline News", number = 103),
         )
         val session = FakeSessionObservation(SessionObservation.create(

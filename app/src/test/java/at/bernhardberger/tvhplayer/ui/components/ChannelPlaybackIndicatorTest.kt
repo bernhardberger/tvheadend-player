@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -56,14 +57,14 @@ class ChannelPlaybackIndicatorTest {
             channelName = "Old name")
         val observation = SessionObservation.create(
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(
-                Channel.create(channel, name = "Ridge Earth HD", number = 1, icon = ArtworkId(1))))),
+                Channel.create(channel, name = "Ridge Earth HD", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))))),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(recording))),
         )
         val recordingTarget = AppPlaybackTarget.Recording(recording.id)
         fun rail(target: AppPlaybackTarget?, state: AppPlaybackState, warm: DvrEntryId? = null, stop: Boolean = false) =
             railNowPlaying(target, state, observation, warm, stop)
 
-        assertEquals(RailNowPlaying(target, channel, 1, "Ridge Earth HD", ArtworkId(1), null, reconnecting = false),
+        assertEquals(RailNowPlaying(target, channel, 1, "Ridge Earth HD", ChannelIcon.ImageCache(ArtworkId(1)), null, reconnecting = false),
             rail(target, AppPlaybackState.Playing))
         for (state in listOf(AppPlaybackState.Starting, AppPlaybackState.Buffering)) {
             assertEquals(false, rail(target, state)?.reconnecting)
@@ -80,7 +81,7 @@ class ChannelPlaybackIndicatorTest {
 
         // A recording counts only while it is the warm one; its channel comes from the line-up.
         assertEquals(null, rail(recordingTarget, AppPlaybackState.Playing))
-        assertEquals(RailNowPlaying(recordingTarget, channel, 1, "Ridge Earth HD", ArtworkId(1), "Northline Tonight",
+        assertEquals(RailNowPlaying(recordingTarget, channel, 1, "Ridge Earth HD", ChannelIcon.ImageCache(ArtworkId(1)), "Northline Tonight",
             reconnecting = false), rail(recordingTarget, AppPlaybackState.Playing, warm = recording.id))
     }
 

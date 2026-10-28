@@ -373,7 +373,7 @@ class PlayerChromeEvidenceTest {
     @Test fun topIdentityDropsTheLogoSlotWithoutAPiconAndStartsTheNameOnTheKeyline() {
         var withLogo by mutableStateOf(true)
         compose.setContent { TVHeadendPlayerTheme {
-            ProvideArtworkSession(session) { PlayerTopIdentity(PlayerChromeContent("", info(false), picon = if (withLogo) ArtworkId.parse("imagecache/2") else null),
+            ProvideArtworkSession(session) { PlayerTopIdentity(PlayerChromeContent("", info(false), picon = if (withLogo) ChannelIcon.parse("imagecache/2") else null),
                 Modifier.fillMaxSize()) }
         } }
         fun bounds(tag: String) = compose.onNodeWithTag(tag, useUnmergedTree = true).fetchSemanticsNode().boundsInRoot
@@ -537,7 +537,7 @@ class PlayerChromeEvidenceTest {
                             Scene.INFO, Scene.INFO_NO_LOGO, Scene.RECORDED -> InfoBar(info(scene == Scene.RECORDED), Modifier.fillMaxWidth().align(Alignment.BottomCenter))
                             Scene.HERO_ART, Scene.HERO_FALLBACK, Scene.HERO_NEUTRAL -> ProvideArtworkSession(session) { ProgrammeHero(
                                 if (scene == Scene.HERO_ART) ArtworkId(1) else null, ChannelId(101), "101",
-                                if (scene == Scene.HERO_NEUTRAL) null else ArtworkId.parse("imagecache/2"),
+                                if (scene == Scene.HERO_NEUTRAL) null else ChannelIcon.parse("imagecache/2"),
                             ) }
                             Scene.PREVIEW_ART, Scene.PREVIEW_TEXT -> ProvideArtworkSession(session) { QuickZapPreview(
                                 "Die außergewöhnliche Reise durch die österreichischen Alpen", "20:15–21:45 • ${playerMinutesLeft(38)} • Natur",

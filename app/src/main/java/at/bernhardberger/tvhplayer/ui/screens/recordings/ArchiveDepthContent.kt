@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.RecordingPlaybackAdmission
 import at.bernhardberger.tvhplayer.R
@@ -74,7 +74,7 @@ internal fun ArchiveDepthContent(
     onModeFocus: () -> Unit,
     onDrawerFocus: (() -> Unit)?,
     onOpenRecording: (DvrEntry) -> Unit,
-    piconForEntry: (DvrEntry) -> ArtworkId?,
+    piconForEntry: (DvrEntry) -> ChannelIcon?,
     admissionForEntry: (DvrEntry) -> RecordingPlaybackAdmission?,
     modifier: Modifier = Modifier,
     onOpenContextMenu: ((DvrEntry) -> Unit)? = null,

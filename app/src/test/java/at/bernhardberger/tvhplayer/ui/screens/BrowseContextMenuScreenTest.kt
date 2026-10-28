@@ -769,7 +769,7 @@ class BrowseContextMenuScreenTest {
             val previous = session.observation.value
             session.publish(SessionObservation.create(previous.sessionState,
                 ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(2),
-                    name = "Ridge Earth SD", number = 100, icon = ArtworkId(1))))), previous.epgState, previous.dvrState))
+                    name = "Ridge Earth SD", number = 100, icon = ChannelIcon.ImageCache(ArtworkId(1)))))), previous.epgState, previous.dvrState))
         }
         compose.onNodeWithTag("browse-context-menu").assertDoesNotExist()
         compose.onNodeWithTag("programme-details-page").assertDoesNotExist()
@@ -1329,8 +1329,8 @@ class BrowseContextMenuScreenTest {
         val context = ApplicationProvider.getApplicationContext<Application>()
         val now = fixedNow?.let(Instant::fromEpochSeconds) ?: Instant.parse("2026-09-15T19:00:00Z")
         check(android.os.SystemClock.setCurrentTimeMillis(now.toEpochMilliseconds()))
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = if (picon) ArtworkId(1) else null)
-        val otherChannel = Channel.create(ChannelId(2), name = "Ridge Earth SD", number = 100, icon = ArtworkId(1))
+        val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = if (picon) ChannelIcon.ImageCache(ArtworkId(1)) else null)
+        val otherChannel = Channel.create(ChannelId(2), name = "Ridge Earth SD", number = 100, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val event = EpgEvent.create(EventId(1), channel.id,
             if (futureProgramme) now + 1800.seconds else now - 1800.seconds,
             if (futureProgramme) now + 3600.seconds else now + 1800.seconds,

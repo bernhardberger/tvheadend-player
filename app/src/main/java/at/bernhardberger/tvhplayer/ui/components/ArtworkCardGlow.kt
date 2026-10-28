@@ -17,6 +17,7 @@ import androidx.tv.material3.CardGlow
 import androidx.tv.material3.Glow
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.images.DetailsArtColors
 
@@ -45,7 +46,7 @@ internal fun Modifier.cardGlowRoom(horizontal: Dp = 0.dp, top: Dp = 0.dp, bottom
 @Composable
 internal fun artworkCardGlow(
     art: ArtworkId?,
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     interactionSource: InteractionSource,
 ): CardGlow {
     val focused by interactionSource.collectIsFocusedAsState()

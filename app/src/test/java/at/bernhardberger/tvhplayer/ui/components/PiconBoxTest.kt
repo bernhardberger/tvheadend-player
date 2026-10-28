@@ -37,6 +37,7 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelRepositoryState
@@ -182,7 +183,7 @@ class PiconBoxTest {
                                     programTitle = "Programme",
                                     programme = null,
                                     nowSec = 0,
-                                    piconPath = picon,
+                                    piconPath = picon?.let { ChannelIcon.ImageCache(it) },
                                     onFocus = {},
                                     onConfirm = {},
                                 )
@@ -201,7 +202,7 @@ class PiconBoxTest {
                             CompositionLocalProvider(LocalContentColor provides Color.Magenta) {
                                 ProvideArtworkSession(session) {
                                     PiconBox(
-                                        piconPath = picon,
+                                        piconPath = picon?.let { ChannelIcon.ImageCache(it) },
                                         modifier = Modifier.size(60.dp, 36.dp).testTag("passive-picon"),
                                     )
                                 }

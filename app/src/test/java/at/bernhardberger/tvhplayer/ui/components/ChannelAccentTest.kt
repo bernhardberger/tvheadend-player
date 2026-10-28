@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
@@ -72,7 +73,7 @@ class ChannelAccentTest {
         compose.setContent {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
                 ProvideArtworkSession(session) {
-                    val colour = rememberChannelAccent(ArtworkId(1), ChannelId(1))
+                    val colour = rememberChannelAccent(ChannelIcon.ImageCache(ArtworkId(1)), ChannelId(1))
                     SideEffect { returned += colour }
                 }
             }

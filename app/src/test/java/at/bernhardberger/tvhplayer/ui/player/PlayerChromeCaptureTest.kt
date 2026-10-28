@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -141,10 +142,10 @@ class PlayerChromeCaptureTest {
     private lateinit var brightStill: Bitmap
     private var defaultZone: TimeZone? = null
     private val channels = listOf(
-        Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = LOGO),
-        Channel.create(ChannelId(2), name = "Harbor Sport HD", number = 102, icon = SPORT_LOGO),
+        Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ChannelIcon.ImageCache(LOGO)),
+        Channel.create(ChannelId(2), name = "Harbor Sport HD", number = 102, icon = ChannelIcon.ImageCache(SPORT_LOGO)),
         Channel.create(ChannelId(3), name = "Northline News", number = 103),
-        Channel.create(ChannelId(4), name = "Kite Kids", number = 104, icon = KIDS_LOGO),
+        Channel.create(ChannelId(4), name = "Kite Kids", number = 104, icon = ChannelIcon.ImageCache(KIDS_LOGO)),
         Channel.create(ChannelId(5), name = "Lantern Hour", number = 105),
     )
     private val session = FakeSessionObservation(SessionObservation.create(
@@ -211,7 +212,7 @@ class PlayerChromeCaptureTest {
             Triple("Northline Tonight", "northline-tonight", 0 to 45), Triple("Paper Kite Tales", "paper-kite-tales", 5 to 50),
             Triple("Ion Wake", "ion-wake", -40 to 25), Triple("The Kettle Hour", "kettle-hour", -60 to 30))
         val lineUp = names.mapIndexed { index, name ->
-            Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(201 + index))
+            Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(201 + index)))
         }
         val events = onAir.mapIndexed { index, (title, _, minutes) ->
             EpgEvent.create(EventId(500L + index), ChannelId(index + 1L), Instant.fromEpochSeconds(hour + minutes.first * 60L),
@@ -249,7 +250,7 @@ class PlayerChromeCaptureTest {
                                     nowSec = now, unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
                                 recordingNow = false,
-                                picon = ArtworkId(201),
+                                picon = ChannelIcon.ImageCache(ArtworkId(201)),
                                 artwork = programme.image,
                             ),
                             window = ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
@@ -319,7 +320,7 @@ class PlayerChromeCaptureTest {
                                     unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
                                 recordingNow = false,
-                                picon = LOGO,
+                                picon = ChannelIcon.ImageCache(LOGO),
                                 artwork = programme.image,
                             ),
                             numberEntryShown = entry.first.isNotEmpty(),
@@ -345,7 +346,7 @@ class PlayerChromeCaptureTest {
         capture("0-identity")
         for ((name, next) in listOf(
             "1-pending" to ("1" to ChannelNumberTarget.Pending),
-            "12-matched" to ("12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", SPORT_LOGO)),
+            "12-matched" to ("12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", ChannelIcon.ImageCache(SPORT_LOGO))),
             "999-unknown" to ("999" to ChannelNumberTarget.None),
         )) {
             compose.runOnIdle { entry = next }
@@ -387,14 +388,14 @@ class PlayerChromeCaptureTest {
         var withLogoWidth: Int? = null
         val entries = listOf(
             "0" to ChannelNumberTarget.Pending,
-            "1" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", LOGO),
-            "01" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", LOGO),
+            "1" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", ChannelIcon.ImageCache(LOGO)),
+            "01" to ChannelNumberTarget.Channel("1", "Ridge Earth HD", ChannelIcon.ImageCache(LOGO)),
             "02" to ChannelNumberTarget.Channel("2", "Ridge Earth HD", null),
             "12" to ChannelNumberTarget.Channel("12", "Channel without a logo", null),
             "123" to ChannelNumberTarget.Channel("123", "A very long international channel name HD", null),
             "999" to ChannelNumberTarget.None,
         ) + if (maxDigits == 4) listOf(
-            "1234" to ChannelNumberTarget.Channel("1234", "A very long international channel name HD", LOGO),
+            "1234" to ChannelNumberTarget.Channel("1234", "A very long international channel name HD", ChannelIcon.ImageCache(LOGO)),
         ) else emptyList()
         fun capture(name: String) {
             val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
@@ -451,7 +452,7 @@ class PlayerChromeCaptureTest {
         }
         // The other plates swap only colours: the same entry keeps its layout on each.
         if (maxDigits != 3) return
-        val matched = "12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", SPORT_LOGO)
+        val matched = "12" to ChannelNumberTarget.Channel("12", "Harbor Sport HD", ChannelIcon.ImageCache(SPORT_LOGO))
         show(matched)
         val layout = compose.onNodeWithTag("number-entry").fetchSemanticsNode().boundsInRoot
         for (style in ChannelNumberPlate.entries) {
@@ -776,7 +777,7 @@ class PlayerChromeCaptureTest {
                 unavailableTitle = "No program information"),
             state = state,
             recordingNow = scene == Scene.CONTROLS_BEHIND || scene == Scene.BANNER_BEHIND,
-            picon = if (scene == Scene.CONTROLS_NO_LOGO) null else LOGO,
+            picon = if (scene == Scene.CONTROLS_NO_LOGO) null else ChannelIcon.ImageCache(LOGO),
             artwork = programme.image.takeUnless { noEpg },
         )
         when (scene) {
@@ -797,7 +798,7 @@ class PlayerChromeCaptureTest {
                     recent.focusedId = channels[1].id
                 } }
                 PlayerPage<Unit>(details = null, railExpanded = true,
-                    nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1), "101", "Ridge Earth HD", LOGO, programme, NOW,
+                    nowPlaying = { ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1), "101", "Ridge Earth HD", ChannelIcon.ImageCache(LOGO), programme, NOW,
                         playbackIndicator = ChannelPlaybackIndicator.PLAYING) } },
                     player = {
                         Controls(timeshift, false, false, content, browser = state, emptyRecent = scene == Scene.BROWSER_EMPTY,
@@ -1095,8 +1096,8 @@ class PlayerChromeCaptureTest {
             onChannelZap = { _, _, _ -> },
             downHint = androidx.compose.ui.res.stringResource(at.bernhardberger.tvhplayer.R.string.nav_channels),
             recents = listOf(
-                RecentChannelPeek(SPORT_LOGO, "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
-                RecentChannelPeek(LOGO, "101", "Ridge Earth HD", ChannelId(1), now = "Ridge Light"),
+                RecentChannelPeek(ChannelIcon.ImageCache(SPORT_LOGO), "102", "Harbor Sport HD", ChannelId(2), now = "Harbor Kickoff"),
+                RecentChannelPeek(ChannelIcon.ImageCache(LOGO), "101", "Ridge Earth HD", ChannelId(1), now = "Ridge Light"),
                 RecentChannelPeek(null, "103", "Northline News International Service", ChannelId(3), now = "Northline Tonight 19:20"),
             ),
             onRecentPick = {},

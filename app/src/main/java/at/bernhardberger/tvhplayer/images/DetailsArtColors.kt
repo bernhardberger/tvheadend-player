@@ -3,7 +3,6 @@ package at.bernhardberger.tvhplayer.images
 import android.content.Context
 import android.util.LruCache
 import androidx.palette.graphics.Palette
-import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import coil3.request.SuccessResult
 import coil3.toBitmap
 import kotlinx.coroutines.Dispatchers
@@ -12,14 +11,16 @@ import kotlinx.coroutines.withContext
 /** Small process-only cache, scoped by the captured session and artwork, not by programme title. */
 internal object DetailsArtColors {
     // Art without a usable colour is remembered too, so it is not decoded again on every focus.
-    private val colors = LruCache<AppArtworkSource, Sample>(128)
+    private val colors = LruCache<Any, Sample>(128)
 
     private class Sample(val rgb: Int?)
 
-    fun stored(source: AppArtworkSource): Int? = colors.get(source)?.rgb
+    fun stored(source: Any): Int? = colors.get(source)?.rgb
+
+    fun clear() = colors.evictAll()
 
     // No shared lock: a slow decode must not hold up other artwork; a duplicate sample is harmless.
-    suspend fun sample(context: Context, source: AppArtworkSource): Int? =
+    suspend fun sample(context: Context, source: Any): Int? =
         withContext(Dispatchers.Default) {
             colors.get(source)?.let { return@withContext it.rgb }
             val result = loadArtworkSample(context, source) as? SuccessResult

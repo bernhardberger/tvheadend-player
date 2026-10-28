@@ -46,6 +46,7 @@ import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -1062,7 +1063,7 @@ class PlayerFooterLayoutEvidenceTest {
             id = ChannelId(it),
             number = it,
             name = if (it == 4L) "Dokumentation und Zeitgeschichte HD" else "Channel $it",
-            icon = if (it == 5L) null else ArtworkId(it.toInt()),
+            icon = if (it == 5L) null else ChannelIcon.ImageCache(ArtworkId(it.toInt())),
         )
     }
 

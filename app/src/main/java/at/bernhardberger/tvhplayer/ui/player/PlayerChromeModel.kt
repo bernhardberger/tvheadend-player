@@ -1,6 +1,7 @@
 package at.bernhardberger.tvhplayer.ui.player
 
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
 import at.bernhardberger.tvhplayer.playback.AppTimeshiftState
@@ -33,7 +34,7 @@ internal data class PlayerChromeContent(
     val state: PlayerStateCell = PlayerStateCell.PLAYING,
     /** The watched channel or recording is being recorded now: the info bar's REC badge. */
     val recordingNow: Boolean = false,
-    val picon: ArtworkId? = null,
+    val picon: ChannelIcon? = null,
     /** The programme's artwork, the identity card's backdrop. */
     val artwork: ArtworkId? = null,
     /** The channel whose colour is the identity card's backdrop without [artwork]. */

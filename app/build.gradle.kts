@@ -297,6 +297,7 @@ dependencies {
 
     implementation(libs.androidx.palette)
     implementation(libs.coil.compose)
+    implementation(libs.coil.network.okhttp)
 
     testImplementation(libs.junit)
     testImplementation("org.robolectric:robolectric:4.17")

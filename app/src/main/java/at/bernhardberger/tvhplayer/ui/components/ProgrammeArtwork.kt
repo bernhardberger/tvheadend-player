@@ -24,7 +24,7 @@ import coil3.compose.AsyncImage
 /** Non-focusable artwork shared by airing cards and browse menus. */
 @Composable
 internal fun ProgrammeArtwork(
-    image: ArtworkId?, channelIcon: ArtworkId?, progress: Float?,
+    image: ArtworkId?, channelIcon: ChannelIcon?, progress: Float?,
     modifier: Modifier = Modifier,
     plateModifier: Modifier = Modifier, progressModifier: Modifier = Modifier,
     progressColor: Color = MaterialTheme.colorScheme.primary,
@@ -48,7 +48,7 @@ internal fun ProgrammeArtwork(
  * for an airing card's picture; a smaller picture passes its [scale], so the plate keeps its share.
  */
 @Composable
-internal fun ArtworkLogoPlate(channelIcon: ArtworkId?, modifier: Modifier = Modifier, scale: Float = 1f) {
+internal fun ArtworkLogoPlate(channelIcon: ChannelIcon?, modifier: Modifier = Modifier, scale: Float = 1f) {
     PiconBox(channelIcon, modifier.size(56.dp * scale, 32.dp * scale)
         .background(TvLogoPlateColor, MaterialTheme.shapes.extraSmall)
         .padding(horizontal = 4.dp * scale, vertical = 3.dp * scale))

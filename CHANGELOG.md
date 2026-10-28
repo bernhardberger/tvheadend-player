@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Fixes
+
+- Channel logos also show when the server's image cache is off.
+
 ## 0.3.1
 
 ### Settings

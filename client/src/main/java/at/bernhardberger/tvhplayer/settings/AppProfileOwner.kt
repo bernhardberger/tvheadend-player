@@ -58,18 +58,21 @@ class AppProfileOwner(
     private val playerSettings: PlayerSettingsStore,
     private val ioDispatcher: CoroutineDispatcher,
     private val readProfileForEditing: suspend () -> ServerProfileEditReadResult,
+    private val clearAppArtwork: suspend () -> Unit = {},
 ) : ConnectionProfileEditor {
     constructor(
         session: TvheadendSession,
         profileStore: TvheadendServerProfileStore,
         playerSettings: PlayerSettingsStore,
         ioDispatcher: CoroutineDispatcher,
+        clearAppArtwork: suspend () -> Unit = {},
     ) : this(
         session = session,
         profileStore = profileStore,
         playerSettings = playerSettings,
         ioDispatcher = ioDispatcher,
         readProfileForEditing = profileStore::loadProfileForEditing,
+        clearAppArtwork = clearAppArtwork,
     )
 
     private val serverMutex = Mutex()
@@ -210,6 +213,7 @@ class AppProfileOwner(
     }
 
     private suspend fun commitServer(host: String, htspPort: Int) = serverMutex.withLock {
+        clearAppArtwork()
         mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
@@ -225,6 +229,7 @@ class AppProfileOwner(
         username: String,
         password: String,
     ) = serverMutex.withLock {
+        clearAppArtwork()
         mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null
@@ -235,6 +240,7 @@ class AppProfileOwner(
     }
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
+        clearAppArtwork()
         mutableConfigurationGeneration.value += 1
         mutableServerProfile.value = null
         audioProfileId = null

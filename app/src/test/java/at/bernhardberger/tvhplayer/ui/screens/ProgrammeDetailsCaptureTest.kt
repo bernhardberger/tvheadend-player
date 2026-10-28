@@ -77,7 +77,7 @@ class ProgrammeDetailsCaptureTest {
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
     )).captureCurrentSession()
     private val start = Instant.parse("2026-09-15T19:00:00Z")
-    private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
+    private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ChannelIcon.ImageCache(ArtworkId(1)))
     private val description = ("A winter expedition beyond the Arctic Circle. The crew follows the changing light across the ridge, discovering the wildlife and people of the far north. ").repeat(8)
 
     @Before fun prepare() {
@@ -338,7 +338,7 @@ class ProgrammeDetailsCaptureTest {
     @Test fun presentation() {
         val start = Instant.parse("2026-10-04T20:00:00Z")
         val now = start.epochSeconds + 900
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ArtworkId(1))
+        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val event = EpgEvent.create(EventId(1), channel.id, start, start + 3600.seconds,
             title = "Ridge Light", subtitle = "Winter on the ridge", genre = "Documentary",
             summary = "Seasonal mountain light, forests and weather moving over a ridge.",

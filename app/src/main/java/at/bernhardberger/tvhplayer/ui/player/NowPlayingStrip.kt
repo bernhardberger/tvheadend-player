@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
@@ -50,7 +50,7 @@ internal fun NowPlayingStrip(
     channelId: ChannelId,
     channelNumber: String?,
     channelName: String,
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     programme: EpgEvent?,
     nowSec: Long,
     modifier: Modifier = Modifier,
@@ -97,7 +97,7 @@ internal val NowPlayingPlateHeight = 27.dp
  */
 @Composable
 internal fun NowPlayingPlate(
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     channelNumber: String?,
     modifier: Modifier = Modifier,
     contentAlpha: Float = 1f,

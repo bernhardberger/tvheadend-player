@@ -11,6 +11,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.unit.dp
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -35,6 +36,7 @@ import coil3.asImage
 import coil3.decode.DataSource
 import coil3.intercept.Interceptor
 import coil3.request.SuccessResult
+import coil3.request.ErrorResult
 import kotlin.time.Instant
 import kotlinx.coroutines.Dispatchers
 import org.junit.Assert.assertEquals
@@ -62,6 +64,34 @@ class ArtworkContextTest {
     private val requests = mutableListOf<Any>()
     private var logoCompositions = 0
     private var observationCompositions = 0
+
+    @Test fun remoteLogoLoadsBeforeReadyAndKeepsItsModelAtReady() {
+        val session = FakeTvheadendSession()
+        val icon = ChannelIcon.parse("https://192.0.2.1/logo.png") as ChannelIcon.RemoteUrl
+        show(session) { PiconBox(icon, Modifier.size(60.dp, 36.dp), ground = null) }
+        assertEquals(listOf(icon.url), requests)
+        session.publish(observation(ready, guide = 1))
+        compose.waitForIdle()
+        assertEquals(listOf(icon.url), requests)
+    }
+
+    @Test fun remoteFailureIsFinalBeforeReadyButImageCacheStillWaitsForTheSession() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        images.install(ImageLoader.Builder(app).components {
+            add(Interceptor { chain -> ErrorResult(null, chain.request, IllegalStateException("Fixture failure")) })
+        }.coroutineContext(Dispatchers.Main.immediate).build())
+        var remoteErrors = 0
+        var imageCacheErrors = 0
+        compose.setContent {
+            PiconBox(ChannelIcon.parse("https://192.0.2.1/logo.png"), Modifier.size(60.dp, 36.dp),
+                ground = null, onError = { remoteErrors++ })
+            PiconBox(ChannelIcon.ImageCache(LOGO), Modifier.size(60.dp, 36.dp),
+                ground = null, onError = { imageCacheErrors++ })
+        }
+        compose.waitForIdle()
+        assertEquals(1, remoteErrors)
+        assertEquals(0, imageCacheErrors)
+    }
 
     @Test fun aGuideUpdateNeitherRecomposesALogoNorRequestsItAgain() {
         val session = FakeTvheadendSession(observation(ready, guide = 1))
@@ -176,7 +206,7 @@ class ArtworkContextTest {
     private fun Logo() {
         LocalArtworkContext.current.currentSession
         SideEffect { logoCompositions++ }
-        PiconBox(LOGO, Modifier.size(60.dp, 36.dp))
+        PiconBox(ChannelIcon.ImageCache(LOGO), Modifier.size(60.dp, 36.dp))
     }
 
     // A screen of the app, which follows every observation.
@@ -188,7 +218,7 @@ class ArtworkContextTest {
 
     private fun observation(state: SessionState, guide: Int) = SessionObservation.create(
         sessionState = state,
-        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "One", icon = LOGO)))),
+        channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "One", icon = ChannelIcon.ImageCache(LOGO))))),
         epgState = EpgRepositoryState.Current(EpgSnapshot.create(listOf(EpgEvent.create(EventId(guide.toLong()), ChannelId(1),
             Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600), title = "Programme $guide")))),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),

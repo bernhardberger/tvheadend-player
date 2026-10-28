@@ -119,7 +119,7 @@ class GuideRealisticSceneTest {
     private val channelRecords = records("channels").sortedBy { it.getLong("number") }
     private val channels = channelRecords.mapIndexed { index, record ->
         Channel.create(ChannelId(record.getLong("number")), name = record.getString("name"), number = record.getLong("number"),
-            icon = if (record.isNull("picon")) null else ArtworkId(index + 1), tagIds = listOf(ChannelTagId(1)) +
+            icon = if (record.isNull("picon")) null else ChannelIcon.ImageCache(ArtworkId(index + 1)), tagIds = listOf(ChannelTagId(1)) +
                 listOfNotNull(ChannelTagId(2).takeIf { record.getString("channel_id") == "ch-harbor-sport-plus" }))
     }
     private val channelIds = channelRecords.mapIndexed { index, record -> record.getString("channel_id") to channels[index].id }.toMap()
@@ -159,7 +159,7 @@ class GuideRealisticSceneTest {
         TimeZone.setDefault(TimeZone.getTimeZone(fixture.getString("timezone")))
         images.install(FixtureArt.imageLoader(context(), channels.zip(channelRecords).mapNotNull { (channel, record) ->
             // Northline World retains its declared icon ID, but its image really fails.
-            channel.icon?.takeUnless { record.getString("channel_id") == "ch-northline-world" }
+            (channel.icon as? ChannelIcon.ImageCache)?.artworkId?.takeUnless { record.getString("channel_id") == "ch-northline-world" }
                 ?.let { it to FixtureArt.picon(record.getString("picon").removeSuffix(".png")) }
         }.toMap()))
     }

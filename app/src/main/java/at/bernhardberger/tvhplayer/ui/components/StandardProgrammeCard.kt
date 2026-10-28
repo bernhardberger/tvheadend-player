@@ -16,6 +16,7 @@ import androidx.tv.material3.CardContainerDefaults
 import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import androidx.tv.material3.StandardCardContainer
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 
@@ -32,7 +33,7 @@ internal fun StandardProgrammeCard(
     onLongClick: (() -> Unit)?,
     modifier: Modifier,
     art: ArtworkId?,
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     title: @Composable () -> Unit,
     subtitle: @Composable () -> Unit,
     contentColor: CardContainerColors = CardContainerDefaults.contentColor(),

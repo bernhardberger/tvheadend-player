@@ -79,7 +79,7 @@ class ChannelScheduleCaptureTest {
         )))
         val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
         val now = hour + 15 * 60
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ArtworkId(1))
+        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         // Title, minutes after 20:00, length, genre and art: one full day from 18:00, so no gap shows.
         val evening = listOf(
             listOf("Foundry Hours", -120, 60, "Documentary", null),
@@ -151,7 +151,7 @@ class ChannelScheduleCaptureTest {
         var scene by mutableStateOf(scenes.first())
         var view: View? = null
         val still = FixtureArt.art("still-ridge-light").asImageBitmap()
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
+        val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
@@ -225,7 +225,7 @@ class ChannelScheduleCaptureTest {
         var scene by mutableStateOf(scenes.first())
         var view: View? = null
         val still = FixtureArt.art("still-kettle-hour").asImageBitmap()
-        val channel = Channel.create(ChannelId(9), name = "Amber Stage", number = 9, icon = ArtworkId(3))
+        val channel = Channel.create(ChannelId(9), name = "Amber Stage", number = 9, icon = ChannelIcon.ImageCache(ArtworkId(3)))
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),

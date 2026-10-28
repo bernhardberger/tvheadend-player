@@ -29,7 +29,7 @@ import androidx.compose.ui.layout.ScaleFactor
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.res.painterResource
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import coil3.compose.AsyncImage
 import coil3.compose.LocalPlatformContext
 import coil3.memory.MemoryCache
@@ -42,7 +42,7 @@ import at.bernhardberger.tvhplayer.profiling.profileTrace
 
 @Composable
 fun PiconBox(
-    piconPath: ArtworkId?,
+    piconPath: ChannelIcon?,
     modifier: Modifier = Modifier,
     contentScale: ContentScale = ContentScale.Fit,
     alignment: Alignment = Alignment.Center,
@@ -91,7 +91,7 @@ fun PiconBox(
             // One icon, one size: a logo without a saved copy keeps looking like it is loading
             // until the session can fetch it, so it only ever changes once, when the logo fades
             // in. Only a failure with a current session is final; no logo keeps the full icon.
-            val waitingForSession = currentSession == null
+            val waitingForSession = piconPath is ChannelIcon.ImageCache && currentSession == null
             val context = LocalPlatformContext.current
             val groundArgb = ground?.toArgb()
             // The logo last shown stands in while it is inked for a new ground, as when a row takes focus.

@@ -768,7 +768,7 @@ class GuideVisualLayoutTest {
     @Test fun logoAndNoLogoHeadersKeepSingleLineContentAccessibleAsFontScaleGrows() {
         val logoName = "Kultur und Dokumentationen aus aller Welt HD"
         val noLogoName = "Northline News: International Headlines and Analysis"
-        val logoChannel = Channel.create(ChannelId(1), name = logoName, number = 1001, icon = ArtworkId(1))
+        val logoChannel = Channel.create(ChannelId(1), name = logoName, number = 1001, icon = ChannelIcon.ImageCache(ArtworkId(1)))
         val noLogoChannel = Channel.create(ChannelId(2), name = noLogoName, number = 4567)
         val currentSession = headerSession()
         val scale = mutableStateOf(1f)
@@ -955,6 +955,29 @@ class GuideVisualLayoutTest {
         compose.onNodeWithText(formatHm(1800L), useUnmergedTree = true).assertIsDisplayed()
     }
 
+    @Test fun remoteLogoBeforeReadyFallsBackToNameOnFailure() {
+        val icon = ChannelIcon.parse("https://192.0.2.1/guide-logo.png") as ChannelIcon.RemoteUrl
+        val models = mutableListOf<Any>()
+        loader.shutdown()
+        loader = ImageLoader.Builder(context()).memoryCache(null).diskCache(null).components {
+            add(Interceptor { chain ->
+                models += chain.request.data
+                ErrorResult(null, chain.request, IllegalStateException("Fixture missing logo"))
+            })
+        }.coroutineContext(Dispatchers.Main.immediate).build()
+        images.install(loader)
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Box(Modifier.height(guideTimelineRowHeight())) {
+                    TimelineChannelHeader(Channel.create(ChannelId(1), name = "Northline News", icon = icon), 1001)
+                }
+            }
+        }
+        compose.onNodeWithText("Northline News", useUnmergedTree = true).assertIsDisplayed()
+        compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertDoesNotExist()
+        assertEquals(listOf(icon.url), models)
+    }
+
     @Test fun unavailableLogoShowsNameAndRetriesWhenIconOrSessionChanges() {
         val name = mutableStateOf("Northline News: International Headlines and Analysis")
         val icon = mutableStateOf(ArtworkId(1))
@@ -982,7 +1005,7 @@ class GuideVisualLayoutTest {
             TVHeadendPlayerTheme {
                 Box(Modifier.height(guideTimelineRowHeight())) {
                     ProvideArtworkSession(currentSession.value) { TimelineChannelHeader(
-                        Channel.create(ChannelId(1), name = name.value, number = 1001, icon = icon.value),
+                        Channel.create(ChannelId(1), name = name.value, number = 1001, icon = ChannelIcon.ImageCache(icon.value)),
                         1001,
                     ) }
                 }
@@ -3111,12 +3134,12 @@ class GuideVisualLayoutTest {
         channelNames: List<String>? = null, uiPreferences: DataStore<Preferences> = preferences(),
         preparationBlocker: @Composable () -> Unit = {}) {
         val channels = channelNames?.mapIndexed { index, name ->
-            Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(index + 1),
+            Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1)),
                 tagIds = listOf(ChannelTagId(1)))
         } ?: (1L..12L).map { id ->
             Channel.create(ChannelId(id), name = if (id == 2L) "Kultur und Dokumentationen aus aller Welt HD" else
                 listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News", "Kite Kids", "Lantern Hour")[(id.toInt() - 1) % 5],
-                number = id, icon = if (id == 3L) null else ArtworkId(id.toInt()),
+                number = id, icon = if (id == 3L) null else ChannelIcon.ImageCache(ArtworkId(id.toInt())),
                 tagIds = if (!tags) emptyList() else if (groupWithoutFirst && id > 1L) listOf(ChannelTagId(1), ChannelTagId(2)) else listOf(ChannelTagId(1)))
         }
         fun event(channel: Channel, offset: Int) = EpgEvent.create(

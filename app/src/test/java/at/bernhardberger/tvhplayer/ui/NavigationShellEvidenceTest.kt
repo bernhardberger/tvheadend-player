@@ -63,6 +63,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import androidx.compose.ui.semantics.LiveRegionMode
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CacheStatistics
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
@@ -1126,8 +1127,8 @@ class NavigationShellEvidenceTest {
     private val fixtureObservation = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
         channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(
-            Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 1, icon = ArtworkId(1)),
-            Channel.create(ChannelId(3), name = "Northline News", number = 3, icon = ArtworkId(3)),
+            Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1))),
+            Channel.create(ChannelId(3), name = "Northline News", number = 3, icon = ChannelIcon.ImageCache(ArtworkId(3))),
         ))),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create(listOf(fixtureRecording))),
     )).observation.value

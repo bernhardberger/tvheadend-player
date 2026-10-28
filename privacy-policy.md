@@ -23,19 +23,27 @@ channels and logos can appear before the server is ready or while it is
 unreachable:
 
 - A copy of the channel list and the programme guide, kept for up to 7 days
-- Channel logos and programme pictures, kept for up to 30 days and up to 64 MiB
+- Channel logos and programme pictures from the server's image cache, kept for
+  up to 30 days and up to 64 MiB
+- Channel and tag logos loaded from web addresses, in a separate cache of up to
+  16 MiB, kept until evicted, the cache is cleared, or the server profile changes
 
 Android may remove cache contents at any time; the app fetches them again from
-the server. Decoded images are also held in memory while the app runs.
+their original addresses or the server. Decoded images are also held in memory
+while the app runs.
 
 The saved password is not displayed in connection settings. Android backup and
 device-transfer extraction are disabled for the app.
 
 ## Network communication
 
-The app connects only to the Tvheadend server configured by the user. It sends
+The app connects to the Tvheadend server configured by the user. It sends
 the username and HTSP challenge-response authentication data needed to connect,
 and receives channel, guide, icon, and media data from that server.
+
+When the server lists channel or tag logos as web addresses, the TV loads them
+directly from those addresses, without sending Tvheadend credentials or cookies.
+These connections use HTTP or HTTPS as specified by the address.
 
 During setup, the app searches your local network for Tvheadend servers with
 multicast DNS (the `_htsp._tcp` service type); this search stays on the local
@@ -56,7 +64,7 @@ project maintainers.
 
 The app uses open-source libraries bundled into the application. Those
 libraries process data locally except when participating in the configured
-Tvheadend connection.
+Tvheadend connection or loading those logos.
 
 ## Accessibility service
 

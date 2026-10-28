@@ -50,6 +50,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -852,7 +853,7 @@ class ChannelsStandardLayoutEvidenceTest {
                 id = ChannelId(n.toLong()),
                 name = name(n),
                 number = n.toLong(),
-                icon = if (n == NO_EPG) null else ArtworkId((n - 1) % 3 + 1),
+                icon = if (n == NO_EPG) null else ChannelIcon.ImageCache(ArtworkId((n - 1) % 3 + 1)),
                 tagIds = buildList {
                     if (n <= 6) add(ChannelTagId(1))
                     if (n in 7..10) add(ChannelTagId(2))

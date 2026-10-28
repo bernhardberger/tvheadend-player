@@ -10,6 +10,9 @@ import coil3.ImageLoader
 import coil3.map.Mapper
 import coil3.request.Options
 import coil3.request.crossfade
+import coil3.network.okhttp.OkHttpNetworkFetcherFactory
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 private class AppArtworkMapper(private val session: TvheadendSession) : Mapper<AppArtworkSource, TvheadendArtwork> {
     // Before a current session the model is the saved copy its observation's profile has, so saved
@@ -19,14 +22,27 @@ private class AppArtworkMapper(private val session: TvheadendSession) : Mapper<A
         data.currentSession?.let { TvheadendArtwork.create(session, it, data.id) } ?: data.saved
 }
 
-fun buildImageLoader(context: Context, session: TvheadendSession): ImageLoader =
+fun buildImageLoader(
+    context: Context,
+    session: TvheadendSession,
+    remoteLogos: RemoteLogoCache = RemoteLogoCache(context),
+): ImageLoader =
     ImageLoader.Builder(context)
         .components {
             add(AppArtworkMapper(session))
             addTvheadendArtwork()
+            add(remoteLogos)
+            // Dedicated client: no Tvheadend credentials, cookie jar or custom headers.
+            add(OkHttpNetworkFetcherFactory(callFactory = {
+                OkHttpClient.Builder()
+                    .retryOnConnectionFailure(false)
+                    .callTimeout(10, TimeUnit.SECONDS)
+                    .build()
+            }))
         }
-        .diskCache(null)
+        .diskCache(remoteLogos.diskCache)
         // Every logo and programme picture fades in over its placeholder when it is actually
         // loaded; Coil shows memory-cache hits and failures at once, so scrolling never fades.
         .crossfade(PlayerMotion.MediumMs)
         .build()
+        .also { remoteLogos.memoryCache = it.memoryCache }

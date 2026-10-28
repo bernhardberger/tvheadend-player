@@ -33,6 +33,7 @@ import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.MaterialTheme
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -251,7 +252,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
             Channel.create(
                 // The README scene keeps every name short; the long German one is a layout case.
                 id = ChannelId(index + 1L), name = if (presentation && index == 1) "Harbor Sport" else name, number = index + 1L,
-                icon = ArtworkId(index + 1),
+                icon = ChannelIcon.ImageCache(ArtworkId(index + 1)),
                 tagIds = if (manyTags) listOfNotNull(ChannelTagId(1).takeIf { index < 6 }, ChannelTagId(2L + index % (TAG_NAMES.size - 1)))
                     else listOf(ChannelTagId(if (index < 6) 1 else 2)),
             )

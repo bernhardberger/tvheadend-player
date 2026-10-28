@@ -68,8 +68,8 @@ class ProgrammeDetailsPageTest {
     private val oldFormat = AppClock.format
     private lateinit var view: View
     private val start = Instant.parse("2026-09-15T19:00:00Z")
-    private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
-    private val otherChannel = Channel.create(ChannelId(2), name = "Ridge Earth Plus", number = 102, icon = ArtworkId(1))
+    private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ChannelIcon.ImageCache(ArtworkId(1)))
+    private val otherChannel = Channel.create(ChannelId(2), name = "Ridge Earth Plus", number = 102, icon = ChannelIcon.ImageCache(ArtworkId(1)))
     private val session = FakeSessionObservation(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
         channelState = ChannelRepositoryState.Current(ChannelCatalog.create()),
@@ -138,7 +138,7 @@ class ProgrammeDetailsPageTest {
         val picture = if (bright) "still-paper-kite-tales" else "still-northline-studio"
         val title = if (bright) "Paper Kite Tales" else "Northline Tonight"
         val station = Channel.create(ChannelId(1), name = if (bright) "Kite Kids" else "Northline News", number = 101,
-            icon = ArtworkId(1))
+            icon = ChannelIcon.ImageCache(ArtworkId(1)))
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext(), mapOf(
             ArtworkId(1) to FixtureArt.picon(if (bright) "kite-kids" else "northline-news"),
             ArtworkId(2) to FixtureArt.art(picture))))

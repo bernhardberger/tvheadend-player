@@ -168,7 +168,7 @@ class RecordingsVisualLayoutTest {
         // The channels as Channels and the player number them; each logo is the channel's fixture picon.
         val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         val channels = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
-            .mapIndexed { index, name -> Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(index + 1)) }
+            .mapIndexed { index, name -> Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(index + 1))) }
         fun recording(id: Long, title: String, channel: Int, folder: String?, start: Long, minutes: Long,
             art: String?, synopsis: String, position: Long? = null, plays: Long? = null,
             state: DvrEntryState = DvrEntryState.COMPLETED) = DvrEntry.create(

@@ -2,7 +2,7 @@ package at.bernhardberger.tvhplayer.ui.components
 
 import android.content.res.Resources
 import androidx.compose.runtime.Immutable
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
@@ -19,7 +19,7 @@ internal data class RailNowPlaying(
     val channelId: ChannelId?,
     val channelNumber: Long?,
     val channelName: String,
-    val picon: ArtworkId?,
+    val picon: ChannelIcon?,
     /** Set for a recording: its title stands where a live channel shows the programme. */
     val recordingTitle: String?,
     val reconnecting: Boolean,

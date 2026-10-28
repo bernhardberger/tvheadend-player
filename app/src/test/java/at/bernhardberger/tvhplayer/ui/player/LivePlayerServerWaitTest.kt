@@ -34,6 +34,7 @@ import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -331,7 +332,7 @@ class LivePlayerServerWaitTest {
             session.artwork.scriptCached(profile)
             session.publish(SessionObservation.create(sessionState = SessionState.Connecting,
                 channelState = ChannelRepositoryState.Stale(ChannelCatalog.create((1..3L).map {
-                    Channel.create(ChannelId(it), name = "Name $it", number = it, icon = LOGO.takeIf { _ -> it == 1L })
+                    Channel.create(ChannelId(it), name = "Name $it", number = it, icon = LOGO.takeIf { _ -> it == 1L }?.let { ChannelIcon.ImageCache(it) })
                 }))), profile)
         }
         val data = InMemoryData()

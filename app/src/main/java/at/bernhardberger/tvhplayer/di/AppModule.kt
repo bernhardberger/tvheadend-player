@@ -18,6 +18,7 @@ import at.bernhardberger.tvhplayer.core.GUIDE_EPG_COVERAGE_POLICY
 import at.bernhardberger.tvhplayer.core.appMetadataCachePolicy
 import at.bernhardberger.tvhplayer.images.ChannelAccents
 import at.bernhardberger.tvhplayer.images.buildImageLoader
+import at.bernhardberger.tvhplayer.images.RemoteLogoCache
 import at.bernhardberger.tvhplayer.playback.AppPlaybackRuntime
 import at.bernhardberger.tvhplayer.playback.AndroidPlaybackAudioFocus
 import at.bernhardberger.tvhplayer.playback.PlaybackRuntimePolicy
@@ -93,6 +94,7 @@ val appModule = module {
             profileStore = TvheadendServerProfileStore(androidContext()),
             playerSettings = playerSettings,
             ioDispatcher = get(qualifier = named("io")),
+            clearAppArtwork = { get<RemoteLogoCache>().clear() },
         )
         val audioOutput = TvheadendAudioOutputProvider(androidContext())
         val liveStartBuffer = TvheadendLiveStartBuffer(500.milliseconds)
@@ -163,7 +165,8 @@ val appModule = module {
     single { LastPlayedChannelStore(androidContext()) }
     single { GuidePositionStore() }
 
-    single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session) }
+    single { RemoteLogoCache(androidContext()) }
+    single<ImageLoader> { buildImageLoader(androidContext(), get<SdkRuntimeOwner>().session, get()) }
 
     single { ChannelAccentStore(androidContext()) }
     single {
@@ -193,7 +196,8 @@ val appModule = module {
     }
     viewModel { VideoPlayerViewModel(playbackRuntime = get(), session = get()) }
     viewModel { ChannelsViewModel(session = get(), tagSettings = get()) }
-    viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get(), get()) }
+    viewModel { SettingsStorageViewModel(get<SdkRuntimeOwner>().session.cache, get(), get(),
+        clearRemoteLogos = { get<RemoteLogoCache>().clear() }) }
     viewModel {
         SettingsPlayerViewModel(
             settingsStore = get(),

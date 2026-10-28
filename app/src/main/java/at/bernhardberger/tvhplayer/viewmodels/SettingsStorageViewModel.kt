@@ -22,6 +22,7 @@ class SettingsStorageViewModel(
     private val notices: NoticeCenter,
     /** Derived from cached picons, so cleared with them. */
     private val channelAccents: ChannelAccentStore,
+    private val clearRemoteLogos: suspend () -> Unit,
 ) : ViewModel() {
     val statistics = cache.statistics
     private val mutableClearState = MutableStateFlow(CacheClearState.IDLE)
@@ -38,6 +39,7 @@ class SettingsStorageViewModel(
                 try {
                     // Finish and publish the accepted outcome even after leaving Settings.
                     cache.clear()
+                    clearRemoteLogos()
                     channelAccents.clear()
                     mutableClearState.value = CacheClearState.CLEARED
                     notices.post(Notice.CacheClear(success = true), context)

@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.core.ArtworkContent
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ArtworkLoadResult
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -25,6 +26,9 @@ import at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.ui.components.ArtworkContext
 import coil3.decode.DataSource
+import coil3.network.NetworkFetcher
+import coil3.request.Options
+import coil3.toUri
 import coil3.request.CachePolicy
 import coil3.request.ErrorResult
 import coil3.request.ImageRequest
@@ -37,6 +41,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.junit.After
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
@@ -56,6 +61,11 @@ class TvheadendArtworkLoaderTest {
     private val loader = buildImageLoader(app, session)
     private val first = ServerProfile("first.tvheadend.test")
     private val second = ServerProfile("second.tvheadend.test")
+
+    @After fun close() {
+        loader.shutdown()
+        loader.diskCache?.shutdown()
+    }
 
     @Test fun beforeASessionALogoLoadsFromTheSavedCopyOfItsProfile() {
         val observation = connecting(first)
@@ -138,6 +148,18 @@ class TvheadendArtworkLoaderTest {
 
         assertEquals(AppArtworkSource(session.captureCurrentSession(), ArtworkId(1)), live)
         assertEquals(DataSource.NETWORK, (result as SuccessResult).dataSource)
+        assertEquals("SDK artwork is not duplicated in Coil's disk cache", 0L, loader.diskCache!!.size)
+    }
+
+    @Test fun remoteLogoSelectsTheNetworkFetcherNotTheSdkFetcher() {
+        val icon = ChannelIcon.parse("https://192.0.2.1/logo.png") as ChannelIcon.RemoteUrl
+        val context = ArtworkContext(session, mutableStateOf(null), mutableStateOf(null))
+        val data = context.logo(icon)
+        assertEquals(icon.url, data)
+        val mapped = loader.components.map(data, Options(app))
+        assertEquals(icon.url.toUri(), mapped)
+        assertTrue(loader.components.newFetcher(mapped, Options(app), loader)?.first is NetworkFetcher)
+        assertTrue(FakeSessionCall.LOAD_ARTWORK !in session.calls)
     }
 
     private fun connecting(profile: ServerProfile): SessionObservation {
@@ -146,11 +168,11 @@ class TvheadendArtworkLoaderTest {
     }
 
     // The model a logo of a surface drawing from [observation] gets.
-    private fun logo(observation: SessionObservation): AppArtworkSource =
-        ArtworkContext(session, mutableStateOf(observation.currentSession), mutableStateOf(observation)).logo(ArtworkId(1))
+    private fun logo(observation: SessionObservation): Any =
+        ArtworkContext(session, mutableStateOf(observation.currentSession), mutableStateOf(observation)).logo(ChannelIcon.ImageCache(ArtworkId(1)))
 
     // Without [memory] the image is fetched, not read from memory, and still stored there.
-    private fun load(source: AppArtworkSource, memory: Boolean = true): ImageResult = runBlocking {
+    private fun load(source: Any, memory: Boolean = true): ImageResult = runBlocking {
         loader.execute(ImageRequest.Builder(app).data(source)
             .memoryCachePolicy(if (memory) CachePolicy.ENABLED else CachePolicy.WRITE_ONLY).build())
     }

@@ -41,7 +41,7 @@ import androidx.tv.material3.CardDefaults
 import androidx.tv.material3.CompactCard
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -293,7 +293,7 @@ private val CompactZapLogoTop = 6.dp
  * to, fading down from the top to [bottomShare] of its strength, by default out toward the text.
  */
 @Composable
-internal fun ChannelAccentFill(piconPath: ArtworkId?, channelId: ChannelId, modifier: Modifier = Modifier, bottomShare: Float = 0f) {
+internal fun ChannelAccentFill(piconPath: ChannelIcon?, channelId: ChannelId, modifier: Modifier = Modifier, bottomShare: Float = 0f) {
     val accent = rememberChannelAccent(piconPath, channelId)
     val top = accent.copy(alpha = CompactZapAccentAlpha).toArgb()
     val bottom = accent.copy(alpha = CompactZapAccentAlpha * bottomShare).toArgb()
@@ -307,7 +307,7 @@ internal fun ChannelAccentFill(piconPath: ArtworkId?, channelId: ChannelId, modi
  * [PiconBox]'s ground. The settled colour, so a crossfading fill does not ink the logo anew every frame.
  */
 @Composable
-internal fun channelAccentGround(piconPath: ArtworkId?, channelId: ChannelId, depth: Float, bottomShare: Float = 0f): Color =
+internal fun channelAccentGround(piconPath: ChannelIcon?, channelId: ChannelId, depth: Float, bottomShare: Float = 0f): Color =
     rememberChannelAccent(piconPath, channelId, onSettled = {})
         .copy(alpha = CompactZapAccentAlpha * (1f - (1f - bottomShare) * depth.coerceIn(0f, 1f)))
         .compositeOver(TvSurfaceColors.containerLowest)

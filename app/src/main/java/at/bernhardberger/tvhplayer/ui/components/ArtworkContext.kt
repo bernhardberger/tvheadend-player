@@ -12,6 +12,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import at.bernhardberger.tvheadend.sdk.android.TvheadendArtwork
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CurrentSessionObservation
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvheadend.sdk.core.TvheadendSession
@@ -34,14 +35,21 @@ class ArtworkContext(
     val currentSession: CurrentSessionObservation? get() = session.value
 
     /**
-     * The model of logo [id]: with the current session, else the saved copy of the observation's
+     * The model of logo [icon]: remote URLs load directly, image-cache IDs with the current session,
+     * else the saved copy of the observation's
      * profile. A saved copy is the SDK's model, equal for every observation of the same profile, so
      * a retained update leaves the logo alone while another profile's observation replaces it.
      * Before Ready it also follows the [latest] observation: a copy missing while the SDK had
      * cleared the profile's saved logos shows once that profile is active again.
      */
     @OptIn(ExperimentalTvheadendApi::class)
-    internal fun logo(id: ArtworkId): AppArtworkSource {
+    internal fun logo(icon: ChannelIcon): Any = when (icon) {
+        is ChannelIcon.ImageCache -> imageCacheLogo(icon.artworkId)
+        is ChannelIcon.RemoteUrl -> icon.url
+    }
+
+    @OptIn(ExperimentalTvheadendApi::class)
+    private fun imageCacheLogo(id: ArtworkId): AppArtworkSource {
         val current = session.value
         if (current != null) return AppArtworkSource(current, id)
         // Read only to resolve again on each emission; the copy stays the [observation]'s profile's.

@@ -32,7 +32,7 @@ import androidx.tv.material3.ListItem
 import androidx.tv.material3.ListItemDefaults
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.profiling.profileLayout
 import at.bernhardberger.tvhplayer.profiling.profileTrace
@@ -80,7 +80,7 @@ fun ChannelRow(
     programTitle: String,
     programme: EpgEvent?,
     nowSec: Long,
-    piconPath: ArtworkId?,
+    piconPath: ChannelIcon?,
     programStartSec: Long? = null,
     recordingNow: Boolean = false,
     playingNow: Boolean = false,

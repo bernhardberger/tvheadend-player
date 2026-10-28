@@ -28,7 +28,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
 import androidx.tv.material3.MaterialTheme
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.core.NEUTRAL_ACCENT_RGB
 import at.bernhardberger.tvhplayer.core.logoGlowPixels
@@ -45,12 +45,12 @@ val LocalChannelAccents = staticCompositionLocalOf { ChannelAccents() }
  *
  * A stored colour is returned in the first frame. Otherwise this returns the neutral tint, samples
  * the picon and crossfades to its colour when it arrives, so cards never pop. Channels without an
- * image-cache icon keep the neutral tint. A caller that waits for [onSettled] instead gets the
+ * icon keep the neutral tint. A caller that waits for [onSettled] instead gets the
  * colour without the crossfade.
  */
 @Composable
 fun rememberChannelAccent(
-    piconPath: ArtworkId?,
+    piconPath: ChannelIcon?,
     channelId: ChannelId,
     onSettled: (() -> Unit)? = null,
 ): Color {
@@ -90,7 +90,7 @@ fun rememberChannelAccent(
  */
 @Composable
 internal fun ChannelLogoGlow(
-    picon: ArtworkId?,
+    picon: ChannelIcon?,
     channelId: ChannelId,
     modifier: Modifier = Modifier,
     scrolled: () -> Float = { 0f },

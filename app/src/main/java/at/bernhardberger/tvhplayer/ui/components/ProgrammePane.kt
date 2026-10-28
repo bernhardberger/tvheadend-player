@@ -38,6 +38,7 @@ import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.TvGridColumnWidth
 import at.bernhardberger.tvhplayer.ui.TvGridGutter
@@ -84,7 +85,7 @@ private const val PictureLogoHeightFraction = 0.5f
 @Composable
 internal fun ProgrammePanePicture(
     art: ArtworkId?,
-    logo: ArtworkId?,
+    logo: ChannelIcon?,
     accent: ChannelId?,
     logoTag: String,
     modifier: Modifier = Modifier,

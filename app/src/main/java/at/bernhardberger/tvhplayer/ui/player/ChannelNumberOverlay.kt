@@ -67,7 +67,7 @@ import androidx.compose.ui.util.lerp
 import androidx.tv.material3.LocalContentColor
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvPanelDenseAlpha
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
@@ -78,7 +78,7 @@ import at.bernhardberger.tvhplayer.ui.components.PiconBox
 @Immutable
 internal sealed interface ChannelNumberTarget {
     /** The match, with its own [number] as its identity shows it: a committed entry settles to it. */
-    data class Channel(val number: String, val name: String, val picon: ArtworkId?) : ChannelNumberTarget
+    data class Channel(val number: String, val name: String, val picon: ChannelIcon?) : ChannelNumberTarget
     /** Not known yet: more digits may still name a channel, or the list has not loaded. */
     data object Pending : ChannelNumberTarget
     /** The complete number names no channel. */

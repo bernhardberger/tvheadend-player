@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import android.view.KeyEvent as AndroidKeyEvent
-import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.SessionObservation
 import at.bernhardberger.tvhplayer.R
@@ -226,6 +226,6 @@ internal const val LivePlayerServerWaitTag = "player-server-wait"
 
 /** Only the saved logo of the observation's profile, as before a session; its own scope reads each emission. */
 @Composable
-private fun WaitPicon(state: LivePlayerServerWaitState, picon: ArtworkId?) {
+private fun WaitPicon(state: LivePlayerServerWaitState, picon: ChannelIcon?) {
     ProvideArtworkSession(null, state.artworkObservation) { PiconBox(picon, Modifier.size(136.dp, 60.dp)) }
 }

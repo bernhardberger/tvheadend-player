@@ -51,6 +51,7 @@ import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -288,7 +289,7 @@ class QuickZapPresentationTest {
     private val channels = (1L..12L).map {
         val line = lineUp[(it - 1).toInt()]
         Channel.create(id = ChannelId(it), number = it, name = line.name,
-            icon = line.picon?.let { _ -> ArtworkId(it.toInt()) })
+            icon = line.picon?.let { _ -> ChannelIcon.ImageCache(ArtworkId(it.toInt())) })
     }
     private var catalog by mutableStateOf(channels)
 

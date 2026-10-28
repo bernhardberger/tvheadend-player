@@ -13,6 +13,7 @@ import at.bernhardberger.tvhplayer.testutil.VisualCapture
 import at.bernhardberger.tvhplayer.ui.PseudoLocaleEvidence
 import org.junit.experimental.categories.Category
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
@@ -571,7 +572,7 @@ class BrowseCohesionEvidenceTest {
         val channels = names.mapIndexed { index, name ->
             Channel.create(
                 id = ChannelId(index + 1L), name = name, number = index + 1L,
-                icon = ArtworkId(index + 1).takeIf { index != 2 },
+                icon = ChannelIcon.ImageCache(ArtworkId(index + 1)).takeIf { index != 2 },
                 tagIds = listOf(ChannelTagId(if (index < 3) 1 else 2)),
             )
         }

@@ -32,6 +32,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.input.key.Key
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -145,7 +146,7 @@ class PlayerMotionCaptureTest {
 
         change("1", ChannelNumberTarget.Pending)
         frames("entry", listOf(3, 6, 10))
-        change("1", ChannelNumberTarget.Channel("1", "Documentary", ArtworkId(1)))
+        change("1", ChannelNumberTarget.Channel("1", "Documentary", ChannelIcon.ImageCache(ArtworkId(1))))
         frames("destination", listOf(3, 6, 9))
         change("12", ChannelNumberTarget.Channel("12", "Arts and Culture", null))
         frames("digit-push", listOf(1, 3, 6))
@@ -156,7 +157,7 @@ class PlayerMotionCaptureTest {
         change("", ChannelNumberTarget.Pending)
         frames("cancel", listOf(3, 6, 10))
         // A leading zero settles as the channel's own number.
-        change("01", ChannelNumberTarget.Channel("1", "Documentary", ArtworkId(1)))
+        change("01", ChannelNumberTarget.Channel("1", "Documentary", ChannelIcon.ImageCache(ArtworkId(1))))
         compose.mainClock.advanceTimeBy(1_000)
         change("", ChannelNumberTarget.Pending, committed = true)
         frames("commit-leading-zero", listOf(1, 6, 10))
@@ -301,7 +302,7 @@ class PlayerMotionCaptureTest {
         ProvideArtworkSession(session) { PlayerChrome(
             mode = mode,
             content = PlayerChromeContent("20:15", liveInfoBarData(androidx.test.core.app.ApplicationProvider.getApplicationContext<android.app.Application>().resources, if (zapped) 2 else 1,
-                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ArtworkId(1)),
+                if (zapped) "Science and Nature" else "Documentary", programme, null, false, 1_800, ""), picon = ChannelIcon.ImageCache(ArtworkId(1))),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = timeshift,
                 nowSec = 1_800,
@@ -440,6 +441,6 @@ class PlayerMotionCaptureTest {
 
     private val channels = (1L..3L).map {
         Channel.create(id = ChannelId(it), number = it + 100,
-            name = listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News")[(it - 1).toInt()], icon = ArtworkId(it.toInt()))
+            name = listOf("Ridge Earth HD", "Harbor Sport HD", "Northline News")[(it - 1).toInt()], icon = ChannelIcon.ImageCache(ArtworkId(it.toInt())))
     }
 }

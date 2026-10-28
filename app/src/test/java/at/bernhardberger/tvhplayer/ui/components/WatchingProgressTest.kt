@@ -98,7 +98,7 @@ class WatchingProgressTest {
     private var ambientColor = 0
     private val start = Instant.parse("2026-09-15T19:00:00Z")
     private val now = start.epochSeconds + 1800
-    private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ArtworkId(1))
+    private val channel = Channel.create(ChannelId(1), name = "Ridge Earth HD", number = 101, icon = ChannelIcon.ImageCache(ArtworkId(1)))
     private val event = EpgEvent.create(EventId(1), channel.id, start, start + 7200.seconds,
         title = "Ridge Light", subtitle = "Beyond the Arctic Circle", image = ArtworkId(2),
         summary = "A winter expedition follows the changing light across the ridge.")
@@ -747,7 +747,7 @@ class WatchingProgressTest {
         bitmap.recycle()
     }
 
-    private fun show(surface: String, picon: ArtworkId? = channel.icon) {
+    private fun show(surface: String, picon: ChannelIcon? = channel.icon) {
         if (surface in listOf("recording", "row", "recording-menu", "recording-continue"))
             target.value = AppPlaybackTarget.Recording(recording.id)
         compose.setContent {

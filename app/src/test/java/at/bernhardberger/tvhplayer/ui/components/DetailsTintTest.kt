@@ -125,7 +125,7 @@ class DetailsTintTest {
         tvheadend.artwork.scriptCached(profile)
         tvheadend.publish(SessionObservation.create(
             sessionState = SessionState.Synchronizing,
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Test", icon = picon)))),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(Channel.create(ChannelId(1), name = "Test", icon = ChannelIcon.ImageCache(picon))))),
         ), profile)
         runBlocking { store.put(TvheadendTestResultFactory.cachedArtwork(profile, picon).cacheKey, 0x336699) }
         val returned = mutableListOf<Color>()
@@ -134,7 +134,7 @@ class DetailsTintTest {
             CompositionLocalProvider(LocalChannelAccents provides accents) {
                 TVHeadendPlayerTheme {
                     ProvideAppArtwork(tvheadend) {
-                        val tint = rememberDetailsTint(null, picon).value
+                        val tint = rememberDetailsTint(null, ChannelIcon.ImageCache(picon)).value
                         SideEffect { returned += tint }
                     }
                 }
@@ -172,7 +172,7 @@ class DetailsTintTest {
                         // A new glow per channel, as each backdrop of the immersive list is.
                         key(shown) {
                             val id = shown
-                            ChannelLogoGlow(picon.takeIf { id == sampled }, id, Modifier.fillMaxSize(),
+                            ChannelLogoGlow(picon.takeIf { id == sampled }?.let { ChannelIcon.ImageCache(it) }, id, Modifier.fillMaxSize(),
                                 onSettled = { settled += id })
                         }
                     }
@@ -205,7 +205,7 @@ class DetailsTintTest {
                     view = LocalView.current
                     ProvideArtworkSession(session) {
                         val shown = logo
-                        ChannelLogoGlow(shown, channel, Modifier.fillMaxSize(), onSettled = { settled += shown })
+                        ChannelLogoGlow(ChannelIcon.ImageCache(shown), channel, Modifier.fillMaxSize(), onSettled = { settled += shown })
                     }
                 }
             }
@@ -242,7 +242,7 @@ class DetailsTintTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
-                    val tint = rememberDetailsTint(art, picon).value
+                    val tint = rememberDetailsTint(art, ChannelIcon.ImageCache(picon)).value
                     SideEffect { returned += tint }
                 }
             }
@@ -292,7 +292,7 @@ class DetailsTintTest {
         compose.setContent {
             TVHeadendPlayerTheme {
                 ProvideArtworkSession(session) {
-                    val tint = rememberDetailsTint(art, picon).value
+                    val tint = rememberDetailsTint(art, ChannelIcon.ImageCache(picon)).value
                     SideEffect { returned += tint }
                 }
             }
@@ -304,7 +304,7 @@ class DetailsTintTest {
     }
 
     private fun showPage(hasArt: Boolean = true, hasPicon: Boolean = true, warm: Boolean = false) {
-        val channel = Channel.create(ChannelId(1), name = "Test", icon = picon.takeIf { hasPicon })
+        val channel = Channel.create(ChannelId(1), name = "Test", icon = picon.takeIf { hasPicon }?.let { ChannelIcon.ImageCache(it) })
         val event = EpgEvent.create(EventId(1), channel.id, Instant.fromEpochSeconds(0), Instant.fromEpochSeconds(3600),
             title = "Test programme", image = art.takeIf { hasArt })
         compose.setContent {

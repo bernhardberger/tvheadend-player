@@ -39,7 +39,8 @@ class SettingsStorageViewModelTest {
                 }
             }
             val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
-            val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore())
+            var remoteClears = 0
+            val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore()) { remoteClears++ }
             val store = ViewModelStore().apply { put("storage", model) }
             model.clearCache()
             runCurrent()
@@ -47,6 +48,7 @@ class SettingsStorageViewModelTest {
             release.complete(Unit)
             runCurrent()
             assertEquals(CacheStatistics.EMPTY, sdkCache.statistics.value)
+            assertEquals(1, remoteClears)
             assertEquals(NoticeSeverity.INFO, notices.state.value.pending.single().notice.severity)
         } finally {
             Dispatchers.resetMain()
@@ -69,12 +71,14 @@ class SettingsStorageViewModelTest {
             cache.scriptStatistics(CacheStatistics(500_000, 12_000_000, 340))
             val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
             val accents = ChannelAccentStore().apply { put("picon", 0x336699) }
-            val model = SettingsStorageViewModel(cache, notices, accents)
+            var remoteClears = 0
+            val model = SettingsStorageViewModel(cache, notices, accents) { remoteClears++ }
             assertEquals(340, model.statistics.value.artworkEntryCount)
             model.clearCache()
             assertEquals(CacheClearState.CLEARING, model.clearState.value)
             runCurrent()
             assertEquals(CacheStatistics.EMPTY, model.statistics.value)
+            assertEquals(1, remoteClears)
             assertEquals("the channel colours go with the cache", null, accents["picon"])
             assertEquals("and a fill-in pass is told", 1, accents.clears.value)
             assertEquals(CacheClearState.CLEARED, model.clearState.value)
@@ -105,7 +109,7 @@ class SettingsStorageViewModelTest {
                 }
             }
             val notices = NoticeCenter({ testScheduler.currentTime }, { NoticeContext(0, null) })
-            val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore())
+            val model = SettingsStorageViewModel(cache, notices, ChannelAccentStore()) {}
             model.clearCache()
             runCurrent()
             model.clearCache()

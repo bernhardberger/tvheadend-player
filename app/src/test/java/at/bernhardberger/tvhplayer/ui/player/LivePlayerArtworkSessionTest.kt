@@ -19,6 +19,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.test.core.app.ApplicationProvider
 import at.bernhardberger.tvheadend.sdk.android.ServerProfileEditReadResult
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.CapabilityAccess
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.ChannelCatalog
@@ -115,7 +116,7 @@ class LivePlayerArtworkSessionTest {
     private fun session() = FakeTvheadendSession(SessionObservation.create(
         sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
         channelState = ChannelRepositoryState.Current(ChannelCatalog.create(
-            listOf(Channel.create(ChannelId(1), name = "Name 1", number = 1, icon = LOGO)),
+            listOf(Channel.create(ChannelId(1), name = "Name 1", number = 1, icon = ChannelIcon.ImageCache(LOGO))),
         )),
         epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
         dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),

@@ -484,7 +484,7 @@ class StartupOfflineTest {
             viewModel { AppConnectionViewModel(get(), get(), get()) }
             viewModel { ChannelsViewModel(get(), get()) }
             viewModel { VideoPlayerViewModel(get(), get()) }
-            viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) }
+            viewModel { SettingsStorageViewModel(session.cache, get(), ChannelAccentStore()) {} }
             viewModel { SettingsPlayerViewModel(get(), get(), get(), get(), get()) }
         }
         val server = ServerSettings(host = "offline.invalid")
