@@ -17,12 +17,14 @@ import androidx.media3.common.Player
 import androidx.media3.common.Timeline
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
 import androidx.media3.common.TrackGroup
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.TransferListener
+import androidx.media3.exoplayer.ExoPlaybackException
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.test.core.app.ApplicationProvider
@@ -35,6 +37,7 @@ import at.bernhardberger.tvheadend.sdk.testing.*
 import at.bernhardberger.tvhplayer.settings.AppProfileOwner
 import at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore
 import at.bernhardberger.tvhplayer.settings.PlayerSettingsStore
+import java.io.IOException
 import java.io.InterruptedIOException
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
@@ -1328,6 +1331,9 @@ class AudioInterruptionRuntimeTest {
     @Test fun aReconnectRetuneThatKeepsFailingRetriesWithBackoffThenStops() = exercise(virtualTime = true) {
         live(timeshift = false)
         restartServer()
+        // The ended stream's player error is already in: the retune and its retries keep their
+        // target all the same.
+        reportStreamError()
         session.scriptLivePlaybackFailure(PlaybackBindingResult.TargetUnavailable)
         val retune = scope.async { runtime.retuneAfterReconnect() }
         await { retune.isCompleted }
@@ -1335,9 +1341,6 @@ class AudioInterruptionRuntimeTest {
         // The first retry follows at once; the later ones back off as any live recovery does.
         for (delayMillis in listOf(2_000L, 5_000L, 10_000L, 20_000L)) {
             await { (runtime.state.value as? AppPlaybackState.Recovering)?.retryDelayMillis == delayMillis }
-            // The retune unsubscribed the ended stream, whose player error arrives meanwhile: the
-            // retries keep their target all the same.
-            await { player.playerError != null }
             advanceRecoveryTime(delayMillis + 1)
         }
         // Out of retries: the ended stream is stopped, not left frozen on screen.
@@ -2596,8 +2599,11 @@ class AudioInterruptionRuntimeTest {
         private val playerListeners = mutableListOf<Player.Listener>()
         var audioTracks: Tracks? = null
         var reportedPlaybackState: Int? = null
+        /** Stands in for the ended stream's own error, which reaches the player at no predictable time. */
+        private var reportedPlayerError: ExoPlaybackException? = null
         private var suppression = Player.PLAYBACK_SUPPRESSION_REASON_NONE
         val runtimePlayer = object : ExoPlayer by player {
+            override fun getPlayerError(): ExoPlaybackException? = reportedPlayerError ?: player.playerError
             override fun getPlaybackSuppressionReason(): Int = suppression
             override fun getCurrentTracks(): Tracks = audioTracks ?: player.currentTracks
             override fun getPlaybackState(): Int = reportedPlaybackState ?: player.playbackState
@@ -2693,6 +2699,17 @@ class AudioInterruptionRuntimeTest {
         fun markReady() { playerListeners.toList().forEach { it.onPlaybackStateChanged(Player.STATE_READY) } }
 
         fun signalIsPlaying() { playerListeners.toList().forEach { it.onIsPlayingChanged(true) } }
+
+        fun reportStreamError() {
+            val error = ExoPlaybackException.createForSource(
+                IOException("stream ended"), PlaybackException.ERROR_CODE_IO_UNSPECIFIED,
+            )
+            reportedPlayerError = error
+            playerListeners.toList().forEach {
+                it.onPlayerErrorChanged(error)
+                it.onPlayerError(error)
+            }
+        }
 
         fun suppress(suppressed: Boolean) {
             suppression = if (suppressed) Player.PLAYBACK_SUPPRESSION_REASON_TRANSIENT_AUDIO_FOCUS_LOSS
