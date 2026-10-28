@@ -846,10 +846,11 @@ private fun DrawerNowPlayingControls(
     val stopFocus = remember { FocusRequester() }
     val controls = listOf("fullscreen", "pause", "stop").filter { it != "pause" || pauseAvailable }
     val requesters = listOfNotNull(fullScreenFocus, pauseFocus.takeIf { pauseAvailable }, stopFocus)
-    Row(Modifier.padding(top = 4.dp)
+    // Directly under the status line, so the row reads as part of the header.
+    Row(Modifier
         .withinDrawerSheet(fullWidth, visibleWidthPx)
         .width(NavigationDrawerItemDefaults.ExpandedDrawerItemWidth)
-        .padding(start = NowPlayingTextStart, top = 2.dp, bottom = 2.dp).testTag("global-drawer-now-playing-controls"),
+        .padding(start = NowPlayingTextStart, bottom = 2.dp).testTag("global-drawer-now-playing-controls"),
         horizontalArrangement = Arrangement.spacedBy(DrawerControlGap)) {
         controls.forEachIndexed { index, control ->
             key(control) {
