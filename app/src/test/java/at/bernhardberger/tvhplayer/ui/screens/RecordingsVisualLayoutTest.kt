@@ -142,46 +142,77 @@ class RecordingsVisualLayoutTest {
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentation() {
-        assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
-        val evening = 1_791_057_600L
-        fun recording(id: Long, title: String, channel: String, folder: String?, start: Long, minutes: Long,
-            art: String?, synopsis: String, position: Long? = null, plays: Long? = null) = DvrEntry.create(
-            DvrEntryId(id), title = title, state = DvrEntryState.COMPLETED, folder = listOfNotNull(folder),
-            start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + minutes * 60),
-            files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
-                stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L)),
-            channelName = channel, image = art?.let { ArtworkId(100 + id.toInt()) }, description = synopsis,
-            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays)
-        val library = listOf(
-            recording(1, "Ridge Light", "Ridge Earth", "Documentaries", evening, 60, "ridge-light",
-                "Seasonal mountain light, forests and weather moving over a ridge.", position = 1223),
-            recording(2, "Tide Watch", "Ridge Earth", "Documentaries", evening - 86400 + 3600, 60, "still-tide-watch",
-                "Coastal wildlife along a tidal estuary, wading birds and seals.", plays = 1),
-            recording(3, "Coastal Miles", "Amber Stage", "Documentaries", evening - 2 * 86400, 45, "still-coastal-miles",
-                "A walking travel strand along a temperate coast."),
-            recording(4, "Harbor Kickoff", "Harbor Sport", "Sport", evening - 86400 - 1800, 135, "harbor-kickoff",
-                "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", plays = 1),
-            recording(5, "River Court", "Harbor Sport", "Sport", evening - 3 * 86400, 105, "river-court",
-                "Indoor basketball, River Court against North Quay."),
-            recording(6, "Glass Harbor", "Amber Stage", null, evening + 1800, 120, "glass-harbor",
-                "A quiet drama about night-shift workers in a harbour glass workshop."),
-            recording(7, "Harbor Lights Live", "Harbor Lights", null, evening - 86400, 90, "harbor-lights-live",
-                "A small-hall concert with a quartet."),
-            recording(8, "Paper Kite Tales", "Kite Kids", null, evening - 2 * 86400 - 7200, 30, "paper-kite-tales",
-                "2D animation about a paper kite over painted hills.", plays = 1),
-        )
-        val art = listOf("ridge-light", "still-tide-watch", "still-coastal-miles", "harbor-kickoff", "river-court",
-            "glass-harbor", "harbor-lights-live", "paper-kite-tales")
-        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(),
-            art.mapIndexed { index, name -> ArtworkId(101 + index) to FixtureArt.art(name) }.toMap()))
-        show(entries = library)
-        compose.mainClock.advanceTimeBy(1_500)
-        focused("recordings-folder-Documentaries")
+        presentationLibrary()
         key(Key.DirectionRight)
         focused("recording-list-entry-1")
         compose.mainClock.advanceTimeBy(1_500)
         compose.waitForIdle()
         capture("recordings", 1f, outputs = "build/outputs/presentation")
+    }
+
+    /** The same library at the Archive's top level: the server's folders, then the recordings outside them. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentationFolders() {
+        presentationLibrary()
+        compose.mainClock.advanceTimeBy(1_500)
+        compose.waitForIdle()
+        capture("recordings-folders", 1f, outputs = "build/outputs/presentation")
+    }
+
+    /** Eight recordings of the README evening's channels, with their logos, focused on the Documentaries folder. */
+    private fun presentationLibrary() {
+        assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+        val evening = 1_791_057_600L
+        // The channels as Channels and the player number them; each logo is the channel's fixture picon.
+        val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
+        val channels = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
+            .mapIndexed { index, name -> Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(index + 1)) }
+        fun recording(id: Long, title: String, channel: Int, folder: String?, start: Long, minutes: Long,
+            art: String?, synopsis: String, position: Long? = null, plays: Long? = null,
+            state: DvrEntryState = DvrEntryState.COMPLETED) = DvrEntry.create(
+            DvrEntryId(id), title = title, state = state, folder = listOfNotNull(folder),
+            start = Instant.fromEpochSeconds(start), stop = Instant.fromEpochSeconds(start + minutes * 60),
+            files = listOf(DvrRecordingFile.create(start = Instant.fromEpochSeconds(start),
+                stop = Instant.fromEpochSeconds(start + minutes * 60), sizeBytes = minutes * 40_000_000L)),
+            channelId = ChannelId(channel.toLong()), channelName = channels[channel - 1].name,
+            image = art?.let { ArtworkId(100 + id.toInt()) }, description = synopsis,
+            subtitle = "Winter on the ridge".takeIf { id == 1L }, playPosition = position?.seconds, playCount = plays)
+        val library = listOf(
+            recording(1, "Ridge Light", 1, "Documentaries", evening, 60, "ridge-light",
+                "Seasonal mountain light, forests and weather moving over a ridge.", position = 1223),
+            recording(2, "Tide Watch", 1, "Documentaries", evening - 86400 + 3600, 60, "still-tide-watch",
+                "Coastal wildlife along a tidal estuary, wading birds and seals.", plays = 1),
+            recording(3, "Coastal Miles", 6, "Documentaries", evening - 2 * 86400, 45, "still-coastal-miles",
+                "A walking travel strand along a temperate coast."),
+            recording(4, "Harbor Kickoff", 2, "Sport", evening - 86400 - 1800, 135, "harbor-kickoff",
+                "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", plays = 1),
+            recording(5, "River Court", 2, "Sport", evening - 3 * 86400, 105, "river-court",
+                "Indoor basketball, River Court against North Quay."),
+            recording(6, "Glass Harbor", 6, null, evening + 1800, 120, "glass-harbor",
+                "A quiet drama about night-shift workers in a harbor glass workshop."),
+            recording(7, "Harbor Lights Live", 7, null, evening - 86400, 90, "harbor-lights-live",
+                "A small-hall concert with a quartet."),
+            recording(8, "Paper Kite Tales", 4, null, evening - 2 * 86400 - 7200, 30, "paper-kite-tales",
+                "2D animation about a paper kite over painted hills.", plays = 1),
+            // Tonight's match, recording now as in the Guide.
+            recording(9, "Harbor Kickoff", 2, "Sport", evening + 86400 - 1800, 135, "harbor-kickoff",
+                "Match coverage from a floodlit stadium as Harbor FC meet Amber Town.", state = DvrEntryState.RECORDING),
+        )
+        val art = listOf("ridge-light", "still-tide-watch", "still-coastal-miles", "harbor-kickoff", "river-court",
+            "glass-harbor", "harbor-lights-live", "paper-kite-tales", "harbor-kickoff")
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), buildMap {
+            picons.forEachIndexed { index, name -> put(ArtworkId(index + 1), FixtureArt.picon(name)) }
+            art.forEachIndexed { index, name -> put(ArtworkId(101 + index), FixtureArt.art(name)) }
+        }))
+        show(entries = library, channels = channels)
+        compose.mainClock.advanceTimeBy(1_500)
+        // The running match's Recording now folder comes first, then Sport, which holds it, then Documentaries.
+        focused("recordings-recording-now-folder")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Sport")
+        key(Key.DirectionDown)
+        focused("recordings-folder-Documentaries")
     }
 
     @Test fun recordingSpaceLineIsQuietInformationInTheHeader() {
@@ -1276,7 +1307,7 @@ class RecordingsVisualLayoutTest {
     }
 
     private fun show(scale: Float = 1f, empty: Boolean = false, entries: List<DvrEntry>? = null, endPadding: Dp? = null,
-        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown) {
+        diskSpace: DvrDiskSpaceState = DvrDiskSpaceState.Unknown, channels: List<Channel> = emptyList()) {
         endPaddingState.value = endPadding
         val recordings = entries ?: if (empty) emptyList() else listOf(
             recording(1, LONG_TITLE, "Documentaries/northern.ts"),
@@ -1291,7 +1322,7 @@ class RecordingsVisualLayoutTest {
             sessionState = SessionState.Ready(ServerCapabilities.create(
                 streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED,
             )),
-            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(emptyList(), emptyList())),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(channels, emptyList())),
             epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
             dvrState = DvrRepositoryState.Current(DvrSnapshot.create(recordings)),
             dvrDiskSpaceState = diskSpace,

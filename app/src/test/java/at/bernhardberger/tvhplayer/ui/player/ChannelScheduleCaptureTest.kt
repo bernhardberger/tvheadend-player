@@ -67,6 +67,84 @@ class ChannelScheduleCaptureTest {
     @Test @Config(qualifiers = "de-w960dp-h540dp-land-xhdpi")
     fun germanDetailsLongTitle() = details("de", listOf("long-title"))
 
+    /**
+     * The README scene: Ridge Earth's schedule beside the playing picture at 20:15 on 2026-10-04, UTC, with Ridge
+     * Light 20:00-21:00 and then Tide Watch, as on the other README screens. One full day repeats for a week.
+     */
+    @Test fun presentation() {
+        images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
+            ArtworkId(1) to FixtureArt.picon("ridge-earth"),
+            ArtworkId(2) to FixtureArt.art("ridge-light"),
+            ArtworkId(3) to FixtureArt.art("still-tide-watch"),
+        )))
+        val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
+        val now = hour + 15 * 60
+        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ArtworkId(1))
+        // Title, minutes after 20:00, length, genre and art: one full day from 18:00, so no gap shows.
+        val evening = listOf(
+            listOf("Foundry Hours", -120, 60, "Documentary", null),
+            listOf("The Seedkeepers of Moss Lantern Valley", -60, 60, "Nature", null),
+            listOf("Ridge Light", 0, 60, "Documentary", ArtworkId(2)),
+            listOf("Tide Watch", 60, 60, "Nature", ArtworkId(3)),
+            listOf("Snowline", 120, 45, "Nature", null),
+            listOf("Six Bridges and a River That Changed Its Mind", 165, 90, "Documentary", null),
+            listOf("Ridge at Night", 255, 105, "Nature", null),
+            listOf("Night Landscapes", 360, 240, "Nature", null),
+            listOf("Morning on the Ridge", 600, 180, "Nature", null),
+            listOf("Field Notes from the High Valleys", 780, 180, "Documentary", null),
+            listOf("Rivers of the North", 960, 180, "Documentary", null),
+            listOf("Mountain Seasons", 1140, 180, "Nature", null),
+        )
+        val events = (0 until 7).flatMap { day ->
+            evening.mapIndexed { index, (title, offset, minutes, genre, art) ->
+                val start = hour + day * 86_400L + (offset as Int) * 60L
+                EpgEvent.create(EventId(day * 100L + index + 1), channel.id, Instant.fromEpochSeconds(start),
+                    Instant.fromEpochSeconds(start + (minutes as Int) * 60L), title = title as String, genre = genre as String,
+                    subtitle = "Winter on the ridge".takeIf { day == 0 && title == "Ridge Light" },
+                    image = art as ArtworkId?)
+            }
+        }.filter { it.stop.epochSeconds > now }
+        val still = FixtureArt.art("still-ridge-light").asImageBitmap()
+        val session = FakeSessionObservation(SessionObservation.create(
+            sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
+            channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
+            epgState = EpgRepositoryState.Current(EpgSnapshot.create()),
+            dvrState = DvrRepositoryState.Current(DvrSnapshot.create()),
+        )).captureCurrentSession()
+        var view: View? = null
+        compose.setContent {
+            view = LocalView.current
+            TVHeadendPlayerTheme {
+                Image(still, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                CompositionLocalProvider(LocalWatchingChannel provides channel.id,
+                    LocalWatchingIndicator provides ChannelPlaybackIndicator.PLAYING) {
+                    ProvideArtworkSession(session) {
+                        PlaybackOptionsOverlayFrame(panelWidth = 480.dp, showScrim = false) {
+                            ChannelSchedule(channel, events, now, now, loading = false, offline = false, recording = { event ->
+                                    // Tonight's Tide Watch is scheduled, as in the Guide.
+                                    DvrEntryState.SCHEDULED.takeIf { event.id == EventId(4) }
+                                }, onOpen = {}, onClose = {}, onRetry = {}, viewerBehindMs = 0)
+                        }
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.advanceTimeBy(1500)
+        compose.waitForIdle()
+        compose.onNodeWithText("Ridge Light", useUnmergedTree = true).assertExists()
+        compose.runOnIdle {
+            val root = requireNotNull(view).rootView
+            val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
+            root.draw(Canvas(image))
+            Assert.assertEquals(1920, image.width)
+            Assert.assertEquals(1080, image.height)
+            val output = File("build/outputs/presentation").apply { mkdirs() }
+            File(output, "player-schedule.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            image.recycle()
+        }
+    }
+
     /** The details page a schedule row opens over the video: the watched programme, or another one framed. */
     private fun details(locale: String, scenes: List<String>) {
         val now = 1789246200L

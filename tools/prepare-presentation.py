@@ -16,10 +16,17 @@ SIZE = (1920, 1080)
 
 notes = {
     "channels": "Channels, Immersive view: the plainest picture of a TV app. Title and focused card read at README width.",
-    "guide": "Guide: shows the Tvheadend programme data directly. Times are small at README width.",
+    "channels-grid": "Channels, Grid view with program art on. Not in the README: logo badges cover titles printed in the art.",
+    "channels-list": "Channels, List view: numbered channels beside the focused program's picture and details.",
+    "channels-logos": "Channels, Immersive view without program pictures: logos and text only.",
+    "guide": "Guide: shows the Tvheadend program data directly. Times are small at README width.",
+    "details": "Program details from the Guide. Supporting image.",
+    "drawer": "Side menu over Channels while Northline News keeps playing behind: its now-playing header above the menu, Channels focused.",
     "player": "Player controls: closest to watching TV. A still cannot show remote response or motion.",
-    "recordings": "Recordings: the previous evening's Ridge Light, partly watched. Supporting image.",
-    "details": "Programme details from the Guide. Supporting image.",
+    "player-rail": "Quick zap rail over the playing picture, with the focused channel's program above it.",
+    "player-schedule": "The playing channel's schedule beside the picture.",
+    "recordings": "Recordings: the previous evening's Ridge Light inside Documentaries, partly watched.",
+    "recordings-folders": "Recordings at the Archive's top level: the server's folders, then recordings with channel logos.",
     "settings": "Playback settings over the playing picture. Supporting image.",
 }
 
@@ -45,7 +52,7 @@ for name in notes:
     }
 (OUT / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
-buttons = "".join(f'<button onclick="show(\'{name}\')">{html.escape(name.title())}</button>' for name in notes)
+buttons = "".join(f'<button onclick="show(\'{name}\')">{html.escape(name.replace("-", " ").capitalize())}</button>' for name in notes)
 (OUT / "review.html").write_text(f'''<!doctype html><html lang="en"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Presentation candidates</title>
 <style>body{{margin:28px auto;max-width:830px;padding:0 16px;background:#0d1117;color:#e6edf3;font:16px/1.6 system-ui}}

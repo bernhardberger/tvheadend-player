@@ -221,7 +221,12 @@ class GuideVisualLayoutTest {
             art.forEachIndexed { index, name -> put(ArtworkId(101 + index), at.bernhardberger.tvhplayer.testutil.FixtureArt.art(name)) }
         })
         images.install(loader)
-        show(headline = true, history = false, channelNames = names, events = events, tagName = "Favorites")
+        // Harbor Kickoff is recording now and the 21:00 Tide Watch on Ridge Earth is scheduled.
+        val recordings = listOf(
+            DvrEntry.create(DvrEntryId(1), eventId = events[3].id, channelId = ChannelId(2), state = DvrEntryState.RECORDING),
+            DvrEntry.create(DvrEntryId(2), eventId = events[2].id, channelId = ChannelId(1), state = DvrEntryState.SCHEDULED),
+        )
+        show(headline = true, history = false, channelNames = names, events = events, tagName = "Favorites", recordings = recordings)
         key(Key.DirectionDown)
         focused("Ridge Light")
         compose.mainClock.advanceTimeBy(1_500)

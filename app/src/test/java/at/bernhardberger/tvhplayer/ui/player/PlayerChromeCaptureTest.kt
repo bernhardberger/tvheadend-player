@@ -187,7 +187,12 @@ class PlayerChromeCaptureTest {
     fun pseudoArXb() = captures(PseudoLocaleEvidence.AR_XB, 1f)
 
     /** The README scene: Ridge Light at 20:15 of 20:00-21:00 on 2026-10-04, ten minutes buffered, at live. */
-    @Test fun presentation() {
+    @Test fun presentation() = presentation("player", railOpen = false)
+
+    /** The same moment with the channel rail open on the playing channel, its program above the cards. */
+    @Test fun presentationRail() = presentation("player-rail", railOpen = true)
+
+    private fun presentation(name: String, railOpen: Boolean) {
         val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
         val now = hour + 15 * 60
         val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage")
@@ -230,7 +235,8 @@ class PlayerChromeCaptureTest {
                             behind = false, paused = false,
                             content = PlayerChromeContent(
                                 clock = formatClock(now),
-                                info = liveInfoBarData(app.resources, 1, "Ridge Earth", programme, next, nextScheduled = false,
+                                // Tide Watch is scheduled and Harbor Kickoff recording, as in the Guide.
+                                info = liveInfoBarData(app.resources, 1, "Ridge Earth", programme, next, nextScheduled = true,
                                     nowSec = now, unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
                                 recordingNow = false,
@@ -238,9 +244,14 @@ class PlayerChromeCaptureTest {
                                 artwork = programme.image,
                             ),
                             window = ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
-                            programme = programme, peek = true,
+                            programme = programme, peek = !railOpen,
+                            tray = if (railOpen) {
+                                { ProvideArtworkSession(session) { QuickZapTrayPreview(lineUp[0], programme, next, now,
+                                    Modifier.padding(horizontal = TvGridHorizontalMargin)) } }
+                            } else null,
                             tracks = PlayerTrackButtons(audio = "English", subtitles = "Off"),
                             nowSec = now, peekChannels = lineUp, peekEvent = { id -> events.firstOrNull { it.channelId == id } },
+                            recordingChannels = setOf(ChannelId(2)),
                         )
                     }
                 }
@@ -252,11 +263,12 @@ class PlayerChromeCaptureTest {
             compose.mainClock.advanceTimeBy(100)
             compose.waitForIdle()
         }
-        compose.onNodeWithTag("player-pause").assertIsFocused()
+        if (railOpen) compose.onNodeWithTag("player-channel-card-1").assertIsFocused()
+        else compose.onNodeWithTag("player-pause").assertIsFocused()
         val bitmap = Bitmap.createBitmap(1920, 1080, Bitmap.Config.ARGB_8888)
         compose.runOnIdle { view.draw(Canvas(bitmap)) }
         val directory = File("build/outputs/presentation").apply { mkdirs() }
-        File(directory, "player.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+        File(directory, "$name.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
         bitmap.recycle()
     }
     @Test fun seekSteps() = captures("en", 1f, stepsOnly = true)
@@ -1096,9 +1108,9 @@ class PlayerChromeCaptureTest {
                             channels[0].id, emptySet(), { if (it == channels[0].id) programme else if (it == channels[1].id) trayProgramme else null },
                             NOW, true, {}, {}, { _, _, _ -> }, {}) }
                         else if (tray != null) ProvideArtworkSession(session) { ChannelDrawer(
-                            channels = channels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
-                            recordingChannelIds = recordingChannels, nowEvent = railEvent,
-                            active = true, nowSec = NOW,
+                            channels = peekChannels, selectedId = ChannelId(1), playingChannelId = ChannelId(1),
+                            recordingChannelIds = recordingChannels, nowEvent = peekEvent ?: railEvent,
+                            active = true, nowSec = nowSec,
                             onFocusChannel = { railFocus = it }, onPickChannel = {}, onCloseDrawer = {},
                         ) }
                     },
@@ -1114,7 +1126,8 @@ class PlayerChromeCaptureTest {
                 )
             },
         ) }
-        if (tray != null && browser == null) ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1), "101", "Ridge Earth HD", LOGO, programme, NOW,
+        if (tray != null && browser == null) ProvideArtworkSession(session) { NowPlayingStrip(ChannelId(1),
+            peekChannels[0].number?.toString(), peekChannels[0].name.orEmpty(), peekChannels[0].icon, programme, nowSec,
             modifier = Modifier.align(Alignment.TopStart).padding(start = 58.dp, top = 29.dp)) }
         }
     }

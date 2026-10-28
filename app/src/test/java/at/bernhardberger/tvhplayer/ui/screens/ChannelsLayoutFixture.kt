@@ -71,6 +71,16 @@ import at.bernhardberger.tvhplayer.ui.rememberSidebarGuideSceneStrategy
 import at.bernhardberger.tvhplayer.ui.LocalWarmPlayback
 import at.bernhardberger.tvhplayer.ui.TVHeadendPlayerTheme
 import at.bernhardberger.tvhplayer.ui.components.SideRail
+import at.bernhardberger.tvhplayer.playback.AppPlaybackState
+import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
+import at.bernhardberger.tvhplayer.ui.components.LiveViewerPosition
+import at.bernhardberger.tvhplayer.ui.components.LocalLivePosition
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingChannel
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingIndicator
+import at.bernhardberger.tvhplayer.ui.components.LocalWatchingTarget
+import at.bernhardberger.tvhplayer.ui.components.ProvideArtworkSession
+import at.bernhardberger.tvhplayer.ui.components.railNowPlaying
 import at.bernhardberger.tvhplayer.viewmodels.resolveChannelScopeState
 import coil3.ImageLoader
 import kotlin.time.Instant
@@ -105,6 +115,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         firstTitle: String? = null,
         guide: Boolean = false,
         presentation: Boolean = false,
+        playingLive: ChannelId? = null,
     ) {
         val observation = observation(tags, manyTags, emptyGroup, recordingNow, scheduledNext, guidePending, firstTitle, presentation)
         // All channels is opt-in under Settings: hiding it shows the tags only.
@@ -115,8 +126,20 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         selected = playerReturn?.playingChannelId
         channelsView = view
         imageLoader?.let(images::install)
+        // Live at the live edge, as the runtime reports it while browse keeps the channel warm.
+        val nowPlaying = playingLive?.let {
+            railNowPlaying(AppPlaybackTarget.Live(it), AppPlaybackState.Playing, observation, null, false)
+        }
+        val livePosition = mutableStateOf(playingLive?.let { LiveViewerPosition(it, System.currentTimeMillis() / 1000, behindLive = false) })
         compose.setContent {
-            CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale), LocalWarmPlayback provides warmPlayback) {
+            CompositionLocalProvider(
+                LocalDensity provides Density(LocalDensity.current.density, scale),
+                LocalWarmPlayback provides warmPlayback,
+                LocalWatchingTarget provides nowPlaying?.target,
+                LocalWatchingChannel provides playingLive,
+                LocalWatchingIndicator provides if (playingLive != null) ChannelPlaybackIndicator.PLAYING else ChannelPlaybackIndicator.NONE,
+                LocalLivePosition provides livePosition.takeIf { playingLive != null },
+            ) {
                 TVHeadendPlayerTheme {
                     this@ChannelsLayoutFixture.view = LocalView.current
                     Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
@@ -127,6 +150,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                             at.bernhardberger.tvhplayer.ui.WarmPlaybackScrim()
                         }
                         val backStack = rememberAppNavBackStack(ChannelsKey)
+                        ProvideArtworkSession(observation.currentSession) {
                         SideRail(
                             currentRoute = if (backStack.last() == GuideKey) AppDestination.GUIDE else AppDestination.CHANNELS,
                             showEpgMenu = true,
@@ -134,6 +158,11 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                             onNavigate = { route ->
                                 if (guide) backStack.navigateTopLevel(if (route == AppDestination.GUIDE) GuideKey else ChannelsKey)
                             },
+                            nowPlaying = nowPlaying,
+                            livePauseAvailable = true,
+                            programmeAt = { channelId, atSec -> observation.eventAt(channelId, Instant.fromEpochSeconds(atSec)) },
+                            animateNowPlaying = false,
+                            nowSecProvider = { System.currentTimeMillis() / 1000 },
                         ) { padding, drawerActive ->
                             if (!guide) {
                                 Channels(padding, !drawerActive, observation, visibility, playerReturn)
@@ -155,6 +184,7 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                                     },
                                 )
                             }
+                        }
                         }
                     }
                 }
@@ -240,7 +270,9 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
         }
         val now = System.currentTimeMillis() / 1000
         val events = channels.mapIndexedNotNull { index, channel ->
+            // The README scene gives picon-only Lantern Hour a programme too, so no visible card is empty.
             val title = firstTitle.takeIf { index == 0 } ?: (if (presentation && index == 1) "Harbor Kickoff" else null)
+                ?: (if (presentation && index == 7) "Stories by Lamplight" else null)
                 ?: LINE_UP[index].second ?: return@mapIndexedNotNull null
             // The README scene puts Ridge Light at 20:00-21:00 under a 20:15 clock.
             val switch = if (presentation && index == 0) now + 45 * 60 else now + (25 + index * 5) * 60
@@ -257,16 +289,16 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
                     episode = EpgEpisode(null, null, 2, 5, 3, 10, null, null, "S2 E3").takeIf { index == 0 },
                     copyrightYear = 2024L.takeIf { index == 0 },
                     rating = EpgRating(12, "XMLTV:FSK:12", null, null, null, null).takeIf { index == 0 },
-                    summary = SYNOPSES[index],
+                    summary = SYNOPSES.getOrElse(index) { "Short stories read aloud, one each evening." },
                     // The Kettle Hour deliberately has no art: the immersive picon fallback.
-                    image = ArtworkId(101 + index).takeIf { index != 5 },
+                    image = ArtworkId(101 + index).takeIf { index != 5 && index < ART.size },
                     nextEventId = EventId(channel.id.value * 100 + 1),
                 ),
                 EpgEvent.create(
                     id = EventId(channel.id.value * 100 + 1), channelId = channel.id,
                     start = Instant.fromEpochSeconds(switch),
                     stop = Instant.fromEpochSeconds(switch + 60 * 60),
-                    title = NEXT_TITLES[index],
+                    title = NEXT_TITLES.getOrElse(index) { "Night Readings" },
                 ),
             )
         }.flatten()

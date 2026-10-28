@@ -37,13 +37,54 @@ class ChannelsLayoutCaptureTest {
     /** The README scene: Immersive with the app's default view, Ridge Light on air under a 20:15 clock, xhdpi. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
-    fun presentation() {
+    fun presentation() = presentation("channels", ChannelsView(), card(1))
+
+    /** The same evening as a grid with View options → Program art on, so the cards carry the program pictures. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentationGrid() = presentation("channels-grid",
+        ChannelsView(ChannelsLayout.GRID, programArt = setOf(ChannelsLayout.IMMERSIVE, ChannelsLayout.GRID)), card(1))
+
+    /** The same evening as a list. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentationList() = presentation("channels-list", ChannelsView(ChannelsLayout.LIST), row(1))
+
+    /** Immersive with program pictures switched off: how the screen looks when the guide has no art. */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentationLogos() = presentation("channels-logos", ChannelsView(programArt = emptySet()), card(1))
+
+    /**
+     * Back from the player, Northline News keeps playing behind Channels. Left past Ridge Earth's
+     * card opens the side menu on Channels, its now-playing header above.
+     */
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentationDrawer() = atEvening {
+        fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1,
+            warmPlayback = true, playerReturn = PlayerReturnFocus(ChannelId(3), ChannelId(3)),
+            video = FixtureArt.art("still-northline-studio"), playingLive = ChannelId(3))
+        fixture.awaitFocus(card(3))
+        repeat(2) { fixture.key(Key.DirectionLeft) }
+        fixture.awaitFocus(card(1))
+        fixture.key(Key.DirectionLeft)
+        capture("drawer", hasTestTag("nav-channels"), outputs = "build/outputs/presentation")
+    }
+
+    private fun presentation(name: String, view: ChannelsView, focus: SemanticsMatcher) = atEvening {
+        // Harbor Kickoff is recording and Tide Watch, next on Ridge Earth, is scheduled, as in the Guide.
+        fixture.show(view, fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
+        capture(name, focus, outputs = "build/outputs/presentation")
+    }
+
+    /** Ridge Light on air under a 20:15 clock. */
+    private fun atEvening(block: () -> Unit) {
         val zone = java.util.TimeZone.getDefault()
         try {
             java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("UTC"))
             assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
-            fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true)
-            capture("channels", card(1), outputs = "build/outputs/presentation")
+            block()
         } finally {
             java.util.TimeZone.setDefault(zone)
         }
