@@ -15,10 +15,13 @@ the D-pad.
 
 ![Channels as large picture cards, with Ridge Light on Ridge Earth focused and Harbor Kickoff marked as recording](artwork/screenshots/channels.png)
 
+| | | |
+|---|---|---|
+| ![Channels as a list, with Ridge Earth focused and Ridge Light's picture and details beside it](artwork/screenshots/channels-list.png) | ![Channels as a grid of program pictures, with Ridge Light on Ridge Earth focused](artwork/screenshots/channels-grid.png) | ![Channels as large cards without program pictures, showing channel logos and text](artwork/screenshots/channels-logos.png) |
+| Channels as a list | Channels as a grid | Channels without program pictures |
+
 | | |
 |---|---|
-| ![Channels as a list, with Ridge Earth focused and Ridge Light's picture and details beside it](artwork/screenshots/channels-list.png) | ![Channels as large cards without program pictures, showing channel logos and text](artwork/screenshots/channels-logos.png) |
-| Channels as a list | Channels without program pictures |
 | ![The program guide, with Ridge Light focused, Harbor Kickoff recording and Tide Watch scheduled](artwork/screenshots/guide.png) | ![The details page for Ridge Light, with its picture across the screen](artwork/screenshots/details.png) |
 | Program guide | Program details |
 | ![The player controls over Ridge Light, with Pause focused](artwork/screenshots/player.png) | ![The channel list over the playing picture, with Ridge Earth focused and its program above](artwork/screenshots/player-rail.png) |

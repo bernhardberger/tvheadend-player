@@ -34,11 +34,11 @@ Pixel-exact reproduction also depends on the same JDK, Robolectric native graphi
 and fonts. Copy only owner-selected images into a tracked artwork directory and
 review the diff; never force-add the generated directory.
 
-The README uses Channels as the lead image, then a gallery in pairs: Channels as
-a list and without program pictures, Guide and details, the player controls and
-its channel list, the channel schedule and the side menu over warm playback, then
-Recordings folders and a recording inside a folder. The Grid and Settings
-captures are not used. The tracked copies in
+The README uses Channels as the lead image, then the other three Channels views
+in a row: list, Grid and without program pictures. A gallery in pairs follows:
+Guide and details, the player controls and its channel list, the channel schedule
+and the side menu over warm playback, then Recordings folders and a recording
+inside a folder. The Settings capture is not used. The tracked copies in
 [`artwork/screenshots/`](../artwork/screenshots/) are the same pixels saved
 without the fully opaque alpha channel.
 
