@@ -14,7 +14,10 @@ Load these through `testutil/FixtureArt.kt`.
   dark marks that need a light plate. `coastal-miles` is an extreme wide
   wordmark (5.5:1) and `roundtable` is a crest.
 - `art/<programme>.jpg`: 16:9 key art at 1280×720 with the title designed
-  into the image. Some carry a channel bug or a NEW/NEU/LIVE badge.
+  into the image, in the upper part of the frame and clear of the corners where
+  the app draws its own marks (logo plate bottom left, playback mark bottom
+  right, REC badge top right, progress line along the bottom). None carries a
+  channel bug or a NEW/LIVE badge.
 - Format edge cases: `glass-harbor-poster-2x3` (480×720, generated as a
   poster, not padded), `harbor-kickoff-4x3` (960×720) and
   `ion-wake-edge-title` (title ink close to the right edge).
@@ -63,7 +66,7 @@ edge cases.
 | Harbor Sport (`harbor-sport`) | Harbor Kickoff | `harbor-kickoff`, `harbor-kickoff-4x3` | `still-harbor-kickoff` | Match coverage from a floodlit stadium as Harbor FC meet Amber Town. |
 | Harbor Sport | River Court | `river-court` | `still-river-court` | Indoor basketball, River Court against North Quay. |
 | Northline News (`northline-news`) | Northline Tonight | `northline-tonight` | `still-northline-studio`, `still-northline-graphics` | Evening studio news from a regional desk with two anchors. |
-| Northline News | Field Desk | `field-desk` (NEW badge) | `still-field-desk-street` | Field reporting from a flooded riverside road. |
+| Northline News | Field Desk | `field-desk` | `still-field-desk-street` | Field reporting from a flooded riverside road. |
 | Northline News | Skyglass Weather | — | `still-skyglass-square` | Weather presentation. |
 | Kite Kids (`kite-kids`) | Paper Kite Tales | `paper-kite-tales` | `still-paper-kite-tales` | 2D animation about a paper kite over painted hills. |
 | Kite Kids | Little Orbit | `little-orbit` | `still-little-orbit` | A gentle science table about orbits using marbles and a bowl. |
@@ -88,6 +91,11 @@ cairosvg using Liberation Sans (SIL OFL 1.1) and DejaVu Sans (Bitstream Vera
 licence). Most key-art titles and pictures were generated with xAI
 `grok-imagine-image-2.0`. Badges were added in Liberation Sans Bold, and the
 edge-title fixture was drawn in Liberation Sans Bold on a generated plate.
+The twelve 16:9 title images are the `-v3` versions (2026-10-28), whose titles
+were moved out of the app's mark corners and whose bugs and badges were removed:
+Field Desk and Ridge Light by `grok-imagine-image-2.0` edits, the other ten by
+Codex's built-in image editing (model not disclosed by the tool); details in the
+batch's `review/keyart/v3/` and the creative repo's `keyart/HANDOFF-v3.md`.
 No exclusive copyright is claimed for the generated media.
 
 The key art and stills were scaled to fit 1280×720 and re-encoded as JPEG
@@ -116,18 +124,18 @@ Source path and SHA-256 of each source file, relative to the batch:
 | `picons/coastal-miles.png` | `channels/ch-coastal-miles/picon/picon-400x240-v2.png` | `1a18b237c78ef2d080d31dc0f746cf145faf42dd15e9dcb48d8f81fda2f6c032` |
 | `picons/roundtable.png` | `channels/ch-roundtable/picon/picon-400x240-v2.png` | `12029ef7408dbd3eec226dd61d213472a3d04dfeda8c1855c7226bfc784191fc` |
 | `picons/quiet-hours.png` | `channels/ch-quiet-hours/picon/picon-400x240.png` | `894a41ae1a2e26ee20ff275784703df0bb32dd96ac1d969e908321ac28c89d5b` |
-| `art/harbor-kickoff.jpg` | `programmes/sport-harbor-kickoff/keyart/title-16x9-v2.png` | `a52d543d1ca8b9a34dcf2dbb79bb729c5b9ca3798319a0a611e4af4352b079e4` |
-| `art/river-court.jpg` | `programmes/sport-river-court/keyart/title-16x9-v2.png` | `2cdfbb3d7dd1f422b949584df108aa4a351128eda764aa1f209e1c81449db43d` |
-| `art/northline-tonight.jpg` | `programmes/news-northline-tonight/keyart/title-16x9-v2.png` | `523d8cd21b5d04184851ca0348640a152572af0ce0bfdb889394d94b0ca26fa8` |
-| `art/field-desk.jpg` | `programmes/news-field-desk/keyart/title-16x9-v2.png` | `27b129695889037dcf675e7951cb8f5b2f3389b135c8443f04601d554697cf20` |
-| `art/kettle-hour.jpg` | `programmes/ent-kettle-hour/keyart/title-16x9-v2.png` | `da7da5bfedf384049834b82176496b40c69a1bb6600fcee9c6ea2babed5db50c` |
-| `art/glass-harbor.jpg` | `programmes/ent-glass-harbor/keyart/title-16x9-v2.png` | `2e2af6612e79d922e05653b913252771696a0c2848d90b9ca528694f11414b9c` |
-| `art/paper-kite-tales.jpg` | `programmes/kids-paper-kite/keyart/title-16x9-v2.png` | `acef06e367e6b98153c8d7620ac59506321f4f8d8b3f86f3905475e3886a9599` |
-| `art/little-orbit.jpg` | `programmes/kids-little-orbit/keyart/title-16x9-v2.png` | `40876c8b4435ebc4a26d9e768559cf916c931ca91835162b740d981cec09d484` |
-| `art/lantern-road.jpg` | `programmes/anime-lantern-road/keyart/title-16x9-v2.png` | `e3b5fb6d65b2270b79811b973cc7b5cfb8e364640c08939df6b675b03fba0438` |
-| `art/ion-wake.jpg` | `programmes/anime-ion-wake/keyart/title-16x9-v2.png` | `db5e79e1d64f4ea5d5653d5e71546511a205250eb29ab8b2eb80ac82991759b5` |
-| `art/ridge-light.jpg` | `programmes/nat-ridge-light/keyart/title-16x9-v2.png` | `7a7e12d3a8f7c666358aece45f48482547c2c806ba73e7447ba2cde60e46e0d6` |
-| `art/harbor-lights-live.jpg` | `programmes/live-harbor-lights/keyart/title-16x9-v2.png` | `42c76af464f8a3087dddff2097750f551fc5b1fe297c00240781eb707516df1b` |
+| `art/harbor-kickoff.jpg` | `programmes/sport-harbor-kickoff/keyart/title-16x9-v3.png` | `0bf9df5eae5bedc8ad3b89a026a9f576c5b2a47a4aa8c72123d9e9dc7f0429af` |
+| `art/river-court.jpg` | `programmes/sport-river-court/keyart/title-16x9-v3.png` | `54206d8408bf61df3054fb187153d1e60e0271bd85ec24b419af643e5102295a` |
+| `art/northline-tonight.jpg` | `programmes/news-northline-tonight/keyart/title-16x9-v3.png` | `060a40cef9ed5dd7f68bd000c96973bcd1d24ab5a1acd15f5106466313f230b0` |
+| `art/field-desk.jpg` | `programmes/news-field-desk/keyart/title-16x9-v3.png` | `4a356a1cbb573bc08182d97e1531879dc371e968557dda29d692482bae4ef8e4` |
+| `art/kettle-hour.jpg` | `programmes/ent-kettle-hour/keyart/title-16x9-v3.png` | `487e87b01397e245ff17456ab54ef4a67a043f0a3c334ab77d43620e69b83d4f` |
+| `art/glass-harbor.jpg` | `programmes/ent-glass-harbor/keyart/title-16x9-v3.png` | `fbdfec2eea5fb9d1169ba2f9dd72b41dd6dc78cc6baaff4157bba3a6b5efbaca` |
+| `art/paper-kite-tales.jpg` | `programmes/kids-paper-kite/keyart/title-16x9-v3.png` | `1143c184feaa92baa9fe059158e72c00a86d9f4fde040e895c16f2af42b26d8f` |
+| `art/little-orbit.jpg` | `programmes/kids-little-orbit/keyart/title-16x9-v3.png` | `2089f015b730e87820b11a2fe1bd19fd4e51685243cf53511d6d25bce2b21f87` |
+| `art/lantern-road.jpg` | `programmes/anime-lantern-road/keyart/title-16x9-v3.png` | `173cb0e0ae06166c7dcc601b7c279bcd11aafc95b4bdcb48d326382ba5667cf3` |
+| `art/ion-wake.jpg` | `programmes/anime-ion-wake/keyart/title-16x9-v3.png` | `b5dd46c81e20e6fee71da9f2cabb310ae80a7f783769851f31c304b769a524d7` |
+| `art/ridge-light.jpg` | `programmes/nat-ridge-light/keyart/title-16x9-v3.png` | `d4ffef89cc70462cb276affe28e4a70b2916903406c0d284b09a90d3f633191d` |
+| `art/harbor-lights-live.jpg` | `programmes/live-harbor-lights/keyart/title-16x9-v3.png` | `3add87da9c55ae6110e08dddcc67b1556276d1a39726b3e64d5f9e5dc75cec6e` |
 | `art/glass-harbor-poster-2x3.jpg` | `programmes/ent-glass-harbor/keyart/poster-2x3-v2.png` | `9a1bf9147379933602ba2a09fa8d0b5e14d07b54d4a1d5b7a101c60407543801` |
 | `art/harbor-kickoff-4x3.jpg` | `programmes/sport-harbor-kickoff/keyart/frame-4x3-v2.png` | `5bb8da2e2b94520c083ee33358d1fef3c966c528155f684fffef9d312cb4cf49` |
 | `art/ion-wake-edge-title.jpg` | `programmes/anime-ion-wake/keyart/edge-16x9-v2.png` | `41cd43e1730e36f692797a1d07b0452a965961e72166579adf1a86cf1b59de8a` |

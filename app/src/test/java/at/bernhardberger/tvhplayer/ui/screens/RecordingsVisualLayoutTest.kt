@@ -206,7 +206,9 @@ class RecordingsVisualLayoutTest {
             picons.forEachIndexed { index, name -> put(ArtworkId(index + 1), FixtureArt.picon(name)) }
             art.forEachIndexed { index, name -> put(ArtworkId(101 + index), FixtureArt.art(name)) }
         }))
-        show(entries = library, channels = channels)
+        // A household server's disk, as the Recordings header reports it.
+        show(entries = library, channels = channels, diskSpace = DvrDiskSpaceState.Current(
+            DvrDiskSpace(1_240_000_000_000L, 2_760_000_000_000L, 4_000_000_000_000L)))
         compose.mainClock.advanceTimeBy(1_500)
         // The running match's Recording now folder comes first, then Sport, which holds it, then Documentaries.
         focused("recordings-recording-now-folder")
