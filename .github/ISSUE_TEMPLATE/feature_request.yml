@@ -1,0 +1,20 @@
+name: Feature request
+description: Something you'd like Tvheadend Player to do.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: wish
+    attributes:
+      label: What would you like the app to do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help you?
+      description: What you're trying to do, and how you do it today.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Settings → About → Version, if you have the app installed.

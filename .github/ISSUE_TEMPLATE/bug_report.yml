@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in Tvheadend Player doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. Please don't include
+        passwords, server addresses or other private details.
+  - type: input
+    id: app-version
+    attributes:
+      label: App version
+      description: Settings → About → Version, for example "0.3.1 (163) · Play".
+    validations:
+      required: true
+  - type: input
+    id: server-version
+    attributes:
+      label: Tvheadend version
+      description: Settings → About → Server shows it while the app is connected.
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: TV or streaming device
+      description: Brand and model, for example "TCL C645" or "NVIDIA Shield TV Pro".
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what did you see?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: If it happens every time, the remote presses that lead to it.
+      placeholder: |
+        1. Open the Guide
+        2. Press OK on a program
+        3. ...
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Screenshots, how often it happens, or anything special about your server setup.
