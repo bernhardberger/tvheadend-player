@@ -10,6 +10,7 @@
     <string name="about_license">GNU General Public License v3</string>
     <string name="about_attribution">以Preclikos開發的TVHStream為基礎</string>
     <string name="about_notices">聲明與第三方程式庫</string>
+    <string name="about_privacy">隱私權政策</string>
     <string name="about_translation">翻譯</string>
     <string name="about_machine_translated">機器翻譯</string>
     <string name="about_machine_translated_details">此翻譯尚未經任何人檢查。如有錯誤，請在Tvheadend Player的GitHub上提出問題回報。</string>

@@ -10,6 +10,7 @@
     <string name="about_license">GNU General Public License v3</string>
     <string name="about_attribution">Alapja a TVHStream, amelynek szerzője Preclikos</string>
     <string name="about_notices">Közlemények és külső könyvtárak</string>
+    <string name="about_privacy">Adatvédelmi irányelvek</string>
     <string name="about_translation">Fordítás</string>
     <string name="about_machine_translated">Gépi fordítás</string>
     <string name="about_machine_translated_details">Ezt a fordítást még senki sem ellenőrizte. A hibákat a Tvheadend Player GitHub-issue-jai között jelentsd.</string>

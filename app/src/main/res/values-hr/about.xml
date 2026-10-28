@@ -10,6 +10,7 @@
     <string name="about_license">GNU General Public License v3</string>
     <string name="about_attribution">Temeljeno na aplikaciji TVHStream autora Preclikos</string>
     <string name="about_notices">Pravne obavijesti i biblioteke trećih strana</string>
+    <string name="about_privacy">Pravila o privatnosti</string>
     <string name="about_translation">Prijevod</string>
     <string name="about_machine_translated">Strojni prijevod</string>
     <string name="about_machine_translated_details">Ovaj prijevod još nitko nije provjerio. Pogreške prijavi kao probleme projekta Tvheadend Player na platformi GitHub.</string>

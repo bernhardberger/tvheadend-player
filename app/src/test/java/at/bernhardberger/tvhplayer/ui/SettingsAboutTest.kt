@@ -108,6 +108,15 @@ class SettingsAboutTest {
         compose.runOnIdle { org.junit.Assert.assertTrue(noticesScroll.value() > 0f) }
         press(Key.Back)
         compose.onNodeWithText("Notices and third-party libraries", substring = true).assertIsFocused()
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Privacy policy").assertIsFocused()
+        press(Key.DirectionCenter)
+        compose.onNodeWithTag("player-info-reading").assertIsFocused()
+        // The reader shows the shipped policy as plain text, without Markdown markers.
+        compose.onNodeWithText("Data stored on the TV", substring = true).assertExists()
+        compose.onAllNodesWithText("## ", substring = true).assertCountEquals(0)
+        press(Key.Back)
+        compose.onNodeWithText("Privacy policy").assertIsFocused()
         press(Key.Back)
         compose.onNodeWithText("About").assertIsFocused()
     }
@@ -115,7 +124,7 @@ class SettingsAboutTest {
     @Test fun machineTranslatedLanguageShowsItsNoticeUnderTranslation() {
         show(machineTranslated = true)
         press(Key.DirectionCenter)
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(5) { press(Key.DirectionDown) }
         compose.onNodeWithText("Machine-translated", substring = true).assertIsFocused()
         compose.onNodeWithText("TRANSLATION").assertIsDisplayed()
         compose.onNodeWithText("Nobody has checked this translation yet", substring = true).assertIsDisplayed()
@@ -129,7 +138,7 @@ class SettingsAboutTest {
         press(Key.DirectionCenter)
         val title = RuntimeEnvironment.getApplication().resources.getString(at.bernhardberger.tvhplayer.R.string.about_machine_translated)
         org.junit.Assert.assertNotEquals("Machine-translated", title)
-        repeat(4) { press(Key.DirectionDown) }
+        repeat(5) { press(Key.DirectionDown) }
         compose.onNodeWithText(title, substring = true).assertIsFocused()
     }
 
@@ -172,6 +181,10 @@ class SettingsAboutTest {
         press(Key.DirectionDown)
         press(Key.DirectionCenter)
         save("$name-notices")
+        press(Key.Back)
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        save("$name-privacy")
     }
 
     private fun save(name: String) {
@@ -188,7 +201,7 @@ class SettingsAboutTest {
             target.parentFile.mkdirs()
             target.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             PseudoLocaleEvidence.mirror("about", name, bitmap, captureView, captureScale, "mdpi 1.0",
-                "native D-pad focus", "Settings About, licence and notices; production SettingsScreenNavigation")
+                "native D-pad focus", "Settings About, licence, notices and privacy policy; production SettingsScreenNavigation")
             bitmap.recycle()
         }
     }

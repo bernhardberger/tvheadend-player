@@ -10,6 +10,7 @@
     <string name="about_license">GNU General Public License v3</string>
     <string name="about_attribution">Based on TVHStream by Preclikos</string>
     <string name="about_notices">Notices and third-party libraries</string>
+    <string name="about_privacy">Privacy policy</string>
     <!-- Section heading in Settings → About above the translation status and translator credits. -->
     <string name="about_translation">Translation</string>
     <!-- Shown only in machine-drafted languages. Max 40 characters. -->

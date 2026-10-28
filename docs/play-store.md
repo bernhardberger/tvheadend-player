@@ -776,6 +776,8 @@ one updates the other.
    Settings → About that shows the policy text on screen (a TV has no reliable
    browser for a link), uploaded before sending for review. That costs a
    release; submitting 0.3.0 risks a rejection round of up to seven days.
+   Done for 0.3.1: Settings → About → Privacy policy shows the bundled
+   `privacy-policy.md` in the same reader as the license, in English.
 3. **Credentials over unencrypted HTSP.** Google's user data policy says to
    "Handle all personal and sensitive user data securely, including
    transmitting it using modern cryptography (for example, over HTTPS)", and

@@ -221,7 +221,7 @@ androidComponents.onVariants { variant ->
     val aboutLegalAssets = tasks.register<GenerateAboutLegalAssets>(
         "generate${variant.name.replaceFirstChar { it.uppercase() }}AboutLegalAssets",
     ) {
-        legalFiles.from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"))
+        legalFiles.from(rootProject.file("LICENSE"), rootProject.file("NOTICE.md"), rootProject.file("privacy-policy.md"))
     }
     variant.sources.assets?.addGeneratedSourceDirectory(
         aboutLegalAssets,

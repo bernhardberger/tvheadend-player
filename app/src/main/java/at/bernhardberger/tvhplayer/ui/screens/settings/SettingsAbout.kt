@@ -46,6 +46,7 @@ internal fun settingsAboutLevels(
     reading?.let { (title, asset) -> AboutReadingDialog(title, asset) { reading = null } }
     val license = stringResource(R.string.about_license)
     val notices = stringResource(R.string.about_notices)
+    val privacy = stringResource(R.string.about_privacy)
     val rows = listOf(
         settingsRow("version", stringResource(R.string.about_version), stringResource(
             R.string.about_version_value, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE,
@@ -55,6 +56,8 @@ internal fun settingsAboutLevels(
             onClick = { reading = license to "LICENSE" }),
         settingsRow("notices", notices, supporting = stringResource(R.string.about_attribution), titleMaxLines = 3,
             trailingIcon = R.drawable.ic_arrow_forward, onClick = { reading = notices to "NOTICE.md" }),
+        settingsRow("privacy", privacy, titleMaxLines = 3, trailingIcon = R.drawable.ic_arrow_forward,
+            onClick = { reading = privacy to "privacy-policy.md" }),
     )
     // One Translation group: the machine-translated notice first when this language has one, then the credits.
     val translation = stringResource(R.string.about_translation)
@@ -87,7 +90,7 @@ private fun AboutReadingDialog(title: String, asset: String, onDismiss: () -> Un
     )) {
         val text = remember(asset) {
             val source = context.assets.open("licenses/$asset").bufferedReader().use { it.readText() }
-            if (asset == "NOTICE.md") aboutNoticeText(source) else source
+            if (asset.endsWith(".md")) aboutNoticeText(source) else source
         }
         ProgrammeDetailsFullDescription(
             modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)

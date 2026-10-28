@@ -10,6 +10,7 @@
     <string name="about_license">GNU General Public License v3</string>
     <string name="about_attribution">Vychází z TVHStream od Preclikos</string>
     <string name="about_notices">Právní informace a knihovny třetích stran</string>
+    <string name="about_privacy">Zásady ochrany osobních údajů</string>
     <string name="about_translation">Překlad</string>
     <string name="about_machine_translated">Strojový překlad</string>
     <string name="about_machine_translated_details">Tento překlad zatím nikdo nezkontroloval. Chyby prosím nahlas v sekci Issues projektu Tvheadend Player na platformě GitHub.</string>
