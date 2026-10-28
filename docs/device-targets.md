@@ -64,5 +64,7 @@ roles. Do not treat a generic model name as an unambiguous target.
   Philips/Shield CEC path, not a claim about every Philips television or remote.
 
 TVHeadend credentials are immutable. Device testing may consume the existing
-non-admin identity but must never rotate or change any TVHeadend account
-credential.
+identity but must never rotate or change any TVHeadend account credential. That
+identity is an admin account with unrestricted channels, so device runs do not
+exercise restricted-user behavior (limited channel lists, refused DVR actions);
+restricted accounts are planned with a future test/review server.

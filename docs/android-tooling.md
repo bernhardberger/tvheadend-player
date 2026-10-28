@@ -159,7 +159,9 @@ adb -s emulator-5556 shell am instrument -w -r -e class at.bernhardberger.tvhpla
 ```
 
 Before installation, confirm the intended emulator's four live properties against
-the qualified identity below. Stop on mismatch. Confirm the installed runner
+the qualified identity: manufacturer `Google`, model
+`sdk_google_atv64_amati_x86_64_16k`, device `emu64xa16k`, product
+`sdk_google_atv64_amati_x86_64_16k` (API 36). Stop on mismatch. Confirm the installed runner
 targets the app. Hash the exact base APK paths returned by `pm path` using
 `adb -s emulator-5556 shell sha256sum <base-apk-path>` and compare both to local
 `sha256sum` results before attributing tests to source. Preserve those hashes,
