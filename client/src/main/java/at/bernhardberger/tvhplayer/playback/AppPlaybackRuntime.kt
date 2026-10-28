@@ -361,12 +361,22 @@ class AppPlaybackRuntime(
         declaredVideoFrameDuration.collect(frameRate::onDeclared)
     }
 
-    private val livePlaybackObservationJob = scope.launch {
+    /**
+     * Records a stop or issue as it shows. The reactions below wait behind a running command, so a
+     * stop the server restarts meanwhile would never reach them.
+     */
+    private val liveLossJob = scope.launch {
         livePlaybackObservation.collect { observation ->
             val observedEpoch = activeTargetEpoch
             if (observation is LivePlaybackObservation.Active && observedEpoch != null) {
                 observation.keptLiveLossNotice()?.let { observedLiveLoss = ObservedLiveLoss(observedEpoch, it) }
             }
+        }
+    }
+
+    private val livePlaybackObservationJob = scope.launch {
+        livePlaybackObservation.collect { observation ->
+            val observedEpoch = activeTargetEpoch
             // Observations arrive several times a second: they must not end a paused seek's refresh.
             targetCommands.serialize(onClosed = {}, countsAsArrival = false) {
                 if (livePlaybackObservation.value == LivePlaybackObservation.Departed) {
@@ -2357,10 +2367,12 @@ class AppPlaybackRuntime(
         cancelKeepTimer()
         recordingMarkers.clearRecordingMarkersAndJoin()
         val pendingRecovery = liveRecovery.cancelOnDetach()
+        liveLossJob.cancel()
         livePlaybackObservationJob.cancel()
         settingsJob.cancel()
         declaredFrameDurationJob.cancel()
         pendingRecovery?.join()
+        liveLossJob.join()
         livePlaybackObservationJob.join()
         settingsJob.join()
         declaredFrameDurationJob.join()

@@ -28,6 +28,7 @@ import kotlinx.coroutines.test.*
 import org.junit.Assert.*
 import org.junit.Test
 import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.minutes
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
@@ -236,6 +237,31 @@ class BackgroundPlaybackRuntimeTest {
         returnAndRetune()
         assertEquals(2, connection.subscribeCount)
         assertEquals(1, connection.unsubscribeCount)
+        assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
+    }
+
+    @Test fun stopThatRestartsWhileAnEarlierObservationWaitsStillReleasesWithInterruptedNotice() = exercise {
+        live()
+        runtime.onAppBackgrounded()
+        await { connection.priorityChanges.size == 1 }
+        val release = holdCommands()
+        // An observation that arrives during the command waits behind it with its own check.
+        connection.emit(SubscriptionEvent.Timeshift(0, 0, 0, 60_000_000, 100))
+        await { (liveObservation()?.timeshiftState as? LiveTimeshiftState.Available)?.bufferedDuration == 1.minutes }
+        settle()
+        connection.emit(SubscriptionEvent.Stopped(SubscriptionCondition.NO_DETAIL, null))
+        await { liveObservation()?.serverStopped == true }
+        settle()
+        startSubscription()
+        await { liveObservation()?.let { !it.serverStopped && it.timeshiftState is LiveTimeshiftState.Available } == true }
+        release.complete(Unit)
+        await { runtime.activeTarget.value == null }
+        assertEquals(1, connection.subscribeCount)
+        assertEquals(1, connection.unsubscribeCount)
+        assertEquals(listOf(LiveSubscriptionPriority.YIELD), connection.priorityChanges)
+        assertNull(runtime.backgroundNotice.value)
+        returnAndRetune()
+        assertEquals(2, connection.subscribeCount)
         assertEquals(BackgroundPlaybackNotice.INTERRUPTED, runtime.backgroundNotice.value)
     }
 
