@@ -1,8 +1,6 @@
 package at.bernhardberger.tvhplayer.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -100,6 +98,7 @@ import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.BuildConfig
 import at.bernhardberger.tvhplayer.playback.AppPlaybackTarget
+import at.bernhardberger.tvhplayer.ui.BrowseMotionPolicy
 import at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlate
 import at.bernhardberger.tvhplayer.ui.player.NowPlayingPlateWidth
@@ -792,10 +791,9 @@ private fun NavigationDrawerScope.DrawerNowPlaying(
             ) {
                 NowPlayingRailStrip(nowPlaying, programme, status, nowSec)
             }
-            // The kit's fade with a slide no longer than the gap, so the labels never cross the plate.
             val gapPx = with(LocalDensity.current) { NowPlayingPlateGap.roundToPx() }
             androidx.compose.animation.AnimatedVisibility(expanded,
-                enter = fadeIn() + slideInHorizontally { -gapPx },
+                enter = BrowseMotionPolicy.besideMarkEnter(gapPx),
                 exit = NavigationDrawerItemDefaults.ContentAnimationExit,
                 modifier = Modifier.align(Alignment.CenterStart).padding(start = NowPlayingTextStart)) {
                 Column(Modifier.testTag("global-drawer-now-playing-text")) {

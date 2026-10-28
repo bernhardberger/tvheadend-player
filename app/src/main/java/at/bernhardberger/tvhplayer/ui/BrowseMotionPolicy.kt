@@ -55,6 +55,12 @@ internal object BrowseMotionPolicy {
     const val fadeThroughInMs = 210
 
     /**
+     * Labels that appear beside a fixed mark as a drawer opens: the kit's fade with a slide no
+     * longer than [gapPx], the gap to the mark, so the text never crosses it. Local, not page travel.
+     */
+    fun besideMarkEnter(gapPx: Int): EnterTransition = fadeIn() + slideInHorizontally { -gapPx }
+
+    /**
      * Leanback's background timing, for any backdrop that follows focus: it follows once focus
      * has rested [backdropSettleMs], but changes at most once per [backdropIntervalMs], so
      * stepping at a steady pace does not repaint the screen on every step. As in Leanback's
