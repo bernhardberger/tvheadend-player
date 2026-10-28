@@ -6,6 +6,7 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -105,10 +106,12 @@ internal const val DepthSlideMillis = 1000
 internal const val DepthAlphaMillis = 200
 
 /**
- * The parent column left of the active one dims further than the preview: its trailing edge
- * peeks out beside the rail, where its folder arrows would otherwise read as the rail's own.
+ * The parent column left of the active one dims further than the preview while it slides off,
+ * then fades out once the slide has settled: its trailing edge would otherwise rest beside the
+ * rail, where its folder arrows read as the rail's own.
  */
-internal const val DepthParentAlpha = 0.25f
+internal const val DepthParentAlpha = 0f
+internal const val DepthParentSlideAlpha = 0.25f
 
 /** Top content reserve inside a depth list so the first focused row's scale is not clipped. */
 internal val DepthListTopReserve = 4.dp
@@ -549,9 +552,14 @@ private fun DepthStripPane(
         column.path.size < activePath.size -> parentAlpha
         else -> previewAlpha
     }
+    val parentSlideAlpha = maxOf(parentAlpha, DepthParentSlideAlpha)
     val alpha by animateFloatAsState(
         targetValue = targetAlpha,
-        animationSpec = tween(DepthAlphaMillis),
+        animationSpec = if (targetAlpha == parentAlpha && parentAlpha < parentSlideAlpha) keyframes {
+            durationMillis = DepthSlideMillis
+            parentSlideAlpha at DepthAlphaMillis
+            parentSlideAlpha at DepthSlideMillis - 2 * DepthAlphaMillis
+        } else tween(DepthAlphaMillis),
         label = "depth-column-alpha",
     )
     val focus = remember { mutableStateMapOf<String, FocusRequester>() }

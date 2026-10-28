@@ -298,16 +298,16 @@ class RecordingsVisualLayoutTest {
     }
 
     /**
-     * Inside a folder the parent's folder arrows peek out at the screen edge beside the rail.
-     * They stay visible but much quieter than the preview, so they do not read as the rail's.
+     * Inside a folder the parent slides off to the screen edge beside the rail. Once the slide
+     * settles it fades out, so its folder arrows do not rest there and read as the rail's.
      */
-    @Test fun parentArrowsBesideTheRailStayQuieterThanThePreview() {
+    @Test fun parentArrowsBesideTheRailFadeOutOnceTheSlideSettles() {
         show()
         focused("recordings-folder-Documentaries")
         key(Key.DirectionCenter)
         focused("recordings-folder-Documentaries/Expeditions")
         compose.waitForIdle()
-        val (parent, preview, background) = compose.runOnIdle {
+        val (parent, _, background) = compose.runOnIdle {
             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
             view.draw(Canvas(bitmap))
             fun brightest(xs: IntRange, ys: IntRange) =
@@ -315,8 +315,7 @@ class RecordingsVisualLayoutTest {
             Triple(brightest(0..30, 116..246), brightest(562..900, 116..186), brightest(0..30, 420..460))
                 .also { bitmap.recycle() }
         }
-        assertTrue("the parent's arrows still show ($parent over $background)", parent > background + .05f)
-        assertTrue("the parent's arrows are well below the preview ($parent vs $preview)", parent < preview * .3f)
+        assertTrue("the parent's arrows still show ($parent over $background)", parent <= background + .01f)
     }
 
     @Test fun theListFadeKeepsTheScaledFocusedRowWhole() {
