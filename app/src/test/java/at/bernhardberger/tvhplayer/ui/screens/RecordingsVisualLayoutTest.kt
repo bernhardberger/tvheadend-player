@@ -865,6 +865,10 @@ class RecordingsVisualLayoutTest {
 
         compose.runOnIdle { connectionState.value = ConnectionUiState.Ready }
         publish(listOf(recording(1, LONG_TITLE, "Documentaries/northern.ts"), recording(5, "Harbor Lights Live", "concert.ts")))
+        // The archive is prepared off the main thread, which waitForIdle does not wait for.
+        compose.waitUntil(10_000) {
+            compose.onAllNodes(hasTestTag("recordings-archive-list"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+        }
         compose.onNodeWithTag("recordings-skeleton").assertDoesNotExist()
         assertEquals(header, bounds("recordings-header"))
         assertEquals(tabs, bounds("recordings-mode-tabs"))
