@@ -2243,9 +2243,9 @@ class AudioInterruptionRuntimeTest {
         failCoordinatorStop = false
         failCoordinatorRemoval = false
         signalPlayIntent()
-        await { player.mediaItemCount == 1 }
+        await { runtime.state.value == AppPlaybackState.Idle }
+        assertEquals(1, player.mediaItemCount)
         assertSame(replacement, player.currentMediaItem)
-        assertEquals(AppPlaybackState.Idle, runtime.state.value)
         assertTrue(player.playWhenReady)
         assertEquals(1, connection.subscribeCount)
     }
