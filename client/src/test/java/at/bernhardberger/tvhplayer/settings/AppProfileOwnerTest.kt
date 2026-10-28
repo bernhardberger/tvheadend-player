@@ -217,6 +217,38 @@ class AppProfileOwnerTest {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
+    @Test fun throwingConnectAfterPersistenceStillClearsBeforeRecovery() = runTest {
+        val stored = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
+        val fakeSession = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()
+        var connects = 0
+        var artworkClears = 0
+        val failure = IllegalStateException("Synthetic connect failure")
+        val session = object : TvheadendSession by fakeSession {
+            override suspend fun connect(profile: ServerProfile): SessionCommandResult {
+                assertTrue(stored.loadProfile() is ServerProfileReadResult.Available)
+                if (++connects == 1) throw failure
+                assertEquals(1, artworkClears) // Recovery cannot reapply the new profile with old logos.
+                return fakeSession.connect(profile)
+            }
+        }
+        val owner = AppProfileOwner(
+            session = session, profileStore = stored,
+            playerSettings = PlayerSettingsStore(InMemoryPreferencesDataStore()),
+            ioDispatcher = StandardTestDispatcher(testScheduler),
+            readProfileForEditing = { error("Unexpected editing read") },
+            clearAppArtwork = { artworkClears++ },
+        )
+        backgroundScope.launch { owner.run() }
+        runCurrent()
+        val result = runCatching { owner.saveServer("offline.invalid", 9982) }.exceptionOrNull()
+        assertTrue(result is IllegalStateException)
+        assertEquals(failure.message, result?.message)
+        assertEquals(1, artworkClears)
+        assertEquals(2, connects)
+        assertTrue(owner.serverProfile.value is ServerProfileReadResult.Available)
+    }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     @Test fun artworkClearWaitsForPersistenceAndSessionReplacement() = runTest {
         val stored = at.bernhardberger.tvheadend.sdk.testing.FakeServerProfileStore()
         val fakeSession = at.bernhardberger.tvheadend.sdk.testing.FakeTvheadendSession()

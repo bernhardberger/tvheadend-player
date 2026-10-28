@@ -219,8 +219,11 @@ class AppProfileOwner(
         playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.storeAnonymous(host, htspPort)
         check(profile is ServerProfileReadResult.Available)
-        applyServerProfile(profile)
-        clearAppArtwork()
+        try {
+            applyServerProfile(profile)
+        } finally {
+            clearAppArtwork()
+        }
     }
 
     private suspend fun commitPasswordServer(
@@ -235,8 +238,11 @@ class AppProfileOwner(
         playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.storePassword(host, htspPort, username, password)
         check(profile is ServerProfileReadResult.Available)
-        applyServerProfile(profile)
-        clearAppArtwork()
+        try {
+            applyServerProfile(profile)
+        } finally {
+            clearAppArtwork()
+        }
     }
 
     private suspend fun clearServerProfile() = serverMutex.withLock {
@@ -246,8 +252,11 @@ class AppProfileOwner(
         playerSettings.audioChoices.profileIdentity(replace = true)
         val profile = profileStore.clearProfile()
         check(profile == ServerProfileReadResult.Missing)
-        applyServerProfile(profile)
-        clearAppArtwork()
+        try {
+            applyServerProfile(profile)
+        } finally {
+            clearAppArtwork()
+        }
     }
 
     private suspend fun commitStreamProfileSelection(
