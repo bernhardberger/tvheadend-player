@@ -244,7 +244,7 @@ Tvheadend Player
 A Tvheadend client for Android TV, built around the remote.
 ```
 
-**Full description** (3297/4000)
+**Full description** (3393/4000)
 
 ```text
 Tvheadend Player is an Android TV and Google TV app for live TV, the program guide and the recordings on your own Tvheadend server. You can do all of it with the D-pad.
@@ -282,7 +282,7 @@ Made for the TV
 
 Setup takes three steps. The app first looks for Tvheadend servers on your local network; if none answers, you type in the address and HTSP port. Then you enter your Tvheadend username and password, and the app tests the connection before it saves anything.
 
-Privacy: no ads, no analytics and no account to sign up for. Your server address and login stay on the TV, and the password is stored encrypted. Apart from the server search on your local network during setup, the app only talks to your Tvheadend server. HTSP itself isn't encrypted, so use it on your home network or through a VPN.
+Privacy: no ads, no analytics and no account to sign up for. Your server address and login are saved only on the TV, and the password is stored encrypted. Apart from the server search on your local network during setup, the app only talks to your Tvheadend server. HTSP, Tvheadend's own protocol, isn't encrypted, and the app can't change that. Your password is never sent, but use the app on your home network or through a VPN.
 
 The app is available in 25 languages. Apart from English and German, the translations are machine-generated, and corrections are very welcome.
 
@@ -309,7 +309,7 @@ Tvheadend Player
 Ein Tvheadend-Client für Android TV, gemacht für die Fernbedienung.
 ```
 
-**Full description** (3686/4000)
+**Full description** (3809/4000)
 
 ```text
 Tvheadend Player ist eine App für Android TV und Google TV: Live-TV, Programmführer und Aufnahmen von deinem eigenen Tvheadend-Server. Alles geht mit dem Steuerkreuz der Fernbedienung.
@@ -347,7 +347,7 @@ Gemacht für den Fernseher
 
 Die Einrichtung hat drei Schritte. Die App sucht zuerst nach Tvheadend-Servern in deinem lokalen Netzwerk; antwortet keiner, gibst du Adresse und HTSP-Port ein. Dann trägst du deinen Tvheadend-Benutzernamen und dein Passwort ein, und die App prüft die Verbindung, bevor sie etwas speichert.
 
-Datenschutz: keine Werbung, keine Analyse und kein Konto zum Anmelden. Serveradresse und Zugangsdaten bleiben auf dem Fernseher, das Passwort wird verschlüsselt gespeichert. Abgesehen von der Serversuche im lokalen Netzwerk bei der Einrichtung spricht die App nur mit deinem Tvheadend-Server. HTSP selbst ist nicht verschlüsselt, nutze es also im Heimnetz oder über ein VPN.
+Datenschutz: keine Werbung, keine Analyse und kein Konto zum Anmelden. Serveradresse und Zugangsdaten werden nur auf dem Fernseher gespeichert, das Passwort verschlüsselt. Abgesehen von der Serversuche im lokalen Netzwerk bei der Einrichtung spricht die App nur mit deinem Tvheadend-Server. HTSP, das eigene Protokoll von Tvheadend, ist nicht verschlüsselt, und die App kann daran nichts ändern. Dein Passwort wird nie übertragen, trotzdem nutzt du die App am besten im Heimnetz oder über ein VPN.
 
 Die App gibt es in 25 Sprachen. Außer Englisch und Deutsch sind die Übersetzungen maschinell erstellt; Korrekturen sind sehr willkommen.
 
@@ -627,8 +627,18 @@ See [owner decisions](#8-owner-decisions).
 
 ### 5.1 Reviewer instructions
 
-Paste into **App access → Any other instructions** (replace the two
-placeholders):
+**Sign-in details → Add details** has one free-text field, "Any other
+information required to access your app", limited to 500 characters, and
+reviewers can't contact you. Paste this there (470 characters plus the video
+link):
+
+```text
+Tvheadend Player is a client for Tvheadend, open-source TV server software that people run on their own hardware. The app has no content or account of its own: it needs the user's own Tvheadend server (4.3 with HTSP 36 or newer) on their network. We don't run a public server, because it would put live TV on the internet unencrypted. This video shows every screen of version 0.3.0 (162) on Google TV with a server: <VIDEO URL>
+Without a server, the app stays on its setup screens.
+```
+
+The longer text below is for an appeal or a reply to a rejection (replace the
+two placeholders):
 
 ```text
 Tvheadend Player is a client for Tvheadend, free and open-source TV server software that people run on their own hardware, such as a PC or NAS with a TV tuner. The app has no content, service or account of its own. Like an email app needs a mail server, it needs the user's own Tvheadend server on their network.
