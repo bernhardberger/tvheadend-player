@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-10-27
+Last updated: 2026-10-28
 
 This policy describes Tvheadend Player, an independent open-source Android TV
 client for Tvheadend servers. It is not an official Tvheadend application.
@@ -77,3 +77,6 @@ Keystore key, making any remaining encrypted password blob unusable.
 
 The app is open-source under GPLv3. Current source and privacy-policy changes
 are available at https://github.com/bernhardberger/tvheadend-player.
+
+For questions about this policy or a privacy concern, open an issue at
+https://github.com/bernhardberger/tvheadend-player/issues.
