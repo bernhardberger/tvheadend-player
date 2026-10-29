@@ -95,7 +95,9 @@ internal fun settingsRow(
                     .semantics { heading(); contentDescription = section })
         }
         ListItem(
-            selected = selected == true,
+            // The platform provider applies ListItem's Selected after ToggleableState.
+            // Keep both states aligned; selected/unselected row styling is already identical.
+            selected = checked ?: (selected == true),
             // Keep the last visible scope reachable even when its switch cannot be turned off.
             onClick = { if (enabled) activate() },
             headlineContent = { Text(title.annotated(), style = MaterialTheme.typography.titleMedium, maxLines = titleMaxLines, overflow = TextOverflow.Ellipsis) },

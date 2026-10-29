@@ -125,6 +125,8 @@ class SettingsDepthNavigationTest {
         val visibleToUser: Boolean,
         val bounds: android.graphics.Rect,
         val focused: Boolean,
+        val checkable: Boolean,
+        val checked: Boolean,
     )
 
     /**
@@ -146,7 +148,8 @@ class SettingsDepthNavigationTest {
                 val node = requireNotNull(provider.createAccessibilityNodeInfo(id))
                 val bounds = android.graphics.Rect()
                 node.getBoundsInScreen(bounds)
-                nodes += AccessibleNode(node.viewIdResourceName, node.isVisibleToUser, bounds, node.isFocused)
+                nodes += AccessibleNode(node.viewIdResourceName, node.isVisibleToUser, bounds, node.isFocused,
+                    node.isCheckable, node.isChecked)
                 repeat(node.childCount) { index ->
                     val packedId = childId.invoke(node, index) as Long
                     visit((packedId shr 32).toInt())
@@ -156,6 +159,99 @@ class SettingsDepthNavigationTest {
             return nodes
         } finally {
             if (previous == null) System.clearProperty(property) else System.setProperty(property, previous)
+        }
+    }
+
+    @Test fun autoplayAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("autoplay", downCount = 0)
+
+    @Test fun timeshiftAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("timeshift", downCount = 2)
+
+    @Test fun tunnelingAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("tunneling", downCount = 7)
+
+    @Test fun passthroughAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("audio-passthrough", 2, SettingsSection.AUDIO)
+
+    @Test fun audioDescriptionAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("audio-description", 3, SettingsSection.AUDIO)
+
+    @Test fun guideMenuAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("guide-menu", 2, SettingsSection.GENERAL)
+
+    @Test fun allChannelsAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("all-channels", 0, SettingsSection.CHANNEL_TAGS)
+
+    @Test fun channelTagAccessibilityCheckedStateTracksCenterAndReentry() =
+        switchAccessibilityCheckedStateTracksCenterAndReentry("1", 1, SettingsSection.CHANNEL_TAGS)
+
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+    private fun switchAccessibilityCheckedStateTracksCenterAndReentry(
+        rowId: String, downCount: Int, section: SettingsSection = SettingsSection.PLAYER,
+    ) {
+        var ui by mutableStateOf(SettingsPlayerUiState(autoStartPlayback = false, timeshiftEnabled = false,
+            tunnelingEnabled = false, audioPassthroughEnabled = false, audioDescription = false))
+        var settings by mutableStateOf(UiSettings(showEpgMenu = false))
+        var visibility by mutableStateOf(ChannelScopeVisibility(configured = true,
+            allChannelsVisible = rowId != "all-channels", visibleTagIds = setOf(ChannelTagId(2))))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                captureView = LocalView.current
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, section.name)
+                Box(Modifier.semantics { testTagsAsResourceId = true }) {
+                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                            settingsPlayerLevel(ui,
+                                onTimeshiftEnabledChanged = { ui = ui.copy(timeshiftEnabled = it) },
+                                onAutoStartPlaybackChanged = { ui = ui.copy(autoStartPlayback = it) },
+                                onTunnelingEnabledChanged = { ui = ui.copy(tunnelingEnabled = it) }),
+                            settingsAudioLevel(ui,
+                                onAudioPassthroughEnabledChanged = { ui = ui.copy(audioPassthroughEnabled = it) },
+                                onAudioDescriptionChanged = { ui = ui.copy(audioDescription = it) }),
+                            settingsChannelTagsLevel(listOf(
+                                ChannelTag.create(ChannelTagId(1), name = "Favorites", channelIds = emptyList()),
+                                ChannelTag.create(ChannelTagId(2), name = "Entertainment", channelIds = emptyList())),
+                                visibility, loaded = true, failed = false, onRetry = {}, onToggle = { tag ->
+                                    visibility = if (tag == null) visibility.copy(allChannelsVisible = !visibility.allChannelsVisible)
+                                    else visibility.copy(visibleTagIds = if (tag in visibility.visibleTagIds)
+                                        visibility.visibleTagIds - tag else visibility.visibleTagIds + tag)
+                                })) + settingsGeneralLevels(settings, AppLanguage.SYSTEM, CacheStatistics.EMPTY,
+                            CacheClearState.IDLE, onSelectLanguage = {},
+                            onToggleEpg = { settings = settings.copy(showEpgMenu = !settings.showEpgMenu) }, onClearCache = {}),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        press(Key.DirectionCenter)
+        repeat(downCount) { press(Key.DirectionDown) }
+        val tag = "settings-row-$rowId"
+        assertAccessibleSwitch(tag, checked = false)
+        press(Key.DirectionCenter)
+        assertAccessibleSwitch(tag, checked = true)
+        press(Key.Back)
+        compose.onNodeWithTag("settings-row-${section.name}").assertIsFocused()
+        press(Key.DirectionCenter)
+        assertAccessibleSwitch(tag, checked = true)
+        press(Key.DirectionCenter)
+        assertAccessibleSwitch(tag, checked = false)
+    }
+
+    private fun assertAccessibleSwitch(tag: String, checked: Boolean) {
+        compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed().let {
+            if (checked) it.assertIsOn() else it.assertIsOff()
+        }
+        compose.runOnIdle {
+            val matching = accessibilityNodes().filter { it.tag == tag }
+            assertEquals("Exactly one platform node must own $tag; focused=${matching.map { it.focused }}",
+                1, matching.size)
+            val node = matching.single()
+            assertTrue("$tag must own platform input focus", node.focused)
+            assertTrue("$tag must be visible", node.visibleToUser)
+            assertTrue("$tag must be checkable", node.checkable)
+            assertEquals("$tag platform checked state must match its switch", checked, node.checked)
         }
     }
 
