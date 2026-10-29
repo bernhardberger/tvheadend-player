@@ -71,17 +71,31 @@ class ChannelScheduleCaptureTest {
      * The README scene: Ridge Earth's schedule beside the playing picture at 20:15 on 2026-10-04, UTC, with Ridge
      * Light 20:00-21:00 and then Tide Watch, as on the other README screens. One full day repeats for a week.
      */
-    @Test fun presentation() {
+    @Test fun presentation() = presentationScene(store = false)
+
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storeSchedule() = presentationScene(store = true)
+
+    private fun presentationScene(store: Boolean) {
         images.install(FixtureArt.imageLoader(ApplicationProvider.getApplicationContext<Application>(), mapOf(
-            ArtworkId(1) to FixtureArt.picon("ridge-earth"),
-            ArtworkId(2) to FixtureArt.art("ridge-light"),
+            ArtworkId(1) to FixtureArt.picon(if (store) "harbor-lights" else "ridge-earth"),
+            ArtworkId(2) to FixtureArt.art(if (store) "harbor-lights-live" else "ridge-light"),
             ArtworkId(3) to FixtureArt.art("still-tide-watch"),
         )))
         val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
         val now = hour + 15 * 60
-        val channel = Channel.create(ChannelId(1), name = "Ridge Earth", number = 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
-        // Title, minutes after 20:00, length, genre and art: one full day from 18:00, so no gap shows.
-        val evening = listOf(
+        val channel = Channel.create(ChannelId(if (store) 7 else 1), name = if (store) "Harbor Lights" else "Ridge Earth",
+            number = if (store) 7 else 1, icon = ChannelIcon.ImageCache(ArtworkId(1)))
+        // Title, minutes after 20:00, length, genre and art: one full repeating day without gaps.
+        val evening = if (store) listOf(
+            listOf("Harbor Lights Live", -60, 180, "Music", ArtworkId(2)),
+            listOf("Backstage at the Harbor", 120, 60, "Music", null),
+            listOf("After the Encore", 180, 60, "Music", null),
+            listOf("Night Sessions", 240, 360, "Music", null),
+            listOf("The Morning Set", 600, 240, "Music", null),
+            listOf("Live from the Archive", 840, 300, "Music", null),
+            listOf("Soundcheck", 1140, 240, "Music", null),
+        ) else listOf(
             listOf("Foundry Hours", -120, 60, "Documentary", null),
             listOf("The Seedkeepers of Moss Lantern Valley", -60, 60, "Nature", null),
             listOf("Ridge Light", 0, 60, "Documentary", ArtworkId(2)),
@@ -104,7 +118,7 @@ class ChannelScheduleCaptureTest {
                     image = art as ArtworkId?)
             }
         }.filter { it.stop.epochSeconds > now }
-        val still = FixtureArt.art("still-ridge-light").asImageBitmap()
+        val still = FixtureArt.art(if (store) "still-harbor-lights-live" else "still-ridge-light").asImageBitmap()
         val session = FakeSessionObservation(SessionObservation.create(
             sessionState = SessionState.Ready(ServerCapabilities.create(streaming = CapabilityAccess.ALLOWED, dvrWrite = CapabilityAccess.ALLOWED)),
             channelState = ChannelRepositoryState.Current(ChannelCatalog.create(listOf(channel))),
@@ -122,7 +136,7 @@ class ChannelScheduleCaptureTest {
                         PlaybackOptionsOverlayFrame(panelWidth = 480.dp, showScrim = false) {
                             ChannelSchedule(channel, events, now, now, loading = false, offline = false, recording = { event ->
                                     // Tonight's Tide Watch is scheduled, as in the Guide.
-                                    DvrEntryState.SCHEDULED.takeIf { event.id == EventId(4) }
+                                    DvrEntryState.SCHEDULED.takeIf { !store && event.id == EventId(4) }
                                 }, onOpen = {}, onClose = {}, onRetry = {}, viewerBehindMs = 0)
                         }
                     }
@@ -132,7 +146,7 @@ class ChannelScheduleCaptureTest {
         compose.waitForIdle()
         compose.mainClock.advanceTimeBy(1500)
         compose.waitForIdle()
-        compose.onNodeWithText("Ridge Light", useUnmergedTree = true).assertExists()
+        compose.onNodeWithText(if (store) "Harbor Lights Live" else "Ridge Light", useUnmergedTree = true).assertExists()
         compose.runOnIdle {
             val root = requireNotNull(view).rootView
             val image = Bitmap.createBitmap(root.width, root.height, Bitmap.Config.ARGB_8888)
@@ -140,7 +154,7 @@ class ChannelScheduleCaptureTest {
             Assert.assertEquals(1920, image.width)
             Assert.assertEquals(1080, image.height)
             val output = File("build/outputs/presentation").apply { mkdirs() }
-            File(output, "player-schedule.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            File(output, if (store) "store-schedule.png" else "player-schedule.png").outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }
             image.recycle()
         }
     }

@@ -78,52 +78,59 @@ fictional content, not evidence of SurfaceView capture, decoding or response.
 
 ## Play Store candidate review
 
-Round 2 uses five store-specific scenes, captured by the same production
-composables as the README scenes. Run every affected fixture-consumer class:
+Round 3 retains the first four round-2 PNGs byte-for-byte and adds programme
+details and the player channel schedule. Keep `captures/play-store/round2/`
+with its manifest, first four plain PNGs, feature C, icon and banner. To recreate
+that baseline, use this document and the packager at commit `adbc9f2a` in a
+separate checkout; its instructions include the round-1 comparison prerequisite.
+No baseline images are tracked.
+
+Run both whole classes owning the new scenes, then package in the same checkout:
 
 ```bash
 ANDROID_HOME=/opt/android-sdk timeout --kill-after=5s 20m ./gradlew \
   :app:testPlayDebugUnitTest -Ptvhplayer.captureTests=all \
-  --tests '*.ChannelsLayoutCaptureTest' --tests '*.ChannelsLayoutFocusTest' \
-  --tests '*.CardGlowRoomTest' --tests '*.DrawerBackdropFadeTest' \
-  --tests '*.GuideVisualLayoutTest' --tests '*.RecordingsVisualLayoutTest' \
-  --tests '*.PlayerChromeCaptureTest' --console=plain --no-scan
+  --tests '*.ProgrammeDetailsCaptureTest' \
+  --tests '*.ChannelScheduleCaptureTest' --console=plain --no-scan
 python3 tools/prepare-play-assets.py
 ```
 
-Use `all`, not `only`: Guide and Recordings methods are not tagged as visual
-captures. Run the tests immediately before packaging in the same checkout;
-the script checks results but cannot establish source freshness from XML.
-It rejects failures and unexpected skips. The existing `pseudoArXb`
-assumption-skip for the known RTL airings-row defect is recorded separately;
-none of the five store methods may skip.
+Use `all`, not `only`: the details method is not tagged as a visual capture.
+Run the tests immediately before packaging; the script checks results but
+cannot establish source freshness from XML. Both whole classes must pass
+without skips. Retained frames carry their round-2 test evidence; they are
+not regenerated or described as newly tested.
 
-The scenes are `storeChannels` (Harbor Kickoff, recording), `storeGuide`
-(Northline Tonight, title-free studio backdrop), `storePlayer` (Harbor Lights
-Live, at live), `storeRecording` (Glass Harbor, saved progress), and
-`storeRecordingNow` (running match folder). All use English (US), font scale
-1.0 and the same fictional evening clock. Program and channel times agree
-across the scenes.
+The order is Channels (Harbor Kickoff, recording), Guide (Northline Tonight),
+Player (Harbor Lights Live), Recordings (Glass Harbor, saved progress), then:
 
-The script needs Python 3 and Pillow and uses the pinned Outfit font. It writes
-ignored `captures/play-store/round2/`: five plain 1920×1080 RGB PNGs, three
-1024×500 feature directions, the existing icon packaged as 512×512 RGBA,
-the unchanged 1280×720 banner, 960px-wide previews, 320px thumbnails and an
-image-embedded `review.html`. Plain screenshots preserve every RGB pixel.
-Only the promotional feature graphics crop the UI.
+- `ProgrammeDetailsCaptureTest.storeDetails`: Ion Frame's Ion Wake,
+  19:20–20:25; Watch focused. A title-free still leaves the native page text clear.
+- `ChannelScheduleCaptureTest.storeSchedule`: Harbor Lights Live, 19:00–22:00;
+  the on-air row focused over the same concert still as Player.
 
-The comparison requires the retained `captures/play-store/round1/previews/`
-baseline. To recreate that baseline in a separate checkout, use the presentation
-command and packager from commit `67581c81`; copy its ignored preview directory
-here before packaging round 2. No baseline images are tracked. The manifest
-records the source commit, tracked diff hash, tests, input hashes and every
-output file's SHA-256 except the manifest itself. Add the local report and
-review evidence before the final packaging pass so they are hashed too.
+All six use English (US), font scale 1.0 and the fictional evening clock
+2026-10-04 20:15 UTC. Recording now is omitted from this set.
+
+The script needs Python 3, Pillow and CairoSVG and uses the pinned Outfit font.
+It writes ignored `captures/play-store/round3/`: six plain 1920×1080 RGB PNGs,
+three 1024×500 C variations, the retained icon and banner, 960px-wide previews,
+320px thumbnails and an image-embedded `review.html`. The variations use the
+canonical symbol's paths and colours with its background omitted; the mark
+itself is unchanged. Their television screens contain complete app captures.
+Plain screenshots preserve every RGB pixel, without added frames or copy.
+
+Each feature is compared with round-2 C in the review. The packager verifies
+retained files against the round-2 manifest before copying. The new manifest
+records the source commit, tracked diff hash, new tests, inherited evidence,
+input hashes and every output file's SHA-256 except itself. Add the local report
+and review evidence before the final packaging pass so they are hashed too.
 
 These are candidates for owner selection, not uploaded assets. Keep at least one
 plain screenshot in a proposed listing set. TV-G4 requires an unaltered current
 TV-app screenshot; acceptance of offline fixture renders remains a submission
-question. The review includes Google rule citations and listing comparisons.
+question. The review includes Google rule citations; round 2 retains the listing
+comparisons that informed these directions.
 Only copy selected assets to `artwork/play/` after owner approval.
 
 ## Editorial use
