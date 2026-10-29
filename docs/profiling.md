@@ -38,28 +38,47 @@ debug signing key, is non-debuggable and shell-profileable. Do not uninstall or
 clear its app data; do not use a production-signed installation as the target.
 The target version must be installable as an update over the existing version.
 
-After the usual exact-target identity checks, run from the repository with JDK 21
-inside `android-emulator with-adb-tunnel`, which sets `ANDROID_SERIAL` and
-`ANDROID_ADB_SERVER_PORT` (for a directly connected device set `ANDROID_SERIAL`
-yourself):
+Do not run `./gradlew :app:generateBaselineProfile` inside the LXC119
+`with-adb-tunnel` lane. There the plugin cannot reach `emulator-5556`, runs no
+test, still reports `BUILD SUCCESSFUL`, and deletes both committed profile files.
+Instead, build the two APKs with Gradle outside the tunnel, then install and
+instrument them directly inside it:
 
 ```bash
-: "${ANDROID_SERIAL:?Set the explicit authorized device serial first}"
-umask 077
-mkdir -p build/profiling
-log=$(mktemp build/profiling/baseline-profile.XXXXXX.log)
-timeout --kill-after=5s 20m ./gradlew :app:generateBaselineProfile \
-  -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
-  -Ptvhplayer.captureTests=exclude --console=plain --no-scan >"$log" 2>&1
+./gradlew :app:assemblePlayNonMinifiedRelease \
+  :baselineprofile:assembleNonMinifiedRelease -Ptvhplayer.captureTests=exclude
 ```
 
-AGP's `leaveApksInstalledAfterRun` option preserves the target and its stored
-server profile after the run. Only Play generation is enabled. The plugin writes
-`app/src/main/generated/baselineProfiles/baseline-prof.txt` and `startup-prof.txt`;
-both shipping flavors consume them, and R8 maps them into the minified releases
-(`assets/dexopt/baseline.prof` and `baseline.profm`). Require all four named tests
-to pass; an ADB exit status alone is insufficient. Commit the regenerated text
-only for an authorized final generation, not a trial run.
+Inside the tunnel, after the usual exact-target identity check:
+
+1. Install `app/build/outputs/apk/play/nonMinifiedRelease/app-play-nonMinifiedRelease.apk`
+   (`-r`) and `baselineprofile/build/outputs/apk/nonMinifiedRelease/baselineprofile-nonMinifiedRelease.apk`
+   (`-r,-t`) with `android install --device "$ANDROID_SERIAL"`; compare each
+   installed APK's SHA-256 with the local file. Do not uninstall the target.
+2. Run the journeys with a per-run output directory under the instrumentation
+   package's media folder:
+
+   ```bash
+   timeout --kill-after=5s 30m adb shell am instrument -w -r \
+     -e class at.bernhardberger.tvhplayer.baselineprofile.PlayerBaselineProfile \
+     -e additionalTestOutputDir "$DIR" -e no-isolated-storage true \
+     at.bernhardberger.tvhplayer.baselineprofile/androidx.test.runner.AndroidJUnitRunner
+   ```
+
+   A full run of all four can exceed 20 minutes. One journey can be repeated on
+   its own with `-e class …PlayerBaselineProfile#startup04AutostartPlayback`.
+3. Require each of the four named tests to report status code 0, plus
+   `OK (n tests)`; an ADB exit status alone is insufficient. Then
+   `adb pull "$DIR"` and force-stop both packages.
+
+The committed profile is the union of the four pulled `*-startup-prof.txt`
+files: one line per rule signature with the union of its `H`, `S` and `P`
+flags, sorted, ending with a newline, written identically to
+`app/src/main/generated/baselineProfiles/baseline-prof.txt` and
+`startup-prof.txt`. Both shipping flavors consume them, and R8 maps them into
+the minified releases (`assets/dexopt/baseline.prof` and `baseline.profm`).
+Commit the regenerated text only for an authorized final generation, not a
+trial run, and time it on the G10 before release.
 
 Play applies the profile on install. A sideloaded install only gets it at the
 next background dexopt, so before timing a sideloaded build run the
