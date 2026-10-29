@@ -45,6 +45,16 @@ class ChannelsLayoutCaptureTest {
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentation() = presentation("channels", ChannelsView(), card(1))
 
+    /** Store lead: a live match, recording badge and the surrounding evening lineup. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun storeChannels() = atEvening {
+        fixture.show(ChannelsView(), fixture.fixtureArt(), presentation = true, recordingNow = 2, scheduledNext = 1)
+        fixture.awaitFocus(card(1))
+        fixture.key(Key.DirectionRight)
+        capture("store-channels", card(2), locale = "en-US", outputs = "build/outputs/presentation")
+    }
+
     /** The same evening as a grid with View options → Program art on, so the cards carry the program pictures. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])

@@ -78,32 +78,52 @@ fictional content, not evidence of SurfaceView capture, decoding or response.
 
 ## Play Store candidate review
 
-To generate the local Play Store comparison, run the capture command above with
-`-Ptvhplayer.captureTests=all`, then:
+Round 2 uses five store-specific scenes, captured by the same production
+composables as the README scenes. Run every affected fixture-consumer class:
 
 ```bash
+ANDROID_HOME=/opt/android-sdk timeout --kill-after=5s 20m ./gradlew \
+  :app:testPlayDebugUnitTest -Ptvhplayer.captureTests=all \
+  --tests '*.ChannelsLayoutCaptureTest' --tests '*.ChannelsLayoutFocusTest' \
+  --tests '*.CardGlowRoomTest' --tests '*.DrawerBackdropFadeTest' \
+  --tests '*.GuideVisualLayoutTest' --tests '*.RecordingsVisualLayoutTest' \
+  --tests '*.PlayerChromeCaptureTest' --console=plain --no-scan
 python3 tools/prepare-play-assets.py
 ```
 
-Use `all`, not `only`: Guide, details and Recordings presentation methods are not
-tagged as visual captures. The script checks for passing test results for each
-selected scene, but cannot establish source freshness. Run the tests immediately
-before packaging, in the same checkout. No test or fixture changes are needed for
-round 1.
+Use `all`, not `only`: Guide and Recordings methods are not tagged as visual
+captures. Run the tests immediately before packaging in the same checkout;
+the script checks results but cannot establish source freshness from XML.
+It rejects failures and unexpected skips. The existing `pseudoArXb`
+assumption-skip for the known RTL airings-row defect is recorded separately;
+none of the five store methods may skip.
+
+The scenes are `storeChannels` (Harbor Kickoff, recording), `storeGuide`
+(Northline Tonight, title-free studio backdrop), `storePlayer` (Harbor Lights
+Live, at live), `storeRecording` (Glass Harbor, saved progress), and
+`storeRecordingNow` (running match folder). All use English (US), font scale
+1.0 and the same fictional evening clock. Program and channel times agree
+across the scenes.
 
 The script needs Python 3 and Pillow and uses the pinned Outfit font. It writes
-ignored `captures/play-store/round1/`: eight plain 1920×1080 RGB PNGs, a matching
-captioned comparison set, three 1024×500 feature directions, the existing icon
-packaged as 512×512 RGBA, the unchanged 1280×720 banner, 960px-wide previews and
-an image-embedded `review.html`. The manifest records the source commit, tests,
-input hashes and every output file's SHA-256 except the manifest itself. The icon
-preview sits at native size on a 960px canvas. Plain screenshots preserve all RGB
-pixels; captioned versions scale the whole frame without cropping it.
+ignored `captures/play-store/round2/`: five plain 1920×1080 RGB PNGs, three
+1024×500 feature directions, the existing icon packaged as 512×512 RGBA,
+the unchanged 1280×720 banner, 960px-wide previews, 320px thumbnails and an
+image-embedded `review.html`. Plain screenshots preserve every RGB pixel.
+Only the promotional feature graphics crop the UI.
+
+The comparison requires the retained `captures/play-store/round1/previews/`
+baseline. To recreate that baseline in a separate checkout, use the presentation
+command and packager from commit `67581c81`; copy its ignored preview directory
+here before packaging round 2. No baseline images are tracked. The manifest
+records the source commit, tracked diff hash, tests, input hashes and every
+output file's SHA-256 except the manifest itself. Add the local report and
+review evidence before the final packaging pass so they are hashed too.
 
 These are candidates for owner selection, not uploaded assets. Keep at least one
 plain screenshot in a proposed listing set. TV-G4 requires an unaltered current
 TV-app screenshot; acceptance of offline fixture renders remains a submission
-question. The review includes current rule citations and generated-art provenance.
+question. The review includes Google rule citations and listing comparisons.
 Only copy selected assets to `artwork/play/` after owner approval.
 
 ## Editorial use

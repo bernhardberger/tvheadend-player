@@ -202,15 +202,20 @@ class PlayerChromeCaptureTest {
     /** The same moment with the channel rail open on the playing channel, its program above the cards. */
     @Test fun presentationRail() = presentation("player-rail", railOpen = true)
 
-    private fun presentation(name: String, railOpen: Boolean) {
+    /** Store player: a concert still and the production live controls at the same evening clock. */
+    @Test @Config(qualifiers = "en-rUS-w960dp-h540dp-land-xhdpi")
+    fun storePlayer() = presentation("store-player", railOpen = false, concert = true)
+
+    private fun presentation(name: String, railOpen: Boolean, concert: Boolean = false) {
         val hour = Instant.parse("2026-10-04T20:00:00Z").epochSeconds
         val now = hour + 15 * 60
-        val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage")
-        val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage")
+        val names = listOf("Ridge Earth", "Harbor Sport", "Northline News", "Kite Kids", "Ion Frame", "Amber Stage", "Harbor Lights")
+        val picons = listOf("ridge-earth", "harbor-sport", "northline-news", "kite-kids", "ion-frame", "amber-stage", "harbor-lights")
         // Title, art and minutes from 20:00, as in the Guide's README scene.
         val onAir = listOf(Triple("Ridge Light", "ridge-light", 0 to 60), Triple("Harbor Kickoff", "harbor-kickoff", -30 to 105),
             Triple("Northline Tonight", "northline-tonight", 0 to 45), Triple("Paper Kite Tales", "paper-kite-tales", 5 to 50),
-            Triple("Ion Wake", "ion-wake", -40 to 25), Triple("The Kettle Hour", "kettle-hour", -60 to 30))
+            Triple("Ion Wake", "ion-wake", -40 to 25), Triple("The Kettle Hour", "kettle-hour", -60 to 30),
+            Triple("Harbor Lights Live", "harbor-lights-live", -60 to 120))
         val lineUp = names.mapIndexed { index, name ->
             Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ChannelIcon.ImageCache(ArtworkId(201 + index)))
         }
@@ -220,15 +225,16 @@ class PlayerChromeCaptureTest {
                 subtitle = "Winter on the ridge".takeIf { index == 0 }, genre = "Documentary".takeIf { index == 0 },
                 summary = "Seasonal mountain light, forests and weather moving over a ridge.".takeIf { index == 0 })
         }
-        val next = EpgEvent.create(EventId(510), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
+        val playingIndex = if (concert) 6 else 0
+        val next = if (concert) null else EpgEvent.create(EventId(510), ChannelId(1), Instant.fromEpochSeconds(hour + 3600),
             Instant.fromEpochSeconds(hour + 7200), title = "Tide Watch")
         val app = ApplicationProvider.getApplicationContext<Application>()
         images.install(FixtureArt.imageLoader(app, buildMap {
             picons.forEachIndexed { index, name -> put(ArtworkId(201 + index), FixtureArt.picon(name)) }
             onAir.forEachIndexed { index, (_, art, _) -> put(ArtworkId(301 + index), FixtureArt.art(art)) }
         }))
-        val still = FixtureArt.art("still-ridge-light")
-        val programme = events[0]
+        val still = FixtureArt.art(if (concert) "still-harbor-lights-live" else "still-ridge-light")
+        val programme = events[playingIndex]
         lateinit var view: View
         var shown by mutableStateOf(false)
         compose.mainClock.autoAdvance = false
@@ -246,14 +252,16 @@ class PlayerChromeCaptureTest {
                             content = PlayerChromeContent(
                                 clock = formatClock(now),
                                 // Tide Watch is scheduled and Harbor Kickoff recording, as in the Guide.
-                                info = liveInfoBarData(app.resources, 1, "Ridge Earth", programme, next, nextScheduled = true,
+                                info = liveInfoBarData(app.resources, playingIndex + 1L, names[playingIndex], programme, next, nextScheduled = !concert,
                                     nowSec = now, unavailableTitle = "No program information"),
                                 state = playerStateCell(false),
                                 recordingNow = false,
-                                picon = ChannelIcon.ImageCache(ArtworkId(201)),
+                                picon = ChannelIcon.ImageCache(ArtworkId(201 + playingIndex)),
                                 artwork = programme.image,
                             ),
-                            window = ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
+                            window = if (concert) ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 75f / 180f,
+                                65f / 180f, 75f / 180f, 75f / 180f, true)
+                            else ProgrammeWindow(programme, Instant.fromEpochSeconds(now), 0.25f, 5f / 60f, 0.25f, 0.25f, true),
                             programme = programme, peek = !railOpen,
                             tray = if (railOpen) {
                                 { ProvideArtworkSession(session) { QuickZapTrayPreview(lineUp[0], programme, next, now,

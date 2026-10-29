@@ -279,12 +279,14 @@ internal class ChannelsLayoutFixture(private val compose: ComposeContentTestRule
             val title = firstTitle.takeIf { index == 0 } ?: (if (presentation && index == 1) "Harbor Kickoff" else null)
                 ?: (if (presentation && index == 7) "Stories by Lamplight" else null)
                 ?: LINE_UP[index].second ?: return@mapIndexedNotNull null
-            // The README scene puts Ridge Light at 20:00-21:00 under a 20:15 clock.
-            val switch = if (presentation && index == 0) now + 45 * 60 else now + (25 + index * 5) * 60
+            // The presentation lineup shares the Guide's 20:15 evening, including the running match.
+            val minutes = if (presentation) listOf(-15 to 45, -45 to 90, -15 to 30, -10 to 35,
+                -55 to 10, -75 to 15, -75 to 105).getOrNull(index) else null
+            val switch = now + (minutes?.second ?: (25 + index * 5)) * 60
             listOf(
                 EpgEvent.create(
                     id = EventId(channel.id.value * 100), channelId = channel.id,
-                    start = Instant.fromEpochSeconds(now - (if (presentation && index == 0) 15 else 10 + index * 7) * 60),
+                    start = Instant.fromEpochSeconds(now + (minutes?.first ?: -(10 + index * 7)) * 60),
                     stop = Instant.fromEpochSeconds(switch),
                     title = title,
                     // Only the first programme has a subtitle, as EIT supplies one beside the title.
