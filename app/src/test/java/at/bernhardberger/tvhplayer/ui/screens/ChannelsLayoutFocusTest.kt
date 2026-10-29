@@ -57,6 +57,25 @@ class ChannelsLayoutFocusTest {
     @get:Rule val compose = createComposeRule()
     private val fixture = ChannelsLayoutFixture(compose, images)
 
+    @Test fun channelTitlesFollowNumberVisibilityWithoutMovingFocus() {
+        fixture.show(ChannelsView(ChannelsLayout.LIST))
+        fixture.awaitFocus(row(1))
+        compose.onNode(row(1) and hasText("1 Ridge Earth")).assertExists()
+        try {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false }
+            compose.onNode(row(1) and hasText("Ridge Earth")).assertExists()
+            compose.onAllNodesWithText("1 Ridge Earth", useUnmergedTree = true).assertCountEquals(0)
+            fixture.awaitFocus(row(1))
+            fixture.key(Key.DirectionDown)
+            fixture.awaitFocus(row(2))
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            compose.onNode(row(1) and hasText("1 Ridge Earth")).assertExists()
+            fixture.awaitFocus(row(2))
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
+    }
+
     private val list = ChannelsView(ChannelsLayout.LIST)
     private val grid = ChannelsView(ChannelsLayout.GRID).toggledProgramArt()
     private val immersive = ChannelsView(ChannelsLayout.IMMERSIVE)

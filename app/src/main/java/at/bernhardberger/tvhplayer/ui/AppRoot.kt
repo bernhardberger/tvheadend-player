@@ -149,6 +149,14 @@ internal fun completeEnteringPlayerVisibility(
 ): Boolean = outcome != null && outcome != MainStartupPlaybackOutcome.RECOVERY &&
     requests.completePlayerVisibility(target, channelId, channelName)
 
+@Composable
+internal fun ApplyUiPresentationSettings(settings: UiSettings) {
+    LaunchedEffect(settings.clockFormat, settings.showChannelNumbers) {
+        AppClock.format = settings.clockFormat
+        at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = settings.showChannelNumbers
+    }
+}
+
 internal fun shouldShowMainNavigationRail(
     currentDestination: AppNavKey?,
     navigationStartDestination: AppNavKey?,
@@ -579,7 +587,7 @@ fun AppRoot(
     }
     val uiSettingsStore: UiSettingsStore = koinInject()
     val uiSettings by uiSettingsStore.settings.collectAsStateWithLifecycle(initialValue = UiSettings())
-    LaunchedEffect(uiSettings.clockFormat) { AppClock.format = uiSettings.clockFormat }
+    ApplyUiPresentationSettings(uiSettings)
     val profileOwner: AppProfileOwner = koinInject()
     val profileGeneration by profileOwner.configurationGeneration.collectAsStateWithLifecycle()
     val browseFailure = at.bernhardberger.tvhplayer.ui.components.rememberBrowseConnectionFailure(

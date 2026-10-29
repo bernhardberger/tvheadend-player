@@ -1,4 +1,6 @@
 <resources xmlns:tools="http://schemas.android.com/tools" tools:locale="en">
+    <string name="settings_channel_numbers">Channel numbers</string>
+    <string name="settings_channel_numbers_help">Turn off if your remote has no number keys</string>
     <string name="player_full_screen">Full screen</string>
     <string name="stop">Stop</string>
     <string name="warm_playback_setting">While browsing</string>

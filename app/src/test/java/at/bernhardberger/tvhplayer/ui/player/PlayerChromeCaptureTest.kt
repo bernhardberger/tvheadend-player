@@ -189,6 +189,15 @@ class PlayerChromeCaptureTest {
     /** The README scene: Ridge Light at 20:15 of 20:00-21:00 on 2026-10-04, ten minutes buffered, at live. */
     @Test fun presentation() = presentation("player", railOpen = false)
 
+    @Test fun presentationWithoutChannelNumbers() {
+        try {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false
+            presentation("player-no-numbers", railOpen = false)
+        } finally {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true
+        }
+    }
+
     /** The same moment with the channel rail open on the playing channel, its program above the cards. */
     @Test fun presentationRail() = presentation("player-rail", railOpen = true)
 

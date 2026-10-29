@@ -56,6 +56,7 @@ internal fun settingsGeneralLevels(
             }
         },
         onToggleEpg = { scope.launch { settingsStore.setShowEpgMenu(!settings.showEpgMenu) } },
+        onToggleChannelNumbers = { scope.launch { settingsStore.setShowChannelNumbers(!settings.showChannelNumbers) } },
         onClearCache = storageViewModel::clearCache,
         onSelectClockFormat = { format ->
             navigation.pop()
@@ -75,6 +76,7 @@ internal fun settingsGeneralLevels(
     onToggleEpg: () -> Unit,
     onClearCache: () -> Unit,
     onSelectClockFormat: (ClockFormat) -> Unit = {},
+    onToggleChannelNumbers: () -> Unit = {},
 ): List<DepthLevel> {
     val clockFormats = listOf(
         ClockFormat.SYSTEM to stringResource(R.string.language_follow_system),
@@ -100,6 +102,9 @@ internal fun settingsGeneralLevels(
                 clockFormats.first { it.first == settings.clockFormat }.second, child = CLOCK_FORMAT_LEVEL),
             settingsRow("guide-menu", stringResource(R.string.show_epg_menu),
                 checked = settings.showEpgMenu, onClick = onToggleEpg),
+            settingsRow("channel-numbers", stringResource(R.string.settings_channel_numbers),
+                supporting = stringResource(R.string.settings_channel_numbers_help),
+                checked = settings.showChannelNumbers, onClick = onToggleChannelNumbers),
             settingsRow("clear-cache", stringResource(R.string.clear_cache),
                 supporting = usage, announcement = announcement,
                 busy = clearState == CacheClearState.CLEARING,

@@ -172,6 +172,17 @@ class GuideRealisticSceneTest {
         TimeZone.setDefault(oldZone)
     }
 
+    @Test @org.junit.experimental.categories.Category(at.bernhardberger.tvhplayer.testutil.VisualCapture::class)
+    fun eveningLineupWithoutChannelNumbers() {
+        showAt("2026-09-15T19:40:00")
+        try {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false }
+            capture("guide-fixture-evening-no-numbers", numbersShown = false)
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
+    }
+
     @Test fun eveningLineupKeepsNumbersFallbackAndDpadFocusAccessible() {
         showAt("2026-09-15T19:40:00")
         capture("guide-fixture-evening-initial")
@@ -817,7 +828,7 @@ class GuideRealisticSceneTest {
         compose.onNodeWithTag("epg-channel-picon-6", useUnmergedTree = true).assertDoesNotExist()
     }
 
-    private fun capture(name: String) {
+    private fun capture(name: String, numbersShown: Boolean = true) {
         compose.waitForIdle()
         val headerGeometry = mutableListOf<String>()
         for (channel in channels) {
@@ -825,17 +836,25 @@ class GuideRealisticSceneTest {
             assertFalse("Channel headers remain nonfocusable", header.config.contains(SemanticsProperties.Focused))
             val number = compose.onNode(hasText(channel.number.toString()) and hasAnyAncestor(hasTestTag("epg-channel-header-${channel.id.value}")),
                 useUnmergedTree = true)
-            val layouts = mutableListOf<TextLayoutResult>()
-            number.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
-            assertFalse("Channel number ${channel.number} must not truncate", layouts.single().hasVisualOverflow)
-            assertFalse("Channel number ${channel.number} must not ellipsize", layouts.single().isLineEllipsized(0))
+            val numberBounds = if (numbersShown) {
+                val layouts = mutableListOf<TextLayoutResult>()
+                number.performSemanticsAction(SemanticsActions.GetTextLayoutResult) { it(layouts) }
+                assertFalse("Channel number ${channel.number} must not truncate", layouts.single().hasVisualOverflow)
+                assertFalse("Channel number ${channel.number} must not ellipsize", layouts.single().isLineEllipsized(0))
+                number.fetchSemanticsNode().boundsInRoot
+            } else {
+                number.assertDoesNotExist()
+                compose.onNodeWithTag("epg-channel-header-${channel.id.value}")
+                    .assertContentDescriptionEquals(channel.name.orEmpty())
+                null
+            }
             val logo = compose.onAllNodesWithTag("epg-channel-picon-${channel.id.value}", useUnmergedTree = true)
                 .fetchSemanticsNodes().singleOrNull()
             val label = compose.onAllNodes(hasText(channel.name.orEmpty()) and
                 hasAnyAncestor(hasTestTag("epg-channel-header-${channel.id.value}")), useUnmergedTree = true)
                 .fetchSemanticsNodes().singleOrNull()
             headerGeometry += "channel=${channel.number}; header=${header.boundsInRoot}; " +
-                "number=${number.fetchSemanticsNode().boundsInRoot}; logo=${logo?.boundsInRoot}; name=${label?.boundsInRoot}"
+                "number=$numberBounds; logo=${logo?.boundsInRoot}; name=${label?.boundsInRoot}"
         }
         val focus = compose.onNode(isFocused())
         focus.assertIsDisplayed().assertIsFocused()

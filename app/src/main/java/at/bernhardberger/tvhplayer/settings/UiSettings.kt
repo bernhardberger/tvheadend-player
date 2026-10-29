@@ -17,6 +17,7 @@ data class UiSettings(
     val recordingProfileId: DvrConfigId? = null,
     val channelsView: ChannelsView = ChannelsView(),
     val guideView: GuideView = GuideView(),
+    val showChannelNumbers: Boolean = true,
 )
 
 fun resolveEpgMenuVisibility(storedValue: Boolean?): Boolean = storedValue ?: true
@@ -28,6 +29,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         val SHOW_EPG_MENU = booleanPreferencesKey("showEpgMenu")
         val AUTO_START_PLAYBACK = booleanPreferencesKey("autoStartPlayback")
         val CLOCK_FORMAT = stringPreferencesKey("clockFormat")
+        val SHOW_CHANNEL_NUMBERS = booleanPreferencesKey("showChannelNumbers")
         val RECORDING_PROFILE = stringPreferencesKey("recordingProfile")
         val CHANNELS_LAYOUT = stringPreferencesKey("channelsLayout")
         fun channelsProgramArt(layout: ChannelsLayout) = booleanPreferencesKey("channelsProgramArt${layout.name}")
@@ -43,6 +45,7 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
             showEpgMenu = resolveEpgMenuVisibility(preferences[Keys.SHOW_EPG_MENU]),
             autoStartPlayback = resolvePlaybackAutoStart(preferences[Keys.AUTO_START_PLAYBACK]),
             clockFormat = resolveClockFormat(preferences[Keys.CLOCK_FORMAT]),
+            showChannelNumbers = preferences[Keys.SHOW_CHANNEL_NUMBERS] ?: true,
             recordingProfileId = preferences[Keys.RECORDING_PROFILE]?.takeIf(String::isNotBlank)?.let(::DvrConfigId),
             channelsView = resolveChannelsView(
                 preferences[Keys.CHANNELS_LAYOUT], { preferences[Keys.channelsChannelNames(it)] },
@@ -57,6 +60,10 @@ class UiSettingsStore(private val dataStore: DataStore<Preferences>) {
         dataStore.edit { preferences ->
             preferences[Keys.CLOCK_FORMAT] = format.name
         }
+    }
+
+    suspend fun setShowChannelNumbers(show: Boolean) {
+        dataStore.edit { it[Keys.SHOW_CHANNEL_NUMBERS] = show }
     }
 
     suspend fun setChannelsView(view: ChannelsView) {

@@ -1,11 +1,23 @@
 package at.bernhardberger.tvhplayer.settings
 
+import kotlinx.coroutines.flow.first
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class UiSettingsTest {
+    @Test fun channelNumbersDefaultToOnAndPersistAcrossStoreRecreation() = kotlinx.coroutines.test.runTest {
+        val data = InMemoryPreferencesDataStore()
+        val store = UiSettingsStore(data)
+        assertTrue(UiSettings().showChannelNumbers)
+        assertTrue(store.settings.first().showChannelNumbers)
+        store.setShowChannelNumbers(false)
+        assertFalse(UiSettingsStore(data).settings.first().showChannelNumbers)
+        store.setShowChannelNumbers(true)
+        assertTrue(UiSettingsStore(data).settings.first().showChannelNumbers)
+    }
+
     @Test
     fun epgMenu_isShownWhenNoPreferenceHasBeenSaved() {
         assertTrue(resolveEpgMenuVisibility(null))

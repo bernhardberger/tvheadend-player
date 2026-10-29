@@ -224,7 +224,8 @@ class SettingsVisualEvidenceTest {
         press(Key.DirectionUp)
         press(Key.DirectionCenter)
         // The German Guide toggle title wraps to a second line instead of being cut off.
-        if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 283f else 264f)
+        if (fontScale == 1f) assertRowTops(76f, 144f, 212f, if (locale == "de") 283f else 264f,
+            if (locale == "de") 360f else 332f)
         capture("$prefix-general")
         press(Key.DirectionDown)
         capture("$prefix-general-middle-focus", middleFocus = true)
@@ -237,6 +238,7 @@ class SettingsVisualEvidenceTest {
         press(Key.DirectionRight)
         capture("$prefix-clock-format")
         press(Key.Back)
+        press(Key.DirectionDown)
         press(Key.DirectionDown)
         press(Key.DirectionDown)
         val row = compose.onNodeWithText(cacheLabel)

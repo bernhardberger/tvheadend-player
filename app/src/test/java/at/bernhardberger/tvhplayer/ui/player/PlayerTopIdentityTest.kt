@@ -50,6 +50,32 @@ import org.robolectric.annotation.GraphicsMode
 class PlayerTopIdentityTest {
     @get:Rule val compose = createComposeRule()
 
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun hiddenChannelNumbersUpdateTheHeaderButNotDigitEntry() {
+        chrome(PlayerChromeMode.CONTROLS, extra = numberEntrySlot)
+        assertEquals(listOf("Channel 1 One"), identityDescription())
+        val numberedWidth = bounds("player-top-identity-name").width
+        try {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false }
+            settle()
+            // The visual text clears semantics to avoid duplicating the header's description.
+            assertTrue("The visible name loses the number prefix",
+                bounds("player-top-identity-name").width < numberedWidth)
+            assertEquals(listOf("Channel One"), identityDescription())
+            compose.runOnIdle { numberEntry = "12"; numberTarget = ChannelNumberTarget.Channel("12", "Twelve", null) }
+            settle()
+            compose.onNodeWithText("12", useUnmergedTree = true).assertExists()
+            compose.onNodeWithText("Twelve", useUnmergedTree = true).assertExists()
+            compose.onAllNodes(hasContentDescription("12, Twelve"), useUnmergedTree = true)
+                .fetchSemanticsNodes().let { assertTrue("Digit entry keeps its number announcement", it.isNotEmpty()) }
+            compose.runOnIdle { numberEntry = ""; at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            settle()
+            assertEquals(listOf("Channel 1 One"), identityDescription())
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
+    }
+
     @Test fun theIdentityStandsAtTheTopStartOnTheStripsAnchor() {
         chrome(PlayerChromeMode.CONTROLS)
         val name = bounds("player-top-identity-name")

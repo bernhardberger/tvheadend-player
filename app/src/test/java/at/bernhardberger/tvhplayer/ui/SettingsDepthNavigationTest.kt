@@ -188,6 +188,49 @@ class SettingsDepthNavigationTest {
     @Test fun guideMenuAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("guide-menu", 2, SettingsSection.GENERAL)
 
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+    @Test fun channelNumbersAreReachableAccessibleAndPersistAfterReopeningGeneral() {
+        val data = at.bernhardberger.tvhplayer.settings.InMemoryPreferencesDataStore()
+        var store by mutableStateOf(UiSettingsStore(data))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                captureView = LocalView.current
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.GENERAL.name)
+                val settings by store.settings.collectAsState(initial = UiSettings())
+                val scope = rememberCoroutineScope()
+                ApplyUiPresentationSettings(settings)
+                Box(Modifier.semantics { testTagsAsResourceId = true }) {
+                    SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false)) + settingsGeneralLevels(
+                        settings, AppLanguage.SYSTEM, CacheStatistics.EMPTY, CacheClearState.IDLE,
+                        onSelectLanguage = {}, onToggleEpg = {}, onClearCache = {},
+                        onToggleChannelNumbers = { scope.launch { store.setShowChannelNumbers(!settings.showChannelNumbers) } },
+                    ))
+                }
+            }
+        }
+        try {
+            compose.onNodeWithTag("settings-row-GENERAL").assertIsFocused()
+            press(Key.DirectionCenter)
+            repeat(3) { press(Key.DirectionDown) }
+            assertAccessibleSwitch("settings-row-channel-numbers", checked = true)
+            compose.onNodeWithText("Turn off if your remote has no number keys").assertExists()
+            press(Key.DirectionCenter)
+            assertAccessibleSwitch("settings-row-channel-numbers", checked = false)
+            assertFalse(runBlocking { UiSettingsStore(data).settings.first().showChannelNumbers })
+            compose.runOnIdle { assertFalse(at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown) }
+            press(Key.Back)
+            compose.onNodeWithTag("settings-row-GENERAL").assertIsFocused()
+            compose.runOnIdle { store = UiSettingsStore(data) }
+            press(Key.DirectionCenter)
+            assertAccessibleSwitch("settings-row-channel-numbers", checked = false)
+            press(Key.DirectionCenter)
+            assertAccessibleSwitch("settings-row-channel-numbers", checked = true)
+            assertTrue(runBlocking { UiSettingsStore(data).settings.first().showChannelNumbers })
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
+    }
+
     @Test fun allChannelsAccessibilityCheckedStateTracksCenterAndReentry() =
         switchAccessibilityCheckedStateTracksCenterAndReentry("all-channels", 0, SettingsSection.CHANNEL_TAGS)
 
@@ -1062,6 +1105,8 @@ class SettingsDepthNavigationTest {
         assertTrue(showGuide)
         press(Key.DirectionCenter)
         assertFalse(showGuide)
+        press(Key.DirectionDown)
+        compose.onNodeWithText("Channel numbers").assertIsFocused()
         press(Key.DirectionDown)
         compose.onNodeWithText("Clear cache").assertIsFocused()
         compose.onNodeWithText("0.0 MB in use").assertExists()

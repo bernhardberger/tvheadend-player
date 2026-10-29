@@ -27,12 +27,18 @@ import java.io.File
 /** Prototype review captures of each Channels layout, option and panel; static composition only. */
 @Category(VisualCapture::class)
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi")
+@Config(sdk = [34], application = Application::class, qualifiers = "en-w960dp-h540dp-land-mdpi",
+    instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 class ChannelsLayoutCaptureTest {
     @get:Rule val images = ImageLoaderRule()
     @get:Rule val compose = createComposeRule()
     private val fixture = ChannelsLayoutFixture(compose, images)
+
+    @org.junit.Before fun freezeSceneClock() {
+        // Match the presentation scene so captures compare channel titles, not wall-clock drift.
+        assertTrue(android.os.SystemClock.setCurrentTimeMillis(1_791_144_900_000L))
+    }
 
     /** The README scene: Immersive with the app's default view, Ridge Light on air under a 20:15 clock, xhdpi. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
@@ -49,6 +55,19 @@ class ChannelsLayoutCaptureTest {
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
         instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
     fun presentationList() = presentation("channels-list", ChannelsView(ChannelsLayout.LIST), row(1))
+
+    @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",
+        instrumentedPackages = ["at.bernhardberger.tvhplayer.ui.screens", "at.bernhardberger.tvhplayer.ui.common"])
+    fun presentationListWithoutChannelNumbers() = atEvening {
+        try {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false
+            fixture.show(ChannelsView(ChannelsLayout.LIST), fixture.fixtureArt(), presentation = true,
+                recordingNow = 2, scheduledNext = 1)
+            capture("channels-list-no-numbers", row(1), outputs = "build/outputs/presentation")
+        } finally {
+            at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true
+        }
+    }
 
     /** Immersive with program pictures switched off: how the screen looks when the guide has no art. */
     @Test @Config(qualifiers = "en-w960dp-h540dp-land-xhdpi",

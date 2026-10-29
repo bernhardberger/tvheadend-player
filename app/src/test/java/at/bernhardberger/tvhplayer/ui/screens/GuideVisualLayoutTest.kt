@@ -848,6 +848,46 @@ class GuideVisualLayoutTest {
         }
     }
 
+    @Test fun hiddenNumbersLeaveGuideLogosNamesAndUnnamedFallback() {
+        val channels = listOf(
+            Channel.create(ChannelId(1), name = "Ridge Earth", number = 1001, icon = ArtworkId(1)),
+            Channel.create(ChannelId(2), name = "Northline News", number = 4567),
+            Channel.create(ChannelId(3), name = "", number = 89),
+        )
+        val currentSession = headerSession()
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                Column {
+                    channels.forEach { channel ->
+                        Box(Modifier.height(guideTimelineRowHeight())) {
+                            ProvideArtworkSession(currentSession) {
+                                TimelineChannelHeader(channel, channel.number)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        try {
+            compose.onNodeWithText("1001", useUnmergedTree = true).assertExists()
+            compose.onNodeWithText("4567", useUnmergedTree = true).assertExists()
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false }
+            compose.onNodeWithText("1001", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithText("4567", useUnmergedTree = true).assertDoesNotExist()
+            compose.onNodeWithTag("epg-channel-picon-1", useUnmergedTree = true).assertExists()
+            compose.onNodeWithText("Northline News", useUnmergedTree = true).assertExists()
+            compose.onNodeWithText("89", useUnmergedTree = true).assertExists()
+            compose.onNodeWithTag("epg-channel-header-1").assertContentDescriptionEquals("Ridge Earth")
+            compose.onNodeWithTag("epg-channel-header-2").assertContentDescriptionEquals("Northline News")
+            compose.onNodeWithTag("epg-channel-header-3").assertContentDescriptionEquals("89")
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            compose.onNodeWithText("1001", useUnmergedTree = true).assertExists()
+            compose.onNodeWithText("4567", useUnmergedTree = true).assertExists()
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
+    }
+
     @Test fun adjacentProgrammeSurfacesKeepFourDpGapAndSymmetricTimelineInset() {
         val channel = Channel.create(ChannelId(1), name = "Northline News", number = 1)
         val requesters = mutableMapOf<EventId, FocusRequester>()

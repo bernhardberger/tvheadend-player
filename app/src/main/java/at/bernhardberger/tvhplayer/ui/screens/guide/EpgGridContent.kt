@@ -118,6 +118,7 @@ import at.bernhardberger.tvhplayer.ui.components.tabFocus
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
+import at.bernhardberger.tvhplayer.ui.components.channelTitleNumber
 import at.bernhardberger.tvhplayer.ui.components.RecordingStatusIndicator
 import at.bernhardberger.tvhplayer.ui.components.StatusIconSize
 import at.bernhardberger.tvhplayer.ui.screens.formatDateTime
@@ -473,6 +474,7 @@ internal fun TimelineChannelHeader(
 ) {
     val currentSession = LocalArtworkContext.current.currentSession
     var logoFailed by remember(channel.icon, currentSession) { mutableStateOf(false) }
+    val titleNumber = channelTitleNumber(number, channel.name.orEmpty())
     Surface(
         modifier = Modifier
             .width(GuideChannelWidth)
@@ -499,9 +501,9 @@ internal fun TimelineChannelHeader(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(TvSpacing8),
         ) {
-            if (number != null) {
+            if (titleNumber != null) {
                 Text(
-                    text = number.toString(),
+                    text = titleNumber.toString(),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
