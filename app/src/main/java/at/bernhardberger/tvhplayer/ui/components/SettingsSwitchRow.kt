@@ -3,6 +3,7 @@ package at.bernhardberger.tvhplayer.ui.components
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.role
@@ -10,6 +11,8 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.toggleableState
 import androidx.compose.ui.state.ToggleableState
 import androidx.tv.material3.ListItem
+import androidx.tv.material3.ListItemDefaults
+import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 
@@ -27,7 +30,13 @@ fun SettingsSwitchRow(
     supportingText: String? = null,
 ) {
     ListItem(
-        selected = false,
+        // Compose maps ListItem's Selected to platform checked, even for a Switch.
+        selected = checked,
+        colors = ListItemDefaults.colors(
+            // Checked is semantic state here, not the selected-container treatment.
+            selectedContainerColor = Color.Transparent,
+            selectedContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
         enabled = enabled,
         onClick = onClick,
         headlineContent = { Text(label) },

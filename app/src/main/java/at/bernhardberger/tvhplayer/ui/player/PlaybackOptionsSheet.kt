@@ -1101,7 +1101,13 @@ internal fun PlaybackOptionRow(
 ) {
     ListItem(
         enabled = enabled,
-        selected = selected,
+        // Compose maps ListItem's Selected to platform checked, even for a Switch.
+        selected = checked ?: selected,
+        colors = if (checked == null) ListItemDefaults.colors() else ListItemDefaults.colors(
+            // Preserve the unselected switch-row picture; choices keep their selected treatment.
+            selectedContainerColor = Color.Transparent,
+            selectedContentColor = MaterialTheme.colorScheme.onSurface,
+        ),
         onClick = onClick,
         headlineContent = {
             when {

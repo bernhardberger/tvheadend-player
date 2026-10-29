@@ -45,6 +45,13 @@ import org.robolectric.RuntimeEnvironment
 import at.bernhardberger.tvhplayer.ui.components.depth.*
 import at.bernhardberger.tvhplayer.ui.components.SideRail
 import at.bernhardberger.tvhplayer.ui.player.DebugVideoBackdrop
+import at.bernhardberger.tvhplayer.ui.player.PlaybackOptionsSheetContent
+import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
+import at.bernhardberger.tvhplayer.settings.AspectRatioMode
+import at.bernhardberger.tvhplayer.settings.ChannelsLayout
+import at.bernhardberger.tvhplayer.settings.ChannelsView
+import at.bernhardberger.tvhplayer.settings.GuideView
+import at.bernhardberger.tvhplayer.ui.screens.guide.GuideViewOptionsPanel
 import at.bernhardberger.tvhplayer.core.ChannelScopeVisibility
 import at.bernhardberger.tvhplayer.viewmodels.SettingsPlayerUiState
 import at.bernhardberger.tvheadend.sdk.core.ChannelTag
@@ -127,6 +134,7 @@ class SettingsDepthNavigationTest {
         val focused: Boolean,
         val checkable: Boolean,
         val checked: Boolean,
+        val selected: Boolean,
     )
 
     /**
@@ -149,7 +157,7 @@ class SettingsDepthNavigationTest {
                 val bounds = android.graphics.Rect()
                 node.getBoundsInScreen(bounds)
                 nodes += AccessibleNode(node.viewIdResourceName, node.isVisibleToUser, bounds, node.isFocused,
-                    node.isCheckable, node.isChecked)
+                    node.isCheckable, node.isChecked, node.isSelected)
                 repeat(node.childCount) { index ->
                     val packedId = childId.invoke(node, index) as Long
                     visit((packedId shr 32).toInt())
@@ -240,11 +248,15 @@ class SettingsDepthNavigationTest {
     }
 
     private fun assertAccessibleSwitch(tag: String, checked: Boolean) {
-        compose.onNodeWithTag(tag).assertIsFocused().assertIsDisplayed().let {
+        val matcher = if (tag == "stats") hasText("Stats for nerds") and isToggleable() else hasTestTag(tag)
+        compose.onNode(matcher).assertIsFocused().assertIsDisplayed().let {
             if (checked) it.assertIsOn() else it.assertIsOff()
         }
         compose.runOnIdle {
-            val matching = accessibilityNodes().filter { it.tag == tag }
+            val matching = accessibilityNodes().filter {
+                // Stats has one toggle and no tag; its label is a published child of the row.
+                if (tag == "stats") it.checkable else it.tag == tag
+            }
             assertEquals("Exactly one platform node must own $tag; focused=${matching.map { it.focused }}",
                 1, matching.size)
             val node = matching.single()
@@ -252,7 +264,118 @@ class SettingsDepthNavigationTest {
             assertTrue("$tag must be visible", node.visibleToUser)
             assertTrue("$tag must be checkable", node.checkable)
             assertEquals("$tag platform checked state must match its switch", checked, node.checked)
+            // Compose maps Selected to checked for non-Tab roles, not to platform isSelected.
+            assertFalse("$tag must not expose platform selection in addition to checked", node.selected)
         }
+        compose.onNode(matcher).let { if (checked) it.assertIsSelected() else it.assertIsNotSelected() }
+    }
+
+    @Test fun statsAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("stats")
+    @Test fun channelArtAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("channels-view-program-art")
+    @Test fun channelNamesAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("channels-view-channel-names")
+    @Test fun guideHeadlineAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("guide-view-headline")
+    @Test fun guideGenresAccessibilityCheckedStateTracksCenter() = panelSwitchAccessibility("guide-view-genre-colors")
+
+    private fun panelSwitchAccessibility(tag: String) {
+        showPanelSwitch(tag)
+        assertAccessibleSwitch(tag, checked = false)
+        press(Key.DirectionCenter)
+        assertAccessibleSwitch(tag, checked = true)
+        press(Key.DirectionUp)
+        press(Key.DirectionDown)
+        assertAccessibleSwitch(tag, checked = true)
+        press(Key.DirectionCenter)
+        assertAccessibleSwitch(tag, checked = false)
+    }
+
+    // Capture both on/off and focused/unfocused: selected styling must not tint an enabled switch row.
+    @Test fun statsSwitchVisualStates() = panelSwitchVisualStates("stats")
+    @Test fun channelArtSwitchVisualStates() = panelSwitchVisualStates("channels-view-program-art")
+    @Test fun channelNamesSwitchVisualStates() = panelSwitchVisualStates("channels-view-channel-names")
+    @Test fun guideHeadlineSwitchVisualStates() = panelSwitchVisualStates("guide-view-headline")
+    @Test fun guideGenresSwitchVisualStates() = panelSwitchVisualStates("guide-view-genre-colors")
+
+    private fun panelSwitchVisualStates(tag: String) {
+        showPanelSwitch(tag)
+        capture("d67-$tag-off-focused")
+        press(Key.DirectionCenter)
+        capture("d67-$tag-on-focused")
+        press(Key.DirectionUp)
+        capture("d67-$tag-on-unfocused")
+        press(Key.DirectionDown)
+        press(Key.DirectionCenter)
+        press(Key.DirectionUp)
+        capture("d67-$tag-off-unfocused")
+    }
+
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+    private fun showPanelSwitch(tag: String) {
+        var stats by mutableStateOf(false)
+        var channels by mutableStateOf(ChannelsView(layout = ChannelsLayout.GRID, programArt = emptySet()))
+        var guide by mutableStateOf(GuideView(headline = false, genreColors = false))
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                captureView = LocalView.current
+                Box(Modifier.fillMaxSize().semantics { testTagsAsResourceId = true }) {
+                    when {
+                        tag == "stats" -> PlaybackOptionsSheetContent(
+                            page = PlaybackOptionsPage.STATS, audioTracks = emptyList(), subtitleTracks = emptyList(),
+                            tracksResolving = false, aspectRatio = AspectRatioMode.FIT, statsVisible = stats,
+                            onPageChange = {}, onAudioTrackSelected = {}, onSubtitleTrackSelected = {},
+                            onAspectRatioChange = {}, onStatsVisibleChange = { stats = it })
+                        tag.startsWith("channels") -> ChannelsViewOptionsPanel(channels, { channels = it }, {})
+                        else -> GuideViewOptionsPanel(guide, { guide = it }, {})
+                    }
+                }
+            }
+        }
+        compose.waitForIdle()
+        val downCount = when (tag) {
+            "stats" -> 0
+            "channels-view-program-art" -> 1
+            "channels-view-channel-names", "guide-view-headline" -> 2
+            else -> 3
+        }
+        if (tag.startsWith("channels")) {
+            assertAccessibleChoice("channels-view-layout-grid", selected = true)
+            assertAccessibleChoice("channels-view-layout-list", selected = false)
+        } else if (tag.startsWith("guide")) {
+            assertAccessibleChoice("guide-view-rows-regular", selected = true)
+            assertAccessibleChoice("guide-view-rows-dense", selected = false)
+        }
+        repeat(downCount) { press(Key.DirectionDown) }
+    }
+
+    private fun assertAccessibleChoice(tag: String, selected: Boolean) {
+        compose.onNodeWithTag(tag).let { if (selected) it.assertIsSelected() else it.assertIsNotSelected() }
+        compose.runOnIdle {
+            val matching = accessibilityNodes().filter { it.tag == tag }
+            assertEquals("Exactly one platform node must own $tag", 1, matching.size)
+            val node = matching.single()
+            assertTrue(node.visibleToUser)
+            assertTrue(node.checkable)
+            assertEquals("$tag retains native checked state for its choice", selected, node.checked)
+            assertFalse("$tag is a choice, not a platform-selected Tab", node.selected)
+        }
+    }
+
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+    @Test fun settingsRadioAccessibilitySelectionIsUnchanged() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                captureView = LocalView.current
+                Box(Modifier.semantics { testTagsAsResourceId = true }) {
+                    val navigation = rememberDepthNavigationState(WARM_PLAYBACK_LEVEL)
+                    SettingsScreenNavigation(navigation, listOf(settingsWarmPlaybackLevel(WarmPlaybackMode.ON) {}))
+                }
+            }
+        }
+        assertAccessibleChoice("settings-row-ON", selected = true)
+        assertAccessibleChoice("settings-row-AUDIO_ONLY", selected = false)
+        press(Key.DirectionDown)
+        compose.onNodeWithTag("settings-row-AUDIO_ONLY").assertIsFocused()
+        assertAccessibleChoice("settings-row-ON", selected = true)
+        assertAccessibleChoice("settings-row-AUDIO_ONLY", selected = false)
     }
 
     @Test fun browsingChoiceUsesCurrentSelectionCommitsOnlyOnOkAndRestoresParent() {
