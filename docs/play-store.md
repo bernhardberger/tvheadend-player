@@ -244,51 +244,36 @@ Tvheadend Player
 A Tvheadend client for Android TV, built around the remote.
 ```
 
-**Full description** (3393/4000)
+**Full description** (1269/4000)
 
 ```text
-Tvheadend Player is an Android TV and Google TV app for live TV, the program guide and the recordings on your own Tvheadend server. You can do all of it with the D-pad.
+Tvheadend Player is an Android TV and Google TV app for live TV, the program guide and recordings from your own Tvheadend server. Everything works with the remote's D-pad.
 
-It isn't an official Tvheadend app and isn't affiliated with or endorsed by the Tvheadend project. The app has no channels of its own: everything you watch comes from your server.
-
-What you need
-• Your own Tvheadend server that the TV can reach over HTSP, Tvheadend's streaming protocol. It has to speak HTSP 36 or newer, which means a recent Tvheadend 4.3 development build. 4.2 is too old, and the app tells you if your server is.
-• An Android TV or Google TV device on Android 9 or newer, and its remote. Phones and tablets aren't supported.
+It's an independent app, not an official Tvheadend product, and it has no channels of its own. You need a Tvheadend 4.3 server that your TV can reach.
 
 Live TV
-• Switch channels with channel up and down, from the channel list under the player controls, or by typing a channel number.
-• Pause and rewind live TV, if your server has a timeshift buffer.
-• Open the playing channel's schedule next to the picture.
-• Pick audio and subtitle tracks, DVB and teletext subtitles included, and set your preferred languages.
+• Change channels with channel up and down, from the channel list, or by typing the number
+• Pause and rewind live TV if your server has timeshift turned on
+• See the channel's schedule next to the picture
+• Pick audio and subtitle tracks, DVB and teletext subtitles included
 
 Channels and guide
-• Browse channels as big picture cards, a grid or a list, with what's on now.
-• A widescreen guide with a headline for the focused program, genre colors and a genre filter.
-• One details page for every program. Watch, watch from the start, record or cancel a recording right from the guide.
+• Browse channels as big cards, a grid or a list
+• A full program guide with genre colors and a genre filter
+• One details page for every program: watch, watch from the start or record
 
 Recordings
-• Your server's folders, plus a Recording now folder for whatever is being recorded at the moment.
-• Pick up where you stopped, mark recordings watched, record, stop a running recording and delete.
-• See how much recording space is left on the server.
-
-What you can do, recording for example, depends on the permissions of your Tvheadend account.
+• Your server's folders, with resume, watched marks and delete
+• See how much recording space is left
 
 Made for the TV
-• The screens are built from Google's Material Design for TV components.
-• Live TV keeps playing behind the menus while you browse, with the picture or with just the sound.
-• SD channels show at 16:9 or 4:3 the way a TV shows them, and you can pick the format for a single channel.
-• On Android 11 and newer, the app can switch the TV to the frame rate Tvheadend reports for the channel.
-• Audio passthrough is on by default, so surround sound reaches your soundbar or receiver unchanged.
+• Built with Google's Material Design for TV
+• Live TV keeps playing while you browse the menus
+• Surround sound passes through to your soundbar or receiver
 
-Setup takes three steps. The app first looks for Tvheadend servers on your local network; if none answers, you type in the address and HTSP port. Then you enter your Tvheadend username and password, and the app tests the connection before it saves anything.
+No ads, no analytics, no account to sign up for.
 
-Privacy: no ads, no analytics and no account to sign up for. Your server address and login are saved only on the TV, and the password is stored encrypted. Apart from the server search on your local network during setup, the app only talks to your Tvheadend server. HTSP, Tvheadend's own protocol, isn't encrypted, and the app can't change that. Your password is never sent, but use the app on your home network or through a VPN.
-
-The app is available in 25 languages. Apart from English and German, the translations are machine-generated, and corrections are very welcome.
-
-Tvheadend Player is open source under the GNU GPL v3, and every release comes with its source code: github.com/bernhardberger/tvheadend-player. It started as a fork of tvhstream by Preclikos.
-
-The app is still in active development. If something doesn't work or looks off, please open an issue on GitHub.
+Open source under the GNU GPL v3, with the source code for every release: github.com/bernhardberger/tvheadend-player
 ```
 
 ### 2.2 German (de-DE)
@@ -309,51 +294,36 @@ Tvheadend Player
 Ein Tvheadend-Client für Android TV, gemacht für die Fernbedienung.
 ```
 
-**Full description** (3809/4000)
+**Full description** (1384/4000)
 
 ```text
 Tvheadend Player ist eine App für Android TV und Google TV: Live-TV, Programmführer und Aufnahmen von deinem eigenen Tvheadend-Server. Alles geht mit dem Steuerkreuz der Fernbedienung.
 
-Die App ist keine offizielle Tvheadend-App und steht in keiner Verbindung zum Tvheadend-Projekt, das sie auch nicht unterstützt oder empfiehlt. Sie bringt keine eigenen Sender mit: Alles, was du siehst, kommt von deinem Server.
-
-Was du brauchst
-• Einen eigenen Tvheadend-Server, den der Fernseher über HTSP erreicht, das Streaming-Protokoll von Tvheadend. Er muss HTSP 36 oder neuer sprechen, also ein aktueller Entwicklungsstand von Tvheadend 4.3 sein. 4.2 ist zu alt, und die App sagt dir, wenn dein Server zu alt ist.
-• Ein Android-TV- oder Google-TV-Gerät ab Android 9 und seine Fernbedienung. Smartphones und Tablets werden nicht unterstützt.
+Die App ist unabhängig, keine offizielle Tvheadend-App, und bringt keine eigenen Sender mit. Du brauchst einen Tvheadend-4.3-Server, den dein Fernseher erreicht.
 
 Live-TV
-• Sender wechseln mit Programm auf und ab, aus der Senderliste unter der Player-Steuerung oder durch Eintippen der Sendernummer.
-• Live-TV anhalten und zurückspulen, wenn dein Server einen Timeshift-Puffer hat.
-• Das Programm des laufenden Senders neben dem Bild öffnen.
-• Ton- und Untertitelspuren wählen, auch DVB- und Videotext-Untertitel, und deine bevorzugten Sprachen festlegen.
+• Sender wechseln mit Programm auf und ab, aus der Senderliste oder durch Eintippen der Nummer
+• Live-TV anhalten und zurückspulen, wenn dein Server Timeshift eingeschaltet hat
+• Das Programm des Senders neben dem Bild sehen
+• Ton- und Untertitelspuren wählen, auch DVB- und Videotext-Untertitel
 
 Sender und Programmführer
-• Sender als große Bildkarten, als Raster oder als Liste durchsehen, mit dem, was gerade läuft.
-• Ein Programmführer im Breitformat mit einer Kopfzeile für die markierte Sendung, Genrefarben und einem Genrefilter.
-• Eine Detailseite für jede Sendung. Ansehen, von Anfang an ansehen, aufnehmen oder eine Aufnahme abbrechen, direkt aus dem Programmführer.
+• Sender als große Karten, als Raster oder als Liste durchsehen
+• Ein vollständiger Programmführer mit Genrefarben und Genrefilter
+• Eine Detailseite für jede Sendung: ansehen, von Anfang an ansehen oder aufnehmen
 
 Aufnahmen
-• Die Ordner deines Servers und ein Ordner „Laufende Aufnahmen“ für alles, was im Moment aufgenommen wird.
-• Dort weiterschauen, wo du aufgehört hast, Aufnahmen als gesehen markieren, aufnehmen, eine laufende Aufnahme stoppen und löschen.
-• Sehen, wie viel Aufnahmeplatz auf dem Server frei ist.
-
-Was du tun kannst, zum Beispiel aufnehmen, hängt von den Rechten deines Tvheadend-Kontos ab.
+• Die Ordner deines Servers, mit Weiterschauen, Gesehen-Markierungen und Löschen
+• Sehen, wie viel Aufnahmeplatz noch frei ist
 
 Gemacht für den Fernseher
-• Die Bildschirme bestehen aus Googles Material-Design-Komponenten für TV.
-• Live-TV läuft hinter den Menüs weiter, während du stöberst, mit Bild oder nur mit Ton.
-• SD-Sender erscheinen in 16:9 oder 4:3, so wie ein Fernseher sie zeigt, und du kannst das Format für einzelne Sender festlegen.
-• Ab Android 11 kann die App den Fernseher auf die Bildrate umschalten, die Tvheadend für den Sender meldet.
-• Audio-Passthrough ist standardmäßig an, damit Raumklang unverändert bei Soundbar oder Receiver ankommt.
+• Gebaut mit Googles Material Design für TV
+• Live-TV läuft weiter, während du durch die Menüs gehst
+• Raumklang geht unverändert an Soundbar oder Receiver
 
-Die Einrichtung hat drei Schritte. Die App sucht zuerst nach Tvheadend-Servern in deinem lokalen Netzwerk; antwortet keiner, gibst du Adresse und HTSP-Port ein. Dann trägst du deinen Tvheadend-Benutzernamen und dein Passwort ein, und die App prüft die Verbindung, bevor sie etwas speichert.
+Keine Werbung, keine Analyse, kein Konto zum Anmelden.
 
-Datenschutz: keine Werbung, keine Analyse und kein Konto zum Anmelden. Serveradresse und Zugangsdaten werden nur auf dem Fernseher gespeichert, das Passwort verschlüsselt. Abgesehen von der Serversuche im lokalen Netzwerk bei der Einrichtung spricht die App nur mit deinem Tvheadend-Server. HTSP, das eigene Protokoll von Tvheadend, ist nicht verschlüsselt, und die App kann daran nichts ändern. Dein Passwort wird nie übertragen, trotzdem nutzt du die App am besten im Heimnetz oder über ein VPN.
-
-Die App gibt es in 25 Sprachen. Außer Englisch und Deutsch sind die Übersetzungen maschinell erstellt; Korrekturen sind sehr willkommen.
-
-Tvheadend Player ist Open Source unter der GNU GPL v3, und zu jeder Version gibt es den Quellcode: github.com/bernhardberger/tvheadend-player. Die App ist als Fork von tvhstream von Preclikos entstanden.
-
-Die App ist noch in aktiver Entwicklung. Wenn etwas nicht funktioniert oder seltsam aussieht, eröffne bitte ein Issue auf GitHub.
+Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com/bernhardberger/tvheadend-player
 ```
 
 ### 2.3 Release notes
@@ -547,9 +517,7 @@ deletion questions
 (<https://support.google.com/googleplay/android-developer/answer/13327111>).
 
 What the app does (evidence: `privacy-policy.md`, the merged manifest,
-`images/TvheadendArtworkLoader.kt`, SDK 0.36.0 `ArtworkId.parse`, which refuses
-external `http(s)` image URLs so artwork comes only from the server's image
-cache over HTSP):
+`images/TvheadendArtworkLoader.kt`, `images/RemoteLogoCache.kt`):
 
 - It stores host, port, username and password on the TV; the password is
   encrypted with AES-GCM under a non-exportable Android Keystore key.
@@ -557,6 +525,11 @@ cache over HTSP):
   itself, to the server the user configured, over HTSP, which is unencrypted
   TCP.
 - It searches the local network with mDNS during setup.
+- It loads channel and tag logos that the server lists as web addresses from
+  those hosts, which see the TV's IP address and the app's name and version.
+  The app doesn't use or keep those IP addresses, and Google says to declare IP
+  addresses by how they're used (FAQ on the same page), so this adds no data
+  type.
 - The developer receives nothing; there is no analytics, ads, crash reporting
   or account with us.
 

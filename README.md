@@ -56,8 +56,8 @@ and decoders. A mobile version might come later, but the TV comes first.
 ## What you need
 
 - A Tvheadend server the TV can reach over HTSP, Tvheadend's streaming protocol.
-  It has to speak HTSP 36 or newer, which means a recent Tvheadend 4.3
-  development build. 4.2 is too old, and the app tells you if your server is.
+  It has to speak HTSP 36 or newer, which means Tvheadend 4.3. 4.2 is too old,
+  and the app tells you if your server is.
 - An Android TV or Google TV device on Android 9 or newer.
 - The TV's remote. Phones and tablets aren't supported.
 
