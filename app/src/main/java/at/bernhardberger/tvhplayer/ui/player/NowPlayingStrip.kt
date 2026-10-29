@@ -33,6 +33,7 @@ import at.bernhardberger.tvheadend.sdk.core.EpgEvent
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackIndicator
 import at.bernhardberger.tvhplayer.ui.components.ChannelPlaybackMarker
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.ui.components.ProgressStrip
 import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvhplayer.ui.components.progressColor
@@ -91,7 +92,7 @@ internal val NowPlayingPlateWidth = 48.dp
 internal val NowPlayingPlateHeight = 27.dp
 
 /**
- * The playing channel's logo plate, or its number without a logo. The plate carries [strip], the
+ * The playing channel's logo plate, or its number/placeholder without a logo. The plate carries [strip], the
  * progress strip; without it the strip would float under the logo. [contentAlpha] dims only the mark.
  */
 @Composable
@@ -105,7 +106,7 @@ internal fun NowPlayingPlate(
     Box(modifier.size(NowPlayingPlateWidth, NowPlayingPlateHeight).clip(PlayerChromeTokens.chipShape)
         .background(TvSurfaceColors.containerLowest), contentAlignment = Alignment.Center) {
         val mark = if (contentAlpha < 1f) Modifier.graphicsLayer { alpha = contentAlpha } else Modifier
-        if (picon != null) PiconBox(picon, mark.padding(3.dp))
+        if (picon != null || !AppChannelNumbers.shown) PiconBox(picon, mark.padding(3.dp))
         else Text(channelNumber.orEmpty(), mark, style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface, maxLines = 1)
         strip()

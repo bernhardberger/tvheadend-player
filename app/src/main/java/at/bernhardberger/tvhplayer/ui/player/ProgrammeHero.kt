@@ -24,6 +24,7 @@ import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.R
 import at.bernhardberger.tvhplayer.ui.TvSurfaceColors
 import at.bernhardberger.tvhplayer.ui.components.PiconBox
+import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.ui.components.rememberChannelAccent
 import coil3.compose.SubcomposeAsyncImage
 
@@ -57,6 +58,8 @@ fun ProgrammeHero(
                     if (picon != null && currentSession != null) {
                         // On its own colour's gradient, so no ground to ink it for.
                         PiconBox(picon, Modifier.fillMaxSize(), ground = null)
+                    } else if (!AppChannelNumbers.shown) {
+                        PiconBox(null, Modifier.fillMaxSize(), ground = null)
                     } else Text(channelNumber.ifBlank { stringResource(R.string.player_channel) },
                         style = if (compact) MaterialTheme.typography.labelMedium else MaterialTheme.typography.headlineSmall,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,

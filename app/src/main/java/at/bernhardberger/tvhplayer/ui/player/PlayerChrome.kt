@@ -38,6 +38,7 @@ import at.bernhardberger.tvhplayer.ui.components.channelTitleText
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvhplayer.ui.components.LocalArtworkContext
+import at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers
 import at.bernhardberger.tvhplayer.core.AppArtworkSource
 import at.bernhardberger.tvhplayer.core.PlaybackOptionsPage
 import at.bernhardberger.tvhplayer.core.PlayerStateCell
@@ -351,6 +352,8 @@ private fun ChannelArtworkFallback(
         if (picon != null && currentSession != null) {
             // On its own colour's gradient, so no ground to ink it for.
             PiconBox(picon, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), ground = null)
+        } else if (!AppChannelNumbers.shown) {
+            PiconBox(null, Modifier.padding(horizontal = 24.dp, vertical = 16.dp), ground = null)
         } else Text(channelNumber, style = MaterialTheme.typography.headlineMedium, maxLines = 1,
             color = MaterialTheme.colorScheme.onSurface)
     }

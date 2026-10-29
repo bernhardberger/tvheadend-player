@@ -19,6 +19,8 @@ import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.isFocusable
 import androidx.compose.ui.test.isFocused
@@ -255,6 +257,31 @@ class PlayerTopIdentityTest {
         settle()
         assertEquals("the Banner's timeline row ends on the bottom margin", 540f - 28f,
             bounds("player-timeline-labels").bottom, 0.5f)
+    }
+
+    @Test @GraphicsMode(GraphicsMode.Mode.NATIVE)
+    fun noLogoInfoArtworkFollowsNumberVisibility() {
+        try {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            chrome(PlayerChromeMode.CONTROLS)
+            val number = hasText("1") and hasAnyAncestor(hasTestTag("player-info-artwork-fallback"))
+            compose.onNode(number, useUnmergedTree = true).assertExists()
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false }
+            settle()
+            compose.onNode(number, useUnmergedTree = true).assertDoesNotExist()
+            val bitmap = compose.onNodeWithTag("player-info-artwork-fallback", useUnmergedTree = true)
+                .captureToImage().asAndroidBitmap()
+            val directory = java.io.File("build/outputs/channel-number-fallbacks").apply { mkdirs() }
+            java.io.File(directory, "player-info-artwork-off.png").outputStream().use {
+                bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it)
+            }
+            bitmap.recycle()
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            settle()
+            compose.onNode(number, useUnmergedTree = true).assertExists()
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
     }
 
     /** Real text metrics at font scale 1.0: the info bar's geometry is the fonts' own. */

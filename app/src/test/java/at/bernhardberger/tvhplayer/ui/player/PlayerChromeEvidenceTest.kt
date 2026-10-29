@@ -243,6 +243,38 @@ class PlayerChromeEvidenceTest {
         compose.onNodeWithText("Channel", useUnmergedTree = true).assertExists()
     }
 
+    @Test fun noLogoNowPlayingPlateFollowsNumberVisibility() = assertNoLogoNumberVisibility("now-playing-plate") {
+        NowPlayingStrip(ChannelId(101), "101", "Ridge Earth HD", null, null, 0L)
+    }
+
+    @Test fun noLogoProgrammeHeroFollowsNumberVisibility() = assertNoLogoNumberVisibility("programme-hero") {
+        ProgrammeHero(null, ChannelId(101), "101", null, Modifier.size(400.dp, 225.dp))
+    }
+
+    private fun assertNoLogoNumberVisibility(name: String, content: @Composable () -> Unit) {
+        lateinit var view: View
+        try {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            compose.setContent { TVHeadendPlayerTheme {
+                view = LocalView.current
+                Box(Modifier.fillMaxSize().background(TvSurfaceColors.containerLowest).padding(48.dp)) { content() }
+            } }
+            compose.onNodeWithText("101", useUnmergedTree = true).assertExists()
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = false }
+            compose.waitForIdle()
+            compose.onNodeWithText("101", useUnmergedTree = true).assertDoesNotExist()
+            val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+            compose.runOnIdle { view.draw(Canvas(bitmap)) }
+            val directory = File("build/outputs/channel-number-fallbacks").apply { mkdirs() }
+            File(directory, "$name-off.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            bitmap.recycle()
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+            compose.onNodeWithText("101", useUnmergedTree = true).assertExists()
+        } finally {
+            compose.runOnIdle { at.bernhardberger.tvhplayer.ui.components.AppChannelNumbers.shown = true }
+        }
+    }
+
     @Test fun recordedAndUnnumberedIdentityHaveNoNextOrNowAndUseSpokenWords() {
         compose.setContent { TVHeadendPlayerTheme {
             InfoBar(info(true).copy(channelNumber = ""), Modifier.fillMaxWidth().testTag("bar"))
