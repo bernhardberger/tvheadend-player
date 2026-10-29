@@ -332,7 +332,7 @@ Saved as a draft on the default (en-US) listing. The files come from branch
 | Android TV screenshots, in order | `plain/01-channels.png`, `02-guide.png`, `03-player.png`, `04-recording.png`, `05-details.png`, `06-schedule.png` |
 | TV banner | `banner/current.png` |
 | Phone screenshots | none |
-| 10-inch tablet screenshots | `01-channels.png`, `02-guide.png`. A full save needs two phone or tablet screenshots until Android TV is opted in, and the opt-in needs a fully saved listing, so these break the loop. Try removing them once TV is approved |
+| 10-inch tablet screenshots | `01-channels.png`, `02-guide.png`. A full save needs two phone or tablet screenshots, and the Android TV opt-in needs a fully saved listing, so these break the loop. After the opt-in (2026-10-29) Console still refuses to save without them ("Upload at least 2 phone or tablet screenshots"). Try again once TV is approved. Android XR has no opt-out in Console; the leanback requirement keeps phones and headsets from installing |
 | AI asset declaration | "Don't label assets" (owner, 2026-10-29): fictional sample art inside app screens, not depicting anything real |
 | Video | none yet, see [5.2](#52-demo-video-shot-list) |
 
