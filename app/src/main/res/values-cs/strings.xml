@@ -113,6 +113,8 @@
     <string name="epg_next">Dále %1$s</string>
     <string name="select_channel_hint">Podrobnosti zobrazíš výběrem kanálu vlevo.</string>
     <string name="settings_general">Obecné</string>
+    <string name="settings_channel_numbers">Čísla kanálů</string>
+    <string name="settings_channel_numbers_help">Vypni, pokud ovladač nemá číselná tlačítka</string>
     <string name="settings_channel_tags_nav">Skupiny kanálů</string>
     <string name="settings_channel_tags_last_enabled">Povinné — alespoň jedna skupina musí zůstat zapnutá.</string>
     <string name="show_epg_menu">Zobrazit Program v postranní nabídce</string>

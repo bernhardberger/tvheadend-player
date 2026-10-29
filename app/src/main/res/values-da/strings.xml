@@ -113,6 +113,8 @@
     <string name="epg_next">Næste %1$s</string>
     <string name="select_channel_hint">Vælg en kanal til venstre for at se detaljer.</string>
     <string name="settings_general">Generelt</string>
+    <string name="settings_channel_numbers">Kanalnumre</string>
+    <string name="settings_channel_numbers_help">Slå fra, hvis din fjernbetjening ikke har talknapper</string>
     <string name="settings_channel_tags_nav">Kanalgrupper</string>
     <string name="settings_channel_tags_last_enabled">Påkrævet — mindst én gruppe skal være slået til.</string>
     <string name="show_epg_menu">Vis Tv-guide i sidemenuen</string>

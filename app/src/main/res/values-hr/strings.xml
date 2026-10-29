@@ -113,6 +113,8 @@
     <string name="epg_next">Slijedi %1$s</string>
     <string name="select_channel_hint">Odaberi kanal s lijeve strane za prikaz pojedinosti.</string>
     <string name="settings_general">Općenito</string>
+    <string name="settings_channel_numbers">Brojevi kanala</string>
+    <string name="settings_channel_numbers_help">Isključi ako daljinski upravljač nema brojčane tipke</string>
     <string name="settings_channel_tags_nav">Grupe kanala</string>
     <string name="settings_channel_tags_last_enabled">Obavezno — barem jedna grupa mora ostati uključena.</string>
     <string name="show_epg_menu">Prikaži TV vodič u bočnom izborniku</string>

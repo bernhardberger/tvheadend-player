@@ -113,6 +113,8 @@
     <string name="epg_next">Далее %1$s</string>
     <string name="select_channel_hint">Выберите канал слева, чтобы увидеть сведения.</string>
     <string name="settings_general">Общие</string>
+    <string name="settings_channel_numbers">Номера каналов</string>
+    <string name="settings_channel_numbers_help">Выключите, если на пульте нет цифровых кнопок</string>
     <string name="settings_channel_tags_nav">Группы каналов</string>
     <string name="settings_channel_tags_last_enabled">Обязательно — хотя бы одна группа должна оставаться включённой.</string>
     <string name="show_epg_menu">Показывать телепрограмму в боковом меню</string>

@@ -113,6 +113,8 @@
     <string name="epg_next">Hierna %1$s</string>
     <string name="select_channel_hint">Kies links een zender om details te zien.</string>
     <string name="settings_general">Algemeen</string>
+    <string name="settings_channel_numbers">Zendernummers</string>
+    <string name="settings_channel_numbers_help">Zet uit als je afstandsbediening geen cijfertoetsen heeft</string>
     <string name="settings_channel_tags_nav">Zendergroepen</string>
     <string name="settings_channel_tags_last_enabled">Verplicht — minstens één groep moet ingeschakeld blijven.</string>
     <string name="show_epg_menu">Tv-gids in het zijmenu tonen</string>

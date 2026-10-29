@@ -1,4 +1,6 @@
 <resources>
+    <string name="settings_channel_numbers">Channel numbers</string>
+    <string name="settings_channel_numbers_help">Turn off if your remote has no number keys</string>
     <string name="details_program">Programme details</string>
     <string name="details_about">About this programme</string>
     <string name="no_epg">No programme information</string>

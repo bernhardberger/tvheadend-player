@@ -113,6 +113,8 @@
     <string name="epg_next">הבא %1$s</string>
     <string name="select_channel_hint">אפשר לבחור ערוץ משמאל כדי להציג פרטים.</string>
     <string name="settings_general">כללי</string>
+    <string name="settings_channel_numbers">מספרי ערוצים</string>
+    <string name="settings_channel_numbers_help">יש לכבות אם אין בשלט כפתורי ספרות</string>
     <string name="settings_channel_tags_nav">קבוצות ערוצים</string>
     <string name="settings_channel_tags_last_enabled">נדרש — לפחות קבוצה אחת חייבת להישאר פעילה.</string>
     <string name="show_epg_menu">הצגת המדריך בתפריט הצד</string>

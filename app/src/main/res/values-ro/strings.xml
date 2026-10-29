@@ -113,6 +113,8 @@
     <string name="epg_next">Urmează %1$s</string>
     <string name="select_channel_hint">Selectează un canal din stânga pentru a vedea detalii.</string>
     <string name="settings_general">General</string>
+    <string name="settings_channel_numbers">Numere de canale</string>
+    <string name="settings_channel_numbers_help">Dezactivează dacă telecomanda nu are butoane numerice</string>
     <string name="settings_channel_tags_nav">Grupuri de canale</string>
     <string name="settings_channel_tags_last_enabled">Obligatoriu — cel puțin un grup trebuie să rămână activ.</string>
     <string name="show_epg_menu">Arată Ghid TV în meniul lateral</string>

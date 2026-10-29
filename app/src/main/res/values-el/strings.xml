@@ -113,6 +113,8 @@
     <string name="epg_next">Επόμενο %1$s</string>
     <string name="select_channel_hint">Επίλεξε κανάλι στα αριστερά για να δεις λεπτομέρειες.</string>
     <string name="settings_general">Γενικά</string>
+    <string name="settings_channel_numbers">Αριθμοί καναλιών</string>
+    <string name="settings_channel_numbers_help">Απενεργοποίησε αν το τηλεχειριστήριο δεν έχει αριθμητικά πλήκτρα</string>
     <string name="settings_channel_tags_nav">Ομάδες καναλιών</string>
     <string name="settings_channel_tags_last_enabled">Απαιτείται — τουλάχιστον μία ομάδα πρέπει να παραμένει ενεργή.</string>
     <string name="show_epg_menu">Εμφάνιση Οδηγού στο πλαϊνό μενού</string>

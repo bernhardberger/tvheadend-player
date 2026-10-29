@@ -113,6 +113,8 @@
     <string name="epg_next">Następnie %1$s</string>
     <string name="select_channel_hint">Wybierz kanał po lewej, aby zobaczyć szczegóły.</string>
     <string name="settings_general">Ogólne</string>
+    <string name="settings_channel_numbers">Numery kanałów</string>
+    <string name="settings_channel_numbers_help">Wyłącz, jeśli pilot nie ma przycisków numerycznych</string>
     <string name="settings_channel_tags_nav">Grupy kanałów</string>
     <string name="settings_channel_tags_last_enabled">Wymagane — co najmniej jedna grupa musi pozostać włączona.</string>
     <string name="show_epg_menu">Pokazuj Program TV w menu bocznym</string>

@@ -113,6 +113,8 @@
     <string name="epg_next">Seuraavaksi %1$s</string>
     <string name="select_channel_hint">Näet tiedot valitsemalla kanavan vasemmalta.</string>
     <string name="settings_general">Yleiset</string>
+    <string name="settings_channel_numbers">Kanavanumerot</string>
+    <string name="settings_channel_numbers_help">Poista käytöstä, jos kaukosäätimessä ei ole numeropainikkeita</string>
     <string name="settings_channel_tags_nav">Kanavaryhmät</string>
     <string name="settings_channel_tags_last_enabled">Pakollinen — vähintään yhden ryhmän on oltava käytössä.</string>
     <string name="show_epg_menu">Näytä Ohjelmaopas sivuvalikossa</string>

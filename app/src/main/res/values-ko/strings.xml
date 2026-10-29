@@ -113,6 +113,8 @@
     <string name="epg_next">다음 %1$s</string>
     <string name="select_channel_hint">왼쪽에서 채널을 선택하면 상세 정보를 볼 수 있습니다.</string>
     <string name="settings_general">일반</string>
+    <string name="settings_channel_numbers">채널 번호</string>
+    <string name="settings_channel_numbers_help">리모컨에 숫자 버튼이 없으면 꺼 주세요</string>
     <string name="settings_channel_tags_nav">채널 그룹</string>
     <string name="settings_channel_tags_last_enabled">필수 — 하나 이상의 그룹은 켜져 있어야 합니다.</string>
     <string name="show_epg_menu">측면 메뉴에 편성표 표시</string>

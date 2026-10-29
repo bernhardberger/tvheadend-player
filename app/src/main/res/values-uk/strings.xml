@@ -113,6 +113,8 @@
     <string name="epg_next">Далі %1$s</string>
     <string name="select_channel_hint">Виберіть канал ліворуч, щоб побачити відомості.</string>
     <string name="settings_general">Загальні</string>
+    <string name="settings_channel_numbers">Номери каналів</string>
+    <string name="settings_channel_numbers_help">Вимкніть, якщо на пульті немає цифрових кнопок</string>
     <string name="settings_channel_tags_nav">Групи каналів</string>
     <string name="settings_channel_tags_last_enabled">Обов’язково — принаймні одна група має залишатися ввімкненою.</string>
     <string name="show_epg_menu">Показувати телепрограму в бічному меню</string>

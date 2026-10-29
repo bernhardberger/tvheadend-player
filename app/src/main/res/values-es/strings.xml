@@ -113,6 +113,8 @@
     <string name="epg_next">Siguiente %1$s</string>
     <string name="select_channel_hint">Selecciona un canal a la izquierda para ver los detalles.</string>
     <string name="settings_general">General</string>
+    <string name="settings_channel_numbers">Números de canal</string>
+    <string name="settings_channel_numbers_help">Desactiva si tu mando no tiene teclas numéricas</string>
     <string name="settings_channel_tags_nav">Grupos de canales</string>
     <string name="settings_channel_tags_last_enabled">Obligatorio: al menos un grupo debe seguir activado.</string>
     <string name="show_epg_menu">Mostrar la Guía en el menú lateral</string>

@@ -113,6 +113,8 @@
     <string name="epg_next">À suivre %1$s</string>
     <string name="select_channel_hint">Sélectionne une chaîne à gauche pour voir les détails.</string>
     <string name="settings_general">Général</string>
+    <string name="settings_channel_numbers">Numéros de chaîne</string>
+    <string name="settings_channel_numbers_help">Désactive si ta télécommande n’a pas de touches numériques</string>
     <string name="settings_channel_tags_nav">Groupes de chaînes</string>
     <string name="settings_channel_tags_last_enabled">Obligatoire — au moins un groupe doit rester activé.</string>
     <string name="show_epg_menu">Afficher le Guide dans le menu latéral</string>

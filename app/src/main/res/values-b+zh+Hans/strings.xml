@@ -113,6 +113,8 @@
     <string name="epg_next">接下来%1$s</string>
     <string name="select_channel_hint">选择左侧频道以查看详情。</string>
     <string name="settings_general">常规</string>
+    <string name="settings_channel_numbers">频道编号</string>
+    <string name="settings_channel_numbers_help">遥控器没有数字键时请关闭</string>
     <string name="settings_channel_tags_nav">频道分组</string>
     <string name="settings_channel_tags_last_enabled">必需 — 至少须启用一个分组。</string>
     <string name="show_epg_menu">在侧边菜单中显示节目指南</string>

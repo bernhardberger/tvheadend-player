@@ -113,6 +113,8 @@
     <string name="epg_next">次：%1$s</string>
     <string name="select_channel_hint">左側のチャンネルを選択すると詳細が表示されます。</string>
     <string name="settings_general">一般</string>
+    <string name="settings_channel_numbers">チャンネル番号</string>
+    <string name="settings_channel_numbers_help">リモコンに数字ボタンがない場合はオフにしてください</string>
     <string name="settings_channel_tags_nav">チャンネルグループ</string>
     <string name="settings_channel_tags_last_enabled">必須 — 少なくとも1つのグループをオンにする必要があります。</string>
     <string name="show_epg_menu">サイドメニューに番組表を表示</string>

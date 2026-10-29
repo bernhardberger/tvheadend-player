@@ -113,6 +113,8 @@
     <string name="epg_next">Következő: %1$s</string>
     <string name="select_channel_hint">A részletekhez válassz egy csatornát a bal oldalon.</string>
     <string name="settings_general">Általános</string>
+    <string name="settings_channel_numbers">Csatornaszámok</string>
+    <string name="settings_channel_numbers_help">Kapcsold ki, ha a távirányítón nincsenek számgombok</string>
     <string name="settings_channel_tags_nav">Csatornacsoportok</string>
     <string name="settings_channel_tags_last_enabled">Kötelező — legalább egy csoportnak bekapcsolva kell maradnia.</string>
     <string name="show_epg_menu">Műsorújság megjelenítése az oldalmenüben</string>

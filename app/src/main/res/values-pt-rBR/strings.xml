@@ -113,6 +113,8 @@
     <string name="epg_next">A seguir %1$s</string>
     <string name="select_channel_hint">Selecione um canal à esquerda para ver os detalhes.</string>
     <string name="settings_general">Geral</string>
+    <string name="settings_channel_numbers">Números dos canais</string>
+    <string name="settings_channel_numbers_help">Desative se o controle remoto não tiver botões numéricos</string>
     <string name="settings_channel_tags_nav">Grupos de canais</string>
     <string name="settings_channel_tags_last_enabled">Obrigatório — pelo menos um grupo precisa ficar ativado.</string>
     <string name="show_epg_menu">Mostrar o Guia no menu lateral</string>

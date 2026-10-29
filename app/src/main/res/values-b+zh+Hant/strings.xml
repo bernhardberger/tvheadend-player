@@ -113,6 +113,8 @@
     <string name="epg_next">接著播出%1$s</string>
     <string name="select_channel_hint">選擇左側頻道以查看詳細資料。</string>
     <string name="settings_general">一般</string>
+    <string name="settings_channel_numbers">頻道號碼</string>
+    <string name="settings_channel_numbers_help">遙控器沒有數字鍵時請關閉</string>
     <string name="settings_channel_tags_nav">頻道群組</string>
     <string name="settings_channel_tags_last_enabled">必要 — 至少須開啟一個群組。</string>
     <string name="show_epg_menu">在側邊選單顯示節目表</string>

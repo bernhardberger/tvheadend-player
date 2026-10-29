@@ -113,6 +113,8 @@
     <string name="epg_next">التالي %1$s</string>
     <string name="select_channel_hint">يمكن اختيار قناة من اليسار لعرض تفاصيلها.</string>
     <string name="settings_general">عام</string>
+    <string name="settings_channel_numbers">أرقام القنوات</string>
+    <string name="settings_channel_numbers_help">يمكن تعطيلها إذا لم يكن بجهاز التحكم أزرار أرقام</string>
     <string name="settings_channel_tags_nav">مجموعات القنوات</string>
     <string name="settings_channel_tags_last_enabled">مطلوب — يجب إبقاء مجموعة واحدة على الأقل مفعّلة.</string>
     <string name="show_epg_menu">عرض دليل البرامج في القائمة الجانبية</string>
