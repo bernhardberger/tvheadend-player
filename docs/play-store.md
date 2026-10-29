@@ -319,6 +319,30 @@ without alpha, 320 to 3840 px, the long side at most twice the short side, up to
 eight per device type, and at least one Android TV screenshot; TV banner
 1280×720, JPEG or 24-bit PNG without alpha.
 
+### 3.0 Uploaded set (2026-10-29)
+
+Saved as a draft on the default (en-US) listing. The files come from branch
+`docs/play-assets` at d0563891, under `captures/play-store/round3/`
+(reproduction in that branch's `docs/presentation-captures.md`):
+
+| Slot | File |
+|---|---|
+| App icon | `icon/current-rgba.png` |
+| Feature graphic | `feature/final.png`: mark and name, "Built around the remote.", the Channels screen in a slim frame |
+| Android TV screenshots, in order | `plain/01-channels.png`, `02-guide.png`, `03-player.png`, `04-recording.png`, `05-details.png`, `06-schedule.png` |
+| TV banner | `banner/current.png` |
+| Phone screenshots | none. The Android TV section only appears after adding Android TV under **Test and release → Advanced settings → Form factors** |
+| Video | none yet, see [5.2](#52-demo-video-shot-list) |
+
+Console's asset library adds several selected files in a scrambled order. Add
+the screenshots one at a time, in order.
+
+Android XR shows as an active form factor that can't be removed. That's
+harmless: the manifest requires `android.software.leanback`, so XR headsets
+never get the app.
+
+The sections below are the earlier candidates and plan, kept as history.
+
 ### 3.1 Candidates (not committed)
 
 Composed from the generated brand PNGs in `artwork/` (themselves rendered by
@@ -776,8 +800,8 @@ one updates the other.
 
 ## 8. Owner decisions
 
-1. Icon: A, B or C (section 3.1).
-2. Feature graphic: A, B or C (section 3.1).
+1. Icon: decided, the existing launcher icon (3.0).
+2. Feature graphic: decided, `final.png` (3.0).
 3. Contact email for Console, store settings and reviewer instructions (it's
    shown on the store listing).
 4. Data safety: answer A or B (4.7). Recommendation: B.
@@ -785,7 +809,7 @@ one updates the other.
    submitting, or submit 0.3.0 and fix after a rejection (risk 2).
    Recommendation: 0.3.1 first.
 6. Demo video host (unlisted YouTube or other) and which channels to show (5.2).
-7. If Console demands phone screenshots: what to upload (3.4).
+7. Phone screenshots: none; Android TV form factor added instead (3.0).
 8. Target audience 13–15, 16–17 and 18 and over (4.6) and category Video Players & Editors
    (1.4): confirm.
 9. Testers: email list or Google Group (1.7), and where the invite asks people
