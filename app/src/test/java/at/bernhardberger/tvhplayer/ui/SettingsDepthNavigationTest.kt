@@ -5,6 +5,7 @@ import at.bernhardberger.tvheadend.sdk.playback.TvheadendFailure
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.view.View
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -21,6 +22,8 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.junit4.StateRestorationTester
@@ -67,6 +70,86 @@ import java.io.File
 class SettingsDepthNavigationTest {
     @get:Rule val compose = createComposeRule()
     private lateinit var captureView: View
+
+    @OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+    @Test fun deeperSettingsRemainExposedToAccessibilityThroughPushAndPop() {
+        compose.setContent {
+            TVHeadendPlayerTheme {
+                captureView = LocalView.current
+                val navigation = rememberDepthNavigationState(SETTINGS_ROOT, SettingsSection.PLAYER.name)
+                Box(Modifier.semantics { testTagsAsResourceId = true }) {
+                    SideRail(currentRoute = AppDestination.SETTINGS, showEpgMenu = true,
+                        onRootBack = {}, onNavigate = {}) { padding, drawerActive ->
+                        SettingsScreenNavigation(navigation, listOf(settingsRootLevel(false),
+                            settingsPlayerLevel(SettingsPlayerUiState(), {}),
+                            settingsWarmPlaybackLevel(WarmPlaybackMode.ON) {}),
+                            initialFocusEnabled = !drawerActive, contentPadding = padding)
+                    }
+                }
+            }
+        }
+        assertAccessibleSettings(SETTINGS_ROOT, "settings-row-PLAYER")
+        press(Key.DirectionCenter)
+        assertAccessibleSettings(SettingsSection.PLAYER.name, "settings-row-autoplay")
+        press(Key.DirectionDown)
+        press(Key.DirectionRight)
+        assertAccessibleSettings(WARM_PLAYBACK_LEVEL, "settings-row-ON")
+        press(Key.Back)
+        assertAccessibleSettings(SettingsSection.PLAYER.name, "settings-row-$WARM_PLAYBACK_LEVEL")
+        press(Key.Back)
+        assertAccessibleSettings(SETTINGS_ROOT, "settings-row-PLAYER")
+    }
+
+    private fun assertAccessibleSettings(level: String, focusedRow: String) {
+        compose.onNodeWithTag(focusedRow).assertIsFocused()
+        compose.runOnIdle {
+            val nodes = accessibilityNodes()
+            fun tagged(tag: String) = nodes.singleOrNull {
+                it.viewIdResourceName == tag
+            }
+            for (tag in listOf("depth-active", "settings-level-$level", focusedRow)) {
+                val node = tagged(tag)
+                assertNotNull("Accessibility provider omitted $tag", node)
+                assertTrue("Accessibility node $tag must be visible", node!!.isVisibleToUser)
+                val bounds = android.graphics.Rect()
+                node.getBoundsInScreen(bounds)
+                assertFalse("Accessibility node $tag must have bounds: $bounds", bounds.isEmpty)
+            }
+            assertTrue(tagged(focusedRow)!!.isFocused)
+            val exposedLevels = nodes.mapNotNull { it.viewIdResourceName }
+                .filter { it.startsWith("settings-level-") }
+            assertEquals("Inactive headings must stay hidden", listOf("settings-level-$level"), exposedLevels)
+        }
+        compose.onNodeWithTag("depth-active").assertIsDisplayed()
+        compose.onNodeWithTag(focusedRow).assertIsDisplayed()
+    }
+
+    /** Walk only child IDs published by the platform provider, not Compose's test semantics tree. */
+    private fun accessibilityNodes(): List<AccessibilityNodeInfo> {
+        // The default Robolectric ANI shadow stores synthetic children instead of platform IDs.
+        // Use real IDs and ask Compose's provider for each child, without a device connection.
+        val property = "robolectric.useRealAni"
+        val previous = System.getProperty(property)
+        System.setProperty(property, "true")
+        try {
+            val provider = requireNotNull(captureView.accessibilityNodeProvider)
+            val childId = AccessibilityNodeInfo::class.java.getDeclaredMethod("getChildId", Int::class.javaPrimitiveType)
+            childId.isAccessible = true
+            val nodes = mutableListOf<AccessibilityNodeInfo>()
+            fun visit(id: Int) {
+                val node = requireNotNull(provider.createAccessibilityNodeInfo(id))
+                nodes += node
+                repeat(node.childCount) { index ->
+                    val packedId = childId.invoke(node, index) as Long
+                    visit((packedId shr 32).toInt())
+                }
+            }
+            visit(View.NO_ID)
+            return nodes
+        } finally {
+            if (previous == null) System.clearProperty(property) else System.setProperty(property, previous)
+        }
+    }
 
     @Test fun browsingChoiceUsesCurrentSelectionCommitsOnlyOnOkAndRestoresParent() {
         var mode by mutableStateOf(WarmPlaybackMode.ON)

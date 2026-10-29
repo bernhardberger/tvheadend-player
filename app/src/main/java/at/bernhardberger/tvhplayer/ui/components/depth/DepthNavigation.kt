@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.*
 import androidx.compose.ui.graphics.graphicsLayer
@@ -356,7 +357,13 @@ fun DepthNavigation(
         }
     }) {
         Box(Modifier.fillMaxSize().padding(start = columnInset)) {
-            Box(Modifier.graphicsLayer { translationX = stripOffset.value }) {
+            // Offsets do not enlarge a Box. Include every placed slot in the strip's
+            // bounds so accessibility does not clip deeper columns to an empty ancestor.
+            val lastSlot = maxOf(activeIndex + 1, displayed.maxOfOrNull { it.path.size - 1 } ?: 0)
+            Box(Modifier
+                .wrapContentWidth(Alignment.Start, unbounded = true)
+                .width(columnWidth + (columnWidth + columnGap) * lastSlot)
+                .graphicsLayer { translationX = stripOffset.value }) {
                 // Depth push/pop slides the full strip (desired wins the slot in unionStrip).
                 // Settled Up/Down sibling preview switches keep the active columns here and
                 // crossfade only the preview slot below: intentional overlap is only for
