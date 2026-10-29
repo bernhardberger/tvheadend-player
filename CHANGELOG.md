@@ -1,10 +1,27 @@
 # Changelog
 
-## Unreleased
+## 0.3.2
 
-### Fixes
+### Settings
 
-- Channel logos also show when the server's image cache is off.
+- Settings → General → Channel numbers turns channel numbers off in Channels,
+  the Guide and the player, for remotes without number keys.
+
+### Everywhere
+
+- Channel and tag logos that the server lists as web addresses now show too,
+  so logos appear even when the server's image cache is off. The TV loads
+  them from those web hosts directly, as the privacy policy describes.
+- After a cold start, the saved program guide appears sooner, and the app is
+  ready sooner.
+- Saved channel logos appear together right after start instead of one by one.
+
+### Accessibility
+
+- TalkBack says whether a switch is on or off in Settings, in the player's
+  Stats for nerds, and in the View options of Channels and the Guide.
+- Settings pages two levels deep, such as Playback, are no longer missing
+  for TalkBack and other accessibility services.
 
 ## 0.3.1
 
