@@ -76,6 +76,36 @@ the player and the channel schedule pass the time as arguments. The player, sche
 backdrop is the `still-ridge-light` fixture and the side menu's is `still-northline-studio`, not decoded video: it is fine for a screenshot of
 fictional content, not evidence of SurfaceView capture, decoding or response.
 
+## Play Store candidate review
+
+To generate the local Play Store comparison, run the capture command above with
+`-Ptvhplayer.captureTests=all`, then:
+
+```bash
+python3 tools/prepare-play-assets.py
+```
+
+Use `all`, not `only`: Guide, details and Recordings presentation methods are not
+tagged as visual captures. The script checks for passing test results for each
+selected scene, but cannot establish source freshness. Run the tests immediately
+before packaging, in the same checkout. No test or fixture changes are needed for
+round 1.
+
+The script needs Python 3 and Pillow and uses the pinned Outfit font. It writes
+ignored `captures/play-store/round1/`: eight plain 1920×1080 RGB PNGs, a matching
+captioned comparison set, three 1024×500 feature directions, the existing icon
+packaged as 512×512 RGBA, the unchanged 1280×720 banner, 960px-wide previews and
+an image-embedded `review.html`. The manifest records the source commit, tests,
+input hashes and every output file's SHA-256 except the manifest itself. The icon
+preview sits at native size on a 960px canvas. Plain screenshots preserve all RGB
+pixels; captioned versions scale the whole frame without cropping it.
+
+These are candidates for owner selection, not uploaded assets. Keep at least one
+plain screenshot in a proposed listing set. TV-G4 requires an unaltered current
+TV-app screenshot; acceptance of offline fixture renders remains a submission
+question. The review includes current rule citations and generated-art provenance.
+Only copy selected assets to `artwork/play/` after owner approval.
+
 ## Editorial use
 
 Lead with what the app is and that it connects straight to Tvheadend. Pick one
