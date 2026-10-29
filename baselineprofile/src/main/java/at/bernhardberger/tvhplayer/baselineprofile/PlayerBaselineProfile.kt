@@ -1,7 +1,6 @@
 package at.bernhardberger.tvhplayer.baselineprofile
 
 import android.os.Build
-import android.os.SystemClock
 import android.view.KeyEvent
 import androidx.benchmark.macro.MacrobenchmarkScope
 import androidx.benchmark.macro.junit4.BaselineProfileRule
@@ -84,7 +83,7 @@ class PlayerBaselineProfile {
     private fun MacrobenchmarkScope.startAtExistingChannels() {
         coldStart()
         assertTrue("Precondition: a stored reachable server and playable channels",
-            device.wait({ has(channel()) || has(By.res("video-surface")) }, ReadyTimeout))
+            device.wait({ !has(By.res("main-startup-root")) && (has(channel()) || has(By.res("video-surface"))) }, ReadyTimeout))
         if (!has(channel())) {
             awaitVideo()
             key(KeyEvent.KEYCODE_BACK)
@@ -94,9 +93,11 @@ class PlayerBaselineProfile {
     }
 
     private fun MacrobenchmarkScope.awaitChannels(layout: Layout? = null) {
-        await(channel(), "Channels must expose a channel row or card")
-        awaitStartupReveal()
-        if (layout != null) await(By.res(layout.readyTag), "Channels must use ${layout.name}")
+        assertTrue("Channels must expose a ${layout?.name ?: "configured"} row or card after startup",
+            device.wait({
+                !has(By.res("main-startup-root")) && has(channel()) &&
+                    (layout == null || has(By.res(layout.readyTag)))
+            }, ReadyTimeout))
     }
 
     private fun MacrobenchmarkScope.tuneAndReturn(layout: Layout) {
@@ -145,15 +146,13 @@ class PlayerBaselineProfile {
     private fun MacrobenchmarkScope.openAutoplay() {
         openDrawer("nav-channels")
         focusToward(By.res("nav-settings"), KeyEvent.KEYCODE_DPAD_DOWN)
-        await(activeLevel("settings-root"), "Settings must open")
+        await(By.res("settings-row-PLAYER"), "Settings must open")
         key(KeyEvent.KEYCODE_DPAD_RIGHT)
         await(By.res("depth-active").hasDescendant(By.focused(true)), "Settings content must receive focus")
         focusToward(By.res("settings-row-GENERAL"), KeyEvent.KEYCODE_DPAD_UP)
         focusToward(By.res("settings-row-PLAYER"), KeyEvent.KEYCODE_DPAD_DOWN)
         key(KeyEvent.KEYCODE_DPAD_CENTER)
-        await(activeLevel("PLAYER"), "Player settings must open")
-        focusToward(By.res("settings-row-autoplay"), KeyEvent.KEYCODE_DPAD_UP)
-        await(By.res("settings-row-autoplay").checkable(true), "Autoplay must expose its switch state")
+        await(By.res("settings-row-autoplay").focused(true).checkable(true), "Player settings must focus the autoplay switch")
     }
 
     private fun MacrobenchmarkScope.setAutoplay(enabled: Boolean) {
@@ -164,7 +163,7 @@ class PlayerBaselineProfile {
 
     private fun MacrobenchmarkScope.settingsToChannels() {
         key(KeyEvent.KEYCODE_BACK)
-        await(activeLevel("settings-root"), "Back must return to Settings root")
+        await(By.res("settings-row-PLAYER").focused(true), "Back must return to the Playback row in Settings root")
         openDrawer("nav-settings")
         focusToward(By.res("nav-channels"), KeyEvent.KEYCODE_DPAD_UP)
         awaitChannels()
@@ -186,14 +185,15 @@ class PlayerBaselineProfile {
         val target = if (focused) By.copy(selector).focused(true) else selector
         repeat(10) {
             if (has(target)) return
+            val previous = device.findObject(By.focused(true))?.resourceName
             key(direction)
+            device.wait({ has(target) || (previous != null && !has(By.res(previous).focused(true))) }, FocusTimeout)
         }
         await(target, "D-pad must reach the requested item")
     }
 
     private fun MacrobenchmarkScope.key(code: Int) {
         assertTrue("Key $code must be delivered", device.pressKeyCode(code))
-        SystemClock.sleep(400)
     }
 
     private fun MacrobenchmarkScope.await(selector: BySelector, message: String) {
@@ -206,7 +206,6 @@ class PlayerBaselineProfile {
         return device.hasObject(selector)
     }
 
-    private fun activeLevel(id: String) = By.res("settings-level-$id").hasAncestor(By.res("depth-active"))
     private fun channel() = By.res(Pattern.compile("channel-(row|card)-.*"))
 
     private enum class Layout(val readyTag: String) {

@@ -15,7 +15,9 @@ Settings before collection. Each collected iteration force-stops and launches th
 app, checks the selected route, waits for video and the passive banner to settle,
 and returns to Channels. The shared Channels ready check accepts either a row or
 card; a separate layout tag distinguishes Grid from Immersive. Autostart checks
-that the player, rather than Channels, is the ready route. Setup and preference
+that the player, rather than Channels, is the ready route. Readiness also requires
+the startup reveal to be gone before navigating; D-pad traversal waits for focus
+changes rather than fixed delays. Setup and preference
 restoration run outside collection, and each test restores the original layout
 and autoplay value in `finally`. Tuning updates the last-played channel as usual.
 
