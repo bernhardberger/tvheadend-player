@@ -3,18 +3,34 @@
 ## Baseline profile generation
 
 `:baselineprofile` uses Jetpack `BaselineProfileRule` against the real configured
-server with one journey: cold start, connection and initial sync, Channels, tune
-a channel and Back. It produces both baseline and startup rules and covers SDK and
-HTSP code on that path. No credentials are supplied to or inspected by the test.
+server with four startup journeys, in this order:
+
+1. Immersive Channels (the default), tune a channel and Back.
+2. Grid Channels, tune a channel and Back.
+3. List Channels, tune a channel and Back.
+4. Autostart playback of a previously tuned channel, then Back to Immersive Channels.
+
+Each journey selects its layout in Channels View options and sets autoplay in
+Settings before collection. Each collected iteration force-stops and launches the
+app, checks the selected route, waits for video and the passive banner to settle,
+and returns to Channels. The shared Channels ready check accepts either a row or
+card; a separate layout tag distinguishes Grid from Immersive. Autostart checks
+that the player, rather than Channels, is the ready route. Setup and preference
+restoration run outside collection, and each test restores the original layout
+and autoplay value in `finally`. Tuning updates the last-played channel as usual.
+
+The journeys produce both baseline and startup rules, including SDK and HTSP code
+executed on those paths. No credentials are supplied to or inspected by the tests.
 Normal builds only package the committed profiles; generation is manual and is
-not part of `tools/verify` or assemble. Add a journey only when a measured screen
-is slow on first use, not hand-written rules.
+not part of `tools/verify` or assemble. Prefer real journeys for coverage. Before
+adding supplemental wildcard rules, measure their expansion and verify their
+inclusion in the built profile; a source rule alone does not prove it is shipped.
 
 Use an authorized **Android 13 (API 33)+ or rooted** device/emulator; the LXC 119
 Google TV emulator is the usual target. The unrooted G10 (API 31) **cannot
 generate** profiles; it only consumes them. Before generation, store a reachable
 server profile using a debug-key build with application ID
-`at.bernhardberger.tvhplayer`, disable autoplay, and confirm Channels has playable
+`at.bernhardberger.tvhplayer` and confirm Channels has playable
 channels. The generator's Play non-minified release target retains that ID and
 debug signing key, is non-debuggable and shell-profileable. Do not uninstall or
 clear its app data; do not use a production-signed installation as the target.
@@ -28,17 +44,20 @@ yourself):
 ```bash
 : "${ANDROID_SERIAL:?Set the explicit authorized device serial first}"
 umask 077
-log=$(mktemp /tmp/opencode/baseline-profile.XXXXXX.log)
+mkdir -p build/profiling
+log=$(mktemp build/profiling/baseline-profile.XXXXXX.log)
 timeout --kill-after=5s 20m ./gradlew :app:generateBaselineProfile \
   -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true \
-  -Ptvhplayer.testForks=1 --console=plain --no-scan >"$log" 2>&1
+  -Ptvhplayer.captureTests=exclude --console=plain --no-scan >"$log" 2>&1
 ```
 
 AGP's `leaveApksInstalledAfterRun` option preserves the target and its stored
 server profile after the run. Only Play generation is enabled. The plugin writes
 `app/src/main/generated/baselineProfiles/baseline-prof.txt` and `startup-prof.txt`;
 both shipping flavors consume them, and R8 maps them into the minified releases
-(`assets/dexopt/baseline.prof` and `baseline.profm`). Commit the regenerated text.
+(`assets/dexopt/baseline.prof` and `baseline.profm`). Require all four named tests
+to pass; an ADB exit status alone is insufficient. Commit the regenerated text
+only for an authorized final generation, not a trial run.
 
 Play applies the profile on install. A sideloaded install only gets it at the
 next background dexopt, so before timing a sideloaded build run the
