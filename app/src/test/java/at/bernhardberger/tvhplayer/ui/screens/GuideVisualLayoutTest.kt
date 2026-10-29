@@ -850,7 +850,7 @@ class GuideVisualLayoutTest {
 
     @Test fun hiddenNumbersLeaveGuideLogosNamesAndUnnamedFallback() {
         val channels = listOf(
-            Channel.create(ChannelId(1), name = "Ridge Earth", number = 1001, icon = ArtworkId(1)),
+            Channel.create(ChannelId(1), name = "Ridge Earth", number = 1001, icon = ChannelIcon.ImageCache(ArtworkId(1))),
             Channel.create(ChannelId(2), name = "Northline News", number = 4567),
             Channel.create(ChannelId(3), name = "", number = 89),
         )

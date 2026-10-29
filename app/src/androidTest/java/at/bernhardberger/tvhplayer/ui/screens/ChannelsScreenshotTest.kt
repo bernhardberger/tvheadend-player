@@ -85,7 +85,7 @@ class ChannelsScreenshotTest(private val scenario: String) {
                 Channel.create(
                     id = ChannelId(index + 1L), number = index + 1L,
                     name = if (longText && index == 1) "International Documentary and Natural History Television HD" else name,
-                    icon = if (longText && index % 2 == 0) null else ArtworkId(index + 1),
+                    icon = if (longText && index % 2 == 0) null else ChannelIcon.ImageCache(ArtworkId(index + 1)),
                     tagIds = tags.filter { it.name != "Empty filter" }.map { it.id },
                 )
             }

@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.DvrEntry
 import at.bernhardberger.tvheadend.sdk.core.DvrEntryId
 import at.bernhardberger.tvhplayer.core.playerStateCell
@@ -79,7 +80,7 @@ internal fun RecordingChromeFixture(
                 durationMs = durationMs.takeIf { it != C.TIME_UNSET && it > 0L }),
             state = playerStateCell(paused),
             recordingNow = growing,
-            picon = picon,
+            picon = picon?.let { ChannelIcon.ImageCache(it) },
         ),
         timeline = PlayerChromeTimeline.Recording(
             positionMs = positionMs,

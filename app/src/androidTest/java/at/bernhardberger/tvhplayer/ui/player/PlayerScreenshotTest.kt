@@ -47,6 +47,7 @@ import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.requestFocus
 import androidx.test.platform.app.InstrumentationRegistry
 import at.bernhardberger.tvheadend.sdk.core.ArtworkId
+import at.bernhardberger.tvheadend.sdk.core.ChannelIcon
 import at.bernhardberger.tvheadend.sdk.core.ChannelId
 import at.bernhardberger.tvheadend.sdk.core.Channel
 import at.bernhardberger.tvheadend.sdk.core.EpgEvent
@@ -178,7 +179,7 @@ class PlayerScreenshotTest(private val scenario: String, private val dark: Boole
                             controlsDecoration = { _, controls -> QuickZapPresentation(expanded = true, preview = {}, controls = controls, channelContent = {
                             ProvideArtworkSession(currentSession) { ChannelDrawer(
                                 channels = if (scenario == "shelf-empty") emptyList() else List(15) {
-                                    Channel.create(id = ChannelId(it + 1L), icon = ArtworkId(it + 1), name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
+                                    Channel.create(id = ChannelId(it + 1L), icon = ChannelIcon.ImageCache(ArtworkId(it + 1)), name = if (scenario == "shelf-long") "Dokumentation und Zeitgeschichte ${it + 1}" else "Documentary ${it + 1}")
                                 },
                                 selectedId = ChannelId(2), playingChannelId = ChannelId(12), recordingChannelIds = setOf(ChannelId(12)),
                              nowEvent = { if (scenario == "shelf-missing") null else programme(long = scenario == "shelf-long") },
