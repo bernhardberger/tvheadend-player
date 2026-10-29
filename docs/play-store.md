@@ -227,8 +227,10 @@ review usually takes seven days or less and is separate from release review.
 Owner's README voice, US English, run through the humanizer pass. No dashes in
 the copy, "•" bullets as in the app. Lengths are counted in Unicode characters;
 limits from <https://support.google.com/googleplay/android-developer/answer/9859152>.
-Every claim is from the README's features list, which was checked against
-0.3.0.
+The listing says only what stays true across releases (owner, 2026-10-29), so
+a release doesn't need a listing change and a second review: no screen or
+view names, no individual features. What changes goes in the release notes
+(2.3), which are reviewed with each release anyway.
 
 ### 2.1 English (United States), default
 
@@ -244,34 +246,17 @@ Tvheadend Player
 A Tvheadend client for Android TV, built around the remote.
 ```
 
-**Full description** (1269/4000)
+**Full description** (665/4000)
 
 ```text
-Tvheadend Player is an Android TV and Google TV app for live TV, the program guide and recordings from your own Tvheadend server. Everything works with the remote's D-pad.
+Tvheadend Player is an Android TV and Google TV app for your own Tvheadend server. Watch live TV, browse the program guide and play your recordings, all with the remote's D-pad.
 
 It's an independent app, not an official Tvheadend product, and it has no channels of its own. You need a Tvheadend 4.3 server that your TV can reach.
 
-Live TV
-• Change channels with channel up and down, from the channel list, or by typing the number
-• Pause and rewind live TV if your server has timeshift turned on
-• See the channel's schedule next to the picture
-• Pick audio and subtitle tracks, DVB and teletext subtitles included
-
-Channels and guide
-• Browse channels as big cards, a grid or a list
-• A full program guide with genre colors and a genre filter
-• One details page for every program: watch, watch from the start or record
-
-Recordings
-• Your server's folders, with resume, watched marks and delete
-• See how much recording space is left
-
-Made for the TV
-• Built with Google's Material Design for TV
-• Live TV keeps playing while you browse the menus
-• Surround sound passes through to your soundbar or receiver
-
-No ads, no analytics, no account to sign up for.
+• Live TV, the program guide and your recordings in one app
+• Made for the remote, built with Google's Material Design for TV
+• Live TV keeps playing while you browse
+• No ads, no analytics, no account to sign up for
 
 Open source under the GNU GPL v3, with the source code for every release: github.com/bernhardberger/tvheadend-player
 ```
@@ -294,34 +279,17 @@ Tvheadend Player
 Ein Tvheadend-Client für Android TV, gemacht für die Fernbedienung.
 ```
 
-**Full description** (1384/4000)
+**Full description** (720/4000)
 
 ```text
-Tvheadend Player ist eine App für Android TV und Google TV: Live-TV, Programmführer und Aufnahmen von deinem eigenen Tvheadend-Server. Alles geht mit dem Steuerkreuz der Fernbedienung.
+Tvheadend Player ist eine App für Android TV und Google TV für deinen eigenen Tvheadend-Server. Live-TV schauen, im Programmführer stöbern und Aufnahmen abspielen, alles mit dem Steuerkreuz der Fernbedienung.
 
 Die App ist unabhängig, keine offizielle Tvheadend-App, und bringt keine eigenen Sender mit. Du brauchst einen Tvheadend-4.3-Server, den dein Fernseher erreicht.
 
-Live-TV
-• Sender wechseln mit Programm auf und ab, aus der Senderliste oder durch Eintippen der Nummer
-• Live-TV anhalten und zurückspulen, wenn dein Server Timeshift eingeschaltet hat
-• Das Programm des Senders neben dem Bild sehen
-• Ton- und Untertitelspuren wählen, auch DVB- und Videotext-Untertitel
-
-Sender und Programmführer
-• Sender als große Karten, als Raster oder als Liste durchsehen
-• Ein vollständiger Programmführer mit Genrefarben und Genrefilter
-• Eine Detailseite für jede Sendung: ansehen, von Anfang an ansehen oder aufnehmen
-
-Aufnahmen
-• Die Ordner deines Servers, mit Weiterschauen, Gesehen-Markierungen und Löschen
-• Sehen, wie viel Aufnahmeplatz noch frei ist
-
-Gemacht für den Fernseher
-• Gebaut mit Googles Material Design für TV
-• Live-TV läuft weiter, während du durch die Menüs gehst
-• Raumklang geht unverändert an Soundbar oder Receiver
-
-Keine Werbung, keine Analyse, kein Konto zum Anmelden.
+• Live-TV, Programmführer und deine Aufnahmen in einer App
+• Gemacht für die Fernbedienung, gebaut mit Googles Material Design für TV
+• Live-TV läuft weiter, während du stöberst
+• Keine Werbung, keine Analyse, kein Konto zum Anmelden
 
 Open Source unter der GNU GPL v3, mit dem Quellcode zu jeder Version: github.com/bernhardberger/tvheadend-player
 ```
