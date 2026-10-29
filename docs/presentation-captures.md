@@ -114,7 +114,8 @@ All six use English (US), font scale 1.0 and the fictional evening clock
 
 The script needs Python 3, Pillow and CairoSVG and uses the pinned Outfit font.
 It writes ignored `captures/play-store/round3/`: six plain 1920×1080 RGB PNGs,
-three 1024×500 C variations, the retained icon and banner, 960px-wide previews,
+three initial 1024×500 C variations plus the owner-requested C4 blend, the
+retained icon and banner, 960px-wide previews,
 320px thumbnails and an image-embedded `review.html`. The variations use the
 canonical symbol's paths and colours with its background omitted; the mark
 itself is unchanged. Their television screens contain complete app captures.
