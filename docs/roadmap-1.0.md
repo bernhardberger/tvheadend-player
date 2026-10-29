@@ -85,7 +85,8 @@ Roadmap D-items below are distinct from the same-numbered defects in
 | S4 | Planned instructions/video access route | Review acceptance unverified; do not treat the preparation pack or video plan as Google's approval. |
 | S5 | Partial | Product covers many checklist requirements; complete per-ID audit and physical validation/deviations remain. |
 | S7, S8 | Preparation pack delivered | Listing/graphics and declaration guidance in `play-store.md`; completion/submission in Console unverified. |
-| S9, S10 | Open; S9 settled for 0.3.2 (owner 2026-10-29) | Owner-accepted GPL-on-Play conclusion (draft for 0.3.2) and package/key registration (owner console step before 1.0) not established. |
+| S9 | Done (owner 2026-10-29) | GPL-on-Play conclusion recorded in `product-identity-plan.md` → Google Play distribution. |
+| S10 | Open | Package/key registration (owner console step before 1.0) not established. |
 | S12 | Watch-ahead, outside current target-36 work | Revisit at the target-37 upgrade; not a feature to build for this baseline. |
 | S13, S14 | Implemented and expanded | README now has a current screenshot gallery and user-facing feature copy; its original three-image placeholder and two-language description are obsolete. |
 | X1, X2 | Completed, 2026-10-18 | Empty plan removed and completed plans archived. |
@@ -503,5 +504,5 @@ Record implementation and physical acceptance separately when closing rows.
    U1 residual trials and U20 seek-step/polish decisions remain bounded to
    their screens. Channels view modes and the current Recordings tabs are
    delivered, not unanswered initial-design questions.
-3. S9 GPLv3-on-Play conclusion.
+3. S9 GPLv3-on-Play conclusion: done 2026-10-29.
 4. A1 and P6.

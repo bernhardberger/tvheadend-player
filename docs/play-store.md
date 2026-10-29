@@ -825,8 +825,8 @@ one updates the other.
    `v0.3.0` carries the source archives, SDK and FFmpeg source), the listing
    points to it (both descriptions do), and we add no extra restrictions. The
    APKs Play builds from our AAB are object code from the same source. This
-   isn't legal advice; once you accept a conclusion, it goes into
-   `product-identity-plan.md` as S9 asks.
+   isn't legal advice. Accepted 2026-10-29 and recorded in
+   `product-identity-plan.md` → Google Play distribution.
 8. **One-way choices.** Free can't become paid, the package name locks with the
    first upload, and the signing key locks with the first open or production
    release. Changing the key after testers installed means reinstalls (1.2).
@@ -849,5 +849,4 @@ one updates the other.
    (1.4): confirm.
 9. Testers: email list or Google Group (1.7), and where the invite asks people
    to send their address (6.1).
-10. S9: accept the GPLv3 conclusion in risk 7, to record it in
-    `product-identity-plan.md`.
+10. S9: accepted 2026-10-29, recorded in `product-identity-plan.md`.

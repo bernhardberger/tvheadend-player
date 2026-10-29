@@ -105,6 +105,38 @@ An optional read-only `upstream` remote may point to
 `Preclikos/tvhstream`. Product and appliance commits must never be pushed there.
 Generic fixes can still be extracted into narrow predecessor-compatible commits.
 
+## Google Play distribution
+
+Accepted by the owner on 2026-10-29 (roadmap S9). Not legal advice.
+
+The app's code is GPLv3 and partly the predecessor's copyright, so every build,
+including the one on Google Play, is distributed under GPLv3 and never
+relicensed. Play distribution complies on these conditions:
+
+1. **Corresponding source for every Play release.** The AAB uploaded to Play
+   comes from the same signed bundle as the GitHub release `v<version>`, which
+   carries the application source archives, the exact SDK source classifiers and
+   the Media3/FFmpeg corresponding source (`docs/release-process.md`). The APKs
+   Play builds from the AAB are object code from that source. No Play upload
+   without the matching public GitHub release.
+2. **Directions next to the object code.** Both store descriptions name the
+   GPLv3 and link the repository, and Settings → About shows the license and
+   notices. That is the "clear directions" GPLv3 section 6(d) asks for when the
+   source sits on a different server.
+3. **Kept available.** A release's source stays on GitHub for as long as that
+   version is offered on Play, as section 6(d) requires; published GitHub
+   releases are not deleted.
+4. **No added restrictions.** The listing, the in-app text and the Play
+   Console settings add no terms beyond GPLv3. Users may build, modify and
+   sideload their own builds; a self-built APK just carries a different
+   signature and installs beside or instead of the Play one.
+5. **Installation information** (GPLv3 section 6, "User Products") does not
+   apply: the app is not conveyed with a device. The Appliance build on a
+   household TV is installed by the owner, not sold with the TV.
+
+Play App Signing uses this project's own release key (uploaded with PEPK), so
+the Play build and the GitHub APK are the same signer and update each other.
+
 ## Release boundary
 
 No signed binary may be published until all of these gates pass:
