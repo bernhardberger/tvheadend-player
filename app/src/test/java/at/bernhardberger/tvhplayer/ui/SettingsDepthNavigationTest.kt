@@ -104,19 +104,15 @@ class SettingsDepthNavigationTest {
         compose.onNodeWithTag(focusedRow).assertIsFocused()
         compose.runOnIdle {
             val nodes = accessibilityNodes()
-            fun tagged(tag: String) = nodes.singleOrNull {
-                it.viewIdResourceName == tag
-            }
+            fun tagged(tag: String) = nodes.singleOrNull { it.tag == tag }
             for (tag in listOf("depth-active", "settings-level-$level", focusedRow)) {
                 val node = tagged(tag)
                 assertNotNull("Accessibility provider omitted $tag", node)
-                assertTrue("Accessibility node $tag must be visible", node!!.isVisibleToUser)
-                val bounds = android.graphics.Rect()
-                node.getBoundsInScreen(bounds)
-                assertFalse("Accessibility node $tag must have bounds: $bounds", bounds.isEmpty)
+                assertTrue("Accessibility node $tag must be visible", node!!.visibleToUser)
+                assertFalse("Accessibility node $tag must have bounds: ${node.bounds}", node.bounds.isEmpty)
             }
-            assertTrue(tagged(focusedRow)!!.isFocused)
-            val exposedLevels = nodes.mapNotNull { it.viewIdResourceName }
+            assertTrue(tagged(focusedRow)!!.focused)
+            val exposedLevels = nodes.mapNotNull { it.tag }
                 .filter { it.startsWith("settings-level-") }
             assertEquals("Inactive headings must stay hidden", listOf("settings-level-$level"), exposedLevels)
         }
@@ -124,8 +120,18 @@ class SettingsDepthNavigationTest {
         compose.onNodeWithTag(focusedRow).assertIsDisplayed()
     }
 
-    /** Walk only child IDs published by the platform provider, not Compose's test semantics tree. */
-    private fun accessibilityNodes(): List<AccessibilityNodeInfo> {
+    private class AccessibleNode(
+        val tag: String?,
+        val visibleToUser: Boolean,
+        val bounds: android.graphics.Rect,
+        val focused: Boolean,
+    )
+
+    /**
+     * Walk only child IDs published by the platform provider, not Compose's test semantics tree.
+     * Fields are read while real node infos are enabled, so assertions never depend on the shadow.
+     */
+    private fun accessibilityNodes(): List<AccessibleNode> {
         // The default Robolectric ANI shadow stores synthetic children instead of platform IDs.
         // Use real IDs and ask Compose's provider for each child, without a device connection.
         val property = "robolectric.useRealAni"
@@ -135,10 +141,12 @@ class SettingsDepthNavigationTest {
             val provider = requireNotNull(captureView.accessibilityNodeProvider)
             val childId = AccessibilityNodeInfo::class.java.getDeclaredMethod("getChildId", Int::class.javaPrimitiveType)
             childId.isAccessible = true
-            val nodes = mutableListOf<AccessibilityNodeInfo>()
+            val nodes = mutableListOf<AccessibleNode>()
             fun visit(id: Int) {
                 val node = requireNotNull(provider.createAccessibilityNodeInfo(id))
-                nodes += node
+                val bounds = android.graphics.Rect()
+                node.getBoundsInScreen(bounds)
+                nodes += AccessibleNode(node.viewIdResourceName, node.isVisibleToUser, bounds, node.isFocused)
                 repeat(node.childCount) { index ->
                     val packedId = childId.invoke(node, index) as Long
                     visit((packedId shr 32).toInt())
