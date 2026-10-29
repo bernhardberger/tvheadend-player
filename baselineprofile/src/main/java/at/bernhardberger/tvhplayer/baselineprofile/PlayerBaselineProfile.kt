@@ -51,7 +51,7 @@ class PlayerBaselineProfile {
             baselineProfile.collect(packageName = PackageName, includeInStartupProfile = true) {
                 coldStart()
                 if (autoplay) {
-                    await(By.res("video-surface"), "Autostart must enter the player")
+                    await(By.res("player-banner"), "Autostart must enter the player")
                     assertTrue("Autostart must bypass Channels", !has(channel()))
                     videoAndReturn(layout)
                 } else {
@@ -83,7 +83,7 @@ class PlayerBaselineProfile {
     private fun MacrobenchmarkScope.startAtExistingChannels() {
         coldStart()
         assertTrue("Precondition: a stored reachable server and playable channels",
-            device.wait({ !has(By.res("main-startup-root")) && (has(channel()) || has(By.res("video-surface"))) }, ReadyTimeout))
+            device.wait({ !has(By.res("main-startup-root")) && (has(channel()) || has(By.res("player-banner"))) }, ReadyTimeout))
         if (!has(channel())) {
             awaitVideo()
             key(KeyEvent.KEYCODE_BACK)
@@ -108,7 +108,8 @@ class PlayerBaselineProfile {
     }
 
     private fun MacrobenchmarkScope.awaitVideo() {
-        await(By.res("video-surface"), "Playback must have a video surface")
+        // PlayerView hides its AndroidView subtree from accessibility; use the Compose chrome.
+        await(By.res("player-banner"), "Playback must enter the player's passive banner")
         assertTrue("Playback must present video", device.wait({ !has(By.res("video-cover")) }, ReadyTimeout))
         awaitStartupReveal()
         // The banner hides five seconds after the first frame, leaving several seconds of tune work.
