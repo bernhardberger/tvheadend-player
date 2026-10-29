@@ -15,7 +15,7 @@ REGISTER_LIMIT = 200
 
 
 def method_registers(lines):
-    """Read dexdump -d records, including signatures to distinguish overloads."""
+    """Read dexdump method headers, including signatures to distinguish overloads."""
     owner = name = signature = None
     for line in lines:
         if line.startswith("  Class descriptor"):
@@ -43,9 +43,9 @@ def check_apk(apk, dexdump):
         for dex_name in dex_names:
             dex_path = Path(directory) / dex_name
             dex_path.write_bytes(archive.read(dex_name))
-            with tempfile.TemporaryFile(mode="w+") as errors:
+            with tempfile.TemporaryFile(mode="w+", encoding="utf-8", errors="replace") as errors:
                 process = subprocess.Popen(
-                    [str(dexdump), "-d", str(dex_path)],
+                    [str(dexdump), str(dex_path)],
                     stdout=subprocess.PIPE, stderr=errors, text=True, errors="replace",
                 )
                 try:
@@ -60,7 +60,10 @@ def check_apk(apk, dexdump):
                     process.stdout.close()
                     result = process.wait()
                 if result != 0:
-                    raise ValueError(f"dexdump failed for {dex_name} (exit {result})")
+                    errors.seek(0)
+                    diagnostic = "\n".join(errors.read(4096).splitlines()[:3])
+                    detail = f"\n{diagnostic}" if diagnostic else ""
+                    raise ValueError(f"dexdump failed for {dex_name} (exit {result}){detail}")
             dex_path.unlink()
     if not app_methods:
         raise ValueError("no app method register records found; use the unminified Play debug APK")

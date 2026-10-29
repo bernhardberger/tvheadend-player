@@ -2456,6 +2456,70 @@ class GuideVisualLayoutTest {
         }
     }
 
+    @Test fun pendingGuideViewSaveSurvivesPreparationAuthorityChange() {
+        val saveStarted = CompletableDeferred<Unit>()
+        val releaseSave = CompletableDeferred<Unit>()
+        val saveCompleted = CompletableDeferred<Unit>()
+        val dataStore = object : DataStore<Preferences> {
+            override val data = MutableStateFlow(emptyPreferences())
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+                saveStarted.complete(Unit)
+                releaseSave.await()
+                return transform(data.value).also {
+                    data.value = it
+                    saveCompleted.complete(Unit)
+                }
+            }
+        }
+        val preparationHeld = java.util.concurrent.CountDownLatch(1)
+        val releasePreparation = java.util.concurrent.CountDownLatch(1)
+        val holdPreparation = mutableStateOf(false)
+        try {
+            show(headline = true, uiPreferences = dataStore, preparationBlocker = {
+                if (holdPreparation.value) {
+                    rememberPreparedBrowseData(authority = Unit, input = Unit) {
+                        preparationHeld.countDown()
+                        check(releasePreparation.await(30, java.util.concurrent.TimeUnit.SECONDS))
+                    }
+                }
+            })
+            key(Key.DirectionRight)
+            key(Key.DirectionRight)
+            tagFocused("channels-view-button")
+            key(Key.Enter)
+            tagFocused("guide-view-rows-regular")
+            key(Key.DirectionDown)
+            key(Key.DirectionDown)
+            tagFocused("guide-view-headline")
+            key(Key.Enter)
+            compose.runOnIdle {
+                assertTrue("The settings write has started", saveStarted.isCompleted)
+                assertFalse(saveCompleted.isCompleted)
+                holdPreparation.value = true
+            }
+            compose.waitForIdle()
+            assertTrue(preparationHeld.await(5, java.util.concurrent.TimeUnit.SECONDS))
+            compose.runOnIdle {
+                val observation = session.observation.value
+                session.publish(SessionObservation.create(sessionState = SessionState.Disconnected,
+                    channelState = observation.channelState, epgState = observation.epgState,
+                    dvrState = observation.dvrState))
+            }
+            compose.waitForIdle()
+            compose.onNodeWithTag("guide-view-headline").assertDoesNotExist()
+            compose.onNodeWithTag("epg-timeline-content").assertDoesNotExist()
+            compose.runOnIdle { releaseSave.complete(Unit) }
+            compose.waitForIdle()
+            compose.runOnIdle {
+                assertTrue("The pending guide-view save survives the preparation authority change", saveCompleted.isCompleted)
+            }
+            assertFalse(runBlocking { uiSettings.settings.first() }.guideView.headline)
+        } finally {
+            releasePreparation.countDown()
+            releaseSave.complete(Unit)
+        }
+    }
+
     @Test fun viewOptionsHideTheHeadlineAndItsArtAndKeepTheChoice() {
         show(headline = true)
         headlineTitle(title(1, 0))
@@ -3004,7 +3068,7 @@ class GuideVisualLayoutTest {
         initialGenre: ProgrammeCategory = ProgrammeCategory.ALL, subtitle: String? = null,
         playingChannel: ChannelId? = null, activeGroup: ChannelTagId? = null, playerReturn: PlayerReturnFocus? = null,
         lastPlayedChannel: ChannelId? = null, rating: EpgRating? = null, events: List<EpgEvent>? = null,
-        channelNames: List<String>? = null,
+        channelNames: List<String>? = null, uiPreferences: DataStore<Preferences> = preferences(),
         preparationBlocker: @Composable () -> Unit = {}) {
         val channels = channelNames?.mapIndexed { index, name ->
             Channel.create(ChannelId(index + 1L), name = name, number = index + 1L, icon = ArtworkId(index + 1),
@@ -3096,7 +3160,7 @@ class GuideVisualLayoutTest {
         val notices = NoticeCenter(android.os.SystemClock::elapsedRealtime) {
             NoticeContext(profiles.configurationGeneration.value, session.observation.value.currentSession?.generationIdentity)
         }
-        uiSettings = UiSettingsStore(preferences())
+        uiSettings = UiSettingsStore(uiPreferences)
         // The grid's geometry without the headline; headline tests keep the default view.
         if (!headline || rows != GuideRows.REGULAR) runBlocking { uiSettings.setGuideView(GuideView(rows, headline = headline)) }
         val noticeModule = module {

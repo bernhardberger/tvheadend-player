@@ -28,7 +28,7 @@ class DexRegistersTest(unittest.TestCase):
         self.apk = self.root / "app.apk"
         self.dexdump = self.root / "dexdump"
         # A local fake reads the canned dump stored in each classes*.dex entry.
-        self.dexdump.write_text("#!/usr/bin/env python3\nimport pathlib, sys\nprint(pathlib.Path(sys.argv[2]).read_text())\n")
+        self.dexdump.write_text("#!/usr/bin/env python3\nimport pathlib, sys\nprint(pathlib.Path(sys.argv[1]).read_text())\n")
         self.dexdump.chmod(0o700)
 
     def write_apk(self, entries):
@@ -64,7 +64,7 @@ class DexRegistersTest(unittest.TestCase):
         self.assertEqual(([], 1, 200), check_apk(self.apk, self.dexdump))
 
     def test_tolerates_non_utf8_dex_string_contents(self):
-        self.dexdump.write_text("#!/usr/bin/env python3\nimport pathlib, sys\nsys.stdout.buffer.write(pathlib.Path(sys.argv[2]).read_bytes())\n")
+        self.dexdump.write_text("#!/usr/bin/env python3\nimport pathlib, sys\nsys.stdout.buffer.write(pathlib.Path(sys.argv[1]).read_bytes())\n")
         self.write_apk({"classes.dex": b"string contents: \xed\xa0\x80\n" + dump(
             "Lat/bernhardberger/tvhplayer/ScreenKt;", 199,
         ).encode()})
@@ -83,6 +83,20 @@ class DexRegistersTest(unittest.TestCase):
         self.dexdump.write_text("#!/usr/bin/env python3\nimport sys\nsys.exit(7)\n")
         with self.assertRaisesRegex(ValueError, "dexdump failed for classes.dex \\(exit 7\\)"):
             check_apk(self.apk, self.dexdump)
+
+    def test_dexdump_failure_includes_first_three_stderr_lines(self):
+        self.write_apk({"classes.dex": "invalid dex"})
+        self.dexdump.write_text(
+            "#!/usr/bin/env python3\nimport sys\n"
+            "sys.stderr.buffer.write(b'Invalid dex\\nBad header\\nDetail: \\xff\\nOmitted line\\n')\n"
+            "sys.exit(7)\n"
+        )
+        with self.assertRaises(ValueError) as failure:
+            check_apk(self.apk, self.dexdump)
+        self.assertEqual(
+            "dexdump failed for classes.dex (exit 7)\nInvalid dex\nBad header\nDetail: \ufffd",
+            str(failure.exception),
+        )
 
 
 if __name__ == "__main__":

@@ -1834,6 +1834,8 @@ fun EpgGridScreen(
 
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(Modifier.fillMaxSize().testTag("epg-screen")) content@{
+        // Settings writes belong to the screen, not the temporarily gated prepared content.
+        val settingsScope = rememberCoroutineScope()
         BrowsePreparationPending(initialFocusEnabled, ready = preparedIndex != null,
             onPendingFocus = {
                 // Cold entry starts on the header; a player return enters its programme.
@@ -2144,9 +2146,8 @@ fun EpgGridScreen(
         }
         GuideBrowseContent()
         @Composable
-        fun GuideOverlays() {
+        fun GuideOverlays(settingsScope: kotlinx.coroutines.CoroutineScope) {
         val settingsStore: UiSettingsStore = koinInject()
-        val settingsScope = rememberCoroutineScope()
         GuideOverlayHost(
             contentPadding = contentPadding,
             showSearchDialog = showSearchDialog,
@@ -2266,7 +2267,7 @@ fun EpgGridScreen(
             null -> Unit
         }
         }
-        GuideOverlays()
+        GuideOverlays(settingsScope)
 
     }
     }
