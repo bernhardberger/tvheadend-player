@@ -2,12 +2,117 @@
 
 **Status:** Internal, preliminary working plan of the maintainer, not a
 published project roadmap: nothing here is a promise or a release date, and
-items change or drop without notice. First draft 2026-10-11. The milestone table shows what
-is done; the SDK version is pinned in `gradle/libs.versions.toml`.
+items change or drop without notice. First draft 2026-10-11; reconciled
+2026-10-28 against `main` at `08b3df64` (0.3.1, SDK 0.36.0). The current
+disposition below replaces the old version allocation; the SDK version is
+pinned in `gradle/libs.versions.toml`.
 **Scope:** Everything between the current Player and a signed 1.0 release of the
 remote-first Android TV client. Detailed designs stay in the plans each
 workstream links to; this document owns scope, order, decisions and exit
 criteria. Archive it once 1.0 ships.
+
+## Where we actually are (2026-10-28)
+
+Most of the screen rework originally allocated to 0.4–0.7 is already in the
+0.3.0 code and changelog. The current tree is 0.3.1. The remaining path is
+feature closure, targeted refinement, physical acceptance and store delivery;
+it is no longer a succession of whole-screen rewrites.
+
+This reconciliation uses the current source, commit history, `CHANGELOG.md`,
+the defect ledger and the linked plans. It did not run new tests, inspect Play
+Console or perform a device session. Local release tags establish the source
+baseline, not acceptance of every roadmap gate.
+
+Status terms:
+
+- **Implemented:** present in the current source/release record. This does not
+  imply physical acceptance or completion of every original optional idea.
+- **Accepted:** an explicit owner observation is recorded for the named scope.
+- **Partial:** substantial delivery, with a named remainder.
+- **Open:** work or a decision remains; **unverified** means the reviewed
+  records do not establish the exit, rather than proving it never happened.
+- **Deferred/out:** an existing owner decision, not a new deferral made by this
+  reconciliation.
+
+### Delivery and acceptance ledger
+
+Roadmap D-items below are distinct from the same-numbered defects in
+`defect-ledger.md`.
+
+| IDs | Implementation / disposition | Acceptance or remaining work |
+|---|---|---|
+| P1, P2 | Implemented: decoder counters and privacy-safe failure classification | P1 does **not** include A/V offset: Media3 supplies no honest value (defect D14). Diagnostic delivery does not close the underlying playback reports. |
+| P3, P4 | Deferred by owner, 2026-10-12 | Reopen the broad reliability session when a defect recurs; independently reported newer defects still need disposition. |
+| P5, P6 | Open; after 0.3.2 (owner 2026-10-29) | Current-stack interlaced/device matrix; owner decision on the G08 render-mode report. G08, Sony and NVIDIA Shield testing/rollout is coordinated by the owner after 0.3.2 and may need appliance-build fixes and device quirks. |
+| D1–D3, D5, D6 | Out: rules/editing remain in the server UI | No new implementation obligation. |
+| D4, D7 | Implemented: disk space; growing-recording playback and resume | D8's real-server mutation pass remains a separate exit. |
+| D8 | Acceptance unverified | Record schedule/cancel/delete end to end on the selected candidate; include D9 if retained. |
+| D9 | Lowest priority (owner 2026-10-29) | If recording timers come, they come as one slate with autorecs and the related rules, either at the end of the 1.0 path or after 1.0 with the mobile app, which needs them anyway. No manual time-window recording UI exists today. |
+| H1 | Completed spike and owner decision | The recorded G10 result closed the investigation, not a shipped launcher integration. |
+| H2–H5, A3 | Out of 1.0 | Launcher integration and its deep-link work remain excluded. This does not remove the separate in-app Home requirement U3. |
+| U1 | Partial | Current Channels layouts and player rail supersede much of the trial work; explicit final trial disposition and branch cleanup (X3) remain unverified. |
+| U2 | Completed initial owner-corrected inventory | Its October 11–12 observations are design history, not a current missing-feature list. |
+| U3 | Open; exploratory design round started 2026-10-29 | No Home destination in `AppNavigation.kt`. Owner wants it soon: one designer round on a non-Claude model first (`build/handoff/u3-home-brainstorm.md`); if it doesn't lead anywhere it waits for Claude quota. Getting 0.3.2 on Play comes first. |
+| U4 | Implemented **and owner-accepted on G10, 2026-10-22** | List, Grid, Immersive, group filtering and skeletons; acceptance recorded in `d3277266`. Later changes still belong to final candidate acceptance. |
+| U5 | Implemented core rework in 0.3.0 | Header/day-time panel, densities, genre filter/colors, recording marks and focus fixes. Final physical acceptance unverified; E7 records remaining artwork cost. Persistent past-guide history was explicitly not required for 1.0. |
+| U6 | Substantially implemented in 0.3.0 | Tabs, folder browse, running/missed/error states, actual recorded length, padded stop, watch status and free space delivered. D9 remains open; extra genre/channel views were ideas, not evidence of missing core functionality. Physical acceptance unverified. |
+| U7 | Implemented core rework in 0.3.0; privacy reader added in 0.3.1 | Guided server discovery/connection setup, reorganized settings, About and three-stage background playback delivered. U18 is still separate; physical acceptance unverified. |
+| U8, U20 | Substantially implemented in 0.3.0 | Shared Info/details, recording date, channel identity, rail peek, Audio/Subtitles actions, relative seek steps and in-place number entry delivered. Final seek-step choice/polish and G10 sign-off remain to reconcile. Owner retained the Channels-down cue on 2026-10-28 (defect D22). |
+| U9, U10 | Implemented | Startup rework and hidden Guide search. Global search stays after 1.0; startup timing/feel remains part of candidate acceptance. |
+| U11 | Partial acceptance record | U4 has explicit acceptance. No blanket sign-off found for all reworked screens. Batch the remaining journeys on the final candidate. |
+| U12 | Partial evidence, exit unverified | Extensive production-composable capture/layout tests exist. They are not by themselves proof of a settled, maintained screenshot-golden suite. |
+| U13, U17, U19 | Implemented | Clock override, locale-aware formatting and shared bullet separators. Width/readability remains in final localized-screen acceptance. |
+| U14 | Partial; a later, larger slice (owner 2026-10-29) | Live-player GUIDE now toggles its channel Schedule panel (`LivePlayerLayerState.handleScheduleKey`). That is not the original all-screen GUIDE/TV/LIST contract. Device quirks need a key-capture diagnostic first, so testers can report raw key codes. |
+| U15 | Implemented | Shared context menus, details family and error catalog integrated into live, recording and browse/startup surfaces. The old 0.4 allocation is obsolete. |
+| U16 | Partial; final consistency pass still pending | Many entry/Back restorations landed, including Guide time/position, recording-player return and folder-row restoration. No complete TV-DB/all-screen acceptance record found. |
+| U18 | Open | `channelTitleText` still includes every non-null number; no app-wide hide-number setting found. |
+| E1 | Dropped | No timing budgets or automatic speed verdicts. |
+| E2, E4 | Implemented measurement lane; execution exit unverified; run once on the 0.3.2 candidate | `fd5d4f8c` adds `:macrobenchmark` and G10 journeys; optimized tracing keep rules exist. Current lane uses real-server `profileServer`, not the original fixture proposal. Assembly/source alone does not establish a successful on-device runner or a complete recorded run. |
+| E3 | Implemented generator and committed profiles | Startup generation landed in `418366c4`; generation reminder is in the release process. Retain the APK-only/DM comparison as unverified rather than calling the entire original exit complete. |
+| E5 | Partial, materially advanced | Cached/startup presentation and SDK startup work delivered. The old 8-second observation is not a current baseline; proposed sync-progress/now-next expansion remains on hold per owner. Current candidate before/after acceptance unverified. |
+| E6 | Open / exit unverified | No completed first-media/codec/render attribution closing this item found in the reviewed records. |
+| E7, E10 | Partial, measured and improved | Guide culling removes per-frame recomposition; baked scrims and drawing changes reduce cost. October 24 G10 record still shows artwork-on Guide frames around 44–48 ms. This is remaining evidence to judge, not an invented timing failure threshold. |
+| E8 | Open | Measurement tools exist; the release process does not yet contain the proposed previous-release number comparison. |
+| E9 | Acceptance unverified | Owner judgment of the optimized final build remains distinct from collected timings. |
+| A1, A2 | Decision / acceptance open; after 0.3.2 (owner 2026-10-29) | Appliance implementation exists; settle the firmware workaround contract and complete current-candidate GUIDE/wake/process-death/repeat/TalkBack checks. |
+| R1, R5, R6 | Implemented release machinery; recurring candidate gates | Native/source checks, signing, notices/privacy review and signed install/update acceptance must be recorded for the 1.0 candidate, not inferred from earlier releases. |
+| R2 | Implemented | R8 release minification and mappings delivered; recorded Play smoke does not waive Appliance/current-release smoke. |
+| R3 | Open / per-package closure unverified | Revalidate each dependency-hygiene candidate against the current graph before scheduling removal; do not assume every old candidate is still present. |
+| R4 | Acceptance unverified | Screen semantics/test work does not substitute for the cross-screen TalkBack pass. |
+| R7 | Optional for 1.0 | Existing build CI is not evidence of the requested dependency-update/wrapper-validation automation. |
+| S1, S3, S6 | Implemented | Separate Play/Appliance IDs and manifests, two APKs and Play AAB pipeline. Console enrollment and exact-candidate verification are separate gates. |
+| S2, S11 | Owner decided to start testing with 0.3.0; preparation delivered | No Console submission, 12-tester/14-day completion or production-access grant established by repository evidence. |
+| S4 | Planned instructions/video access route | Review acceptance unverified; do not treat the preparation pack or video plan as Google's approval. |
+| S5 | Partial | Product covers many checklist requirements; complete per-ID audit and physical validation/deviations remain. |
+| S7, S8 | Preparation pack delivered | Listing/graphics and declaration guidance in `play-store.md`; completion/submission in Console unverified. |
+| S9, S10 | Open; S9 settled for 0.3.2 (owner 2026-10-29) | Owner-accepted GPL-on-Play conclusion (draft for 0.3.2) and package/key registration (owner console step before 1.0) not established. |
+| S12 | Watch-ahead, outside current target-36 work | Revisit at the target-37 upgrade; not a feature to build for this baseline. |
+| S13, S14 | Implemented and expanded | README now has a current screenshot gallery and user-facing feature copy; its original three-image placeholder and two-language description are obsolete. |
+| X1, X2 | Completed, 2026-10-18 | Empty plan removed and completed plans archived. |
+| X3, X4 | Open / partial | Trial cleanup unverified; defect ledger remains active. D22's cue decision is settled, but the other open reports prevent ledger closure. |
+
+### Delivery beyond the original milestone table
+
+- The 0.3.0 language slate and centralized locale selection shipped; English
+  and German are no longer the only shipped languages. Arabic/Hebrew and the
+  associated RTL defects remain deferred to a later release, not silently
+  accepted (`translations-plan.md`, defects D46–D48/D50).
+- 0.3.1 includes reconnect retry/backoff and background-timeshift loss fixes
+  (defects D53/D56/D60). The ledger also records closed production fixes and
+  reproducible test-harness repairs; those should not be re-added as new work.
+- Newer open reports remain visible: D58 is an SDK-boundary in-flight error/zap
+  race found in tests, not observed on a device; D42/D59 are test flakes. D25
+  (growing-recording trailing edge) and D27 (intermittent initial focus) also
+  remain open. Resolve their disposition alongside the older deferred reports;
+  P3's deferral is not a blanket waiver for new findings.
+
+Primary evidence: `CHANGELOG.md` 0.3.0/0.3.1; `docs/defect-ledger.md`;
+`docs/performance-suite.md`; `docs/guide-performance-baseline-2026-10-22.md`
+(including its follow-ups, not just the pre-rework baseline);
+`docs/release-process.md`; `docs/play-store.md`; `docs/translations-plan.md`;
+and the current application navigation/settings/player owners in
+`docs/code-ownership.md`. Evidence without an explicit owner observation is
+not labeled physically accepted.
 
 ## Scope decisions (owner, 2026-10-11)
 
@@ -59,7 +164,11 @@ Owner, 2026-10-11:
   benchmarks record numbers, and the owner's judgment on the G10 decides what
   is slow. No budget file or automatic gate.
 
-## Baseline (verified 2026-10-11)
+## Original baseline (2026-10-11, with dated updates)
+
+Historical starting point, retained to explain the scope. The reconciliation
+above is the current status; in particular, server discovery is now used by
+onboarding and the shipped language slate has expanded.
 
 Present:
 
@@ -89,10 +198,14 @@ Release builds are R8-minified since R2 (2026-10-15); the optimized
 `profileServer` build used for measurement needs `-Ptvhplayer.profileMinify=true`
 to match them.
 
-## Workstreams
+## Workstream scope and decision history
 
 Each item has an ID for tracking. **[TV]** marks a physical-TV (G10) gate, which
 needs owner observation when the item is human-visible.
+The descriptions below preserve the original briefs and dated decisions,
+including observations such as “today” and “missing” from their drafting date.
+Use the delivery ledger above for current status, not those old observations.
+An unimplemented idea in a brief is not automatically a new 1.0 requirement.
 
 ### P — Playback reliability
 
@@ -193,7 +306,7 @@ screenshot-first UX review.
 | U11 | Physical acceptance of the reworked screens **[TV]** | Observation only |
 | U12 | Screenshot goldens for production composables once screens settle | After U3–U10 |
 | U13 | **Done 2026-10-11.** 12/24-hour clock (owner: required for 1.0): an app setting "Clock format" with System (default, follows `DateFormat.is24HourFormat`), 12-hour and 24-hour, applied through one shared time formatter. The setting goes in Settings → General (`ui/screens/settings/SettingsGeneral.kt`), and a change is applied immediately without a restart. Today the format is fixed at `HH:mm` in `ui/common/TimeConverter.kt:9`, `ui/player/ProgrammeWindow.kt:146`, `ui/notifications/NoticeFormatter.kt:93`, `ui/screens/EpgGridScreen.kt:2408` and `ui/screens/recordings/RecordingsContent.kt:873`. Any later time entry (D9) follows the same setting. Re-check widths of the Guide time ruler, rail, Banner and cards for "12:45 PM" | By default all times follow the system setting, and the override wins when set; JVM tests for all three options in both locales; setting row meets the TV floor (focus, Back, TalkBack); captures in 12-hour mode |
-| U14 | Remote keys in the open app, both builds, no accessibility service: GUIDE opens our Guide, the TV key goes to the live player, LIST keeps opening the channel shelf. Owner check on the G10 (2026-10-11, service off): the keys reach the open app, which routes them to the wrong screens; the mapping is settled with the UX rework, and more keys than GUIDE and TV are likely (owner). Today the foreground app has no GUIDE→Guide mapping (`KEYCODE_GUIDE` appears only in `ui/startup/MainStartupKeyCycleOwner.kt` and the accessibility service), and TCL's TV key `4001` (`core/ApplianceEntryPolicy.kt`) is handled only by the service. Step 1: record the exact key codes the foreground app receives for GUIDE and TV **[TV]** | Each key consumed and routed from every screen; key policy JVM tests; observed on the G10 |
+| U14 | Remote keys in the open app, both builds, no accessibility service: GUIDE opens our Guide, the TV key goes to the live player. Owner check on the G10 (2026-10-11, service off): GUIDE opened the TV's own channel shelf, and the keys that reach the open app are routed to the wrong screens; the mapping is settled with the UX rework, and more keys than GUIDE and TV are likely (owner). Today the foreground app has no GUIDE→Guide mapping (`KEYCODE_GUIDE` appears only in `ui/startup/MainStartupKeyCycleOwner.kt` and the accessibility service), and TCL's TV key `4001` (`core/ApplianceEntryPolicy.kt`) is handled only by the service. Step 1: record the exact key codes the foreground app receives for GUIDE and TV **[TV]** | Each key consumed and routed from every screen; key policy JVM tests; observed on the G10 |
 | U15 | Shared patterns used by every screen, decided before the screen packages and applied in each: Menu/long-press context actions, one details surface family, and an overhaul of error delivery and recovery (one vocabulary, recovery actions, translated reasons instead of raw codes). Owner agreed these are gaps (2026-10-12) | Patterns accepted in a brief; each screen package applies them |
 | U16 | Entry focus and Back across screens: focus lands consistently when a screen is entered from the side rail, and Back meets TV-DB. Owner: deferred until the screens are feature complete | One rule, applied everywhere; key-policy tests |
 | U17 | Locale-aware dates and numbers everywhere (owner 2026-10-14), the same way U13 did the clock: one shared formatter set, used by every screen, following the app's selected language, so new translations need no formatting work. Today dates use fixed patterns: "EEE d MMM" in the Guide and Recordings (`ui/screens/EpgGridScreen.kt:2286`, `ui/screens/recordings/RecordingsContent.kt:863`), "EEEE d MMMM" for Recordings headers (`RecordingsContent.kt:842`), and a German/English switch in `ui/common/TimeConverter.kt:90`; only "First aired" uses the locale's medium date. Numbers: file sizes are hand-built "%.1f GB" (`RecordingsContent.kt:893-908`), cache size in `core/CacheStatisticsFormatting.kt`; the player statistics overlay uses `Locale.ROOT` on purpose (diagnostics) and timecodes stay "h:mm:ss". Formats come from Android for the locale (`DateFormat.getBestDateTimePattern` skeletons, `NumberFormat`, `Formatter.formatShortFileSize`), named by use (short day label, day header, short numeric date, file size). Do it before the screen packages so they use it | No fixed date pattern or hand-built number format left in UI code outside the shared set; JVM tests for each format in en-US and de; captures re-checked for width |
@@ -229,7 +342,7 @@ Sources: `profiling.md`, `responsive-ui-implementation-record.md`,
 `navigation-startup-profiling-2026-09-10.md`,
 `residual-main-menu-performance-2026-09-11.md`.
 
-Current state:
+Measurement tooling (updated 2026-10-28):
 
 - Profiling is manual ADB/Perfetto (`tools/profiling/`).
 - The `:baselineprofile` module generates the baseline and startup profiles
@@ -237,16 +350,19 @@ Current state:
   `baselineprofile/src/main/java/at/bernhardberger/tvhplayer/baselineprofile/PlayerBaselineProfile.kt`)
   into `app/src/main/generated/baselineProfiles/`. It uses the Macrobenchmark
   library for generation only; E3 covers the minimal journeys.
-- There is no benchmark module that records timings, no machine-readable
-  budgets and no regression detection (E2).
+- `:macrobenchmark` now records frame/startup timings on optimized
+  `profileServer`; `tools/perf/journeys` records G10 histogram deltas.
+  `performance-suite.md` owns both lanes. There are deliberately no timing
+  budgets or automatic speed gates.
 
-Measured on the G10, 2026-09:
+Historical G10 measurements, 2026-09 (not the current performance baseline):
 
 - about 8 s from process bind to first admitted tune;
 - zap to first frame 0.5–3.4 s;
 - Guide page return 286–353 ms;
 - rail reopen 209–265 ms;
-- cold main menu misses the declared 100/200 ms budgets.
+- cold main menu was compared with subsequently retired 100/200 ms budgets;
+  those figures are not acceptance criteria.
 
 | ID | Item | Exit |
 |---|---|---|
@@ -322,9 +438,10 @@ application ID and `APPLIANCE_BUILD`) and the Play bundle in the release pipelin
 (`tools/prepare-release:46-50` builds `:app:bundlePlayRelease` and checks
 `app/build/outputs/bundle/playRelease/app-play-release.aab`).
 
-Gaps:
+Submission gaps (updated 2026-10-28):
 
-- There are no store assets and no current screenshots.
+- Current README captures and the store preparation pack exist. Console
+  listing completion and submission are not established by those files.
 - A reviewer cannot use the app without a Tvheadend server.
 
 | ID | Item | Exit |
@@ -355,45 +472,36 @@ Gaps:
 
 ## Milestones
 
-| Version | Content | Exit |
+The old 0.4–0.8 version allocations are retired: they placed delivered work in
+future releases. The stages below express remaining dependencies without
+assigning new version numbers or changing the owner's scope decisions.
+
+| Stage | Remaining scope | Exit |
 |---|---|---|
-| 0.3 | Done so far: P1–P2, H1, U2 inventory, U15 shared patterns, U17 locale formats, E3 (minimal journeys), R2, S1/S3 split, S6 AAB, D4, U9 startup, player entry and picture cover, display frame-rate matching from the stream's declared frame rate (SDK 0.34.0), artwork context (SDK 0.33.0); repository, docs and release material checked for stale content and naming first | Signed Play and Appliance release on GitHub; release smoke on the G10; README screenshots and features section (S13, S14); Play closed test submitted with 0.3.0 (S2/S11, with S4, S7 and S8; owner 2026-10-28) |
-| 0.4 | U4 Channels; error catalog wired in three slices (live player, recording player, browse screens) | Channels accepted on the G10; no raw codes outside the stats overlay |
-| 0.5 | U6 Recordings (D9 inside, real recorded length and padded stop) | Recordings accepted on the G10 |
-| 0.6–0.7 | Remaining screens in the U2 order, U3 Home where it fits, E4, U14; U1 trials decided in place; E5/E6 alongside | Each screen accepted as it lands |
-| 0.8 | U16 entry focus and Back; E2 full journeys, E7, E8 on the settled screens; S5 audit and fixes; U12 goldens | Numbers recorded; TV checklist passes or deviations documented |
-| 0.9 RC | U11, P5, A1–A2, R1, R3–R5, E9, S9, S10, X1–X4; S4 demo video re-recorded on the RC if the screens changed since the closed-test submission | All [TV] gates observed |
-| 1.0 | R6, Play production release after S11 | Signed release on GitHub and Play |
+| Delivered baseline: 0.3.0 → 0.3.1 | Screen reworks, shared patterns, startup, DVR improvements, localization, R8, profiles, Play/Appliance/AAB pipeline; subsequent recovery fixes | Credit implementation now; carry only the specific unresolved items and acceptance gates above. |
+| Feature closure | U3 Home, D9 manual recording (or owner drops it), U18 number visibility, U14 remote contract; U8/U20 residual polish and U1 dispositions | Each remaining requirement implemented or explicitly removed by owner; U16's cross-screen entry/Back rule settled. |
+| Quality closure, alongside feature work | Open defect dispositions; E2/E4 executed evidence, E5–E10 remaining measurements/improvements, U12, R3 revalidation, S5 audit | Focused fixes and evidence; no resurrection of dropped performance budgets or already-closed defects. |
+| Physical release-candidate acceptance | U11, D8, P5, A1–A2, R4, E9; current-candidate native/release checks, privacy/notices, trial cleanup | Named journeys observed on the candidate; unresolved failures fixed or explicitly dispositioned. Prior Channels acceptance narrows work but does not certify the whole candidate. |
+| Play track, in parallel from 0.3.x | S2/S4/S7/S8/S11 closed-test submission, access route and tester window; S9/S10 conclusions/registration | Recorded Console/review outcomes, test feedback triaged, production access granted. |
+| 1.0 delivery | R6 exact signed-candidate verification and install/update matrix; GitHub and Play publication | All retained 1.0 exits met and publication approved. |
 
-The closed test (S2/S11) starts with 0.3.0 (owner, 2026-10-28), with S4
-reviewer instructions and a demo video recorded on 0.3.0 and the store listing,
-app content declarations and Play App Signing (S7, S8) done for that submission.
-The 14-day window can then close long before 1.0, so a Play 1.0 waits only for
-production access and its own review, not for a test window after the RC.
+The owner chose to start the closed test with 0.3.0, rather than wait for the
+RC. `play-store.md` owns that preparation. The 14-day window is counted from
+actual qualifying tester participation, not the decision date or the existence
+of a preparation pack. Update screenshots/video when the submitted UI changes.
 
-Order rationale:
-
-- Reliability, the UX inventory and the home-screen integration spike come
-  first because they change what later work builds on.
-- The UX rework is the main body. Work that does not depend on the screens
-  (playback, build split, minified release, AAB, startup and zap internals,
-  profile generation) runs alongside it and stays valid whatever the screens
-  become.
-- Work that does depend on the screens (benchmark journeys beyond startup and
-  playback, Guide and rail performance, audit fixes, goldens, store screenshots,
-  demo video) waits until the screens settle, so it is not built twice. The
-  closed test's first listing and demo video use 0.3.0 and are refreshed then.
-- TV quality requirements and H1 results feed the UX work as inputs rather than
-  arriving as late fixes.
-- Physical-TV gates are batched per milestone so the owner observes once, with
-  the G10 sessions clustered at 0.3 (reliability) and 0.9 (acceptance).
+Revalidate this ledger after a scope decision, a materially changed screen or
+playback path, a new release candidate, or a recorded device/Console outcome.
+Record implementation and physical acceptance separately when closing rows.
 
 ## Owner decisions needed
 
-1. Remaining U2 questions, each settled inside its screen's rework with
-   prototypes and trials rather than up front (owner 2026-10-12): Channels view
-   modes and group tabs (U4), Recordings views and tabs (U6), continue watching
-   on Home or in Recordings (U3/U6).
-2. U1 trials, each inside its screen's rework.
+1. U3 Home: still in scope and absent; settle its content, including Continue
+   watching. The temporary Recordings Continue watching tab was removed
+   (`95c39627`); that did not deliver Home or remove its requirement.
+2. D9 remains in but droppable; confirm a drop only if the owner chooses it.
+   U1 residual trials and U20 seek-step/polish decisions remain bounded to
+   their screens. Channels view modes and the current Recordings tabs are
+   delivered, not unanswered initial-design questions.
 3. S9 GPLv3-on-Play conclusion.
 4. A1 and P6.

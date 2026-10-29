@@ -10,6 +10,14 @@ unfinished parts, visible nits, gaps, open trials and stale documentation. It
 feeds the screen packages U3–U10 in `roadmap-1.0.md`. It is not a design and
 authorizes no implementation.
 
+**Reconciliation, 2026-10-28:** This is the original design inventory, not a
+current list of missing features. Channels, Guide, Recordings, Settings/setup,
+shared details/context actions/errors and substantial player polish have since
+landed in 0.3.0. Use [the roadmap's delivery and acceptance ledger](roadmap-1.0.md#delivery-and-acceptance-ledger)
+for current disposition. Preserve the owner directions below as design history;
+do not reopen a delivered item solely because its original description says
+“missing”. Physical acceptance remains separate from implementation.
+
 Conventions: paths are relative to
 `app/src/main/java/at/bernhardberger/tvhplayer/` unless they start with `app/`,
 `docs/` or `artifacts/`. Captures are under `app/build/outputs/` (ignored,
