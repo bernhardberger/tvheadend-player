@@ -3392,7 +3392,7 @@ class GuideVisualLayoutTest {
             compose.waitUntil(10_000) { compose.onAllNodes(matcher and isFocused()).fetchSemanticsNodes().isNotEmpty() }
             compose.onNode(matcher and isFocused()).assertIsDisplayed().assertIsFocused()
         } catch (failure: Throwable) {
-            // Failure-only synthetic fixture evidence; retain the original exception and deadline.
+            // Failure-only synthetic fixture evidence; retain the original cause and deadline.
             println("Guide focus failure: expected=$text position=${position.position.value}")
             if (::session.isInitialized) {
                 println("Guide EPG=${session.observation.value.epgState.javaClass.simpleName} " +
@@ -3402,7 +3402,12 @@ class GuideVisualLayoutTest {
                 .getOrElse { "Cannot read focused nodes: ${it.javaClass.simpleName}" })
             println(runCatching { compose.onAllNodes(matcher, useUnmergedTree = true).printToString() }
                 .getOrElse { "Cannot read expected nodes: ${it.javaClass.simpleName}" })
-            throw failure
+            val focusedTags = runCatching {
+                compose.onAllNodes(isFocused(), useUnmergedTree = true).fetchSemanticsNodes().map {
+                    it.config.getOrElseNullable(SemanticsProperties.TestTag) { null } ?: "<untagged>"
+                }
+            }.getOrElse { listOf("<unavailable: ${it.javaClass.simpleName}>") }
+            throw AssertionError("Guide focus: expected=$text, focusedTags=$focusedTags, position=${position.position.value}", failure)
         }
     }
     private fun title(channel: Int, offset: Int) = if (channel == 2 && offset == 0)
