@@ -114,14 +114,17 @@ All six use English (US), font scale 1.0 and the fictional evening clock
 
 The script needs Python 3, Pillow and CairoSVG and uses the pinned Outfit font.
 It writes ignored `captures/play-store/round3/`: six plain 1920×1080 RGB PNGs,
-three initial 1024×500 C variations plus the owner-requested C4 blend, the
+three initial 1024×500 C variations plus the C4 owner blend and C5 primary blend, the
 retained icon and banner, 960px-wide previews,
 320px thumbnails and an image-embedded `review.html`. The variations use the
 canonical symbol's paths and colours with its background omitted; the mark
 itself is unchanged. Their television screens contain complete app captures.
 Plain screenshots preserve every RGB pixel, without added frames or copy.
 
-Each feature is compared with round-2 C in the review. The packager verifies
+The review leads with C4 and C5 side by side, followed by C1 and C3 as references.
+Each feature is also compared with round-2 C. C5 retains C3's left column and
+frame exactly and replaces only the screen pixels with the complete Channels
+capture, keeping the card row above the bottom bezel. The packager verifies
 retained files against the round-2 manifest before copying. The new manifest
 records the source commit, tracked diff hash, new tests, inherited evidence,
 input hashes and every output file's SHA-256 except itself. Add the local report

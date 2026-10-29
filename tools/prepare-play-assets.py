@@ -29,6 +29,7 @@ FEATURES = [
     ("c2-gallery", "C2 · Gallery", "A warm, light field and a graphite television on slender feet. The same live-match UI gives the frame and palette a fair comparison with C1."),
     ("c3-cinema", "C3 · Cinema", "A compact mark-and-name lockup, a remote-first headline and the concert player on a low-profile pedestal. The screen shows viewing rather than browsing."),
     ("c4-warm", "C4 · Warm title-led", "The owner’s blend: C1’s product-name hierarchy, copy and mark placement with C3’s concert picture, warm glow and low-profile television."),
+    ("c5-remote-channels", "C5 · Remote + Channels", "The primary’s blend: C3’s left column and television unchanged, with C1’s complete Channels screen. The channel cards fit vertically inside the TV; there is no player-rail peek along its bottom edge."),
 ]
 RULES = [
     ("Preview asset requirements", "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en"),
@@ -165,6 +166,10 @@ def features():
     television(c, "03-player", (410, 101), 580, "cinema")
     save(c, "feature/c3-cinema.png")
 
+    primary = c.copy()
+    television(primary, "01-channels", (410, 101), 580, "cinema")
+    save(primary, "feature/c5-remote-channels.png")
+
     hybrid = Image.new("RGB", (1024, 500), "#101319")
     halo(hybrid, (380, 95, 1060, 490), (164, 83, 31, 80), 80)
     mark(hybrid, (54, 58), 62)
@@ -198,8 +203,9 @@ def review(suites):
     (OUT / "review.html").write_text(f'''<!doctype html><html lang="en-US"><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>Play Store assets · Round 3</title>
 <style>body{{margin:32px auto;padding:0 20px;max-width:1440px;background:{FIELD};color:{TEXT};font:16px/1.6 system-ui}}h1,h2{{line-height:1.2}}p,figcaption{{color:#BAC4CC;max-width:90ch}}a{{color:#6CD5FA}}img{{display:block;width:100%;height:auto}}figure{{margin:0 0 24px}}figcaption{{margin-top:8px}}.pair{{display:grid;grid-template-columns:1fr 1fr;gap:24px}}.choices{{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}}section{{margin:48px 0}}.screens{{max-width:960px}}@media(max-width:800px){{.pair,.choices{{grid-template-columns:1fr}}}}</style>
-<h1>Tvheadend Player · Round 3</h1><p>Six plain app screenshots. Following the first three variations, the owner asked to combine C1’s text with C3’s warmth. C4 is that blend: title-led copy and logo placement with the concert picture, warm glow and refined television from C3.</p>
-<h2>Latest · C4</h2>{figure(OUT / 'previews/feature/c4-warm.png', 'C4 · C1 text + C3 warmth')}
+<h1>Tvheadend Player · Round 3</h1><p>Six plain app screenshots. Two combinations for comparison: C4 combines C1’s text with C3’s warmth; C5 retains C3’s left column and frame with C1’s full Channels screen.</p>
+<h2>The two combinations</h2><div class="pair">{figure(OUT / 'previews/feature/c4-warm.png', 'C4 · Owner’s combination: C1 text + C3 warmth')}{figure(OUT / 'previews/feature/c5-remote-channels.png', 'C5 · Primary’s combination: C3 text + C1 Channels')}</div>
+<h2>Original references</h2><div class="pair">{figure(OUT / 'previews/feature/c1-floating.png', 'C1 · Original title-led / Channels')}{figure(OUT / 'previews/feature/c3-cinema.png', 'C3 · Original remote-led / concert')}</div>
 <h2>Variations · thumbnail comparison</h2><div class="choices">{choices}</div>
 {''.join(comparisons)}
 <h2>The six screenshots · listing order</h2><p>01–04 are byte-for-byte copies of round 2. Recording now is removed. Details and schedule are fresh, unaltered production-composable captures from the same fictional evening: October 4, 2026 at 20:15 UTC, English (US), font scale 1.0.</p>
