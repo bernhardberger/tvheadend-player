@@ -2739,7 +2739,16 @@ class AudioInterruptionRuntimeTest {
             val install = scope.async {
                 runtime.playLive(requireNotNull(currentLivePlaybackSelection(session.observation.value, ChannelId(channel.toLong()))))
             }
-            await { connection.subscribeCount > subscriptions }
+            try {
+                await { connection.subscribeCount > subscriptions }
+            } catch (failure: TimeoutCancellationException) {
+                val installed = if (install.isCompleted) runCatching { install.await() }.toString() else "<pending>"
+                throw AssertionError(
+                    "Live channel $channel did not subscribe: install=$installed, " +
+                        "playerState=${player.playbackState}, playerError=${player.playerError?.errorCodeName}",
+                    failure,
+                )
+            }
             val registration = connection.awaitCollectionRegistered()
             startSubscription(registration)
             await { install.isCompleted }
