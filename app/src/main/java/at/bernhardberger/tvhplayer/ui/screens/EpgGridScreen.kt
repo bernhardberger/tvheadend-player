@@ -300,9 +300,12 @@ fun EpgGridScreen(
     ProfileCompositionLifetime("guide")
     val startPadding = contentPadding.calculateStartPadding(layoutDirection)
     val endPadding = contentPadding.calculateEndPadding(layoutDirection)
+    fun timelineWidthPixels(): Float {
     val timelineWidth = (maxWidth - startPadding - TvBrowseLeadingInset - GuideChannelWidth - GuideChannelGap)
         .coerceAtLeast(1.dp)
-    val timelineWidthPx = with(density) { timelineWidth.toPx() }
+    return with(density) { timelineWidth.toPx() }
+    }
+    val timelineWidthPx = timelineWidthPixels()
     // With the headline shown, the headline and grid sit lower so the bottom row shows it is cut.
     // Computed where it is used: a value of this body costs registers in its one generated method.
     @Composable
@@ -312,18 +315,25 @@ fun EpgGridScreen(
         gridTopPadding = guideTimelineContentPadding(contentPadding, layoutDirection).calculateTopPadding(),
         rows = view.rows,
     )
+    @Composable
+    fun visibleWindowSeconds(): Long {
     val timeLabelMeasurer = rememberTextMeasurer()
     val timeLabelWidth = clockWidthSamples(uses24Hour = AppClock.uses24Hour, digit = '0').maxOf {
         timeLabelMeasurer.measure(it, style = MaterialTheme.typography.labelMedium).size.width
     }
     // Capacity already budgets the outer safe area. Do not subtract terminal padding again.
-    val visibleWindowSec = guideVisibleWindowSec(timelineWidthPx, timeLabelWidth, density.density)
+    return guideVisibleWindowSec(timelineWidthPx, timeLabelWidth, density.density)
+    }
+    val visibleWindowSec = visibleWindowSeconds()
+    @Composable
+    fun rememberGuideBringIntoView(): InsetBringIntoViewSpec {
     val platformBringIntoView = LocalBringIntoViewSpec.current
     // Only the top edge fades; the bottom cuts, so it needs just the focus reserve.
     val topFocusInset = with(density) { (GuideEdgeFade + GuideFocusReserve).toPx() }
     val bottomFocusInset = with(density) { GuideFocusReserve.toPx() }
-    val guideBringIntoView = remember(platformBringIntoView, topFocusInset, bottomFocusInset) {
+    return remember(platformBringIntoView, topFocusInset, bottomFocusInset) {
         InsetBringIntoViewSpec(platformBringIntoView, topFocusInset, bottomFocusInset)
+    }
     }
     val coroutineScope = rememberCoroutineScope()
     val detailsMutationInFlight = remember { mutableStateOf<DvrMutationAction?>(null) }
@@ -345,10 +355,6 @@ fun EpgGridScreen(
     val currentSession = observation.currentSession
     val channels = channelScope.visibleChannels
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
-    val channelNumbers = remember(channels) {
-        channels.associate { it.id to it.visibleChannelNumber }
-    }
-    val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
     val selectedChannelId by selection.selectedId.collectAsStateWithLifecycle()
     val activePlaybackTarget by playerSession.activeTarget.collectAsStateWithLifecycle()
     val playingChannelId = (activePlaybackTarget as? AppPlaybackTarget.Live)?.channelId
@@ -366,9 +372,6 @@ fun EpgGridScreen(
         channelCatalogCurrent = channelScopeState.channelCatalogCurrent,
         connectionFailure = connectionFailure,
     )
-    val guideRecovering = connectionUiState == ConnectionUiState.Connecting ||
-        connectionUiState == ConnectionUiState.SyncingChannels ||
-        connectionUiState == ConnectionUiState.Reconnecting
 
     val guideZoneId = remember { ZoneId.systemDefault() }
     val openedAtSec = remember { System.currentTimeMillis() / 1000L }
@@ -387,10 +390,6 @@ fun EpgGridScreen(
     val pendingPlayerReturn = playerReturn?.takeIf { it !== positionedPlayerReturn }
     val playerReturnChannelId = pendingPlayerReturn?.playingChannelId
         ?.takeIf { id -> channels.any { it.id == id } }
-    val requestedProgramme = pendingPlayerReturn?.programmeId?.let(observation::event)?.takeIf {
-        it.channelId == playerReturnChannelId && it.start.epochSeconds == pendingPlayerReturn.programmeStartSec &&
-            it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
-    }
     val rememberedChannelId = remember { guidePositionStore.position.value?.channelId }
     // Recording-player Back restores the exact spot; live-player return can reposition it below.
     val restoredPosition = remember { guidePositionStore.position.value.takeIf { playerReturn != null || browseReturn } }
@@ -405,6 +404,8 @@ fun EpgGridScreen(
     // Start with the available restored/browse viewport instead of constructing page zero
     // and discarding it in the initial-position effect. That effect still resolves the
     // asynchronous last-played identity and current coverage using its existing policy.
+    @Composable
+    fun rememberChannelListState(): androidx.compose.foundation.lazy.LazyListState {
     val initialChannelId = playerReturnChannelId ?: guideEntryChannelId(
         orderedChannelIds, playingChannelId, rememberedChannelId, null, selectedChannelId,
     )
@@ -413,7 +414,9 @@ fun EpgGridScreen(
         ?.takeIf { position -> playerReturnChannelId == null && channels.any { it.id == position.channelId } }
         ?.firstVisibleColumn?.coerceIn(0, channels.lastIndex.coerceAtLeast(0))
         ?: (initialChannelIndex / CHANNEL_PAGE_SIZE) * CHANNEL_PAGE_SIZE
-    val channelListState = rememberLazyListState(initialFirstVisibleItemIndex = initialViewportIndex)
+    return rememberLazyListState(initialFirstVisibleItemIndex = initialViewportIndex)
+    }
+    val channelListState = rememberChannelListState()
     var windowStartSec by remember {
         mutableLongStateOf(
             restoredTimelinePosition?.windowStartSec?.takeIf { playerReturnChannelId == null }
@@ -477,7 +480,6 @@ fun EpgGridScreen(
     val displayEvents = remember(observation.epgSnapshotForDisplay) { guideDisplayEvents(observation.epgSnapshotForDisplay) }
     // Filter offers itself once the guide carries a genre code, and stays while one is chosen.
     val genreCodes = remember(displayEvents) { displayEvents.any { programmeCategory(it) != null } }
-    val showGenre = genreCodes || genre != ProgrammeCategory.ALL
     val indexInput = GuideIndexInput(
         observation.epgSnapshotForDisplay, displayEvents, observation.epgState, windowStartSec, windowEndSec,
     )
@@ -591,16 +593,16 @@ fun EpgGridScreen(
 
     val epgState = preparedIndex?.input?.state ?: observation.epgState
     val timelineEventIndex = preparedIndex?.value?.index ?: emptyGuideIndex
-    // From the same snapshot as the rows' programmes, so a row is never proven empty before they arrive.
-    val coverageByChannel = remember(epgState) {
-        epgState.currentEpgSnapshot()?.coverages?.associateBy { it.channelId }.orEmpty()
-    }
+    @Composable
+    fun RetainEventFocusRequesters() {
     val currentEventIds = preparedIndex?.value?.eventIds.orEmpty()
     LaunchedEffect(currentEventIds) {
         eventFocusRequesters.keys.retainAll(currentEventIds)
     }
-    val eventsByChannel = timelineEventIndex.visibleEventsByChannel
+    }
+    RetainEventFocusRequesters()
     val focusRows = remember(channels, timelineEventIndex) {
+        val eventsByChannel = timelineEventIndex.visibleEventsByChannel
         channels.map { channel ->
             EpgFocusColumn(
                 channelId = channel.id,
@@ -902,6 +904,12 @@ fun EpgGridScreen(
         coveragePending(request.coverageRequest)
     } == true
 
+    @Composable
+    fun GuidePositionEffects() {
+    val requestedProgramme = pendingPlayerReturn?.programmeId?.let(observation::event)?.takeIf {
+        it.channelId == playerReturnChannelId && it.start.epochSeconds == pendingPlayerReturn.programmeStartSec &&
+            it.start.epochSeconds in windowBounds.earliestStartSec..windowBounds.latestStartSec
+    }
     LaunchedEffect(
         channels,
         focusRows,
@@ -1169,6 +1177,9 @@ fun EpgGridScreen(
         selectedTarget, frontierRequest, pendingFrontierOrigin, channelFocusRequest, windowFocusRequest, indexCurrent) {
         if (scopeEntryRequested && initialFocusEnabled) leaveGuideScope()
     }
+
+    }
+    GuidePositionEffects()
 
     // The viewport is a native focus target only used as a bridge while its focused
     // cell is being replaced. Programme cells retain their own TV/accessibility focus.
@@ -1787,6 +1798,8 @@ fun EpgGridScreen(
         restoreSearchHeaderFocus = true
     }
 
+    @Composable
+    fun SearchSessionEffect() {
     val searchGeneration = searchObservation?.currentSession ?: searchRequest?.currentSession
     LaunchedEffect(currentSession, searchGeneration) {
         if (searchGeneration != null && searchGeneration !== currentSession) {
@@ -1796,9 +1809,9 @@ fun EpgGridScreen(
             closeSearch()
         }
     }
+    }
+    SearchSessionEffect()
 
-    val settingsStore: UiSettingsStore = koinInject()
-    val settingsScope = rememberCoroutineScope()
 
     /** Closes the open side panel and returns focus to the header button that opened it. */
     fun closePanel() {
@@ -1872,6 +1885,18 @@ fun EpgGridScreen(
         // (VerifyError: an int parameter read from an unassigned register).
         @Composable
         fun GuideBrowseContent() {
+        val channelNumbers = remember(channels) {
+            channels.associate { it.id to it.visibleChannelNumber }
+        }
+        val tagNotice by channelViewModel.unavailableTagNotice.collectAsStateWithLifecycle()
+        val guideRecovering = connectionUiState == ConnectionUiState.Connecting ||
+            connectionUiState == ConnectionUiState.SyncingChannels ||
+            connectionUiState == ConnectionUiState.Reconnecting
+        val showGenre = genreCodes || genre != ProgrammeCategory.ALL
+        // From the same snapshot as the rows' programmes, so a row is never proven empty before they arrive.
+        val coverageByChannel = remember(epgState) {
+            epgState.currentEpgSnapshot()?.coverages?.associateBy { it.channelId }.orEmpty()
+        }
         val browseAlpha = { 1f - (detailsLayering?.detailsAlpha() ?: if (detailsEvent != null && !showContextMenu) 1f else 0f) }
         // Read by the headline and its picture alone, so neither focus steps nor a settle recompose the screen.
         val settledHeadline = if (view.headline) {
@@ -2025,7 +2050,7 @@ fun EpgGridScreen(
                 startPadding = startPadding,
                 endPadding = endPadding,
                 timelineWidthPx = timelineWidthPx,
-                guideBringIntoView = guideBringIntoView,
+                guideBringIntoView = rememberGuideBringIntoView(),
                 gridFocus = gridFocus,
                 guideRetryFocus = guideRetryFocus,
                 navigationFocus = navigationFocus,
@@ -2120,6 +2145,8 @@ fun EpgGridScreen(
         GuideBrowseContent()
         @Composable
         fun GuideOverlays() {
+        val settingsStore: UiSettingsStore = koinInject()
+        val settingsScope = rememberCoroutineScope()
         GuideOverlayHost(
             contentPadding = contentPadding,
             showSearchDialog = showSearchDialog,

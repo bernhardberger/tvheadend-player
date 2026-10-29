@@ -383,15 +383,14 @@ fun VideoPlayerScreen(
     val channelScope by channelsVm.scope.collectAsStateWithLifecycle()
     // One source: the rows come from the scope whose observation their saved logos use.
     val channels = channelScope.scope.visibleChannels
-    val channelsTitle = channelScope.scope.let { scope -> scope.tags.firstOrNull { it.id == scope.activeTagId } }
+    @Composable
+    fun channelsTitle() = channelScope.scope.let { scope -> scope.tags.firstOrNull { it.id == scope.activeTagId } }
         ?.name?.takeIf { it.isNotBlank() } ?: stringResource(R.string.all_channels)
     val observation by videoPlayerViewModel.observation.collectAsStateWithLifecycle()
     val currentSession = observation.currentSession
     // Opened before its session was playable: the entry start below tunes once one is current.
     val serverWait = rememberLivePlayerServerWait(observation, connectionUiState, playerClose, onReconnect, onOpenConnectionSettings)
     val channelBrowser = remember(currentSession) { PlayerChannelBrowserState() }
-    val dvrEntries = observation.dvrEntries()
-    val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
     val canModifyRecordings = currentSession != null
     val orderedChannelIds = remember(channels) { channels.map { it.id } }
     val channelNumbers = remember(channels) {
@@ -411,7 +410,6 @@ fun VideoPlayerScreen(
     var timeshiftCommandToken by remember { mutableLongStateOf(0L) }
     var restoreToLiveAfterReconnect by remember { mutableStateOf(false) }
     var infoRailChannelId by remember { mutableStateOf<ChannelId?>(null) }
-    val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
     // The control last focused in the controls, which closing Info returns to.
     var lastChromeAction by remember { mutableStateOf<String?>(null) }
     var infoReturnAction by remember { mutableStateOf<String?>(null) }
@@ -430,9 +428,8 @@ fun VideoPlayerScreen(
     val player = remember { videoPlayerViewModel.getPlayerInstance() }
     val playWhenReady by rememberPlaybackIntent(player)
     val livePauseState by playbackRuntime.livePause.collectAsStateWithLifecycle()
-    val livePauseNotice by playbackRuntime.livePauseNotice.collectAsStateWithLifecycle()
     val livePauseAvailability = liveTransportAvailability(livePauseState, playingLiveChannelId == currentChannelId)
-    val channelIndicator = channelPlaybackIndicator(
+    fun channelIndicator() = channelPlaybackIndicator(
         currentChannelId,
         playingLiveChannelId?.let { at.bernhardberger.tvhplayer.playback.AppPlaybackTarget.Live(it) },
         playbackState,
@@ -517,12 +514,7 @@ fun VideoPlayerScreen(
         timelineState.updateTimeline(effectiveTimeshiftState.timeline)
     }
     val visibleSeekPreview = timelineState.previewForTimeline(effectiveTimeshiftState.timeline)
-    val previewId = visibleSeekPreview?.id
-    val onStepAnnounced = remember(timelineState, previewId) {
-        { previewId?.let(timelineState::stepAnnounced); Unit }
-    }
     val nowSec = timelineState.nowEpochSec
-    val aspectRatio = targetAspect.mode
 
     fun dispatchTimeshiftCommand(
         rollbackPlayWhenReady: Boolean? = null,
@@ -561,6 +553,9 @@ fun VideoPlayerScreen(
         notices.post(Notice.PauseUnavailable(reason), notices.context())
     }
 
+    @Composable
+    fun LivePauseNoticeEffect() {
+    val livePauseNotice by playbackRuntime.livePauseNotice.collectAsStateWithLifecycle()
     LaunchedEffect(livePauseNotice) {
         val notice = livePauseNotice ?: return@LaunchedEffect
         // A pause pressed while timeshift was starting was dropped: no grant for this channel.
@@ -568,6 +563,8 @@ fun VideoPlayerScreen(
         layerState.core.chrome.peekBanner()
         playbackRuntime.consumeLivePauseNotice(notice)
     }
+    }
+    LivePauseNoticeEffect()
 
     fun dispatchPlaybackAction(action: MediaPlaybackAction) {
         dispatchTimeshiftPlaybackAction(
@@ -582,6 +579,8 @@ fun VideoPlayerScreen(
     }
 
     // Only Stats for nerds needs full diagnostics.
+    @Composable
+    fun DiagnosticsEffect() {
     val diagnosticsWanted = layerState.core.statsVisible
     DisposableEffect(diagnosticsWanted) {
         videoPlayerViewModel.setDiagnosticsEnabled(diagnosticsWanted)
@@ -589,6 +588,8 @@ fun VideoPlayerScreen(
             if (diagnosticsWanted) videoPlayerViewModel.setDiagnosticsEnabled(false)
         }
     }
+    }
+    DiagnosticsEffect()
 
     var lastPlayedChannelId by remember { mutableStateOf<ChannelId?>(null) }
     // Counts ON_START: each start runs the entry/resume effect below again, even when a
@@ -653,11 +654,7 @@ fun VideoPlayerScreen(
     }
 
     /** Starts [requestToken]'s selection; a newer request supersedes its outcome. */
-    suspend fun runLiveStart(
-        playbackSelection: LivePlaybackSelection,
-        requestToken: Long,
-        requestIntent: Long?,
-    ) {
+    val runLiveStart: suspend (LivePlaybackSelection, Long, Long?) -> Unit = { playbackSelection, requestToken, requestIntent ->
         val startupOwner = startupTarget
         if (startupOwner != null) {
             initialPlaybackSelection = playbackSelection
@@ -824,10 +821,15 @@ fun VideoPlayerScreen(
     }
 
     // Confirmed watch history, newest first, restricted to the current channel scope.
-    val recentChannels = remember(recentChannelIds, channels, currentChannelId) {
+    @Composable
+    fun rememberRecentChannels(): List<Channel> {
+    val recentChannelIds by lastPlayedChannelStore.recentChannelIds.collectAsStateWithLifecycle(emptyList())
+    return remember(recentChannelIds, channels, currentChannelId) {
         recentChannelIds.filter { it != currentChannelId }
             .mapNotNull { id -> channels.firstOrNull { it.id == id } }.take(RecentChannelCount)
     }
+    }
+    val recentChannels = rememberRecentChannels()
 
     fun openChannelDrawer(fromKey: Boolean = false) {
         // The rail reopens on its remembered card; preview that card from the first frame. A card
@@ -895,7 +897,7 @@ fun VideoPlayerScreen(
      * Tunes [channel] from the key that chose it: at once, or [settleMs] after a CH+/- repeat
      * so a burst opens no tuner per press. The newest request supersedes every earlier one.
      */
-    fun tuneChannel(channel: Channel, settleMs: Long = 0L): Boolean {
+    val tuneChannel = fun(channel: Channel, settleMs: Long): Boolean {
         profileTrace("P49:zap:tune-channel:settle:$settleMs:time:${SystemClock.uptimeMillis()}") { }
         val channelId = channel.id
         channelNumberInput = ""
@@ -957,7 +959,7 @@ fun VideoPlayerScreen(
         val channel = channels.firstOrNull { it.id == adjacentId } ?: return false
         // A series' first press tunes at once; its later presses and every repeat settle, so a
         // series tunes its first and its last channel, not one tuner per key press.
-        return tuneChannel(channel, settleMs = zapPacer.settleDelayMs(keyTimeMs, repeat))
+        return tuneChannel(channel, zapPacer.settleDelayMs(keyTimeMs, repeat))
     }
 
     fun tuneEnteredChannel(): Boolean {
@@ -972,20 +974,15 @@ fun VideoPlayerScreen(
         channelNumberCommitted = channel != null
         channelNumberInput = ""
 
-        return channel?.let(::tuneChannel) ?: true
+        return channel?.let { tuneChannel(it, 0L) } ?: true
     }
 
     // The digit timer commits with the list, numbers and session current when it fires,
     // not the ones of the composition that started it.
-    val channelNumberEntryReadiness = ChannelNavigation.entryReadiness(
-        orderedIds = orderedChannelIds,
-        channelNumbers = channelNumbers,
-        enteredNumber = channelNumberInput,
-        playable = { currentLivePlaybackSelection(observation, it) != null },
-    )
     // Set while an entry that named no channel is still shown, after its commit.
     var channelNumberUnknown by remember { mutableStateOf(false) }
-    val channelNumberTarget = remember(channelNumberInput, channels, channelNumberDigits, channelNumberUnknown) {
+    @Composable
+    fun channelNumberTarget() = remember(channelNumberInput, channels, channelNumberDigits, channelNumberUnknown) {
         val channel = ChannelNavigation.idForNumber(orderedChannelIds, channelNumbers, channelNumberInput)
             ?.let { id -> channels.firstOrNull { it.id == id } }
         when {
@@ -998,11 +995,19 @@ fun VideoPlayerScreen(
             else -> ChannelNumberTarget.None
         }
     }
+    // Uptime of the last digit or CH key not yet followed by a recomposition (0 when none).
+    val zapKeyUptime = remember { longArrayOf(0L) }
+    val channelNumberEntryReadiness = ChannelNavigation.entryReadiness(
+        orderedIds = orderedChannelIds,
+        channelNumbers = channelNumbers,
+        enteredNumber = channelNumberInput,
+        playable = { currentLivePlaybackSelection(observation, it) != null },
+    )
+    @Composable
+    fun ChannelNumberEntryEffect() {
     val latestChannelNumberEntryReadiness by rememberUpdatedState(channelNumberEntryReadiness)
     val latestChannelNumberDigits by rememberUpdatedState(channelNumberDigits)
     val latestTuneEnteredChannel by rememberUpdatedState<() -> Unit> { tuneEnteredChannel() }
-    // Uptime of the last digit or CH key not yet followed by a recomposition (0 when none).
-    val zapKeyUptime = remember { longArrayOf(0L) }
     SideEffect {
         val keyUptime = zapKeyUptime[0]
         if (keyUptime != 0L) {
@@ -1045,46 +1050,23 @@ fun VideoPlayerScreen(
         }
     }
 
+    }
+    ChannelNumberEntryEffect()
+
     val nowEvent = remember(observation, currentChannelId, nowSec) {
         observation.eventAt(
             currentChannelId,
             kotlin.time.Instant.fromEpochSeconds(nowSec),
         )
     }
-    val nextEvent = remember(observation, currentChannelId, nowSec) {
-        observation.nextEvent(
-            currentChannelId,
-            kotlin.time.Instant.fromEpochSeconds(nowSec),
-        )
-    }
-    val currentChannel = remember(observation, currentChannelId) {
-        observation.channel(currentChannelId)
-    }
-    val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-        programmeWindow(effectiveTimeshiftState) { observation.eventAt(currentChannelId, it) }
-    } else null
-    val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
-        visibleSeekPreview?.let { preview ->
-            programmeWindow(effectiveTimeshiftState, preview.target, preview.mappingTimeline) {
-                observation.eventAt(currentChannelId, it)
-            }
-        } ?: committedWindow.takeIf { visibleSeekPreview == null }
-    } else null
-    // A slot window (no programme at the position) is an axis only: it has no Next line.
-    val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
-        effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
-    val currentChannelNumber = remember(channels, currentChannelId) {
+    @Composable
+    fun currentChannelNumber() = remember(channels, currentChannelId) {
         ChannelNavigation.numberForId(
             orderedChannelIds,
             channelNumbers,
             currentChannelId,
         )
     }
-    val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
-        committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
-    val detailsChannelId = infoRailChannelId ?: currentChannelId
-    val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
-    val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
     val currentSubscriptionFailure = subscriptionFailure.takeIf { playingLiveChannelId == currentChannelId }
         ?: (playbackState as? AppPlaybackState.Failed)?.subscriptionIssue
     val currentLiveInterrupted = liveInterrupted(
@@ -1135,6 +1117,8 @@ fun VideoPlayerScreen(
         if (!layerState.core.chrome.controlsVisible) numberEntryReturnAction = null
         else if (numberEntryUp) numberEntryReturnAction = lastChromeControl
     }
+    @Composable
+    fun AutoHideEligibility() {
     val autoHideEligible = playerControlsAutoHideEligible(
         PlayerAutoHideContext(
             controlsVisible = layerState.core.chrome.controlsVisible,
@@ -1156,8 +1140,10 @@ fun VideoPlayerScreen(
     SideEffect {
         layerState.core.chrome.updateAutoHideEligibility(autoHideEligible)
     }
-    val chromeState = playerStateCell(paused = livePaused)
-    val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
+    }
+    AutoHideEligibility()
+    @Composable
+    fun StartupOutcome() {
     val initialPresentation = if (startupTarget == null) null else initialPlaybackSelection?.let {
         playbackRuntime.liveTargetPresentation(it, liveIntent)
     }
@@ -1180,6 +1166,12 @@ fun VideoPlayerScreen(
             startupOutcomeDelivered = latestStartupOutcome(target, startupOutcome)
         }
     }
+    }
+    StartupOutcome()
+    val busyBlocked = channelUnavailable || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
+    @Composable
+    fun rememberBusyStatus(): PlayerBusyStatus? {
+    val audioOnly = tracksAudioOnly(rememberPlayerTracks(player))
     // The Banner stays while tuning and hides after the first frame of this tune; only a
     // service whose tracks are positively audio-only lets its playing state stand in.
     val bannerFramePresented = at.bernhardberger.tvhplayer.core.bannerFramePresented(
@@ -1188,7 +1180,6 @@ fun VideoPlayerScreen(
         playing = playbackState is AppPlaybackState.Playing,
         audioOnly = audioOnly,
     )
-    val busyBlocked = channelUnavailable || statusPresentation == PlaybackStatusPresentation.FULL_RECOVERY
     val busyTarget = AppPlaybackTarget.Live(currentChannelId)
     val busyKey = busyTarget to (currentSession to liveRequestToken)
     var tunePresented by remember(busyKey) { mutableStateOf(false) }
@@ -1211,11 +1202,16 @@ fun VideoPlayerScreen(
         bufferingVisible -> PlayerBusyStatus.BUFFERING
         else -> null
     }
-    val compactTuning = tuningVisible && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
     SideEffect {
         layerState.core.chrome.onBannerFramePresented(bannerFramePresented)
         layerState.core.chrome.holdBanner(livePaused)
     }
+    return busyStatus
+    }
+    val busyStatus = rememberBusyStatus()
+    val compactTuning = busyStatus == PlayerBusyStatus.TUNING && statusPresentation == PlaybackStatusPresentation.COMPACT_TUNING
+    @Composable
+    fun ProgrammeChangeBanner() {
     val airingEventId = nowEvent?.id?.value
     var watchedProgramme by remember { mutableStateOf<Pair<ChannelId, Long?>?>(null) }
     LaunchedEffect(currentChannelId, airingEventId) {
@@ -1235,6 +1231,8 @@ fun VideoPlayerScreen(
             )
         ) layerState.onProgrammeChanged()
     }
+    }
+    ProgrammeChangeBanner()
 
     /**
      * Retunes the last live channel. While the session has the channel on screen, its failed
@@ -1329,33 +1327,13 @@ fun VideoPlayerScreen(
     }
     if (contentAllowed) PlayerBackHandler(handlePlaybackBack)
 
-    val unavailableTitle = stringResource(R.string.no_epg)
-    val controlsEvent = infoEvent.takeUnless { channelUnavailable }
-    // During a quick step the Next line follows the step's target programme, so the block keeps its height.
-    val controlsNext = infoNextEvent.takeUnless { channelUnavailable }
-    val chromeContent = PlayerChromeContent(
-        clock = formatClock(nowSec),
-        state = chromeState,
-        info = liveInfoBarData(
-            resources = androidx.compose.ui.platform.LocalContext.current.resources,
-            channelNumber = currentChannelNumber,
-            channelName = currentChannelName,
-            event = controlsEvent,
-            next = controlsNext,
-            nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it) }?.state ==
-                DvrEntryState.SCHEDULED,
-            nowSec = nowSec,
-            unavailableTitle = unavailableTitle,
-        ),
-        recordingNow = currentChannelId in recordingChannelIds,
-        picon = currentChannel?.icon,
-        // The info bar's artwork tile.
-        artwork = controlsEvent?.image,
-        channelId = currentChannelId,
-    )
+    val onPickChannel: (Channel) -> Boolean = { tuneChannel(it, 0L) }
+    val onTogglePause = { dispatchPlaybackAction(MediaPlaybackAction.TOGGLE) }
+    val onSeek: (Long) -> Unit = { queueTimeshiftSeek(it) }
+    val onRecoveryRetry: (PlaybackRetryCommand) -> Unit = { dispatchRecoveryRetry(it) }
 
-    Box(
-        modifier = Modifier
+    @Composable
+    fun playerRootModifier(): Modifier = Modifier
             .fillMaxSize()
             .onPreviewKeyEvent { event ->
                 if (serverWait.consumesKey(event, layerState)) return@onPreviewKeyEvent true
@@ -1537,7 +1515,69 @@ fun VideoPlayerScreen(
             }
             .focusRequester(rootFocus)
             .livePlayerRoot(stringResource(R.string.player_live_tv_surface), contentAllowed)
-    ) { ProvideArtworkSession(currentSession, observation) {
+    val rootModifier = playerRootModifier()
+    @Composable
+    fun PlayerContent() {
+    val dvrEntries = observation.dvrEntries()
+    val recordingChannelIds = remember(dvrEntries) { activeRecordingChannelIds(dvrEntries) }
+    val aspectRatio = targetAspect.mode
+    val previewId = visibleSeekPreview?.id
+    val onStepAnnounced = remember(timelineState, previewId) {
+        { previewId?.let(timelineState::stepAnnounced); Unit }
+    }
+    val chromeState = playerStateCell(paused = livePaused)
+    val nextEvent = remember(observation, currentChannelId, nowSec) {
+        observation.nextEvent(
+            currentChannelId,
+            kotlin.time.Instant.fromEpochSeconds(nowSec),
+        )
+    }
+    val currentChannel = remember(observation, currentChannelId) {
+        observation.channel(currentChannelId)
+    }
+    val committedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+        programmeWindow(effectiveTimeshiftState) { observation.eventAt(currentChannelId, it) }
+    } else null
+    val displayedWindow = if (at.bernhardberger.tvhplayer.BuildConfig.PROGRAMME_WINDOW_B) {
+        visibleSeekPreview?.let { preview ->
+            programmeWindow(effectiveTimeshiftState, preview.target, preview.mappingTimeline) {
+                observation.eventAt(currentChannelId, it)
+            }
+        } ?: committedWindow.takeIf { visibleSeekPreview == null }
+    } else null
+    // A slot window (no programme at the position) is an axis only: it has no Next line.
+    val infoNextEvent = displayedNextEvent(visibleSeekPreview != null, displayedWindow,
+        effectiveTimeshiftState, nextEvent, liveStart, nowEvent) { observation.nextEvent(currentChannelId, it) }
+    val infoEvent = displayedProgrammeEvent(visibleSeekPreview != null, displayedWindow,
+        committedWindow, effectiveTimeshiftState, nowEvent, liveStart)
+    @Composable
+    fun chromeContent(): PlayerChromeContent {
+    val unavailableTitle = stringResource(R.string.no_epg)
+    val controlsEvent = infoEvent.takeUnless { channelUnavailable }
+    // During a quick step the Next line follows the step's target programme, so the block keeps its height.
+    val controlsNext = infoNextEvent.takeUnless { channelUnavailable }
+    return PlayerChromeContent(
+        clock = formatClock(nowSec),
+        state = chromeState,
+        info = liveInfoBarData(
+            resources = androidx.compose.ui.platform.LocalContext.current.resources,
+            channelNumber = currentChannelNumber(),
+            channelName = currentChannelName,
+            event = controlsEvent,
+            next = controlsNext,
+            nextScheduled = controlsNext?.let { observation.dvrEntryForEvent(it) }?.state ==
+                DvrEntryState.SCHEDULED,
+            nowSec = nowSec,
+            unavailableTitle = unavailableTitle,
+        ),
+        recordingNow = currentChannelId in recordingChannelIds,
+        picon = currentChannel?.icon,
+        // The info bar's artwork tile.
+        artwork = controlsEvent?.image,
+        channelId = currentChannelId,
+    )
+    }
+    Box(modifier = rootModifier) { ProvideArtworkSession(currentSession, observation) {
         // A quick step's preview plays inside the Banner; the pending or dispatched seek is its own layer.
         val bannerSeekPreview = visibleSeekPreview?.takeIf {
             foregroundLayer == PlayerForegroundLayer.PENDING_SEEK_PREVIEW ||
@@ -1550,16 +1590,8 @@ fun VideoPlayerScreen(
             layerState.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_DPAD_DOWN)
             if (foregroundLayer != PlayerForegroundLayer.CHANNEL_DRAWER) openChannelDrawer()
         }
-        PlayerPage(
-            railExpanded = layerState.channelRailPresented,
-            nowPlaying = {
-                NowPlayingStrip(currentChannelId, currentChannelNumber?.toString(), currentChannelName, currentChannel?.icon,
-                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec,
-                    playbackIndicator = channelIndicator,
-                    programmeAt = { at -> channelsVm.nowEvent(currentChannelId, at) })
-            },
-            details = null as Unit?,
-            player = { keepControls ->
+        @Composable
+        fun PlayerControls(keepControls: Boolean) {
         // The same availability as the options sheet's quick lists the buttons open.
         val trackButtons = rememberPlayerTrackButtons(
             player, available = !channelFailed && playingLiveChannelId == currentChannelId)
@@ -1578,7 +1610,7 @@ fun VideoPlayerScreen(
                     (layerState.core.chrome.bannerVisible && chromeLayer == PlayerForegroundLayer.NONE)),
                 stepPreview = bannerSeekPreview != null,
             ),
-            content = chromeContent,
+            content = chromeContent(),
             timeline = PlayerChromeTimeline.Live(
                 timeshift = visibleSeekPreview?.let {
                     projectedTimeshiftState(effectiveTimeshiftState, it.decision.targetMs)
@@ -1623,13 +1655,9 @@ fun VideoPlayerScreen(
             panelOpen = chromePanelOpen,
             numberEntryShown = numberEntry.isNotEmpty(),
             modifier = Modifier.align(Alignment.BottomCenter),
-            onTogglePause = {
-                dispatchPlaybackAction(MediaPlaybackAction.TOGGLE)
-            },
+            onTogglePause = onTogglePause,
             onPauseUnavailable = { showPauseUnavailable() },
-            onSeek = { deltaMs ->
-                queueTimeshiftSeek(deltaMs)
-            },
+            onSeek = onSeek,
             onCommitSeek = timelineState::commitPendingSeek,
             onStop = stopAndClose,
             onInfo = {
@@ -1674,7 +1702,7 @@ fun VideoPlayerScreen(
                     nowSec = railNowSec,
                     nowEvent = { id -> observation.eventAt(id, kotlin.time.Instant.fromEpochSeconds(railNowSec)) },
                     onFocusChannel = { selectedId = it },
-                    onPickChannel = { tuneChannel(it) },
+                    onPickChannel = { onPickChannel(it) },
                     onClose = { keyCode ->
                         if (keyCode != null) layerState.core.beginOpeningKeyCycle(keyCode)
                         layerState.dismissChannelDrawer()
@@ -1687,11 +1715,11 @@ fun VideoPlayerScreen(
                         layerState.openInfo()
                     },
                     active = foregroundLayer == PlayerForegroundLayer.CHANNEL_DRAWER,
-                    channelsTitle = channelsTitle,
+                    channelsTitle = channelsTitle(),
                 )
             } },
             trayBleeds = recentChannels.isNotEmpty(),
-            header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle) },
+            header = { PlayerChannelBrowserHint(channelBrowser, recentChannels.isNotEmpty(), channelsTitle()) },
             preview = {
                 val previewChannel = channels.firstOrNull { it.id == selectedId }
                 QuickZapTrayPreview(previewChannel,
@@ -1716,12 +1744,27 @@ fun VideoPlayerScreen(
             modifier = Modifier.align(Alignment.BottomStart).padding(playerHiddenChipPadding()),
         )
 
+        }
+        PlayerPage(
+            railExpanded = layerState.channelRailPresented,
+            nowPlaying = {
+                NowPlayingStrip(currentChannelId, currentChannelNumber()?.toString(), currentChannelName, currentChannel?.icon,
+                    channelsVm.nowEvent(currentChannelId, nowSec), nowSec,
+                    playbackIndicator = channelIndicator(),
+                    programmeAt = { at -> channelsVm.nowEvent(currentChannelId, at) })
             },
+            details = null as Unit?,
+            player = { keepControls -> PlayerControls(keepControls) },
         ) { }
+        @Composable
+        fun PlayerPanels() {
+        val detailsChannelId = infoRailChannelId ?: currentChannelId
+        val detailsChannel = channels.firstOrNull { it.id == detailsChannelId }
+        val detailsBaseEvent = if (infoRailChannelId == null) infoEvent else channelsVm.nowEvent(detailsChannelId, nowSec)
         if (layerState.scheduleOpen) PlayerChannelSchedule(
             layerState, currentChannelId, currentChannel, observation, { session.observation.value }, nowSec, effectiveTimeshiftState,
             dvrMutationActions, notices, scope, uiSettingsStore, onReconnect,
-            onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
+            onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(onPickChannel) },
             onPlayRecording = onPlayRecording, onShowGuide = onShowGuide,
             connectionUiState = connectionUiState, session = session,
         )
@@ -1731,7 +1774,7 @@ fun VideoPlayerScreen(
                 currentObservation = { session.observation.value }, nowSec = nowSec,
                 mutations = dvrMutationActions, notices = notices, mutationScope = scope,
                 settingsStore = uiSettingsStore,
-                onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(::tuneChannel) },
+                onPlay = { id, _ -> channels.firstOrNull { it.id == id }?.let(onPickChannel) },
                 onShowGuide = onShowGuide, onClose = ::closeInfo,
                 onBackKeyDown = { layerState.core.beginOpeningKeyCycle(AndroidKeyEvent.KEYCODE_BACK) },
                 onPlayRecording = onPlayRecording,
@@ -1783,10 +1826,13 @@ fun VideoPlayerScreen(
             )
         }
 
+        }
+        PlayerPanels()
+
         PlayerTopIdentitySlot {
             ChannelNumberOverlay(
                 number = numberEntry,
-                target = channelNumberTarget,
+                target = channelNumberTarget(),
                 maxDigits = channelNumberDigits,
                 settles = channelNumberCommitted,
             )
@@ -1803,11 +1849,13 @@ fun VideoPlayerScreen(
         LivePlayerAlertOverlay(
             visible = foregroundLayer == PlayerForegroundLayer.RECOVERY && serverWait.presentation == null,
             alert = livePlayerAlert(connState, playbackState, channelCondition),
-            onRetry = ::dispatchRecoveryRetry,
+            onRetry = onRecoveryRetry,
             onConnectionSettings = serverWait::openConnectionSettings,
             onClose = playerClose::close,
         )
     } }
+    }
+    PlayerContent()
 }
 
 private fun SessionObservation.dvrEntries(): List<DvrEntry> =

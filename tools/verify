@@ -116,6 +116,7 @@ fi
 
 aapt=""
 zipalign=""
+dexdump=""
 for candidate in \
     "$ANDROID_HOME/build-tools/36.0.0" \
     "$ANDROID_HOME/build-tools/35.0.0"; do
@@ -125,6 +126,21 @@ for candidate in \
         break
     fi
 done
+for candidate in "$ANDROID_HOME/build-tools/36.0.0/dexdump" "$ANDROID_HOME/build-tools/35.0.0/dexdump"; do
+    if [[ -x "$candidate" ]]; then
+        dexdump="$candidate"
+        break
+    fi
+done
+if [[ -z "$dexdump" ]] && command -v dexdump >/dev/null 2>&1; then
+    dexdump="$(command -v dexdump)"
+fi
+if [[ -z "$dexdump" ]]; then
+    printf 'error: dexdump is required in Android build-tools or PATH\n' >&2
+    exit 1
+fi
+printf '==> App dex register limit\n'
+python3 tools/check_dex_registers.py "$apk" --dexdump "$dexdump"
 if [[ -z "$aapt" ]] && command -v aapt >/dev/null 2>&1 && command -v zipalign >/dev/null 2>&1; then
     aapt="$(command -v aapt)"
     zipalign="$(command -v zipalign)"

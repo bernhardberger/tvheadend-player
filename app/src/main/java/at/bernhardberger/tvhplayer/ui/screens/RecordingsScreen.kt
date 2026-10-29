@@ -829,6 +829,8 @@ internal fun RecordingsScreenContent(
         }
     }
 
+    @Composable
+    fun RecordingDetails() {
     // Refresh metadata only within the opening session. Never substitute a colliding ID
     // from a later session, including while a captured confirmation is pending.
     val selectedCapability = detailsObservation?.currentSession
@@ -878,7 +880,8 @@ internal fun RecordingsScreenContent(
     }
     if (opened != null) {
         val nowSec = at.bernhardberger.tvhplayer.ui.common.rememberDetailsEpochSeconds(nowSecProvider)
-        if (showResumeChoice) {
+        @Composable
+        fun ResumeChoice() {
             val closeBehindPlayer = rememberCloseBehindPlayer()
             val resources = androidx.compose.ui.platform.LocalContext.current.resources
             val channel = opened.channelId?.let(channelsById::get)
@@ -952,6 +955,9 @@ internal fun RecordingsScreenContent(
                     Text(stringResource(R.string.context_start_over), maxLines = 1, softWrap = false)
                 }
             }
+        }
+        if (showResumeChoice) {
+            ResumeChoice()
         } else {
         val closeBehindPlayer = rememberCloseBehindPlayer()
         val entryPending = at.bernhardberger.tvhplayer.ui.rememberPlayerEntryPending()
@@ -1193,6 +1199,10 @@ internal fun RecordingsScreenContent(
             },
         )
     }
+    }
+    RecordingDetails()
+    @Composable
+    fun FolderMenu() {
     folderMenu?.let { menu ->
         // The menu acts with the session it opened in, on the folder as it is now.
         val session = menu.session.takeIf { observation.currentSession === it }
@@ -1271,6 +1281,8 @@ internal fun RecordingsScreenContent(
             )
         }
     }
+    }
+    FolderMenu()
     }
 }
 

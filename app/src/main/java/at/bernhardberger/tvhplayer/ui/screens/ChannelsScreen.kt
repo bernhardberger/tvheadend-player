@@ -647,6 +647,8 @@ internal fun ChannelsScreenContent(
         if (scopeEntryRequested && initialFocusEnabled) focusBrowseContent()
     }
 
+    @Composable
+    fun ChannelBrowseContent() {
     val detailsLayering = at.bernhardberger.tvhplayer.ui.components.LocalBrowseContentLayering.current
     Box(
         Modifier
@@ -676,6 +678,8 @@ internal fun ChannelsScreenContent(
                 )
             }
         }
+        @Composable
+        fun BrowseColumn() {
         Column(
             Modifier
                 .fillMaxSize()
@@ -688,6 +692,8 @@ internal fun ChannelsScreenContent(
                 .focusProperties { onEnter = { enterFromNavigation() } }
                 .focusGroup()
         ) {
+            @Composable
+            fun Header() {
             ChannelsHeader(
                 // The destination is the header's pane title; the Tags button shows the active group.
                 title = stringResource(R.string.nav_channels),
@@ -716,6 +722,8 @@ internal fun ChannelsScreenContent(
                     end = maxOf(endPadding, TvBrowseTrailingInset),
                 ),
             )
+            }
+            Header()
             // What the list layout shows below the header instead of beside it keeps the header's band.
             val listHeaderBand = if (layout == ChannelsLayout.LIST) TvBrowseHeaderHeight + ChannelsHeaderGap else 0.dp
             Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -1048,6 +1056,11 @@ internal fun ChannelsScreenContent(
             }
         }
     }
+    BrowseColumn()
+    }
+    }
+    ChannelBrowseContent()
+
     contextChannelId?.let { channelId ->
         ChannelContextMenu(
             mutationScope = coroutineScope,
