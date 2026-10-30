@@ -455,12 +455,15 @@ slots imply a phone app.
   instructions**
   (<https://support.google.com/googleplay/android-developer/answer/15748846>).
   The exact option labels aren't on the page.
-- **Answer:** functionality is restricted; paste the [reviewer
-  instructions](#51-reviewer-instructions) into **Any other instructions**, with
-  the video link.
-- **Evidence:** the app needs the user's own Tvheadend server; without one it
-  stays on setup. Google's page doesn't say a video can stand in for access.
-  See [risk 1](#7-open-risks).
+- **Answer (saved 2026-10-30):** **Yes**, part of the app is restricted. One
+  set, "Demo server reviewer account", with the review server's reviewer
+  username and password in their own fields, the [reviewer
+  instructions](#51-reviewer-instructions) in **Any other information**, and
+  "provide full access to all the features" ticked.
+- **Evidence:** the app needs a Tvheadend server; without one it stays on
+  setup. The review server (homelab `docs/operator/tvh-review.md`) is reachable
+  at all times from anywhere and its account doesn't expire. Credentials live
+  only in Console and the homelab private store, never in this repository.
 
 ### 4.5 Content rating (IARC questionnaire)
 
@@ -597,28 +600,32 @@ See [owner decisions](#8-owner-decisions).
 
 ### 5.1 Reviewer instructions
 
-**Sign-in details → Add details** has one free-text field, "Any other
-information required to access your app", limited to 500 characters, and
-reviewers can't contact you. Paste this there (470 characters plus the video
-link):
+**Sign-in details → Add details** has a name, username and password fields, and
+one free-text field, "Any other information required to access your app",
+limited to 500 characters; reviewers can't contact you. Saved 2026-10-30 (459
+characters):
 
 ```text
-Tvheadend Player is a client for Tvheadend, open-source TV server software that people run on their own hardware. The app has no content or account of its own: it needs the user's own Tvheadend server (4.3 with HTSP 36 or newer) on their network. We don't run a public server, because it would put live TV on the internet unencrypted. This video shows every screen of version 0.3.0 (162) on Google TV with a server: <VIDEO URL>
-Without a server, the app stays on its setup screens.
+Tvheadend Player is a client for Tvheadend, TV server software that users self-host on their local network. The app has no content or accounts of its own, so we run a demo server for review.
+
+To sign in:
+- Welcome screen: select Continue
+- Server address: tvh-demo.bernhardberger.at
+- Port: 19982
+- Enter the username and password above, then Connect
+
+The server has two channels with open movies, a guide and recordings. Its account can record and play them.
 ```
 
 The longer text below is for an appeal or a reply to a rejection (replace the
-two placeholders):
+placeholder):
 
 ```text
-Tvheadend Player is a client for Tvheadend, free and open-source TV server software that people run on their own hardware, such as a PC or NAS with a TV tuner. The app has no content, service or account of its own. Like an email app needs a mail server, it needs the user's own Tvheadend server on their network.
+Tvheadend Player is a client for Tvheadend, free and open-source TV server software that users self-host on their local network, such as a PC or NAS with a TV tuner. The app has no content, service or account of its own. Like an email app needs a mail server, it needs a Tvheadend server.
 
-We don't operate a public server for review: it would put an unencrypted streaming server with live TV on the internet. Instead, this video shows every screen and feature of this exact version (0.3.0, version code 162) on a Google TV device connected to a Tvheadend server:
-<VIDEO URL>
+For review we run a demo server at tvh-demo.bernhardberger.at, port 19982, with the username and password given in Sign-in details. It has two channels playing open movies (Big Buck Bunny, Sintel), a program guide, recordings, and an account that can record and play them.
 
-To try it with your own server: install Tvheadend 4.3 (it must speak HTSP 36 or newer) on the same network as the TV, open the app, pick the server the search finds or enter its address and port 9982, enter a Tvheadend username and password, and select Connect.
-
-Without a server, the app opens on its setup screens, where the D-pad, Back and the error messages can be checked.
+To sign in: on the Welcome screen select Continue, enter the server address and port, select Continue, enter the username and password, and select Connect.
 
 Questions: <CONTACT EMAIL>
 ```
@@ -733,12 +740,10 @@ one updates the other.
    that if a password expires "we may not be able to review your app and,
    therefore, the app may be rejected"
    (<https://support.google.com/googleplay/android-developer/answer/15748846>).
-   Nothing on the page says a video replaces access. A rejection under App
-   access is the likeliest outcome. What I'd do: submit with the instructions
-   and the video as planned, and if Google rejects, reply through the appeal
-   with the server explanation once. If that fails, the roadmap's fallback is a
-   server run only during review windows; it needs your approval and puts an
-   unhardened server and plaintext HTSP on the internet.
+   Resolved 2026-10-30 with an always-on review server (homelab
+   `docs/operator/tvh-review.md`): isolated VM, two open-movie channels, a
+   non-admin account with stream and bitrate caps. What remains: the server must
+   stay up for every review, and HTSP to it is plaintext (risk 3).
 2. **No privacy policy inside the app.** "Have a valid privacy policy in both
    the app's store listing and within the app itself"
    (<https://support.google.com/googleplay/android-developer/answer/10144311>);
@@ -809,14 +814,19 @@ one updates the other.
 2. Feature graphic: decided, `final.png` (3.0).
 3. Contact email for Console, store settings and reviewer instructions (it's
    shown on the store listing).
-4. Data safety: answer A or B (4.7). Recommendation: B.
+4. Data safety: decided, B, saved 2026-10-30 (4.7). Accounts answer: users sign
+   in with accounts made outside the app, "Other": "Users sign in with an
+   account on their local Tvheadend server, which they create themselves in
+   Tvheadend's web interface. The developer runs no accounts." Deletion request
+   question left blank (optional).
 5. In-app privacy policy: build a 0.3.1 with a Privacy policy row before
    submitting, or submit 0.3.0 and fix after a rejection (risk 2).
    Recommendation: 0.3.1 first.
 6. Demo video host (unlisted YouTube or other) and which channels to show (5.2).
 7. Phone screenshots: none; Android TV form factor added, two TV screenshots in the 10-inch tablet slot (3.0).
-8. Target audience 13–15, 16–17 and 18 and over (4.6) and category Video Players & Editors
-   (1.4): confirm.
+8. Target audience: decided, 13–15, 16–17 and 18 and over, saved 2026-10-30
+   (4.6); Console warned the Families policy applies where teens count as
+   children. Category Video Players & Editors (1.4).
 9. Testers: email list or Google Group (1.7), and where the invite asks people
    to send their address (6.1).
 10. S9: accepted 2026-10-29, recorded in `product-identity-plan.md`.
