@@ -176,14 +176,18 @@ From <https://support.google.com/googleplay/android-developer/answer/9845334>:
    Tvheadend users are everywhere. The general testing page says additional
    closed tracks may not offer country targeting, which is one more reason to
    use the first one.
-3. **Testers:** an email list (`Tvheadend Player testers`) for people who send
-   you their Google account address, or a Google Group they join themselves.
-   Google Group members must join the group before opting in. Limits: 200 lists,
-   2,000 users per list, 50 lists per track.
+3. **Testers:** the Testers tab is a choice between **Email lists** and
+   **Google Groups**, not both. We use the Google Group
+   `tvheadend-player-testers@googlegroups.com`
+   (<https://groups.google.com/g/tvheadend-player-testers>): anyone can join,
+   members can post, and only managers see the member list. Members must join
+   the group before opting in.
 4. **Feedback URL or email:** `https://github.com/bernhardberger/tvheadend-player/issues`.
-5. Copy the opt-in link. "Each tester needs to opt in using the link."
+5. Opt-in link: <https://play.google.com/apps/testing/at.bernhardberger.tvhplayer>.
+   "Each tester needs to opt in using the link."
 6. **Create new release:** upload the AAB from [What gets uploaded](#what-gets-uploaded).
-   Release name: `0.3.0 (162)`. Paste both release notes from
+   Submitted as `0.3.2 (164)` on the track Closed testing - Alpha, all 179
+   countries and regions. Paste both release notes from
    [section 2.3](#23-release-notes). If Console offers an upload for the
    deobfuscation (R8 mapping) file, use the Play mapping from the same directory.
 7. **Save**, then **Review release**. Read every error and warning before going
@@ -195,6 +199,10 @@ From <https://support.google.com/googleplay/android-developer/answer/9845334>:
 hours or up to seven days (or longer in exceptional cases)"
 (<https://support.google.com/googleplay/android-developer/answer/9859654>). The
 closed-test release is reviewed, including the Android TV review from 1.6.
+
+Sent 2026-10-30: 16 changes (listing, app content, TV opt-in, Alpha track with
+0.3.2 (164)). Managed publishing is off, so the closed test opens to group
+members as soon as Google approves.
 
 ### 1.9 After approval
 
@@ -687,29 +695,35 @@ You need:
 - your own Tvheadend server that speaks HTSP 36 or newer (a recent 4.3 build)
 - the Google account that's signed in on your TV
 
-If you'd like to help, send me that Google account's email address [by private message / by email to tvhplayer@bernhardberger.at], and I'll add you and send you the link. Please stay opted in for the 14 days and keep the app installed; use it like you normally would. Bugs and ideas are welcome as GitHub issues or as private feedback in the Play Store.
+If you'd like to help:
+1. Join the testers group with that Google account: https://groups.google.com/g/tvheadend-player-testers
+2. Opt in to the test: https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
+3. Install Tvheadend Player on your TV from the Play Store.
+
+Please stay opted in for the 14 days and keep the app installed; use it like you normally would. Bugs and ideas are welcome as GitHub issues (https://github.com/bernhardberger/tvheadend-player/issues), as posts in the group, or as private feedback in the Play Store.
 
 Thanks!
 ```
 
 ### 6.2 Tester instructions
 
-Sent with the opt-in link:
+Posted in the group as a welcome message:
 
 ```text
 Thanks for testing Tvheadend Player.
 
-1. Open this link on a phone or computer signed in with the same Google account as your TV, and select "Become a tester": <OPT-IN LINK>
-2. Install the app on your TV from the Play Store (still signed in with that account). The app doesn't show up in Play search yet, so use the link from step 1.
-3. Please stay opted in for at least 14 days in a row and keep the app installed. If you leave the test, your days stop counting, so please don't opt out and back in.
-4. Feedback: open an issue at https://github.com/bernhardberger/tvheadend-player/issues, or leave private feedback on the app's Play Store page. Only I can read the private feedback.
+1. Join this group with the same Google account that's signed in on your TV (you're here if you can read this).
+2. Open this link on a phone or computer signed in with that account, and select "Become a tester": https://play.google.com/apps/testing/at.bernhardberger.tvhplayer
+3. Install the app on your TV from the Play Store (still signed in with that account). The app doesn't show up in Play search yet, so use the link from step 2.
+4. Please stay opted in for at least 14 days in a row and keep the app installed. If you leave the test, your days stop counting, so please don't opt out and back in. Leaving the group also removes you from the test.
+5. Feedback: open an issue at https://github.com/bernhardberger/tvheadend-player/issues, post in this group, or leave private feedback on the app's Play Store page. Only I can read the private feedback.
 
 If you have the GitHub APK installed, the Play version installs over it, and a newer GitHub APK installs over the Play version.
 ```
 
-Step 2 isn't documented by Google for TVs; check it with your own account
-first (1.9) and adjust the text. The last paragraph holds only once Play App
-Signing uses our key (1.2).
+Step 3 isn't documented by Google for TVs; check it with your own account
+first (1.9) and adjust the text. The last paragraph holds: Play App Signing
+uses our key (SHA-256 checked in Console 2026-10-30, 1.2).
 
 ### 6.3 Draft "Beta testing" section for README.md
 
@@ -724,10 +738,12 @@ developer publish an app, at least 12 testers have to stay in the test for 14
 days in a row, and I'd be glad if you joined.
 
 You need an Android TV or Google TV device and your own Tvheadend server.
-Send the email address of the Google account on your TV to <CONTACT>, and I'll
-add you and send you the link. Please stay in the test for the 14 days.
-Feedback goes to [GitHub issues](https://github.com/bernhardberger/tvheadend-player/issues)
-or to the private feedback in the Play Store.
+With the Google account on your TV, join the
+[testers group](https://groups.google.com/g/tvheadend-player-testers), then
+[opt in to the test](https://play.google.com/apps/testing/at.bernhardberger.tvhplayer)
+and install the app from the Play Store. Please stay in the test for the 14
+days. Feedback goes to [GitHub issues](https://github.com/bernhardberger/tvheadend-player/issues),
+the group, or the private feedback in the Play Store.
 
 The Play version and the GitHub APKs are signed with the same key, so either
 one updates the other.
@@ -827,6 +843,7 @@ one updates the other.
 8. Target audience: decided, 13–15, 16–17 and 18 and over, saved 2026-10-30
    (4.6); Console warned the Families policy applies where teens count as
    children. Category Video Players & Editors (1.4).
-9. Testers: email list or Google Group (1.7), and where the invite asks people
-   to send their address (6.1).
+9. Testers: decided, Google Group tvheadend-player-testers, feedback URL GitHub
+   issues (1.7); people join the group and opt in themselves (6.1). Sent for
+   review 2026-10-30 (1.8).
 10. S9: accepted 2026-10-29, recorded in `product-identity-plan.md`.
