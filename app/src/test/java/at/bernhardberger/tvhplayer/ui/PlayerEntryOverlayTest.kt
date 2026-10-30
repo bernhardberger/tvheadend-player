@@ -256,6 +256,8 @@ class PlayerEntryOverlayTest {
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        key(Key.DirectionUp)
         compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
         key(Key.DirectionCenter)
         compose.waitUntil(10_000) { playerVisible }
@@ -288,6 +290,8 @@ class PlayerEntryOverlayTest {
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        key(Key.DirectionUp)
         compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
 
         unconsumedCenterUps = 0
@@ -306,15 +310,16 @@ class PlayerEntryOverlayTest {
             assertEquals(epoch, runtime.videoPresentation.value.epoch)
         }
 
-        // Back does not depend on the way in: Channels again, drawer closed, on the playing channel.
+        // Back does not depend on the way in. Up from Channels to the slot passes Home, and the open
+        // drawer switches to it, so Back lands on Home with the drawer closed.
         assertEquals(backsToLeave, leavePlayer())
         assertEquals(80f, drawerWidth(), .5f)
-        compose.onNodeWithTag("channel-row-1").assertIsFocused()
+        assertEquals(HomeKey, shellStack().last())
     }
 
     // A recording player's exit only pops back to the destination that was showing. Up from
-    // Recordings to the slot has already switched the shell to Channels, so Back lands there.
-    @Test fun railSlotOnTheRemoteReturnsToTheRecordingAndBackToTheChannelsTheDrawerSwitchedTo() {
+    // Recordings to the slot has already switched the shell to Home, so Back lands there.
+    @Test fun railSlotOnTheRemoteReturnsToTheRecordingAndBackToTheDestinationTheDrawerSwitchedTo() {
         recordingRow()
         val bindings = session.calls.count { it == FakeSessionCall.BIND_RECORDING_PLAYBACK }
         val selection = runtime.recordingSelection.value
@@ -325,15 +330,17 @@ class PlayerEntryOverlayTest {
         compose.onNodeWithTag("recording-list-entry-7").assertIsFocused()
         key(Key.DirectionLeft)
         compose.onNodeWithTag("nav-recordings").assertIsFocused()
-        // The slot is the first stop above the destinations, so Up passes Guide and Channels first,
+        // The slot is the first stop above the destinations, so Up passes Guide, Channels and Home first,
         // and the open drawer switches to each destination it focuses on the way.
         key(Key.DirectionUp)
         compose.onNodeWithTag("nav-epg").assertIsFocused()
         key(Key.DirectionUp)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
         key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-home").assertIsFocused()
+        key(Key.DirectionUp)
         compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
-        assertEquals(ChannelsKey, shellStack().last())
+        assertEquals(HomeKey, shellStack().last())
 
         unconsumedCenterUps = 0
         compose.onRoot().performKeyInput { keyDown(Key.DirectionCenter) }
@@ -353,10 +360,9 @@ class PlayerEntryOverlayTest {
         }
 
         assertEquals(backsToLeave, leavePlayer())
-        assertEquals(listOf(HomeKey, RecordingsKey, GuideKey, ChannelsKey), shellStack())
+        assertEquals(listOf(RecordingsKey, GuideKey, ChannelsKey, HomeKey), shellStack())
         assertEquals(80f, drawerWidth(), .5f)
         compose.onNodeWithTag("recording-list-entry-7").assertDoesNotExist()
-        compose.onNodeWithTag("channel-row-1").assertIsFocused()
     }
 
     private fun shellStack(): List<AppNavKey> = compose.runOnIdle {
@@ -380,6 +386,8 @@ class PlayerEntryOverlayTest {
         compose.onNodeWithTag("nav-epg").assertIsFocused()
         key(Key.DirectionUp)
         compose.onNodeWithTag("nav-channels").assertIsFocused()
+        key(Key.DirectionUp)
+        compose.onNodeWithTag("nav-home").assertIsFocused()
         key(Key.DirectionUp)
         compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
         key(Key.DirectionCenter)
@@ -446,6 +454,8 @@ class PlayerEntryOverlayTest {
         if (from == "rail") {
             key(Key.DirectionLeft)
             compose.onNodeWithTag("nav-channels").assertIsFocused()
+            key(Key.DirectionUp)
+            compose.onNodeWithTag("nav-home").assertIsFocused()
             key(Key.DirectionUp)
             compose.onNodeWithTag("global-drawer-now-playing-fullscreen").assertIsFocused()
             // Capture the pressed button that leaves on release, not its unpressed size.
