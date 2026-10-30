@@ -104,6 +104,8 @@ empty heading or placeholder:
   under the usual browse scrim and no artwork backdrop is drawn, as in Channels
   (`ChannelsImmersiveList.kt`, `LocalWarmPlayback`). Cards keep their artwork.
 - **No On now/Primetime tabs in phase 1.** This row shows On now content.
+- Programme artwork and title lead; channel identity, broadcast time and progress
+  are supporting information.
 - Geometry and motion follow [3.3.1](#331-immersive-row-reference), which is
   measured from Google's guidance, not interpreted.
 
@@ -157,19 +159,53 @@ differences and are approximate (±1 frame of 17 ms).
   100–130 ms; settled by about 350 ms.
 - The row above shows its focused card's title under the card.
 
-**Not shown in the videos:** leaving the immersive row downward to the row below
-(on Home, the genre row) and entering it from below. Rule for Home: the same
-transitions mirrored. Down collapses the immersive row in place (background and
-content block fade out, heading returns, row dims) while the row below moves up
-into the focus position; Up from below reverses it. The owner confirms this with
-the mockup.
+**Device reference, all four directions.** The videos don't show the row below,
+so the remaining transitions were measured on the G10's own Google TV home
+screen (2026-10-30, `screenrecord` 1280×720, variable frame rate, about 60 fps
+during motion). Its immersive row is "Top picks for you": a hero carousel above
+it, ordinary rows ("Your apps", then poster rows) below. Durations run from the
+first changed frame; positions are dp on the 960×540 canvas. Recording and frame
+sheets: `build/reference/immersive-list/g10/` (ignored).
 
-**Checks a capture or review must pass:** the immersive row doesn't jump to the
-top of the screen on entry; the row above disappears by fading and sliding, not
-by a page scroll; no frame shows the background without the content block or
-the reverse; Left/Right keeps the focused card at the start position.
-- Programme artwork and title lead; channel identity, broadcast time and progress
-  are supporting information.
+The rule that ties all four together: **the expanded immersive row has one fixed
+slot** (its cards at about 356 dp, background top right, content block above),
+and **an ordinary focused row has the top slot** (heading at about 76 dp, the row
+above peeking dimmed at the top edge). Each move scrolls the page by whatever
+distance puts the newly focused row into its slot. The immersive row never
+collapses in place while the rest of the page stays still.
+
+- **Down into it from above** (G10, from the hero): the page scrolls up about
+  140 dp until the cards sit in the slot (row from about 496 to 356 dp, in place
+  after about 200 ms). The hero's text fades out while moving up (gone after about
+  170 ms), the background crossfades, the content block fades in from about
+  230 ms and is opaque by about 300–370 ms; the facts line appears last. Settled
+  after about 470 ms. In Google's video the row above is an ordinary row and the
+  row was already almost in its slot, which is why it moved only about 20 dp
+  there.
+- **Down out of it to the row below:** in the first frame (about 35 ms) the
+  content block is gone and the immersive row starts to fade and move up. The page
+  scrolls the next row from the bottom peek (heading about 480 dp) to the top slot
+  (about 76 dp), decelerating, in place after about 370 ms. The collapsed former
+  immersive row ends dimmed, peeking at the top edge. The background fades to the
+  plain page background, gone after about 450 ms. Settled after about 480 ms.
+- **Up into it from the row below:** the reverse. The page scrolls the row below
+  from the top slot back down to the bottom peek (heading about 478 dp); the
+  background starts fading in after about 50 ms, the content block fades in
+  between about 150 and 300 ms. Settled after about 450 ms.
+- **Up out of it to the row above** (G10, to the hero): the page scrolls down,
+  the hero text comes in from the top, the cards move back to about 500 dp, and
+  the background crossfades from about 250 ms. Settled after about 550 ms.
+
+On Home the row below is the genre row, so Down from On now uses the
+"Down out of it" transition: genres take the top slot, On now collapses to a
+dimmed row at the top edge, and the background fades out.
+
+**Checks a capture or review must pass:** entering the immersive row puts its
+cards in the fixed slot, never at the top of the screen; leaving it downward
+scrolls the next row to the top slot and leaves the collapsed row peeking at the
+top edge; no frame shows the background without the content block or the
+reverse, apart from the first frame of leaving downward, where the content block
+goes first; Left/Right keeps the focused card at the start position.
 
 ### 3.4 Browse by genre
 
